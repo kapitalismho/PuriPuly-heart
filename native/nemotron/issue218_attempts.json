@@ -1,0 +1,94 @@
+{
+  "schema": "issue218-execution-attempts-1",
+  "baseline_candidate": "ea488774c3d1a89b92130b862d2d4102c91c1349",
+  "git_or_product_mutations": false,
+  "attempts": [
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue215_smoke.py --mode new --profile 1.04 --cases clean_A_B,distinct_repeated_A_B_A,six_second_rollover,linguistic_correction --output native/nemotron/issue218_qualification_cpu.json",
+      "result": "exit0; actual current unpadded CPU-ASR/Vulkan Nemotron source-only qualification; returning A becomes Yeah., long continuation tail omitted, all-gray attribution",
+      "wall_seconds": 38.24,
+      "classification": "actual acoustic qualification negative, not E2E"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route cpu --cases clean_A_B,distinct_repeated_A_B_A,six_second_rollover,linguistic_correction --repetitions 1 --output native/nemotron/issue218_cpu_initial",
+      "result": "exit1 before inference; task-driver selected nonexistent source_language manifest key; StopIteration",
+      "wall_seconds": 1.09,
+      "classification": "driver-only setup error; corrected to locale; not product/model failure"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route cpu --cases clean_A_B,distinct_repeated_A_B_A,six_second_rollover,linguistic_correction --repetitions 1 --output native/nemotron/issue218_cpu_initial",
+      "result": "exit0; twelve actual end-to-end case observations across matched baseline/1.04/0.64; real managed Gemma effective Vulkan; real current Flet renderer; all source translations terminal translated",
+      "wall_seconds": 126.70,
+      "classification": "actual E2E measured; executed is not quality acceptance"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_summarize.py --trace native/nemotron/issue218_cpu_initial/trace.json --output native/nemotron/issue218_cpu_initial_summary.json",
+      "result": "exit1; analyzer assumed source_audio_ranges field on serialized SourceChild, which instead stores source_ranges/context_ranges in origins",
+      "classification": "analysis-only schema error; corrected using observed actual schema; no workload/model failure"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route gpu --cases clean_A_B,distinct_repeated_A_B_A,six_second_rollover,linguistic_correction,short_A_B_A,korean_read,japanese_read,synthetic_overlap --repetitions 2 --output native/nemotron/issue218_gpu_rotated",
+      "result": "exit1; actual GPU-worker discovery worked but task-driver exact device-name equality found no entry; no ASR activation/inference; Gemma/actual renderer started and closed normally",
+      "wall_seconds": 11.97,
+      "classification": "driver-only device selection error, not missing GPU model; corrected to explicit registry_index0; raw failed trace retained"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_summarize.py --trace native/nemotron/issue218_cpu_initial/trace.json --output native/nemotron/issue218_cpu_initial_summary.json",
+      "result": "exit0; actual initial trace analyzed without new inference",
+      "classification": "offline evidence analysis"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route gpu --cases clean_A_B,distinct_repeated_A_B_A,six_second_rollover,linguistic_correction,short_A_B_A,korean_read,japanese_read,synthetic_overlap --repetitions 2 --output native/nemotron/issue218_gpu_rotated_v2",
+      "result": "exit0;48 actual E2E observations,92ASR/92real Gemma Vulkan translations; all gray; exact alternate GPU artifact/current worker compatible",
+      "wall_seconds": 609.37
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route cpu --cases clean_A_B,distinct_repeated_A_B_A,six_second_rollover,linguistic_correction,short_A_B_A,synthetic_overlap --repetitions 1 --rotation-offset 1 --output native/nemotron/issue218_cpu_rotated_readback",
+      "result": "exit0;18actual rotated E2E observations/25translations; core negative reproduced; timely owned readbacks",
+      "wall_seconds": 185.91
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route gpu --cases clean_A_B --repetitions 1 --rotation-offset 2 --output native/nemotron/issue218_gpu_readback",
+      "result": "exit0;3actual E2E observations solely concrete renderer correlation/5ASR+translation calls;0.64cold dispatch delayed;1.04warm near-end pixels",
+      "wall_seconds": 34.72
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_experiment.py --route gpu --cases distinct_repeated_A_B_A --repetitions 1 --rotation-offset 2 --output native/nemotron/issue218_gpu_aba_readback",
+      "result": "exit0;3actual E2E observations solely longer positive renderer opportunity/10ASR+translation calls; useful A pixels before enclosing six-second end on both profiles",
+      "wall_seconds": 42.99
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_summarize.py --trace native/nemotron/issue218_cpu_initial/trace.json --trace native/nemotron/issue218_gpu_rotated_v2/trace.json --output native/nemotron/issue218_initial_gpu_summary.json",
+      "result": "exit0;offline initial GPU+CPU analysis, superseded by final summary"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_summarize.py --trace native/nemotron/issue218_cpu_initial/trace.json --trace native/nemotron/issue218_cpu_rotated_readback/trace.json --trace native/nemotron/issue218_gpu_rotated_v2/trace.json --trace native/nemotron/issue218_gpu_readback/trace.json --output native/nemotron/issue218_summary.json",
+      "result": "exit0;offline analysis, later completed with GPUABA readback"
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_summarize.py --trace native/nemotron/issue218_cpu_initial/trace.json --trace native/nemotron/issue218_cpu_rotated_readback/trace.json --trace native/nemotron/issue218_gpu_rotated_v2/trace.json --trace native/nemotron/issue218_gpu_readback/trace.json --trace native/nemotron/issue218_gpu_aba_readback/trace.json --output native/nemotron/issue218_summary.json",
+      "result": "exit0;final offline analysis84cases/165ASR/149translations; no new inference",
+      "wall_seconds": 2.16
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_attribution.py --trace native/nemotron/issue218_cpu_rotated_readback/trace.json --trace native/nemotron/issue218_gpu_rotated_v2/trace.json --output native/nemotron/issue218_attribution.json",
+      "result": "first exit0 analysis had empty rows because parent request identity was not native slice identity; corrected to exact sealed-source-range join; second exit0 gives87 frozen attribution origins with matching reconstructed states; no model/decision rerun",
+      "wall_seconds_corrected": 5.56
+    }
+  ],
+  "metadata_correction": {
+    "scope": [
+      "native/nemotron/issue218_summary.json",
+      "native/nemotron/issue218_report.json",
+      "native/nemotron/issue218_attempts.json"
+    ],
+    "activity": "Bounded Python Eval byte-provenance diagnosis using Director-extracted traces and counters; no inference, selector execution, statistics regeneration or ZIP mutation.",
+    "observed_cause": "CRLF-to-LF normalization through text archival, not post-analysis trace header edits. All five portable LF trace hashes match Director reproduction; expanding LF to CRLF reproduces each historical saved execution-file SHA256 exactly. All four measured counter stdout hashes likewise match after LF-to-CRLF expansion.",
+    "summary_binding": "runs.trace_path now identifies the authoritative ZIP member and runs.trace_sha256 hashes its actual portable LF bytes. Historical generated-file paths/hashes remain distinct in summary.trace_byte_provenance and report.byte_provenance.",
+    "sanitization_scope": "Home-path replacement with <USER_HOME> occurred in the driver before the original generated execution JSON was written and hashed. Those original hashes refer to already privacy-sanitized Windows CRLF files, not unsanitized reports. Archival text transport subsequently normalized CRLF to LF; JSON field values and execution observations were not edited.",
+    "claim_correction": "Complete privacy-sanitized JSON content is retained in portable LF form. Original CRLF file bytes are not claimed to be stored unchanged; both original generated-file and portable-member hashes are recorded explicitly.",
+    "director_evidence_reused": "Director reports both ZIP CRCs pass and all case/statistical/counter results identical in2.50s. Worker did not rerun those checks.",
+    "results": "Five trace newline reconstructions and four measured-counter newline reconstructions match their historical byte hashes; no case, timing, quality, call, resource or counter results changed."
+  },
+  "prohibitions_preserved": ["no cloud requests", "no downloads", "no ambient/private audio", "no VRChat or SteamVR launch", "no user settings read or write", "no product repair", "no Git mutation", "no padding/trim/threshold tuning/model upgrade"]
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "issue218-initial-runtime-acceptance-manifest-1",
+  "authority": {
+    "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/218",
+    "amendment_readback_updated_at": "2026-10-13T02:34:30Z",
+    "scope": "Maintainer authorized measurement without VRChat. R7 now requires equivalent declared non-VR workloads; VRChat/SteamVR coexistence, HMD readability and photon latency are deferred follow-up, not this investigation's completion gates.",
+    "preserved": "No cloud spending, private audio capture, profile/default enablement, deployment or release authorization. Other requirements remain in force. #211 full feature acceptance and #219 migration/cutover are not granted."
+  },
+  "candidate": {
+    "product_commit": "ea488774c3d1a89b92130b862d2d4102c91c1349",
+    "branch": "listen-integrate-the-initial-fp16-vulkan-nemotro",
+    "preexisting_dirty_paths": [],
+    "upstream": "No branch upstream. Remote dev tip at experiment start was 3db94433fd474c6ad6a5353e8b36c87f4856e2d7; common ancestor eac4fb465665f15edcaa7d794f467411185ca947. The remote-only QQ-auth #226 commit was not merged: merge authority was not granted, and the explicit experiment candidate remains fixed.",
+    "product_changes": false,
+    "architecture_changes": false,
+    "persisted_settings_changes": false
+  },
+  "disposition": {
+    "measured_non_vr_result": "negative_for_supported_speaker_activation",
+    "full_issue_qualification": "not_accepted",
+    "selected_profile": null,
+    "production_default": null,
+    "production_enablement": "not_authorized",
+    "cpu_parakeet_v3": {"1.04": "defer", "0.64": "defer", "reason": "Repeated returning-A semantic substitution/omission versus matched baseline, and zero established speaker-color coverage."},
+    "gpu_qwen3_asr_1_7b_q6_k": {"1.04": "defer", "0.64": "defer", "reason": "Real compatibility, co-residency and useful early translated captions demonstrated, but zero established speaker-color coverage. Hardware is not rejected as incapable."},
+    "other_routes": "Not newly measured. Retain #212/#216 route-local qualifications; no new cloud timing, quality, billing or end-to-end claims.",
+    "negative_result_limit": "The reachable experiment and its negative evidence are durable. Unknown R5 acoustic coverage and failed activation quality are not waived or relabeled passed. No issue closure or complete #211 delivery is claimed."
+  },
+  "frozen_configuration": {
+    "full_manifest": "issue218_report.json:configuration",
+    "inputs_and_reference_method": "issue218_report.json:inputs",
+    "nemotron_model_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "nemotron_runtime_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+    "profile_field_order": ["chunk_frames", "right_context_frames", "left_context_frames", "fifo_frames", "speaker_cache_frames", "update_period_frames"],
+    "profiles": {"1.04": [9, 4, 0, 264, 264, 222], "0.64": [6, 2, 0, 264, 264, 222]},
+    "device": "AMD Radeon RX 7900 XTX, Vulkan registry index 0",
+    "translation": "Actual managed Gemma E4B Q4_K_XL, effective Vulkan in all runs; production prompt/context and concurrency 3; exact hashes/launch arguments in report and traces.",
+    "audio_policy": "Real Silero, 16 kHz/512-sample frames, 500 ms onset and 300 ms real six-second rollover context; disjoint speaker cuts; no synthetic successor tail.",
+    "filter": "OFF",
+    "soniox": "Approved automatic endpoint ON retained; no fresh Soniox calls; finality benefit and unsupported post-manual capture-clock mapping remain distinct.",
+    "presentation": "Same current two-card Flet renderer and no artificial one-second gate in all arms; TTL 8 s. Source order, context and ordered output use production owners."
+  },
+  "execution_evidence": {
+    "report": "issue218_report.json",
+    "summary": "issue218_summary.json",
+    "commands_and_failures": "issue218_attempts.json",
+    "attribution_diagnosis": "issue218_attribution.json",
+    "background_snapshot": "issue218_background.json",
+    "raw_evidence": ["issue218_evidence.zip", "issue218_evidence_aux.zip"],
+    "actual_e2e_observations": 84,
+    "actual_e2e_asr_calls": 165,
+    "separate_source_only_qualification_asr_calls": 9,
+    "actual_local_translation_calls": 149,
+    "cloud_calls": 0,
+    "declared_pcm_mismatches": 0,
+    "timing_boundary": "Renderer dispatch ACK is not pixel onset. Timestamped owned-window readback confirms specified useful source/translation pixels with an upper observation bound only; neither HMD photons nor wearer readability was measured.",
+    "reused_invariants": "issue218_report.json:reused_deterministic_evidence identifies existing source/control/epoch/presentation execution receipts and limits. No full-suite-green or fresh-test claim.",
+    "component_acceptance_limit": "#217 repaired checkpoint and actual renderer evidence are available; its separate terminal acceptance verdict is not present in inspected repository records. This experiment does not fabricate that verdict."
+  },
+  "activation_gates_and_owners": [
+    {"owner": "Maintainer and local-ASR implementation owner", "status": "failed", "gate": "Preserve returning useful speech through the supported Parakeet slice/native-input path relative to baseline. No padding workaround, dependency upgrade or route cut policy change is approved by this experiment."},
+    {"owner": "Maintainer and speaker/source implementation owner", "status": "failed", "gate": "Qualify useful established-key coverage under whole-input purity and evidence-readiness/freeze rules. Protect overlap/short corrections; do not majority-assign another speaker's words, add a fixed speaker wait, or call all-gray output rich attribution."},
+    {"owner": "Experiment owner with authorized reference inputs", "status": "unknown", "gate": "R5 Chinese/spontaneous code-switch and distinct eight/over-eight acoustic pressure remain unmeasured. Synthetic mixes and palette fixtures do not certify natural conversational overlap or speaker capacity."},
+    {"owner": "Runtime measurement owner", "status": "unknown", "gate": "Precise GPU timestamp-query inference/submit timing is not exposed by this experiment; host queue/elapsed timings and Windows occupancy counters are explicitly distinct. Physical capture loss is not measured by file replay."},
+    {"owner": "Maintainer", "status": "blocked", "gate": "Fresh provider and budget authority is required before any new cloud measurement; historical grants ended."},
+    {"owner": "Maintainer and VR qualification owner", "status": "not_run", "gate": "VRChat/SteamVR/HMD qualification is explicitly deferred under the amended contract, not a blocker to the bounded non-VR investigation."},
+    {"owner": "Maintainer", "status": "not_approved", "gate": "Accept material quality/latency/resource/cost tradeoffs and select a profile only after supported activation evidence. No profile is selected here."}
+  ],
+  "migration_handoff_219": {
+    "use": "Reproducible initial-backend measurement and negative regression baseline, including actual input/context/filter/UI policy and current failure examples.",
+    "not_use": "Not a qualified production profile or authorization to cut over. Both profiles remain unselected; #219 must not inherit an enum as qualification or erase failed/unknown criteria.",
+    "preserve": "Carry input/artifact pins, returning-A regressions, all-gray causes, actual six-second continuation, conservative route dispositions, and deferred VR limitations into any later comparison."
+  },
+  "tracking": "#218 Project status changed Backlog to existing In progress and read back. Issue remains open. Only the explicitly authorized non-VR contract amendment was published; no results push, PR, merge, release, deployment or worktree cleanup.",
+  "director_verification": {
+    "offline_reproduction": "Extracted both ZIPs and executed the real summarizer over all five runs in 2.50 s. All case/statistical/counter results matched. The initial hash-only discrepancy was traced to CRLF-to-LF archival normalization: restoring CRLF reproduces all five original execution-file hashes. The owner records both original execution-file and authoritative portable archive-member hashes; no content or measurement changed.",
+    "archive_crc": "Both ZIPs passed Python zipfile.testzip; primary 3 members, auxiliary 23 members.",
+    "driver_syntax": "Python ast.parse passed for experiment, summarize and attribution drivers; no extra model calls for metadata-only edits.",
+    "visual_observation": "Director observed GPU ABA commit_11 useful English source/Korean translation in gray, and CPU rotated commit_7 showing the Yeah./네. semantic substitution in the actual owned-window screenshots.",
+    "independent_review": "Recorded separately in issue218_review_record.json at the pinned evidence checkpoint."
+  }
+}

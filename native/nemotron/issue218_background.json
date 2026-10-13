@@ -1,0 +1,34 @@
+{
+  "observation": "post-experiment passive name/PID whitelist, not a during-run background activity log",
+  "unix_seconds": 1791861052.2505076,
+  "processes": [
+    {
+      "name": "VirtualDesktop.Streamer.exe",
+      "pid": 10588
+    },
+    {
+      "name": "PuriPulyHeart.exe",
+      "pid": 16452
+    },
+    {
+      "name": "PuriPulyHeart.exe",
+      "pid": 42724
+    },
+    {
+      "name": "PuriPulyHeart.exe",
+      "pid": 49708
+    },
+    {
+      "name": "OVRServer_x64.exe",
+      "pid": 51500
+    }
+  ],
+  "absent_in_snapshot": [
+    "PuriPulyHeartGpuWorker.exe",
+    "VRChat.exe",
+    "llama-server.exe",
+    "vrcompositor.exe",
+    "vrmonitor.exe",
+    "vrserver.exe"
+  ]
+}

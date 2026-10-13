@@ -1,0 +1,751 @@
+{
+  "schema": "issue218-complete-non-vr-investigation-1",
+  "authority": {
+    "issue218": "https://github.com/kapitalismho/PuriPuly-heart/issues/218",
+    "authority_updated_at": "2026-10-13T02:34:30Z",
+    "program": "https://github.com/kapitalismho/PuriPuly-heart/issues/211",
+    "soniox_default": "https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6135356918"
+  },
+  "candidate": "ea488774c3d1a89b92130b862d2d4102c91c1349",
+  "result": {
+    "reachable_non_vr_investigation": "completed",
+    "product_qualification": "failed",
+    "profile_selected": false,
+    "production_enablement_authorized": false,
+    "recommendation": "Defer both profiles for supported speaker activation on both tested ASR routes. CPU early slices repeatedly damage returning useful speech; GPU slices improve useful content/early availability but every admitted attribution is mixed/uncertain/unavailable. The measured 0.64 warm useful-source dispatch advantage is not a rich-speaker profile approval. No all-gray success or numerical acceptance threshold is invented."
+  },
+  "scope": "Isolated causal realtime-paced production Silero/listen delivery -> ScopedRecognitionEngine/CausalBatchSession -> actual CPU Parakeet or actual local Qwen Vulkan ASR -> production contribution ledger/SourceChild -> PeerTranslationChannelOwner/TranslationRequestOwner/TranslationTurnLifecycleOwner context and real managed Gemma -> production ordered OutputRuntime/OverlayPresenter -> authenticated loopback -> actual current DesktopOverlayRenderer/FletDesktopRendererWindow. Not ordinary persisted application startup, source-only runner, mock translator, or offline render replay.",
+  "safety": {
+    "product_changes": false,
+    "maintained_docs_changes": false,
+    "tests_added": false,
+    "git_mutations": false,
+    "cloud_calls_by_experiment": 0,
+    "downloads": 0,
+    "ambient_or_private_capture": false,
+    "model_or_audio_rehosting": false,
+    "settings_read_write": false,
+    "VRChat_or_SteamVR_launched": false,
+    "foreign_processes_stopped": false,
+    "screenshots": "Exact verified owned overlay client over opaque owned backdrop; foreign intersections reject capture; never whole-desktop/private screenshot."
+  },
+  "hardware": {
+    "gpu": "AMD Radeon RX 7900 XTX",
+    "gpu_asr_actual_device": {
+      "device_id": "vulkan-index-0",
+      "registry_index": 0,
+      "name": "Vulkan0",
+      "description": "AMD Radeon RX 7900 XTX",
+      "device_type": "gpu",
+      "memory_total_bytes": 25753026560,
+      "memory_free_bytes": 24890653872
+    },
+    "driver_reused_readonly_inventory": "AMD26.8.1(LLPC), Windows32.0.31041.1004, Vulkan1.4.349; CPU Ryzen7 9800X3D; physical memory33933414400 bytes. Inventory from hardware-feasibility, not fresh inference counters.",
+    "non_vr_workload": "Exactly declared task pipeline per case; no unrelated GPU benchmark. Gemma held resident across rotated arms; ASR and Nemotron activated before playback and coexist throughout each case; stopped only when isolated case/session ends. Default eight-channel F16 Nemotron, selected local ASR, Gemma Vulkan and Flet desktop share the GPU.",
+    "background": "Existing PuriPulyHeart PIDs16452/42724/49708, OVRServer51500, VirtualDesktop.Streamer10588 present in pre-research and post-experiment whitelisted snapshots; their activity not controlled. No VRChat/vrserver/vrcompositor/vrmonitor in those snapshots. There is no continuous global process/activity log; equivalent task workload and rotation do not assert perfectly constant background.",
+    "post_snapshot": "native/nemotron/issue218_background.json"
+  },
+  "configuration": {
+    "official_model_card_revision": "f667ed73aee57d40cc39428eb768b4fd87a0a29e",
+    "nemotron": {
+      "publisher": "Bonenk/Nemotron-3-Diarization-GGUF",
+      "publisher_revision": "25cf0d6b0c91b679376df0f6ef3087b4fd96af1f",
+      "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+      "bytes": 201832928,
+      "tensor_formats": {
+        "F16": 125,
+        "F32": 231
+      },
+      "execution": "Actual Vulkan neural inference only; no CPU neural fallback; F32 auxiliaries/activations and shader-selected accumulation, not all-F16 arithmetic. Approved publisher conversion lineage was not independently reproduced.",
+      "runtime_revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf",
+      "llama_cpp_dependency": "bd4f514db14d87fded667787a7a963bfbaa98e89",
+      "vcpkg_dependency": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+      "runtime_manifest_sha256": "4615d82df024992cd4ecf2cff3ec7391a9165ac836b2f32459e182e8e45704f9",
+      "profiles": {
+        "1.04": {
+          "chunk": 9,
+          "right": 4,
+          "left": 0,
+          "FIFO": 264,
+          "cache": 264,
+          "update": 222
+        },
+        "0.64": {
+          "chunk": 6,
+          "right": 2,
+          "left": 0,
+          "FIFO": 264,
+          "cache": 264,
+          "update": 222
+        }
+      },
+      "environment": {
+        "HF_HUB_OFFLINE": "1",
+        "GGML_VK_DISABLE_GRAPH_OPTIMIZE": "1",
+        "NEMO_SPEECH_SCHEDULE_CAPTURE": "1"
+      }
+    },
+    "asr_cpu": {
+      "model": "parakeet-tdt-0.6b-v3-int8-sherpa",
+      "backend": "actual sherpa-onnx1.13.4 CPU",
+      "hashes": {
+        "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+        "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+        "installed-manifest.json": "82b63f3fb4ab1c08821dbad59bc5683e7d1cde57e7291754c8f211f833ffee61",
+        "joiner.int8.onnx": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+        "tokens.txt": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+      },
+      "padding": "No synthetic successor tail; no model upgrade"
+    },
+    "asr_gpu": {
+      "model": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+      "model_sha256": "c75a961b7134a6c952d89797865cb0d0376876185aee04ef6d12c31c2952e4e1",
+      "worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+      "alternate_root": "<USER_HOME>/Documents/dev/puripuly_heart/.worktrees/puripuly_heart/issue/.agents/goals/goal-issue-20-local-asr-backends-001/evidence/gpu-production/model-root",
+      "worker": "<USER_HOME>/Documents/dev/puripuly_heart/build/gpu_worker/PuriPulyHeartGpuWorker.exe",
+      "backend": "Actual Vulkan; no missing-model blocker; device name Vulkan0, description AMD Radeon RX7900XTX. Registry index0 is explicit."
+    },
+    "translation": {
+      "model": "managed_gemma; gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+      "publisher_revision": "8c5a9e4fd5482e2be20fe0bf013b4c262a8f4265",
+      "model_sha256": "df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3",
+      "mtp_sha256": "423074e537504b4f9ec5eafed5c639fac82c96631626efccacdd3c4039b20605",
+      "runtime_root": "<USER_HOME>/Documents/dev/puripuly_heart/build/llama.cpp/llama.cpp-b10423",
+      "runtime_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+      "requested": "gpu",
+      "effective_all_runs": "vulkan",
+      "fallback_observed": false,
+      "server_geometry": "ctx4608/parallel3/batch512/ubatch512/F16KV/cache-prompt/reasoning-off+budget0/Vulkan0/gpu-layers99/flash-attn-on/threads4+batch4; complete exact launch argv and performance output retained in every raw report.",
+      "prompt": "Current production resolve_system_prompt default; full rendered prompts/context captured per admitted source and selection in raw traces. No speaker IDs in prompts.",
+      "context": "Integrated enabled, prior history before source admission; ordinary30s/3 and integrated60s/5 bounds; reset isolated context each case; sources retained once in source order before translation; en->ko, ko->en, ja->ko.",
+      "concurrency": 3,
+      "warmup_cache": "Production owner prepare/prefix prefill before playback; no additional request warmup, disk prefix cache disabled; in-memory server cache-prompt retained across arms. First real translation after each new server can be slower; cold observations retained, not corrected/subtracted."
+    },
+    "vad_and_audio": {
+      "engine": "real bundled Silero CPU",
+      "sample_rate": 16000,
+      "frame_samples": 512,
+      "threshold": 0.3,
+      "hangover_ms": 600,
+      "onset_pre_roll_ms": 500,
+      "hard_rollover_pre_roll_ms": 300,
+      "speaker_cut": "disjoint new content; no trim/padding/tuning",
+      "natural_and_safety": "Production capture-owned natural end and actual six-second continuation; source children do not restart deadline."
+    },
+    "ui": {
+      "renderer": "actual current Flet desktop",
+      "window": [
+        32,
+        32,
+        1344,
+        336
+      ],
+      "visible_cards": 2,
+      "TTL_s": 8,
+      "late_arrival_window_s": 5,
+      "artificial_1s_wait": false,
+      "show_translation": true,
+      "show_peer_original": true,
+      "calibration": {
+        "anchor": "head_locked",
+        "offset_x": 0,
+        "offset_y": -0.45,
+        "distance": 1.1,
+        "text_scale": 1,
+        "background_alpha": 0.24
+      },
+      "styles": "Existing whiteSELF/gold/cyan/coral/blue/gray palette; actual tested admissions all gray, not palette overflow."
+    },
+    "endpoints_filter": "Soniox automatic endpoint ON inherited; no Soniox/cloud call. Automatic trim OFF in every arm; natural/hardcut policy common; no secondary tuning."
+  },
+  "inputs": {
+    "provenance": {
+      "A": {
+        "dataset": "common_voice",
+        "dataset_revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2",
+        "dataset_version": "cv-corpus-17.0-2024-03-15",
+        "duration_ms": 3504,
+        "license": "CC0-1.0",
+        "locale": "en",
+        "relative_audio_path": "clips/common-voice-17.0/en/common_voice_en_11289258.mp3",
+        "sample_id": "common_voice_en_11289258.mp3",
+        "source_audio_sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad",
+        "source_text": "He washed the detritus from his hair.",
+        "split": "dev",
+        "verified_sha256": "19865499680804b33e8ac1f3a7b96fa8762e31be6a143c9e711bba72984272ad"
+      },
+      "B": {
+        "dataset": "common_voice",
+        "dataset_revision": "8262c16bf297c87a9cd88c51997c4758ed7a8ba2",
+        "dataset_version": "cv-corpus-17.0-2024-03-15",
+        "duration_ms": 3456,
+        "license": "CC0-1.0",
+        "locale": "en",
+        "relative_audio_path": "clips/common-voice-17.0/en/common_voice_en_12274.mp3",
+        "sample_id": "common_voice_en_12274.mp3",
+        "source_audio_sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5",
+        "source_text": "Gentlemen of the Press!",
+        "split": "dev",
+        "verified_sha256": "cccded3f9d5a5bb4c28110b8273e217cc44d5d9e9de95eb70fd19208dce9b4f5"
+      },
+      "long": {
+        "dataset": "fleurs",
+        "dataset_revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+        "dataset_version": "google-fleurs-dev",
+        "duration_ms": 7920,
+        "license": "CC-BY-4.0",
+        "locale": "en_us",
+        "relative_audio_path": "clips/fleurs/en_us/1009709090964908274.wav",
+        "sample_id": "1510:1009709090964908274.wav",
+        "source_audio_sha256": "e5664ae10a6273fbe0009068e512f4c416cccbeff19d3d2d11e5fb8d72d03fb7",
+        "source_text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the impacts.",
+        "split": "dev",
+        "verified_sha256": "e5664ae10a6273fbe0009068e512f4c416cccbeff19d3d2d11e5fb8d72d03fb7"
+      },
+      "local_no_trim": {
+        "path": "issue212/audio/local_no_trim.wav",
+        "sha256": "e474e0808b047ccbc2a678a22531adc9599cd07a2a5fccea0e7be8047b777c49",
+        "pcm_sha256": "cb998cbfc4cef3e63e8daf7fd252dccc6c27b94ce95c169470e1a0b0101cd2ca",
+        "samples": 5760,
+        "seconds": 0.36,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "mapping": {
+          "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_no.wav",
+          "parent_sha256": "3f8f7d13d5759710840f7af5b47ea72f01c3a59db4a63e1090bda9edc1debcc1",
+          "sample_range": [
+            1200,
+            6960
+          ],
+          "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+        },
+        "voice": "Microsoft Zira Desktop",
+        "kind": "authorized synthetic linguistic speech, not natural conversation",
+        "source_text": "No."
+      },
+      "local_correction_trim": {
+        "path": "issue212/audio/local_correction_trim.wav",
+        "sha256": "34a41d87d8752cc290945044af90309c36d7076c0a1f236394a095a78d7eadac",
+        "pcm_sha256": "b4a3f39ebd49960ca8ceca005524ffc93500ac85f93abb1e382357ae8b672f16",
+        "samples": 17839,
+        "seconds": 1.1149375,
+        "sample_rate_hz": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "mapping": {
+          "parent": "docs\\experiments\\issue-212-clarification\\audio\\shared_correction.wav",
+          "parent_sha256": "3e6655f480b5a25b42a65ca888f0a1fb2d04d15747bc973faed32b19247e8729",
+          "sample_range": [
+            1280,
+            19119
+          ],
+          "rule": "Remove exact digital-zero leading/trailing samples only; no VAD/quality threshold"
+        },
+        "voice": "Microsoft Zira Desktop",
+        "kind": "authorized synthetic linguistic speech, not natural conversation",
+        "source_text": "No, three."
+      },
+      "korean_read": {
+        "dataset": "fleurs",
+        "dataset_revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+        "dataset_version": "google-fleurs-dev",
+        "duration_ms": 12720,
+        "license": "CC-BY-4.0",
+        "locale": "ko_kr",
+        "relative_audio_path": "clips/fleurs/ko_kr/18423917436786011041.wav",
+        "sample_id": "1510:18423917436786011041.wav",
+        "source_audio_sha256": "a116c744b2bce62bf53f16f136b1df8d1aa8e247f28d69137ed97502b329eb49",
+        "source_text": "또한 유엔은 지구 온난화의 영향을 받는 국가들의 대처를 돕기 위한 기금의 조성을 완료하기를 기대하고 있습니다.",
+        "split": "dev"
+      },
+      "japanese_read": {
+        "dataset": "fleurs",
+        "dataset_revision": "70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+        "dataset_version": "google-fleurs-dev",
+        "duration_ms": 14700,
+        "license": "CC-BY-4.0",
+        "locale": "ja_jp",
+        "relative_audio_path": "clips/fleurs/ja_jp/4094665828851158897.wav",
+        "sample_id": "1510:4094665828851158897.wav",
+        "source_audio_sha256": "1a563453c1667e34037fb6922fe09fca1683411472d052682c6c9205e29c9b95",
+        "source_text": "また、国連では、地球温暖化の影響を被っている国々がその影響に対処できるように支援するための基金について最終決定したいと考えています。",
+        "split": "dev"
+      }
+    },
+    "corpus_manifest_sha256": "546402f99f5b1b2edbb1dbf6a01ca260eeeee7661dce973a73682a470bddefe2",
+    "licenses": "CommonVoice17 CC0-1.0@8262c16bf297c87a9cd88c51997c4758ed7a8ba2; FLEURS CC-BY-4.0@70bb2e84b976b7e960aa89f1c648e09c59f894dd",
+    "method": "Public English/Korean/Japanese read speech plus existing authorized Microsoft Zira SAPI No./No,three corrections; synthetic concatenations/mix clearly named. Exact audio and normalized assembled PCM hashes verified/pinned in raw reports. Energy crop160ms context is input preparation only, no aligned oracle. Assembly/reference maps used only after decisions for scoring, never passed into selector. No biometric identification or natural VRChat acoustic certification."
+  },
+  "measurement_counts": {
+    "source_only_qualification_cases": 4,
+    "actual_e2e_case_observations": 84,
+    "cpu_e2e": 30,
+    "gpu_e2e": 54,
+    "primary_gpu_samples_per_case_arm": 2,
+    "cpu_core_samples_per_case_arm": 2,
+    "additional_gpu_cases": "Only six observations for concrete timely renderer correlation: cleanAB andABA across three arms, not another acoustic grid.",
+    "E2E_ASR_seals_or_decode_requests": 165,
+    "source_only_qualification_ASR_calls": 9,
+    "total_local_ASR_calls": 174,
+    "real_local_translation_calls": 149,
+    "translated_terminal_count": 149,
+    "cloud_calls": 0,
+    "capture_accounting_passed_cases": 84,
+    "payload_mismatches": 0,
+    "color_source_char_coverage": 0,
+    "attribution_states": {
+      "unavailable": 101,
+      "uncertain": 42,
+      "mixed": 6,
+      "identified": 0
+    },
+    "qualification_status_meaning": "Execution success/correct event accounting is not semantic or rich-speaker acceptance."
+  },
+  "key_findings": [
+    {
+      "case": "CPUcleanAB",
+      "result": "Baseline emits only A with detritus lexical substitution; both new profiles emit exact A+B. N1 warm A dispatch ACK lead1.04=.278s,0.64=.729s, NOT pixel/photon latency. Rotated0.64 actual timed owned A source+translation pixels observed by4.350s, .485s before enclosing natural end. First cold1.04 repeat ACK5.576s/readback5.833s is AFTER end, exposing warmup/cache variability."
+    },
+    {
+      "case": "CPUABA/shortABA",
+      "result": "Material repeated feature-induced semantic damage: matched baseline represents returning A;1.04 returning A becomes Yeah.;0.64 returning A empty; shortABA new profiles preserve No. but omit returning A. Reproduced at N2 core; no further negative repeats or workaround. Source PCM is delivered intact/mapped exactly; damage is already native ASR text. Complete returning-turn availability failed/unavailable; earlier prefix timing cannot pass complete-turn quality."
+    },
+    {
+      "case": "CPUlong six-second",
+      "result": "Both baseline and new terminate prefix at cope with the and actual continuation ASR is empty; impacts absent. Baseline-common failure, not profile-induced. Real continuation PCM/calls preserved; complete-turn availability unavailable, not short latency success."
+    },
+    {
+      "case": "GPUclearAB",
+      "result": "Baseline recognizes only B; both profiles exact A+B at N2. Same useful A warm dispatch ACK times1.04=[4.659,4.620] vs0.64=[4.228,4.251]s after playback. This bounded~0.4s buffering/dispatch difference is not measured pixel onset or approval. Complete A+B translated dispatch by~5.17-5.21s for new profiles; baseline completeAB unavailable."
+    },
+    {
+      "case": "GPUABA/shortABA",
+      "result": "New profiles preserve useful firstA+B and most/full returning content; hard-rollover From his hair. overlaps preceding from his. (two extra words, normal case WER.111). Both profiles same normal repeat/edge pattern; baseline omits most A. ShortABA returns exact No. plus both A sentences (WER0), not filtered away. Source lead and observed pixel benefit are real but gray; no stable returning-key/color claim."
+    },
+    {
+      "case": "GPUlinguistic",
+      "result": "No,no,three correction remains exact normalized text across all arms; actual Gemma corrections translated. Korean selected read speech normalized WER/CER0 in all arms with genuine continuation. Japanese CER~.095, substantive fund/dialogue-tail error in baseline and both profiles; Japanese whitespace WER2.0 is not useful, prefer CER/qualitative tail description. Not spontaneous code-switch/natural multilingual conversation certification."
+    },
+    {
+      "case": "Synthetic overlap",
+      "result": "CPU retains both assembled sentence content with lexical error; GPU recognizes B only in every arm. Conservation/no forced-cut component evidence reused; no conversational overlap/backchannel accuracy success inferred."
+    }
+  ],
+  "complete_turn_availability": {
+    "CPU": {
+      "cleanAB_baseline": "failed/unavailable B",
+      "cleanAB_new": "complete source+translation contributions available; no rich attribution",
+      "ABA_new": "failed/unavailable returning A despite earlier useful prefixes",
+      "shortABA_new": "failed/unavailable returning A; No. retained",
+      "long_all_arms": "failed/unavailable impacts tail",
+      "correction_all_arms": "available with protected negation and number"
+    },
+    "GPU": {
+      "cleanAB_baseline": "failed/unavailable A",
+      "cleanAB_new": "available exact source contributions; translations/renderer recorded",
+      "ABA_new": "useful return content available only via two fragments with from his continuation repeat; complete semantic quality/fragment acceptability remains maintainer decision, not zero-WER/whole-card proof",
+      "shortABA_all_arms": "all source content available; new retains separate No. and return",
+      "long_all_arms": "tail retained with bounded with the replay; no profile advantage claimed",
+      "KO_all_arms": "full normalized source reference available",
+      "JA_all_arms": "semantic tail quality failed despite terminal availability; no complete-correct-turn success"
+    }
+  },
+  "renderer_evidence": {
+    "boundaries": "Source/admission/translation/order timestamps, real Flet dispatch render_commit ACK, and separately timestamped exact owned screen readback are retained. ACK is not proof of pixel onset; readback completed time is an upper observation bound, not HMD photons or wearer readability.",
+    "observed_images": [
+      {
+        "path": "native/nemotron/issue218_cpu_rotated_readback/commit_23.png",
+        "observed": "Useful complete predecessorA source+real translated text visible gray; readback by4.350s, .485s before enclosing end;0.64."
+      },
+      {
+        "path": "native/nemotron/issue218_cpu_rotated_readback/commit_5.png",
+        "observed": "Useful predecessorA source+translation visible gray; readback by4.789s,1.831s before enclosing six-second end;1.04ABA."
+      },
+      {
+        "path": "native/nemotron/issue218_cpu_rotated_readback/commit_7.png",
+        "observed": "Actual Yeah./네. returning-source substitution visibly propagated, not hidden by presentation."
+      },
+      {
+        "path": "native/nemotron/issue218_gpu_aba_readback/commit_1.png",
+        "observed": "GPU0.64 actual useful A+translation pixels visible; cold ACK5.219s, readback by5.467s,1.165s before first enclosing six-second end."
+      },
+      {
+        "path": "native/nemotron/issue218_gpu_aba_readback/commit_11.png",
+        "observed": "GPU1.04 actual useful A+translation pixels visible; ACK4.623s, readback by4.880s,1.740s before enclosing end."
+      },
+      {
+        "path": "native/nemotron/issue218_gpu_readback/commit_8.png",
+        "observed": "GPU1.04 cleanA pixels confirmed but readback only~.001s before end; not a robust photon/draw-onset margin claim."
+      }
+    ],
+    "late_blank_frames": "Retained original finite end screenshots include blanks. No TTL explanation was established (productionTTL8s); late blank alone is not evidence absent early display. Relevant timed readbacks confirm specific useful captions. No pixel-onset measurements, screen-wide capture, or fabricated readability results."
+  },
+  "all_gray_diagnosis": {
+    "evidence": "native/nemotron/issue218_attribution.json",
+    "method": "87new-path origins from CPUrepeat+GPUprimary, joined by exact source ranges to actual submissions, recorded evidence bounded at submit (no future). All87 reconstructed state labels agree with authoritative frozen attribution; retained-frame floor-pruning not replayed and disclosed.",
+    "facts": "51unavailable/30uncertain/6mixed. GPU1.04 clearAB A:48000 source+context samples,0eligible gap,32960clear,1120uncertain,onlyslot0,maxp.999122 => whole-result uncertain. B:27584samples,6464not eligible/immutable at submission,onlyslot1,maxp.998870 => unavailable. 0.64 A also1120uncertain, B same6464 gap. ShortNo has480/320uncertain with5600clear,slot1 =>uncertain. These are not a model that never emits clear slots or palette overflow.",
+    "policy": "CausalBatchSession._attribute considers every supplied source/context span; any uncertainty affects whole untimed result, any eligible coverage gap ->unavailable, multiple slots/epochs ->mixed. It freezes speaker at input submit before ASRfinal; downstream allocator receives key=None and cannot invent or recolor identity. Missing eligible diarizer coverage at that time is not missed capture PCM.",
+    "next_empirical_decision": "Maintainer/implementation owner must qualify supported whole-span purity/established-key handling and evidence readiness/freeze point while protecting overlap/short corrections and without majority assigning others words or fixed speaker wait. No tuning grid, threshold change, additional alignment model, or repair was performed."
+  },
+  "resources": {
+    "full_primary_gpu_samples": 572,
+    "invalid_windows_counter_values": 0,
+    "global_adapter_dedicated_peak_bytes": 10373718016,
+    "global_adapter_shared_peak_bytes": 2193981440,
+    "adapter_limit": "Includes surrounding applications, not attributed solely to task.1s counter cadence; no per-inference Vulkan GPU timestamps.",
+    "primary_gpu_process_peak_by_name_bytes": {
+      "python": {
+        "rss": 814772224,
+        "private": 2322333696
+      },
+      "llama_server": {
+        "rss": 4918501376,
+        "private": 5217153024
+      },
+      "gpu_asr_worker": {
+        "rss": 801837056,
+        "private": 3459661824
+      },
+      "flet": {
+        "rss": 200089600,
+        "private": 246800384
+      }
+    },
+    "process_limit": "0.25s own-descendant samples; maxima by process name are not sum of all concurrent PIDs. Raw PID samples and PID-labelled VRAM counters permit scoped review.",
+    "speaker_observed_global_peaks": {
+      "pending_samples": 17920,
+      "pending_items": 17,
+      "retained_map_pieces": 35,
+      "evidence_items": 99,
+      "copied_samples_per_case": 317888,
+      "max_copy_samples": 512,
+      "overloads": 0,
+      "evidence_evictions": 0
+    },
+    "speaker_limits": {
+      "input_samples": 16000,
+      "pending_samples": 64000,
+      "pending_items": 128,
+      "map_pieces": 2048,
+      "frames_per_update": 1024,
+      "evidence_items": 2048,
+      "evidence_map_pieces": 8192,
+      "capture_sessions": 1024,
+      "backend_lag_samples": 64000,
+      "tail_padding_samples": 32000
+    },
+    "local_batch_limits": {
+      "pending_slices": 8,
+      "frames": 2048
+    },
+    "gpu_asr_limits": {
+      "pending_per_channel": 8,
+      "pending_TTL_s": 12,
+      "active_decode_timeout_s": 30
+    },
+    "translation_limits": {
+      "concurrency": 3,
+      "waiting_capacity": 8,
+      "waiting_TTL_s": 12,
+      "child_watchdog_s": 60
+    },
+    "delivery_lag_peak_s": 0.1562563999905251,
+    "capture_loss": "All84 actual generated inputs received once/hash-identical;0declared PCM mismatches. This proves replay/delivery accounting, not physical device capture-loss behavior.",
+    "timings": "Actual GPU-ASR decode_attempt/decode_timing retained. gpu_queue_wait_seconds is HOST queued_at-to-dequeued_at (gpu_asr.py786-789), not a Vulkan timestamp. Worker decode_seconds is native host-reported elapsed inference; worker roundtrip includes host/staging/IPC; Gemma performance logs are llama server prompt/generation timings, not isolated GPU timestamp queries. Nemotron exact GPU submit/inference-query durations not exposed/unknown.",
+    "precise_GPU_inference_status": "unknown; prerequisite exposed calibrated GPU timestamp-query/trace support, not substituted by counters or host latency."
+  },
+  "reused_deterministic_evidence": [
+    {
+      "path": "native/nemotron/verification.json; epoch-repair-verification.json",
+      "status": "passed_reused",
+      "scope": "Both-profile actual Vulkan causal pause/tail/EOF/return slot, eight-channel overlap representation; actual in-flight stop/epoch fences. Not current E2E acoustic comparison or ninth-speaker certification."
+    },
+    {
+      "path": "native/nemotron/issue215_report.json; issue215_native_applicability.json",
+      "status": "passed_reused_mechanics_only",
+      "scope": "Current post-revert469-pass range/option/timer/source suites. Historical padded acoustic successes NOT reused as current quality; current unpadded fresh negative evidence here supersedes."
+    },
+    {
+      "path": "native/nemotron/issue216_acceptance.json; issue216_final_repaired.json",
+      "status": "passed_reused",
+      "scope": "317shared/142isolated source/control/context/Unicode/prefix-tail suites and repaired actual streaming source lead. Zero historical translations, no current cloud call. Soniox finality improvement vs unresolved post-manual capture clock remains separate."
+    },
+    {
+      "path": "native/overlay/issue217_verification_index.json; issue217_review_record.json; issue217_source_repair_report.json; issue217_presenter_repair_report.json; issue217_render_report.json; issue217_desktop_report.json",
+      "status": "passed_reused_affected_invariants",
+      "scope": "267combined repaired presentation tests, actual native D3D11/Flet fixture rendering. A-B-A aggregation/TTL/palette/style-freeze/epoch/destination invariants, not current acoustic speaker attribution. Four unaffected known baseline failures not rerun or called green. Terminal component acceptance delivery belongs to Director; not inferred from issue OPEN."
+    }
+  ],
+  "R1_R9": [
+    {
+      "id": "R1",
+      "status": "passed",
+      "evidence": "Frozen candidate/actual dependencies/artifacts/routes/inputs; current unpadded route qualified negative before comparison; production source/context/order/display assembled in isolated causal measurement path. Conservative unsupported streaming enhancements remain explicit. Not a claim #211 initial milestone accepted; Director owns final #217 terminal visibility/manifest."
+    },
+    {
+      "id": "R2",
+      "status": "passed",
+      "evidence": "Both full9/4/0/264/264/222 and6/2/0/264/264/222 actually identified in runtime diagnostics, same9b277 artifact/Vulkan0. Input/VAD500/300/ASR/prompt/context/concurrency/filter/UI matched per route. Actual Gemma Vulkan, no fallback. Recorded inert GPU provider-signature label issue separately disclosed."
+    },
+    {
+      "id": "R3",
+      "status": "passed",
+      "evidence": "Matched current-UI baseline without speaker early release and both complete new profiles; real natural and six-second continuation; no benefit credited to fixed1s gate removal or cloud endpoint changes."
+    },
+    {
+      "id": "R4",
+      "status": "passed",
+      "evidence": "Actual causal replay/evidence/submission/nativefinal/admission/translation/order/real renderer dispatch and owned readback boundaries; reference maps scoring only; no offline fake E2E or photon equivalence."
+    },
+    {
+      "id": "R5",
+      "status": "unknown",
+      "evidence": "Reachable representative clearAB/ABA/shortNo+numeric correction/long+real six-second/KO+JA/synthetic overlap, plus reusable VAD/tail/return/reset/control-stop/Unicode invariants. Full acoustic representativeness not certified.",
+      "not_run": [
+        "Authorized Chinese/relevant spontaneous code-switch audio/reference unavailable in supplied corpus",
+        "Eight/over-eight distinct acoustically annotated speakers unavailable; channel shape/palette fixtures are not capacity-pressure acoustics",
+        "Natural conversational overlap/backchannels/VRChat acoustics not established by synthetic mix"
+      ]
+    },
+    {
+      "id": "R6",
+      "status": "passed",
+      "evidence": "Useful/complete-turn failures, exact raw texts/calls, all-gray coverage/attribution limits, mixed/repeat/edge/omission, context, process/GPU occupancy/queue/lag/buffer bounds reported. WER/CER used only with appropriate references; no zero-repeat gate.",
+      "unknown": [
+        "True GPU timestamp-query submit/inference durations",
+        "Physical capture loss from generated input",
+        "Rich attribution error rate when no source receives established key; zero gray coverage is not zero error"
+      ]
+    },
+    {
+      "id": "R7",
+      "status": "passed",
+      "evidence": "Actual CPU-ASR+Nemotron and GPU-ASR+Nemotron+Gemma co-residency on identified Windows GPU with matched declared non-VR workload, rotation/repetition and counter/process limits. VR/SteamVR/HMD explicitly deferred under amended contract, never launched. Background activity/control limits stated."
+    },
+    {
+      "id": "R8",
+      "status": "passed",
+      "evidence": "Per-tested-route defer both after observations; no production profile selected; no invented threshold/weighted score. Non-VR results cannot certify VR. Maintainer approval remains unresolved."
+    },
+    {
+      "id": "R9",
+      "status": "passed",
+      "evidence": "Explicit activation gates for current segmentation/purity/established keys/epoch evidence;500/300 preserved, trimOFF, no tuning/repair. Supporting configuration here; Director owns issue218_acceptance.json and integration/review record for #219."
+    }
+  ],
+  "completion_criteria": [
+    {
+      "id": "CC1_durable_frozen_reproducible_report",
+      "status": "passed",
+      "evidence": "This report/summary/attempts, complete portable privacy-sanitized JSON traces, driver snapshots/counters/owned PNGs, pins and commands. Original generated-file CRLF hashes and authoritative portable LF member hashes are separately recorded in byte_provenance; no unchanged-original-byte claim."
+    },
+    {
+      "id": "CC2_three_arm_real_E2E_positive_opportunities",
+      "status": "passed",
+      "evidence": "All3 arms actually observed on both tested routes, both new profiles genuine useful early sources/translations and specific timely actual pixels. Positive E2E measurement validity does NOT pass useful speaker-color activation: that observed outcome failed (0identified)."
+    },
+    {
+      "id": "CC3_independent_invariants_and_practical_quality",
+      "status": "failed",
+      "evidence": "Deterministic mechanics passed/reused and all fresh event/PCM/source/order/context checks pass. Required useful speech quality for activation fails CPUreturning content; all-gray rich outcome fails both routes. Negative investigation is complete, not disguised by favorable aggregates or a repeat-only gate."
+    },
+    {
+      "id": "CC4_route_dispositions_and_limits",
+      "status": "passed",
+      "evidence": "Both tested routes/profile arms defer, conservative route limits and maintainer decisions explicit; cloud timing/finality findings not promoted to current E2E."
+    },
+    {
+      "id": "CC5_no_unapproved_selection_or_deployment",
+      "status": "passed",
+      "evidence": "No profile/default/enablement selected; supported negative non-VR investigation only; not #211 delivery or release."
+    },
+    {
+      "id": "CC6_honest_status_and_evidence_types",
+      "status": "passed",
+      "evidence": "Unknown/not_run/blocked requirements preserved; real vs fixtures vs host clocks vs readback vs photons distinct; no added repetition prerequisite."
+    }
+  ],
+  "route_dispositions": [
+    {
+      "route": "CPU Parakeet v3 + FP16 Vulkan Nemotron",
+      "1.04": "defer",
+      "0.64": "defer",
+      "reason": "Repeated material returning-A substitution/omission versus matched baseline, shortABAreturn omission, baseline-common long continuation gap, no established/color coverage. Useful early predecessor output alone cannot approve route.",
+      "next_owner_decision": "Source-preserving local slice/native-window behavior and rich whole-span attribution qualification required; no padding/model upgrade/trim authorized or performed."
+    },
+    {
+      "route": "GPU Qwen3-ASR1.7bQ6_K + FP16 Vulkan Nemotron",
+      "1.04": "defer",
+      "0.64": "defer",
+      "reason": "Actual compatibility/co-residency and useful improved text/latency demonstrated, but0identified sources/all-gray outcomes; return/hardcut fragmentation/replay and Japanese baseline semantic limit remain. Not rejected as incapable hardware; not adopted as rich speakers.",
+      "next_owner_decision": "Qualify legal whole-input purity/established-key/readiness handling and maintainer acceptance of fragmented return/latency/resource tradeoff; only afterward choose a production profile."
+    }
+  ],
+  "unrun_and_deferred": [
+    {
+      "status": "blocked",
+      "requirement": "New cloud ASR/translation measurements",
+      "prerequisite": "Fresh explicit provider/budget authorization. Old grants ended; SonioxON inherited, no cloudcalls."
+    },
+    {
+      "status": "not_run",
+      "requirement": "VRChat/SteamVR coexistence, HMD wearer readability, photon latency",
+      "prerequisite": "Separate later permitted equipment/workload/observer/apparatus qualification; explicitly DEFERRED, not blocker to this non-VR investigation."
+    },
+    {
+      "status": "not_run",
+      "requirement": "Chinese/spontaneous code-switch/distinct8+9-speaker acoustics/natural conversational overlap",
+      "prerequisite": "Suitable authorized inputs and scoring references; current supplied public read-speech/SAPI fixtures do not establish these conditions."
+    },
+    {
+      "status": "unknown",
+      "requirement": "Precise GPU timestamp inference/submit measurements",
+      "prerequisite": "Runtime/query or approved external GPU tracing support; host/counter labels cannot substitute."
+    },
+    {
+      "status": "unknown",
+      "requirement": "Production quality/resource enablement and empirical established-key/segmentation policy",
+      "prerequisite": "Maintainer/implementation-owner decision and supported activation qualification; this worker has no product repair or enablement authority."
+    }
+  ],
+  "driver_and_record_limits": [
+    "GPU raw provider_signature contains inert unused CPU args.asr_model label Parakeet; actual native backend/model/activation/hash/options are Qwen GPU in every GPU case. This isolated factory marker did not select a model or change between arms; JSON fields retained without edits; archival newlines normalized as documented. Final reusable driver stamps backend.model_id; no new inference performed for labeling fix.",
+    "Older CPU source-only qualification runner reports GPUblocked from DEFAULT model root only; actual alternate-root GPU execution here removes that obsolete machine-wide missing-model disposition.",
+    "Original final finite screenshots sometimes blank; no unsupported TTL explanation or all-frames-visible claim. Relevant timed owned readbacks prove specified source+translation pixels; dispatch ACK is not pixel onset.",
+    "GPU portable UTF-8 LF trace is109913419 bytes in primaryZIP; its historical generated UTF-8 CRLF execution file was112666608 bytes and has a different recorded SHA256. Complete privacy-sanitized JSON content is retained, not unchanged original CRLF file bytes. Tool archive extraction limit64MiB requires Python zipfile extraction; auxiliaryZIP supplies representative small case views.",
+    "No full-suite/build/lint/format rerun. Reused deterministic evidence is expressly not fresh execution. Final driver metadata/output-surface-only edits were not rerun; Director can inspect syntax/perform offline report reproduction."
+  ],
+  "evidence_layout": {
+    "primary_archive": "native/nemotron/issue218_evidence.zip",
+    "aux_archive": "native/nemotron/issue218_evidence_aux.zip",
+    "trace_members": {
+      "native/nemotron/issue218_cpu_initial/trace.json": "native/nemotron/issue218_evidence.zip:cpu_initial/trace.json",
+      "native/nemotron/issue218_cpu_rotated_readback/trace.json": "native/nemotron/issue218_evidence.zip:cpu_rotated_readback/trace.json",
+      "native/nemotron/issue218_gpu_rotated_v2/trace.json": "native/nemotron/issue218_evidence.zip:gpu_rotated_v2/trace.json",
+      "native/nemotron/issue218_gpu_readback/trace.json": "native/nemotron/issue218_evidence_aux.zip:gpu_readback/trace.json",
+      "native/nemotron/issue218_gpu_aba_readback/trace.json": "native/nemotron/issue218_evidence_aux.zip:gpu_aba_readback/trace.json"
+    },
+    "counter_members": "aux ZIP cpu_rotated_readback/gpu_rotated_v2/gpu_readback/gpu_aba_readback gpu_counters.jsonl",
+    "reviewable_gpu_views": "auxZIP gpu_rotated_v2/case_001/002/003/006/007/009/010/013/014/015/016/017/018.json are reformatted views; full portable LF trace retained in primaryZIP. Historical execution-file and portable-member hashes are distinct and documented.",
+    "images": "native/nemotron/issue218_cpu_initial/,issue218_cpu_rotated_readback/,issue218_gpu_rotated_v2/,issue218_gpu_readback/,issue218_gpu_aba_readback/ *.png",
+    "summary": "native/nemotron/issue218_summary.json",
+    "attribution": "native/nemotron/issue218_attribution.json",
+    "attempts": "native/nemotron/issue218_attempts.json"
+  },
+  "reproduce_analysis_commands_proposed": [
+    ".venv/Scripts/python.exe -B -m zipfile -e native/nemotron/issue218_evidence.zip build/issue218_raw",
+    ".venv/Scripts/python.exe -B -m zipfile -e native/nemotron/issue218_evidence_aux.zip build/issue218_raw",
+    ".venv/Scripts/python.exe -B native/nemotron/issue218_summarize.py --trace build/issue218_raw/cpu_initial/trace.json --trace build/issue218_raw/cpu_rotated_readback/trace.json --trace build/issue218_raw/gpu_rotated_v2/trace.json --trace build/issue218_raw/gpu_readback/trace.json --trace build/issue218_raw/gpu_aba_readback/trace.json --output native/nemotron/issue218_reproduced_summary.json"
+  ],
+  "handoff": "Director owns final acceptance/configuration manifest, issue218_acceptance.json, issue218_review_record.json, integration report and Git. This result is experiment evidence/proposed dispositions, not integration/review approval or acceptance.",
+  "byte_provenance": {
+    "correction_scope": "Metadata only: summary trace_path/trace_sha256 rebound to authoritative archived LF bytes; all case, timing, quality, call, resource and counter results retained. Historical analysis command/hash remains the executed analysis record, not an assertion that it directly consumed ZIP members.",
+    "execution_time_sanitization": "Before original execution JSON file write, the driver replaced current home directory in slash and escaped-backslash path forms with <USER_HOME>. The original execution-file hashes here refer to those already privacy-sanitized UTF-8 reports written with Windows CRLF, not to an unsanitized/private report. No unsanitized report hash was recorded.",
+    "archive_text_normalization": "Text was transported through Eval read(path) and write-to-ZIP as UTF-8 LF. Exact cause for all five differing trace hashes is CRLF-to-LF normalization, not post-analysis header edits: LF-to-CRLF expansion of each archived member reproduces its historical recorded execution-file SHA256 exactly.",
+    "preservation_claim": "Complete privacy-sanitized JSON content is retained in portable LF form. The archives are not claimed to store the original CRLF file bytes unchanged; original-file and portable-file hashes are explicitly distinct. Original CRLF representation is reconstructible by documented LF-to-CRLF expansion with matching recorded hash.",
+    "authority": "Current runs[].trace_path is the stable ZIP-member reference; runs[].trace_sha256 is the SHA256 of that actual portable member. Extraction path chosen by a reproducer is not its immutable identity.",
+    "not_modified": "No inference, selector decisions, statistical computation, cases, observations, model/audio hashes, native timestamps, PNGs, ZIPs or original trace JSON headers were changed by this correction.",
+    "director_evidence_reused": "Director reports both ZIP CRCs passed and all case/statistical/counter results reproduced identically in2.50s; reused, not rerun by worker.",
+    "traces": [
+      {
+        "authoritative_archive_member": "native/nemotron/issue218_evidence.zip:cpu_initial/trace.json",
+        "portable_trace_sha256": "8a1243b17e907ecec6a785f490262bb8ab2bbd52b84bf30af0d2cb819fda01f2",
+        "historical_execution_file_path": "native/nemotron/issue218_cpu_initial/trace.json",
+        "historical_execution_file_sha256": "bc74421f2263f9a89ab944de41cd35872d12c0b57eff1fcc59734edcf3d17a3f",
+        "portable_utf8_LF_bytes": 21823627,
+        "historical_utf8_CRLF_bytes": 22368622,
+        "portable_LF_count": 544995,
+        "portable_CR_count": 0,
+        "LF_to_CRLF_reconstruction_sha256": "bc74421f2263f9a89ab944de41cd35872d12c0b57eff1fcc59734edcf3d17a3f",
+        "reconstruction_matches_recorded_execution_hash": true
+      },
+      {
+        "authoritative_archive_member": "native/nemotron/issue218_evidence.zip:cpu_rotated_readback/trace.json",
+        "portable_trace_sha256": "fcf5a82adfc0eaa3e09686d61c2607dcd7306741b992762b92fbed35f53a79fe",
+        "historical_execution_file_path": "native/nemotron/issue218_cpu_rotated_readback/trace.json",
+        "historical_execution_file_sha256": "39669b39050e511cffe96d28accd331e394608afc1275056979bd55f56df353a",
+        "portable_utf8_LF_bytes": 32285228,
+        "historical_utf8_CRLF_bytes": 33096914,
+        "portable_LF_count": 811686,
+        "portable_CR_count": 0,
+        "LF_to_CRLF_reconstruction_sha256": "39669b39050e511cffe96d28accd331e394608afc1275056979bd55f56df353a",
+        "reconstruction_matches_recorded_execution_hash": true
+      },
+      {
+        "authoritative_archive_member": "native/nemotron/issue218_evidence.zip:gpu_rotated_v2/trace.json",
+        "portable_trace_sha256": "d09e1cb58ecb290058dfae1945e3e4475f456e36bf4d6d0e56b0e8582e4d4c6d",
+        "historical_execution_file_path": "native/nemotron/issue218_gpu_rotated_v2/trace.json",
+        "historical_execution_file_sha256": "529802f46ac41e0ba5e8a686ab23337b23eb6b6c372e5d15fd8004e4f97ef50d",
+        "portable_utf8_LF_bytes": 109913419,
+        "historical_utf8_CRLF_bytes": 112666608,
+        "portable_LF_count": 2753189,
+        "portable_CR_count": 0,
+        "LF_to_CRLF_reconstruction_sha256": "529802f46ac41e0ba5e8a686ab23337b23eb6b6c372e5d15fd8004e4f97ef50d",
+        "reconstruction_matches_recorded_execution_hash": true
+      },
+      {
+        "authoritative_archive_member": "native/nemotron/issue218_evidence_aux.zip:gpu_readback/trace.json",
+        "portable_trace_sha256": "35db1533a5f6ba7a3bdd3ac3a0152d2721394e54ee899fab40c23ee277d766a4",
+        "historical_execution_file_path": "native/nemotron/issue218_gpu_readback/trace.json",
+        "historical_execution_file_sha256": "b7dd8e03b92bc1ae89f8e8c4227ba8dc747095d91fae66dff11c1c4936d7ad9b",
+        "portable_utf8_LF_bytes": 5053396,
+        "historical_utf8_CRLF_bytes": 5178510,
+        "portable_LF_count": 125114,
+        "portable_CR_count": 0,
+        "LF_to_CRLF_reconstruction_sha256": "b7dd8e03b92bc1ae89f8e8c4227ba8dc747095d91fae66dff11c1c4936d7ad9b",
+        "reconstruction_matches_recorded_execution_hash": true
+      },
+      {
+        "authoritative_archive_member": "native/nemotron/issue218_evidence_aux.zip:gpu_aba_readback/trace.json",
+        "portable_trace_sha256": "7ba63e7bdb93170f89aaa9906bf80aac0767f39acbe6264a771bcc8ae7b6f406",
+        "historical_execution_file_path": "native/nemotron/issue218_gpu_aba_readback/trace.json",
+        "historical_execution_file_sha256": "db73652ee0a6f52d53936f40dd0f33bc2ce98ceafb6a2c5f1695a8f0c1dc41d0",
+        "portable_utf8_LF_bytes": 8113861,
+        "historical_utf8_CRLF_bytes": 8310518,
+        "portable_LF_count": 196657,
+        "portable_CR_count": 0,
+        "LF_to_CRLF_reconstruction_sha256": "db73652ee0a6f52d53936f40dd0f33bc2ce98ceafb6a2c5f1695a8f0c1dc41d0",
+        "reconstruction_matches_recorded_execution_hash": true
+      }
+    ],
+    "counters": [
+      {
+        "archive_member": "native/nemotron/issue218_evidence_aux.zip:cpu_rotated_readback/gpu_counters.jsonl",
+        "execution_stdout_sha256_recorded_in_trace_header": "3ad3522bb0d18a42ee2333d5faf54f594c492979f0813b92dc894b11aff3ccbb",
+        "portable_archive_sha256": "9b7cb119caf916b7df89b99d24831fafee86ff5bf9cdbe6a3455833d4cdb40ff",
+        "CRLF_reconstruction_sha256": "3ad3522bb0d18a42ee2333d5faf54f594c492979f0813b92dc894b11aff3ccbb",
+        "CRLF_reconstruction_matches_execution_stdout": true,
+        "portable_CR_count": 0,
+        "portable_LF_count": 176
+      },
+      {
+        "archive_member": "native/nemotron/issue218_evidence_aux.zip:gpu_rotated_v2/gpu_counters.jsonl",
+        "execution_stdout_sha256_recorded_in_trace_header": "da0548e540bc464e8655a75332fb37d5fc03f08317ee78db07b76ccd3557ec2e",
+        "portable_archive_sha256": "256db6c1e5a2b7139b84804dfe30a00ecb596aed65cf02a60ded2f167762bb99",
+        "CRLF_reconstruction_sha256": "da0548e540bc464e8655a75332fb37d5fc03f08317ee78db07b76ccd3557ec2e",
+        "CRLF_reconstruction_matches_execution_stdout": true,
+        "portable_CR_count": 0,
+        "portable_LF_count": 572
+      },
+      {
+        "archive_member": "native/nemotron/issue218_evidence_aux.zip:gpu_readback/gpu_counters.jsonl",
+        "execution_stdout_sha256_recorded_in_trace_header": "b1c5477f461e0d943e6d8ef454bf12219e06676085dfbaaa540c0e14787e4904",
+        "portable_archive_sha256": "e9663b82f4dfd5680e1a7e89a2735d13eb92280a0c51a1044cfa8c75cf46b9ce",
+        "CRLF_reconstruction_sha256": "b1c5477f461e0d943e6d8ef454bf12219e06676085dfbaaa540c0e14787e4904",
+        "CRLF_reconstruction_matches_execution_stdout": true,
+        "portable_CR_count": 0,
+        "portable_LF_count": 30
+      },
+      {
+        "archive_member": "native/nemotron/issue218_evidence_aux.zip:gpu_aba_readback/gpu_counters.jsonl",
+        "execution_stdout_sha256_recorded_in_trace_header": "89117b0c4c1c3b0fcef00e4fbb168a1595ab69ba5f14f1daa4a7e418330167db",
+        "portable_archive_sha256": "05ea2c10b1e05e1ebd0c7bc56c9e4cf8df6cbca739e15a31f255140e5e71025b",
+        "CRLF_reconstruction_sha256": "89117b0c4c1c3b0fcef00e4fbb168a1595ab69ba5f14f1daa4a7e418330167db",
+        "CRLF_reconstruction_matches_execution_stdout": true,
+        "portable_CR_count": 0,
+        "portable_LF_count": 37
+      }
+    ]
+  }
+}

@@ -1,0 +1,3074 @@
+{
+  "schema": "issue218-recorded-attribution-diagnosis-1",
+  "command": [
+    "native/nemotron/issue218_attribution.py",
+    "--trace",
+    "native/nemotron/issue218_cpu_rotated_readback/trace.json",
+    "--trace",
+    "native/nemotron/issue218_gpu_rotated_v2/trace.json",
+    "--output",
+    "native/nemotron/issue218_attribution.json"
+  ],
+  "thresholds": {
+    "active": 0.5,
+    "clear": 0.8,
+    "quiet": 0.2,
+    "competing": 0.35,
+    "MAX_FRAMES": 2048
+  },
+  "source": "Frozen CausalBatchSession._attribute considers every supplied source/context span, not majority duration; attribution frozen at _submit, before ASR final/admission; downstream allocator cannot invent keys for uncertain/unavailable/mixed.",
+  "rows": [
+    {
+      "route": "cpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "03e6eee8e5c845dfb34ab4aed48a3be4",
+      "native_slice_id": "7f390aaf1d294d22879d571a69037dfa",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "1"
+      },
+      "actual_submit_at": 136420.3781812,
+      "source_available_at": 136420.5239731,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 492,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32960,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        1
+      ],
+      "top_probability_min": 0.00053423858480528,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "03e6eee8e5c845dfb34ab4aed48a3be4",
+      "native_slice_id": "9c77c0920f0e459ca4ba080a1c446871",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "1"
+      },
+      "actual_submit_at": 136421.0991085,
+      "source_available_at": 136421.2098669,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 512,
+      "selected_source_plus_context_unique_samples": 27584,
+      "eligible_coverage_unique_samples": 9600,
+      "missing_eligible_samples": 17984,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 9440,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        1
+      ],
+      "top_probability_min": 0.7632228136062622,
+      "top_probability_max": 0.9987567663192749,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "eb65cca395b34b9e90bca1924d4d757e",
+      "native_slice_id": "fce787a9f363489eb7827e82550f2e8a",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 136429.6203108,
+      "source_available_at": 136429.7410382,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 492,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32960,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.00053423858480528,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "eb65cca395b34b9e90bca1924d4d757e",
+      "native_slice_id": "f7d0d1f179674a8ab417396d0bb70224",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 136431.06342,
+      "source_available_at": 136431.1443007,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 680,
+      "selected_source_plus_context_unique_samples": 26240,
+      "eligible_coverage_unique_samples": 26240,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 23360,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.01466891448944807,
+      "top_probability_max": 0.998869776725769,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "Yeah.",
+      "parent_request_id": "eb65cca395b34b9e90bca1924d4d757e",
+      "native_slice_id": "69c3c7e157f24b95a592dc915158d498",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 136432.1271519,
+      "source_available_at": 136432.2194261,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 786,
+      "selected_source_plus_context_unique_samples": 29504,
+      "eligible_coverage_unique_samples": 17920,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17760,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.7360673546791077,
+      "top_probability_max": 0.999863862991333,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+      "parent_request_id": "a0627e2584694e8d8563a1067d53fe1e",
+      "native_slice_id": "58e67870c3ac4414b9201a225afb1c26",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "5"
+      },
+      "actual_submit_at": 136444.5044604,
+      "source_available_at": 136444.7378525,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 830,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 92160,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 84480,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        5
+      ],
+      "top_probability_min": 0.00022811710368841887,
+      "top_probability_max": 0.9999934434890747,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "linguistic_correction",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "No, no. Three.",
+      "parent_request_id": "94000e7fca2c43b0950f2a21a4f3e2cf",
+      "native_slice_id": "744b606bf187454cbb3b351e6c7b5e20",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "7"
+      },
+      "actual_submit_at": 136452.5130509,
+      "source_available_at": 136452.6179071,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 299,
+      "selected_source_plus_context_unique_samples": 41280,
+      "eligible_coverage_unique_samples": 34560,
+      "missing_eligible_samples": 6720,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17280,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        7
+      ],
+      "top_probability_min": 2.7179688913747668e-05,
+      "top_probability_max": 0.9990814924240112,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "ffc287ba6fe243249494d0d8bc074c2a",
+      "native_slice_id": "4d347ac97ec74c37a9bbc21fd38474a5",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "9"
+      },
+      "actual_submit_at": 136460.1891236,
+      "source_available_at": 136460.3168193,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 46080,
+      "eligible_coverage_unique_samples": 46080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        9
+      ],
+      "top_probability_min": 0.0022367562633007765,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "No.",
+      "parent_request_id": "ffc287ba6fe243249494d0d8bc074c2a",
+      "native_slice_id": "cad6688189c7480f8048d90a5fd4b95a",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "9"
+      },
+      "actual_submit_at": 136460.1905603,
+      "source_available_at": 136460.361453,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 6720,
+      "eligible_coverage_unique_samples": 6720,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 5600,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        9
+      ],
+      "top_probability_min": 0.09394676238298416,
+      "top_probability_max": 0.9867117404937744,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "synthetic_overlap",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the Detroiters from his hair. Gentlemen of the press.",
+      "parent_request_id": "3ddd6e14def24803aa95216633e2bbcd",
+      "native_slice_id": "bb50e7d67b904359a107a3c60d075c4a",
+      "actual_frozen_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "11"
+      },
+      "actual_submit_at": 136471.5295747,
+      "source_available_at": 136471.7093078,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 594,
+      "selected_source_plus_context_unique_samples": 79680,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 160,
+      "clear_unique_samples": 40160,
+      "observed_active_slots": [
+        0,
+        1
+      ],
+      "observed_epochs": [
+        11
+      ],
+      "top_probability_min": 0.0022367562633007765,
+      "top_probability_max": 0.9999598264694214,
+      "reconstructed_purity_state": "mixed",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "831edcd81fe446f1a41fa915b748cad9",
+      "native_slice_id": "eb7aa3dbb8b4416ea724353e24971175",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "13"
+      },
+      "actual_submit_at": 136479.5586527,
+      "source_available_at": 136479.6812986,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 455,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        13
+      ],
+      "top_probability_min": 0.0007597376825287938,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "831edcd81fe446f1a41fa915b748cad9",
+      "native_slice_id": "5f18c4d1b8fe43cb98d12a662cc91520",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "13"
+      },
+      "actual_submit_at": 136480.6997342,
+      "source_available_at": 136480.7918091,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 586,
+      "selected_source_plus_context_unique_samples": 27584,
+      "eligible_coverage_unique_samples": 21120,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 20960,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        13
+      ],
+      "top_probability_min": 0.7573774456977844,
+      "top_probability_max": 0.9986306428909302,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "2efc3b8ed2b44b6e8805cb2ffa8e606e",
+      "native_slice_id": "13864ba51e8e4fb5a9053f4a2c37b957",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "15"
+      },
+      "actual_submit_at": 136488.9049144,
+      "source_available_at": 136489.0289853,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 455,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        15
+      ],
+      "top_probability_min": 0.0007597376825287938,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "2efc3b8ed2b44b6e8805cb2ffa8e606e",
+      "native_slice_id": "016ba13b9d3f4c419d6e508ccc226c15",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "15"
+      },
+      "actual_submit_at": 136490.3349541,
+      "source_available_at": 136490.4228459,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 643,
+      "selected_source_plus_context_unique_samples": 26080,
+      "eligible_coverage_unique_samples": 26080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 23360,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        15
+      ],
+      "top_probability_min": 0.014835634268820286,
+      "top_probability_max": 0.9986306428909302,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "The UN also hopes to finalize a fund to help countries affected by global warming to cope with the",
+      "parent_request_id": "3ef460c8dc16439e84275f11b363341f",
+      "native_slice_id": "152355683d2f4a12b07d7d47066b7d0f",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "17"
+      },
+      "actual_submit_at": 136504.3160752,
+      "source_available_at": 136504.548406,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 877,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 99840,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 92160,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        17
+      ],
+      "top_probability_min": 0.055514171719551086,
+      "top_probability_max": 0.999996542930603,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "linguistic_correction",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "No, no. Three.",
+      "parent_request_id": "4f23441b9fa24ca4bc0d14b21034421b",
+      "native_slice_id": "15d22223c81940c6b7d243941bd6475b",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "19"
+      },
+      "actual_submit_at": 136512.6177351,
+      "source_available_at": 136512.7391387,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 275,
+      "selected_source_plus_context_unique_samples": 41280,
+      "eligible_coverage_unique_samples": 30720,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 640,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17120,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        19
+      ],
+      "top_probability_min": 0.00188660086132586,
+      "top_probability_max": 0.9993379712104797,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "c8a48b2020fb4447bf41043515f4025b",
+      "native_slice_id": "1dba29b44d23455386c6b64dc81ac164",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "21"
+      },
+      "actual_submit_at": 136520.2613394,
+      "source_available_at": 136520.3806443,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 46080,
+      "eligible_coverage_unique_samples": 46080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1280,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        21
+      ],
+      "top_probability_min": 0.002304821740835905,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "No.",
+      "parent_request_id": "c8a48b2020fb4447bf41043515f4025b",
+      "native_slice_id": "658eab831ba648ffb659863f6b9fcbf9",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "21"
+      },
+      "actual_submit_at": 136520.2625837,
+      "source_available_at": 136520.4249591,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 6720,
+      "eligible_coverage_unique_samples": 6720,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 5600,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        21
+      ],
+      "top_probability_min": 0.12719124555587769,
+      "top_probability_max": 0.9868261814117432,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "cpu",
+      "case": "synthetic_overlap",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the Detroiters from his hair. Gentlemen of the press.",
+      "parent_request_id": "7ae74bb9be49452a9205b513c93c0bbc",
+      "native_slice_id": "a0ab8ab2244542e9bfb843fb8b24d7ae",
+      "actual_frozen_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "23"
+      },
+      "actual_submit_at": 136532.2563477,
+      "source_available_at": 136532.4510645,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 594,
+      "selected_source_plus_context_unique_samples": 79680,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 40000,
+      "observed_active_slots": [
+        0,
+        1
+      ],
+      "observed_epochs": [
+        23
+      ],
+      "top_probability_min": 0.002304821740835905,
+      "top_probability_max": 0.9999221563339233,
+      "reconstructed_purity_state": "mixed",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "ec51a9d08c9944c0a50f3d7ab1be7581",
+      "native_slice_id": "f004392010664bb3b3fe198b89dc524f",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "1"
+      },
+      "actual_submit_at": 135887.4326656,
+      "source_available_at": 135887.647533,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32960,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        1
+      ],
+      "top_probability_min": 0.00053423858480528,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "ec51a9d08c9944c0a50f3d7ab1be7581",
+      "native_slice_id": "f929219fb11d4a07a276e5be47df758d",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "1"
+      },
+      "actual_submit_at": 135888.1641562,
+      "source_available_at": 135888.295839,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 586,
+      "selected_source_plus_context_unique_samples": 27584,
+      "eligible_coverage_unique_samples": 21120,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 20960,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        1
+      ],
+      "top_probability_min": 0.7632228136062622,
+      "top_probability_max": 0.9988704919815063,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "1ebab4de9d5f43afba357dc368cabe9b",
+      "native_slice_id": "6d54cc451a00421fb71c2acbd902304b",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 135896.5749517,
+      "source_available_at": 135896.829735,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32960,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.00053423858480528,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "1ebab4de9d5f43afba357dc368cabe9b",
+      "native_slice_id": "85bec9be61b2420c9ee3271beb6a8c10",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 135898.0054393,
+      "source_available_at": 135898.1473835,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 680,
+      "selected_source_plus_context_unique_samples": 26240,
+      "eligible_coverage_unique_samples": 26240,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 23360,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.01466891448944807,
+      "top_probability_max": 0.998869776725769,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his.",
+      "parent_request_id": "1ebab4de9d5f43afba357dc368cabe9b",
+      "native_slice_id": "35f5a22bd1494175829b514fb691a243",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 135899.0842675,
+      "source_available_at": 135899.2215376,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 786,
+      "selected_source_plus_context_unique_samples": 29504,
+      "eligible_coverage_unique_samples": 17920,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17760,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.7360673546791077,
+      "top_probability_max": 0.999863862991333,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "From his hair.",
+      "parent_request_id": "bae47c2bc0b345cba655973b056eac4b",
+      "native_slice_id": "274c8e4ad33d4905b996ba75f0d1823b",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "3"
+      },
+      "actual_submit_at": 135900.0291514,
+      "source_available_at": 135900.1368527,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 887,
+      "selected_source_plus_context_unique_samples": 20160,
+      "eligible_coverage_unique_samples": 4736,
+      "missing_eligible_samples": 15424,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 4736,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        3
+      ],
+      "top_probability_min": 0.9977237582206726,
+      "top_probability_max": 0.9998242259025574,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+      "parent_request_id": "b434379961da43e48677d72d2fa9b31c",
+      "native_slice_id": "d85ce88a72c846799cd49284e2cbdb87",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "5"
+      },
+      "actual_submit_at": 135911.3835504,
+      "source_available_at": 135911.7927549,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 830,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 92160,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 84480,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        5
+      ],
+      "top_probability_min": 0.00022811710368841887,
+      "top_probability_max": 0.9999934434890747,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "With the impacts.",
+      "parent_request_id": "c81f26867ac3458a9e8b082361bf9276",
+      "native_slice_id": "7c7eae7d2e3f4d1886fcb1a8990fb9ef",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "5"
+      },
+      "actual_submit_at": 135912.5974962,
+      "source_available_at": 135912.7013952,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1012,
+      "selected_source_plus_context_unique_samples": 24768,
+      "eligible_coverage_unique_samples": 16256,
+      "missing_eligible_samples": 8512,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 13536,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        5
+      ],
+      "top_probability_min": 3.951633334509097e-05,
+      "top_probability_max": 0.9999945163726807,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "No, no, three.",
+      "parent_request_id": "c925140c0954487993985a06525af29a",
+      "native_slice_id": "e0d7f730f6a445fe8ac520f5958fe82b",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "7"
+      },
+      "actual_submit_at": 135919.2632262,
+      "source_available_at": 135919.5358831,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 299,
+      "selected_source_plus_context_unique_samples": 41280,
+      "eligible_coverage_unique_samples": 34560,
+      "missing_eligible_samples": 6720,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17280,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        7
+      ],
+      "top_probability_min": 2.7179688913747668e-05,
+      "top_probability_max": 0.9990814924240112,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "3c3bb1e5ef2047228dacbe18ed021e49",
+      "native_slice_id": "6effb5bf30a94d0e9529971c171e11ff",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "9"
+      },
+      "actual_submit_at": 135927.0639521,
+      "source_available_at": 135927.3851311,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 46080,
+      "eligible_coverage_unique_samples": 46080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        9
+      ],
+      "top_probability_min": 0.0022367562633007765,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "No.",
+      "parent_request_id": "3c3bb1e5ef2047228dacbe18ed021e49",
+      "native_slice_id": "1f3cdb05c25542c79bc1105e4cc2a98f",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "9"
+      },
+      "actual_submit_at": 135927.0654399,
+      "source_available_at": 135927.7453687,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 6720,
+      "eligible_coverage_unique_samples": 6720,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 5600,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        9
+      ],
+      "top_probability_min": 0.09394676238298416,
+      "top_probability_max": 0.9867117404937744,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "3c3bb1e5ef2047228dacbe18ed021e49",
+      "native_slice_id": "b86d941c07884ecba36015e076e8d59c",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "9"
+      },
+      "actual_submit_at": 135928.7268808,
+      "source_available_at": 135928.8757933,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 687,
+      "selected_source_plus_context_unique_samples": 37632,
+      "eligible_coverage_unique_samples": 27840,
+      "missing_eligible_samples": 9792,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 27520,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        9
+      ],
+      "top_probability_min": 0.5104352235794067,
+      "top_probability_max": 0.9997807145118713,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "또한 유엔은 지구 온난화의 영향을 받는 국가들의 대처를 돕기 위한.",
+      "parent_request_id": "c9edad01173c4932922d07922bb26ea4",
+      "native_slice_id": "6d7de4e6fb7b4312b8a398df7e338bc4",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "11"
+      },
+      "actual_submit_at": 135940.7704171,
+      "source_available_at": 135941.1983715,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 749,
+      "selected_source_plus_context_unique_samples": 85312,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 16192,
+      "uncertain_unique_samples": 6720,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 61760,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        11
+      ],
+      "top_probability_min": 0.36964476108551025,
+      "top_probability_max": 0.9992443323135376,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "기금의 조성을 완료하기를 기대하고 있습니다.",
+      "parent_request_id": "bf1a9ad9bb264197a39db1a7107ff8c6",
+      "native_slice_id": "e4ea9cde88a5452fac0e333c6440a026",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "11"
+      },
+      "actual_submit_at": 135944.447226,
+      "source_available_at": 135944.6486031,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1296,
+      "selected_source_plus_context_unique_samples": 58880,
+      "eligible_coverage_unique_samples": 52928,
+      "missing_eligible_samples": 5952,
+      "uncertain_unique_samples": 448,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 45440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        11
+      ],
+      "top_probability_min": 0.005474643316119909,
+      "top_probability_max": 0.9975882768630981,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "また国連では地球温暖化の影響を被っている国々がその影響に対処できるように支援する。",
+      "parent_request_id": "d7f2d14986e048238e5e06d9e29671b4",
+      "native_slice_id": "7d4885158f3a4b9d8c1dc28e775be026",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "13"
+      },
+      "actual_submit_at": 135959.2062627,
+      "source_available_at": 135959.6442997,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 918,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 92160,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 84160,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        13
+      ],
+      "top_probability_min": 0.00564099894836545,
+      "top_probability_max": 0.9999536275863647,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "する対話の結果について最終決定したいと考えています。",
+      "parent_request_id": "2122d6a3394f4fd8ae9066677bac2c9a",
+      "native_slice_id": "1abc49f8a44a4e3ea42c4c1faeeabe8b",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "13"
+      },
+      "actual_submit_at": 135963.1858074,
+      "source_available_at": 135963.3888053,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1474,
+      "selected_source_plus_context_unique_samples": 68800,
+      "eligible_coverage_unique_samples": 62336,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 57696,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        13
+      ],
+      "top_probability_min": 0.007895505987107754,
+      "top_probability_max": 0.9999523162841797,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "synthetic_overlap",
+      "profile": "1.04",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "6ad0a8bc2246475a9dcbc24eb396e5c4",
+      "native_slice_id": "9350b75790704984913c7af2fbe3ca5c",
+      "actual_frozen_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "15"
+      },
+      "actual_submit_at": 135975.2103365,
+      "source_available_at": 135975.4617475,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 594,
+      "selected_source_plus_context_unique_samples": 79680,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 160,
+      "clear_unique_samples": 40160,
+      "observed_active_slots": [
+        0,
+        1
+      ],
+      "observed_epochs": [
+        15
+      ],
+      "top_probability_min": 0.0022367562633007765,
+      "top_probability_max": 0.9999598264694214,
+      "reconstructed_purity_state": "mixed",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "bfab747793eb413594a1d2178e4b5520",
+      "native_slice_id": "520c4bcc26bd4bb6bbc4e478dd9b7965",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "17"
+      },
+      "actual_submit_at": 135982.9228245,
+      "source_available_at": 135983.1519886,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        17
+      ],
+      "top_probability_min": 0.0007597376825287938,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "bfab747793eb413594a1d2178e4b5520",
+      "native_slice_id": "c3911b147ab645f9b09ec4680b55872c",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "17"
+      },
+      "actual_submit_at": 135984.0816635,
+      "source_available_at": 135984.2059533,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 586,
+      "selected_source_plus_context_unique_samples": 27584,
+      "eligible_coverage_unique_samples": 21120,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 20960,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        17
+      ],
+      "top_probability_min": 0.7573774456977844,
+      "top_probability_max": 0.9986306428909302,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "0e18b96b564e47c4bef559aa5b16c463",
+      "native_slice_id": "00e1e0dde963430bbe855868dc0110f0",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "19"
+      },
+      "actual_submit_at": 135991.9106032,
+      "source_available_at": 135992.1209843,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        19
+      ],
+      "top_probability_min": 0.0007597376825287938,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "0e18b96b564e47c4bef559aa5b16c463",
+      "native_slice_id": "606873a0fd294f90b90b4dd2f0a29075",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "19"
+      },
+      "actual_submit_at": 135993.3480979,
+      "source_available_at": 135993.4846658,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 643,
+      "selected_source_plus_context_unique_samples": 26080,
+      "eligible_coverage_unique_samples": 26080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 23360,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        19
+      ],
+      "top_probability_min": 0.014835634268820286,
+      "top_probability_max": 0.9986306428909302,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his.",
+      "parent_request_id": "0e18b96b564e47c4bef559aa5b16c463",
+      "native_slice_id": "7ebf2d61e9454839a1559f86f121c0e3",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "19"
+      },
+      "actual_submit_at": 135994.832737,
+      "source_available_at": 135994.9704476,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 834,
+      "selected_source_plus_context_unique_samples": 29664,
+      "eligible_coverage_unique_samples": 25760,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 25440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        19
+      ],
+      "top_probability_min": 0.5226427316665649,
+      "top_probability_max": 0.9999268054962158,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "From his hair.",
+      "parent_request_id": "f8db52c4dcdc4fa4836ad02cdc19e035",
+      "native_slice_id": "9992d5d29ac74c0dbd8370a2a66d1a22",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "19"
+      },
+      "actual_submit_at": 135995.7882465,
+      "source_available_at": 135995.895195,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 959,
+      "selected_source_plus_context_unique_samples": 20160,
+      "eligible_coverage_unique_samples": 16256,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 960,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 8576,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        19
+      ],
+      "top_probability_min": 0.01224239356815815,
+      "top_probability_max": 0.9998475313186646,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+      "parent_request_id": "3a2e99c873a149629d1f88c1427fe787",
+      "native_slice_id": "3a2b7b2298f042d48409d74ecf7b2874",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "21"
+      },
+      "actual_submit_at": 136007.1599708,
+      "source_available_at": 136007.6148053,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 878,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 99840,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 92160,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        21
+      ],
+      "top_probability_min": 0.055514171719551086,
+      "top_probability_max": 0.999996542930603,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "With the impacts.",
+      "parent_request_id": "d8b2f4ac901b49c5aedbb4831d75405c",
+      "native_slice_id": "cec9a54f70c9449480072261e350175b",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "21"
+      },
+      "actual_submit_at": 136008.373844,
+      "source_available_at": 136008.5146711,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1012,
+      "selected_source_plus_context_unique_samples": 24768,
+      "eligible_coverage_unique_samples": 16256,
+      "missing_eligible_samples": 8512,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 13536,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        21
+      ],
+      "top_probability_min": 4.9295933422399685e-05,
+      "top_probability_max": 0.999994158744812,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "No, no, three.",
+      "parent_request_id": "0bad6c01c2224b709f6f3c1b6b605686",
+      "native_slice_id": "a6173d1a9d304a408e6499d806855449",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "23"
+      },
+      "actual_submit_at": 136015.4653868,
+      "source_available_at": 136015.7391982,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 275,
+      "selected_source_plus_context_unique_samples": 41280,
+      "eligible_coverage_unique_samples": 30720,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 640,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17120,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        23
+      ],
+      "top_probability_min": 0.00188660086132586,
+      "top_probability_max": 0.9993379712104797,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "cda7156fc3d04fb390764b4cea9f26d6",
+      "native_slice_id": "157d9a74c3ee45e9a627c2c9f49fdefe",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "25"
+      },
+      "actual_submit_at": 136022.9639443,
+      "source_available_at": 136023.2144236,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 46080,
+      "eligible_coverage_unique_samples": 46080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1280,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        25
+      ],
+      "top_probability_min": 0.002304821740835905,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "No.",
+      "parent_request_id": "cda7156fc3d04fb390764b4cea9f26d6",
+      "native_slice_id": "3df5a781c3764afa8c9af1c25eec0c10",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "25"
+      },
+      "actual_submit_at": 136022.9650929,
+      "source_available_at": 136023.3095525,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 6720,
+      "eligible_coverage_unique_samples": 6720,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 5600,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        25
+      ],
+      "top_probability_min": 0.12719124555587769,
+      "top_probability_max": 0.9868261814117432,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "cda7156fc3d04fb390764b4cea9f26d6",
+      "native_slice_id": "1bccf323619546ebb33f40da5fffcdc2",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "25"
+      },
+      "actual_submit_at": 136025.0374036,
+      "source_available_at": 136025.1870714,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 711,
+      "selected_source_plus_context_unique_samples": 37632,
+      "eligible_coverage_unique_samples": 31680,
+      "missing_eligible_samples": 5952,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 31360,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        25
+      ],
+      "top_probability_min": 0.5022190809249878,
+      "top_probability_max": 0.9998151659965515,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "또한 유엔은 지구 온난화의 영향을 받는 국가들의 대처를 돕기 위한.",
+      "parent_request_id": "4d09b8ba83ce4181a470fe4a1b083ff2",
+      "native_slice_id": "b0bfa30f772343fdbf99cf0c699d367a",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "27"
+      },
+      "actual_submit_at": 136037.386894,
+      "source_available_at": 136037.9301643,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 797,
+      "selected_source_plus_context_unique_samples": 85312,
+      "eligible_coverage_unique_samples": 76800,
+      "missing_eligible_samples": 8512,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 69440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        27
+      ],
+      "top_probability_min": 0.008901260793209076,
+      "top_probability_max": 0.9992330074310303,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "기금의 조성을 완료하기를 기대하고 있습니다.",
+      "parent_request_id": "ee5e60be6bc14362aa0085e2fd53799e",
+      "native_slice_id": "792afd3aa5bf481e8f5ef198de469f4b",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "27"
+      },
+      "actual_submit_at": 136041.0551603,
+      "source_available_at": 136041.2638085,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1296,
+      "selected_source_plus_context_unique_samples": 58880,
+      "eligible_coverage_unique_samples": 52928,
+      "missing_eligible_samples": 5952,
+      "uncertain_unique_samples": 448,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 45440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        27
+      ],
+      "top_probability_min": 0.005781648214906454,
+      "top_probability_max": 0.9978087544441223,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "また国連では地球温暖化の影響を被っている国々がその影響に対処できるように支援する。",
+      "parent_request_id": "e5c54faa05274691ab70251eba0026c9",
+      "native_slice_id": "1b0495b78f4a4a608d2cb674122d37c7",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "29"
+      },
+      "actual_submit_at": 136056.2930633,
+      "source_available_at": 136056.6441996,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 966,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 99840,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 92000,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        29
+      ],
+      "top_probability_min": 0.040980447083711624,
+      "top_probability_max": 0.9999548196792603,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "する対話の結果について最終決定したいと考えています。",
+      "parent_request_id": "72cef9e8a0cd4987b52ba7812929a846",
+      "native_slice_id": "cbc2682b4d5545ebbdc56dd1b4f66327",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "29"
+      },
+      "actual_submit_at": 136060.2703284,
+      "source_available_at": 136060.4928077,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1474,
+      "selected_source_plus_context_unique_samples": 68800,
+      "eligible_coverage_unique_samples": 62336,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 800,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 57536,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        29
+      ],
+      "top_probability_min": 0.04499368742108345,
+      "top_probability_max": 0.99994957447052,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "synthetic_overlap",
+      "profile": "0.64",
+      "repetition": 1,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "8a36fef4295842c7b98afb75269568ae",
+      "native_slice_id": "6c7ac1634c224245b86737dfb51da07f",
+      "actual_frozen_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "31"
+      },
+      "actual_submit_at": 136072.544437,
+      "source_available_at": 136072.7744007,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 594,
+      "selected_source_plus_context_unique_samples": 79680,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 40000,
+      "observed_active_slots": [
+        0,
+        1
+      ],
+      "observed_epochs": [
+        31
+      ],
+      "top_probability_min": 0.002304821740835905,
+      "top_probability_max": 0.9999221563339233,
+      "reconstructed_purity_state": "mixed",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "755898dc51c04e8f9b9386c5aa804092",
+      "native_slice_id": "1a62986c39a44b6381d129899b9b3101",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "33"
+      },
+      "actual_submit_at": 136080.887703,
+      "source_available_at": 136081.1255102,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32960,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        33
+      ],
+      "top_probability_min": 0.00053423858480528,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "755898dc51c04e8f9b9386c5aa804092",
+      "native_slice_id": "97ad61e96b0d4303b6f6d82fa39b110e",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "33"
+      },
+      "actual_submit_at": 136081.6084034,
+      "source_available_at": 136081.7350719,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 586,
+      "selected_source_plus_context_unique_samples": 27584,
+      "eligible_coverage_unique_samples": 21120,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 20960,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        33
+      ],
+      "top_probability_min": 0.7632228136062622,
+      "top_probability_max": 0.9988704919815063,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "ea229426228d40e1b8d7f5badf19f515",
+      "native_slice_id": "53c18506372c4cd39623644e52545492",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "35"
+      },
+      "actual_submit_at": 136090.5322607,
+      "source_available_at": 136090.7870827,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 491,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32960,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        35
+      ],
+      "top_probability_min": 0.00053423858480528,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "ea229426228d40e1b8d7f5badf19f515",
+      "native_slice_id": "9923e6850ac046d691fdc460e38cd709",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "35"
+      },
+      "actual_submit_at": 136091.9473262,
+      "source_available_at": 136092.0713664,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 680,
+      "selected_source_plus_context_unique_samples": 26240,
+      "eligible_coverage_unique_samples": 26240,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 23360,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        35
+      ],
+      "top_probability_min": 0.01466891448944807,
+      "top_probability_max": 0.998869776725769,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "He washed the detritus from his.",
+      "parent_request_id": "ea229426228d40e1b8d7f5badf19f515",
+      "native_slice_id": "592eac9df9254ee680b272b6e93ebf2d",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "35"
+      },
+      "actual_submit_at": 136093.0208982,
+      "source_available_at": 136093.1560565,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 786,
+      "selected_source_plus_context_unique_samples": 29504,
+      "eligible_coverage_unique_samples": 17920,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17760,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        35
+      ],
+      "top_probability_min": 0.7360673546791077,
+      "top_probability_max": 0.999863862991333,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "From his hair.",
+      "parent_request_id": "84eb0cc61c924d4c800abf1122b549f1",
+      "native_slice_id": "29daa08a66d9459a918b5550c0c75ec3",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "35"
+      },
+      "actual_submit_at": 136093.9671942,
+      "source_available_at": 136094.0762812,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 887,
+      "selected_source_plus_context_unique_samples": 20160,
+      "eligible_coverage_unique_samples": 4736,
+      "missing_eligible_samples": 15424,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 4736,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        35
+      ],
+      "top_probability_min": 0.9977237582206726,
+      "top_probability_max": 0.9998242259025574,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+      "parent_request_id": "325efa77e7e942aaa9339b976e69fcf5",
+      "native_slice_id": "bea3588481f844179bc1c58143285ae8",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "37"
+      },
+      "actual_submit_at": 136105.9545837,
+      "source_available_at": 136106.4093011,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 830,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 92160,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 84480,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        37
+      ],
+      "top_probability_min": 0.00022811710368841887,
+      "top_probability_max": 0.9999934434890747,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "With the impacts.",
+      "parent_request_id": "2f992b3efccb447a93312a56b5cea512",
+      "native_slice_id": "15fb689399c34381ad98707b70718655",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "37"
+      },
+      "actual_submit_at": 136107.166907,
+      "source_available_at": 136107.271271,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1012,
+      "selected_source_plus_context_unique_samples": 24768,
+      "eligible_coverage_unique_samples": 16256,
+      "missing_eligible_samples": 8512,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 13536,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        37
+      ],
+      "top_probability_min": 3.951633334509097e-05,
+      "top_probability_max": 0.9999945163726807,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "No, no, three.",
+      "parent_request_id": "88c6a17617514a3f867da5826fe1e4ac",
+      "native_slice_id": "87582698a5d248e284b4e82bc156cf73",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "39"
+      },
+      "actual_submit_at": 136114.9028613,
+      "source_available_at": 136115.065196,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 299,
+      "selected_source_plus_context_unique_samples": 41280,
+      "eligible_coverage_unique_samples": 34560,
+      "missing_eligible_samples": 6720,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17280,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        39
+      ],
+      "top_probability_min": 2.7179688913747668e-05,
+      "top_probability_max": 0.9990814924240112,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "a121faa4fc73460395d50da3532014d2",
+      "native_slice_id": "50917b332e974d14b1dbdef24c8c2beb",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "41"
+      },
+      "actual_submit_at": 136123.3352804,
+      "source_available_at": 136123.5896572,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 492,
+      "selected_source_plus_context_unique_samples": 46080,
+      "eligible_coverage_unique_samples": 46080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        41
+      ],
+      "top_probability_min": 0.0022367562633007765,
+      "top_probability_max": 0.9991223216056824,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "No.",
+      "parent_request_id": "a121faa4fc73460395d50da3532014d2",
+      "native_slice_id": "1e5f9a779f0f4d279c08937199b5cda1",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "41"
+      },
+      "actual_submit_at": 136123.3364707,
+      "source_available_at": 136123.6779195,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 492,
+      "selected_source_plus_context_unique_samples": 6720,
+      "eligible_coverage_unique_samples": 6720,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 5600,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        41
+      ],
+      "top_probability_min": 0.09394676238298416,
+      "top_probability_max": 0.9867117404937744,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "a121faa4fc73460395d50da3532014d2",
+      "native_slice_id": "f4f83c5a90f6438f846a28a33a60e0fe",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "41"
+      },
+      "actual_submit_at": 136124.974521,
+      "source_available_at": 136125.1291367,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 687,
+      "selected_source_plus_context_unique_samples": 37632,
+      "eligible_coverage_unique_samples": 27840,
+      "missing_eligible_samples": 9792,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 27520,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        41
+      ],
+      "top_probability_min": 0.5104352235794067,
+      "top_probability_max": 0.9997807145118713,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "또한 유엔은 지구 온난화의 영향을 받는 국가들의 대처를 돕기 위한.",
+      "parent_request_id": "d0f1fd20ff9c49fc892bfdda773ff556",
+      "native_slice_id": "ce71664769fa49679d61c7d89d5860c7",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "43"
+      },
+      "actual_submit_at": 136137.7164656,
+      "source_available_at": 136138.103174,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 749,
+      "selected_source_plus_context_unique_samples": 85312,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 16192,
+      "uncertain_unique_samples": 6720,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 61760,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        43
+      ],
+      "top_probability_min": 0.36964476108551025,
+      "top_probability_max": 0.9992443323135376,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "기금의 조성을 완료하기를 기대하고 있습니다.",
+      "parent_request_id": "d8fa291e571f445ea1d02e87649b747b",
+      "native_slice_id": "cc560efaea4540e098f8b330df4c01fa",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "43"
+      },
+      "actual_submit_at": 136141.3940757,
+      "source_available_at": 136141.5988315,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1296,
+      "selected_source_plus_context_unique_samples": 58880,
+      "eligible_coverage_unique_samples": 52928,
+      "missing_eligible_samples": 5952,
+      "uncertain_unique_samples": 448,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 45440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        43
+      ],
+      "top_probability_min": 0.005474643316119909,
+      "top_probability_max": 0.9975882768630981,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "また国連では地球温暖化の影響を被っている国々がその影響に対処できるように支援する。",
+      "parent_request_id": "f4a0357e288a4f269c8584f6c0cbc3e0",
+      "native_slice_id": "a8b32d19a22f4cb9af073f40e92fba58",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "45"
+      },
+      "actual_submit_at": 136157.7129693,
+      "source_available_at": 136158.1869738,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 917,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 92160,
+      "missing_eligible_samples": 11584,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 84160,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        45
+      ],
+      "top_probability_min": 0.00564099894836545,
+      "top_probability_max": 0.9999536275863647,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "する対話の結果について最終決定したいと考えています。",
+      "parent_request_id": "b9dbd1d1d9c54415a32f8c7f7ac1f2a6",
+      "native_slice_id": "00459a623cc4460c8943fa1188421d77",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "45"
+      },
+      "actual_submit_at": 136161.6799507,
+      "source_available_at": 136161.8941138,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1474,
+      "selected_source_plus_context_unique_samples": 68800,
+      "eligible_coverage_unique_samples": 62336,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 57696,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        45
+      ],
+      "top_probability_min": 0.007895505987107754,
+      "top_probability_max": 0.9999523162841797,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "synthetic_overlap",
+      "profile": "1.04",
+      "repetition": 2,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "a3d2b6545f3844d6b650d120aa34ac6c",
+      "native_slice_id": "ee176e692ca04a488ae036f6b782de8c",
+      "actual_frozen_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "47"
+      },
+      "actual_submit_at": 136175.1320493,
+      "source_available_at": 136175.4450522,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 594,
+      "selected_source_plus_context_unique_samples": 79680,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 160,
+      "clear_unique_samples": 40160,
+      "observed_active_slots": [
+        0,
+        1
+      ],
+      "observed_epochs": [
+        47
+      ],
+      "top_probability_min": 0.0022367562633007765,
+      "top_probability_max": 0.9999598264694214,
+      "reconstructed_purity_state": "mixed",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "98dfa189a36f406c84591e2f5ef489e7",
+      "native_slice_id": "08d2706a85d548bfb71246c5282dfe8f",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "49"
+      },
+      "actual_submit_at": 136184.1766147,
+      "source_available_at": 136184.4287332,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        49
+      ],
+      "top_probability_min": 0.0007597376825287938,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "98dfa189a36f406c84591e2f5ef489e7",
+      "native_slice_id": "8e31553d8bcd47b0af81162ff01d6d9d",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "49"
+      },
+      "actual_submit_at": 136185.3377667,
+      "source_available_at": 136185.4655134,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 586,
+      "selected_source_plus_context_unique_samples": 27584,
+      "eligible_coverage_unique_samples": 21120,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 20960,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        49
+      ],
+      "top_probability_min": 0.7573774456977844,
+      "top_probability_max": 0.9986306428909302,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "d2a72977b1fc4d2eb30da6eec9452b1f",
+      "native_slice_id": "70729abc9b2f44ca8686ecb2a480d75b",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "51"
+      },
+      "actual_submit_at": 136194.8126552,
+      "source_available_at": 136195.0118478,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 48000,
+      "eligible_coverage_unique_samples": 48000,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1120,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        51
+      ],
+      "top_probability_min": 0.0007597376825287938,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "d2a72977b1fc4d2eb30da6eec9452b1f",
+      "native_slice_id": "a99081c56a134c9e8f4239280b8ec30e",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "51"
+      },
+      "actual_submit_at": 136196.2429431,
+      "source_available_at": 136196.3675294,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 643,
+      "selected_source_plus_context_unique_samples": 26080,
+      "eligible_coverage_unique_samples": 26080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 23360,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        51
+      ],
+      "top_probability_min": 0.014835634268820286,
+      "top_probability_max": 0.9986306428909302,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "He washed the detritus from his.",
+      "parent_request_id": "d2a72977b1fc4d2eb30da6eec9452b1f",
+      "native_slice_id": "7e828f1484e649ac9b0de54cf9d01f22",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "51"
+      },
+      "actual_submit_at": 136197.7271746,
+      "source_available_at": 136197.8643033,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 834,
+      "selected_source_plus_context_unique_samples": 29664,
+      "eligible_coverage_unique_samples": 25760,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 25440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        51
+      ],
+      "top_probability_min": 0.5226427316665649,
+      "top_probability_max": 0.9999268054962158,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "From his hair.",
+      "parent_request_id": "1933177853874ecaabe3a1a30c4994c0",
+      "native_slice_id": "0792e76444a8442895f0420cb8f77e37",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "51"
+      },
+      "actual_submit_at": 136198.6758134,
+      "source_available_at": 136198.7850785,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 959,
+      "selected_source_plus_context_unique_samples": 20160,
+      "eligible_coverage_unique_samples": 16256,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 960,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 8576,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        51
+      ],
+      "top_probability_min": 0.01224239356815815,
+      "top_probability_max": 0.9998475313186646,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+      "parent_request_id": "2e1b28666ed64c9bb93af91dec473952",
+      "native_slice_id": "70ba426a5c6c4172b2f8fba57ceb8b53",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "53"
+      },
+      "actual_submit_at": 136211.5091216,
+      "source_available_at": 136211.8820441,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 878,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 99840,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 480,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 92160,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        53
+      ],
+      "top_probability_min": 0.055514171719551086,
+      "top_probability_max": 0.999996542930603,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "With the impacts.",
+      "parent_request_id": "0621303f152b426e82b736b14c499db7",
+      "native_slice_id": "4f4c732bcfcf4fa7aac4a7e3e3334c70",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "53"
+      },
+      "actual_submit_at": 136212.7369539,
+      "source_available_at": 136212.861474,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1012,
+      "selected_source_plus_context_unique_samples": 24768,
+      "eligible_coverage_unique_samples": 16256,
+      "missing_eligible_samples": 8512,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 13536,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        53
+      ],
+      "top_probability_min": 4.9295933422399685e-05,
+      "top_probability_max": 0.999994158744812,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "No, no, three.",
+      "parent_request_id": "64559b045a0e43e4bf69bdf004156674",
+      "native_slice_id": "6125322b1c1d49e285438f22b1484012",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "55"
+      },
+      "actual_submit_at": 136221.3094839,
+      "source_available_at": 136221.5283035,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 275,
+      "selected_source_plus_context_unique_samples": 41280,
+      "eligible_coverage_unique_samples": 30720,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 640,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 17120,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        55
+      ],
+      "top_probability_min": 0.00188660086132586,
+      "top_probability_max": 0.9993379712104797,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "c9d5a27d322e439e95fd594eab41f5d7",
+      "native_slice_id": "7346f65ef4c64986a0929674f736c411",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "57"
+      },
+      "actual_submit_at": 136229.8155201,
+      "source_available_at": 136230.0582048,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 46080,
+      "eligible_coverage_unique_samples": 46080,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 1280,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 32640,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        57
+      ],
+      "top_probability_min": 0.002304821740835905,
+      "top_probability_max": 0.9990515112876892,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "No.",
+      "parent_request_id": "c9d5a27d322e439e95fd594eab41f5d7",
+      "native_slice_id": "410bcbd87fb64d5cae7f4e14d748cc1a",
+      "actual_frozen_attribution": {
+        "state": "uncertain",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "57"
+      },
+      "actual_submit_at": 136229.8166758,
+      "source_available_at": 136230.1491778,
+      "seal_reason": "speaker",
+      "delivered_evidence_items_at_submit": 454,
+      "selected_source_plus_context_unique_samples": 6720,
+      "eligible_coverage_unique_samples": 6720,
+      "missing_eligible_samples": 0,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 5600,
+      "observed_active_slots": [
+        1
+      ],
+      "observed_epochs": [
+        57
+      ],
+      "top_probability_min": 0.12719124555587769,
+      "top_probability_max": 0.9868261814117432,
+      "reconstructed_purity_state": "uncertain",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "He washed the detritus from his hair.",
+      "parent_request_id": "c9d5a27d322e439e95fd594eab41f5d7",
+      "native_slice_id": "467aa5358569422d87f03b3abee5b702",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "57"
+      },
+      "actual_submit_at": 136231.9031641,
+      "source_available_at": 136232.052803,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 711,
+      "selected_source_plus_context_unique_samples": 37632,
+      "eligible_coverage_unique_samples": 31680,
+      "missing_eligible_samples": 5952,
+      "uncertain_unique_samples": 0,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 31360,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        57
+      ],
+      "top_probability_min": 0.5022190809249878,
+      "top_probability_max": 0.9998151659965515,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "또한 유엔은 지구 온난화의 영향을 받는 국가들의 대처를 돕기 위한.",
+      "parent_request_id": "9f9d0cce9b194dbcad330d3302f0174a",
+      "native_slice_id": "16ba9e394c2244aabf27bf4a5cb7a9c0",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "59"
+      },
+      "actual_submit_at": 136245.3450864,
+      "source_available_at": 136245.7385878,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 797,
+      "selected_source_plus_context_unique_samples": 85312,
+      "eligible_coverage_unique_samples": 76800,
+      "missing_eligible_samples": 8512,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 69440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        59
+      ],
+      "top_probability_min": 0.008901260793209076,
+      "top_probability_max": 0.9992330074310303,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "korean_read",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "기금의 조성을 완료하기를 기대하고 있습니다.",
+      "parent_request_id": "a2b79dd982794ce98b6c2e7a3bbbcf93",
+      "native_slice_id": "7c20d3a734944b77a18fc27822b8ed77",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "59"
+      },
+      "actual_submit_at": 136249.0171503,
+      "source_available_at": 136249.2284405,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1296,
+      "selected_source_plus_context_unique_samples": 58880,
+      "eligible_coverage_unique_samples": 52928,
+      "missing_eligible_samples": 5952,
+      "uncertain_unique_samples": 448,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 45440,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        59
+      ],
+      "top_probability_min": 0.005781648214906454,
+      "top_probability_max": 0.9978087544441223,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "また国連では地球温暖化の影響を被っている国々がその影響に対処できるように支援する。",
+      "parent_request_id": "5b7463a117e041b89c77e8f2f847c2a4",
+      "native_slice_id": "2f5b8602cb554c5cb1095ccecd1f0fa9",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "61"
+      },
+      "actual_submit_at": 136265.2768728,
+      "source_available_at": 136265.7270479,
+      "seal_reason": "delivery_deadline",
+      "delivered_evidence_items_at_submit": 966,
+      "selected_source_plus_context_unique_samples": 103744,
+      "eligible_coverage_unique_samples": 99840,
+      "missing_eligible_samples": 3904,
+      "uncertain_unique_samples": 320,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 92000,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        61
+      ],
+      "top_probability_min": 0.040980447083711624,
+      "top_probability_max": 0.9999548196792603,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "japanese_read",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "する対話の結果について最終決定したいと考えています。",
+      "parent_request_id": "e69e70a120c740bea5d2c8aee7f9faba",
+      "native_slice_id": "69b80f5260bb49718528deab789ef37f",
+      "actual_frozen_attribution": {
+        "state": "unavailable",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "61"
+      },
+      "actual_submit_at": 136269.2646603,
+      "source_available_at": 136269.4883135,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 1474,
+      "selected_source_plus_context_unique_samples": 68800,
+      "eligible_coverage_unique_samples": 62336,
+      "missing_eligible_samples": 6464,
+      "uncertain_unique_samples": 800,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 57536,
+      "observed_active_slots": [
+        0
+      ],
+      "observed_epochs": [
+        61
+      ],
+      "top_probability_min": 0.04499368742108345,
+      "top_probability_max": 0.99994957447052,
+      "reconstructed_purity_state": "unavailable",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    },
+    {
+      "route": "gpu",
+      "case": "synthetic_overlap",
+      "profile": "0.64",
+      "repetition": 2,
+      "text": "Gentlemen of the press.",
+      "parent_request_id": "191d8d49664846ac942402335430a684",
+      "native_slice_id": "b4be71a5af2440918e5413688f4b7237",
+      "actual_frozen_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "63"
+      },
+      "actual_submit_at": 136282.9316598,
+      "source_available_at": 136283.2459263,
+      "seal_reason": "delivery_pause",
+      "delivered_evidence_items_at_submit": 594,
+      "selected_source_plus_context_unique_samples": 79680,
+      "eligible_coverage_unique_samples": 69120,
+      "missing_eligible_samples": 10560,
+      "uncertain_unique_samples": 160,
+      "competing_unique_samples": 0,
+      "clear_unique_samples": 40000,
+      "observed_active_slots": [
+        0,
+        1
+      ],
+      "observed_epochs": [
+        63
+      ],
+      "top_probability_min": 0.002304821740835905,
+      "top_probability_max": 0.9999221563339233,
+      "reconstructed_purity_state": "mixed",
+      "limit": "Offline inspection of delivered recorded evidence at submission; reproduces revision/immutability and MAX_FRAMES but not per-request retained-frame floor pruning. Frozen actual attribution is authoritative. No thresholds changed, future evidence used, or decisions rerun."
+    }
+  ],
+  "record_generation": "Offline same retained execution records; final identity labels distinguish enclosing parent request and exact range-joined native slice; no model execution or selector decision rerun."
+}
