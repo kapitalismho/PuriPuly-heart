@@ -662,3 +662,137 @@ def test_request_version_matches_service_metadata_contract(phase, parameters):
     else:
         with pytest.raises(RuntimeError, match="parameters"):
             signing.validate_request(item, phase, CONTEXT, **arguments)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Native smoke isolation requires Windows")
+@pytest.mark.parametrize("fail_after_version", [False, True])
+def test_native_smoke_owns_child_appdata_and_cleans_it_after_success_or_failure(
+    tmp_path, fail_after_version
+):
+    from puripuly_heart import __version__
+
+    powershell = shutil.which("pwsh")
+    compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+    if powershell is None or not compiler.is_file():
+        pytest.skip("PowerShell 7 and the Windows .NET compiler are required")
+    launcher_source = tmp_path / "launcher.cs"
+    launcher = tmp_path / "launcher.exe"
+    launcher_source.write_text(
+        """
+using System;
+using System.Diagnostics;
+class Launcher {
+    static int Main(string[] args) {
+        if (args.Length != 2 || args[0] != "--headless") return 99;
+        Console.Error.WriteLine("child_localappdata=" + Environment.GetEnvironmentVariable("LOCALAPPDATA"));
+        Console.Error.WriteLine("child_appdata=" + Environment.GetEnvironmentVariable("APPDATA"));
+        var start = new ProcessStartInfo();
+        start.FileName = Environment.GetEnvironmentVariable("PROBE_PYTHON");
+        start.Arguments = "-m puripuly_heart.main " + args[1];
+        start.UseShellExecute = false;
+        using (var child = Process.Start(start)) {
+            child.WaitForExit();
+            return child.ExitCode;
+        }
+    }
+}
+""",
+        encoding="utf-8",
+    )
+    compiled = subprocess.run(
+        [str(compiler), "/nologo", f"/out:{launcher}", str(launcher_source)],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
+    assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    local, roaming = tmp_path / "ambient-local", tmp_path / "ambient-roaming"
+    for directory in (local, roaming):
+        directory.mkdir()
+        (directory / "sentinel").write_text("unrelated user state", encoding="utf-8")
+    smoke = tmp_path / "smoke"
+    repo = Path(__file__).resolve().parents[2]
+    script = r"""
+$ErrorActionPreference = 'Stop'
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:PROBE_SCRIPT, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw ($errors | Out-String) }
+$function = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-Headless' }, $true)
+. ([scriptblock]::Create($function.Extent.Text))
+$mainTry = @($ast.EndBlock.Statements | Where-Object { $_ -is [System.Management.Automation.Language.TryStatementAst] })[0]
+$hostExe = $env:PROBE_HOST
+$smokeRoot = $env:PROBE_SMOKE
+$previousPythonPath = $env:PYTHONPATH
+$previousDontWriteBytecode = $env:PYTHONDONTWRITEBYTECODE
+$ambientLocal = $env:LOCALAPPDATA
+$ambientRoaming = $env:APPDATA
+$sandboxCreated = $false
+$failure = $null
+Push-Location $env:PROBE_REPO
+try {
+    $setup = $mainTry.Body.Statements | Where-Object { $_ -is [System.Management.Automation.Language.PipelineAst] -and $_.Extent.Text.StartsWith('New-Item ') -and $_.Extent.Text.Contains('$smokeRoot') }
+    foreach ($statement in $setup) { . ([scriptblock]::Create($statement.Extent.Text)) }
+    $version = Invoke-Headless -ArgumentList @('--version')
+    $sandboxCreated = Test-Path -LiteralPath (Join-Path $smokeRoot 'LocalAppData/puripuly-heart')
+    if ($env:PROBE_FAIL -eq 'true') { [void](Invoke-Headless -ArgumentList @('not-a-command')) }
+} catch {
+    $failure = $_
+} finally {
+    foreach ($statement in $mainTry.Finally.Statements) { . ([scriptblock]::Create($statement.Extent.Text)) }
+}
+@{
+    version = $version
+    sandbox_created = $sandboxCreated
+    sandbox_removed = -not (Test-Path -LiteralPath $smokeRoot)
+    ambient_local_unchanged = $env:LOCALAPPDATA -eq $ambientLocal
+    ambient_roaming_unchanged = $env:APPDATA -eq $ambientRoaming
+    pythonpath_restored = $env:PYTHONPATH -eq $previousPythonPath
+    bytecode_restored = $env:PYTHONDONTWRITEBYTECODE -eq $previousDontWriteBytecode
+    child_failed = $null -ne $failure
+} | ConvertTo-Json
+if ($null -ne $failure) { throw $failure }
+"""
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-NonInteractive", "-Command", script],
+        env={
+            **os.environ,
+            "PYTHONPATH": str(repo / "src"),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "LOCALAPPDATA": str(local),
+            "APPDATA": str(roaming),
+            "PROBE_PYTHON": sys.executable,
+            "PROBE_SCRIPT": str(repo / "scripts/ci/build-native-release-artifacts.ps1"),
+            "PROBE_HOST": str(launcher),
+            "PROBE_SMOKE": str(smoke),
+            "PROBE_REPO": str(repo),
+            "PROBE_FAIL": str(fail_after_version).lower(),
+        },
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=30,
+        check=False,
+    )
+    assert (result.returncode != 0) is fail_after_version, result.stdout + result.stderr
+    observed = json.loads(result.stdout[result.stdout.index("\n{") + 1 :])
+    assert observed["version"] == __version__
+    assert observed["child_failed"] is fail_after_version
+    assert all(
+        observed[key]
+        for key in (
+            "sandbox_created",
+            "sandbox_removed",
+            "ambient_local_unchanged",
+            "ambient_roaming_unchanged",
+            "pythonpath_restored",
+            "bytecode_restored",
+        )
+    )
+    assert f"child_localappdata={smoke / 'LocalAppData'}" in result.stdout
+    assert f"child_appdata={smoke / 'RoamingAppData'}" in result.stdout
+    for directory in (local, roaming):
+        assert (directory / "sentinel").read_text(encoding="utf-8") == "unrelated user state"
+        assert not (directory / "puripuly-heart").exists()

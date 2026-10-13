@@ -58,6 +58,8 @@ Retain GitHub-hosted, tag-triggered builds and manually published draft releases
 
 The repository stages the three explicit project executables and generated uninstaller as `uninstaller.exe`, validates the signed results, rebuilds from those exact bytes, and requests signing of the installer. Local real-PE/Inno probes verified signing-boundary handoff and installed uninstaller reuse with an independently pinned local probe authority; these probes do not establish real SignPath or production acceptance.
 
+Native build smoke processes use disposable local and roaming AppData directories beneath their owned smoke directory, cleaned on success or failure. They must not populate the runner profile used by later clean-install validation. That validation still refuses preexisting installation, uninstall-registry or application-data state; it never deletes unrelated state to make the check pass.
+
 Missing artifacts, signing rejection or failure, or invalid signatures, publisher, metadata, or provenance must block the signed release. Never substitute unsigned files. Verify the certificate chain, applicable timestamp, expected publisher, product metadata, and installed inner artifacts.
 
 Link the tag, source SHA, workflow run, submitted artifacts, signing requests, validated outputs, and release asset names. Signing approval is not publication approval.

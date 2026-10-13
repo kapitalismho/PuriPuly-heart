@@ -79,6 +79,8 @@ function Invoke-Headless {
     $startInfo.RedirectStandardError = $true
     $startInfo.StandardOutputEncoding = [System.Text.Encoding]::UTF8
     $startInfo.StandardErrorEncoding = [System.Text.Encoding]::UTF8
+    $startInfo.Environment["LOCALAPPDATA"] = Join-Path $smokeRoot "LocalAppData"
+    $startInfo.Environment["APPDATA"] = Join-Path $smokeRoot "RoamingAppData"
     $startInfo.ArgumentList.Add("--headless")
     foreach ($argument in $ArgumentList) {
         $startInfo.ArgumentList.Add($argument)
