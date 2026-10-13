@@ -46,17 +46,27 @@ try {
     if ($installationStarted -and (Test-Path -LiteralPath $installed)) {
         $uninstallers = @(Get-ChildItem -LiteralPath $installed -Filter "unins*.exe" -File)
         if ($uninstallers.Count -ne 1) { throw "Cannot verify clean uninstall: generated uninstaller missing or ambiguous." }
+        $uninstallTimeout = 300000
+        $uninstallTimer = [System.Diagnostics.Stopwatch]::StartNew()
         $process = Start-Process -FilePath $uninstallers[0].FullName -ArgumentList @(
             "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/LOG=`"$uninstallLog`""
         ) -PassThru
-        if (-not $process.WaitForExit(300000)) {
+        $remaining = [Math]::Max(0, $uninstallTimeout - $uninstallTimer.ElapsedMilliseconds)
+        if (-not $process.WaitForExit([int]$remaining)) {
             $process.Kill($true)
             throw "Signed uninstaller timed out."
         }
-        if ($process.ExitCode -ne 0 -or (Test-Path -LiteralPath $registry)) {
+        if ($process.ExitCode -ne 0) {
             throw "Clean signed uninstall failed."
         }
-        foreach ($target in @("PuriPulyHeart.exe", "PuriPulyHeartOverlay.exe", "PuriPulyHeartGpuWorker.exe", $uninstallers[0].Name)) {
+        $targets = @("PuriPulyHeart.exe", "PuriPulyHeartOverlay.exe", "PuriPulyHeartGpuWorker.exe", $uninstallers[0].Name)
+        while ((Test-Path -LiteralPath $registry) -or @($targets | Where-Object { Test-Path -LiteralPath (Join-Path $installed $_) }).Count -ne 0) {
+            $remaining = $uninstallTimeout - $uninstallTimer.ElapsedMilliseconds
+            if ($remaining -le 0) { break }
+            Start-Sleep -Milliseconds ([Math]::Min(100, $remaining))
+        }
+        if (Test-Path -LiteralPath $registry) { throw "Clean signed uninstall failed." }
+        foreach ($target in $targets) {
             if (Test-Path -LiteralPath (Join-Path $installed $target)) { throw "Signed target remains after uninstall: $target" }
         }
         $uninstallPassed = $true

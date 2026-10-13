@@ -60,6 +60,8 @@ The repository stages the three explicit project executables and generated unins
 
 Native build smoke processes use disposable local and roaming AppData directories beneath their owned smoke directory, cleaned on success or failure. They must not populate the runner profile used by later clean-install validation. That validation still refuses preexisting installation, uninstall-registry or application-data state; it never deletes unrelated state to make the check pass.
 
+Inno's initial uninstaller process can exit before its cleanup worker finishes. Clean-uninstall validation rejects a nonzero exit and requires the uninstall-registry entry and all four signed targets to disappear within one total five-minute allowance. Neither initial-process exit nor a success log alone proves cleanup; persistent residue still fails validation and is never deleted by the validator.
+
 Missing artifacts, signing rejection or failure, or invalid signatures, publisher, metadata, or provenance must block the signed release. Never substitute unsigned files. Verify the certificate chain, applicable timestamp, expected publisher, product metadata, and installed inner artifacts.
 
 Link the tag, source SHA, workflow run, submitted artifacts, signing requests, validated outputs, and release asset names. Signing approval is not publication approval.

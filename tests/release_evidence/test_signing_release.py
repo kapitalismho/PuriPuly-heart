@@ -796,3 +796,158 @@ if ($null -ne $failure) { throw $failure }
     for directory in (local, roaming):
         assert (directory / "sentinel").read_text(encoding="utf-8") == "unrelated user state"
         assert not (directory / "puripuly-heart").exists()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Uninstall completion requires Windows")
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "eventual-files",
+        "eventual-registry",
+        "keep-PuriPulyHeart.exe",
+        "keep-PuriPulyHeartOverlay.exe",
+        "keep-PuriPulyHeartGpuWorker.exe",
+        "keep-unins000.exe",
+        "keep-registry",
+        "nonzero",
+        "shared-deadline",
+    ],
+)
+def test_signed_uninstall_waits_for_final_state_without_waiving_failures(tmp_path, mode):
+    powershell = shutil.which("pwsh")
+    compiler = Path(os.environ["WINDIR"]) / "Microsoft.NET/Framework64/v4.0.30319/csc.exe"
+    if powershell is None or not compiler.is_file():
+        pytest.skip("PowerShell 7 and the Windows .NET compiler are required")
+    installed = tmp_path / "installed"
+    installed.mkdir()
+    targets = (*signing.COMPONENTS[:-1], "unins000.exe")
+    for name in targets[:-1]:
+        (installed / name).write_text("owned uninstall target", encoding="utf-8")
+    registry = tmp_path / "registry-presence"
+    if mode in {"eventual-registry", "keep-registry"}:
+        registry.write_text("owned registry-presence fixture", encoding="utf-8")
+    source = tmp_path / "uninstaller.cs"
+    uninstaller = installed / targets[-1]
+    worker = tmp_path / "worker.exe"
+    source.write_text(
+        """
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Threading;
+class Uninstaller {
+    static int Main(string[] args) {
+        string mode = Environment.GetEnvironmentVariable("PROBE_MODE");
+        if (args.Length == 0 || args[0] != "--worker") {
+            if (mode == "nonzero") return 7;
+            if (mode == "shared-deadline") Thread.Sleep(1600);
+            var start = new ProcessStartInfo();
+            start.FileName = Environment.GetEnvironmentVariable("PROBE_WORKER");
+            start.Arguments = "--worker";
+            start.UseShellExecute = false;
+            using (var child = Process.Start(start)) {
+                File.WriteAllText(Environment.GetEnvironmentVariable("PROBE_WORKER_PID"), child.Id.ToString());
+            }
+            return 0;
+        }
+        Thread.Sleep(mode == "shared-deadline" ? 800 : 200);
+        string root = Environment.GetEnvironmentVariable("PROBE_INSTALLED");
+        foreach (string name in new[] { "PuriPulyHeart.exe", "PuriPulyHeartOverlay.exe", "PuriPulyHeartGpuWorker.exe", "unins000.exe" }) {
+            if (mode != "keep-" + name) File.Delete(Path.Combine(root, name));
+        }
+        if (mode != "keep-registry") File.Delete(Environment.GetEnvironmentVariable("PROBE_REGISTRY"));
+        return 0;
+    }
+}
+""",
+        encoding="utf-8",
+    )
+    compiled = subprocess.run(
+        [str(compiler), "/nologo", f"/out:{uninstaller}", str(source)],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        check=False,
+    )
+    assert compiled.returncode == 0, compiled.stdout + compiled.stderr
+    shutil.copyfile(uninstaller, worker)
+    repo = Path(__file__).resolve().parents[2]
+    script = r"""
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:PROBE_VALIDATOR, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw ($errors | Out-String) }
+$mainTry = @($ast.EndBlock.Statements | Where-Object { $_ -is [System.Management.Automation.Language.TryStatementAst] })[0]
+$cleanup = $mainTry.Finally.Statements[0].Clauses[0].Item2.Statements
+$installed = $env:PROBE_INSTALLED
+$registry = $env:PROBE_REGISTRY
+$uninstallLog = Join-Path $installed 'uninstall.log'
+$uninstallTimeout = [int]$env:PROBE_TIMEOUT
+$uninstallPassed = $false
+$targets = @('PuriPulyHeart.exe','PuriPulyHeartOverlay.exe','PuriPulyHeartGpuWorker.exe','unins000.exe')
+$failure = $null
+try {
+    foreach ($statement in $cleanup) {
+        if ($statement -is [System.Management.Automation.Language.AssignmentStatementAst] -and $statement.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and $statement.Left.VariablePath.UserPath -eq 'uninstallTimeout') { continue }
+        . ([scriptblock]::Create($statement.Extent.Text))
+    }
+} catch {
+    $failure = $_
+}
+$elapsed = $uninstallTimer.ElapsedMilliseconds
+$remainingTargets = @($targets | Where-Object { Test-Path -LiteralPath (Join-Path $installed $_) })
+$remainingRegistry = Test-Path -LiteralPath $registry
+if (Test-Path -LiteralPath $env:PROBE_WORKER_PID) {
+    try {
+        $child = [System.Diagnostics.Process]::GetProcessById([int](Get-Content -LiteralPath $env:PROBE_WORKER_PID))
+        $null = $child.Handle
+        if (-not $child.WaitForExit(5000)) { throw 'Fixture worker did not finish' }
+    } catch [System.ArgumentException] {}
+}
+@{
+    passed = $uninstallPassed
+    elapsed = $elapsed
+    remaining_targets = $remainingTargets
+    remaining_registry = $remainingRegistry
+    failure = $(if ($null -ne $failure) { $failure.Exception.Message } else { $null })
+} | ConvertTo-Json
+if ($null -ne $failure) { throw $failure }
+"""
+    result = subprocess.run(
+        [powershell, "-NoProfile", "-NonInteractive", "-Command", script],
+        env={
+            **os.environ,
+            "PROBE_VALIDATOR": str(repo / "scripts/ci/validate-signed-install.ps1"),
+            "PROBE_INSTALLED": str(installed),
+            "PROBE_REGISTRY": str(registry),
+            "PROBE_WORKER": str(worker),
+            "PROBE_WORKER_PID": str(tmp_path / "worker.pid"),
+            "PROBE_MODE": mode,
+            "PROBE_TIMEOUT": "2000" if mode == "shared-deadline" else "1000",
+        },
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=15,
+        check=False,
+    )
+    observed = json.loads(result.stdout)
+    passes = mode in {"eventual-files", "eventual-registry"}
+    assert (result.returncode == 0) is passes, result.stdout + result.stderr
+    assert observed["passed"] is passes
+    if passes:
+        assert observed["remaining_targets"] == []
+        assert observed["remaining_registry"] is False
+    elif mode in {"keep-registry", "nonzero"}:
+        assert observed["failure"] == "Clean signed uninstall failed."
+    else:
+        assert observed["failure"].startswith("Signed target remains after uninstall:")
+    if mode.startswith("keep-") and mode != "keep-registry":
+        assert observed["remaining_targets"] == [mode.removeprefix("keep-")]
+    if mode == "keep-registry":
+        assert observed["remaining_registry"] is True
+    if mode == "shared-deadline":
+        assert observed["elapsed"] < 2400
