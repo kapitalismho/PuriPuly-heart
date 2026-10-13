@@ -58,7 +58,7 @@
   },
   "headline_disposition": {
     "Deepgram_baseline": "DEFER as complete-content success: cleanAB missing A and longer cases retain existing edge/replay issues. Baseline useful context/translation comparison remains valid.",
-    "Deepgram_1.04": "DEFER, no adoption: actual early identified pixels and returning text exist, but phrase fragments cause material translation usefulness regression; gray/cyan split within one true B sentence is not rich complete success.",
+    "Deepgram_1.04": "DEFER, no adoption: actual early identified pixels and returning text exist, but phrase fragments cause material translation usefulness regression; gray/gold split within one true B sentence is not rich complete success.",
     "Deepgram_0.64": "DEFER, no adoption: same material translation splitting harm, plus only bounded additional returning-tail identification versus1.04; no profile winner.",
     "Gemini_Transcribe_baseline": "DEFER complete-content claim pending finality/source-coverage qualification; recorded authoritative finals are conserved, but normal admitted final source lacks earlier required content. Exact service/SDK/contract cause unresolved.",
     "Gemini_Transcribe_1.04": "DEFER rich enhancement: independent native finals remain unmapped/allgray; same baseline-common final-source coverage failure, not CPU feature-induced substitution.",
@@ -299,7 +299,7 @@
       },
       {
         "source": "of the press.",
-        "speaker": "identified1/cyan",
+        "speaker": "identified slot1; rendered gold as the first established identity in this fresh scope",
         "actual_translation": "기자분들의."
       }
     ],
@@ -352,7 +352,7 @@
       ]
     },
     "full_span_observed_disposition": "uncertain, speaker_idNone inall4new cleanAB observations. Other words map wholly B[58048,70848), full-span identifiedslot1 with no overlapping transition range.",
-    "known_wrong_assignment": "Not demonstrated for this sentence. Gray is unknown/coverage loss, not correct identified B; cyan remainder agrees with B. Whole-word ambiguity remains explicit; no exact phonetic alignment, majority vote or scoring-reference repair.",
+    "known_wrong_assignment": "Not demonstrated for this sentence. Gray is unknown/coverage loss, not correct identified B; the gold remainder agrees with B. Gold is the first established identity's palette assignment in this fresh scope, not a fixed color for numeric slot1. Whole-word ambiguity remains explicit; no exact phonetic alignment, majority vote or scoring-reference repair.",
     "reproduction": "cloud_summarize clean_B_sentence_word_span_attribution_explanation reconstructs only recorded delivered evidence and actual submitted PCM maps through current full-span policy, at actual admission time. This is offline explanation of actual E2E output, not a new run or substitute source mapping."
   },
   "Gemini_finality_mechanism": {
@@ -1839,7 +1839,7 @@
     {
       "requirement": "Rich speaker attribution",
       "status": "failed",
-      "evidence": "Deepgram partial22identified new units with retained gray/transitions; cleanBgray/cyan fragment coverage. Gemini0identified current independent/unmapped route."
+      "evidence": "Deepgram partial22identified new units with retained gray/transitions; cleanBgray/gold fragment coverage. Gemini0identified current independent/unmapped route."
     },
     {
       "requirement": "No feature-induced CPU-style return substitution on tested cloud routes",

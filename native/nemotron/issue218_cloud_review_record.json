@@ -1,0 +1,31 @@
+{
+  "schema": "issue218-cloud-independent-review-1",
+  "baseline": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+  "initial_candidate": "c40d570951ebf2a27c593080fe8170bb09f56e92",
+  "reviewer": "cloud-followup-review",
+  "mode": "Fresh whole-checkpoint FULL_REVIEW plus declared combined terminal evidence audit; experiment-only checkpoint, no product changes.",
+  "initial_result": "findings",
+  "initial_verdict": "repair_required",
+  "initial_verdict_scope": "All four requested investigation outcomes substantively supported. Only the missing durable independent-review record/index required correction. No product repair, paid rerun, profile activation or whole-#218 acceptance warranted.",
+  "adjudication": [
+    {"id":"R1","severity":"low","decision":"ACCEPT","scope":"Evidence-index correction","finding":"Acceptance.json named this review record before the artifact existed at c40d5709.","correction":"This file now records the actual pinned initial review coverage, verdict and correction; it does not invent a prior accepted verdict."},
+    {"id":"C1","severity":"low","decision":"ACCEPT","scope":"Director-adjudicated factual wording correction from reviewer counterevidence","finding":"Some cleanAB narrative labels incorrectly equated speaker slot1 with cyan. In that fresh scope its first established identity is gold; ABA B is cyan only after A allocated gold.","correction":"Report and Director assessment distinguish gray/identified coverage from scope-ordered palette color. Original snapshots, measurements, translations, archives and drivers remain unchanged."}
+  ],
+  "coverage": {
+    "user1_profile_parakeet_relationship":"Inspected actual causal PCM selection and original CPU slices. Profiles configure Nemotron only; returning slices differ10ms, baseline recognizes larger context. Different PCM proven,10ms alone as native decoder cause not proven.",
+    "user2_simple_relaxation":"Inspected whole-input policy and actual70ms counterexample. Bounded same-key interior holes are a proposal only; successor-facing edge and missing/competing evidence remain conservative. No numeric default or implementation claimed.",
+    "user3_freeze_feasibility":"Inspected _submit/_consume/_release and downstream SourceChild boundary. Later own-terminal no-wait attribution is structurally possible, but bounded pending evidence retention/epoch fences required. Recorded13/87coverage opportunity is not a changed-runtime test.",
+    "user4_actual_cloud_tests":"Inspected24valid cases/provider, real3arms/two rotations/current adapters/GemmaVulkan/Flet. Explicit KEY2 selection proven by targeted parser and client constructor checks, no credential exposure. Actual Gemini model/endpoint retained.",
+    "budget_safety":"Inspected reservations before session start and eachPCMwrite, persistent ledger and input hashes. Deepgram24starts/124.2s, Gemini36starts/215.407s including invalid attempt remain below72/300per-provider. Monetary billing unknown.",
+    "invalid_attempts":"First Gemini run is invalid driver evidence, not provider failure. Product-independent terminal/proxy driver correction inspected; unaffected Deepgram executed snapshot remains applicable without paid rerun.",
+    "native_semantics":"All30Gemini decoded-SDK authoritative fragments preserved. Earlier words appear only in speculative interim; uncaptured WebSocket/service-vs-SDK cause unresolved. Deepgram text conservation does not certify translation composition.",
+    "negative_quality":"Actual Deepgram phrase fragmentation harms translation even with earlier fragment in context. Both routes/profile arms remain defer. Gemini normal-final omissions are baseline-common, not a proved Nemotron-induced Parakeet-style effect.",
+    "evidence_boundaries":"Archived execution snapshots and original traces inspected. Director reproduction1.85s, allper-runfields excepttrace_path identical, bothZIPCRC4/5members and2driverASTpasses reused. ACK/readback/pixel-onset/photons and sampled resource limits remain distinct."
+  },
+  "independent_activity": "Read-only exact diff/source/caller/original JSON/archive inspection, snapshot comparison and selected original-record analysis. No private-env/credential reads, calls, inference, tests/builds, screenshots, mutations or remote operations.",
+  "preserved_limits": "Proposals not implemented; no ASR native internal cause, accepted uncertainty threshold, raw-wire Gemini diagnosis, production profile or full#218/VR acceptance. User receives a scoped experiment and grounded design assessment, not fixes disguised as completed.",
+  "repair_verification": {
+    "status":"pending_bounded_review",
+    "scope":"Record/index resolution and corrected scope-ordered cleanAB palette wording only. No measurement, driver, product, policy or budget changes; unaffected whole-checkpoint coverage retained."
+  }
+}
