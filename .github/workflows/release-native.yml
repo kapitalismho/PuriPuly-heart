@@ -143,6 +143,7 @@ jobs:
           sync-args: --extra build
       - name: Require verified signing context and cutover authority
         shell: pwsh
+        timeout-minutes: 5
         env:
           SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
         run: |

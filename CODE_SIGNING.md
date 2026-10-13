@@ -80,6 +80,8 @@ Configure these repository variables from independently approved public certific
 
 Test certificates are not publicly trusted production certificates. The approved test authority is installed only in the isolated test runner; an independently approved self-signed test leaf may be its own authority. Never trust a certificate merely because it came back with a signed artifact, and never use local probe certificates as the project's approved authority.
 
+Test trust initialization requires a disposable GitHub-hosted Windows runner with administrator privileges. It imports the independently pinned certificate into `LocalMachine\Root` to avoid interactive per-user root confirmation, then verifies the exact stored certificate bytes. The preflight has a five-minute timeout and reports import/readback phases; it must complete before any build or signing request. Local workstation imports are rejected, and production mode never adds a trust anchor.
+
 Derive values from independently exported public certificates with PowerShell:
 
 ```powershell
