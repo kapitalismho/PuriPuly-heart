@@ -26,7 +26,9 @@ class SourceCaptionUnit:
 @dataclass(slots=True)
 class PresenterSourceLedger:
     units: dict[OverlayEntryKey, SourceCaptionUnit] = field(default_factory=dict)
-    attempts: OrderedDict[OverlayEntryKey, OverlayEntryKey] = field(default_factory=OrderedDict)
+    attempts: OrderedDict[OverlayEntryKey, OverlayEntryKey | None] = field(
+        default_factory=OrderedDict
+    )
     attempt_sequences: OrderedDict[OverlayEntryKey, tuple[int, int]] = field(
         default_factory=OrderedDict
     )
@@ -47,6 +49,12 @@ class PresenterSourceLedger:
             return None
         if source is not None and source.channel != event.channel:
             return "stale"
+        if event.channel is not None and event.utterance_id is not None:
+            attempt = (event.channel, event.utterance_id)
+            if attempt in self.attempts and self.attempts[attempt] is None:
+                if source is not None:
+                    self.retire_source(source)
+                return "stale"
         unit = self.units.get(key)
         if unit is None:
             if source is None or source.order <= self.retired_orders.get(key[0], (-1, -1, -1)):
@@ -77,17 +85,29 @@ class PresenterSourceLedger:
         self.attempts.move_to_end(attempt)
         self.attempt_sequences[attempt] = (event.sequence_namespace, event.seq)
         self.attempt_sequences.move_to_end(attempt)
+        self._trim_attempts()
+
+    def retire_attempt(self, key: OverlayEntryKey) -> None:
+        self.attempts[key] = None
+        self.attempts.move_to_end(key)
+        self.attempt_sequences.pop(key, None)
+        self._trim_attempts()
+
+    def _trim_attempts(self) -> None:
         while len(self.attempts) > SOURCE_ATTEMPT_LIMIT:
             retired, _ = self.attempts.popitem(last=False)
             self.attempt_sequences.pop(retired, None)
+
+    def retire_source(self, source: SourceChild) -> None:
+        self.retired_orders[source.channel] = max(
+            source.order, self.retired_orders.get(source.channel, (-1, -1, -1))
+        )
 
     def retire_card(self, key: OverlayEntryKey) -> None:
         for source_key in self.card_sources.pop(key, []):
             unit = self.units.pop(source_key, None)
             if unit is not None:
-                self.retired_orders[source_key[0]] = max(
-                    unit.source.order, self.retired_orders.get(source_key[0], (-1, -1, -1))
-                )
+                self.retire_source(unit.source)
 
     def reset(self) -> None:
         self.units.clear()

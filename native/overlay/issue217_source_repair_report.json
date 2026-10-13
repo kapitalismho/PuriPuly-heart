@@ -1,0 +1,38 @@
+{
+  "issue": 217,
+  "finding": "F1",
+  "reviewed_candidate": "baea72e9398c71d358bca89f83e44d40ee57d47d",
+  "status": "repaired-and-focused-verification-passed",
+  "changed_paths": ["src/puripuly_heart/core/orchestrator/translation_output_projection.py"],
+  "repair": "Canonical SourceChild and Peer speaker assignment now enter translation_final explicitly at the finalized emission callsite. Renamed the shared helper to _translation_delivery_metadata; it returns only delivery/update scalar metadata accepted by both finalized translation and active speculative SELF adapters. The speculative secondary caller uses this narrowed contract. Active SELF preview remains unadmitted source_child=None; self_active_update API is unchanged.",
+  "tests": [
+    {"command":"uv run pytest tests/core/test_self_translation_low_latency.py tests/core/test_self_ui_isolation.py -q","exit_code":0,"result":"passed"},
+    {"command":"uv run pytest tests/core/test_translation_output_streaming.py -q -k \"not test_translation_peer_overlay_snapshot_uses_peer_specific_source_and_target_languages\"","exit_code":0,"result":"passed","excluded_case":"Accepted F2 source-language regression is owned by caption-presenter; its language test node is deliberately delegated to that peer after repair, not rerun before its fix."},
+    {"command":"uv run pytest tests/core/test_translation_output_streaming.py -q","exit_code":0,"result":"passed","purpose":"Full-file closure after caption-presenter notified F2/F3 repairs and formatting landed; includes the resolved Peer-language node."},
+    {"command":"uv run pytest tests/core/test_source_context_contract.py tests/core/output/test_adapter_wrappers.py -q","exit_code":0,"result":"passed","purpose":"Refresh finalized source propagation evidence after moving canonical metadata to its finalized callsite."}
+  ],
+  "format": {"command":"uv run ruff format src/puripuly_heart/core/orchestrator/translation_output_projection.py","exit_code":0,"result":"1 file left unchanged"},
+  "standalone_runtime_smoke": {
+    "command":"uv run python .issue217_spec_preview_smoke.py",
+    "exit_code":0,
+    "result":"passed",
+    "environment":"Windows x64; repository uv Python environment; controlled in-process provider and synthetic SELF text; no cloud or device inference",
+    "path":"Real STT final dispatch -> SelfTranslationChannelOwner speculative execution -> output projection -> actual OverlayEventAdapter -> real OverlayPresenter application. An observational wrapper delegated every speculative next-action evaluation to the original method. VAD SpeechEnd then committed the source and reused the translation.",
+    "original_sanitized_output": {
+      "result":"passed",
+      "cloud_calls":0,
+      "preview":{"type":"self_active_update","secondary_text":"synthetic preview translation","source_child":null,"receipt":"applied","attempt_status":"ready","next_action_reasons":["final_reconciled","spec_done"]},
+      "continued_execution":{"merge_committed":true,"provider_calls":1,"osc_messages":1,"final_source_id":"1b5e6d3a-a316-573d-a709-c11b7a419655","final_source_order":[0,0,0],"effective_text":"synthetic SELF source"}
+    },
+    "assertions":["Presenter active secondary text equals synthetic translation", "Exactly one readable active preview received application outcome applied", "Preview carries no admitted SourceChild", "spec_done next-action evaluation executed", "No finalized translation event before VAD completion", "Merge committed after VAD end", "Provider called only once and final OSC payload contains ordinary synthetic translation", "Finalized translation carries canonical SourceChild"],
+    "cleanup":"Deleted .issue217_spec_preview_smoke.py after proof"
+  },
+  "coverage_and_evidence": {
+    "existing_regressions_suffice":"No permanent behavior test added: existing low-latency, SELF-isolation and streaming tests already exercised F1.",
+    "invalidated":"Original broad-suite F1 failure evidence describes the previous candidate and is not passing evidence for this repair. The shared final metadata extraction implementation changed; the original finalized source behavioral suite was rerun and passed.",
+    "retained":"Original native/overlay/issue217_source_report.json remains historical standalone source smoke evidence. Source contract, adapter signatures, canonical text/group semantics and renderer/wire contracts are unchanged by F1. No rendering/device evidence is replaced or newly claimed.",
+    "coordination":"caption-presenter owns F2/F3. This worker initially excluded its known failing language node during repair, then ran the full streaming file successfully after notification that presenter repairs and formatting landed.",
+    "not_run":["Repository-wide suite", "Native/desktop/device checks"]
+  },
+  "boundaries":"No maintained documentation, sink product changes, new source admission, provider/cloud calls, or Git mutations in this repair wave."
+}

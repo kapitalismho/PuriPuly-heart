@@ -125,6 +125,36 @@ class RecordingOverlay:
         return None
 
 
+@dataclass
+class CaptionSnapshotBridge:
+    snapshots: list[object] = field(default_factory=list)
+    deadlines: dict[str, float | None] = field(default_factory=dict)
+
+    async def replace_snapshot(self, snapshot, *, block_expirations=None) -> None:
+        self.snapshots.append(snapshot)
+        self.deadlines = dict(block_expirations or {})
+
+
+@dataclass
+class PresentingOverlay:
+    presenter: OverlayPresenter
+    events: list[object] = field(default_factory=list)
+    translations: asyncio.Queue[object] = field(default_factory=asyncio.Queue)
+
+    async def emit(self, event) -> None:
+        self.events.append(event)
+        await self.presenter.emit(event)
+        if event.type == "translation_final":
+            await self.translations.put(event)
+
+    def active_self_overlay_metadata(self):
+        return self.presenter.active_self_overlay_metadata()
+
+
+async def hold_caption_expiration(_delay: float) -> None:
+    await asyncio.Event().wait()
+
+
 class RecordingRuntimeLogging:
 
     def __init__(self) -> None:
@@ -302,65 +332,18 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
 
 
 @pytest.mark.asyncio
-async def test_split_self_primary_a_survives_b_retirement_until_its_own_deadline() -> None:
+async def test_split_self_sources_keep_original_deadlines_and_reject_retired_replays() -> None:
     clock = FakeClock(_now=10.0)
     provider = TargetControlledProvider()
-    expiration_sleeps: asyncio.Queue[tuple[asyncio.Task[None], float, asyncio.Event]] = (
-        asyncio.Queue()
-    )
-
-    async def controlled_sleep(delay: float) -> None:
-        release = asyncio.Event()
-        task = asyncio.current_task()
-        assert task is not None
-        await expiration_sleeps.put((task, delay, release))
-        await release.wait()
-
-    class SnapshotBridge:
-        def __init__(self) -> None:
-            self.snapshots: list[object] = []
-            self.published = asyncio.Event()
-
-        async def replace_snapshot(
-            self, snapshot: object, *, block_expirations: object | None = None
-        ) -> None:
-            self.snapshots.append(snapshot)
-            self.published.set()
-
-    class ForwardingOverlay:
-        def __init__(self, presenter: OverlayPresenter) -> None:
-            self.presenter = presenter
-            self.translations: asyncio.Queue[object] = asyncio.Queue()
-            self.closed: asyncio.Queue[object] = asyncio.Queue()
-
-        async def emit(self, event: object) -> None:
-            await self.presenter.emit(event)
-            if getattr(event, "type", None) == "translation_final":
-                await self.translations.put(event)
-            if getattr(event, "type", None) == "utterance_closed":
-                await self.closed.put(event)
-
-        def active_self_overlay_metadata(self) -> object:
-            return self.presenter.active_self_overlay_metadata()
-
-    bridge = SnapshotBridge()
+    bridge = CaptionSnapshotBridge()
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
         bridge=bridge,
         clock=clock,
-        sleep=controlled_sleep,
+        sleep=hold_caption_expiration,
         visible_window_target_blocks=3,
     )
-
-    async def current_expiration_sleep(
-        utterance_id: UUID,
-    ) -> tuple[float, asyncio.Event]:
-        while True:
-            task, delay, release = await asyncio.wait_for(expiration_sleeps.get(), timeout=1)
-            if task is presenter._expiration_tasks.get(("self", utterance_id)):
-                return delay, release
-
-    overlay = ForwardingOverlay(presenter)
+    overlay = PresentingOverlay(presenter)
     harness = compose_translation_test_harness(
         stt=None,
         llm=provider,
@@ -372,7 +355,6 @@ async def test_split_self_primary_a_survives_b_retirement_until_its_own_deadline
         self_target_languages=("zh-CN", "ja"),
     )
     parent_id = uuid4()
-
     try:
         await harness.dispatch_stt_event(
             STTFinalEvent(
@@ -397,71 +379,127 @@ async def test_split_self_primary_a_survives_b_retirement_until_its_own_deadline
             ("beta", "zh-CN"),
             ("beta", "ja"),
         }
-        original_blocks = presenter.snapshot().blocks
-        assert {block.primary_text for block in original_blocks} == {
-            "alpha beta",
-            "alpha",
-            "beta",
-        }
-        assert all(block.secondary_text == "" for block in original_blocks)
-        assert any(block.id == f"self:{parent_id}" for block in original_blocks)
-        a_id = next(block.id for block in original_blocks if block.primary_text == "alpha")
-        b_id = next(block.id for block in original_blocks if block.primary_text == "beta")
-        assert len({f"self:{parent_id}", a_id, b_id}) == 3
-
+        original = {block.primary_text: block for block in presenter.snapshot().blocks}
+        assert set(original) == {"alpha beta", "alpha", "beta"}
+        a_id, b_id = original["alpha"].id, original["beta"].id
+        assert a_id != b_id
+        assert all(block.secondary_text == "" for block in original.values())
+        assert bridge.deadlines[a_id] == bridge.deadlines[b_id] == 18
         provider.releases[("beta", "zh-CN")].set()
         b_event = await asyncio.wait_for(overlay.translations.get(), timeout=1)
-        assert b_event.utterance_id == UUID(b_id.removeprefix("self:"))
-        b_closed = await asyncio.wait_for(overlay.closed.get(), timeout=1)
-        assert b_closed.utterance_id == b_event.utterance_id
-        b_sleep, release_b = await current_expiration_sleep(b_event.utterance_id)
-        assert b_sleep == 8.0
+        assert b_event.source_child.effective_text == "beta"
         blocks = {block.id: block for block in presenter.snapshot().blocks}
-        assert blocks[b_id].primary_text == "beta"
         assert blocks[b_id].secondary_text == "translated-zh-CN"
-        assert blocks[a_id].primary_text == "alpha"
-        assert blocks[a_id].secondary_text == ""
-
-        clock.advance(4.0)
+        assert blocks[a_id] == original["alpha"]
+        assert bridge.deadlines[a_id] == bridge.deadlines[b_id] == 18
+        clock.advance(4)
         provider.releases[("alpha ", "zh-CN")].set()
         a_event = await asyncio.wait_for(overlay.translations.get(), timeout=1)
-        assert a_event.utterance_id == UUID(a_id.removeprefix("self:"))
-        a_closed = await asyncio.wait_for(overlay.closed.get(), timeout=1)
-        assert a_closed.utterance_id == a_event.utterance_id
-        a_sleep, release_a = await current_expiration_sleep(a_event.utterance_id)
-        assert a_sleep == 8.0
+        assert a_event.source_child.effective_text == "alpha "
+        assert a_event.source_child.source_id != b_event.source_child.source_id
         blocks = {block.id: block for block in presenter.snapshot().blocks}
-        assert blocks[a_id].primary_text == "alpha"
         assert blocks[a_id].secondary_text == "translated-zh-CN"
         assert blocks[b_id].secondary_text == "translated-zh-CN"
-
-        bridge.published.clear()
-        clock.advance(4.0)
-        release_b.set()
-        await asyncio.wait_for(bridge.published.wait(), timeout=1)
-        blocks = {block.id: block for block in presenter.snapshot().blocks}
-        assert b_id not in blocks
-        assert blocks[a_id].primary_text == "alpha"
-        assert blocks[a_id].secondary_text == "translated-zh-CN"
-
-        bridge.published.clear()
-        clock.advance(4.0)
-        release_a.set()
-        await asyncio.wait_for(bridge.published.wait(), timeout=1)
-        assert a_id not in {block.id for block in presenter.snapshot().blocks}
-        expired_snapshot = presenter.snapshot()
-        published_count = len(bridge.snapshots)
-        await presenter.emit(
-            replace(
-                a_event,
-                seq=a_event.seq + 100,
+        assert bridge.deadlines[a_id] == bridge.deadlines[b_id] == 18
+        clock.advance(4.1)
+        await presenter.begin_native_retry_epoch(enabled=True)
+        assert presenter.snapshot().blocks == []
+        for event in (a_event, b_event):
+            retired = replace(
+                event,
+                utterance_id=uuid4(),
+                seq=event.seq + 100,
                 event_id=uuid4().hex,
                 created_at=clock.now(),
-                text="late A translation",
+                text="late translation",
             )
-        )
-        assert presenter.snapshot() == expired_snapshot
-        assert len(bridge.snapshots) == published_count
+            assert (await presenter.emit(retired)).outcome == "stale"
+            assert presenter.snapshot().blocks == []
+        for release in provider.releases.values():
+            release.set()
+        await harness.translation_turns.wait_for_idle()
+        assert presenter.snapshot().blocks == []
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        await harness.translation_turns.close()
+        await harness.output_runtime.close()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_dual_target_self_sources_retire_on_independent_original_deadlines() -> None:
+    clock = FakeClock(_now=10)
+    provider = TargetControlledProvider()
+    bridge = CaptionSnapshotBridge()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        bridge=bridge,
+        clock=clock,
+        sleep=hold_caption_expiration,
+    )
+    overlay = PresentingOverlay(presenter)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOsc(),
+        overlay_sink=overlay,
+        clock=clock,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+    )
+    try:
+        await harness.self_owner.submit_text("B source")
+        assert {await asyncio.wait_for(provider.started.get(), 1) for _ in range(2)} == {
+            ("B source", "zh-CN"),
+            ("B source", "ja"),
+        }
+        b_original = presenter.snapshot().blocks[0]
+        provider.releases[("B source", "zh-CN")].set()
+        b_event = await asyncio.wait_for(overlay.translations.get(), 1)
+        assert bridge.deadlines[b_original.id] == 18
+        clock.advance(2)
+        await harness.self_owner.submit_text("A source")
+        assert {await asyncio.wait_for(provider.started.get(), 1) for _ in range(2)} == {
+            ("A source", "zh-CN"),
+            ("A source", "ja"),
+        }
+        a_original = presenter.snapshot().blocks[-1]
+        assert a_original.id != b_original.id
+        assert bridge.deadlines[a_original.id] == 20
+        clock.advance(4)
+        provider.releases[("A source", "zh-CN")].set()
+        a_event = await asyncio.wait_for(overlay.translations.get(), 1)
+        assert a_event.source_child.source_id != b_event.source_child.source_id
+        assert bridge.deadlines[a_original.id] == 20
+        assert bridge.deadlines[b_original.id] == 18
+        clock.advance(2.1)
+        await presenter.begin_native_retry_epoch(enabled=True)
+        remaining = presenter.snapshot().blocks
+        assert len(remaining) == 1 and remaining[0].id == a_original.id
+        assert remaining[0].secondary_text == "translated-zh-CN"
+        assert bridge.deadlines[a_original.id] == 20
+        for release in provider.releases.values():
+            release.set()
+        await harness.translation_turns.wait_for_idle()
+        assert [block.id for block in presenter.snapshot().blocks] == [a_original.id]
+        assert bridge.deadlines[a_original.id] == 20
+        clock.advance(2)
+        await presenter.begin_native_retry_epoch(enabled=True)
+        assert presenter.snapshot().blocks == []
+        for event in (a_event, b_event):
+            assert (
+                await presenter.emit(
+                    replace(
+                        event,
+                        utterance_id=uuid4(),
+                        event_id=uuid4().hex,
+                        seq=event.seq + 100,
+                    )
+                )
+            ).outcome == "stale"
+        assert presenter.snapshot().blocks == []
     finally:
         for release in provider.releases.values():
             release.set()

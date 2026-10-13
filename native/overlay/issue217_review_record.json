@@ -1,0 +1,28 @@
+{
+  "baseline": "ce95d66437b12e5418f7d50b69a4bab457336fa7",
+  "reviewed_candidate": "baea72e9398c71d358bca89f83e44d40ee57d47d",
+  "mode": "FULL_REVIEW",
+  "responsibility": "Independent whole-checkpoint #217, all nine requirements and interactions",
+  "reviewer_result": "findings",
+  "review_transcript": "history://checkpoint-review",
+  "findings": [
+    {"id": "F1", "severity": "P1", "adjudication": "ACCEPT", "failure": "Shared finalized translation metadata sends source_child to self_active_update and breaks speculative SELF publication.", "evidence": "Broad execution TypeError and static caller trace; 15 affected SELF/streaming/isolation failures.", "owner": "source-plumbing", "repair": "Keep admitted source metadata at finalized publication boundary; preserve speculative active preview contract without suppressing errors."},
+    {"id": "F2", "severity": "P2", "adjudication": "ACCEPT", "failure": "SourceChild.language=None discards an already-resolved Peer source-language hint.", "evidence": "test_translation_peer_overlay_snapshot_uses_peer_specific_source_and_target_languages: None != ja.", "owner": "caption-presenter", "repair": "Preserve canonical effective text while retaining resolved event language fallback."},
+    {"id": "F3", "severity": "P2", "adjudication": "ACCEPT", "failure": "First canonical completion of legacy-first SELF bypasses expired attempt retirement and resurrects a new card/lifetime.", "evidence": "Reviewer new fake-clock probe artifact://98: source t10, completion t19, old attempt expired, new card deadline27.", "owner": "caption-presenter", "repair": "Carry exact existing attempt/card retirement into canonical source admission; cover expiry and eviction before first canonical completion."},
+    {"id": "E1", "adjudication": "ACCEPT", "kind": "Obsolete test contract", "failure": "Split-SELF fixture assumes attempt ID equals card ID and completion renews TTL.", "owner": "caption-presenter", "repair": "Remove obsolete implementation assertions; retain behavioral source retirement/original-deadline/no-resurrection coverage without restoring old contract."}
+  ],
+  "baseline_failures": {
+    "adjudication": "DEFER_OUT_OF_SCOPE",
+    "method": "Exact baseline/candidate Git object and field comparison, not a baseline test rerun.",
+    "count": 4,
+    "items": [
+      {"test": "test_installer_script_embeds_local_stt_manifest_assets_for_inno_download", "basis": "Nemotron manifest model ID absent from installer at both pins.", "unchanged": {"test_blob": "7cd4168f0bd2142cbcea9a0d45e8439a7b70da7f", "installer_blob": "5f1b6e03f9cb9bb698970c35edad55c70652d35d", "models_tree": "aacf00a3a5d8d2d9b8896cb73f30e1f1ceae5c32"}},
+      {"test": "test_version_49_gemma_consolidated_settings_gain_shared_connections", "basis": "Test expects settings52, existing serializer/schema writes53.", "unchanged": {"test_blob": "0c4155a4c823a7bc514b4e97e71ea5273946b8a2", "settings_tree": "f6c6faf6f3a07516df098951379a21f90e80e3f1"}},
+      {"test": "test_relevant_non_private_modules_are_inventoried_or_classified", "basis": "Existing Nemotron/speaker __all__ exports lack inventory classification.", "unchanged": {"test_blob": "18338b1db8f09e9dac8d2f07a7b08cf7fa80f78f", "inventory_blob": "660234a8114c43fb16ddd1eeaf46cd0a928af12e", "nemotron_tree": "4dc5ea403a90ffef5ce672b8721a8456ec4c73bc", "speaker_tree": "3db8bd5b3631de8e910985d928999f84552036eb"}},
+      {"test": "test_installer_identity_snapshot_matches_inno_and_smoke_guard_contract", "basis": "Installer52 versus settings schema53 at both pins. Entire installer_identity snapshot equal; #217 snapshot changes only overlay version/card_revision."}
+    ]
+  },
+  "upstream": {"observed_origin_dev": "3db94433fd474c6ad6a5353e8b36c87f4856e2d7", "change": "QQ auth diagnostic/recovery #226; changed paths do not overlap #217 surfaces.", "disposition": "Fetched and inspected; not merged/rebased under repository explicit-merge-approval rule. Candidate boundary unchanged."},
+  "repair_verification": "Pending repaired committed candidate and bounded REPAIR_VERIFY; unaffected renderer/native execution evidence remains applicable unless repair changes its input contract.",
+  "terminal_audit": "Pending independent final-candidate completion-evidence audit."
+}

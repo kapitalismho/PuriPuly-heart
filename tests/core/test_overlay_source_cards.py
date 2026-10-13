@@ -742,3 +742,204 @@ async def test_first_readable_preference_reveal_is_not_later_renewed_by_completi
         assert bridge.deadlines[first.id] == 20
     finally:
         await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("detected_language", "resolved_language", "expected_language"),
+    [(None, "ja", "ja"), ("en", "ja", "en")],
+)
+async def test_canonical_text_keeps_resolved_language_fallback_without_overriding_detection(
+    detected_language, resolved_language, expected_language
+):
+    clock = FakeClock(_now=10)
+    bridge = RecordingBridge()
+    presenter = OverlayPresenter(OverlayCalibration(), bridge=bridge, clock=clock)
+    adapter = OverlayEventAdapter(clock=clock)
+    source = replace(
+        source_child(1, "canonical source", group=UUID(int=217)),
+        language=detected_language,
+    )
+    attempt = uuid4()
+    try:
+        await presenter.emit(
+            adapter.transcript_final(
+                Transcript(attempt, "ignored source", True, channel="peer", source_child=source),
+                source_language="",
+                target_language="zh-TW",
+                speaker_assignment=assignment(1, "A"),
+            )
+        )
+        first = presenter.snapshot().blocks[0]
+        deadline = bridge.deadlines[first.id]
+        clock.advance(1)
+        await presenter.emit(
+            replace(
+                adapter.translation_final(
+                    utterance_id=attempt,
+                    channel="peer",
+                    text="translation",
+                    source_text="ignored downstream source",
+                    source_language=resolved_language,
+                    target_language="zh-TW",
+                    applied_context_mode=None,
+                ),
+                source_child=source,
+            )
+        )
+        current = presenter.snapshot().blocks[0]
+        assert current.id == first.id
+        assert current.secondary_text == source.effective_text
+        assert current.secondary_language == expected_language
+        assert current.primary_language == "zh-TW"
+        assert source.language == detected_language
+        assert bridge.deadlines[first.id] == deadline
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("removal", ["expiry", "eviction"])
+@pytest.mark.parametrize("caption_churn", [0, 100])
+async def test_first_canonical_self_completion_carries_exact_legacy_attempt_retirement(
+    removal, caption_churn
+):
+    clock = FakeClock(_now=10)
+    bridge = RecordingBridge()
+    presenter = OverlayPresenter(OverlayCalibration(), bridge=bridge, clock=clock)
+    adapter = OverlayEventAdapter(clock=clock)
+    attempt = uuid4()
+    source = replace(source_child(1, "old SELF", group=None), channel="self")
+    try:
+        await presenter.emit(
+            adapter.transcript_final(
+                Transcript(attempt, source.effective_text, True, channel="self"),
+                source_language="en",
+                target_language="ko",
+            )
+        )
+        original = presenter.snapshot().blocks[0]
+        assert bridge.deadlines[original.id] == 18
+        if removal == "expiry":
+            clock.advance(9)
+            await presenter.begin_native_retry_epoch(enabled=True)
+        else:
+            clock.advance(1)
+            for text in ("newer one", "newer two"):
+                await presenter.emit(
+                    adapter.transcript_final(
+                        Transcript(uuid4(), text, True, channel="self"),
+                        source_language="en",
+                        target_language="ko",
+                    )
+                )
+        for index in range(caption_churn):
+            await presenter.emit(
+                adapter.transcript_final(
+                    Transcript(uuid4(), f"newer {index}", True, channel="self"),
+                    source_language="en",
+                    target_language="ko",
+                )
+            )
+        before = presenter.snapshot()
+        deadlines = dict(bridge.deadlines)
+        assert original.id not in {block.id for block in before.blocks}
+        completion = replace(
+            adapter.translation_final(
+                utterance_id=attempt,
+                channel="self",
+                text="late translation",
+                source_language="en",
+                target_language="ko",
+                applied_context_mode=None,
+            ),
+            source_child=source,
+        )
+        assert (await presenter.emit(completion)).outcome == "stale"
+        assert presenter.snapshot() == before
+        assert bridge.deadlines == deadlines
+        retry = replace(
+            completion, utterance_id=uuid4(), event_id=uuid4().hex, seq=completion.seq + 1
+        )
+        assert (await presenter.emit(retry)).outcome == "stale"
+        assert presenter.snapshot() == before
+        new_source = replace(source_child(2, "old SELF", group=None), channel="self")
+        assert (
+            await presenter.emit(
+                adapter.transcript_final(
+                    Transcript(
+                        uuid4(),
+                        new_source.effective_text,
+                        True,
+                        channel="self",
+                        source_child=new_source,
+                    ),
+                    source_language="en",
+                    target_language="ko",
+                )
+            )
+        ).outcome == "applied"
+        newest = presenter.snapshot().blocks[-1]
+        assert newest.primary_text == source.effective_text
+        assert newest.id != original.id
+        assert bridge.deadlines[newest.id] == clock.now() + 8
+        assert len(presenter.snapshot().blocks) <= 2
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("active_preview", [False, True])
+async def test_first_canonical_self_completion_upgrades_live_legacy_caption_without_new_lifetime(
+    active_preview,
+):
+    clock = FakeClock(_now=10)
+    bridge = RecordingBridge()
+    presenter = OverlayPresenter(OverlayCalibration(), bridge=bridge, clock=clock)
+    adapter = OverlayEventAdapter(clock=clock)
+    attempt = uuid4()
+    source = replace(source_child(1, "SELF source", group=None), channel="self")
+    try:
+        if active_preview:
+            await presenter.emit(
+                adapter.self_active_update(
+                    text="preview", utterance_id=attempt, occupant_key=f"self:{attempt}"
+                )
+            )
+            clock.advance(1)
+            await presenter.emit(
+                adapter.self_active_update(
+                    text="preview progress", utterance_id=attempt, occupant_key=f"self:{attempt}"
+                )
+            )
+            clock.advance(1)
+        await presenter.emit(
+            adapter.transcript_final(
+                Transcript(attempt, source.effective_text, True, channel="self"),
+                source_language="en",
+                target_language="ko",
+            )
+        )
+        original = presenter.snapshot().blocks[0]
+        deadline = bridge.deadlines[original.id]
+        clock.advance(5)
+        completed = replace(
+            adapter.translation_final(
+                utterance_id=attempt,
+                channel="self",
+                text="completion",
+                source_language="en",
+                target_language="ko",
+                applied_context_mode=None,
+            ),
+            source_child=source,
+        )
+        assert (await presenter.emit(completed)).outcome == "applied"
+        current = presenter.snapshot().blocks[0]
+        assert current.id == original.id
+        assert current.occupant_key == original.occupant_key
+        assert current.secondary_text == "completion"
+        assert bridge.deadlines[current.id] == deadline
+        assert deadline == (19 if active_preview else 18)
+    finally:
+        await presenter.close()

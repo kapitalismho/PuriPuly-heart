@@ -1,0 +1,184 @@
+{
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/217",
+  "reviewed_candidate": "baea72e9398c71d358bca89f83e44d40ee57d47d",
+  "original_checkpoint_baseline": "ce95d66437b12e5418f7d50b69a4bab457336fa7",
+  "status": "assigned-repairs-complete-focused-verification-passed",
+  "accepted_findings": {
+    "F2": "Canonical source.language=None erased the resolved event source-language hint; original broad-suite language failure accepted without rerunning it before repair.",
+    "F3": "Legacy-first SELF caption removed before first canonical completion could reappear under a new card/deadline; original fake-clock probe artifact://98 accepted without rerunning it before repair.",
+    "evidence_gap": "Old split-SELF test equated attempts/cards and expected completion renewal; those implementation assertions were removed, not repinned."
+  },
+  "changed_paths": [
+    "src/puripuly_heart/core/overlay/presenter.py",
+    "src/puripuly_heart/core/overlay/presenter_sources.py",
+    "tests/core/test_overlay_source_cards.py",
+    "tests/core/test_dual_target_translation_lifecycle.py"
+  ],
+  "repairs": {
+    "F2": "When canonical detected language is absent, preserve a nonempty resolved event.source_language on the source contribution. Canonical detected language still wins when present; source.effective_text and immutable SourceChild remain unchanged.",
+    "F3": "Store exact legacy attempt retirement as None bindings inside the existing source-ledger attempts window. Expiry/eviction record the attempt before a canonical source is known. First canonicalization rejects that exact attempt and propagates its now-known SourceChild.order into the existing canonical retired_orders fence; a different-attempt replay of that retired source also stays stale. Existing retained acceptance terminal records supply a fallback.",
+    "retention_choice": "No parallel tombstone table. Reused the existing 4096-entry attempts store and common trimming path. The acceptance terminal window is only 64 entries, which cannot alone fence delayed first canonicalization after caption churn; 100-caption expiry/eviction cases exercise the retained exact fence beyond that window. Unit, payload and source-frontier bounds remain unchanged.",
+    "fixture_migration": "Actual split-SELF/dual-target output now verifies distinct canonical source IDs, actual visible card IDs and original t=18 deadlines despite t=14 completion. A separate two-source dual-target fixture verifies B expires at original t=18 while A survives only until original t=20, with no resurrection from later target completion/replay."
+  },
+  "preserved_invariants": [
+    "No text matching, color-based identity inference, second text filter, completion floor or new caption lifetime.",
+    "Exact source/attempt/card separation, authoritative source order and independent equal-text sources.",
+    "Currently live legacy SELF and active preview upgrade retain card/occupant and original deadline.",
+    "Retired completion cannot change surviving cards or their deadlines; later distinct sources remain admissible.",
+    "No sink/projection/native/UI/schema/documentation/Git changes by this worker."
+  ],
+  "verification": [
+    {
+      "command": "uv run --frozen ruff check --fix src/puripuly_heart/core/overlay/presenter.py src/puripuly_heart/core/overlay/presenter_sources.py tests/core/test_overlay_source_cards.py tests/core/test_dual_target_translation_lifecycle.py && uv run --frozen black <same four files>",
+      "status": "passed",
+      "result": "Ruff: all checks passed. Black: 2 test files reformatted, 2 product files unchanged."
+    },
+    {
+      "command": "uv run --frozen pytest tests/core/test_overlay_source_cards.py tests/core/test_overlay_presenter.py tests/core/test_dual_target_translation_lifecycle.py tests/core/runtime/test_output_runtime.py tests/core/test_translation_output_streaming.py::test_translation_peer_overlay_snapshot_uses_peer_specific_source_and_target_languages",
+      "status": "passed",
+      "passed": 196,
+      "failed": 0,
+      "duration_seconds": 1.33,
+      "timing": "After product repairs and owned formatting; background job bg_16 completed successfully."
+    },
+    {
+      "command": "uv run pytest tests/core/test_translation_output_streaming.py -q",
+      "status": "passed_reused",
+      "exit_code": 0,
+      "owner": "source-plumbing",
+      "source": "native/overlay/issue217_source_repair_report.json",
+      "applicability": "Full file executed after this worker notified repaired F2/F3 and formatting; includes resolved Peer-language node and the sibling F1 repair."
+    },
+    {
+      "command": "uv run --frozen python -c <throwaway standalone presenter retirement/upgrade smoke>",
+      "status": "passed",
+      "clock": "SystemClock",
+      "python": "3.14.7",
+      "elapsed_seconds": 8.19,
+      "environment": "Standalone Python presenter and recording transport; no cloud, native rendering, GUI or HMD.",
+      "expired_legacy_first": {
+        "removal": "expiry",
+        "first_canonical_outcome": "stale",
+        "different_attempt_source_replay": "stale",
+        "unchanged_survivor_deadlines": true,
+        "before": {
+          "revision": 2,
+          "blocks": []
+        },
+        "after": {
+          "revision": 2,
+          "blocks": []
+        }
+      },
+      "evicted_legacy_first": {
+        "removal": "eviction",
+        "first_canonical_outcome": "stale",
+        "different_attempt_source_replay": "stale",
+        "unchanged_survivor_deadlines": true,
+        "before": {
+          "revision": 3,
+          "blocks": [
+            {
+              "id": "self:076b231e-cfb9-4b6b-bc1a-e07dfa051d40",
+              "occupant_key": "self:076b231e-cfb9-4b6b-bc1a-e07dfa051d40",
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "self",
+              "block_variant": "finalized",
+              "primary_text": "newer one",
+              "secondary_text": "",
+              "secondary_enabled": true,
+              "primary_language": "en"
+            },
+            {
+              "id": "self:8884747a-8fba-4230-ad5f-fbfe1bb6aea4",
+              "occupant_key": "self:8884747a-8fba-4230-ad5f-fbfe1bb6aea4",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "self",
+              "block_variant": "finalized",
+              "primary_text": "newer two",
+              "secondary_text": "",
+              "secondary_enabled": true,
+              "primary_language": "en"
+            }
+          ]
+        },
+        "after": {
+          "revision": 3,
+          "blocks": [
+            {
+              "id": "self:076b231e-cfb9-4b6b-bc1a-e07dfa051d40",
+              "occupant_key": "self:076b231e-cfb9-4b6b-bc1a-e07dfa051d40",
+              "appearance_seq": 2,
+              "card_revision": 1,
+              "channel": "self",
+              "block_variant": "finalized",
+              "primary_text": "newer one",
+              "secondary_text": "",
+              "secondary_enabled": true,
+              "primary_language": "en"
+            },
+            {
+              "id": "self:8884747a-8fba-4230-ad5f-fbfe1bb6aea4",
+              "occupant_key": "self:8884747a-8fba-4230-ad5f-fbfe1bb6aea4",
+              "appearance_seq": 3,
+              "card_revision": 1,
+              "channel": "self",
+              "block_variant": "finalized",
+              "primary_text": "newer two",
+              "secondary_text": "",
+              "secondary_enabled": true,
+              "primary_language": "en"
+            }
+          ]
+        }
+      },
+      "active_live_upgrade": {
+        "outcome": "applied",
+        "stable_card_and_occupant": true,
+        "original_deadline_preserved": true,
+        "scene": {
+          "revision": 3,
+          "blocks": [
+            {
+              "id": "self:74dafc7c-9b71-4074-b276-e572cbb79d2c",
+              "occupant_key": "self:74dafc7c-9b71-4074-b276-e572cbb79d2c",
+              "appearance_seq": 1,
+              "card_revision": 3,
+              "channel": "self",
+              "block_variant": "finalized",
+              "primary_text": "canonical SELF source",
+              "secondary_text": "canonical completion",
+              "secondary_enabled": true,
+              "update_id": "e374459e91b84e5abc3335ba552f962f",
+              "primary_language": "ja",
+              "secondary_language": "ko"
+            }
+          ]
+        }
+      },
+      "cleanup": "Smoke executed from an in-memory -c script; no throwaway file created."
+    }
+  ],
+  "coverage": [
+    "Canonical absent-detected-language fallback plus known-detected-language precedence, with canonical effective text and unchanged deadline.",
+    "First canonical completion after legacy SELF expiry and eviction, both without churn and after 100 captions.",
+    "Different-attempt canonical replay rejected after the exact retired legacy attempt reveals its source identity.",
+    "Fresh distinct equal-text source/order accepted after old-source retirement; surviving captions remain unchanged.",
+    "Live legacy-first and active-preview canonical upgrade preserve identity/lifetime.",
+    "Actual split source/dual-target lifecycle retains original deadlines, independent source retirement and no-resurrection after secondary completion/replay.",
+    "Existing source-card, presenter and output-runtime regressions remain green."
+  ],
+  "evidence_applicability": {
+    "invalidated_and_rerun": "Canonical presenter language/retirement handling and obsolete split-SELF evidence were changed; affected focused suites and standalone smoke were rerun after repair.",
+    "retained": "Unchanged renderer/wire/palette/grouping surfaces and unrelated prior hardware evidence are not replaced or newly claimed. Director must judge their applicability when pinning the repaired candidate.",
+    "F1": "Sibling source-plumbing owns projection metadata boundary and its low-latency/isolation/full-streaming/source-adapter evidence; no overlapping product edits."
+  },
+  "remaining_gaps": [
+    "Director owns new candidate pin, combined integration validation and bounded independent repair verification.",
+    "No repository-wide, native/desktop/device/cloud/model/HMD checks by this repair worker.",
+    "Four adjudicated preexisting configuration/installer drift failures remain outside this assignment and were not changed or rerun."
+  ],
+  "followup_review_input": "Checkpoint repair verification of accepted F2/F3 and migrated split-SELF evidence against the Director-pinned repaired candidate; no worker review approval or terminal program acceptance asserted."
+}

@@ -342,6 +342,14 @@ class OverlayPresenter(OverlaySink):
         if self._sources.key_for(event) is not None:
             if self._closing or self._closed:
                 return "closed"
+            if event.channel is not None and event.utterance_id is not None:
+                attempt_key = (event.channel, event.utterance_id)
+                if (
+                    attempt_key not in self._entries
+                    and attempt_key not in self._sources.attempts
+                    and self._acceptance.terminal_reason(attempt_key) is not None
+                ):
+                    self._sources.retire_attempt(attempt_key)
             reason = self._sources.rejection_reason(event)
             if reason is not None:
                 return reason
@@ -540,6 +548,8 @@ class OverlayPresenter(OverlaySink):
             unit = SourceCaptionUnit(source, content)
             self._sources.units[source_key] = unit
         content = unit.content
+        if unit.source.language is None and event.source_language.strip():
+            content.original_language = event.source_language.strip()
         self._sources.remember_attempt(event, source_key)
         if not unit.applied and event.speaker_assignment is not None:
             content.speaker_assignment = event.speaker_assignment
@@ -1271,6 +1281,8 @@ class OverlayPresenter(OverlaySink):
     def _record_removed_entry(self, record: OverlayEntryRemovalRecord) -> None:
         key = record.key
         entry = record.entry
+        if not entry.source_managed and record.reason in {"expired", "evicted_by_newer_turn"}:
+            self._sources.retire_attempt(key)
         self._acceptance.retire_entry(key)
         for source_key in self._sources.card_sources.get(key, []):
             self._acceptance.retire_entry(source_key)

@@ -1723,7 +1723,11 @@ class TranslationOutputProjectionOwner:
                 applied_context_mode=projection.applied_context_mode,
                 created_at=translation.created_at,
                 output_scope=projection.output_scope,
-                **self._translation_metadata(translation),
+                source_child=translation.source_child,
+                speaker_assignment=(
+                    translation.speaker_assignment if translation.channel == "peer" else None
+                ),
+                **self._translation_delivery_metadata(translation),
             ),
             publication_generation=projection.publication_generation,
             source_order=projection.source_order,
@@ -3175,19 +3179,15 @@ class TranslationOutputProjectionOwner:
         return result
 
     @staticmethod
-    def _translation_metadata(translation: Translation) -> dict[str, object]:
-        metadata: dict[str, object] = {
+    def _translation_delivery_metadata(translation: Translation) -> dict[str, object]:
+        return {
             "update_id": translation.update_id,
             "origin_wall_clock_ms": translation.origin_wall_clock_ms,
             "session_scope": translation.session_scope,
             "source_text_hash": translation.source_text_hash,
             "source_text_len": translation.source_text_len,
             "logical_turn_key": translation.logical_turn_key,
-            "source_child": translation.source_child,
         }
-        if translation.channel == "peer":
-            metadata["speaker_assignment"] = translation.speaker_assignment
-        return metadata
 
     @staticmethod
     def _active_translation_metadata(
@@ -3236,7 +3236,7 @@ class TranslationOutputProjectionOwner:
         if not secondary_text:
             return self._active_translation_metadata(None)
         if source == "spec" and projection.spec_translation is not None:
-            return self._translation_metadata(projection.spec_translation)
+            return self._translation_delivery_metadata(projection.spec_translation)
         if (
             source == "sticky_cache"
             and metadata is not None
