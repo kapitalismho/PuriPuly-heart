@@ -173,7 +173,6 @@ def test_stalled_writer_overflow_is_nonblocking_and_shutdown_loss_is_visible(tmp
         assert health["file"]["dropped_records"] > 0
         assert health["file"]["written_records"] == 0
         assert health["history"]["evicted_records"] > 0
-        # Closing the existing writer has a bounded drain even while the sink stalls.
         closed_at = time.monotonic()
         with pytest.raises(TimeoutError, match="listener stop timed out"):
             sinks.close(force=True)

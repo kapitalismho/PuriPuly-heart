@@ -847,7 +847,6 @@ class RuntimeLoggingSinks:
 
 def default_main_log_file(*, log_dir: Path | None = None) -> Path:
     resolved_log_dir = log_dir or user_config_dir()
-    # A failed file destination must not prevent the live control host from starting.
     with contextlib.suppress(OSError):
         resolved_log_dir.mkdir(parents=True, exist_ok=True)
     return resolved_log_dir / MAIN_LOG_FILENAME
@@ -976,7 +975,6 @@ class SessionRuntimeLoggingService:
         self._diagnostic_event_lock = RLock()
         self._diagnostic_delivery_scheduled = False
         self._diagnostic_ingress = _DiagnosticIngressHandler(self)
-        # Before formatting/redaction: typed meaning must not be recovered from prose.
         self._root_logger.handlers.insert(0, self._diagnostic_ingress)
         self._session_logger.handlers.insert(0, self._diagnostic_ingress)
         for handler in (self._sinks.file_handler, self._sinks.file_queue_handler):
@@ -1225,7 +1223,6 @@ class SessionRuntimeLoggingService:
         level = {"info": logging.INFO, "warning": logging.WARNING}.get(
             record["severity"], logging.ERROR
         )
-        # File-only detailed metadata, factual Basic summary derived from the same record.
         if project_file:
             file_record = self._session_logger.makeRecord(
                 self._session_logger.name,
@@ -1337,7 +1334,6 @@ class SessionRuntimeLoggingService:
             safe_message,
             extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
         )
-        # Untyped human log text is not a competing diagnostic authority.
 
     def emit_translation_latency(self, message: str) -> bool:
         if self._closed or not is_translation_latency_summary(message):

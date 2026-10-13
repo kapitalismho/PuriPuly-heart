@@ -1764,8 +1764,6 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             let terminal_status = self
                 .emit_terminal_status(bridge, primary_failure_reason, cleanup_failure_reason)
                 .await;
-            // Independent reserved pipe event preserves both causes if the bridge is lost.
-            // A failed write remains unavailable; process exit is not cleanup acknowledgement.
             let _ = logger.emit_stdout_event(&json!({
                 "type": if self.runtime.ready_sent() { "runtime_error" } else { "startup_error" },
                 "overlay_instance_id": bridge.overlay_instance_id(),

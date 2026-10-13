@@ -148,6 +148,7 @@ DOMAIN_CODES = (
             "self_stt_runtime_apply_not_converged",
             "stt_runtime_apply_not_converged",
             "runtime_apply_exception",
+            "runtime_apply_degraded",
             "runtime_apply_interrupted",
             "settings_snapshot_notification_failed",
             "runtime_result_notification_failed",

@@ -325,7 +325,6 @@ def run(report: Path) -> dict:
                 raise RuntimeError("restart_scope_not_explicit")
             stop_host(host, "restart_stop")
             host = None
-            # A real invalid Windows file destination must not take down metadata control.
             failed_root = root / "failed-file-localappdata"
             failed_log = failed_root / "puripuly-heart" / "puripuly_heart.log"
             failed_log.mkdir(parents=True)

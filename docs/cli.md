@@ -305,6 +305,8 @@ puripuly.exe operation status <operation-id>
 
 Use real identities and cursors returned by the host, not the example placeholders. `diagnostics.history` accepts only optional `operation_id`, `diagnostic_id`, `instance_id`, `after`, and `limit`. `diagnostics.health` takes no arguments. Both use the existing authenticated same-user local connection; they neither grant mutation authority nor enable conversation access.
 
+Operation and diagnostic identity payloads use 8–64 ASCII hexadecimal digits or UUID-shaped `8-4-4-4-12` groups, optionally with an existing native prefix such as `overlay-`. Short native hexadecimal identities remain valid; identities are not restricted to UUIDs. Hyphen-only payloads or trailing separators such as `--------` and `dead----` are malformed, not missing retained evidence. Host `instance_id` uses its separate instance-name syntax.
+
 ### Identity and interpretation
 
 Schema version 1 records contain a distinct `diagnostic_id`, UTC `occurred_at`, current `instance_id`, `diagnostic_sequence`, repository-owned component/operation/stage, severity, actual disposition, stable code/category, and known cause/operation/request/channel/turn/generation identities. Unavailable relationships are `null`, not inferred from nearby events. Allowlisted native/status/provider details and bounded exception-class cause relationships may be present; raw exception messages, stack traces, arbitrary child JSON/stderr, response bodies, credentials, URLs, personal paths, audio, and conversation content are excluded.

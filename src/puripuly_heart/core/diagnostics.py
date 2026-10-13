@@ -45,7 +45,10 @@ DISPOSITIONS = frozenset(
     }
 )
 _KNOWN_ID_SENTINELS = {"provider_epoch_id": frozenset({"admission"})}
-_ID = re.compile(r"(?:[a-z][a-z0-9_-]{0,31}-)?[0-9a-fA-F-]{8,64}\Z")
+_ID = re.compile(
+    r"(?:[a-z][a-z0-9_-]{0,31}-)?"
+    r"(?:[0-9a-fA-F]{8,64}|[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})\Z"
+)
 _EXCEPTION_CLASSES = frozenset(
     name
     for name in dir(builtins)
@@ -391,6 +394,7 @@ _COMPONENTS = frozenset(
         "overlay_process",
         "overlay_bridge",
         "provider_verifier",
+        "openrouter_pkce_handoff",
         "runtime_logging",
         "managed_key_delivery_ack",
         "managed_openrouter_broker_client",
@@ -449,6 +453,7 @@ _BOUNDARIES = (
             "clear_secret",
             "restore_secret",
             "verify_provider_secret",
+            "verify_transient_key",
             "commit_provider_verification",
             "store_creation",
             "secret_read",
@@ -917,7 +922,6 @@ def normalize_diagnostic(
     file_evidence: str = "unknown",
 ) -> dict:
     context = _operation_context.get()
-    # Source-bound episodes must not inherit a command identity from detached tasks.
     source_bound = (
         diagnostics.channel is not None
         or diagnostics.turn_id is not None

@@ -12,6 +12,7 @@ from puripuly_heart.core.diagnostic_validation import (
 )
 from puripuly_heart.core.diagnostics import (
     DiagnosticHistory,
+    DiagnosticQueryArgumentsError,
     current_diagnostic_operation,
     diagnostic_operation,
     normalize_diagnostic,
@@ -135,6 +136,48 @@ def test_retention_dedup_filter_bounds_eviction_and_restart_are_explicit():
     ):
         with pytest.raises(ValueError):
             history.query(arguments)
+
+
+@pytest.mark.parametrize("key", ("operation_id", "diagnostic_id"))
+@pytest.mark.parametrize(
+    "value",
+    ("--------", "dead----", "overlay---------", "01234567-1234-1234-1234-123456789ab"),
+)
+def test_history_rejects_malformed_identity_filters(key, value):
+    history = DiagnosticHistory()
+    history.bind_instance("host_with-hyphen")
+    with pytest.raises(DiagnosticQueryArgumentsError):
+        history.query({key: value})
+
+
+@pytest.mark.parametrize(
+    "identity",
+    (
+        "deadbeef",
+        "ABCDEF0123456789",
+        "0123456789abcdef" * 2,
+        "0123456789abcdef" * 4,
+        "01234567-89ab-cdef-0123-456789abcdef",
+        "overlay-0123456789abcdef",
+        "overlay-01234567-89ab-cdef-0123-456789abcdef",
+        "startup-" + "0123456789abcdef" * 2,
+        "provider-01234567-89ab-cdef-0123-456789abcdef",
+        "a_b-c-01234567",
+    ),
+)
+def test_history_preserves_native_identity_formats(identity):
+    history = DiagnosticHistory()
+    history.bind_instance("host_with-hyphen")
+    original = diagnostic(diagnostic_id=identity, operation_id=identity)
+    record, fresh = history.retain(original, severity="error", disposition="failed")
+    assert fresh
+    assert record["diagnostic_id"] == identity
+    assert record["operation_id"] == identity
+    for key in ("diagnostic_id", "operation_id"):
+        page = history.query({key: identity})
+        assert page["lookup"] == "found"
+        assert page["records"] == [record]
+        assert history.query({key: "ffffffff"})["lookup"] == "not_retained"
 
 
 @pytest.mark.asyncio
