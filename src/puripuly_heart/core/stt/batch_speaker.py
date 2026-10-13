@@ -72,8 +72,6 @@ class CausalBatchSession:
     CLEAR_PROBABILITY = 0.8
     QUIET_PROBABILITY = 0.2
     COMPETING_PROBABILITY = 0.35
-    PARAKEET_RIGHT_CONTEXT_SAMPLES = 32000
-    _PARAKEET_RIGHT_CONTEXT_PCM = bytes(PARAKEET_RIGHT_CONTEXT_SAMPLES * 2)
 
     def __init__(self, inner, *, clock=time.monotonic):
         self.inner = inner
@@ -365,21 +363,12 @@ class CausalBatchSession:
         native_backend = parent.request.native_options
         if not hasattr(native_backend, "provider_id"):
             native_backend = getattr(self.inner, "backend", None)
-        padding = (
-            self.PARAKEET_RIGHT_CONTEXT_SAMPLES
-            if parent.submitted_cursor >= 0
-            and getattr(native_backend, "provider_id", None) == "local_parakeet_v3"
-            else 0
-        )
-        padding_rate = getattr(native_backend, "sample_rate_hz", None) if padding else None
         audio = STTSourceAudio(
             child_id.provider_turn_id,
             source,
             context,
             parent.request.display_group_id,
             speaker.attribution,
-            padding,
-            padding_rate,
         )
         child = _Slice(parent, child_id, audio, speaker)
         parent.children.append(child)
@@ -389,8 +378,6 @@ class CausalBatchSession:
                 parent.request,
                 identity=child_id,
                 isolate_failure=True,
-                synthetic_right_context_samples=padding,
-                synthetic_context_sample_rate_hz=padding_rate,
             )
         )
         sequence = 0
@@ -403,14 +390,6 @@ class CausalBatchSession:
                 source_ranges=ranges,
                 context_only=is_context,
             )
-        if padding:
-            await self.inner.send_turn_audio(
-                child_id,
-                self._PARAKEET_RIGHT_CONTEXT_PCM,
-                payload_sequence=sequence + 1,
-                source_ranges=(),
-                context_only=True,
-            )
         await self.inner.seal_turn(
             child_id,
             sealed_content_ranges=source,
@@ -422,7 +401,7 @@ class CausalBatchSession:
         logger.info(
             "[BatchSpeaker] request=%s slice=%s reason=%s source_boundary=%s "
             "evidence_ready=%s submitted_at=%s submitted_cursor=%s context_samples=%s "
-            "synthetic_right_context_samples=%s attribution=%s capture_epoch=%s "
+            "attribution=%s capture_epoch=%s "
             "speaker_epoch=%s group=%s model=%s backend=%s",
             parent.request.identity.provider_turn_id,
             child_id.provider_turn_id,
@@ -432,7 +411,6 @@ class CausalBatchSession:
             self.clock(),
             parent.submitted_cursor,
             sum(span.normalized_sample_count for span in context),
-            padding,
             child.speaker.attribution_state,
             parent.request.identity.segment.capture_epoch,
             child.speaker.session_scope,

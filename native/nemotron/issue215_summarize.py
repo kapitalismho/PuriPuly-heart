@@ -108,9 +108,8 @@ def summarize(case):
         row["synthetic_right_context_samples"] = begun.get("synthetic_right_context_samples", 0)
         row["synthetic_context_sample_rate_hz"] = begun.get("synthetic_context_sample_rate_hz")
         row["synthetic_native_input_valid"] = (
-            item.get("synthetic_right_context_valid")
+            item.get("synthetic_right_context_valid", True)
             and all(payload["matches_declared_native_input"] for payload in item["payloads"])
-            if "synthetic_right_context_valid" in item else None
         )
         row["synthetic_context_metadata_preserved"] = all(
             origin.get("synthetic_right_context_samples", 0) == row["synthetic_right_context_samples"]

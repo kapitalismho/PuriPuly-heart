@@ -120,8 +120,6 @@ class RecognitionTextOrigin:
     audio_settings: AudioSegmentSettingsSnapshot | None = None
     source_available_at_monotonic_s: float | None = None
     speaker_attribution: SpeakerAttribution | None = None
-    synthetic_right_context_samples: int = 0
-    synthetic_context_sample_rate_hz: int | None = None
     native_provenance: tuple[STTNativeProvenance, ...] = ()
 
     def __post_init__(self) -> None:
@@ -141,18 +139,6 @@ class RecognitionTextOrigin:
             span.capture_epoch != self.identity.stream.capture_epoch for span in self.source_ranges
         ):
             raise ValueError("source ranges belong to another capture epoch")
-        if (
-            self.synthetic_right_context_samples < 0
-            or (
-                bool(self.synthetic_right_context_samples)
-                != (self.synthetic_context_sample_rate_hz is not None)
-            )
-            or (
-                self.synthetic_context_sample_rate_hz is not None
-                and self.synthetic_context_sample_rate_hz <= 0
-            )
-        ):
-            raise ValueError("invalid synthetic native context")
 
 
 def validate_recognition_origins(

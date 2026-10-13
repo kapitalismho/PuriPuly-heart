@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import FrozenInstanceError, replace
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -217,24 +217,9 @@ async def test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins(bac
             t.recognition_origins[0].display_group_id == req.display_group_id for t in transcripts
         )
         assert all(not t.recognition_origins[0].context_ranges for t in transcripts)
-        expected_padding = (
-            [0, 32000, 32000] if backend_type is LocalParakeetV3SherpaSTTBackend else [0, 0, 0]
-        )
-        assert [
-            t.recognition_origins[0].synthetic_right_context_samples for t in transcripts
-        ] == expected_padding
-        assert [t.recognition_origins[0].synthetic_context_sample_rate_hz for t in transcripts] == [
-            16000 if count else None for count in expected_padding
-        ]
-        assert [call.samples.size for call in recognizer.calls] == [
-            800 + count for count in expected_padding
-        ]
-        assert all(
-            not count or np.count_nonzero(call.samples[-count:]) == 0
-            for call, count in zip(recognizer.calls, expected_padding)
-        )
+        assert [call.samples.size for call in recognizer.calls] == [800, 800, 800]
         assert np.array_equal(
-            np.concatenate([s.samples[:800] for s in recognizer.calls]),
+            np.concatenate([s.samples for s in recognizer.calls]),
             np.arange(2400, dtype=np.int16).astype(np.float32) / 32768,
         )
         assert sum(isinstance(event, STTProviderTurnTerminal) for event in received) == 1
@@ -985,8 +970,6 @@ async def test_imminent_safety_coalesces_optional_cut_without_losing_short_succe
         assert audio.context_ranges == ()
         assert audio.display_group_id == req.display_group_id
         assert audio.speaker_attribution.state == "mixed"
-        assert audio.synthetic_right_context_samples == 0
-        assert audio.synthetic_context_sample_rate_hz is None
     finally:
         await session.close()
         await backend.close()
@@ -1077,25 +1060,8 @@ async def test_actual_listen_safety_policy_reaches_owner_without_restarting_dead
 
 
 @pytest.mark.asyncio
-async def test_parakeet_native_window_is_frozen_synthetic_context_not_capture_or_rollover(
-    monkeypatch,
-):
+async def test_parakeet_disjoint_slices_preserve_native_options_and_rollover_context():
     backend, recognizer, session = await opened(LocalParakeetV3SherpaSTTBackend)
-    inner_type = type(session.inner)
-    native_requests, native_payloads = [], []
-    begin = inner_type.begin_turn
-    send = inner_type.send_turn_audio
-
-    async def recorded_begin(inner, native_request):
-        native_requests.append(native_request)
-        await begin(inner, native_request)
-
-    async def recorded_send(inner, identity, pcm, **kwargs):
-        native_payloads.append((identity, pcm, kwargs))
-        await send(inner, identity, pcm, **kwargs)
-
-    monkeypatch.setattr(inner_type, "begin_turn", recorded_begin)
-    monkeypatch.setattr(inner_type, "send_turn_audio", recorded_send)
     first, rollover = request(), request(2, "ja")
     await backend._decode_lock.acquire()
     try:
@@ -1116,27 +1082,6 @@ async def test_parakeet_native_window_is_frozen_synthetic_context_not_capture_or
         await payload(session, rollover, 2400, 7200, 1, context=True)
         await payload(session, rollover, 7200, 8800, 2)
         await seal(session, rollover)
-        assert [item.synthetic_right_context_samples for item in native_requests] == [
-            0,
-            32000,
-            32000,
-            0,
-        ]
-        assert [item.synthetic_context_sample_rate_hz for item in native_requests] == [
-            None,
-            16000,
-            16000,
-            None,
-        ]
-        with pytest.raises(FrozenInstanceError):
-            native_requests[1].synthetic_right_context_samples = 0
-        synthetic_payloads = [
-            (pcm, kwargs) for _, pcm, kwargs in native_payloads if not kwargs["source_ranges"]
-        ]
-        assert len(synthetic_payloads) == 2
-        assert all(
-            pcm == bytes(64000) and kwargs["context_only"] for pcm, kwargs in synthetic_payloads
-        )
         backend._decode_lock.release()
         events = await asyncio.wait_for(terminal_events(session, 2), 2)
         terminals = [event for event in events if isinstance(event, STTProviderTurnTerminal)]
@@ -1146,7 +1091,15 @@ async def test_parakeet_native_window_is_frozen_synthetic_context_not_capture_or
             "English",
             "Japanese",
         ]
-        assert [stream.samples.size for stream in recognizer.calls] == [2400, 34400, 34400, 6400]
+        assert [stream.samples.size for stream in recognizer.calls] == [2400, 2400, 2400, 6400]
+        np.testing.assert_array_equal(
+            np.concatenate([stream.samples for stream in recognizer.calls[:3]]),
+            np.arange(7200, dtype=np.int16).astype(np.float32) / 32768,
+        )
+        np.testing.assert_array_equal(
+            recognizer.calls[3].samples,
+            np.arange(2400, 8800, dtype=np.int16).astype(np.float32) / 32768,
+        )
         assert [run.speaker_id for run in terminals[0].final_speaker_runs] == ["0", "1", "0"]
         assert [
             (
@@ -1160,27 +1113,9 @@ async def test_parakeet_native_window_is_frozen_synthetic_context_not_capture_or
             audio.display_group_id == first.display_group_id for audio in terminals[0].source_audio
         )
         assert terminals[1].source_audio[0].context_ranges == (span(2400, 7200),)
-        assert terminals[1].source_audio[0].synthetic_right_context_samples == 0
         assert terminals[1].source_audio[0].display_group_id == rollover.display_group_id
     finally:
         if backend._decode_lock.locked():
             backend._decode_lock.release()
         await session.close()
         await backend.close()
-
-
-@pytest.mark.parametrize("count,rate", [(-1, None), (32000, None), (0, 16000), (32000, 0)])
-def test_synthetic_context_metadata_cannot_be_unmapped_or_negative(count, rate):
-    from puripuly_heart.core.stt.backend import STTSourceAudio
-
-    with pytest.raises(ValueError, match="synthetic native context"):
-        replace(
-            request(), synthetic_right_context_samples=count, synthetic_context_sample_rate_hz=rate
-        )
-    with pytest.raises(ValueError, match="synthetic native context"):
-        STTSourceAudio(
-            "source",
-            (span(0, 160),),
-            synthetic_right_context_samples=count,
-            synthetic_context_sample_rate_hz=rate,
-        )

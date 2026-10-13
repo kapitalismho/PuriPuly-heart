@@ -66,23 +66,7 @@ class STTProviderTurnRequest:
     display_group_id: UUID | None = None
     isolate_failure: bool = False
     native_options: object | None = None
-    synthetic_right_context_samples: int = 0
-    synthetic_context_sample_rate_hz: int | None = None
     optional_cutoff_at_monotonic_s: float | None = None
-
-    def __post_init__(self) -> None:
-        if (
-            self.synthetic_right_context_samples < 0
-            or (
-                bool(self.synthetic_right_context_samples)
-                != (self.synthetic_context_sample_rate_hz is not None)
-            )
-            or (
-                self.synthetic_context_sample_rate_hz is not None
-                and self.synthetic_context_sample_rate_hz <= 0
-            )
-        ):
-            raise ValueError("invalid synthetic native context")
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,24 +76,10 @@ class STTSourceAudio:
     context_ranges: tuple[AudioCaptureSpan, ...] = ()
     display_group_id: UUID | None = None
     speaker_attribution: SpeakerAttribution | None = None
-    synthetic_right_context_samples: int = 0
-    synthetic_context_sample_rate_hz: int | None = None
 
     def __post_init__(self) -> None:
         if not self.contribution_id:
             raise ValueError("batch audio requires a contribution identity")
-        if (
-            self.synthetic_right_context_samples < 0
-            or (
-                bool(self.synthetic_right_context_samples)
-                != (self.synthetic_context_sample_rate_hz is not None)
-            )
-            or (
-                self.synthetic_context_sample_rate_hz is not None
-                and self.synthetic_context_sample_rate_hz <= 0
-            )
-        ):
-            raise ValueError("invalid synthetic native context")
 
 
 @dataclass(frozen=True, slots=True)

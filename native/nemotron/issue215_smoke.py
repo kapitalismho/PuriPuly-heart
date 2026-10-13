@@ -166,7 +166,6 @@ class SessionTrace:
         from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
         self.inner, self.trace = inner, trace
         self.payloads, self.hashes = {}, {}
-        self.synthetic, self.synthetic_seen = {}, {}
         self.capture_pcm = float32_to_pcm16le_bytes(capture_values)
 
     def __getattr__(self, name):
@@ -175,11 +174,6 @@ class SessionTrace:
     async def begin_turn(self, request):
         self.payloads[request.identity] = []
         self.hashes[request.identity] = hashlib.sha256()
-        self.synthetic[request.identity] = (
-            request.synthetic_right_context_samples,
-            request.synthetic_context_sample_rate_hz,
-        )
-        self.synthetic_seen[request.identity] = 0
         self.trace.append({"event": "native_begin", "at": time.monotonic(), "request": serial(request)})
         await self.inner.begin_turn(request)
 
@@ -196,33 +190,23 @@ class SessionTrace:
             for span in spans
         )
         role = "source_context" if kwargs["context_only"] else "new_content"
-        declared, rate = self.synthetic[identity]
         if not spans:
-            role = "synthetic_zero_right_context" if kwargs["context_only"] and declared > 0 else "unmapped"
-            expected = bytes(declared * 2) if role == "synthetic_zero_right_context" else b""
-            if role == "synthetic_zero_right_context":
-                self.synthetic_seen[identity] += len(pcm16le) // 2
+            role = "unmapped"
         self.payloads[identity].append({
             "samples": len(pcm16le) // 2,
             "pcm16_sha256": hashlib.sha256(pcm16le).hexdigest(),
             "payload_role": role,
             "expected_source_pcm16_sha256": hashlib.sha256(expected).hexdigest() if spans else None,
             "matches_declared_source_pcm": pcm16le == expected if spans else None,
-            "matches_declared_native_input": role != "unmapped" and pcm16le == expected and (bool(spans) or rate == 16000),
+            "matches_declared_native_input": bool(spans) and pcm16le == expected,
             **serial(kwargs),
         })
         await self.inner.send_turn_audio(identity, pcm16le, **kwargs)
 
     async def seal_turn(self, identity, **kwargs):
-        declared, rate = self.synthetic.pop(identity)
-        seen = self.synthetic_seen.pop(identity)
         self.trace.append({
             "event": "native_submit", "at": time.monotonic(), "identity": serial(identity),
             "pcm16_sha256": self.hashes.pop(identity).hexdigest(), "payloads": self.payloads.pop(identity),
-            "synthetic_right_context_declared_samples": declared,
-            "synthetic_context_sample_rate_hz": rate,
-            "synthetic_right_context_observed_samples": seen,
-            "synthetic_right_context_valid": seen == declared and (rate == 16000 if declared else rate is None),
             **serial(kwargs),
         })
         await self.inner.seal_turn(identity, **kwargs)

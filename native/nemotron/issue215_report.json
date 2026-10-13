@@ -1,5 +1,16 @@
 {
   "schema": "issue215-practical-validation-report-2",
+  "current_behavior_after_requested_revert": {
+    "decision": "Remove the automatic two-second Parakeet V3 successor silence tail at the user's request, ahead of their later sherpa 1.13.8 merge.",
+    "runtime": "This worktree still uses sherpa wrapper/core 1.13.4. No dependency upgrade, model change or new acoustic inference is part of this revert.",
+    "removed": "Synthetic tail allocation/submission and its dedicated request/source/origin metadata. Archived traces and diagnostic comparisons below remain unchanged historical evidence, not certification of the unpadded current runtime.",
+    "preserved": "Causal splitting, native option snapshots, source order/ownership, display groups, six-second cutoff, genuine onset and captured rollover context; trimming remains OFF.",
+    "verification": {
+      "regression_tests": "469 passed in 25.89s across causal batch, shared source, scoped/streaming speaker, capture/VAD, timer policy and local CPU/GPU/decode suites.",
+      "request_path_smoke": "Production Parakeet session/queue plus capture-PCM trace with recording recognizer: native sample counts [2400,2400,2400,6400], 8800 unique new samples, 4800 captured rollover-context samples, zero synthetic samples; exact native PCM, A-B-A order and enclosing group preserved.",
+      "acoustic_limit": "No new model-quality claim. Historical 1.13.4 returning-A omission risk remains until the separately planned runtime merge is integrated and verified."
+    }
+  },
   "validation_execution": "passed",
   "practical_R8_gate": "passed",
   "acceptance_authority": "Director explicitly accepted the practical R8 gate with residual lexical/hardcut substitution risk. Entire returning contribution restored, correct three-unit order, no new troublesome repetition. Trimming remains OFF; acoustic investigation stopped.",
