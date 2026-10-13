@@ -575,6 +575,7 @@ class PeerApplicationOwner:
             if peer_local_transition and transition_status == "failed":
                 raise ProviderRuntimeConvergenceError(
                     "Peer STT runtime did not converge to requested settings",
+                    failure_diagnostics=runtime.snapshot.failure_diagnostics,
                 )
         except PeerLocalASRTransitionSuperseded:
             self.superseded_sink()
@@ -590,6 +591,7 @@ class PeerApplicationOwner:
         if self.capture_runtime_convergence(config, state) is False:
             raise ProviderRuntimeConvergenceError(
                 "Peer STT runtime did not converge to requested settings",
+                failure_diagnostics=runtime.snapshot.failure_diagnostics,
             )
         self._last_runtime_signature = config.runtime_signature
         self._last_provider_signature = config.provider_signature

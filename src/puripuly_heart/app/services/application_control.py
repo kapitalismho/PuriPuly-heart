@@ -1535,7 +1535,9 @@ class ApplicationControlOwner:
                 status="rejected", error={"code": "invalid_arguments", "type": "InvalidArgumentsError"}
             )
         except Exception as exc:
-            source = vars(exc).get("diagnostics")
+            source = vars(exc).get("failure_diagnostics")
+            if not isinstance(source, ErrorDiagnostics):
+                source = vars(exc).get("diagnostics")
             owning_cause = (
                 self._retain_diagnostic(source, disposition="failed")
                 if isinstance(source, ErrorDiagnostics) else None

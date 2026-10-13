@@ -14,6 +14,7 @@ from puripuly_heart.app.services.provider.provider_runtime_apply import (
 from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureProviderStatus,
     PeerCaptureSessionState,
@@ -62,6 +63,7 @@ class RuntimeSnapshot:
     runtime_signature: tuple[object, ...] | None = None
     provider_status: PeerCaptureProviderStatus = PeerCaptureProviderStatus.READY
     failure_reason: object | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass

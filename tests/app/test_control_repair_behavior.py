@@ -1553,3 +1553,59 @@ def test_transaction_receipt_reports_owner_secondary_omissions():
     receipt = ApplicationControlOwner._transaction_receipt(owner, transaction, "persistence_failed")
     assert [item["diagnostic_id"] for item in receipt["secondary_diagnostics"]] == [cause.diagnostic_id for cause in causes[:4]]
     assert receipt["secondary_omitted_count"] == 4 and receipt["secondary_truncated"] is True
+
+
+@pytest.mark.parametrize("carrier", ["provider_convergence", "self_runtime", "legacy_diagnostics"])
+@pytest.mark.asyncio
+async def test_execution_receipt_preserves_approved_native_failure_carrier(offline, monkeypatch, carrier):
+    from uuid import uuid4
+
+    from puripuly_heart.app.services.capture.self_capture_application import (
+        SelfCaptureRuntimeApplyError,
+    )
+    from puripuly_heart.app.services.provider.provider_runtime_apply import (
+        ProviderRuntimeConvergenceError,
+    )
+    from puripuly_heart.core.messages import ErrorDiagnostics
+    app = compose_headless_application(offline)
+    request_id = uuid4().hex
+    native = []
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(str(uuid4()))
+        async def fail_dispatch(_self, _command, _arguments, *, operation_id):
+            cause = ErrorDiagnostics(
+                component="capture.peer", operation="provider_build", code="capture.peer.provider_failed",
+                category="lifecycle", visibility="diagnostic_only", content_policy="metadata_only",
+                status_code=None, retry_after_ms=None, fields={"errno": 13},
+                channel="peer", generation=1, operation_id=operation_id, request_id=request_id,
+            )
+            native.append(cause)
+            control._retain_diagnostic(cause, disposition="failed")
+            if carrier == "provider_convergence":
+                error = ProviderRuntimeConvergenceError("PRIVATE_WRAPPER_MARKER", failure_diagnostics=cause)
+                error.diagnostics = replace(cause, diagnostic_id=uuid4().hex)
+            elif carrier == "self_runtime":
+                error = SelfCaptureRuntimeApplyError("PRIVATE_WRAPPER_MARKER", failure_diagnostics=cause)
+            else:
+                error = RuntimeError("PRIVATE_WRAPPER_MARKER")
+                error.failure_diagnostics = "PRIVATE_NON_TYPED_MARKER"
+                error.diagnostics = cause
+            raise error
+        monkeypatch.setattr(type(control), "_dispatch", fail_dispatch)
+        admitted = await control.submit("translation.set", {"enabled": False}, request_id=request_id)
+        receipt = await control.wait(admitted["operation_id"], timeout=5)
+        cause = native[0]
+        assert receipt["status"] == "failed" and receipt["error"]["code"] == "application_operation_failed"
+        assert receipt["cause_diagnostics"]["diagnostic_id"] == cause.diagnostic_id
+        assert receipt["diagnostics"]["cause_id"] == cause.diagnostic_id
+        assert receipt["diagnostics"]["diagnostic_id"] != cause.diagnostic_id
+        assert receipt["cause_diagnostics"]["operation_id"] == admitted["operation_id"]
+        assert receipt["cause_diagnostics"]["request_id"] == request_id
+        assert receipt["cause_diagnostics"]["category"] == "lifecycle"
+        assert "PRIVATE_" not in json.dumps(receipt)
+        records = (await control.query("diagnostics.history", {"operation_id": admitted["operation_id"]}))["records"]
+        assert receipt["cause_diagnostics"] in records and receipt["diagnostics"] in records
+    finally:
+        await app.stop()
