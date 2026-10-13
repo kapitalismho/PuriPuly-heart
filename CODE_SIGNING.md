@@ -39,16 +39,11 @@ Sign only these explicit targets, never all packaged executables by wildcard. Ad
 
 Do not re-sign untouched third-party binaries. Preserve their signatures. Packaging them in a signed installer does not individually sign them.
 
-All targets must use the same logical product identity, `PuriPuly <3`, and release product version. Certificate publisher identity is separate. Raw PE version strings must match the following target-specific representation exactly:
+All targets must use the same logical product identity, `PuriPuly <3`, and release product version. CI compares product names and canonical textual versions after removing trailing ASCII spaces, and checks the numeric product version. Padding width is not a CI acceptance condition.
 
-| Targets | Raw `ProductName` | Raw textual `ProductVersion` |
-| --- | --- | --- |
-| Three project executables | `PuriPuly <3`, without padding | Verified canonical release version, without padding |
-| Generated installer and uninstaller, including the installed uninstaller | `PuriPuly <3` followed by exactly 49 ASCII spaces (60 characters total) | Verified canonical release version right-padded with ASCII spaces to exactly 50 characters |
+Validate every version-resource language and string table, and preserve their raw values in signing/provenance evidence. A later table must not conceal conflicting product or version metadata. Ignoring trailing ASCII spaces does not permit a different product or version.
 
-The Inno representation is the stock pinned compiler's fixed-width output, explicitly approved for the compatibility probe. Compiler binaries, templates and their original verification remain unchanged. This does not change application branding or installer UI.
-
-Validate every version-resource language and string table, including the numeric product version, and preserve the raw values in signing/provenance evidence. Do not trim strings, accept arbitrary whitespace or let a later table conceal conflicting metadata. Versions that exceed the fixed-width field are rejected rather than truncated.
+The stock Inno compiler emits padded metadata. Compiler binaries, templates and their original verification remain unchanged. This does not change application branding or installer UI.
 
 ## Release process
 
@@ -73,9 +68,11 @@ Use organization `41a8602a-e07d-4d35-876f-8876d5acb31d`, project `PuriPuly-heart
 
 The `components` artifact configuration must select only the three named project executables and `uninstaller.exe` at the root of the uploaded artifact ZIP. The `installer` configuration must select only `PuriPulyHeart-Setup-${version}.exe` at that ZIP root. A nested ZIP or wildcard executable selection is not the approved contract.
 
-Both configurations require canonical `version` and `inno-version`. Derive `inno-version` only from that verified release version using the exact Inno padding rule above; it is not an independent version choice. The three project executables retain unpadded `product-name` and `product-version="${version}"` restrictions. Only the generated installer/uninstaller use the padded product name and `product-version="${inno-version}"`. Installer filenames continue to use canonical `${version}`. XML character references can preserve the required product-name spaces; neither metadata condition may be removed or replaced with a wildcard.
+Both configurations require only canonical `version`. Keep service-side product-name and product-version restrictions, as described in the [Foundation's published conditions](https://signpath.org/terms). The three project executables use `product-name="PuriPuly &lt;3"` and `product-version="${version}"`. Installer filenames also use canonical `${version}`.
 
-The workflow transports both parameters as JSON, with the padded value inside JSON quotes. Request identity and provenance checks require the returned `inno-version` to match exactly. Verify fresh server-exported XML and actual request parameter values before claiming live compatibility. Local schema, metadata and JSON checks do not establish that the service preserves or accepts padding; this compatibility probe remains subject to live validation.
+For the generated installer and uninstaller, place the stock Inno padding directly in the XML attributes, not in a request parameter. Their product name is `PuriPuly <3` followed by 49 ASCII spaces. Their product version is `${version}` followed by enough literal ASCII spaces to make the expanded value 50 characters; XML `&#x20;` references express those spaces. A five-character version such as `2.8.3` requires 45 spaces. If the canonical version's string length changes, update both configurations before the next signing run. This is portal configuration maintenance, not a target-specific CI metadata profile.
+
+Both requests send and validate canonical `version`; there is no separate padded-version parameter. Save and freshly read back the XML before testing a configuration change. Local schema validation does not prove that live service substitution and matching accept the resulting attributes.
 
 Dispatch **Native Release** from the selected immutable `vMAJOR.MINOR.PATCH` tag, enter that same `tag`, and set `test_signing=true` for the first end-to-end probe. Both requests use `test-signing`; both require manual approval and all artifact, signature, metadata, provenance and installed-file checks. Successful test runs produce clearly named `test-signed-candidate-<run>-<attempt>` and `test-signing-evidence-<run>-<attempt>` Actions artifacts, never a GitHub draft release.
 

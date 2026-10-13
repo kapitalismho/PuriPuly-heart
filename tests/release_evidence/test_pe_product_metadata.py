@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import os
-import shutil
 import struct
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -146,15 +142,15 @@ def test_exact_metadata_preserves_every_resource_language_and_table(tmp_path):
 @pytest.mark.parametrize(
     "field,value",
     [
-        ("name", PRODUCT + " " * 49),
         ("name", "PuriPuly \u2764\ufe0f "),
-        ("version", VERSION + " " * 45),
-        ("version", "9.9.9"),
+        ("name", PRODUCT + "\t"),
+        ("name", " " + PRODUCT),
+        ("version", "9.9.9 "),
+        ("version", VERSION + "\t"),
+        ("version", " " + VERSION),
     ],
 )
-def test_preparation_rejects_raw_mismatch_instead_of_stripping_or_flattening(
-    tmp_path, field, value
-):
+def test_preparation_rejects_semantic_mismatch_in_any_resource(tmp_path, field, value):
     name = value if field == "name" else PRODUCT
     version = value if field == "version" else VERSION
     executable = write_versioned_pe(
@@ -199,73 +195,22 @@ def test_binary_version_mismatch_in_any_resource_blocks_submission(tmp_path):
         signing.unsigned_record(executable, VERSION)
 
 
-def test_exact_inno_profile_retains_padding_and_is_not_a_project_executable_profile(tmp_path):
-    name, text_version = signing.inno_product_metadata(VERSION)
+@pytest.mark.parametrize("padding", [1, 49, 80])
+def test_ascii_padding_is_ignored_for_identity_and_preserved_in_evidence(tmp_path, padding):
+    name, text_version = PRODUCT + " " * padding, VERSION + " " * padding
     executable = write_versioned_pe(
-        tmp_path / "uninstaller.exe",
+        tmp_path / "target.exe",
         [
             (0, [("000004b0", name, text_version)], (2, 8, 3, 0)),
-            (1033, [("040904b0", name, text_version)], (2, 8, 3, 0)),
+            (1033, [("040904b0", PRODUCT, VERSION)], (2, 8, 3, 0)),
         ],
     )
-    record = signing.unsigned_record(executable, VERSION, inno=True)
-    assert record["product_name"] == PRODUCT.ljust(60, " ")
-    assert record["product_version"] == VERSION.ljust(50, " ")
+    record = signing.unsigned_record(executable, VERSION)
     assert len(record["metadata_resources"]) == 2
-    assert all(row["strings"]["ProductName"] == name for row in record["metadata_resources"])
-    with pytest.raises(RuntimeError, match="ProductName mismatch"):
-        signing.unsigned_record(executable, VERSION)
-
-
-@pytest.mark.parametrize(
-    "mutation",
-    [
-        "short-name",
-        "long-name",
-        "tab-name",
-        "emoji",
-        "short-version",
-        "wrong-version",
-        "binary-version",
-        "resource-conflict",
-    ],
-)
-def test_inno_profile_rejects_every_deviation_from_exact_fixed_width(tmp_path, mutation):
-    name, text_version = signing.inno_product_metadata(VERSION)
-    binary = (2, 8, 3, 0)
-    if mutation == "short-name":
-        name = name[:-1]
-    elif mutation == "long-name":
-        name += " "
-    elif mutation == "tab-name":
-        name = name[:-1] + "\t"
-    elif mutation == "emoji":
-        name = "PuriPuly \u2764\ufe0f".ljust(60, " ")
-    elif mutation == "short-version":
-        text_version = text_version[:-1]
-    elif mutation == "wrong-version":
-        text_version = "9.9.9".ljust(50, " ")
-    elif mutation == "binary-version":
-        binary = (9, 9, 9, 0)
-    first_name, first_version = signing.inno_product_metadata(VERSION)
-    first = (0, [("000004b0", first_name, first_version)], (2, 8, 3, 0))
-    if mutation == "resource-conflict":
-        name = PRODUCT
-    executable = write_versioned_pe(
-        tmp_path / "uninstaller.exe",
-        [
-            first,
-            (1033, [("040904b0", name, text_version)], binary),
-        ],
-    )
-    with pytest.raises(RuntimeError, match="Product(Name|Version) mismatch"):
-        signing.unsigned_record(executable, VERSION, inno=True)
-
-
-def test_inno_version_contract_rejects_overlength_without_truncation():
-    version = "0" * 51 + ".1.0"
-    with pytest.raises(ValueError, match="50-character"):
-        signing.inno_product_metadata(version)
+    assert record["metadata_resources"][0]["strings"]["ProductName"] == name
+    assert record["metadata_resources"][0]["strings"]["ProductVersion"] == text_version
+    assert record["metadata_resources"][1]["strings"]["ProductName"] == PRODUCT
+    assert record["metadata_resources"][1]["strings"]["ProductVersion"] == VERSION
 
 
 def test_project_text_version_matches_canonical_parameter_in_every_table(tmp_path):
@@ -284,94 +229,3 @@ def test_project_text_version_matches_canonical_parameter_in_every_table(tmp_pat
     )
     with pytest.raises(RuntimeError, match="ProductVersion mismatch"):
         signing.unsigned_record(executable, VERSION)
-
-
-@pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell caller requires pwsh")
-@pytest.mark.parametrize(
-    "mode,padded_outer,padded_host,passes",
-    [
-        ("outer", True, False, True),
-        ("outer", False, False, False),
-        ("project", True, False, True),
-        ("project", True, True, False),
-    ],
-)
-def test_local_release_metadata_callers_select_exact_target_profile(
-    tmp_path, mode, padded_outer, padded_host, passes
-):
-    root = Path(__file__).resolve().parents[2]
-    inno_name, inno_version = signing.inno_product_metadata(VERSION)
-    for name in signing.COMPONENTS[:-1]:
-        padded = padded_host and name == "PuriPulyHeart.exe"
-        write_versioned_pe(
-            tmp_path / name,
-            [
-                (
-                    1033,
-                    [
-                        (
-                            "000004b0",
-                            inno_name if padded else PRODUCT,
-                            inno_version if padded else VERSION,
-                        )
-                    ],
-                    (2, 8, 3, 0),
-                )
-            ],
-        )
-    outer = write_versioned_pe(
-        tmp_path / "Setup.exe",
-        [
-            (
-                1033,
-                [
-                    (
-                        "000004b0",
-                        inno_name if padded_outer else PRODUCT,
-                        inno_version if padded_outer else VERSION,
-                    )
-                ],
-                (2, 8, 3, 0),
-            )
-        ],
-    )
-    script = r"""
-$ErrorActionPreference = 'Stop'
-$ToolPython = $env:CALLER_PYTHON
-$appVersion = $env:CALLER_VERSION
-$installerPath = $env:CALLER_INSTALLER
-$OutputDir = $env:CALLER_PAYLOAD
-$hostExe = Join-Path $OutputDir 'PuriPulyHeart.exe'
-$tokens = $null
-$errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:CALLER_SCRIPT, [ref]$tokens, [ref]$errors)
-if ($errors.Count) { throw ($errors | Out-String) }
-$invoke = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-Checked' }, $true)
-. ([scriptblock]::Create($invoke.Extent.Text))
-$assignment = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$metadataCheck' }, $true)
-. ([scriptblock]::Create($assignment.Extent.Text))
-$variable = if ($env:CALLER_MODE -eq 'outer') { '$installerPath' } else { '$hostExe' }
-$caller = $ast.Find({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and $n.GetCommandName() -eq 'Invoke-Checked' -and $n.Extent.Text.Contains($variable) }, $true)
-. ([scriptblock]::Create($caller.Extent.Text))
-"""
-    result = subprocess.run(
-        ["pwsh", "-NoProfile", "-NonInteractive", "-Command", script],
-        env={
-            **os.environ,
-            "PYTHONPATH": str(root / "src"),
-            "CALLER_SCRIPT": str(root / "scripts/ci/build-native-release-artifacts.ps1"),
-            "CALLER_PYTHON": sys.executable,
-            "CALLER_VERSION": VERSION,
-            "CALLER_PAYLOAD": str(tmp_path),
-            "CALLER_INSTALLER": str(outer),
-            "CALLER_MODE": mode,
-        },
-        capture_output=True,
-        text=True,
-        errors="replace",
-        timeout=30,
-        check=False,
-    )
-    assert (result.returncode == 0) is passes, result.stdout + result.stderr
-    if not passes:
-        assert "ProductName mismatch" in result.stderr

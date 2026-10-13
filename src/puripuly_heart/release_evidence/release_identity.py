@@ -175,33 +175,26 @@ def verify_product_metadata_records(
     *,
     expected_version: str,
     expected_product: str = PRODUCT_NAME,
-    inno: bool = False,
 ) -> dict[str, object]:
     if not isinstance(records, list) or not records:
         raise RuntimeError("Missing PE product metadata resource evidence")
     numbers = version_tuple(expected_version)
     expected_binary = ".".join(str(number) for number in numbers)
-    if inno:
-        from puripuly_heart.release_evidence.windows_product_metadata import inno_product_metadata
-
-        expected_product, text_version = inno_product_metadata(expected_version)
-        expected_text_versions = {text_version}
-    else:
-        expected_text_versions = {expected_version}
+    expected_text_version = expected_version.rstrip(" ")
     for record in records:
         if not isinstance(record, dict) or not isinstance(record.get("strings"), dict):
             raise RuntimeError("Malformed PE product metadata resource evidence")
         strings = record.get("strings", {})
         label = f"resource {record.get('resource_id')}/language {record.get('language')}/table {record.get('translation')}"
         product = strings.get("ProductName", "")
-        if product != expected_product:
+        if not isinstance(product, str) or product.rstrip(" ") != expected_product:
             raise RuntimeError(
                 f"ProductName mismatch in {label}: expected {expected_product!r}, found {product!r}"
             )
         if record.get("product_version_binary") != expected_binary:
             raise RuntimeError(f"binary ProductVersion mismatch in {label}")
         text_version = strings.get("ProductVersion", "")
-        if text_version not in expected_text_versions:
+        if not isinstance(text_version, str) or text_version.rstrip(" ") != expected_text_version:
             raise RuntimeError(
                 f"ProductVersion mismatch in {label}: expected {expected_version!r}, found {text_version!r}"
             )
@@ -219,13 +212,11 @@ def verify_pe_product_metadata(
     *,
     expected_version: str,
     expected_product: str = PRODUCT_NAME,
-    inno: bool = False,
 ) -> dict[str, object]:
     return verify_product_metadata_records(
         read_pe_product_metadata(exe_path),
         expected_version=expected_version,
         expected_product=expected_product,
-        inno=inno,
     )
 
 

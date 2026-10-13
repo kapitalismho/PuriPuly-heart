@@ -26,7 +26,6 @@ CONTEXT = {
     "root_sha256": "b" * 64,
     "approved_origin": f"v{VERSION}",
     "production_ready": True,
-    "inno_version": signing.inno_product_metadata(VERSION)[1],
 }
 KEYWORDS = {
     "version": VERSION,
@@ -52,15 +51,15 @@ def pe_bytes(*, signed=False, content=b"payload"):
     return bytes(data)
 
 
-def metadata_resources(version, *, inno=False):
+def metadata_resources(version):
     return [
         {
             "resource_id": 1,
             "language": 0,
             "translation": "000004b0",
             "strings": {
-                "ProductName": signing.inno_product_metadata(version)[0] if inno else "PuriPuly <3",
-                "ProductVersion": signing.inno_product_metadata(version)[1] if inno else version,
+                "ProductName": "PuriPuly <3",
+                "ProductVersion": version,
             },
             "file_version_binary": f"{version}.0",
             "product_version_binary": f"{version}.0",
@@ -68,13 +67,11 @@ def metadata_resources(version, *, inno=False):
     ]
 
 
-def verified(path, version, *, inno=False):
+def verified(path, version):
     return {
         **signing.file_identity(path),
         "payload_sha256": signing.payload_identity(path),
-        "product_name": metadata_resources(version, inno=inno)[0]["strings"]["ProductName"],
-        "product_version": metadata_resources(version, inno=inno)[0]["strings"]["ProductVersion"],
-        "metadata_resources": metadata_resources(version, inno=inno),
+        "metadata_resources": metadata_resources(version),
         "signature": {
             "status": "Valid",
             "publisher": CONTEXT["publisher"],
@@ -103,10 +100,7 @@ def request(phase):
             "projectSlug": signing.PROJECT,
             "artifactConfigurationSlug": phase,
             "signingPolicySlug": "release-signing",
-            "parameters": {
-                "version": VERSION,
-                "inno-version": signing.inno_product_metadata(VERSION)[1],
-            },
+            "parameters": {"version": VERSION},
             "webLink": url,
             "origin": {
                 "repositoryData": {
@@ -125,11 +119,8 @@ def request(phase):
 def candidate(tmp_path):
     asset = tmp_path / signing.installer_filename(VERSION)
     asset.write_bytes(pe_bytes(signed=True))
-    components = {
-        name: verified(asset, VERSION, inno=name == "uninstaller.exe")
-        for name in signing.COMPONENTS
-    }
-    outer = {asset.name: verified(asset, VERSION, inno=True)}
+    components = {name: verified(asset, VERSION) for name in signing.COMPONENTS}
+    outer = {asset.name: verified(asset, VERSION)}
     record = {
         "schema": signing.SCHEMA,
         "status": "validated",
@@ -179,7 +170,6 @@ def test_only_validated_production_candidate_can_create_draft(candidate):
         "ref",
         "source",
         "attempt",
-        "inno-context-padding",
         "extra",
         "missing",
         "cutover",
@@ -197,7 +187,7 @@ def test_unsigned_or_detached_candidate_never_passes_draft_gate(candidate, mutat
     elif mutation == "root":
         target["signature"]["root_sha256"] = "d" * 64
     elif mutation == "metadata":
-        target["product_name"] = "Other product"
+        target["metadata_resources"][0]["strings"]["ProductName"] = "Other product"
     elif mutation == "missing-resource-proof":
         target.pop("metadata_resources")
     elif mutation == "hidden-resource-mismatch":
@@ -205,7 +195,7 @@ def test_unsigned_or_detached_candidate_never_passes_draft_gate(candidate, mutat
         hidden["strings"]["ProductName"] = "Other product"
         target["metadata_resources"].insert(0, hidden)
     elif mutation == "version":
-        target["product_version"] = "9.0.0"
+        target["metadata_resources"][0]["strings"]["ProductVersion"] = "9.0.0"
     elif mutation == "installed":
         record["validation"]["installed"][signing.COMPONENTS[0]]["sha256"] = "e" * 64
     elif mutation == "payload":
@@ -226,8 +216,6 @@ def test_unsigned_or_detached_candidate_never_passes_draft_gate(candidate, mutat
         record["source_sha"] = "f" * 40
     elif mutation == "attempt":
         record["workflow"]["run_attempt"] = "1"
-    elif mutation == "inno-context-padding":
-        record["context"]["inno_version"] = VERSION
     elif mutation == "extra":
         record["validation"]["components"]["upstream.exe"] = target
     elif mutation == "missing":
@@ -244,7 +232,6 @@ def test_unsigned_or_detached_candidate_never_passes_draft_gate(candidate, mutat
         ("projectSlug", "other"),
         ("artifactConfigurationSlug", "installer"),
         ("signingPolicySlug", "test-signing"),
-        ("parameters", {"version": "9.9.9"}),
         ("status", "Failed"),
         ("workflowStatus", "Denied"),
         ("isFinalStatus", False),
@@ -363,9 +350,9 @@ def test_rebuild_consumes_exact_signed_bytes_and_preserves_upstream_payload(tmp_
     monkeypatch.setattr(
         signing,
         "verify_pe_product_metadata",
-        lambda path, expected_version, inno=False: {
-            **metadata_resources(expected_version, inno=inno)[0]["strings"],
-            "version_resources": metadata_resources(expected_version, inno=inno),
+        lambda path, expected_version: {
+            **metadata_resources(expected_version)[0]["strings"],
+            "version_resources": metadata_resources(expected_version),
         },
     )
     consumed = []
@@ -398,10 +385,7 @@ def test_installed_uninstaller_and_components_must_reuse_identical_signed_bytes(
         (tmp_path / name).write_bytes(pe_bytes(signed=True))
     uninstaller = tmp_path / "unins000.exe"
     uninstaller.write_bytes(pe_bytes(signed=True))
-    expected = {
-        name: verified(uninstaller, VERSION, inno=name == "uninstaller.exe")
-        for name in signing.COMPONENTS
-    }
+    expected = {name: verified(uninstaller, VERSION) for name in signing.COMPONENTS}
     result = signing.validate_installed(tmp_path, expected, VERSION)
     assert result["uninstaller.exe"]["installed_filename"] == "unins000.exe"
     uninstaller.write_bytes(pe_bytes())
@@ -499,9 +483,9 @@ def test_prepare_refuses_ambiguous_or_missing_generated_uninstaller(tmp_path, mo
     monkeypatch.setattr(
         signing,
         "verify_pe_product_metadata",
-        lambda path, expected_version, inno=False: {
-            **metadata_resources(expected_version, inno=inno)[0]["strings"],
-            "version_resources": metadata_resources(expected_version, inno=inno),
+        lambda path, expected_version: {
+            **metadata_resources(expected_version)[0]["strings"],
+            "version_resources": metadata_resources(expected_version),
         },
     )
 
@@ -662,18 +646,10 @@ def test_signing_context_survives_native_build_initialization(monkeypatch):
 
 
 @pytest.mark.parametrize("phase", ["components", "installer"])
-@pytest.mark.parametrize("mutation", [None, "trimmed", "extra-space", "wrong-version", "missing"])
-def test_request_identity_requires_exact_inno_version_parameter(phase, mutation):
+@pytest.mark.parametrize("parameters", [{"version": VERSION}, {"version": "9.9.9"}, {}, None])
+def test_request_version_matches_service_metadata_contract(phase, parameters):
     item = request(phase)
-    parameters = item["metadata"]["parameters"]
-    if mutation == "trimmed":
-        parameters["inno-version"] = VERSION
-    elif mutation == "extra-space":
-        parameters["inno-version"] += " "
-    elif mutation == "wrong-version":
-        parameters["inno-version"] = "9.9.9".ljust(50, " ")
-    elif mutation == "missing":
-        parameters.pop("inno-version")
+    item["metadata"]["parameters"] = parameters
     arguments = {
         "version": VERSION,
         "repository": "owner/repo",
@@ -681,9 +657,8 @@ def test_request_identity_requires_exact_inno_version_parameter(phase, mutation)
         "run_id": "123",
         "run_attempt": "2",
     }
-    if mutation:
+    if parameters == {"version": VERSION}:
+        assert signing.validate_request(item, phase, CONTEXT, **arguments)["commit_id"] == SHA
+    else:
         with pytest.raises(RuntimeError, match="parameters"):
             signing.validate_request(item, phase, CONTEXT, **arguments)
-    else:
-        result = signing.validate_request(item, phase, CONTEXT, **arguments)
-        assert result["commit_id"] == SHA

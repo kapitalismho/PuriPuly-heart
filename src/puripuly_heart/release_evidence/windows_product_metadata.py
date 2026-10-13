@@ -50,13 +50,6 @@ def version_tuple(version: str) -> tuple[int, int, int, int]:
     return (numbers[0], numbers[1], numbers[2], numbers[3])
 
 
-def inno_product_metadata(version: str) -> tuple[str, str]:
-    if len(version) > 50:
-        raise ValueError("Inno ProductVersion exceeds the exact 50-character metadata contract")
-    version_tuple(version)
-    return PRODUCT_NAME.ljust(60, " "), version.ljust(50, " ")
-
-
 def file_description_for_executable(executable_name: str) -> str:
     lowered = executable_name.lower()
     if lowered.startswith("puripulyheartoverlay"):

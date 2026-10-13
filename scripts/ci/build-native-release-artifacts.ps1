@@ -232,7 +232,7 @@ try {
             (Join-Path $repoRoot "installer.iss")
         )
         Invoke-Checked -FilePath $ToolPython -ArgumentList @(
-            "-c", "import sys; from pathlib import Path; from puripuly_heart.release_evidence.release_identity import verify_pe_product_metadata; verify_pe_product_metadata(Path(sys.argv[2]), expected_version=sys.argv[1], inno=True)",
+            "-c", "import sys; from pathlib import Path; from puripuly_heart.release_evidence.release_identity import verify_pe_product_metadata; verify_pe_product_metadata(Path(sys.argv[2]), expected_version=sys.argv[1])",
             $appVersion, $installerPath
         )
         $hash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
