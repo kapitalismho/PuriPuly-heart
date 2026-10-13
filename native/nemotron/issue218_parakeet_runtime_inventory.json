@@ -1,0 +1,43 @@
+{
+  "native_module_file": "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv\\Lib\\site-packages\\sherpa_onnx\\lib\\_sherpa_onnx.cp314-win_amd64.pyd",
+  "runtime": {
+    "version": "1.13.5",
+    "git_sha1": "3dc7c569",
+    "git_date": "Tue Aug 11 06:43:30 2026",
+    "onnxruntime_version": "1.28.0"
+  },
+  "syspath": [
+    "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\src",
+    "",
+    "C:\\Python314\\python314.zip",
+    "C:\\Python314\\DLLs",
+    "C:\\Python314\\Lib",
+    "C:\\Python314",
+    "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv",
+    "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv\\Lib\\site-packages",
+    "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\src"
+  ],
+  "native_module_sha256": "1d99c6d061c901a8714a59d6f3bb413c7954a47bb4b79f620ddc9e4d72f7cee7",
+  "same_native_file_as_isolated_runtime": true,
+  "environment_delta": {
+    "sherpa-onnx": {
+      "before": "1.13.4",
+      "after": "1.13.5"
+    },
+    "sherpa-onnx-core": {
+      "before": "1.13.4",
+      "after": "1.13.5"
+    }
+  },
+  "google_genai_unchanged": {
+    "before": "2.21.0",
+    "after": "2.21.0"
+  },
+  "inventory_command": [
+    "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv\\Scripts\\python.exe",
+    "-B",
+    "-c",
+    "import sys, json\nfrom pathlib import Path\nsys.path.insert(0, str(Path(\"src\").resolve()))\nfrom puripuly_heart.core.local_qwen_runtime import ensure_local_qwen_windows_runtime\nensure_local_qwen_windows_runtime()\nimport sherpa_onnx\nimport sherpa_onnx.lib._sherpa_onnx as native\nprint(json.dumps({\"native_module_file\":native.__file__,\"runtime\":{name:str(getattr(sherpa_onnx,name)) for name in (\"version\",\"git_sha1\",\"git_date\",\"onnxruntime_version\")},\"syspath\":sys.path},indent=2))\n"
+  ],
+  "source_inventory_note": "Metadata observation after product smoke; no additional decode. Earlier smoke tried callable-only version attributes and recorded {}; these native attributes are strings."
+}

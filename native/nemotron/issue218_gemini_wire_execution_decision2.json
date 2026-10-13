@@ -1,0 +1,32 @@
+{
+  "decision": "One final manually initiated corrected observation is necessary to close the requested normal-EOF and bounded continued-receive evidence gap. No automatic retry or provider/profile sweep.",
+  "reason_before_additional_call": "Attempt 2 produced valid preparse wire and SDK text, but the task-local SessionTrace proxy omitted explicit STTIndependentRecognitionSession properties/methods. Python's runtime structural protocol check does not recognize attributes supplied only by __getattr__. Consequently the engine did not submit the continuous tail or send source_eof, and the attempt is invalid as the exact native continuous schedule. Offline construction confirmed actual native session=True and proxy=False for the protocol; adding the same explicit delegations used by the valid existing cloud driver now confirms native=True and proxy=True, without network calls. No product change is needed for this instrumentation defect.",
+  "remaining_uncertainty": "The valid raw wire showed only 'Gentlemen of the press.' authoritative text and both sentences in speculative interim text; that final survived SDK and adapter and engine. But EOF was not sent and the requested normal 2-second drain versus extended receive window remains unobserved. A single exact-schedule corrected run can separate a final absent before EOF from a later-final timing gap. No retrospective cause may be assigned from attempt 2.",
+  "attempt2_accounting": {
+    "remote_starts": 1,
+    "audio_samples_reserved": 75584,
+    "audio_samples_write_returned": 75584,
+    "actual_wire_audio_samples": 75584,
+    "submitted_audio_seconds": 4.724,
+    "source_eof_control_sent": false,
+    "other_control_audio_frontier": 75584,
+    "raw_messages_including_setup": 13,
+    "sdk_decoded_messages": 12,
+    "wire_interims": 8,
+    "wire_finals": 1,
+    "authoritative_final": "Gentlemen of the press.",
+    "final_conservation": "Wire=SDK=adapter flat STTRecognitionUnit=engine STTRecognitionUnitTerminal. Initial report summary wrongly searched adapter output for a terminal-shaped nested unit and said false; raw events 1020,1021,1025,1026 establish conservation.",
+    "remote_start_to_socket_close_seconds": 6.8309467,
+    "artifact": "native/nemotron/issue218_gemini_wire_archive2.zip"
+  },
+  "aggregate_before_attempt3": {
+    "remote_starts": 2,
+    "reserved_audio_samples": 90240,
+    "write_returned_audio_samples": 89728,
+    "reserved_audio_seconds": 5.64,
+    "successfully_submitted_audio_seconds": 5.608,
+    "charge": "Unknown; no billing claim"
+  },
+  "attempt3_bounds": "One additional start; <=8 seconds submitted PCM including context/replay; <=30 seconds overall; <=10 seconds after last EOF; same exact approved clean_A_B input/config/native pipeline; only GOOGLE_API_KEY2 and SDK 2.21.0; no translation/Nemotron/other provider/search.",
+  "authorization": "Existing user instruction authorizes necessary Gemini calls without further approval. No further call is planned once the bounded observation is obtained."
+}

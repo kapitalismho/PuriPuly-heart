@@ -1,0 +1,653 @@
+{
+  "schema": "issue218-parakeet-repair-report-1",
+  "authority": {
+    "baseline": "b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e",
+    "approved_plan": "docs/issue218-speaker-attribution-plan.md Outcome C",
+    "task_local_plan": "native/nemotron/issue218_parakeet_plan.md",
+    "scope": "Provider/runtime/dependency repair; no shared speaker policy mutation; Director integrates/commits and owns maintained guidance."
+  },
+  "result": {
+    "runtime_returning_loss": "passed: two exact failing packets no longer collapse to Yeah./empty through actual installed scoped product path",
+    "full_returning_content": "failed: hair becomes hand/hands on exact predeadline returning inputs; no claim fully correct transcript",
+    "hard_rollover_successor": "failed: exact common successor remains empty, unchanged from reused old evidence",
+    "package_compatibility": "passed actual CPython3.14 Windows x64 native import/model initialization/scoped queued decode using1.13.5 pair and ONNXRuntime1.28.0",
+    "packaged_build": "not run: distribution/license guard updated; no rebuilt installed Windows payload or installer acceptance",
+    "single_commit_normalization_causality": "unknown: known repair included and relevant path proved; actual old/new fbank tensors/single-commit runtime not measured",
+    "speaker_policy": "intentionally unchanged; native decode recovery is independent of attribution metadata/colors"
+  },
+  "upstream": {
+    "release": {
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.5",
+      "tag": "v1.13.5",
+      "published_at": "2026-08-11T07:04:00Z",
+      "commit": "3dc7c569f31ca2cd4a20ed6f7db780327e6714c5"
+    },
+    "old_tag_commit": "142807252687d81b40d6315f23470a1512a00de3",
+    "normalization_fix": {
+      "url": "https://github.com/k2-fsa/sherpa-onnx/commit/0967a08db705d8eec9cf5cef962c8ec57c16e4a8",
+      "commit": "0967a08db705d8eec9cf5cef962c8ec57c16e4a8",
+      "date": "2026-08-11T03:15:32Z",
+      "pull_request": "https://github.com/k2-fsa/sherpa-onnx/pull/3857",
+      "message": "Fix float32 catastrophic cancellation in NemoNormalizePerFeature (#3857)\n\nFixes #3853",
+      "math_patch": "@@ -137,8 +137,12 @@ void NemoNormalizePerFeature(float *p, int32_t num_frames,\n   Eigen::Map<RowMajorMat> x(p, num_frames, feature_dim);\n \n   Eigen::RowVectorXf mean = x.colwise().mean();\n+\n+  // E[x^2] - E[x]^2 cancels catastrophically in float32 when a feature\n+  // stays near a constant value, yielding var == 0 and huge normalized\n+  // outliers, so compute the variance from centered values instead.\n   Eigen::RowVectorXf var =\n-      (x.array().square().colwise().mean() - mean.array().square()).max(0.0f);\n+      (x.rowwise() - mean).array().square().colwise().mean();\n \n   Eigen::RowVectorXf inv_std = (var.array().sqrt() + 1e-5f).inverse();\n "
+    },
+    "upstream_reproducer": {
+      "url": "https://github.com/k2-fsa/sherpa-onnx/issues/3853",
+      "scope": "Parakeet Unified EN INT8 batch contamination on1.13.4; different artifact/recording than this task. Upstream fix is verified, not proof its exact statistics caused this PCM."
+    },
+    "trailing_silence_lead": {
+      "url": "https://github.com/NVIDIA-NeMo/NeMo/issues/15757",
+      "status": "Open report, NeMo2.7.3/Torch2.10 CPU v3 with400ms synthetic valid zero tail; not the same implementation or PCM, no product trim/retry/tail adopted."
+    },
+    "source_snapshots": {
+      "v1.13.4/math.cc": {
+        "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.4/sherpa-onnx/csrc/math.cc",
+        "sha256": "40ecd5ae7d5a4530134fc143cbbd1c55bfa153854c177df9481b1454d61f8c60"
+      },
+      "v1.13.5/math.cc": {
+        "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.5/sherpa-onnx/csrc/math.cc",
+        "sha256": "71681f56d5835dde295ad9249f2f6d52ee7731ac2ac23346d1d19895083b611a"
+      },
+      "v1.13.4/offline-stream.cc": {
+        "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.4/sherpa-onnx/csrc/offline-stream.cc",
+        "sha256": "b8ff2b3f90eb3a2c3c14c4bd2853bea63de1a27338f29c34ec64e0c9b1f3c895"
+      },
+      "v1.13.5/offline-stream.cc": {
+        "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.5/sherpa-onnx/csrc/offline-stream.cc",
+        "sha256": "b8ff2b3f90eb3a2c3c14c4bd2853bea63de1a27338f29c34ec64e0c9b1f3c895"
+      },
+      "v1.13.4/offline-recognizer-transducer-nemo-impl.h": {
+        "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.4/sherpa-onnx/csrc/offline-recognizer-transducer-nemo-impl.h",
+        "sha256": "561b99f9ad872be403c0839ee05eee59d87808fd5623d2e0ef0e6e61e31d0109"
+      },
+      "v1.13.5/offline-recognizer-transducer-nemo-impl.h": {
+        "url": "https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/v1.13.5/sherpa-onnx/csrc/offline-recognizer-transducer-nemo-impl.h",
+        "sha256": "561b99f9ad872be403c0839ee05eee59d87808fd5623d2e0ef0e6e61e31d0109"
+      }
+    },
+    "normalization_call_path": "Selected encoder metadata says per_feature/128/TDT; unchanged NeMo PostInit overrides configured80 to128, OfflineStream::GetFrames calls NemoNormalizeFeatures and NemoNormalizePerFeature. Source snapshots inspected in both exact tags.",
+    "causality_limit": "Observed recovery isolates changing Sherpa packages/native binary, not a rebuilt single-commit-only candidate or captured old/new feature tensors. Attribution to stable variance computation is [INFERENCE] supported by upstream fix/call path; do not label exact-function causality directly measured."
+  },
+  "exact_input": {
+    "driver": "native/nemotron/issue215_smoke.py input_cases via issue218_experiment inputs",
+    "assembled_pcm_f32_sha256": "47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67",
+    "samples": 135225,
+    "assembly": [
+      {
+        "input": "A",
+        "input_sample_range": [
+          11457,
+          51550
+        ],
+        "scenario_sample_range": [
+          8000,
+          48093
+        ]
+      },
+      {
+        "input": "B",
+        "input_sample_range": [
+          17517,
+          44556
+        ],
+        "scenario_sample_range": [
+          48093,
+          75132
+        ]
+      },
+      {
+        "input": "A",
+        "input_sample_range": [
+          11457,
+          51550
+        ],
+        "scenario_sample_range": [
+          75132,
+          115225
+        ]
+      }
+    ],
+    "reference_A": "He washed the detritus from his hair.",
+    "old_runtime": "sherpa-onnx/core1.13.4 CPU2 threads",
+    "old_evidence": "Both cpu_initial and cpu_rotated_readback archived traces hash-matched every individual payload, concatenated request and assembled float32. Old native output reused; no negative decode rerun.",
+    "pcm_conversion": "Actual PCM16LE submission reconstructed from declared ranges in archived payload order, converted by product pcm16le_bytes_to_float32. Model hashes match prior issue218 report. No appended samples/new context/native options."
+  },
+  "model_sha256": {
+    "decoder.int8.onnx": "179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e",
+    "encoder.int8.onnx": "acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247",
+    "installed-manifest.json": "82b63f3fb4ab1c08821dbad59bc5683e7d1cde57e7291754c8f211f833ffee61",
+    "joiner.int8.onnx": "3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3",
+    "tokens.txt": "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+  },
+  "native_options": {
+    "provider": "cpu",
+    "num_threads": 2,
+    "sample_rate_hz": 16000,
+    "feature_dim": 80,
+    "decoding_method": "greedy_search",
+    "model_type": "nemo_transducer",
+    "language_hint": null,
+    "hotwords": [],
+    "effective_feature_dim": 128,
+    "effective_feature_dim_evidence": "Reused issue215_native_applicability.json encoder metadata; artifact SHA256 identical and exact-tag frontend metadata override unchanged."
+  },
+  "outputs": [
+    {
+      "capture_ranges": [
+        [
+          1728,
+          9728,
+          "source_context"
+        ],
+        [
+          9728,
+          105472,
+          "new_content"
+        ]
+      ],
+      "samples": 103744,
+      "pcm16_sha256": "d8bfd15e589806ee6125fdd620e9892f841299ee8ea8b0290d9a20dd26a0ac94",
+      "native_float32_sha256": "47b10870d1803dc6802b3ddf5853858ef9cf6d70f2dd471e800892447539f933",
+      "product_text": "He washed the Detroitists from his hair. Gentlemen of the press. He washed the Detroitus from his hair.",
+      "product_terminal": {
+        "outcome": "final",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        "He washed the Detroitus from his hair. Gentlemen of the press. He washed the Detroit from his hair."
+      ],
+      "old_observation_count": 2
+    },
+    {
+      "capture_ranges": [
+        [
+          100672,
+          105472,
+          "source_context"
+        ],
+        [
+          105472,
+          120832,
+          "new_content"
+        ]
+      ],
+      "samples": 20160,
+      "pcm16_sha256": "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b",
+      "native_float32_sha256": "384cc61aba4f88fbd2db4a26571fd3b3d497a0a7d8ef4778f6ca397c1bb3568d",
+      "product_text": "",
+      "product_terminal": {
+        "outcome": "empty",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        ""
+      ],
+      "old_observation_count": 6
+    },
+    {
+      "capture_ranges": [
+        [
+          1728,
+          9728,
+          "source_context"
+        ],
+        [
+          9728,
+          49728,
+          "new_content"
+        ]
+      ],
+      "samples": 48000,
+      "pcm16_sha256": "db78f0567568988e95dd14dc83f8c6da6a6b45e805a1da09600574f34f55807a",
+      "native_float32_sha256": "029bd4fef04c0c7eb89408096e842461be1b932be6258571ce2696fee926c676",
+      "product_text": "He washed the detritus from his hair.",
+      "product_terminal": {
+        "outcome": "final",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        "He washed the detritus from his hair."
+      ],
+      "old_observation_count": 4
+    },
+    {
+      "capture_ranges": [
+        [
+          49728,
+          75968,
+          "new_content"
+        ]
+      ],
+      "samples": 26240,
+      "pcm16_sha256": "74fe45af599d359dd74a73444f94fbe8f20aeae2d8a88b93cdd8e1bd890f51a6",
+      "native_float32_sha256": "eb16f4aeda3ce9432cff8abab8322ed159b6fa7dea91f8b92fb0d54d1dcc072f",
+      "product_text": "Gentlemen of the press.",
+      "product_terminal": {
+        "outcome": "final",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        "Gentlemen of the press."
+      ],
+      "old_observation_count": 2
+    },
+    {
+      "capture_ranges": [
+        [
+          75968,
+          105472,
+          "new_content"
+        ]
+      ],
+      "samples": 29504,
+      "pcm16_sha256": "563945ae319de1dbb7286714e9bf651d30ce1462ce1a6b75750021162b85a586",
+      "native_float32_sha256": "4566107c902deead6336c1efd754482baf928973398a6aa9ac29ea526f7d6e7b",
+      "product_text": "He washed the detritus from his hand.",
+      "product_terminal": {
+        "outcome": "final",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        "Yeah."
+      ],
+      "old_observation_count": 2
+    },
+    {
+      "capture_ranges": [
+        [
+          49728,
+          75808,
+          "new_content"
+        ]
+      ],
+      "samples": 26080,
+      "pcm16_sha256": "3852db9dc82bcdb2d22dfe23fe124bc145a910d4ba9546537cc0be6e203f5f81",
+      "native_float32_sha256": "f76f5462347c388be8454e5910b46bb99bfbb2e1e897a5751f2be7c5a2d4e986",
+      "product_text": "Gentlemen of the press.",
+      "product_terminal": {
+        "outcome": "final",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        "Gentlemen of the press."
+      ],
+      "old_observation_count": 2
+    },
+    {
+      "capture_ranges": [
+        [
+          75808,
+          105472,
+          "new_content"
+        ]
+      ],
+      "samples": 29664,
+      "pcm16_sha256": "93978b19455fbc61574098c2d3898b988e4bf820730855d453b407063ece6d0a",
+      "native_float32_sha256": "66759b057f272d5812e27b79737fc6db1fc987eea32c4316dbfe90991d4bcc4a",
+      "product_text": "He washed the detritus from his hands.",
+      "product_terminal": {
+        "outcome": "final",
+        "text_authority": "authoritative",
+        "failure_reason": null,
+        "epoch_disposition": "reuse"
+      },
+      "old_texts_reused": [
+        ""
+      ],
+      "old_observation_count": 2
+    }
+  ],
+  "bounded_diagnostic": {
+    "schema": "issue218-parakeet-bounded-real-window-1",
+    "diagnostic_only": true,
+    "capture_range": [
+      75808,
+      115225
+    ],
+    "pcm16_sha256": "6d7517d4a3f6f7e73139725cfcbc31ad95efd4a1f2417c2c147d30da1a962580",
+    "samples": 39417,
+    "product_text": "He washed the detritus from his hair.",
+    "scope": "One original real-A capture enclosure comparison after exact native repair; no appended samples, no product policy change, no re-decode fallback, no claim causal future data was available at old submission.",
+    "reference": "He washed the detritus from his hair.",
+    "executed_command": [
+      "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv\\Scripts\\python.exe",
+      "-B",
+      "-c",
+      "import sys, json, asyncio, hashlib\nfrom pathlib import Path\nfrom types import SimpleNamespace\nroot=Path.cwd()\nsys.path.insert(0,str(root/\"src\"))\nsys.path.insert(0,str(root/\"native/nemotron\"))\nimport issue215_smoke as prior\nfrom issue218_parakeet_probe import save\nfrom puripuly_heart.core.audio.format import float32_to_pcm16le_bytes\nfrom puripuly_heart.providers.stt.local_parakeet_sherpa import LocalParakeetV3SherpaSTTBackend\nasync def run():\n    _,cases=prior.input_cases(SimpleNamespace(corpus=Path.home()/\".cache/puripuly-heart/sim-v02-public-corpus-600-v1\",correction_root=root.parent/\"listen-mega-integrate-nemotron-speaker-tracking/docs/experiments/issue-212-clarification\"))\n    values=cases[\"distinct_repeated_A_B_A\"][0]\n    pcm=float32_to_pcm16le_bytes(values[75808:115225])\n    backend=LocalParakeetV3SherpaSTTBackend(model_dir=Path.home()/\"AppData/Local/puripuly-heart/models/parakeet-tdt-0.6b-v3-int8-sherpa\",num_threads=2,language_hint=None)\n    try:\n        text=await backend.decode_pcm16le(pcm)\n        result={\"schema\":\"issue218-parakeet-bounded-real-window-1\",\"diagnostic_only\":True,\"capture_range\":[75808,115225],\"pcm16_sha256\":hashlib.sha256(pcm).hexdigest(),\"samples\":len(pcm)//2,\"product_text\":text,\"scope\":\"One original real-A capture enclosure comparison after exact native repair; no appended samples, no product policy change, no re-decode fallback, no claim causal future data was available at old submission.\",\"reference\":\"He washed the detritus from his hair.\"}\n        save(root/\"native/nemotron/issue218_parakeet_real_window_diagnostic.json\",result)\n        print(json.dumps(result))\n    finally:\n        await backend.close()\nasyncio.run(run())\n"
+    ],
+    "assessment": "Complete real returning-A enclosure yields exact reference, while hard safety split loses tail/corrupts hair. This narrows remaining window/fragment limitation; it is not a causal live policy or authorized future-context workaround."
+  },
+  "environment": {
+    "interpreter": "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv\\Scripts\\python.exe",
+    "before_packages": {
+      "aiohappyeyeballs": "2.6.1",
+      "aiohttp": "3.13.2",
+      "aiosignal": "1.4.0",
+      "annotated-doc": "0.0.5",
+      "annotated-types": "0.7.0",
+      "anyio": "4.12.0",
+      "attrs": "25.4.0",
+      "black": "26.5.1",
+      "certifi": "2025.11.12",
+      "cffi": "2.0.0",
+      "cfgv": "3.5.0",
+      "charset-normalizer": "3.4.4",
+      "click": "8.4.2",
+      "colorama": "0.4.6",
+      "coverage": "7.13.4",
+      "cryptography": "46.0.7",
+      "dashscope": "1.26.4",
+      "deepgram-sdk": "5.3.4",
+      "distlib": "0.4.0",
+      "distro": "1.9.0",
+      "elevenlabs": "2.65.0",
+      "filelock": "3.20.1",
+      "flatbuffers": "25.12.19",
+      "flet": "1.0.0",
+      "flet-desktop": "1.0.0",
+      "frozenlist": "1.8.0",
+      "fsspec": "2026.6.0",
+      "google-auth": "2.56.2",
+      "google-genai": "2.21.0",
+      "h11": "0.16.0",
+      "hf-xet": "1.5.2",
+      "httpcore": "1.0.9",
+      "httpx": "0.28.1",
+      "httpx-sse": "0.4.3",
+      "huggingface-hub": "1.26.0",
+      "identify": "2.6.15",
+      "idna": "3.11",
+      "ifaddr": "0.2.0",
+      "iniconfig": "2.3.0",
+      "janus": "2.0.0",
+      "jaraco.classes": "3.4.0",
+      "jaraco.context": "6.0.1",
+      "jaraco.functools": "4.3.0",
+      "keyring": "25.7.0",
+      "markdown-it-py": "4.2.0",
+      "mdurl": "0.1.2",
+      "more-itertools": "10.8.0",
+      "msgpack": "1.2.1",
+      "multidict": "6.7.0",
+      "mypy-extensions": "1.1.0",
+      "nodeenv": "1.10.0",
+      "numpy": "2.5.1",
+      "oauthlib": "3.3.1",
+      "onnxruntime": "1.28.0",
+      "packaging": "25.0",
+      "pathspec": "1.1.1",
+      "platformdirs": "4.5.1",
+      "pluggy": "1.6.0",
+      "pre-commit": "4.6.1",
+      "proc-tap": "1.1.1",
+      "propcache": "0.4.1",
+      "protobuf": "6.33.2",
+      "psutil": "7.2.2",
+      "puripuly-heart": "2.8.2",
+      "pyasn1": "0.6.1",
+      "pyasn1-modules": "0.4.2",
+      "pyaudiowpatch": "0.2.12.8",
+      "pycparser": "2.23",
+      "pydantic": "2.12.5",
+      "pydantic-core": "2.41.5",
+      "pygments": "2.19.2",
+      "pysocks": "1.7.1",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "pytest-cov": "7.1.0",
+      "python-osc": "1.10.2",
+      "python-socks": "2.8.2",
+      "pytokens": "0.4.1",
+      "pywin32-ctypes": "0.2.3",
+      "pyyaml": "6.0.3",
+      "repath": "0.9.0",
+      "requests": "2.32.5",
+      "rich": "15.0.0",
+      "ruff": "0.16.1",
+      "scipy": "1.18.0",
+      "shellingham": "1.5.4",
+      "sherpa-onnx-core": "1.13.4",
+      "sherpa-onnx": "1.13.4",
+      "six": "1.17.0",
+      "sniffio": "1.3.1",
+      "socksio": "1.0.0",
+      "sounddevice": "0.5.5",
+      "soxr": "1.1.0",
+      "tenacity": "9.1.2",
+      "tqdm": "4.69.0",
+      "truststore": "0.10.4",
+      "typer": "0.27.0",
+      "typing-inspection": "0.4.2",
+      "typing-extensions": "4.15.0",
+      "urllib3": "2.6.2",
+      "virtualenv": "20.35.4",
+      "websocket-client": "1.9.0",
+      "websockets": "16.1.1",
+      "yarl": "1.22.0",
+      "zeroconf": "0.150.0"
+    },
+    "after_packages": {
+      "aiohappyeyeballs": "2.6.1",
+      "aiohttp": "3.13.2",
+      "aiosignal": "1.4.0",
+      "annotated-doc": "0.0.5",
+      "annotated-types": "0.7.0",
+      "anyio": "4.12.0",
+      "attrs": "25.4.0",
+      "black": "26.5.1",
+      "certifi": "2025.11.12",
+      "cffi": "2.0.0",
+      "cfgv": "3.5.0",
+      "charset-normalizer": "3.4.4",
+      "click": "8.4.2",
+      "colorama": "0.4.6",
+      "coverage": "7.13.4",
+      "cryptography": "46.0.7",
+      "dashscope": "1.26.4",
+      "deepgram-sdk": "5.3.4",
+      "distlib": "0.4.0",
+      "distro": "1.9.0",
+      "elevenlabs": "2.65.0",
+      "filelock": "3.20.1",
+      "flatbuffers": "25.12.19",
+      "flet": "1.0.0",
+      "flet-desktop": "1.0.0",
+      "frozenlist": "1.8.0",
+      "fsspec": "2026.6.0",
+      "google-auth": "2.56.2",
+      "google-genai": "2.21.0",
+      "h11": "0.16.0",
+      "hf-xet": "1.5.2",
+      "httpcore": "1.0.9",
+      "httpx": "0.28.1",
+      "httpx-sse": "0.4.3",
+      "huggingface-hub": "1.26.0",
+      "identify": "2.6.15",
+      "idna": "3.11",
+      "ifaddr": "0.2.0",
+      "iniconfig": "2.3.0",
+      "janus": "2.0.0",
+      "jaraco.classes": "3.4.0",
+      "jaraco.context": "6.0.1",
+      "jaraco.functools": "4.3.0",
+      "keyring": "25.7.0",
+      "markdown-it-py": "4.2.0",
+      "mdurl": "0.1.2",
+      "more-itertools": "10.8.0",
+      "msgpack": "1.2.1",
+      "multidict": "6.7.0",
+      "mypy-extensions": "1.1.0",
+      "nodeenv": "1.10.0",
+      "numpy": "2.5.1",
+      "oauthlib": "3.3.1",
+      "onnxruntime": "1.28.0",
+      "packaging": "25.0",
+      "pathspec": "1.1.1",
+      "platformdirs": "4.5.1",
+      "pluggy": "1.6.0",
+      "pre-commit": "4.6.1",
+      "proc-tap": "1.1.1",
+      "propcache": "0.4.1",
+      "protobuf": "6.33.2",
+      "psutil": "7.2.2",
+      "puripuly-heart": "2.8.2",
+      "pyasn1": "0.6.1",
+      "pyasn1-modules": "0.4.2",
+      "pyaudiowpatch": "0.2.12.8",
+      "pycparser": "2.23",
+      "pydantic": "2.12.5",
+      "pydantic-core": "2.41.5",
+      "pygments": "2.19.2",
+      "pysocks": "1.7.1",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "pytest-cov": "7.1.0",
+      "python-osc": "1.10.2",
+      "python-socks": "2.8.2",
+      "pytokens": "0.4.1",
+      "pywin32-ctypes": "0.2.3",
+      "pyyaml": "6.0.3",
+      "repath": "0.9.0",
+      "requests": "2.32.5",
+      "rich": "15.0.0",
+      "ruff": "0.16.1",
+      "scipy": "1.18.0",
+      "shellingham": "1.5.4",
+      "sherpa-onnx-core": "1.13.5",
+      "sherpa-onnx": "1.13.5",
+      "six": "1.17.0",
+      "sniffio": "1.3.1",
+      "socksio": "1.0.0",
+      "sounddevice": "0.5.5",
+      "soxr": "1.1.0",
+      "tenacity": "9.1.2",
+      "tqdm": "4.69.0",
+      "truststore": "0.10.4",
+      "typer": "0.27.0",
+      "typing-inspection": "0.4.2",
+      "typing-extensions": "4.15.0",
+      "urllib3": "2.6.2",
+      "virtualenv": "20.35.4",
+      "websocket-client": "1.9.0",
+      "websockets": "16.1.1",
+      "yarl": "1.22.0",
+      "zeroconf": "0.150.0"
+    },
+    "delta": {
+      "sherpa-onnx": {
+        "before": "1.13.4",
+        "after": "1.13.5"
+      },
+      "sherpa-onnx-core": {
+        "before": "1.13.4",
+        "after": "1.13.5"
+      }
+    },
+    "preservation": "Only sherpa wrapper+core changed; google-genai remains2.21.0; no uv sync, SDK upgrade, unrelated package update or model mutation.",
+    "native_runtime": {
+      "version": "1.13.5",
+      "git_sha1": "3dc7c569",
+      "git_date": "Tue Aug 11 06:43:30 2026",
+      "onnxruntime_version": "1.28.0"
+    },
+    "native_module_file": "<USER_HOME>\\Documents\\dev\\puripuly_heart\\.worktrees\\puripuly_heart\\listen-integrate-the-initial-fp16-vulkan-nemotro\\.venv\\Lib\\site-packages\\sherpa_onnx\\lib\\_sherpa_onnx.cp314-win_amd64.pyd",
+    "native_module_sha256": "1d99c6d061c901a8714a59d6f3bb413c7954a47bb4b79f620ddc9e4d72f7cee7",
+    "mapped_path_note": "Windows psutil memory map reports isolated-target path for native pyd after normal installed import; os.path.samefile confirms target and .venv pyd are the same hardlinked file. Actual sys.modules.__file__ resolves .venv, no target on sys.path in installed inventory.",
+    "inventory_record": "native/nemotron/issue218_parakeet_runtime_inventory.json",
+    "smoke_metadata_limit": "Earlier smoke callable-only version selector produced {}; supplemental post-smoke native string-attribute inventory is explicit. Final probe fixes metadata recording only; no new decode claim for this final metadata-only edit."
+  },
+  "implementation": {
+    "changed_product_surfaces": [
+      "pyproject.toml",
+      "uv.lock",
+      "src/puripuly_heart/release_evidence/release_identity.py",
+      "tests/app/test_release_dependency_guards.py"
+    ],
+    "dependency_strategy": "Both sherpa-onnx and sherpa-onnx-core exactly1.13.5, preventing wrapper/core ABI drift; targeted lock reported only pair updated.",
+    "provider_logic": "Unchanged: recovery obtained without special-case PCM handling or native option changes.",
+    "test_changes": "Removed incidental old wrapper minimum/old-version text pin tests. Added observable matched-pair/hash-export/CPython3.14 Windows wheel readiness and lock-derived required packaged license acceptance/empty rejection. Focused execution exposed a stale installer guard scanning all model manifests, including non-ASR Nemotron; repaired that owned guard to use the existing canonical local STT manifest inventory without changing installer behavior.",
+    "license": {
+      "relative_path": "sherpa_onnx-1.13.5.dist-info/licenses/LICENSE",
+      "bytes": 11560,
+      "sha256": "3ddf9be5c28fe27dad143a5dc76eea25222ad1dd68934a047064e56ed2fa40c5",
+      "content": "Same Apache2.0 LICENSE bytes as1.13.4 supplied wrapper; core wheel still supplies no separate license-file member."
+    }
+  },
+  "execution": {
+    "commands": [
+      {
+        "command": "uv pip install --python .venv/Scripts/python.exe --target build/issue218_parakeet_runtime_1_13_5 --no-deps sherpa-onnx==1.13.5 sherpa-onnx-core==1.13.5",
+        "result": "installed isolated pair"
+      },
+      {
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_parakeet_probe.py --runtime-target build/issue218_parakeet_runtime_1_13_5 --output native/nemotron/issue218_parakeet_runtime_1_13_5.json",
+        "result": "7 unique archived native requests executed in4.75s"
+      },
+      {
+        "command": "uv lock --upgrade-package sherpa-onnx --upgrade-package sherpa-onnx-core",
+        "result": "only pair updated1.13.4->1.13.5"
+      },
+      {
+        "command": "uv pip install --python .venv/Scripts/python.exe --no-deps sherpa-onnx==1.13.5 sherpa-onnx-core==1.13.5",
+        "result": "installed actual worktree product environment pair; unrelated versions preserved"
+      },
+      {
+        "command": ".venv/Scripts/python.exe -B native/nemotron/issue218_parakeet_probe.py --scoped --output native/nemotron/issue218_parakeet_product_smoke.json",
+        "result": "7 archived exact requests through actual scoped session/frozen options/native queue/terminals in4.39s; outputs equal isolated observation"
+      }
+    ],
+    "tests": "Executed under explicit follow-up authority. First run:93 passed,1 failed in3.49s. Failure was an owned stale local-STT installer guard including Nemotron speaker manifest. Repaired only its inventory selection; focused affected-test rerun:1 passed in0.07s. The other93 checks' evidence is unchanged and reused; no second full-suite run claimed.",
+    "test_runs": [
+      {
+        "command": ".venv/Scripts/python.exe -m pytest tests/app/test_release_dependency_guards.py tests/providers/test_local_cpu_backends.py tests/release_evidence/test_release_identity.py",
+        "exit_code": 1,
+        "passed": 93,
+        "failed": 1,
+        "pytest_seconds": 3.49,
+        "failing_test": "tests/app/test_release_dependency_guards.py::test_installer_script_embeds_local_stt_manifest_assets_for_inno_download",
+        "failure": "Existing glob over every model manifest required the separate nemotron-3-diarization-f16-vulkan speaker model in the local STT installer script. Both new Sherpa guards and all provider/release-identity tests passed."
+      },
+      {
+        "command": ".venv/Scripts/python.exe -m pytest tests/app/test_release_dependency_guards.py::test_installer_script_embeds_local_stt_manifest_assets_for_inno_download",
+        "exit_code": 0,
+        "passed": 1,
+        "failed": 0,
+        "pytest_seconds": 0.07,
+        "repair": "Use canonical LOCAL_STT_MANIFEST_RELATIVE_PATHS rather than an undifferentiated model-directory glob. Preserve GPU-ASR non-bundling and all local CPU asset checks. No installer/product change or incidental version re-pinning."
+      }
+    ],
+    "cloud_calls": 0,
+    "VRChat_SteamVR_launched": false,
+    "audio_capture": false,
+    "synthetic_native_padding": false
+  },
+  "maintained_doc_recommendations": [
+    "THIRD_PARTY_NOTICES.txt: replace sherpa-onnx1.13.4/core1.13.4 with1.13.5 pair; same complete Apache2.0 wrapper LICENSE retained alongside both metadata; no new license text required.",
+    "Architecture Causal local recognition: preserve no-synthetic-tail rule, link this report for exact native returnA recovery from runtime upgrade; keep lexical hand/hands and empty hard-rollover limitations explicit. Do not rewrite historical issue215/218 reports as new qualification.",
+    "Installed immutable payload requires rebuild to distribute new pair. No profile selection, production enablement or semantic full-content acceptance granted by this native repair."
+  ],
+  "director_checks_recommended": [
+    ".venv/Scripts/python.exe -m pytest tests/app/test_release_dependency_guards.py::test_production_export_keeps_matched_sherpa_native_pair tests/app/test_release_dependency_guards.py::test_packaged_sherpa_license_matches_locked_distribution tests/providers/test_local_cpu_backends.py tests/release_evidence/test_release_identity.py",
+    "During eventual native distribution assembly, verify required sherpa_onnx-1.13.5.dist-info/licenses/LICENSE and matched wrapper/core metadata in actual immutable payload."
+  ],
+  "remaining": [
+    "Exact returnA hair substitution persists despite removal of catastrophic loss.",
+    "Baseline-common hard-rollover successor remains empty; this repair does not recover it.",
+    "No exact old/new normalized feature statistics or single-commit build were obtained.",
+    "No fresh Japanese/Qwen acoustic qualification or native Windows payload rebuild in this task.",
+    "Speaker attribution/color policy and profile acceptance belong to other workstreams."
+  ],
+  "policy_decision": "No optional-cut restriction justified by the repaired catastrophic returnA disappearance; Director explicitly accepted no restriction based on this loss. Residual safety-cut/lexical limitations remain disclosed; no retries/tail/minimum-duration deletion/context inflation adopted."
+}

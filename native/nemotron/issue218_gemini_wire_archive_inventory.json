@@ -1,0 +1,111 @@
+{
+  "publication": {
+    "availability": "All three original ZIPs are local-only and intentionally excluded from public Git history because their executed driver snapshots contain a private absolute credential-file path. The hashes below identify the unchanged local originals, not public downloads.",
+    "retention": "Original files remain at the listed local paths and in unpublished commit d1164dfc680f4fd5b77b835a31b87286bb883f43, retained by backup/listen-before-dev-sync-c237d660.",
+    "public_driver": "The checked-in probe is a publication derivative: PURIPULY_GEMINI_PROBE_ENV selects the env file, otherwise repository .env.local is used. Only GOOGLE_API_KEY2 is accepted. This derivative is not the byte-identical executed driver.",
+    "verification_scope": "CRC, extracted-byte equality and snapshot-hash observations below belong to the original archived execution evidence. They do not qualify the synchronized product or a rerun."
+  },
+  "archives": [
+    {
+      "archive": "native/nemotron/issue218_gemini_wire_archive1.zip",
+      "sha256": "81cbcace2a7857cedc4cc6e014b1d512d440fbabbf57706397dee86e6d0b5f18",
+      "crc_valid": true,
+      "extracted_members_byte_identical": true,
+      "driver_snapshot_hash_matches_report": true,
+      "members": [
+        {
+          "member": "trace.jsonl",
+          "bytes": 1113623,
+          "crc32": "42551714",
+          "sha256": "ea25ec9bf69d4d791cfb3e9ec9e021003b608d80d61e6ffc77f4583a0c635951"
+        },
+        {
+          "member": "report.json",
+          "bytes": 9984,
+          "crc32": "df289d7f",
+          "sha256": "737506daad653f3eb3c2beb113985533275ad532889aa7b0ccc6e3e2806df695"
+        },
+        {
+          "member": "submitted.pcm16le",
+          "bytes": 24595,
+          "crc32": "eff8010b",
+          "sha256": "50ac76ff255b1c837a932acf5c0d75e3368d158bc18980ea13e7457c7bfd2806"
+        },
+        {
+          "member": "issue218_gemini_wire_probe.py",
+          "bytes": 26324,
+          "crc32": "a078ccfb",
+          "sha256": "e31550614c051037cb4f2c02c18a54352c9bf9ec764d59ac155f19645f46044f"
+        }
+      ]
+    },
+    {
+      "archive": "native/nemotron/issue218_gemini_wire_archive2.zip",
+      "sha256": "a6d309270ef2668a48a7ea07dc420879dfdba269fb9d8b0cf7d37699a2f649dc",
+      "crc_valid": true,
+      "extracted_members_byte_identical": true,
+      "driver_snapshot_hash_matches_report": true,
+      "members": [
+        {
+          "member": "trace.jsonl",
+          "bytes": 1411347,
+          "crc32": "d0991481",
+          "sha256": "b4c427ae587f89f611055c0ba9954063484da6ba7718facb67954c749e834dd2"
+        },
+        {
+          "member": "report.json",
+          "bytes": 14215,
+          "crc32": "f8911ee0",
+          "sha256": "af1682b4d9b4605aa91415362f564f4a346705bc8437cda7247e5578e0d4dacb"
+        },
+        {
+          "member": "submitted.pcm16le",
+          "bytes": 151168,
+          "crc32": "4e21d5b4",
+          "sha256": "53444ed2f4198ad3e400edfbbddce946818a1e7b980d0acabd7147fceefb2adc"
+        },
+        {
+          "member": "issue218_gemini_wire_probe.py",
+          "bytes": 26669,
+          "crc32": "2ac5eacc",
+          "sha256": "6ed70bf70d6ba8f402274d0f2e9b2af6db41cdf27e5e6a4a37d8d38c11d02c44"
+        }
+      ]
+    },
+    {
+      "archive": "native/nemotron/issue218_gemini_wire_archive3.zip",
+      "sha256": "0e9e02c610e0a3f3cfb963a5421043ed44386e168aa1a89d4426c5a6c86f9378",
+      "crc_valid": true,
+      "extracted_members_byte_identical": true,
+      "driver_snapshot_hash_matches_report": true,
+      "members": [
+        {
+          "member": "trace.jsonl",
+          "bytes": 1421340,
+          "crc32": "d5ec6ea1",
+          "sha256": "0bf89b52744599326f714e01d13ee3c229868b9f6ab2b4ce8afe3efefc6199a1"
+        },
+        {
+          "member": "report.json",
+          "bytes": 14920,
+          "crc32": "15de4a8b",
+          "sha256": "85c3d2dc47b32f52a9422e5c92130e0fc3e19cab2f91f301d9b387a6bc16bca4"
+        },
+        {
+          "member": "submitted.pcm16le",
+          "bytes": 186808,
+          "crc32": "62ee889f",
+          "sha256": "1484712bf62ace51138eafb48e3525c78ce4ab49c741e0cc6eac3e1ec4cae22a"
+        },
+        {
+          "member": "issue218_gemini_wire_probe.py",
+          "bytes": 27204,
+          "crc32": "8ab7aa6f",
+          "sha256": "878499e6aa4d0287b9e8b81f8d7d1b52135a7770e3af37010d4d87c2ac1c7f81"
+        }
+      ]
+    }
+  ],
+  "historical_report_paths": "Archived reports retain original execution-time run paths; findings' archive:member references identify local-only originals, not repository files available to public readers.",
+  "cleanup": "Only byte-identical extracted run1/run2/run3 copies removed. Invalid evidence and all driver snapshots preserved."
+}

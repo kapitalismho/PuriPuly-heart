@@ -22,19 +22,12 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import STTNormalizationError, STTScopedTurnNormalizer
+from puripuly_heart.core.stt.speaker_attribution import (
+    SpeakerFrame,
+    attribute_speaker,
+    probability_state,
+)
 from puripuly_heart.domain.models import FinalSpeakerRun
-
-
-@dataclass(frozen=True, slots=True)
-class _Frame:
-    span: AudioCaptureSpan
-    epoch: int
-    compact_end: int
-    closed: bool
-    slots: tuple[int, ...]
-    clear: bool
-    uncertain: bool
-    ready_at: float
 
 
 class _Timeline:
@@ -66,30 +59,28 @@ class _Timeline:
                         and piece.capture.normalized_end_sample is not None
                     ):
                         self.frames.append(
-                            _Frame(
+                            SpeakerFrame(
                                 piece.capture,
                                 item.speaker_epoch,
                                 piece.compact_end_sample,
+                                item.observation_ready_monotonic_s,
                                 True,
                                 (),
                                 False,
                                 False,
-                                item.observation_ready_monotonic_s,
+                                False,
                             )
                         )
                 continue
             if item.reason not in (None, "vad_pause", "source_eof"):
                 self.frames.clear()
                 continue
-            if item.frame is None or len(item.frame.probabilities) != 8:
+            if item.frame is None:
                 continue
-            values = item.frame.probabilities
-            if not all(math.isfinite(value) for value in values):
+            state = probability_state(item.frame.probabilities)
+            if state is None:
                 continue
-            ranked = sorted(values, reverse=True)
-            slots = tuple(index for index, value in enumerate(values) if value >= 0.5)
-            clear = len(slots) == 1 and ranked[0] >= 0.8 and ranked[1] <= 0.2
-            uncertain = ranked[1] >= 0.35 or (not slots and ranked[0] >= 0.2)
+            slots, clear, uncertain, competing = state
             for piece in item.source_map:
                 span = piece.capture
                 if piece.kind != "original" or span is None:
@@ -108,15 +99,16 @@ class _Timeline:
                     continue
                 self.frames = [frame for frame in self.frames if frame not in overlapping]
                 self.frames.append(
-                    _Frame(
+                    SpeakerFrame(
                         span,
                         item.speaker_epoch,
                         piece.compact_end_sample,
+                        item.observation_ready_monotonic_s,
                         item.range_state == "closed",
                         slots,
                         clear,
                         uncertain,
-                        item.observation_ready_monotonic_s,
+                        competing,
                     )
                 )
         self.frames.sort(
@@ -130,45 +122,12 @@ class _Timeline:
         )
 
     def attribute(self, ranges):
-        slots, epochs = set(), set()
-        missing, uncertain = not ranges, False
-        for span in ranges:
-            cursor, end = span.normalized_start_sample, span.normalized_end_sample
-            if cursor is None or end is None:
-                missing = True
-                continue
-            for frame in self.stable_frames():
-                if frame.span.capture_epoch != span.capture_epoch:
-                    continue
-                left, right = max(cursor, frame.span.normalized_start_sample), min(
-                    end, frame.span.normalized_end_sample
-                )
-                if left >= right:
-                    continue
-                missing |= left != cursor
-                slots.update(frame.slots)
-                epochs.add(frame.epoch)
-                uncertain |= frame.uncertain
-                cursor = right
-            missing |= cursor != end
-        state = (
-            "mixed"
-            if len(slots) > 1 or len(epochs) > 1
-            else (
-                "unavailable"
-                if missing or not slots
-                else "uncertain" if uncertain else "identified"
-            )
-        )
-        return FinalSpeakerRun(
-            "",
-            str(next(iter(slots))) if state == "identified" else None,
-            str(next(iter(epochs))) if len(epochs) == 1 else "",
-            source="nemotron",
-            attribution_state=state,
-        )
+        return attribute_speaker(ranges, self.frames, self.immutable)
 
     def boundaries(self):
+        return (boundary for boundary, _, _ in self.transitions())
+
+    def transitions(self):
         previous = None
         last_epoch = last_end = None
         for frame in self.stable_frames():
@@ -179,18 +138,25 @@ class _Timeline:
             ):
                 previous = None
             last_epoch, last_end = frame.span.capture_epoch, frame.span.normalized_end_sample
+            if frame.competing or len(frame.slots) > 1:
+                previous = None
+                continue
             if not frame.clear:
                 continue
             if previous is not None and previous.slots != frame.slots:
-                yield STTAudioBoundary(
-                    f"nemotron:{frame.epoch}:{frame.span.capture_epoch}:{frame.span.normalized_start_sample}",
-                    frame.span.capture_epoch,
-                    frame.span.normalized_start_sample,
-                    frame.ready_at,
-                    "speaker",
-                    str(frame.epoch),
-                    transition_start_sample=previous.span.normalized_end_sample,
-                    transition_end_sample=frame.span.normalized_start_sample,
+                yield (
+                    STTAudioBoundary(
+                        f"nemotron:{frame.epoch}:{frame.span.capture_epoch}:{frame.span.normalized_start_sample}",
+                        frame.span.capture_epoch,
+                        frame.span.normalized_start_sample,
+                        frame.ready_at,
+                        "speaker",
+                        str(frame.epoch),
+                        transition_start_sample=previous.span.normalized_end_sample,
+                        transition_end_sample=frame.span.normalized_start_sample,
+                    ),
+                    previous,
+                    frame,
                 )
             previous = frame
 
@@ -397,19 +363,7 @@ class StreamingSpeakerSession:
 
     def _speaker(self, turn, timing):
         ranges = self._mapped(turn, timing)
-        speaker = self._timeline.attribute(ranges)
-        if speaker.attribution_state == "identified":
-            for boundary in self._timeline.boundaries():
-                start = boundary.transition_start_sample
-                end = boundary.transition_end_sample
-                if start is not None and any(
-                    span.capture_epoch == boundary.capture_epoch
-                    and span.normalized_start_sample < end
-                    and start < span.normalized_end_sample
-                    for span in ranges
-                ):
-                    return replace(speaker, speaker_id=None, attribution_state="uncertain")
-        return speaker
+        return self._timeline.attribute(ranges)
 
     def _complete_text_groups(self, turn, event, timings):
         endpoints = {0, len(event.text)}
@@ -420,6 +374,8 @@ class StreamingSpeakerSession:
             if timing.complete_boundary and timing.semantics == "result_span"
             for point in (timing.text_start, timing.text_end)
         )
+        if isinstance(event, STTProviderTurnUpdate) and event.source_release is not None:
+            endpoints.update((event.source_release.text_start, event.source_release.text_end))
         fixed_endpoints = endpoints.copy()
         lexical = [
             timing
@@ -429,7 +385,8 @@ class StreamingSpeakerSession:
         ]
         mapped = [self._mapped(turn, timing) for timing in lexical]
         speakers = [self._speaker(turn, timing) for timing in lexical]
-        for boundary in self._timeline.boundaries():
+        final = isinstance(event, STTProviderTurnTerminal) or event.source_release is not None
+        for boundary, predecessor, successor in self._timeline.transitions():
             transition_start = (
                 boundary.transition_start_sample
                 if boundary.transition_start_sample is not None
@@ -445,8 +402,11 @@ class StreamingSpeakerSession:
                     or any(span.capture_epoch != boundary.capture_epoch for span in ranges)
                 ):
                     continue
-                if timing.complete_boundary and all(
-                    span.normalized_end_sample <= transition_start for span in ranges
+                if (
+                    timing.complete_boundary
+                    and (speakers[index].session_scope, speakers[index].speaker_id)
+                    == (str(predecessor.epoch), str(predecessor.slots[0]))
+                    and all(span.normalized_end_sample <= transition_start for span in ranges)
                 ):
                     preceding = index
                 if (
@@ -454,13 +414,15 @@ class StreamingSpeakerSession:
                     and index > 0
                     and lexical[index - 1].complete_boundary
                     and lexical[index - 1].text_end <= timing.text_start
+                    and (speakers[index].session_scope, speakers[index].speaker_id)
+                    == (str(successor.epoch), str(successor.slots[0]))
                     and all(
                         span.normalized_start_sample >= boundary.normalized_sample
                         for span in ranges
                     )
                 ):
                     following = index
-            if preceding is not None:
+            if preceding is not None and not final:
                 timing = lexical[preceding]
                 cut = timing.text_end
                 if preceding + 1 < len(lexical):
@@ -470,23 +432,58 @@ class StreamingSpeakerSession:
                 elif not event.text[cut:].strip():
                     cut = len(event.text)
                 endpoints.add(cut)
-            if following is not None and (preceding is None or preceding < following):
-                endpoints.add(lexical[following].text_start)
-        if isinstance(event, STTProviderTurnUpdate) and event.source_release is not None:
-            endpoints.update((event.source_release.text_start, event.source_release.text_end))
-            fixed_endpoints.update((event.source_release.text_start, event.source_release.text_end))
+            if (
+                following is not None
+                and (preceding is None or preceding < following)
+                and (
+                    not final
+                    or (
+                        preceding is not None
+                        and speakers[preceding].attribution.key
+                        != speakers[following].attribution.key
+                    )
+                )
+            ):
+                cut = lexical[following].text_start
+                if final and cut not in fixed_endpoints:
+                    lower = max(point for point in fixed_endpoints if point < cut)
+                    upper = min(point for point in fixed_endpoints if point > cut)
+                    owned = [
+                        span
+                        for timing, ranges in zip(lexical, mapped)
+                        if lower <= timing.text_start and timing.text_end <= upper
+                        for span in ranges
+                    ]
+                    supported = {
+                        (frame.epoch, frame.slots)
+                        for frame in self._timeline.stable_frames()
+                        if frame.clear
+                        and any(
+                            span.capture_epoch == frame.span.capture_epoch
+                            and span.normalized_start_sample < frame.span.normalized_end_sample
+                            and frame.span.normalized_start_sample < span.normalized_end_sample
+                            for span in owned
+                        )
+                    }
+                    if not all(
+                        (frame.epoch, frame.slots) in supported
+                        for frame in (predecessor, successor)
+                    ):
+                        continue
+                endpoints.add(cut)
         ordered = sorted(point for point in endpoints if 0 <= point <= len(event.text))
-        whole = self._timeline.attribute(tuple(turn.content + turn.context))
-        identified = [
-            self._group_speaker(turn, event.text, start, end, timings, whole).attribution_state
-            == "identified"
-            for start, end in zip(ordered, ordered[1:])
-        ]
-        ordered = [
-            point
-            for index, point in enumerate(ordered)
-            if point in fixed_endpoints or identified[index - 1] or identified[index]
-        ]
+        if not final:
+            speakers = [
+                self._group_speaker(turn, event.text, start, end, timings)
+                for start, end in zip(ordered, ordered[1:])
+            ]
+            ordered = [
+                point
+                for index, point in enumerate(ordered)
+                if point in fixed_endpoints
+                or speakers[index - 1].attribution_state == "identified"
+                or speakers[index].attribution_state == "identified"
+            ]
         return zip(ordered, ordered[1:])
 
     def _group_timings(self, text, start, end, timings):
@@ -506,7 +503,7 @@ class StreamingSpeakerSession:
             cursor = timing.text_end
         return tuple(covered) if covered and not text[cursor:end].strip() else ()
 
-    def _group_speaker(self, turn, text, start, end, timings, whole):
+    def _group_speaker(self, turn, text, start, end, timings):
         covered = self._group_timings(text, start, end, timings)
         if not covered:
             result = next(
@@ -519,28 +516,22 @@ class StreamingSpeakerSession:
                 ),
                 None,
             )
-            return self._speaker(turn, result) if result is not None else whole
-        speakers = [self._speaker(turn, timing) for timing in covered]
-        identified = {
-            item.attribution.key for item in speakers if item.attribution_state == "identified"
-        }
-        epochs = {item.session_scope for item in speakers if item.session_scope}
-        states = {item.attribution_state for item in speakers}
-        state = (
-            "mixed"
-            if len(identified) > 1 or len(epochs) > 1 or "mixed" in states
-            else (
-                "unavailable"
-                if "unavailable" in states
-                else "uncertain" if states != {"identified"} else "identified"
+            return (
+                self._speaker(turn, result)
+                if result is not None
+                else FinalSpeakerRun(
+                    "", None, "", source="nemotron", attribution_state="unavailable"
+                )
             )
-        )
-        return replace(
-            speakers[0],
-            speaker_id=speakers[0].speaker_id if state == "identified" else None,
-            session_scope=next(iter(epochs)) if len(epochs) == 1 else "",
-            attribution_state=state,
-        )
+        ranges = []
+        for timing in covered:
+            mapped = self._mapped(turn, timing)
+            if not mapped:
+                return FinalSpeakerRun(
+                    "", None, "", source="nemotron", attribution_state="unavailable"
+                )
+            ranges.extend(mapped)
+        return self._timeline.attribute(tuple(ranges))
 
     def _annotate(self, turn, event):
         text = event.text
@@ -567,7 +558,7 @@ class StreamingSpeakerSession:
         )
         runs = [
             replace(
-                self._group_speaker(turn, text, start, end, timings, whole) if timings else whole,
+                self._group_speaker(turn, text, start, end, timings) if timings else whole,
                 text=text[start:end],
             )
             for start, end in self._complete_text_groups(turn, event, timings)
@@ -661,13 +652,12 @@ class StreamingSpeakerSession:
             return
         timings = sorted(turn.timings.values(), key=lambda item: (item.text_start, item.text_end))
         complete = turn.released
-        whole = self._timeline.attribute(tuple(turn.content + turn.context))
         for start, end in self._complete_text_groups(turn, event, timings):
             if end <= complete:
                 continue
             if start != complete:
                 break
-            speaker = self._group_speaker(turn, event.text, start, end, timings, whole)
+            speaker = self._group_speaker(turn, event.text, start, end, timings)
             if speaker.attribution_state != "identified":
                 break
             covered = self._group_timings(event.text, start, end, timings) or tuple(

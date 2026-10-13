@@ -310,23 +310,47 @@ async def test_overlap_and_unknown_keep_all_short_audio_without_forced_cut(slots
 
 
 @pytest.mark.asyncio
-async def test_declared_rollover_context_prevents_false_whole_result_b_attribution():
+@pytest.mark.parametrize(
+    "context_samples,replayed,context_only,expected",
+    [
+        (1600, True, True, "identified"),
+        (4800, True, True, "mixed"),
+        (1600, False, True, "mixed"),
+        (1600, False, False, "mixed"),
+    ],
+)
+async def test_small_proven_replay_intrusion_does_not_outvote_new_speech(
+    context_samples, replayed, context_only, expected
+):
     backend, recognizer, session = await opened()
-    req = request()
+    first, req = request(), replace(request(2), optional_cutoff_at_monotonic_s=0)
     try:
+        if replayed:
+            await session.begin_turn(first)
+            await payload(session, first, 0, 4800, 1)
+            await session.observe_speaker_evidence((evidence(0, 4800, (0,)),))
+            await seal(session, first)
+            await asyncio.wait_for(terminal_events(session), 2)
         await session.begin_turn(req)
-        await payload(session, req, 0, 4800, 1, context=True)
-        await payload(session, req, 4800, 6400, 2)
+        await payload(session, req, 4800 - context_samples, 4800, 1, context=context_only)
+        await payload(session, req, 4800, 36800, 2)
         await session.observe_speaker_evidence(
-            (evidence(0, 4800, (0,)), evidence(4800, 6400, (1,)))
+            (evidence(0, 4800, (0,)), evidence(4800, 36800, (1,)))
         )
         await seal(session, req, "hardcut")
         events = await asyncio.wait_for(terminal_events(session), 2)
         result = events[-1]
-        assert result.final_speaker_runs[0].attribution_state == "mixed"
-        assert result.source_audio[0].context_ranges == (span(0, 4800),)
-        assert result.source_audio[0].source_ranges == (span(4800, 6400),)
-        assert recognizer.calls[0].samples.size == 6400
+        assert result.final_speaker_runs[0].attribution_state == expected
+        assert result.final_speaker_runs[0].speaker_id == ("1" if expected == "identified" else None)
+        assert result.source_audio[0].context_ranges == (
+            (span(4800 - context_samples, 4800),) if context_only else ()
+        )
+        assert result.source_audio[0].source_ranges == (
+            (span(4800, 36800),)
+            if context_only
+            else (span(4800 - context_samples, 4800), span(4800, 36800))
+        )
+        assert recognizer.calls[-1].samples.size == 32000 + context_samples
     finally:
         await session.close()
         await backend.close()
@@ -1117,5 +1141,203 @@ async def test_parakeet_disjoint_slices_preserve_native_options_and_rollover_con
     finally:
         if backend._decode_lock.locked():
             backend._decode_lock.release()
+        await session.close()
+        await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("second_evidence_before_final", [False, True])
+async def test_each_native_final_snapshots_delivered_evidence_before_ordered_release(
+    second_evidence_before_final,
+):
+    from tests.core.test_source_context_contract import until
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    session = CausalBatchSession(inner)
+    first, second = request(), request(2)
+    try:
+        for req, start, end in [(first, 0, 16000), (second, 16000, 32000)]:
+            await session.begin_turn(req)
+            await payload(session, req, start, end, 1)
+            await seal(session, req)
+        first_id, second_id = [req.identity for req in inner.requests]
+        if second_evidence_before_final:
+            await session.observe_speaker_evidence((evidence(16000, 32000, (1,)),))
+        inner.emit(STTProviderTurnTerminal(second_id, "final", "No.", text_authority="authoritative"))
+        await until(lambda: second_id not in session._slices)
+        await session.observe_speaker_evidence(
+            (evidence(0, 16000, (0,)), evidence(16000, 32000, (1,)))
+        )
+        inner.emit(STTProviderTurnTerminal(first_id, "final", "Alpha.", text_authority="authoritative"))
+        events = await asyncio.wait_for(terminal_events(session, 2), 2)
+        assert [item.text for item in events] == ["Alpha.", "No."]
+        assert [item.final_speaker_runs[0].speaker_id for item in events] == [
+            "0", "1" if second_evidence_before_final else None
+        ]
+        assert [item.source_audio[0].source_ranges for item in events] == [
+            (span(0, 16000),), (span(16000, 32000),)
+        ]
+        assert [item.source_audio[0].display_group_id for item in events] == [
+            first.display_group_id, second.display_group_id
+        ]
+        assert len(inner.requests) == 2
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("exhausted", [False, True])
+async def test_unresolved_native_request_retains_proof_until_final_with_hard_cache_bound(exhausted):
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    session = CausalBatchSession(inner)
+    first, second = request(), replace(request(2), optional_cutoff_at_monotonic_s=0)
+    try:
+        await session.begin_turn(first)
+        await payload(session, first, 0, 16000, 1)
+        await seal(session, first)
+        await session.observe_speaker_evidence((evidence(0, 16000, (0,)),))
+        await session.begin_turn(second)
+        await payload(session, second, 16000, 48000, 1)
+        later = (
+            tuple(evidence(16000 + i * 16, 16016 + i * 16, (1,)) for i in range(session.MAX_FRAMES + 1))
+            if exhausted
+            else (evidence(16000, 48000, (1,)),)
+        )
+        await session.observe_speaker_evidence(later)
+        assert len(session._frames) <= session.MAX_FRAMES
+        inner.emit(
+            STTProviderTurnTerminal(inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative")
+        )
+        first_final = await asyncio.wait_for(anext(session.turn_events()), 2)
+        assert first_final.final_speaker_runs[0].speaker_id == (None if exhausted else "0")
+        assert first_final.final_speaker_runs[0].attribution_state == (
+            "unavailable" if exhausted else "identified"
+        )
+        assert first_final.source_audio[0].source_ranges == (span(0, 16000),)
+        await session.abort_turn(second.identity, reason="test_complete")
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fence", ["epoch", "reset", "capture"])
+async def test_pending_final_cannot_use_new_epoch_reset_or_other_capture_evidence(fence):
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    session = CausalBatchSession(inner)
+    req = request()
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 16000, 1)
+        await session.observe_speaker_evidence((evidence(0, 16000, (0,)),))
+        await seal(session, req)
+        if fence == "epoch":
+            replacement = evidence(0, 16000, (0,), epoch=12)
+        elif fence == "reset":
+            await session.observe_speaker_evidence(
+                (SpeakerEvidence("capture", 11, 4, (), 16000, 16000, reason="manual_reset"),)
+            )
+            replacement = evidence(0, 16000, (0,))
+        else:
+            await session.observe_speaker_evidence(
+                (SpeakerEvidence("capture", 11, 4, (), 16000, 16000, reason="source_discontinuity"),)
+            )
+            original = evidence(0, 16000, (0,))
+            replacement = replace(
+                original, source_map=(replace(original.source_map[0], capture=span(0, 16000, epoch=8)),)
+            )
+        await session.observe_speaker_evidence((replacement,))
+        inner.emit(
+            STTProviderTurnTerminal(inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative")
+        )
+        result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
+        assert result.final_speaker_runs[0].attribution_state == "unavailable"
+        assert result.source_audio[0].source_ranges == (span(0, 16000),)
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "segments,expected",
+    [
+        ([(0, 160, None), (160, 16000, 0), (16000, 16800, None), (16800, 31840, 0), (31840, 32000, None)], "identified"),
+        ([(0, 14400, 0), (14400, 17600, None), (17600, 32000, 0)], "uncertain"),
+        ([(0, 8000, 0), (8000, 9760, None), (9760, 24000, 0), (24000, 25760, None), (25760, 48000, 0)], "uncertain"),
+        ([(0, 720, 0), (720, 880, None), (880, 1600, 0)], "identified"),
+        ([(0, 640, 0), (640, 960, None), (960, 1600, 0)], "uncertain"),
+        ([(0, 15840, 0), (15840, 16000, 1), (16000, 32000, 0)], "mixed"),
+    ],
+)
+async def test_representative_utterance_tolerates_bounded_edges_but_never_clear_short_other_speech(
+    segments, expected
+):
+    backend, recognizer, session = await opened()
+    req = replace(request(), optional_cutoff_at_monotonic_s=0)
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, segments[-1][1], 1)
+        observed = []
+        for start, end, slot in segments:
+            item = evidence(start, end, (slot,) if slot is not None else ())
+            if slot is None:
+                item = replace(item, frame=replace(item.frame, probabilities=(0.4,) + (0.01,) * 7))
+            observed.append(item)
+        await session.observe_speaker_evidence(tuple(observed))
+        await seal(session, req)
+        result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
+        assert result.final_speaker_runs[0].attribution_state == expected
+        assert result.final_speaker_runs[0].speaker_id == ("0" if expected == "identified" else None)
+        assert len(recognizer.calls) == 1
+        assert recognizer.calls[0].samples.size == segments[-1][1]
+    finally:
+        await session.close()
+        await backend.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("immutable_at_final", [False, True])
+async def test_own_final_uses_only_delivered_immutable_probability_frontier(immutable_at_final):
+    from tests.core.test_stt_scoped_engine import ControlledScopedSession
+
+    inner = ControlledScopedSession()
+    session = CausalBatchSession(inner)
+    req = request()
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 16000, 1)
+        await seal(session, req)
+        await session.observe_speaker_evidence(
+            (evidence(0, 16000, (0,), immutable=16000 if immutable_at_final else 0, state="open"),)
+        )
+        inner.emit(
+            STTProviderTurnTerminal(inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative")
+        )
+        result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
+        assert result.final_speaker_runs[0].speaker_id == ("0" if immutable_at_final else None)
+        await session.observe_speaker_evidence((SpeakerEvidence("capture", 11, 4, (), 16000, 16000),))
+        assert result.final_speaker_runs[0].speaker_id == ("0" if immutable_at_final else None)
+    finally:
+        await session.close()
+
+
+@pytest.mark.asyncio
+async def test_missing_central_eligible_evidence_is_not_a_confidence_hole():
+    backend, recognizer, session = await opened()
+    req = request()
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 32000, 1)
+        await session.observe_speaker_evidence((evidence(0, 15920, (0,)), evidence(16080, 32000, (0,))))
+        await seal(session, req)
+        result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
+        assert result.final_speaker_runs[0].attribution_state == "unavailable"
+        assert result.text == "no"
+        assert recognizer.calls[0].samples.size == 32000
+    finally:
         await session.close()
         await backend.close()

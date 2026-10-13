@@ -810,22 +810,19 @@ async def replay_captured_fragmentation(*, complete_words=True):
         )
         assert len(sources) == len(harness.peer_runtime.translation_history)
         if complete_words:
-            assert [source.raw_text for source in sources[:3]] == [
-                "Washed the detritus from his ",
-                "hair. ",
+            assert [source.raw_text for source in sources[:2]] == [
+                "Washed the detritus from his hair. ",
                 "Gentlemen of the press.",
             ]
-            assert [source.speaker.speaker_id for source in sources[:3]] == ["0", None, "1"]
-            assert sources[1].speaker.attribution_state in {"uncertain", "mixed"}
-            assert [source.origins[0].contribution_range for source in sources[:3]] == [
-                (0, 29),
-                (29, 35),
+            assert sources[1].speaker.speaker_id == "1"
+            assert [source.origins[0].contribution_range for source in sources[:2]] == [
+                (0, 35),
                 (35, 58),
             ]
-            assert [source.raw_text for source in sources[3:]] == [
+            assert [source.raw_text for source in sources[2:]] == [
                 "He washed the detritus from his",
             ]
-            assert sources[3].speaker.attribution_state == "unavailable"
+            assert sources[2].speaker.attribution_state == "unavailable"
         else:
             assert [source.raw_text for source in sources] == [
                 item["text"] for item in fixture["updates"]
@@ -1258,8 +1255,138 @@ async def test_lexical_cuts_without_qualified_audio_partition_do_not_create_word
         result = await next_text(session.turn_events())
         assert len(result.final_speaker_runs) == 1
         assert result.final_speaker_runs[0].text == event.text
-        assert result.final_speaker_runs[0].speaker_id is None
+        assert result.final_speaker_runs[0].speaker_id == ("0" if qualified else None)
         assert STTContributionConsumptionLedger().consume(result) == event.text
         assert not provider.sealed
     finally:
         await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "text,uncertain_edge,qualified,expected",
+    [
+        ("Gentlemen of the press.", "leading", True, "1"),
+        ("Washed the detritus from his hair.", "trailing", True, "0"),
+        ("Gentlemen of the press.", "long_leading", True, None),
+        ("Gentlemen of the press.", "leading", False, None),
+    ],
+)
+async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translation(
+    text, uncertain_edge, qualified, expected
+):
+    from tests.core.test_source_context_contract import (
+        ControlledProvider,
+        close,
+        finish,
+        harness_for,
+        source_fixture,
+    )
+
+    snapshot, identity = source_fixture()
+    req = STTProviderTurnRequest(identity, snapshot.settings, display_group_id=snapshot.display_group_id)
+    provider = Provider()
+    session = StreamingSpeakerSession(provider)
+    translator = ControlledProvider()
+    harness, trace = harness_for(translator)
+    slot = 0 if uncertain_edge == "trailing" else 1
+    edge = 4000 if uncertain_edge == "long_leading" else 800
+    try:
+        await session.begin_turn(req)
+        await send(session, req, 0, 32000, 1)
+        gray_start, gray_end = (32000 - edge, 32000) if uncertain_edge == "trailing" else (0, edge)
+        gray = replace(
+            evidence(gray_start, gray_end, None),
+            frame=ProbabilityFrame(gray_start, gray_end, (0.4,) + (0.01,) * 7),
+        )
+        clear = evidence(0, 32000 - edge, slot) if uncertain_edge == "trailing" else evidence(edge, 32000, slot)
+        await session.observe_speaker_evidence((clear, gray) if uncertain_edge == "trailing" else (gray, clear))
+        words = text.split()
+        positions = []
+        cursor = 0
+        for index, word in enumerate(words):
+            start = text.index(word, cursor)
+            end = start + len(word)
+            positions.append(
+                STTTextTiming(
+                    "phrase-1", start, end, "word_interval",
+                    2 * index / len(words), 2 * (index + 1) / len(words),
+                    clock_id="clock", complete_boundary=True, estimated=True,
+                )
+            )
+            cursor = end
+        event = update(req, text, qualified=qualified, release=True)
+        event = replace(event, provenance=replace(event.provenance, text_timing=tuple(positions)))
+        provider.events.put(event)
+        result = STTScopedTurnNormalizer(identity).apply_update(await next_text(session.turn_events()))
+        await harness.peer_owner.handle_provider_turn_update(snapshot, result)
+        await harness.peer_owner.handle_provider_turn_update(snapshot, result)
+        await finish(harness)
+        sources = [item.source_child for item in trace.items]
+        assert [source.raw_text for source in sources] == [text]
+        assert sources[0].speaker.speaker_id == expected
+        assert sources[0].origins[0].contribution_range == (0, len(text))
+        assert sources[0].origins[0].native_provenance == (event.provenance,)
+        assert len(harness.peer_runtime.translation_history) == 1
+        assert len(translator.calls) == 1
+        assert not provider.sealed
+    finally:
+        await session.close()
+        await close(harness)
+
+
+@pytest.mark.asyncio
+async def test_final_phrase_preserves_very_short_clear_no_between_returning_speaker():
+    from tests.core.test_source_context_contract import (
+        ControlledProvider,
+        close,
+        finish,
+        harness_for,
+        source_fixture,
+    )
+
+    snapshot, identity = source_fixture()
+    req = STTProviderTurnRequest(identity, snapshot.settings, display_group_id=snapshot.display_group_id)
+    provider = Provider()
+    session = StreamingSpeakerSession(provider)
+    translator = ControlledProvider()
+    harness, trace = harness_for(translator)
+    text = "Use two. No. Use three."
+    try:
+        await session.begin_turn(req)
+        await send(session, req, 0, 32800, 1)
+        await session.observe_speaker_evidence(
+            (evidence(0, 16000, 0), evidence(16000, 16800, 1), evidence(16800, 32800, 0))
+        )
+        event = update(req, text, release=True)
+        word_ranges = [
+            ("Use", 0, 0.0, 0.4), ("two.", 4, 0.4, 1.0),
+            ("No.", 9, 1.0, 1.05), ("Use", 13, 1.05, 1.45), ("three.", 17, 1.45, 2.05),
+        ]
+        event = replace(
+            event,
+            provenance=replace(
+                event.provenance,
+                text_timing=tuple(
+                    STTTextTiming(
+                        "phrase-1", start, start + len(word), "word_interval", a, b,
+                        clock_id="clock", complete_boundary=True,
+                    )
+                    for word, start, a, b in word_ranges
+                ),
+            ),
+        )
+        provider.events.put(event)
+        result = STTScopedTurnNormalizer(identity).apply_update(await next_text(session.turn_events()))
+        await harness.peer_owner.handle_provider_turn_update(snapshot, result)
+        await finish(harness)
+        sources = [item.source_child for item in trace.items]
+        assert [source.raw_text for source in sources] == ["Use two. ", "No. ", "Use three."]
+        assert [source.speaker.speaker_id for source in sources] == ["0", "1", "0"]
+        assert "".join(source.raw_text for source in sources) == text
+        assert [source.origins[0].contribution_range for source in sources] == [(0, 9), (9, 13), (13, 23)]
+        assert len(harness.peer_runtime.translation_history) == len(translator.calls) == 3
+        assert not provider.sealed
+    finally:
+        await session.close()
+        await close(harness)

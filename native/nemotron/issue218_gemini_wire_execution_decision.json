@@ -1,0 +1,29 @@
+{
+  "decision": "Make one manually initiated replacement observation, not an automatic retry or a profile sweep.",
+  "reason_before_additional_call": "The first remote attempt was invalidated by the task-local outgoing-byte accounting tap: installed google-genai 2.21.0 uses URL-safe base64, while the initial tap used standard base64 decoding. That tap raised on a real 1024-byte input chunk at source samples 15872:16384, preventing that write and retiring the stream before source EOF. Offline exact-input serialization reproduced the standard decoder exception and demonstrated exact URL-safe roundtrip. The task-local tap is corrected; product/SDK files remain unchanged. The required raw-finality boundary remains unobserved, so a single replacement with the same approved public clean_A_B PCM and production controls can change the decision.",
+  "remaining_uncertainty": "No valid raw-WebSocket/SDK/adapter finality comparison or EOF/continued-receive observation was obtained from attempt 1. Zero final conservation there is vacuous, not a pass. No service or product finality cause may be inferred from that invalid attempt.",
+  "attempt1_accounting": {
+    "remote_starts": 1,
+    "audio_samples_reserved": 14656,
+    "audio_samples_write_returned": 14144,
+    "reserved_audio_seconds": 0.916,
+    "successfully_submitted_audio_seconds": 0.884,
+    "wire_decoded_pcm_accounting": "INVALID: standard decoder discarded URL-safe characters; archived submitted.pcm16le is not actual wire PCM",
+    "remote_start_to_socket_close_seconds": 1.8527283,
+    "source_eof_control_sent": false,
+    "raw_messages": "Setup response only; no transcription result",
+    "artifact": "native/nemotron/issue218_gemini_wire_archive1.zip"
+  },
+  "replacement_bounds": {
+    "additional_remote_starts": 1,
+    "additional_submitted_pcm_seconds_including_replay_context_max": 8,
+    "overall_session_seconds_max": 30,
+    "after_last_eof_seconds_max": 10,
+    "continued_receive_target_seconds_after_eof": 9,
+    "automatic_retries": false,
+    "providers": "Only GeminiTranscribeSTTBackend gemini-3.5-transcribe-live",
+    "credential": "Only designated parent .env.local GOOGLE_API_KEY2; no value/hash or headers retained"
+  },
+  "authorization": "Existing user instruction authorizes necessary Gemini calls without further approval; no other provider/search/translation authorization inferred.",
+  "monetary_charge": "Unknown. Start/audio counts are not a billing guarantee."
+}

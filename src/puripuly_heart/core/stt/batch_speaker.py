@@ -19,22 +19,15 @@ from puripuly_heart.core.stt.backend import (
     STTTextContribution,
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
+from puripuly_heart.core.stt.speaker_attribution import (
+    SpeakerFrame,
+    attribute_speaker,
+    partition_replay,
+    probability_state,
+)
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class _Frame:
-    span: AudioCaptureSpan
-    epoch: int
-    slots: tuple[int, ...]
-    compact_end: int
-    ready_at: float
-    closed: bool
-    clear: bool
-    uncertain: bool
-    competing: bool
 
 
 @dataclass(slots=True)
@@ -60,7 +53,10 @@ class _Slice:
     parent: _Parent
     identity: STTProviderTurnIdentity
     audio: STTSourceAudio
-    speaker: FinalSpeakerRun
+    unique_context: tuple
+    replayed_context: tuple
+    speaker: FinalSpeakerRun | None = None
+    evidence_valid: bool = True
     result: STTProviderTurnTerminal | None = None
 
 
@@ -68,10 +64,6 @@ class CausalBatchSession:
     allows_sealed_turn_overlap = True
     MAX_PENDING_SLICES = 8
     MAX_FRAMES = 2048
-    ACTIVE_PROBABILITY = 0.5
-    CLEAR_PROBABILITY = 0.8
-    QUIET_PROBABILITY = 0.2
-    COMPETING_PROBABILITY = 0.35
 
     def __init__(self, inner, *, clock=time.monotonic):
         self.inner = inner
@@ -81,6 +73,7 @@ class CausalBatchSession:
         self._active = None
         self._slices = {}
         self._frames = []
+        self._submitted_ranges = deque(maxlen=self.MAX_FRAMES)
         self._epoch = None
         self._immutable = 0
         self._closed = False
@@ -125,22 +118,56 @@ class CausalBatchSession:
                 if self._epoch is not None and item.speaker_epoch < self._epoch:
                     continue
                 if item.speaker_epoch != self._epoch:
+                    if self._epoch is not None:
+                        for child in self._slices.values():
+                            child.evidence_valid = False
                     self._frames.clear()
+                    self._submitted_ranges.clear()
                     self._immutable = 0
                     self._epoch = item.speaker_epoch
                 previous_immutable = self._immutable
-                if item.frame is None:
-                    self._immutable = max(self._immutable, item.immutable_through_sample)
+                self._immutable = max(self._immutable, item.immutable_through_sample)
+                if item.reason == "omitted_silence" and item.frame is None:
+                    for piece in item.source_map:
+                        if (
+                            piece.kind == "unobserved"
+                            and piece.capture is not None
+                            and piece.capture.normalized_start_sample is not None
+                            and piece.capture.normalized_end_sample is not None
+                        ):
+                            self._frames.append(
+                                SpeakerFrame(
+                                    piece.capture,
+                                    item.speaker_epoch,
+                                    piece.compact_end_sample,
+                                    item.observation_ready_monotonic_s,
+                                    True,
+                                    (),
+                                    False,
+                                    False,
+                                    False,
+                                )
+                            )
+                    continue
                 if item.reason not in (None, "vad_pause", "source_eof"):
                     self._frames.clear()
+                    self._submitted_ranges.clear()
+                    for child in self._slices.values():
+                        child.evidence_valid = False
                     continue
                 if item.frame is None:
                     continue
+                state = probability_state(item.frame.probabilities)
+                if state is None:
+                    continue
+                slots, clear, uncertain, competing = state
                 for piece in item.source_map:
                     span = piece.capture
                     if span is None or piece.kind != "original":
                         continue
                     start, end = span.normalized_start_sample, span.normalized_end_sample
+                    if start is None or end is None:
+                        continue
                     self._frames = [
                         frame
                         for frame in self._frames
@@ -160,55 +187,53 @@ class CausalBatchSession:
                         for frame in self._frames
                     ):
                         continue
-                    probabilities = item.frame.probabilities
-                    slots = tuple(
-                        index
-                        for index, value in enumerate(probabilities)
-                        if value >= self.ACTIVE_PROBABILITY
-                    )
-                    ranked = sorted(probabilities, reverse=True)
-                    competing = len(slots) < 2 and ranked[1] >= self.COMPETING_PROBABILITY
                     self._frames.append(
-                        _Frame(
+                        SpeakerFrame(
                             span,
                             item.speaker_epoch,
-                            slots,
                             piece.compact_end_sample,
                             item.observation_ready_monotonic_s,
                             item.range_state == "closed",
-                            len(slots) == 1
-                            and ranked[0] >= self.CLEAR_PROBABILITY
-                            and ranked[1] <= self.QUIET_PROBABILITY,
-                            (not slots and ranked[0] >= self.QUIET_PROBABILITY) or competing,
+                            slots,
+                            clear,
+                            uncertain,
                             competing,
                         )
                     )
             self._frames.sort(
                 key=lambda frame: (frame.span.capture_epoch, frame.span.normalized_start_sample)
             )
-            self._frames = self._frames[-self.MAX_FRAMES :]
+            self._prune_frames()
             if self._active is not None:
-                if self._active.payloads:
-                    ranges = [span for _, spans, _ in self._active.payloads for span in spans]
-                    if ranges:
-                        floor = (
-                            min(
-                                (
-                                    span.normalized_start_sample
-                                    for span in ranges
-                                    if span.normalized_start_sample is not None
-                                ),
-                                default=0,
-                            )
-                            - 8000
-                        )
-                        self._frames = [
-                            frame
-                            for frame in self._frames
-                            if frame.span.capture_epoch == ranges[0].capture_epoch
-                            and frame.span.normalized_end_sample > floor
-                        ]
                 await self._cut_available(self._active)
+
+    def _prune_frames(self):
+        needed = [
+            span
+            for child in self._slices.values()
+            for span in (*child.audio.source_ranges, *child.audio.context_ranges)
+        ]
+        if self._active is not None:
+            needed.extend(span for _, ranges, _ in self._active.payloads for span in ranges)
+        floors = {}
+        for span in needed:
+            if span.normalized_start_sample is not None:
+                floors[span.capture_epoch] = min(
+                    floors.get(span.capture_epoch, span.normalized_start_sample),
+                    span.normalized_start_sample,
+                )
+        newest = self._frames[-1].span if self._frames else None
+        if newest is not None:
+            floors[newest.capture_epoch] = min(
+                floors.get(newest.capture_epoch, newest.normalized_end_sample),
+                newest.normalized_end_sample - 8000,
+            )
+        self._frames = [
+            frame
+            for frame in self._frames
+            if frame.span.capture_epoch in floors
+            and frame.span.normalized_end_sample > floors[frame.span.capture_epoch]
+        ][-self.MAX_FRAMES :]
 
     async def _cut_available(self, parent):
         if parent.optional_cuts_disabled:
@@ -307,49 +332,9 @@ class CausalBatchSession:
         parent.payloads = remaining
         return selected
 
-    def _attribute(self, source, context):
-        slots, epochs = set(), set()
-        missing, overlap, uncertain = False, False, False
-        for span in (*source, *context):
-            cursor = span.normalized_start_sample
-            end = span.normalized_end_sample
-            if cursor is None or end is None:
-                missing = True
-                continue
-            for frame in self._frames:
-                if frame.span.capture_epoch != span.capture_epoch or (
-                    not frame.closed and frame.compact_end > self._immutable
-                ):
-                    continue
-                left = max(cursor, frame.span.normalized_start_sample)
-                right = min(end, frame.span.normalized_end_sample)
-                if left >= right:
-                    continue
-                if left != cursor:
-                    missing = True
-                slots.update(frame.slots)
-                epochs.add(frame.epoch)
-                overlap |= len(frame.slots) > 1
-                uncertain |= frame.uncertain
-                cursor = right
-            missing |= cursor != end
-        state = (
-            "mixed"
-            if overlap or len(slots) > 1 or len(epochs) > 1
-            else (
-                "unavailable"
-                if missing or not slots
-                else "uncertain"
-                if uncertain
-                else "identified"
-            )
-        )
-        return FinalSpeakerRun(
-            "",
-            str(next(iter(slots))) if state == "identified" else None,
-            str(next(iter(epochs))) if len(epochs) == 1 else "",
-            source="nemotron",
-            attribution_state=state,
+    def _attribute(self, source, context, replayed=()):
+        return attribute_speaker(
+            (*source, *context), self._frames, self._immutable, replayed=replayed
         )
 
     async def _submit(self, parent, boundary, reason, ready_at=None):
@@ -359,7 +344,7 @@ class CausalBatchSession:
         source = tuple(span for _, ranges, context in selected if not context for span in ranges)
         context = tuple(span for _, ranges, context in selected if context for span in ranges)
         child_id = replace(parent.request.identity, provider_turn_id=uuid4().hex)
-        speaker = self._attribute(source, context)
+        unique_context, replayed_context = partition_replay(context, self._submitted_ranges)
         native_backend = parent.request.native_options
         if not hasattr(native_backend, "provider_id"):
             native_backend = getattr(self.inner, "backend", None)
@@ -368,9 +353,8 @@ class CausalBatchSession:
             source,
             context,
             parent.request.display_group_id,
-            speaker.attribution,
         )
-        child = _Slice(parent, child_id, audio, speaker)
+        child = _Slice(parent, child_id, audio, unique_context, replayed_context)
         parent.children.append(child)
         self._slices[child_id] = child
         await self.inner.begin_turn(
@@ -398,11 +382,13 @@ class CausalBatchSession:
         )
         if source:
             parent.submitted_cursor = source[-1].normalized_end_sample
+        for span in (*context, *source):
+            if span.normalized_start_sample is not None and span.normalized_end_sample is not None:
+                self._submitted_ranges.append(span)
         logger.info(
             "[BatchSpeaker] request=%s slice=%s reason=%s source_boundary=%s "
             "evidence_ready=%s submitted_at=%s submitted_cursor=%s context_samples=%s "
-            "attribution=%s capture_epoch=%s "
-            "speaker_epoch=%s group=%s model=%s backend=%s",
+            "capture_epoch=%s group=%s model=%s backend=%s",
             parent.request.identity.provider_turn_id,
             child_id.provider_turn_id,
             reason,
@@ -411,9 +397,7 @@ class CausalBatchSession:
             self.clock(),
             parent.submitted_cursor,
             sum(span.normalized_sample_count for span in context),
-            child.speaker.attribution_state,
             parent.request.identity.segment.capture_epoch,
-            child.speaker.session_scope,
             parent.request.display_group_id,
             getattr(native_backend, "model_id", None),
             getattr(native_backend, "provider", "Vulkan"),
@@ -436,7 +420,26 @@ class CausalBatchSession:
                     async with self._lock:
                         child = self._slices.pop(event.identity, None)
                         if child is not None:
+                            child.speaker = (
+                                self._attribute(
+                                    child.audio.source_ranges,
+                                    child.unique_context,
+                                    child.replayed_context,
+                                )
+                                if child.evidence_valid
+                                and all(
+                                    span.capture_epoch == child.identity.segment.capture_epoch
+                                    for span in (*child.audio.source_ranges, *child.audio.context_ranges)
+                                )
+                                else FinalSpeakerRun(
+                                    "", None, "", source="nemotron", attribution_state="unavailable"
+                                )
+                            )
+                            child.audio = replace(
+                                child.audio, speaker_attribution=child.speaker.attribution
+                            )
                             child.result = event
+                            self._prune_frames()
                             await self._release()
         finally:
             self._events.close()
@@ -529,6 +532,7 @@ class CausalBatchSession:
             for child in parent.children:
                 self._slices.pop(child.identity, None)
             parent.children.clear()
+            self._prune_frames()
             if self._active is parent:
                 self._active = None
             await self._release()
@@ -551,4 +555,5 @@ class CausalBatchSession:
         self._parents.clear()
         self._slices.clear()
         self._frames.clear()
+        self._submitted_ranges.clear()
         self._events.close()

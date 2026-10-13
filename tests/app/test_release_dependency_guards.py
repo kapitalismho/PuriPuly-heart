@@ -152,6 +152,92 @@ def test_pyproject_build_extra_covers_python_soxr_no_build_isolation_backend() -
     assert "setuptools_scm[toml]>=6.2" in build_extra
 
 
+def test_production_export_keeps_matched_sherpa_native_pair(tmp_path: Path) -> None:
+    from packaging.requirements import Requirement
+
+    from puripuly_heart.release_evidence.native_distribution import filter_requirements
+
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    packages = {package["name"]: package for package in lock["package"]}
+    pair = ("sherpa-onnx", "sherpa-onnx-core")
+    assert packages[pair[0]]["version"] == packages[pair[1]]["version"]
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    declared = {
+        requirement.name: requirement
+        for value in pyproject["project"]["dependencies"]
+        if (requirement := Requirement(value)).name in pair
+    }
+    for name in pair:
+        assert declared[name].specifier.contains(packages[name]["version"])
+        assert any(
+            wheel["url"].endswith(
+                "-cp314-cp314-win_amd64.whl"
+                if name == "sherpa-onnx"
+                else "-py3-none-win_amd64.whl"
+            )
+            and wheel["hash"].startswith("sha256:")
+            for wheel in packages[name]["wheels"]
+        )
+    uv = shutil.which("uv")
+    if uv is None:
+        pytest.skip("uv is required to exercise the native production dependency export")
+    exported = tmp_path / "exported.txt"
+    subprocess.run(
+        [
+            uv,
+            "export",
+            "--locked",
+            "--no-dev",
+            "--no-emit-project",
+            "--format",
+            "requirements-txt",
+            "--output-file",
+            str(exported),
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    filtered = tmp_path / "native-requirements.txt"
+    filter_requirements(exported, filtered)
+    requirements = {
+        requirement.name: requirement
+        for line in filtered.read_text(encoding="utf-8").splitlines()
+        if line and not line[0].isspace() and not line.startswith(("#", "--"))
+        if (requirement := Requirement(line.split(" \\", 1)[0])).name in pair
+    }
+    assert set(requirements) == set(pair)
+    for name in pair:
+        assert str(requirements[name].specifier) == f"=={packages[name]['version']}"
+
+
+def test_packaged_sherpa_license_matches_locked_distribution(tmp_path: Path) -> None:
+    from puripuly_heart.release_evidence.release_identity import (
+        PACKAGED_LICENSE_PATHS,
+        verify_packaged_license_payloads,
+    )
+
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    version = next(
+        package["version"] for package in lock["package"] if package["name"] == "sherpa-onnx"
+    )
+    sherpa_license = f"sherpa_onnx-{version}.dist-info/licenses/LICENSE"
+    for relative in PACKAGED_LICENSE_PATHS:
+        if relative.startswith("sherpa_onnx-"):
+            continue
+        path = tmp_path / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("Required packaged license", encoding="utf-8")
+    path = tmp_path / sherpa_license
+    path.parent.mkdir(parents=True)
+    path.write_text("Apache License, Version 2.0", encoding="utf-8")
+    payloads = verify_packaged_license_payloads(tmp_path)
+    assert sherpa_license in {payload["path"] for payload in payloads}
+    path.write_text("", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="is empty"):
+        verify_packaged_license_payloads(tmp_path)
+
 def test_uv_lock_pins_soxr_version() -> None:
     uv_lock = (ROOT / "uv.lock").read_text(encoding="utf-8")
 
@@ -415,11 +501,14 @@ def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock
 
 
 def test_installer_script_embeds_local_stt_manifest_assets_for_inno_download() -> None:
+    from puripuly_heart.core.local_stt_assets import LOCAL_STT_MANIFEST_RELATIVE_PATHS
+
     script = (ROOT / "installer.iss").read_text(encoding="utf-8")
 
     assert "HuggingFaceLocalSttUrl" in script
     assert "ModelScopeLocalSttUrl" in script
-    for manifest_path in sorted((ROOT / "src/puripuly_heart/data/models").glob("*.manifest.json")):
+    for relative in sorted(LOCAL_STT_MANIFEST_RELATIVE_PATHS.values()):
+        manifest_path = ROOT / "src/puripuly_heart" / relative
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest["engine"] == "transcribe.cpp-vulkan":
             assert manifest["model_id"] not in script

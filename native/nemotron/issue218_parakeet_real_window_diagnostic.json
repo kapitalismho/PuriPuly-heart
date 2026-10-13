@@ -1,0 +1,13 @@
+{
+  "schema": "issue218-parakeet-bounded-real-window-1",
+  "diagnostic_only": true,
+  "capture_range": [
+    75808,
+    115225
+  ],
+  "pcm16_sha256": "6d7517d4a3f6f7e73139725cfcbc31ad95efd4a1f2417c2c147d30da1a962580",
+  "samples": 39417,
+  "product_text": "He washed the detritus from his hair.",
+  "scope": "One original real-A capture enclosure comparison after exact native repair; no appended samples, no product policy change, no re-decode fallback, no claim causal future data was available at old submission.",
+  "reference": "He washed the detritus from his hair."
+}
