@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureProviderStatus,
@@ -15,6 +16,10 @@ from puripuly_heart.core.self_capture import (
 
 class SelfCaptureRuntimeApplyError(RuntimeError):
     code = "self_stt_runtime_apply_not_converged"
+
+    def __init__(self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.failure_diagnostics = failure_diagnostics
+        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +134,8 @@ class SelfCaptureApplicationOwner:
             )
             if failure_reason is not None or required:
                 raise SelfCaptureRuntimeApplyError(
-                    "Self STT runtime did not apply the requested configuration"
+                    "Self STT runtime did not apply the requested configuration",
+                    failure_diagnostics=snapshot.failure_diagnostics,
                 )
 
     def _replacement_required(

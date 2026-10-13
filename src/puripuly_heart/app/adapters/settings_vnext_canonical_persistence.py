@@ -39,6 +39,7 @@ class SettingsVNextCanonicalPersistenceAdapter:
                 message,
                 diagnostics=result.error.diagnostics if result.error else None,
                 secondary_diagnostics=result.error.secondary_diagnostics if result.error else (),
+                secondary_omitted_count=result.error.secondary_omitted_count if result.error else 0,
             )
         if result.migrated:
             failure_types: set[str] = set()
@@ -71,6 +72,7 @@ class SettingsVNextCanonicalPersistenceAdapter:
                 message,
                 diagnostics=result.error.diagnostics if result.error else None,
                 secondary_diagnostics=result.error.secondary_diagnostics if result.error else (),
+                secondary_omitted_count=result.error.secondary_omitted_count if result.error else 0,
             )
 
     def bind_provider_verification(

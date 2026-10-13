@@ -74,6 +74,7 @@ class CanonicalSettingsPatchRepository:
     commit_sink: Callable[[], None] | None = None
     commit_succeeded: bool = False
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
 
     async def load(self) -> SettingsSnapshot:
         settings = self.owner.canonical or self.committed_settings
@@ -113,6 +114,7 @@ class CanonicalSettingsPatchRepository:
             await self.owner.persist_async()
             self.commit_succeeded = True
             self.secondary_diagnostics = self.owner.notification_diagnostics
+            self.secondary_omitted_count = 0
         except asyncio.CancelledError:
             self.owner.rollback()
             raise
@@ -128,6 +130,7 @@ class CanonicalSettingsPatchRepository:
                 diagnostics, fields={**diagnostics.fields, "surface": self.surface}
             )
             secondary: list[ErrorDiagnostics] = list(self.owner.persistence_secondary_diagnostics)
+            self.secondary_omitted_count = self.owner.persistence_secondary_omitted_count
             try:
                 self.owner.rollback()
             except Exception as rollback_exc:
@@ -217,6 +220,7 @@ class SettingsOwner:
     last_failure: ErrorDiagnostics | None = None
     notification_diagnostics: tuple[ErrorDiagnostics, ...] = ()
     persistence_secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    persistence_secondary_omitted_count: int = 0
 
     def require_canonical(self) -> AppSettingsVNext:
         if self.canonical is None:
@@ -303,6 +307,7 @@ class SettingsOwner:
         self.last_failure = None
         self.notification_diagnostics = ()
         self.persistence_secondary_diagnostics = ()
+        self.persistence_secondary_omitted_count = 0
         loop = self._commit_loop
         different_thread = (
             self.commit_listener is not None and threading.get_ident() != self._commit_thread
@@ -325,6 +330,9 @@ class SettingsOwner:
                 exc.secondary_diagnostics
                 if isinstance(exc, CanonicalSettingsPersistenceError)
                 else ()
+            )
+            self.persistence_secondary_omitted_count = (
+                exc.secondary_omitted_count if isinstance(exc, CanonicalSettingsPersistenceError) else 0
             )
             raise
         if different_thread:

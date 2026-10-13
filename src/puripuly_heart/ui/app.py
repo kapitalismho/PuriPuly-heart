@@ -1051,11 +1051,9 @@ class TranslatorApp:
                     next_task = self._settings_mutation_queue.pop(0)
                     operation_id = uuid4().hex
                     try:
-                        control = getattr(self.application, "control", None)
-                        instance_id = (
-                            getattr(control(), "instance_id", None) if callable(control) else None
-                        )
-                        with diagnostic_operation(instance_id, operation_id, operation_id):
+                        with diagnostic_operation(
+                            self.application.diagnostic_instance_id, operation_id, operation_id
+                        ):
                             result = await next_task()
                         if result is False:
                             self._show_snackbar(
@@ -1075,6 +1073,7 @@ class TranslatorApp:
                                 retry_after_ms=None,
                                 fields={"phase": "queued_mutation", **safe_exception_fields(exc)},
                                 operation_id=operation_id,
+                                request_id=operation_id,
                             ),
                             stage="queued_mutation",
                         )

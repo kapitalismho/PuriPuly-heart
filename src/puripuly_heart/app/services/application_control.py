@@ -353,18 +353,25 @@ def _known_secret(application: UiApplicationBoundary, name: str) -> str:
     return name
 
 
-def _json(value: object) -> object:
-    from dataclasses import asdict, is_dataclass
+def _json(value: object, *, diagnostic_projector: Callable[[ErrorDiagnostics], dict] | None = None) -> object:
+    from dataclasses import fields, is_dataclass
     from enum import Enum
 
+    if isinstance(value, ErrorDiagnostics):
+        if diagnostic_projector is not None:
+            return diagnostic_projector(value)
+        return normalize_diagnostic(value, instance_id=None, severity="error", disposition="unknown")
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
-        return _json(asdict(value))
-    if isinstance(value, dict):
-        return {str(k): _json(v) for k, v in value.items()}
+        return {
+            item.name: _json(getattr(value, item.name), diagnostic_projector=diagnostic_projector)
+            for item in fields(value)
+        }
+    if isinstance(value, Mapping):
+        return {str(k): _json(v, diagnostic_projector=diagnostic_projector) for k, v in value.items()}
     if isinstance(value, (tuple, list, set, frozenset)):
-        return [_json(v) for v in value]
+        return [_json(v, diagnostic_projector=diagnostic_projector) for v in value]
     if isinstance(value, (str, bool, int, float)) or value is None:
         return value
     return str(value)
@@ -558,6 +565,9 @@ class ApplicationControlOwner:
             ],
         }
 
+    def _snapshot_json(self, value: object) -> object:
+        return _json(value, diagnostic_projector=lambda diagnostic: self._retain_diagnostic(diagnostic, disposition="unknown"))
+
     def _channels(self) -> dict:
         canonical = self.application.compatibility_settings()
         runtime = getattr(self.pipeline, "local_asr_runtime", None)
@@ -592,8 +602,8 @@ class ApplicationControlOwner:
                 "pending_handoff": provider.pending_handoff if provider is not None else False,
                 "failure_reason": _json(state.failure_reason) if state is not None else None,
                 "provider_status": _json(state.provider_status) if state is not None else None,
-                "capture": _json(state) if state is not None else None,
-                "provider": _json(provider) if provider is not None else None,
+                "capture": self._snapshot_json(state) if state is not None else None,
+                "provider": self._snapshot_json(provider) if provider is not None else None,
             }
         return channels
 
@@ -1043,6 +1053,7 @@ class ApplicationControlOwner:
             data["startup_cleanup"] = {
                 "availability": "unavailable", "pending_startups": None,
                 "close_complete": None, "cleanup_failures": [],
+                "pending_temporary_directories": None, "temporary_cleanup_diagnostic_id": None,
             }
             return data
         pending = cleanup.get("pending_startups")
@@ -1060,11 +1071,17 @@ class ApplicationControlOwner:
                     rejected += 1
         else:
             rejected += 1
+        temporary, removed = sanitize_diagnostic_fields({
+            "pending_temporary_directories": cleanup.get("pending_temporary_directories"),
+            "temporary_cleanup_diagnostic_id": cleanup.get("temporary_cleanup_diagnostic_id"),
+        })
+        rejected += removed
         data["startup_cleanup"] = {
             "availability": "observed",
             "pending_startups": pending if type(pending) is int and 0 <= pending < 2**31 else None,
             "close_complete": complete if type(complete) is bool else None,
             "cleanup_failures": safe_failures,
+            **temporary,
             "detail_rejected": rejected,
             "truncated": isinstance(failures, (list, tuple)) and len(failures) > 4,
         }
@@ -1360,6 +1377,7 @@ class ApplicationControlOwner:
                 secondary.append(evidence)
             else:
                 receipt["secondary_truncated"] = True
+                receipt["secondary_omitted_count"] = receipt.get("secondary_omitted_count", 0) + 1
             self.events.publish({
                 "topic": "error", "operation_id": evidence["operation_id"],
                 "code": evidence["code"], "diagnostic_id": evidence["diagnostic_id"],
@@ -1380,7 +1398,8 @@ class ApplicationControlOwner:
             self._retain_diagnostic(diagnostic, disposition="degraded")
             for diagnostic in transaction.secondary_diagnostics[:4]
         ]
-        data["secondary_truncated"] = len(transaction.secondary_diagnostics) > 4
+        data["secondary_omitted_count"] = transaction.secondary_omitted_count + max(0, len(transaction.secondary_diagnostics) - 4)
+        data["secondary_truncated"] = data["secondary_omitted_count"] > 0
         return data
 
     async def _execute_owned(
@@ -2041,7 +2060,8 @@ class ApplicationControlOwner:
                         self._retain_diagnostic(item, disposition="degraded")
                         for item in connect.secondary_diagnostics[:4]
                     ],
-                    "secondary_truncated": len(connect.secondary_diagnostics) > 4,
+                    "secondary_omitted_count": connect.secondary_omitted_count + max(0, len(connect.secondary_diagnostics) - 4),
+                    "secondary_truncated": connect.secondary_omitted_count > 0 or len(connect.secondary_diagnostics) > 4,
                 }
                 self._notify_presentation(evidence, primary)
                 if connect.succeeded:
@@ -2174,7 +2194,8 @@ class ApplicationControlOwner:
                     self._retain_diagnostic(item, disposition="degraded")
                     for item in signed_out.secondary_diagnostics[:4]
                 ],
-                "secondary_truncated": len(signed_out.secondary_diagnostics) > 4,
+                "secondary_omitted_count": signed_out.secondary_omitted_count + max(0, len(signed_out.secondary_diagnostics) - 4),
+                "secondary_truncated": signed_out.secondary_omitted_count > 0 or len(signed_out.secondary_diagnostics) > 4,
             }
             self._notify_presentation(result, diagnostic)
             return result

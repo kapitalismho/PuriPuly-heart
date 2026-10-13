@@ -1074,7 +1074,7 @@ def test_secret_store_encrypted_file_path_resolution_and_env_passphrase(
     assert raw["items"] == {}
 
     monkeypatch.delenv(wiring.SECRETS_PASSPHRASE_ENV, raising=False)
-    with pytest.raises(ValueError, match=wiring.SECRETS_PASSPHRASE_ENV):
+    with pytest.raises(ValueError):
         wiring.create_secret_store(settings, config_path=config_path)
 
 

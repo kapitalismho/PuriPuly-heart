@@ -225,10 +225,12 @@ class SettingsMutationService:
                 secondary_diagnostics=getattr(
                     self.settings_repository, "secondary_diagnostics", ()
                 ),
+                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
             )
 
         snapshot = commit_result.snapshot
         secondary = list(getattr(self.settings_repository, "secondary_diagnostics", ()))
+        secondary_omitted_count = getattr(self.settings_repository, "secondary_omitted_count", 0)
         if self.snapshot_publisher is not None:
             try:
                 await self.snapshot_publisher.publish_settings_snapshot(
@@ -256,19 +258,22 @@ class SettingsMutationService:
                 message=None,
                 diagnostics=_phase_diagnostics("runtime_apply_interrupted", "runtime_apply", None),
             )
-            transaction_result = TransactionResult(
-                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
-                message=None,
-                diagnostics=runtime_result.diagnostics,
-                secondary_diagnostics=tuple(secondary[:4]),
-            )
             if self.runtime_result_publisher is not None:
                 try:
                     await self.runtime_result_publisher.publish_runtime_apply_result(
                         runtime_result, correlation_id=request.correlation_id
                     )
-                except Exception:
-                    pass
+                except Exception as exc:
+                    secondary.append(_phase_diagnostics(
+                        "runtime_result_notification_failed", "runtime_notification", exc
+                    ))
+            transaction_result = TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
+                message=None,
+                diagnostics=runtime_result.diagnostics,
+                secondary_diagnostics=tuple(secondary),
+                secondary_omitted_count=secondary_omitted_count,
+            )
             raise SettingsMutationInterrupted(transaction_result)
         except Exception as exc:
             runtime_result = RuntimeApplyResult(
@@ -299,7 +304,10 @@ class SettingsMutationService:
                     )
                 )
 
-        return replace(transaction_result, secondary_diagnostics=tuple(secondary[:4]))
+        return replace(
+            transaction_result, secondary_diagnostics=tuple(secondary),
+            secondary_omitted_count=secondary_omitted_count + runtime_result.secondary_omitted_count,
+        )
 
 
 def _transaction_result_for_commit_and_runtime(

@@ -874,8 +874,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ControlTransportError, ValueError, OSError, json.JSONDecodeError) as exc:
         code = exc.code if isinstance(exc, ControlTransportError) else "invalid_input"
         message = (
-            "Local input or control resource could not be accessed"
-            if isinstance(exc, OSError) else str(exc)
+            str(exc) if isinstance(exc, ControlTransportError)
+            else "Local input or control resource could not be accessed" if isinstance(exc, OSError)
+            else "Invalid local input or arguments"
         )
         print(
             json.dumps(

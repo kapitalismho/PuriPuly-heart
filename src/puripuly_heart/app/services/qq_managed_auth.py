@@ -347,6 +347,7 @@ class QqManagedAuthService:
                     ack_status=ack_result.status,
                     diagnostics=ack_result.diagnostics,
                     secondary_diagnostics=ack_result.secondary_diagnostics,
+                    secondary_omitted_count=ack_result.secondary_omitted_count,
                 )
             await self._clear_qq_operation()
             return TransactionResult(
@@ -399,6 +400,7 @@ class QqManagedAuthService:
                     for cause in getattr(exc, "secondary_diagnostics", ())
                     if isinstance(cause, ErrorDiagnostics)
                 ),
+                upstream_omitted_count=getattr(exc, "secondary_omitted_count", 0),
             )
         await self._write_status_auth_secret_best_effort(request)
         await self._clear_qq_operation()
@@ -450,6 +452,7 @@ class QqManagedAuthService:
                 ack_status=result.status,
                 diagnostics=result.diagnostics,
                 secondary_diagnostics=result.secondary_diagnostics,
+                secondary_omitted_count=result.secondary_omitted_count,
             )
         if result.status == "none":
             return None
@@ -907,7 +910,7 @@ class QqManagedAuthService:
             return replace(
                 result,
                 diagnostics=diagnostic or result.diagnostics,
-                secondary_diagnostics=(*result.secondary_diagnostics, *secondary)[:4],
+                secondary_diagnostics=(*result.secondary_diagnostics, *secondary),
             )
         if diagnostic is not None:
             emit_failure(
@@ -1062,6 +1065,7 @@ class QqManagedAuthService:
                     for cause in getattr(exc, "secondary_diagnostics", ())
                     if isinstance(cause, ErrorDiagnostics)
                 ),
+                upstream_omitted_count=getattr(exc, "secondary_omitted_count", 0),
             )
         await self._write_status_auth_secret_best_effort(request)
         ack_result = await self._delivery_ack_service().retry_pending()
@@ -1071,6 +1075,7 @@ class QqManagedAuthService:
                 ack_status=ack_result.status,
                 diagnostics=ack_result.diagnostics,
                 secondary_diagnostics=ack_result.secondary_diagnostics,
+                secondary_omitted_count=ack_result.secondary_omitted_count,
             )
         await self._clear_qq_operation()
         return TransactionResult(
@@ -1248,6 +1253,7 @@ class QqManagedAuthService:
         state_snapshot: ManagedIdentitySnapshot,
         primary: ErrorDiagnostics,
         upstream_secondaries: tuple[ErrorDiagnostics, ...] = (),
+        upstream_omitted_count: int = 0,
     ) -> TransactionResult:
         state_rollback_succeeded, state_causes = self._restore_state_snapshot(state_snapshot)
         secret_rollback_succeeded, secret_cause = await self._restore_secret_snapshot(
@@ -1284,7 +1290,8 @@ class QqManagedAuthService:
                     *state_causes,
                     *((secret_cause,) if secret_cause is not None else ()),
                 )
-            )[:4],
+            ),
+            secondary_omitted_count=upstream_omitted_count,
         )
 
     def _restore_state_snapshot(
@@ -1387,6 +1394,7 @@ def _local_failure_result(
     phase: str,
     diagnostics: ErrorDiagnostics | None = None,
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+    secondary_omitted_count: int = 0,
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
@@ -1410,7 +1418,8 @@ def _local_failure_result(
                 "settings_commit_succeeded": False,
             },
         ),
-        secondary_diagnostics=secondary_diagnostics[:4],
+        secondary_diagnostics=secondary_diagnostics,
+        secondary_omitted_count=secondary_omitted_count,
     )
 
 
@@ -1641,7 +1650,7 @@ def _with_network_context(
             result,
             message=assertion.message,
             diagnostics=assertion.diagnostics,
-            secondary_diagnostics=secondary[:4],
+            secondary_diagnostics=secondary,
         )
     return result
 
@@ -1685,6 +1694,7 @@ def _remote_active_local_missing_result(
     retry_after_ms: int | None,
     diagnostics: ErrorDiagnostics | None = None,
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+    secondary_omitted_count: int = 0,
 ) -> TransactionResult:
     fields: dict[str, DiagnosticFieldValue] = {
         "phase": phase,
@@ -1709,7 +1719,8 @@ def _remote_active_local_missing_result(
             retry_after_ms=retry_after_ms,
             fields=fields,
         ),
-        secondary_diagnostics=secondary_diagnostics[:4],
+        secondary_diagnostics=secondary_diagnostics,
+        secondary_omitted_count=secondary_omitted_count,
     )
 
 
@@ -1718,6 +1729,7 @@ def _delivery_ack_pending_result(
     ack_status: str,
     diagnostics: ErrorDiagnostics | None,
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+    secondary_omitted_count: int = 0,
 ) -> TransactionResult:
     managed_secret_missing = ack_status == "managed_secret_missing"
     return TransactionResult(
@@ -1747,7 +1759,8 @@ def _delivery_ack_pending_result(
                 "ack_status": ack_status,
             },
         ),
-        secondary_diagnostics=secondary_diagnostics[:4],
+        secondary_diagnostics=secondary_diagnostics,
+        secondary_omitted_count=secondary_omitted_count,
     )
 
 
@@ -1774,7 +1787,9 @@ def _diagnostics(
 ) -> ErrorDiagnostics:
     if cause is not None:
         safe = sanitize_diagnostics(cause)
-        return replace(safe, fields={**fields, **safe.fields})
+        return replace(
+            safe, visibility=DIAGNOSTIC_VISIBILITY_BASIC, fields={**fields, **safe.fields}
+        )
     return ErrorDiagnostics(
         component="qq_managed_auth",
         operation=operation,

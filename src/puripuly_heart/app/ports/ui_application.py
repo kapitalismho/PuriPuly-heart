@@ -68,6 +68,9 @@ class UiApplicationFactoryPort(Protocol):
 
 
 class UiApplicationPort(Protocol):
+    @property
+    def diagnostic_instance_id(self) -> str | None: ...
+
     def control(self) -> ApplicationControl: ...
     def bind_presentation_close(self, callback: Callable[[], Awaitable[None]]) -> None: ...
 

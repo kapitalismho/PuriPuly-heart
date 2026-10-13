@@ -78,6 +78,8 @@ class ProviderRuntimeBuildRequest:
     provider_signature: tuple[object, ...] | None = None
     runtime_signature: tuple[object, ...] | None = None
     recognition_projection: Literal["auto", "legacy", "scoped"] = "auto"
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.config.channel not in {"self", "peer"}:
@@ -234,6 +236,8 @@ class ProviderGpuRuntimePort(Protocol):
         model_path: Path,
         model_id: str,
         device_id: str,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> GpuWorkerActivation: ...
 
     async def retry(self) -> GpuWorkerActivation: ...
@@ -312,7 +316,10 @@ class LocalASRProviderRuntimePort(Protocol):
 
     async def start_channel(self, channel: ProviderRuntimeChannel) -> None: ...
 
-    async def warmup_channel(self, channel: ProviderRuntimeChannel) -> None: ...
+    async def warmup_channel(
+        self, channel: ProviderRuntimeChannel, *, operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> None: ...
 
     async def handle_vad_event(
         self,

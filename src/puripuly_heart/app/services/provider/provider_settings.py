@@ -516,7 +516,7 @@ class ProviderApplicationOwner:
                                 if result.diagnostics
                                 else None,
                             ),
-                        )[:4],
+                        ),
                     )
                 )
             self.remember_order22(self.settings.canonical)
@@ -727,7 +727,7 @@ class ProviderApplicationOwner:
                         else None,
                     ),
                     *((restoration_failure,) if restoration_failure is not None else ()),
-                )[:4],
+                ),
             )
         self._set_result(failure_result)
 

@@ -155,7 +155,7 @@ class ChatGptAccountOwner:
                     replace(cause, cause_id=primary.diagnostic_id)
                     for cause in self._cleanup_diagnostics
                 ),
-            )[:4]
+            )
             emit_failure(logger, primary, stage=self._phase)
             for cause in secondary:
                 emit_failure(logger, cause, severity="warning", disposition="degraded")
@@ -164,6 +164,7 @@ class ChatGptAccountOwner:
                 failure_code=code,
                 diagnostics=primary,
                 secondary_diagnostics=secondary,
+                secondary_omitted_count=exc.secondary_omitted_count if isinstance(exc, ChatGptAuthError) else 0,
             )
 
     async def sign_out(self) -> ChatGptSignOutResult:
@@ -173,6 +174,7 @@ class ChatGptAccountOwner:
             local_credentials_removed=result.local_credentials_removed,
             diagnostics=result.diagnostics,
             secondary_diagnostics=result.secondary_diagnostics,
+            secondary_omitted_count=result.secondary_omitted_count,
         )
 
     def cancel(self) -> None:

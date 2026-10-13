@@ -135,6 +135,7 @@ class SelfCaptureSessionSnapshot:
     has_loop_task: bool
     cleanup_debt: int
     closed: bool
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class SelfCaptureIngressError(RuntimeError):
@@ -176,7 +177,9 @@ class SelfCaptureProviderPort(Protocol):
 
     async def start_ingress(self) -> None: ...
 
-    async def warmup(self) -> None: ...
+    async def warmup(
+        self, *, operation_id: str | None = None, request_id: str | None = None,
+    ) -> None: ...
 
     async def release(
         self,

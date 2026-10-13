@@ -32,8 +32,13 @@ class SettingsPersistenceError:
     message: str
     diagnostics: ErrorDiagnostics | None = None
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
 
     def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
         if self.diagnostics is None:
             object.__setattr__(
                 self,
@@ -451,7 +456,8 @@ def _combined_restore_error(
     )
     return replace(
         primary,
-        secondary_diagnostics=(*primary.secondary_diagnostics, *secondary)[:4],
+        secondary_diagnostics=(*primary.secondary_diagnostics, *secondary),
+        secondary_omitted_count=primary.secondary_omitted_count + restored.secondary_omitted_count,
     )
 
 

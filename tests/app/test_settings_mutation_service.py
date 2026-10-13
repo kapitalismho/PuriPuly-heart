@@ -901,3 +901,41 @@ def test_settings_mutation_service_module_avoids_concrete_ui_provider_and_i18n_i
         for forbidden in FORBIDDEN_SERVICE_IMPORT_PREFIXES
         if imported == forbidden or imported.startswith(f"{forbidden}.")
     }
+
+@pytest.mark.asyncio
+async def test_combined_secondary_causes_preserve_order_and_known_omission_count():
+    repository_causes = tuple(_diagnostics("settings_save_failed", operation="save") for _ in range(3))
+    runtime_causes = tuple(_diagnostics("runtime_apply_exception", operation="runtime_apply") for _ in range(2))
+
+    class Repository:
+        secondary_diagnostics = repository_causes
+        secondary_omitted_count = 0
+
+        async def save(self, request):
+            return settings_repository.SettingsCommitResult(
+                True, settings_repository.SettingsSnapshot({}, "settings-r2"), None, None
+            )
+
+    runtime = RecordingRuntimeApply(messages.RuntimeApplyResult(
+        messages.RUNTIME_APPLY_STATUS_FAILED, None,
+        _diagnostics("runtime_apply_exception", operation="runtime_apply"),
+        secondary_diagnostics=runtime_causes,
+    ))
+    module = _service_module()
+    result = await _service(
+        repository=Repository(), runtime=runtime,
+        snapshot_publisher=RaisingSettingsSnapshotPublisher(),
+        runtime_result_publisher=RaisingRuntimeResultPublisher(),
+    ).mutate(module.SettingsMutationRequest({}, "settings-r1", "user_patch", "corr-omission"))
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED
+    assert len(result.secondary_diagnostics) == 4
+    assert result.secondary_diagnostics[:3] == repository_causes
+    assert result.secondary_diagnostics[3].code == "settings_snapshot_notification_failed"
+    assert result.secondary_omitted_count == 3
+
+
+def test_runtime_result_bounds_secondary_causes_without_silent_loss():
+    causes = tuple(_diagnostics("runtime_apply_exception", operation="runtime_apply") for _ in range(6))
+    result = messages.RuntimeApplyResult(messages.RUNTIME_APPLY_STATUS_FAILED, None, None, causes)
+    assert result.secondary_diagnostics == causes[:4]
+    assert result.secondary_omitted_count == 2

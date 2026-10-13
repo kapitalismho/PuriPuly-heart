@@ -156,6 +156,9 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 )
             ),
         )
+        if isinstance(backend, LocalGpuSTTBackend):
+            backend.operation_id = request.operation_id
+            backend.request_id = request.request_id
         if request.recognition_projection != "scoped":
             raise ValueError("production recognition requires the scoped projection")
         if request.provider_signature is None or request.runtime_signature is None:

@@ -59,12 +59,14 @@ class ChatGptAuthError(RuntimeError):
         status_code: int | None = None,
         diagnostics: ErrorDiagnostics | None = None,
         secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+        secondary_omitted_count: int = 0,
     ) -> None:
         super().__init__(f"ChatGPT authorization failed ({code})")
         self.code = code
         self.status_code = status_code
         self.diagnostics = diagnostics
-        self.secondary_diagnostics = secondary_diagnostics
+        self.secondary_diagnostics = secondary_diagnostics[:4]
+        self.secondary_omitted_count = secondary_omitted_count + max(0, len(secondary_diagnostics) - 4)
 
 
 class ChatGptReauthRequired(ChatGptAuthError):

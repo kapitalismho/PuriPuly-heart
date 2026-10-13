@@ -39,7 +39,9 @@ async def test_luna_defaults_to_chatgpt_and_reports_required_sign_in(tmp_path, m
         control = app.control()
         control.bind_instance("chatgpt-status")
         before = (await control.query("auth.status", {}))["chatgpt"]
-        assert before == {"signed_in": False, "in_progress": False, "sign_in_required": False}
+        assert before["signed_in"] is False
+        assert before["in_progress"] is False
+        assert before["sign_in_required"] is False
 
         submitted = await control.submit(
             "settings.apply",
@@ -55,7 +57,9 @@ async def test_luna_defaults_to_chatgpt_and_reports_required_sign_in(tmp_path, m
         ]
         assert translation["connection"] == "chatgpt"
         after = (await control.query("auth.status", {}))["chatgpt"]
-        assert after == {"signed_in": False, "in_progress": False, "sign_in_required": True}
+        assert after["signed_in"] is False
+        assert after["in_progress"] is False
+        assert after["sign_in_required"] is True
         assert "email" not in after
     finally:
         await app.stop()
@@ -75,7 +79,7 @@ async def test_cli_chatgpt_login_and_logout_report_outcomes(tmp_path, monkeypatc
         return ChatGptConnectResult(succeeded=True, first_sign_in=True, email="u@example.com")
 
     async def sign_out_chatgpt():
-        return ChatGptSignOutResult(remote_revoked=False)
+        return ChatGptSignOutResult(remote_revoked=False, local_credentials_removed=True)
 
     monkeypatch.setattr(app, "connect_chatgpt", connect_chatgpt)
     monkeypatch.setattr(app, "sign_out_chatgpt", sign_out_chatgpt)

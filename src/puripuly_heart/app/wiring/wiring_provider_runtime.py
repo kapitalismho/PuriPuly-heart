@@ -216,6 +216,7 @@ class ProviderRuntimeEffects:
         llm_runtime = self.llm_runtime_provider()
         local_asr_runtime = self.local_asr_runtime_provider()
         self_owner = self.self_capture_provider()
+        peer_owner = self.peer().runtime
         return ProviderRuntimeState(
             runtime_available=llm_runtime is not None and local_asr_runtime is not None,
             llm_available=llm_runtime is not None and llm_runtime.provider is not None,
@@ -229,6 +230,8 @@ class ProviderRuntimeEffects:
             ),
             self_stt_desired=bool(self_owner is not None and self_owner.snapshot.desired_active),
             peer_stt_desired=self.peer_desired(settings),
+            self_failure_diagnostics=self_owner.snapshot.failure_diagnostics if self_owner is not None else None,
+            peer_failure_diagnostics=peer_owner.snapshot.failure_diagnostics if peer_owner is not None else None,
         )
 
     def self_runtime_convergence(self, settings: object) -> bool | None:

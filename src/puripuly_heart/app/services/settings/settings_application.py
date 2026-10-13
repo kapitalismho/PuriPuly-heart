@@ -1008,7 +1008,7 @@ class SettingsApplicationOwner:
                                 code="settings_commit_notification_failed",
                                 exception=exc,
                             ),
-                        )[:4],
+                        ),
                     )
                 )
 
@@ -1044,7 +1044,8 @@ class SettingsApplicationOwner:
                     secondary_diagnostics=(
                         *self.settings.persistence_secondary_diagnostics,
                         *self.settings.notification_diagnostics,
-                    )[:4],
+                    ),
+                    secondary_omitted_count=self.settings.persistence_secondary_omitted_count,
                 )
             )
             return False
@@ -1412,7 +1413,7 @@ class SettingsApplicationOwner:
                                 if result.diagnostics
                                 else None,
                             ),
-                        )[:4],
+                        ),
                     )
                 )
             self.projection.remember_order22(self.settings.canonical)
@@ -1702,7 +1703,7 @@ class SettingsApplicationOwner:
                         else None,
                     ),
                     *((restoration_failure,) if restoration_failure is not None else ()),
-                )[:4],
+                ),
             )
         self._set_result(failure_result)
 

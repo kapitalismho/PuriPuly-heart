@@ -34,7 +34,12 @@ from puripuly_heart.core.runtime.oscquery import (
 from .control_application import SettingsBackedOscControlApplication
 from .control_router import OscControlRouter
 from .noop_query import NoopOscQueryService
-from .state_publisher import OscCanonicalState, OscStatePublicationError, OscStatePublisher
+from .state_publisher import (
+    OscCanonicalState,
+    OscPublishedValue,
+    OscStatePublicationError,
+    OscStatePublisher,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +93,7 @@ class OscControlIntegrationOwner:
         self._scope = LifecycleScope("OscControlIntegrationOwner")
         self._query_failure: str | None = None
         self._publication_failure: ErrorDiagnostics | None = None
+        self._publication_pending: set[str] | None = None
         self._resync_operation_identity: dict[str, str | None] = {}
         self._apply_settings_callback = apply_settings
 
@@ -526,7 +532,7 @@ class OscControlIntegrationOwner:
             self._record_publication_failure("startup_state", exc, origin=self._resync_operation_identity)
             return
         self._mark_resync_ready(generation)
-        self._record_publication_success("startup_state", len(published))
+        self._record_publication_success("startup_state", published)
 
     def _publish_delta(self) -> None:
         if self._mode == "off":
@@ -539,7 +545,7 @@ class OscControlIntegrationOwner:
         except Exception as exc:
             self._record_publication_failure("delta_state", exc)
         else:
-            self._record_publication_success("delta_state", len(published))
+            self._record_publication_success("delta_state", published)
 
     def publish_delta(self) -> None:
         self._publish_delta()
@@ -555,7 +561,7 @@ class OscControlIntegrationOwner:
         except Exception as exc:
             self._record_publication_failure("full_state", exc)
             return
-        self._record_publication_success("full_state", len(published))
+        self._record_publication_success("full_state", published)
 
     async def _publish_snapshot(
         self,
@@ -581,7 +587,7 @@ class OscControlIntegrationOwner:
             self._record_publication_failure("snapshot_state", exc, origin=self._resync_operation_identity if generation is not None else None)
             return
         self._mark_resync_ready(generation)
-        self._record_publication_success("snapshot_state", len(published))
+        self._record_publication_success("snapshot_state", published)
 
     def _record_publication_failure(
         self, stage: str, exception: Exception, *, origin: dict[str, str | None] | None = None
@@ -599,14 +605,36 @@ class OscControlIntegrationOwner:
             generation=self._resync_generation,
             **(current_diagnostic_operation() if origin is None else origin),
         )
-        self._publication_failure = diagnostics
+        if self._publication_failure is None:
+            self._publication_failure = diagnostics
+            self._publication_pending = (
+                set(exception.pending_parameters)
+                if isinstance(exception, OscStatePublicationError) else None
+            )
+        elif self._publication_pending is not None:
+            if isinstance(exception, OscStatePublicationError):
+                self._publication_pending.difference_update(exception.completed_parameters)
+                self._publication_pending.update(exception.pending_parameters)
+            else:
+                self._publication_pending = None
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=stage)
 
-    def _record_publication_success(self, stage: str, completed: int) -> None:
+    def _record_publication_success(
+        self, stage: str, published: tuple[OscPublishedValue, ...],
+    ) -> None:
         failure = self._publication_failure
-        self._publication_failure = None
-        if failure is None:
+        if failure is None or not published:
             return
+        if self._publication_pending is None:
+            if stage == "delta_state":
+                return
+        else:
+            self._publication_pending.difference_update(item.parameter for item in published)
+            if self._publication_pending:
+                return
+        self._publication_failure = None
+        self._publication_pending = None
+        completed = len(published)
         diagnostics = ErrorDiagnostics(
             component="osc_control", operation="publish_state", code="osc_state_send_recovered",
             category="network", visibility="basic", content_policy="metadata_only",

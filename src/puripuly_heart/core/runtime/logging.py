@@ -280,6 +280,7 @@ class RuntimeLoggingService:
                         component="runtime_logging", operation="emit",
                         code="diagnostic_builder_failed", category="lifecycle",
                         visibility="diagnostic_only", content_policy="metadata_only",
+                        status_code=None, retry_after_ms=None, fields={},
                     ), stage="diagnostic", exception=exc,
                 )
                 return False

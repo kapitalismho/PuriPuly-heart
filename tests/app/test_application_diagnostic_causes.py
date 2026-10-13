@@ -278,7 +278,7 @@ async def test_gui_queue_contains_failed_task_and_runs_next_without_acknowledgin
     workers = []
     notifications = []
     acknowledgements = []
-    app._ui_application = SimpleNamespace(control=lambda: SimpleNamespace(instance_id=uuid4().hex))
+    app._ui_application = SimpleNamespace(diagnostic_instance_id=uuid4().hex)
     app._run_page_task = workers.append
     app._show_snackbar = lambda message, color: notifications.append(message)
 

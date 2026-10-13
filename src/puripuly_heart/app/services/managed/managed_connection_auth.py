@@ -404,7 +404,8 @@ class ManagedConnectionAuthService:
                             if restoration_cause is not None
                             else ()
                         ),
-                    )[:4],
+                    ),
+                    secondary_omitted_count=clear_commit.secondary_omitted_count,
                 )
             commit_result = clear_commit
 
@@ -1586,6 +1587,7 @@ def _delivery_ack_pending_result(
     exception: BaseException | None = None,
     message: UserMessageRef | None,
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+    secondary_omitted_count: int = 0,
 ) -> TransactionResult:
     fields: dict[str, DiagnosticFieldValue] = {
         "phase": "remote_delivery_ack",
@@ -1616,7 +1618,8 @@ def _delivery_ack_pending_result(
             fields=fields,
             exception=exception,
         ),
-        secondary_diagnostics=secondary_diagnostics[:4],
+        secondary_diagnostics=secondary_diagnostics,
+        secondary_omitted_count=secondary_omitted_count,
     )
 
 

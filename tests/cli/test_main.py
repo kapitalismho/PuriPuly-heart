@@ -216,3 +216,16 @@ async def test_remote_gui_stop_closes_presentation_after_ordered_runtime_shutdow
     gui._close_task = None
     await gui._stop_on_request()
     assert events == ["stop-requested", "runtime-closed", "presentation-closed"]
+
+
+def test_calibration_numeric_error_does_not_export_supplied_input(tmp_path, capsys, monkeypatch):
+    sentinel = "PRIVATE_CALIBRATION_SENTINEL"
+    monkeypatch.setattr(cli, "_instance", lambda _: pytest.fail("invalid numeric input must fail before discovery"))
+    result = cli.main([
+        "--config", str(tmp_path / "settings.json"),
+        "overlay", "calibrate", "change", "--field", "offset_x", "--value", sentinel,
+    ])
+    output = capsys.readouterr()
+    assert result == 3
+    assert json.loads(output.err)["error"]["code"] == "invalid_input"
+    assert sentinel not in output.out + output.err

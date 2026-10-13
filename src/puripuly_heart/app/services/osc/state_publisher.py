@@ -55,11 +55,15 @@ class OscStatePublicationError(RuntimeError):
         requested: int,
         completed: int,
         parameter: str,
+        completed_parameters: tuple[str, ...],
+        pending_parameters: tuple[str, ...],
     ) -> None:
         super().__init__("OSC state local send failed")
         self.requested = requested
         self.completed = completed
         self.parameter = parameter
+        self.completed_parameters = completed_parameters
+        self.pending_parameters = pending_parameters
 
 
 
@@ -154,6 +158,8 @@ class OscStatePublisher:
                     requested=len(items),
                     completed=completed,
                     parameter=item.parameter,
+                    completed_parameters=tuple(value.parameter for value in items[:completed]),
+                    pending_parameters=tuple(value.parameter for value in items[completed:]),
                 ) from exc
 
 

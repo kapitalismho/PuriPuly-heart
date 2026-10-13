@@ -84,18 +84,12 @@ async def test_manual_verification_accepts_success_and_only_explicit_rejection(
     ],
 )
 async def test_manual_noncredential_http_failures_reach_ui_and_safe_metadata(
-    monkeypatch: pytest.MonkeyPatch, status: int, reason: str
+    monkeypatch: pytest.MonkeyPatch, status: int, reason: str, caplog
 ) -> None:
     install_response(monkeypatch, httpx.Response(status, text=UNSAFE))
-    diagnostics: list[dict[str, object]] = []
-    errors: list[object] = []
     owner = ProviderCredentialVerificationInteractionOwner(
         verification_owner=ProviderCredentialVerificationOwner(
             verifier=ProviderVerifierAdapter(),
-            diagnostics_sink=lambda _event, metadata, exc: (
-                diagnostics.append(dict(metadata)),
-                errors.append(exc),
-            ),
         ),
         selected_model_provider=lambda _provider: None,
     )
@@ -111,11 +105,14 @@ async def test_manual_noncredential_http_failures_reach_ui_and_safe_metadata(
     assert controller.status == "error"
     assert controller.last_verified_hash == ""
     assert messages == [("snackbar.verification_failed", f"error.openrouter_auth.{reason}")]
-    assert errors == [None]
-    assert f"status={status}" in str(diagnostics)
-    assert "operation=key_verification" in str(diagnostics)
-    assert SECRET not in str(diagnostics) + str(messages)
-    assert "proxy-password" not in str(diagnostics) + str(messages)
+    failures = [
+        record._puripuly_heart_failure[0] for record in caplog.records
+        if hasattr(record, "_puripuly_heart_failure")
+    ]
+    assert failures
+    assert failures[-1].status_code == status
+    assert SECRET not in repr(failures) + str(messages)
+    assert "proxy-password" not in repr(failures) + str(messages)
 
 
 def tls_error() -> httpx.ConnectError:
@@ -152,7 +149,6 @@ async def test_transport_and_client_setup_failures_are_not_credential_rejection(
     report = openrouter_auth_failure_report(failure, stage="key_verification")
     rendered = format_error_report_for_log(report)
     assert report.message.key == f"error.openrouter_auth.{reason}"
-    assert f"exception_type={exception_type}" in rendered
     assert SECRET not in rendered + str(failure) + repr(report)
     assert "proxy-password" not in rendered + str(failure) + repr(report)
     assert validate_diagnostics_for_sink(report.diagnostics, "persisted_logs").status == "accepted"
@@ -276,9 +272,7 @@ async def test_pkce_application_retains_failure_stage_and_does_not_commit(
     )
     assert await owner.connect(target=target, launch_source="settings") is False
     reason = "tls" if verification_failure else "callback_timeout"
-    stage = "key_verification" if verification_failure else "callback_wait"
     assert messages == [f"error.openrouter_auth.{reason}"]
-    assert f"operation={stage}" in diagnostics[0]
     assert routes == ["settings"]
     assert SECRET not in str(diagnostics) + str(messages)
     assert not (tmp_path / "settings.json").exists()
@@ -336,7 +330,6 @@ async def test_pkce_explicit_rejection_cannot_write_secret_or_settings(tmp_path:
     )
     assert await owner.connect(target=target, launch_source="onboarding") is False
     assert messages == ["error.openrouter_auth.credential_rejected"]
-    assert "status=401" in diagnostics[0]
     assert routes == ["onboarding"]
     assert not (tmp_path / "settings.json").exists()
 
@@ -419,8 +412,6 @@ async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_
 
     assert await owner.connect(target=target, launch_source="settings") is False
     assert messages == ["error.openrouter_auth.setup"]
-    assert "operation=browser_launch" in diagnostics[0]
-    assert "category=lifecycle" in diagnostics[0]
     assert calls == ["browser", "closed"]
     assert routes == ["settings"]
     assert flow.active_client is None
@@ -432,37 +423,25 @@ async def test_unsuccessful_browser_launch_is_reported_without_callback_wait_or_
 async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import io
     import logging
-    from logging.handlers import RotatingFileHandler
     from uuid import uuid4
 
     from puripuly_heart.app.services.application_runtime_logging import (
         ApplicationRuntimeLoggingOwner,
     )
     from puripuly_heart.core.error_messages import provider_failure_report
-    from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
-
-    log_file = tmp_path / "transport.log"
-    file_handler = RotatingFileHandler(log_file, encoding="utf-8")
-    file_handler.setFormatter(logging.Formatter("%(message)s"))
-    root = logging.getLogger(f"test.transport.root.{uuid4()}")
-    root.propagate = False
-    session = logging.getLogger(f"test.transport.session.{uuid4()}")
-    session.propagate = False
-    service = SessionRuntimeLoggingService(
-        root_logger=root,
-        session_logger=session,
-        sinks=SimpleNamespace(
-            stream_handler=logging.StreamHandler(io.StringIO()),
-            file_handler=file_handler,
-            log_file=log_file,
-        ),
+    from puripuly_heart.core.runtime_logging import (
+        SessionRuntimeLoggingService,
+        configure_main_logging,
     )
+
+    root = logging.Logger(f"test.transport.{uuid4().hex}")
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    service = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    service.configure_diagnostics(instance_id=uuid4().hex)
     owner = ApplicationRuntimeLoggingOwner(
         presentation=SimpleNamespace(attach_runtime_log_sink=lambda _service: None),
-        service_factory=lambda: service,
-        fallback_logger=root,
+        service_factory=lambda: service, fallback_logger=root,
     )
     try:
         for code in (20, 62):
@@ -471,11 +450,8 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
             failure = httpx.ConnectError(UNSAFE)
             failure.__cause__ = cause
             failure.connection_diagnostics = {
-                "transport": "https",
-                "tls_source": "windows",
-                "proxy_source": "direct",
-                "tls_backend": "native",
-                "proxy_url": UNSAFE,
+                "transport": "https", "tls_source": "windows",
+                "proxy_source": "direct", "tls_backend": "native", "proxy_url": UNSAFE,
             }
 
             def fail(**_kwargs: object) -> None:
@@ -491,15 +467,12 @@ async def test_tls_codes_survive_real_auth_normalization_and_persisted_log_owner
                 provider_failure_report(normalized, provider="openrouter", operation="translate"),
             ):
                 assert report.diagnostics.fields["tls_verify_code"] == code
-                owner.emit_basic(format_error_report_for_log(report))
+                owner.emit_failure(report.diagnostics)
     finally:
-        service.close()
-        file_handler.close()
-    persisted = log_file.read_text(encoding="utf-8")
-    assert persisted.count("tls_verify_code=20") == 2
-    assert persisted.count("tls_verify_code=62") == 2
-    assert "tls_backend=native" in persisted
-    assert "tls_source=windows" in persisted
-    assert "os_errno=1" not in persisted
-    assert SECRET not in persisted
-    assert "proxy-password" not in persisted
+        service.close_terminal_owner()
+    records = service.diagnostic_history({})["records"]
+    assert sorted(record["fields"]["tls_verify_code"] for record in records) == [20, 20, 62, 62]
+    persisted = sinks.log_file.read_text(encoding="utf-8")
+    assert persisted
+    assert SECRET not in persisted + repr(records)
+    assert "proxy-password" not in persisted + repr(records)

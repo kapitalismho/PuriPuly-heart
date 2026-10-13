@@ -43,6 +43,13 @@ class ManagedKeyDeliveryAckServiceResult:
     diagnostics: ErrorDiagnostics | None = None
     ack_result: ManagedKeyDeliveryAckResult | None = None
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+    def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
 
 
 class ManagedKeyDeliveryAckTokenStoreError(Exception):

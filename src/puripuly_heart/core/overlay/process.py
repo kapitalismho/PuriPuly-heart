@@ -16,6 +16,7 @@ from typing import Any
 from uuid import uuid4
 
 from puripuly_heart import __version__
+from puripuly_heart.core.diagnostic_validation import validate_desktop_renderer_event
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.messages import ErrorDiagnostics
 
@@ -1338,53 +1339,22 @@ class OverlayProcessManager:
             if self.diagnostics is not None:
                 self.diagnostics.note_input_rejected("desktop_diagnostic_stale_instance")
             return
-        if event.get("runtime_generation") != 1:
+        if type(event.get("runtime_generation")) is not int or event.get("runtime_generation") != 1:
             if self.diagnostics is not None:
                 self.diagnostics.note_input_rejected("desktop_diagnostic_stale_generation")
             return
         record = event.get("record")
-        if not isinstance(record, dict) or not self._is_valid_desktop_renderer_diagnostic(record):
+        validated = validate_desktop_renderer_event(record) if isinstance(record, dict) else None
+        if validated is None:
             if self.diagnostics is not None:
                 self.diagnostics.note_input_rejected("desktop_diagnostic_invalid")
             return
         if self.diagnostics is not None:
             self.diagnostics.record_process(
                 "desktop_renderer",
-                **record,
+                **validated,
             )
 
-    @classmethod
-    def _is_valid_desktop_renderer_diagnostic(cls, record: dict[object, object]) -> bool:
-        expected = {
-            "schema_version",
-            "record_type",
-            "event_type",
-            "renderer_revision",
-            "actual_disposition",
-            "render_commit_acknowledged",
-            "slot_count",
-            "line_count",
-            "surface_visible",
-            "interaction_mode",
-            "window_width",
-            "window_height",
-        }
-        if set(record) != expected:
-            return False
-        return (
-            record.get("schema_version") == 1
-            and record.get("record_type") == "renderer_event"
-            and isinstance(record.get("event_type"), str)
-            and cls._is_non_negative_int(record.get("renderer_revision"))
-            and isinstance(record.get("actual_disposition"), str)
-            and isinstance(record.get("render_commit_acknowledged"), bool)
-            and cls._is_non_negative_int(record.get("slot_count"))
-            and cls._is_non_negative_int(record.get("line_count"))
-            and isinstance(record.get("surface_visible"), bool)
-            and record.get("interaction_mode") in {"locked", "edit"}
-            and cls._is_finite_non_bool_number(record.get("window_width"))
-            and cls._is_finite_non_bool_number(record.get("window_height"))
-        )
 
     def _maybe_mark_desktop_cleanup_complete(self) -> None:
         if self._desktop_cleanup_complete or not self._shutdown_acknowledged:

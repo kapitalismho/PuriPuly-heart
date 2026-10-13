@@ -23,6 +23,7 @@ from puripuly_heart.core.audio.ownership import (
 )
 from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
 from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
@@ -596,6 +597,8 @@ class SelfCaptureSessionOwner:
             has_loop_task=self._loop_task is not None,
             cleanup_debt=len(self._retired_sources),
             closed=self._closed,
+            failure_diagnostics=self._primary_failure[1]
+            if self._failure_reason is not None and self._primary_failure is not None else None,
         )
 
     @property
@@ -812,6 +815,7 @@ class SelfCaptureSessionOwner:
             self._generation += 1
             generation = self._generation
             self._generation_operation = (generation, current_diagnostic_operation())
+            self._primary_failure = None
             self._desired_active = enabled
             if (
                 enabled
@@ -854,6 +858,17 @@ class SelfCaptureSessionOwner:
                     self._transition_task = None
         return self.snapshot
 
+    def _provider_build_request(
+        self, config: SelfCaptureSessionConfig, warmup: bool, generation: int,
+    ) -> object:
+        request = self._provider_request_factory(config, warmup)
+        operation = self._generation_operation
+        if isinstance(request, ProviderRuntimeBuildRequest):
+            return replace(
+                request, **(operation[1] if operation is not None and operation[0] == generation else {})
+            )
+        return request
+
     async def prepare_provider(
         self,
         config: SelfCaptureSessionConfig,
@@ -865,6 +880,8 @@ class SelfCaptureSessionOwner:
                 raise RuntimeError("SelfCaptureSessionOwner is closed")
             self._generation += 1
             generation = self._generation
+            self._generation_operation = (generation, current_diagnostic_operation())
+            self._primary_failure = None
             self._config = config
             self._state = SelfCaptureSessionState.STARTING
             self._provider_status = SelfCaptureProviderStatus.PENDING
@@ -883,7 +900,7 @@ class SelfCaptureSessionOwner:
                 attachment_token = object()
                 try:
                     result = await self._provider.replace(
-                        self._provider_request_factory(config, False),
+                        self._provider_build_request(config, False, generation),
                         start=False,
                         on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                             exc,
@@ -1185,7 +1202,7 @@ class SelfCaptureSessionOwner:
             self._notify_state_changed()
             try:
                 result = await self._provider.replace(
-                    self._provider_request_factory(config, config.local_cpu or config.local_gpu),
+                    self._provider_build_request(config, config.local_cpu or config.local_gpu, generation),
                     start=False,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
@@ -1297,7 +1314,10 @@ class SelfCaptureSessionOwner:
         self._notify_state_changed()
         if config.warmup:
             try:
-                await self._provider.warmup()
+                operation = self._generation_operation
+                await self._provider.warmup(
+                    **(operation[1] if operation is not None and operation[0] == generation else {})
+                )
             except Exception as exc:
                 self._emit(
                     SelfCaptureDiagnosticEvent.FAILURE,
@@ -1321,7 +1341,7 @@ class SelfCaptureSessionOwner:
         self._notify_state_changed()
         try:
             result = await self._provider.handoff(
-                self._provider_request_factory(config, True),
+                self._provider_build_request(config, True, generation),
                 start=True,
                 on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                     exc,
@@ -1885,7 +1905,7 @@ class SelfCaptureSessionOwner:
             if reason is SelfCaptureFailureReason.CLEANUP_FAILED and primary is not None:
                 if primary[0] == generation and primary[1].diagnostic_id != native.diagnostic_id:
                     native = replace(native, cause_id=primary[1].diagnostic_id)
-            elif disposition == "failed":
+            elif disposition in {"failed", "degraded"}:
                 self._primary_failure = (generation, native)
             failure_diagnostics = native
             emit_failure(

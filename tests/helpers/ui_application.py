@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 from puripuly_heart.app.services.settings_application import (
@@ -12,6 +14,7 @@ from puripuly_heart.app.services.settings_application import (
     settings_view_surface_snapshots,
 )
 
+from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
 )
@@ -505,7 +508,7 @@ def compose_test_ui_application_boundary(
         UiApplicationStateRuntimeStub(backend),
     )
     runtime = UiApplicationRuntimeStub(backend)
-    return UiApplicationBoundary(
+    boundary = UiApplicationBoundary(
         startup=cast(ApplicationStartupOwner, runtime),
         input_runtime=cast(UiInputRuntimePort, runtime),
         peer_capture=cast(UiPeerCaptureRuntimePort, runtime),
@@ -524,3 +527,11 @@ def compose_test_ui_application_boundary(
         ),
         osc_state_publisher=osc_state_publisher,
     )
+    boundary.attach_control(cast(
+        ApplicationControl, SimpleNamespace(
+            instance_id="00000000-0000-0000-0000-000000000231",
+            _resource_lock=asyncio.Lock(), _lock=asyncio.Lock(),
+            lock_owned_by_current_task=lambda: False,
+        )
+    ))
+    return boundary

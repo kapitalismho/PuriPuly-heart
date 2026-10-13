@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -330,3 +331,149 @@ async def test_startup_cause_survives_failed_cleanup_and_factory_retries_cleanup
         await asyncio.wait_for(factory.close_pending_startups(), timeout=2.0)
     await factory.close_pending_startups()
     assert factory.startup_cleanup_snapshot()["close_complete"] is True
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows file-sharing cleanup contract")
+@pytest.mark.skipif(os.getenv("INTEGRATION") != "1", reason="requires real owned child")
+async def test_real_worker_activation_failure_retains_locked_audio_directory_until_close(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    import ctypes
+    from ctypes import wintypes
+    from uuid import uuid4
+
+    import psutil
+
+    import puripuly_heart.core.runtime.gpu_asr as gpu_asr_module
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+    from puripuly_heart.core.runtime.gpu_asr import (
+        GpuASRManualRetryRequired,
+        GpuASRRuntimeState,
+        SharedGpuASRRuntime,
+    )
+
+    for name in tuple(os.environ):
+        if any(part in name.upper() for part in ("API_KEY", "AUTH_TOKEN", "ACCESS_TOKEN", "CREDENTIAL")):
+            monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("FAKE_GPU_WORKER_ACTIVATION_FAILURE", "1")
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    create_file = kernel32.CreateFileW
+    create_file.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.LPVOID,
+        wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE,
+    ]
+    create_file.restype = wintypes.HANDLE
+    close_handle = kernel32.CloseHandle
+    close_handle.argtypes = [wintypes.HANDLE]
+    close_handle.restype = wintypes.BOOL
+    original_directory = gpu_asr_module.tempfile.TemporaryDirectory
+    locks: list[object] = []
+    owned_paths: list[Path] = []
+
+    def create_owned_directory(*args: object, **kwargs: object) -> object:
+        directory = original_directory(*args, **kwargs)
+        if kwargs.get("prefix") == "puripuly-gpu-asr-audio-":
+            path = Path(directory.name) / "owned-cleanup-lock"
+            path.write_bytes(b"")
+            handle = create_file(str(path), 0x80000000, 0x1 | 0x2, None, 3, 0x80, None)
+            if handle in (None, ctypes.c_void_p(-1).value):
+                raise ctypes.WinError(ctypes.get_last_error())
+            locks.append(handle)
+            owned_paths.append(Path(directory.name))
+        return directory
+
+    monkeypatch.setattr(gpu_asr_module.tempfile, "TemporaryDirectory", create_owned_directory)
+    original_start = DefaultGpuWorkerProcessFactory.start
+    children: list[tuple[object, float]] = []
+
+    async def track_start(
+        factory: DefaultGpuWorkerProcessFactory, *, mode: str,
+        operation_id: str | None = None, request_id: str | None = None,
+    ) -> object:
+        child = await original_start(
+            factory, mode=mode, operation_id=operation_id, request_id=request_id,
+        )
+        children.append((child, psutil.Process(child.pid).create_time()))
+        return child
+
+    monkeypatch.setattr(DefaultGpuWorkerProcessFactory, "start", track_start)
+    factory = _factory()
+    runtime = SharedGpuASRRuntime(process_factory=factory)
+    operation_id, request_id = uuid4().hex, uuid4().hex
+    try:
+        with pytest.raises(GpuASRManualRetryRequired) as caught:
+            await asyncio.wait_for(runtime.activate_channel(
+                "self", owner=object(), model_path=Path("synthetic-unused-model.gguf"),
+                model_id="qwen-gpu", device_id="vulkan:0",
+                operation_id=operation_id, request_id=request_id,
+            ), timeout=5)
+        assert caught.value.code == "out_of_memory"
+        assert isinstance(caught.value.__cause__, GpuWorkerRequestError)
+        primary = caught.value.failure_diagnostics
+        assert primary is not None
+        assert primary.operation_id == operation_id and primary.request_id == request_id
+        assert primary.fields["native_classification"] == "out_of_memory"
+        assert runtime.state == GpuASRRuntimeState.FAILED
+        assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 1
+        assert owned_paths[0].exists()
+        secondary = next(
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].diagnostic_id
+            == runtime.startup_cleanup_snapshot["temporary_cleanup_diagnostic_id"]
+        )
+        assert secondary.cause_id == primary.diagnostic_id
+        assert secondary.fields["exception_class"] == "PermissionError"
+        assert secondary.fields["errno"] == 13
+        assert str(owned_paths[0]) not in caplog.text
+        assert len(children) == 1 and children[0][0].is_closed
+        child, create_time = children[0]
+        try:
+            assert psutil.Process(child.pid).create_time() != create_time
+        except psutil.NoSuchProcess:
+            pass
+        for handle in locks:
+            assert close_handle(handle)
+        locks.clear()
+        await asyncio.wait_for(runtime.close(), timeout=5)
+        assert runtime.state == GpuASRRuntimeState.CLOSED
+        assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 0
+        assert not owned_paths[0].exists()
+    finally:
+        for handle in locks:
+            close_handle(handle)
+        await asyncio.wait_for(runtime.close(), timeout=5)
+
+
+async def test_first_real_startup_failure_is_retained_with_explicit_admission_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from uuid import uuid4
+
+    from puripuly_heart.core.runtime.gpu_asr import GpuASRManualRetryRequired, SharedGpuASRRuntime
+    from tests.core.test_diagnostic_delivery import finish, logging_service
+
+    monkeypatch.setenv("FAKE_GPU_WORKER_EXIT_BEFORE_AUTH", "1")
+    root, sinks, service, _basic = logging_service(tmp_path)
+    monkeypatch.setattr(gpu_worker_process_module, "logger", root)
+    operation_id, request_id = uuid4().hex, uuid4().hex
+    runtime = SharedGpuASRRuntime(process_factory=_factory())
+    try:
+        with pytest.raises(GpuASRManualRetryRequired) as caught:
+            await asyncio.wait_for(runtime.activate_channel(
+                "self", owner=object(), model_path=tmp_path / "unused-model.gguf",
+                model_id="qwen-gpu", device_id="vulkan:0",
+                operation_id=operation_id, request_id=request_id,
+            ), timeout=5)
+        primary = caught.value.failure_diagnostics
+        assert primary is not None
+        retained = service.diagnostic_history({"operation_id": operation_id})["records"]
+        assert len(retained) == 1
+        assert retained[0]["diagnostic_id"] == primary.diagnostic_id
+        assert retained[0]["request_id"] == request_id
+        assert retained[0]["code"] == primary.code
+        assert retained[0]["fields"]["exit_code"] == 23
+        assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 0
+    finally:
+        await runtime.close()
+        finish(root, sinks, service)

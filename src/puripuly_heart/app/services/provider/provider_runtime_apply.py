@@ -49,6 +49,8 @@ class ProviderRuntimeState:
     peer_stt_available: bool
     self_stt_desired: bool
     peer_stt_desired: bool
+    self_failure_diagnostics: ErrorDiagnostics | None = None
+    peer_failure_diagnostics: ErrorDiagnostics | None = None
 
 
 ProviderRuntimeStateProvider = Callable[[object], ProviderRuntimeState]
@@ -87,6 +89,10 @@ def _unknown_peer_runtime_convergence(_settings: object) -> bool | None:
 
 class ProviderRuntimeConvergenceError(RuntimeError):
     code = "stt_runtime_apply_not_converged"
+
+    def __init__(self, message: str, *, failure_diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.failure_diagnostics = failure_diagnostics
+        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,10 +229,12 @@ class ProviderRuntimeOwner:
         if self.self_runtime_convergence(settings) is False:
             raise ProviderRuntimeConvergenceError(
                 "Self STT runtime did not converge to requested settings",
+                failure_diagnostics=self.state_provider(settings).self_failure_diagnostics,
             )
         if self.peer_runtime_convergence(settings) is False:
             raise ProviderRuntimeConvergenceError(
                 "Peer STT runtime did not converge to requested settings",
+                failure_diagnostics=self.state_provider(settings).peer_failure_diagnostics,
             )
 
     def unavailable_result(
@@ -278,7 +286,9 @@ def _settings_mutation_diagnostics(
     for _ in range(4):
         if current is None:
             break
-        diagnostics = getattr(current, "diagnostics", None)
+        diagnostics = getattr(current, "failure_diagnostics", None)
+        if not isinstance(diagnostics, ErrorDiagnostics):
+            diagnostics = getattr(current, "diagnostics", None)
         if isinstance(diagnostics, ErrorDiagnostics):
             return replace(diagnostics, fields={**diagnostics.fields, "surface": surface})
         current = current.__cause__
@@ -357,6 +367,8 @@ def _runtime_apply_result_as_degraded_transaction(
         status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
         message=runtime_result.message,
         diagnostics=runtime_result.diagnostics,
+        secondary_diagnostics=runtime_result.secondary_diagnostics,
+        secondary_omitted_count=runtime_result.secondary_omitted_count,
     )
 
 

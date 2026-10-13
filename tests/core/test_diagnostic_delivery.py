@@ -164,3 +164,24 @@ async def test_threaded_producer_and_failed_subscriber_keep_independent_history(
         assert service.diagnostic_health()["history"]["subscriber_delivery_failures"] == 1
     finally:
         finish(root, sinks, service)
+
+
+def test_throwing_lazy_builder_retains_original_safe_cause_once(tmp_path):
+    from puripuly_heart.core.runtime.logging import RuntimeLoggingService
+    root, sinks, session, _ = logging_service(tmp_path)
+    owner = RuntimeLoggingService(session_service=session)
+    calls = 0
+    def builder():
+        nonlocal calls
+        calls += 1
+        raise PermissionError(13, "PRIVATE_BUILDER_EXCEPTION_MARKER")
+    try:
+        assert owner.emit_diagnostic_lazy(builder) is False
+        assert calls == 1
+        record = session.diagnostic_history({})["records"][0]
+        assert record["code"] == "diagnostic_builder_failed"
+        assert record["fields"]["exception_class"] == "PermissionError"
+        assert record["fields"]["errno"] == 13
+        assert "PRIVATE_BUILDER" not in json.dumps(record)
+    finally:
+        finish(root, sinks, session)

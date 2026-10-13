@@ -486,17 +486,10 @@ async def test_path_validator_rejects_out_of_scope_paths_without_secret_values(
 
     assert result.succeeded is False
     assert result.message is None
-    assert result.diagnostics == messages.ErrorDiagnostics(
-        component="settings_mutation",
-        operation=operation,
-        code="settings_path_not_covered",
-        category=messages.DIAGNOSTIC_CATEGORY_TRANSACTION,
-        visibility=messages.DIAGNOSTIC_VISIBILITY_BASIC,
-        content_policy=messages.CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
-        fields={"path": first_bad_path},
-    )
+    assert result.diagnostics.code == "settings_path_not_covered"
+    assert result.diagnostics.category == messages.DIAGNOSTIC_CATEGORY_TRANSACTION
+    assert result.diagnostics.fields["path"] == first_bad_path
+    assert len(result.diagnostics.diagnostic_id) == 32
     for hidden in hidden_values:
         assert hidden not in repr(result)
 

@@ -38,6 +38,7 @@ from puripuly_heart.core.audio.smart_turn import (
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
 from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
@@ -756,6 +757,15 @@ class PeerCaptureSessionOwner:
     def state(self) -> PeerChannelRuntimeState:
         return self._state
 
+    def _provider_build_request(self, config: PeerCaptureSessionConfig, warmup: bool) -> object:
+        request = self._provider_request_factory(config, warmup)
+        operation = self._generation_operation
+        if isinstance(request, ProviderRuntimeBuildRequest):
+            return replace(
+                request, **(operation[1] if operation is not None and operation[0] == self._generation else {})
+            )
+        return request
+
     @property
     def snapshot(self) -> PeerCaptureSessionSnapshot:
         return PeerCaptureSessionSnapshot(
@@ -1163,7 +1173,7 @@ class PeerCaptureSessionOwner:
                 self._pending_provider_failures[attachment_token] = None
                 try:
                     result = await self._provider.replace(
-                        self._provider_request_factory(config, config.local_provider),
+                        self._provider_build_request(config, config.local_provider),
                         start=False,
                         on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
                             exc,
@@ -1416,7 +1426,7 @@ class PeerCaptureSessionOwner:
         ) -> PreparedLocalASRTransition:
             return PreparedLocalASRTransition(
                 request=prepared_request,
-                provider=self._provider_request_factory(config, True),
+                provider=self._provider_build_request(config, True),
                 generation=transition_generation,
             )
 
@@ -1589,7 +1599,7 @@ class PeerCaptureSessionOwner:
                 self._pending_provider_failures[attachment_token] = None
                 self._provider_status = PeerCaptureProviderStatus.PENDING
                 self._notify_state_changed()
-                request = self._provider_request_factory(
+                request = self._provider_build_request(
                     config,
                     config.local_provider,
                 )

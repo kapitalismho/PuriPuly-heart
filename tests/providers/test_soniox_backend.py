@@ -1343,11 +1343,15 @@ async def test_soniox_probe_local_server_authenticates_and_closes(response, capl
                 with pytest.raises(asyncio.CancelledError):
                     await probe
             elif response:
-                with pytest.raises(Exception, match="^Connection failed$") as failure:
+                with pytest.raises(Exception) as failure:
                     await SonioxRealtimeSTTBackend.verify_api_key(
                         marker, endpoint=f"ws://{host}:{port}"
                     )
                 assert marker not in "".join(traceback.format_exception(failure.value))
+                assert failure.value.failure_diagnostics is not None
+                assert failure.value.failure_diagnostics.status_code == (
+                    401 if response.get("error_code") == 401 else None
+                )
             else:
                 assert await SonioxRealtimeSTTBackend.verify_api_key(
                     marker, endpoint=f"ws://{host}:{port}"

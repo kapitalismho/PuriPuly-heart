@@ -12,6 +12,7 @@ DOMAIN_CODES = frozenset({
     "presentation_sync_failed", "provider_receive_failed", "output_cleanup_failed",
     "output_observer_failed", "oscquery_unavailable", "osc_state_send_failed",
     "worker_cleanup_failed", "startup_cleanup_failed", "worker_startup_failed",
+    "worker_activation_failed",
     "worker_startup_cancelled", "worker_executable_missing", "native_diagnostic_loss",
     "native_terminal_evidence_incomplete", "child_detail_rejected",
     "overlay_reader_cleanup_failed", "osc_local_send_failed", "shutdown_cleanup_failed",

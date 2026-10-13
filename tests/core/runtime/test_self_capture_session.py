@@ -119,7 +119,7 @@ class RecordingProvider:
         if self.start_failure is not None:
             raise self.start_failure
 
-    async def warmup(self) -> None:
+    async def warmup(self, *, operation_id=None, request_id=None) -> None:
         self.warmup_calls += 1
 
     async def reconfigure(self, session_options: object) -> None:

@@ -757,7 +757,9 @@ class TestContextLogging:
             clock=FakeClock(),
         )
 
-        utterance_id = await harness.self_owner.submit_text("hello")
+        admission = await harness.self_owner.submit_text("hello")
+        assert admission.status == "admitted"
+        utterance_id = admission.turn_id
         bundle = harness.bundle_for(utterance_id)
         assert bundle.translation is None
 
@@ -918,7 +920,9 @@ class TestContextLogging:
             osc=FakeOscQueue(),
             clock=FakeClock(initial_time=1.0),
         )
-        utterance_id = await harness.self_owner.submit_text("hello")
+        admission = await harness.self_owner.submit_text("hello")
+        assert admission.status == "admitted"
+        utterance_id = admission.turn_id
         await asyncio.gather(
             *harness.self_runtime.translation_tasks.values(), return_exceptions=True
         )

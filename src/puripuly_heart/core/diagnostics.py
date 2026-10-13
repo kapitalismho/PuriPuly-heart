@@ -43,10 +43,11 @@ _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"status_polls"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"logging_delivery_dropped", "logging_delivery_failures", "delivery_failures", "oversized_rejected", "failed_records", "listener_failures", "abandoned_records"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"logging_oversized_rejected"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"dropped"})
+_NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"pending_temporary_directories"})
 _BOOLEAN_FIELDS = frozenset({"settings_commit_succeeded", "secret_write_succeeded", "secret_restore_succeeded", "previous_secret_existed", "remote_revoked", "local_credentials_removed", "fallback_persisted", "observation_succeeded", "process_present", "notification_delivered", "cleanup_confirmed", "cleanup_complete", "timed_out", "abandoned", "close_complete", "recovery_pending", "warmup_usable", "rollback_succeeded", "managed_secret_present", "token_present"})
 _BOOLEAN_FIELDS = _BOOLEAN_FIELDS | frozenset({"remote_active", "broker_issue_succeeded", "settings_values_accepted", "diagnostics_present"})
 _BOOLEAN_FIELDS = _BOOLEAN_FIELDS | frozenset({"drain_complete"})
-_ID_FIELDS = frozenset({"publication_id", "overlay_instance_id", "provider_epoch_id", "provider_turn_id", "parent_utterance_id", "capture_epoch", "worker_session_id", "attempt_id"})
+_ID_FIELDS = frozenset({"publication_id", "overlay_instance_id", "provider_epoch_id", "provider_turn_id", "parent_utterance_id", "capture_epoch", "worker_session_id", "attempt_id", "temporary_cleanup_diagnostic_id"})
 _ENUM_FIELDS = {
     **TRANSPORT_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
@@ -187,6 +188,7 @@ _BOUNDARIES = frozenset({
     "managed_usage_refresh", "managed_authentication",
     "admission", "child_creation", "rejection", "parent_execution",
     "output_submit", "turn_generation", "retirement",
+    "activation",
 }) | frozenset(LIFECYCLE_SHUTDOWN_PHASE_ORDER) | QQ_STAGES
 _NATIVE_REASONS = frozenset({
     "manifest_invalid", "contract_mismatch", "bridge_auth_failed", "steamvr_not_installed",
@@ -200,6 +202,8 @@ _NATIVE_REASONS = frozenset({
     "runtime_control_invalid", "runtime_crashed", "startup_cancelled",
     "shutdown_terminal_unavailable", "shutdown_forced", "shutdown_not_acknowledged",
     "runtime_exit_nonzero", "listener_bind_failed",
+    "window_reveal_lost", "window_observation_failed", "window_visibility_unstable",
+    "window_bounds_failed", "window_native_ready_failed", "window_identity_failed",
 })
 _ENUM_FIELDS.update({
     "stage": _BOUNDARIES, "phase": _BOUNDARIES,
@@ -365,6 +369,25 @@ def normalize_diagnostic(diagnostics: ErrorDiagnostics, *, instance_id: str | No
     rejected += int(stage is not None and boundary is None)
     code_allowed = is_supported_diagnostic_code(diagnostics.code, _NATIVE_REASONS)
     rejected += int(diagnostics.code is not None and not code_allowed)
+    identities = {
+        key: _identity(getattr(diagnostics, key))
+        for key in ("cause_id", "operation_id", "request_id", "turn_id")
+    }
+    rejected += sum(
+        getattr(diagnostics, key) is not None and value is None
+        for key, value in identities.items()
+    )
+    channel = diagnostics.channel if type(diagnostics.channel) is str and diagnostics.channel in {"self", "peer"} else None
+    generation = diagnostics.generation if type(diagnostics.generation) is int and 0 <= diagnostics.generation < 2**31 else None
+    status_code = diagnostics.status_code if type(diagnostics.status_code) is int and 100 <= diagnostics.status_code <= 599 else None
+    retry_after_ms = diagnostics.retry_after_ms if type(diagnostics.retry_after_ms) is int and 0 <= diagnostics.retry_after_ms < 2**31 else None
+    rejected += sum(
+        raw is not None and safe is None
+        for raw, safe in (
+            (diagnostics.channel, channel), (diagnostics.generation, generation),
+            (diagnostics.status_code, status_code), (diagnostics.retry_after_ms, retry_after_ms),
+        )
+    )
     record = {
         "schema_version": DIAGNOSTIC_SCHEMA_VERSION,
         "diagnostic_id": diagnostic_id,
@@ -377,14 +400,14 @@ def normalize_diagnostic(diagnostics: ErrorDiagnostics, *, instance_id: str | No
         "disposition": disposition if type(disposition) is str and disposition in DISPOSITIONS else "unknown",
         "code": diagnostics.code if code_allowed else "unclassified_failure",
         "category": diagnostics.category if type(diagnostics.category) is str and diagnostics.category in DIAGNOSTIC_CATEGORIES else "unknown",
-        "cause_id": _identity(diagnostics.cause_id),
-        "operation_id": _identity(diagnostics.operation_id) or (inherit[1] if inherit else None),
-        "request_id": _identity(diagnostics.request_id) or (_identity(inherit[2]) if inherit else None),
-        "channel": diagnostics.channel if type(diagnostics.channel) is str and diagnostics.channel in {"self", "peer"} else fields.get("channel"),
-        "turn_id": _identity(diagnostics.turn_id),
-        "generation": diagnostics.generation if type(diagnostics.generation) is int and 0 <= diagnostics.generation < 2**31 else fields.get("activation_generation", fields.get("runtime_generation")),
-        "status_code": diagnostics.status_code if type(diagnostics.status_code) is int and 100 <= diagnostics.status_code <= 599 else None,
-        "retry_after_ms": diagnostics.retry_after_ms if type(diagnostics.retry_after_ms) is int and 0 <= diagnostics.retry_after_ms < 2**31 else None,
+        "cause_id": identities["cause_id"],
+        "operation_id": identities["operation_id"] or (inherit[1] if inherit and diagnostics.operation_id is None else None),
+        "request_id": identities["request_id"] or (_identity(inherit[2]) if inherit and diagnostics.request_id is None else None),
+        "channel": channel if channel is not None else fields.get("channel"),
+        "turn_id": identities["turn_id"],
+        "generation": generation if generation is not None else fields.get("activation_generation", fields.get("runtime_generation")),
+        "status_code": status_code,
+        "retry_after_ms": retry_after_ms,
         "fields": fields,
         "file_evidence": file_evidence if file_evidence in {"unknown", "unavailable"} else "unknown",
         "detail": {"state": "truncated" if diagnostics.detail_truncated else "rejected" if rejected else "available" if any(value is not None for value in fields.values()) or diagnostics.status_code is not None else "unavailable", "rejected_fields": rejected, "truncated": bool(diagnostics.detail_truncated)},

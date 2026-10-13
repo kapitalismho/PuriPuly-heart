@@ -65,19 +65,6 @@ def compose_github_star_prompt_owner(
     runtime_diagnostics_sink: GithubStarPromptRuntimeDiagnosticsSink,
     mutation_service_provider: GithubStarPromptSettingsMutationServiceProvider,
 ) -> GithubStarPromptOwner:
-    def report_settings_save_failure(_message: str) -> None:
-        try:
-            runtime_diagnostics_sink(
-                "github_star_prompt_settings_persistence_failed",
-                {
-                    "component": "settings_repository",
-                    "operation": "save",
-                    "code": "settings_save_failed",
-                    "surface": "ui_prompt_clipboard_state",
-                },
-            )
-        except Exception:
-            return
 
     async def persist_state(base: object, committed: object) -> bool:
         patch_values = build_ui_prompt_clipboard_state_settings_path_patch(base, committed)
@@ -87,7 +74,6 @@ def compose_github_star_prompt_owner(
             base_settings=base,
             committed_settings=committed,
             surface="ui_prompt_clipboard_state",
-            save_failure_sink=report_settings_save_failure,
         )
         command = UiPromptClipboardStateSettingsMutation(values=patch_values)
         service = mutation_service_provider() or SettingsMutationService(

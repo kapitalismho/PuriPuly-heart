@@ -10,7 +10,6 @@ import pytest
 
 from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
-from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
@@ -2065,9 +2064,7 @@ async def test_peer_failure_waiting_for_ui_is_retired_without_replay() -> None:
 
 
 @pytest.mark.asyncio
-async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_log(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
+async def test_translation_provider_failure_uses_safe_report_and_retained_diagnostics() -> None:
     raw_detail = "provider raw detail token=translation-secret-789"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     harness = compose_translation_test_harness(
@@ -2094,18 +2091,13 @@ async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_lo
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
         assert raw_detail not in runtime_log
-        failures = [
-            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
-            for record in caplog.records
-            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
-        ]
-        assert any(
-            diagnostic.diagnostic_id == error_event.payload.diagnostics.diagnostic_id
-            and diagnostic.category == messages.DIAGNOSTIC_CATEGORY_UNKNOWN
-            and diagnostic.code == "provider.unknown"
-            for diagnostic in failures
-        )
-        assert raw_detail not in caplog.text
+        retained = runtime_logging.diagnostic_history(
+            {"diagnostic_id": error_event.payload.diagnostics.diagnostic_id}
+        )["records"]
+        assert len(retained) == 1
+        assert retained[0]["code"] == error_event.payload.diagnostics.code
+        assert retained[0]["category"] == messages.DIAGNOSTIC_CATEGORY_UNKNOWN
+        assert raw_detail not in json.dumps(retained)
     finally:
         runtime_logging.close()
 

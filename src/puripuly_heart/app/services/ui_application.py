@@ -277,6 +277,10 @@ class UiApplicationBoundary:
             ),
         )
 
+    @property
+    def diagnostic_instance_id(self) -> str | None:
+        return self.control().instance_id
+
     def control(self) -> ApplicationControl:
         if self._control is None:
             raise RuntimeError("application control is not composed")

@@ -1483,3 +1483,73 @@ def test_unknown_account_observation_preserves_owning_diagnostic():
     result = _chatgpt_status(app, retain)
     assert result["signed_in"] is None and result["sign_in_required"] is None
     assert result["diagnostic_id"] == cause.diagnostic_id and observed == [cause]
+
+
+@pytest.mark.asyncio
+async def test_real_peer_fault_queries_project_safe_original_cause(offline):
+    from uuid import uuid4
+
+    from puripuly_heart.core.messages import ErrorDiagnostics
+    from puripuly_heart.core.peer_capture import (
+        PeerCaptureFailureReason,
+        PeerCaptureLanguageFacts,
+        PeerCaptureSessionConfig,
+        PeerCaptureSessionState,
+        PeerCaptureTargetIntent,
+    )
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(str(uuid4()))
+        owner = control.pipeline.current.peer_capture
+        config = PeerCaptureSessionConfig(
+            provider_id="soniox", provider_signature=("soniox",), runtime_signature=("soniox",),
+            capture_signature=("fixture",), capture_target=PeerCaptureTargetIntent(kind="default_output_device"),
+            language=PeerCaptureLanguageFacts(source_mode="manual", source_language="en"),
+            target_sample_rate_hz=16000, vad_speech_threshold=0.4, vad_hangover_ms=500, vad_pre_roll_ms=500,
+        )
+        cause = ErrorDiagnostics(
+            component="capture.peer", operation="receive", code="capture.peer.provider_failed",
+            category="network", visibility="diagnostic_only", content_policy="metadata_only",
+            status_code=999, retry_after_ms=-1, fields={"errno": 13, "body": "PRIVATE_PEER_FIELD_SENTINEL"},
+            channel="PRIVATE_PEER_CHANNEL_SENTINEL", generation=-1,
+        )
+        await owner._fault_current_generation(
+            owner.snapshot.generation, config=config, reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+            exception=cause,
+        )
+        assert owner.snapshot.state is PeerCaptureSessionState.FAULTED
+        assert owner.snapshot.failure_diagnostics.diagnostic_id == cause.diagnostic_id
+        for query in ("capture.channels", "providers.status", "app.status"):
+            result = await control.query(query, {})
+            text = json.dumps(result)
+            assert cause.diagnostic_id in text and "PRIVATE_PEER" not in text
+        retained = (await control.query("diagnostics.history", {"diagnostic_id": cause.diagnostic_id}))["records"][0]
+        assert retained["code"] == cause.code
+        assert retained["channel"] is None and retained["generation"] is None
+        assert retained["status_code"] is None and retained["retry_after_ms"] is None
+        assert retained["detail"]["rejected_fields"] == 5
+        self_snapshot = replace(control.pipeline.self_capture.snapshot, failure_diagnostics=cause)
+        safe_self = control._snapshot_json(self_snapshot)["failure_diagnostics"]
+        assert safe_self["diagnostic_id"] == cause.diagnostic_id
+        assert safe_self["detail"]["rejected_fields"] == 5
+        assert "PRIVATE_PEER" not in json.dumps(safe_self)
+    finally:
+        await app.stop()
+
+
+def test_transaction_receipt_reports_owner_secondary_omissions():
+    from puripuly_heart.app.services.application_control import ApplicationControlOwner
+    from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
+    causes = tuple(
+        ErrorDiagnostics(component="settings_repository", operation="save", code="settings_save_failed",
+                         category="transaction", visibility="diagnostic_only", content_policy="metadata_only",
+                         status_code=None, retry_after_ms=None, fields={})
+        for _ in range(6)
+    )
+    transaction = TransactionResult("settings_commit_failed", None, causes[0], secondary_diagnostics=causes, secondary_omitted_count=2)
+    owner = SimpleNamespace(_retain_diagnostic=lambda diagnostic, **_: {"diagnostic_id": diagnostic.diagnostic_id})
+    receipt = ApplicationControlOwner._transaction_receipt(owner, transaction, "persistence_failed")
+    assert [item["diagnostic_id"] for item in receipt["secondary_diagnostics"]] == [cause.diagnostic_id for cause in causes[:4]]
+    assert receipt["secondary_omitted_count"] == 4 and receipt["secondary_truncated"] is True

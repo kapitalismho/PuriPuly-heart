@@ -2045,6 +2045,9 @@ def _discord_listener_release_error(error: Exception) -> ManagedOpenRouterReleas
         error_class="retryable",
         message=f"Discord OAuth loopback listener unavailable: {message}",
         operation="discord_start",
+        failure_diagnostics=provider_failure_report(
+            error, provider="openrouter", operation="provider_build"
+        ).diagnostics,
     )
 
 
@@ -2056,6 +2059,9 @@ def _discord_callback_release_error(error: Exception) -> ManagedOpenRouterReleas
             message=f"Discord OAuth callback failed: {error.error}",
             operation="discord_callback",
             subcode=error.error,
+            failure_diagnostics=provider_failure_report(
+                error, provider="openrouter", operation="provider_build"
+            ).diagnostics,
         )
     if isinstance(error, TimeoutError):
         return ManagedOpenRouterReleaseError(
@@ -2066,6 +2072,9 @@ def _discord_callback_release_error(error: Exception) -> ManagedOpenRouterReleas
                 default="timed out waiting for Discord OAuth callback",
             ),
             operation="discord_callback",
+            failure_diagnostics=provider_failure_report(
+                error, provider="openrouter", operation="provider_build"
+            ).diagnostics,
         )
     return ManagedOpenRouterReleaseError(
         code="discord_oauth_callback_closed",
@@ -2075,6 +2084,9 @@ def _discord_callback_release_error(error: Exception) -> ManagedOpenRouterReleas
             default="Discord OAuth callback listener closed before completion",
         ),
         operation="discord_callback",
+        failure_diagnostics=provider_failure_report(
+            error, provider="openrouter", operation="provider_build"
+        ).diagnostics,
     )
 
 

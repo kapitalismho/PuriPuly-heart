@@ -61,6 +61,8 @@ class FakeSharedGpuRuntime:
         model_path: Path,
         model_id: str,
         device_id: str,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> GpuWorkerActivation:
         self.active_channels.add(channel)
         self.owners.setdefault(channel, set()).add(owner)

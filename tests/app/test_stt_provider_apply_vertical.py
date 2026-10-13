@@ -239,6 +239,7 @@ class _ChannelReset:
 
 
 class _Peer:
+    runtime = None
     last_provider_signature = None
     last_runtime_signature = None
     last_intent_enabled = False

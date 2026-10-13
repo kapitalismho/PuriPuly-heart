@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import httpx
 import pytest
@@ -1397,7 +1397,10 @@ async def test_qq_managed_auth_own_ack_recovers_while_discord_operation_preserve
 
 
 @pytest.mark.asyncio
-async def test_qq_compensation_retains_owning_commit_identity_and_native_secondary_causes():
+@pytest.mark.parametrize(("upstream_count", "known_omitted"), [(0, 0), (3, 2), (4, 2)])
+async def test_qq_compensation_retains_owning_commit_identity_and_native_secondary_causes(
+    upstream_count, known_omitted
+):
     import errno
 
     from puripuly_heart.app.ports.canonical_settings_persistence import (
@@ -1420,13 +1423,18 @@ async def test_qq_compensation_retains_owning_commit_identity_and_native_seconda
             "winerror": 5,
         },
     )
+    upstream = tuple(
+        replace(primary, diagnostic_id=f"{index + 1:032x}", cause_id=primary.diagnostic_id)
+        for index in range(upstream_count)
+    )
 
     class State(RecordingManagedState):
         def persist(self):
             self.persist_calls += 1
             if self.persist_calls == 2:
                 raise CanonicalSettingsPersistenceError(
-                    "save_failed", "safe failure", diagnostics=primary
+                    "save_failed", "safe failure", diagnostics=primary,
+                    secondary_diagnostics=upstream, secondary_omitted_count=known_omitted,
                 )
             if self.persist_calls == 3:
                 raise OSError(errno.ENOSPC, RAW_QQ_CREDENTIAL)
@@ -1445,12 +1453,17 @@ async def test_qq_compensation_retains_owning_commit_identity_and_native_seconda
     assert result.diagnostics.occurred_at == primary.occurred_at
     assert result.diagnostics.fields["errno"] == errno.EACCES
     assert result.diagnostics.fields["compensation_succeeded"] is False
-    assert len(result.secondary_diagnostics) == 2
-    state_cause, secret_cause = result.secondary_diagnostics
-    assert state_cause.cause_id == primary.diagnostic_id
-    assert state_cause.fields["errno"] == errno.ENOSPC
-    assert secret_cause.cause_id == primary.diagnostic_id
-    assert secret_cause.fields["exception_class"] == "KeyError"
+    assert len(result.secondary_diagnostics) == min(4, upstream_count + 2)
+    assert result.secondary_omitted_count == known_omitted + max(0, upstream_count + 2 - 4)
+    assert tuple(cause.diagnostic_id for cause in result.secondary_diagnostics[:upstream_count]) == (
+        tuple(cause.diagnostic_id for cause in upstream)
+    )
+    retained_compensation = result.secondary_diagnostics[upstream_count:]
+    assert all(cause.cause_id == primary.diagnostic_id for cause in result.secondary_diagnostics)
+    if retained_compensation:
+        assert retained_compensation[0].fields["errno"] == errno.ENOSPC
+    if len(retained_compensation) == 2:
+        assert retained_compensation[1].fields["exception_class"] == "KeyError"
     assert state.active_managed_credential_ref == "previous-ref"
     assert store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] == RAW_MANAGED_KEY
     assert broker.ack_requests == []

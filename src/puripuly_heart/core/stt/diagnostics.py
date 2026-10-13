@@ -18,6 +18,10 @@ _RECOGNITION_CAUSES = frozenset(
         "provider_event_stream_ended",
         "provider_idle_timeout",
         "retired",
+        "pending_capacity",
+        "channel_disabled",
+        "dispatcher_cancelled",
+        "channel_cancel_timeout",
         "gemini_receive_failed",
         "gemini_write_failed",
         "gemini_connection_ended",
@@ -148,6 +152,8 @@ def recognition_failure_diagnostics(
         exception, provider=provider, channel=channel, operation=operation
     ).diagnostics
     category = diagnostics.category
+    if cause in {"pending_capacity", "channel_disabled", "dispatcher_cancelled"}:
+        category = "lifecycle"
     if exception is None and cause.endswith("_timeout"):
         category = "timeout"
     elif cause in {

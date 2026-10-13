@@ -99,7 +99,7 @@ async def test_attached_warmup_failure_preserves_actual_phase_and_retryability(c
 @pytest.mark.asyncio
 async def test_self_capture_failed_warmup_keeps_actual_capture_running() -> None:
     class Provider(RecordingProvider):
-        async def warmup(self):
+        async def warmup(self, *, operation_id=None, request_id=None):
             raise TimeoutError('PRIVATE_WARMUP_DETAIL')
 
     diagnostics = []

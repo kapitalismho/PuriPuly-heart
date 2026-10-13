@@ -72,6 +72,13 @@ class ChatGptSessionSignOutResult:
     local_credentials_removed: bool
     diagnostics: ErrorDiagnostics | None = None
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+    def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(self, "secondary_omitted_count", self.secondary_omitted_count + excess)
 
 
 CHATGPT_REFRESH_TOKEN_SECRET: Final = "chatgpt_refresh_token"
@@ -204,7 +211,7 @@ class ChatGptSession:
             raise ChatGptAuthError(
                 "credential_store_failed",
                 diagnostics=primary,
-                secondary_diagnostics=tuple(secondary[:4]),
+                secondary_diagnostics=tuple(secondary),
             ) from exc
         self._tokens = tokens
         self._generation += 1

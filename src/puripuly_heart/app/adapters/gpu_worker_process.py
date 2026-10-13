@@ -115,11 +115,19 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
                 failures.append(_gpu_cleanup_failure("temp_cleanup", exc, cause=debt.primary_diagnostics))
         debt.failures = tuple(failures)
 
-    async def start(self, *, mode: GpuWorkerMode) -> GpuWorkerClientPort:
+    async def start(
+        self, *, mode: GpuWorkerMode,
+        operation_id: str | None = None, request_id: str | None = None,
+    ) -> GpuWorkerClientPort:
         async with self._startup_lock:
-            return await self._start_owned(mode=mode)
+            return await self._start_owned(
+                mode=mode, operation_id=operation_id, request_id=request_id,
+            )
 
-    async def _start_owned(self, *, mode: GpuWorkerMode) -> GpuWorkerClientPort:
+    async def _start_owned(
+        self, *, mode: GpuWorkerMode,
+        operation_id: str | None, request_id: str | None,
+    ) -> GpuWorkerClientPort:
         if self._startup_cleanup_debt:
             raise GpuWorkerClosedError(
                 "worker startup cleanup incomplete",
@@ -129,8 +137,13 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
         executable = self.executable_path or self.resolve_default_executable()
         if not executable.is_file():
             error = GpuWorkerClosedError("worker executable unavailable", code="worker_executable_missing")
-            _emit_gpu_failure(error.code, stage="startup", exception=error)
-            raise error from FileNotFoundError(executable)
+            missing = FileNotFoundError(executable)
+            error.__cause__ = missing
+            error.failure_diagnostics = _emit_gpu_failure(
+                error.code, stage="startup", exception=error,
+                operation_id=operation_id, request_id=request_id,
+            )
+            raise error from missing
         session_id = uuid4().hex
         auth_token = secrets.token_hex(32)
         temporary_directory = tempfile.TemporaryDirectory(prefix="puripuly-gpu-worker-")
@@ -194,9 +207,10 @@ class DefaultGpuWorkerProcessFactory(GpuWorkerProcessFactoryPort):
             debt.primary_diagnostics = _emit_gpu_failure(
                 primary.code if isinstance(primary, GpuWorkerClosedError) else "worker_startup_cancelled" if isinstance(primary, asyncio.CancelledError) else "worker_startup_failed",
                 stage="startup", exception=primary,
-                fields={"exit_code": process.returncode} if process else {},
+                fields={"worker_session_id": session_id, **({"exit_code": process.returncode} if process else {})},
                 severity="info" if isinstance(primary, asyncio.CancelledError) else "error",
                 disposition="cancelled" if isinstance(primary, asyncio.CancelledError) else "failed",
+                operation_id=operation_id, request_id=request_id,
             )
             await self._cleanup_startup(debt)
             complete = (
@@ -868,6 +882,8 @@ def _emit_gpu_failure(
     cause: ErrorDiagnostics | None = None,
     severity: str = "error",
     disposition: str = "failed",
+    operation_id: str | None = None,
+    request_id: str | None = None,
 ) -> ErrorDiagnostics:
     diagnostics = ErrorDiagnostics(
         component="gpu_worker", operation="process_lifecycle", code=code,
@@ -875,6 +891,8 @@ def _emit_gpu_failure(
         status_code=None, retry_after_ms=None,
         fields={key: value for key, value in (fields or {}).items() if value is not None},
         cause_id=cause.diagnostic_id if cause else None,
+        operation_id=cause.operation_id if cause is not None else operation_id,
+        request_id=cause.request_id if cause is not None else request_id,
     )
     emit_failure(logger, diagnostics, stage=stage, exception=exception, severity=severity, disposition=disposition)
     return diagnostics

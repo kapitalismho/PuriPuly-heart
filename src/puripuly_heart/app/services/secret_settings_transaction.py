@@ -349,7 +349,11 @@ class SecretSettingsTransaction:
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                 message=commit_result.message,
                 diagnostics=commit_result.diagnostics,
-                secondary_diagnostics=((notification,) if notification is not None else ()),
+                secondary_diagnostics=(
+                    *getattr(self.settings_repository, "secondary_diagnostics", ()),
+                    *((notification,) if notification is not None else ()),
+                ),
+                secondary_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
             )
 
         return await self._restore_after_settings_commit_failure(
@@ -360,6 +364,8 @@ class SecretSettingsTransaction:
             or _settings_commit_failed_diagnostics(
                 provider="unknown", secret_key=request.secret_key
             ),
+            upstream_secondaries=getattr(self.settings_repository, "secondary_diagnostics", ()),
+            upstream_omitted_count=getattr(self.settings_repository, "secondary_omitted_count", 0),
         )
 
     async def _restore_after_settings_commit_failure(
@@ -369,6 +375,8 @@ class SecretSettingsTransaction:
         action: str,
         commit_message: UserMessageRef | None,
         primary: ErrorDiagnostics,
+        upstream_secondaries: tuple[ErrorDiagnostics, ...] = (),
+        upstream_omitted_count: int = 0,
     ) -> TransactionResult:
         primary = sanitize_diagnostics(primary)
         restore_cause = None
@@ -404,7 +412,7 @@ class SecretSettingsTransaction:
             previous_secret_existed=snapshot.existed,
             secret_restore_succeeded=restore_succeeded,
         )
-        secondary = [replace(outcome, cause_id=primary.diagnostic_id)]
+        secondary = [*upstream_secondaries, replace(outcome, cause_id=primary.diagnostic_id)]
         if restore_cause is not None:
             secondary.append(replace(restore_cause, cause_id=primary.diagnostic_id))
         return TransactionResult(
@@ -416,6 +424,7 @@ class SecretSettingsTransaction:
             message=commit_message,
             diagnostics=primary,
             secondary_diagnostics=tuple(secondary),
+            secondary_omitted_count=upstream_omitted_count,
         )
 
     async def _publish_dashboard_needs_key_snapshot(

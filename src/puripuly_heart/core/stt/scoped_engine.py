@@ -198,7 +198,7 @@ class ScopedRecognitionEngine:
     monotonic_clock: Callable[[], float] = time.monotonic
     accepted_settings_scope: tuple[object, ...] | None = None
     backend_close: Callable[[], Awaitable[None] | None] | None = None
-    backend_prepare: Callable[[], Awaitable[None] | None] | None = None
+    backend_prepare: Callable[..., Awaitable[None] | None] | None = None
     retention_profile_resolver: (
         Callable[[AudioSegmentSettingsSnapshot], STTRetentionProfile] | None
     ) = None
@@ -821,12 +821,17 @@ class ScopedRecognitionEngine:
             if not turns:
                 self._retire_current_session()
 
-    async def warmup(self) -> None:
+    async def warmup(
+        self, *, operation_id: str | None = None, request_id: str | None = None,
+    ) -> None:
         if self._closed or self._closing:
             raise RuntimeError("scoped recognition engine is closed")
         prepare = self.backend_prepare
         if prepare is not None:
-            result = prepare()
+            result = (
+                prepare(operation_id=operation_id, request_id=request_id)
+                if operation_id is not None or request_id is not None else prepare()
+            )
             if inspect.isawaitable(result):
                 await result
         if self._closed or self._closing:

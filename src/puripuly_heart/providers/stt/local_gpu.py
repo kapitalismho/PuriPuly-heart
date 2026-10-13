@@ -29,7 +29,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
 )
@@ -49,6 +49,8 @@ class LocalGpuSTTBackend(STTBackend):
     language_hint: str | None = None
     speech_end_clock: Callable[[], float] = field(default_factory=lambda: time.monotonic)
     active_decode_timeout_s: float = 30.0
+    operation_id: str | None = None
+    request_id: str | None = None
     _closed: bool = field(init=False, default=False, repr=False)
     _active: bool = field(init=False, default=False, repr=False)
     _lock: asyncio.Lock = field(init=False, repr=False)
@@ -63,19 +65,25 @@ class LocalGpuSTTBackend(STTBackend):
             raise ValueError("active_decode_timeout_s must be > 0")
         self._lock = asyncio.Lock()
 
-    async def prepare(self) -> None:
+    async def prepare(
+        self, *, operation_id: str | None = None, request_id: str | None = None,
+    ) -> None:
         async with self._lock:
             if self._closed or self._closing:
                 raise RuntimeError("Local GPU STT backend is closed")
             if self._quarantined_session is not None:
                 raise RuntimeError("Local GPU STT resource is awaiting decode cleanup")
             if not self._active:
+                operation_id = operation_id if operation_id is not None else self.operation_id
+                request_id = request_id if request_id is not None else self.request_id
+                self.operation_id = self.request_id = None
                 await self.runtime.activate_channel(
                     self.channel,
                     owner=self._resource_owner,
                     model_path=self.model_path,
                     model_id=self.model_id,
                     device_id=self.device_id,
+                    operation_id=operation_id, request_id=request_id,
                 )
                 self._active = True
 
@@ -332,7 +340,7 @@ class _LocalGpuSTTSession(STTBackendSession):
                 self._terminalize_scoped(
                     scoped_identity,
                     outcome="failed",
-                    failure_reason="local_decode_failed",
+                    failure_reason=recognition_cause(exc.reason),
                     exception=exc,
                 )
             return

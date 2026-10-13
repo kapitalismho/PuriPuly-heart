@@ -132,3 +132,31 @@ def test_owned_finite_labels_survive_projection(component, operation, code, stag
     )
     assert (record["component"], record["operation"], record["code"], record["stage"]) == (component, operation, code, stage)
     assert record["detail"]["rejected_fields"] == 0
+
+
+@pytest.mark.parametrize("code", [
+    "window_reveal_lost", "window_observation_failed", "window_visibility_unstable",
+    "window_bounds_failed", "window_native_ready_failed", "window_identity_failed",
+])
+def test_native_window_causes_survive_common_projection(code):
+    record = normalize_diagnostic(
+        diagnostic(component="overlay_process", operation="process_lifecycle", code=code, fields={"primary_failure_reason": code}),
+        instance_id=str(uuid4()), severity="error", disposition="failed", stage="native_terminal",
+    )
+    assert record["code"] == code
+    assert record["fields"]["primary_failure_reason"] == code
+    assert record["detail"]["rejected_fields"] == 0
+
+
+def test_invalid_nonnull_top_level_details_are_counted_without_erasing_cause():
+    source = diagnostic(
+        fields={"errno": 13}, cause_id="PRIVATE_CAUSE_MARKER", operation_id="PRIVATE_OPERATION_MARKER",
+        request_id="PRIVATE_REQUEST_MARKER", turn_id="PRIVATE_TURN_MARKER", channel="PRIVATE_CHANNEL_MARKER",
+        generation=-1, status_code=999, retry_after_ms=-1,
+    )
+    record = normalize_diagnostic(source, instance_id=str(uuid4()), severity="error", disposition="failed")
+    assert record["code"] == source.code and record["diagnostic_id"] == source.diagnostic_id
+    assert all(record[key] is None for key in ("cause_id", "operation_id", "request_id", "turn_id", "channel", "generation", "status_code", "retry_after_ms"))
+    assert record["detail"]["state"] == "rejected"
+    assert record["detail"]["rejected_fields"] == 8
+    assert "PRIVATE_" not in json.dumps(record)

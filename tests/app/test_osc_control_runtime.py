@@ -1351,3 +1351,83 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
     assert len(sender.messages) == 16
     assert sender.messages[-1] == ("/avatar/parameters/PuriPuly_Talk", True)
     await integration.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("loopback", [False, True])
+async def test_failed_cached_full_resync_requires_observed_obligation_completion(
+    caplog: pytest.LogCaptureFixture, loopback: bool,
+) -> None:
+    import logging
+    import socket
+
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+    from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
+
+    endpoint = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) if loopback else None
+    if endpoint is not None:
+        endpoint.bind(("127.0.0.1", 0))
+        endpoint.settimeout(1.0)
+    send_port = endpoint.getsockname()[1] if endpoint is not None else 9050
+    udp_sender = VrchatOscUdpSender(host="127.0.0.1", port=send_port) if loopback else None
+
+    class ResyncSender(FakeSender):
+        failed_parameter: str | None = None
+
+        def send_message(self, address: str, *values: object) -> None:
+            if address.endswith("/PuriPuly_Translator") and self.failed_parameter is not None:
+                self.failed_parameter = None
+                raise OSError(13, "private OSC resync credential body")
+            if udp_sender is not None:
+                udp_sender.send_message(address, *values)
+            super().send_message(address, *values)
+
+    state = OscCanonicalState()
+    sender = ResyncSender()
+    integration = _integration(
+        AppSettingsVNext(), FakeReceiverOwner(), sender, FakeService(None),
+        state_provider=lambda: state,
+    )
+    caplog.set_level(logging.INFO, logger=control_runtime_module.__name__)
+    try:
+        await integration.configure_connection(mode="manual", send_port=send_port, receive_port=9051)
+        sender.failed_parameter = "PuriPuly_Translator"
+        integration._publish_full()
+        failure = integration.output_snapshot()["state_publication"]
+        assert failure is not None
+        sent_after_failure = len(sender.messages)
+
+        integration.publish_delta()
+        assert len(sender.messages) == sent_after_failure
+        assert integration.output_snapshot()["state_publication"] == failure
+
+        state = replace(state, self_capture=True)
+        integration.publish_delta()
+        assert len(sender.messages) == sent_after_failure + 1
+        assert integration.output_snapshot()["state_publication"] == failure
+        assert not any(
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code == "osc_state_send_recovered"
+            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        )
+
+        integration._publish_full()
+        assert integration.output_snapshot()["state_publication"] is None
+        recovery = next(
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code == "osc_state_send_recovered"
+        )
+        assert recovery.cause_id == failure["diagnostic_id"]
+        assert recovery.fields["local_send_completed"] == 15
+        assert recovery.fields["remote_delivery"] == "unacknowledged"
+        if endpoint is not None:
+            assert len(sender.messages) == 45
+            for _ in sender.messages:
+                packet, _source = endpoint.recvfrom(65535)
+                assert packet.startswith(b"/avatar/parameters/PuriPuly")
+    finally:
+        await integration.close()
+        if udp_sender is not None:
+            udp_sender.close()
+        if endpoint is not None:
+            endpoint.close()

@@ -42,6 +42,7 @@ from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
+from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
 ProviderRuntimeStateChanged = Callable[
@@ -688,7 +689,10 @@ class LocalASRProviderRuntimeOwner:
             self._channel_phases[channel] = "running"
         await self._publish_state()
 
-    async def warmup_channel(self, channel: ProviderRuntimeChannel) -> None:
+    async def warmup_channel(
+        self, channel: ProviderRuntimeChannel, *, operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> None:
         self._require_open("warm provider channel")
         self._validate_channel(channel)
         async with self._operation():
@@ -699,7 +703,10 @@ class LocalASRProviderRuntimeOwner:
             self._channel_phases[channel] = "building"
             await self._publish_state()
             try:
-                await _call_async_method(provider, "warmup")
+                if isinstance(provider, ScopedRecognitionEngine):
+                    await provider.warmup(operation_id=operation_id, request_id=request_id)
+                else:
+                    await _call_async_method(provider, "warmup")
             except Exception as exc:
                 current = self._handles[channel].is_current_provider_generation(
                     provider=provider, generation=generation
@@ -713,6 +720,7 @@ class LocalASRProviderRuntimeOwner:
                         reason="provider_not_ready",
                     ),
                     generation=generation,
+                    operation_id=operation_id, request_id=request_id,
                 )
                 diagnostics = replace(
                     diagnostics, fields={
@@ -1237,7 +1245,12 @@ class LocalASRProviderRuntimeOwner:
                 raise RuntimeError("provider factory returned no provider")
             if request.warmup:
                 failure_stage = "provider_warmup"
-                await _call_async_method(provider, "warmup")
+                if isinstance(provider, ScopedRecognitionEngine):
+                    await provider.warmup(
+                        operation_id=request.operation_id, request_id=request.request_id
+                    )
+                else:
+                    await _call_async_method(provider, "warmup")
             return provider, None, None, None, None
         except asyncio.CancelledError as exc:
             if provider is not None:
@@ -1434,6 +1447,7 @@ class LocalASRProviderRuntimeOwner:
                 reason="provider_not_ready",
             ),
             generation=self._handles[request.channel].generation,
+            operation_id=request.operation_id, request_id=request.request_id,
         )
         emit_failure(logger, diagnostics, stage=event)
         await self._emit_diagnostic(

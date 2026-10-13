@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -67,9 +68,47 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--ready-file', type=Path, required=True)
+    parser.add_argument('--failure-stage', choices=('provider_build', 'provider_warmup'))
+    parser.add_argument('--failure-gate', type=Path)
     args = parser.parse_args()
     SelfCaptureSourceAdapter.__call__ = generated_source
     SelfCaptureVadAdapter.__call__ = generated_vad
+    if args.failure_stage is not None:
+        from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import (
+            SharedSTTProviderFactory,
+        )
+        from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
+
+        create_provider = SharedSTTProviderFactory.create
+        create_owner = SelfCaptureSessionOwner.__init__
+
+        def armed():
+            return args.failure_gate is not None and args.failure_gate.exists()
+
+        async def create(self, request, **kwargs):
+            if armed() and args.failure_stage == 'provider_build':
+                raise ConnectionError('PRIVATE_ADMISSION_CREATION')
+            provider = await create_provider(self, request, **kwargs)
+            if armed():
+                async def fail_warmup(**identity):
+                    raise TimeoutError('PRIVATE_ADMISSION_WARMUP')
+                provider.backend_prepare = fail_warmup
+            return provider
+
+        def initialize(self, *arguments, **kwargs):
+            create_owner(self, *arguments, **kwargs)
+            request_factory = self._provider_request_factory
+
+            def request(config, warmup):
+                native = request_factory(config, warmup)
+                if armed() and args.failure_stage == 'provider_warmup':
+                    native = replace(native, warmup=True)
+                return native
+
+            self._provider_request_factory = request
+
+        SharedSTTProviderFactory.create = create
+        SelfCaptureSessionOwner.__init__ = initialize
     return application_main([
         "run-headless", "--config", str(args.config), "--ready-file", str(args.ready_file),
     ])

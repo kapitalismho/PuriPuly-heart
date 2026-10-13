@@ -1023,7 +1023,8 @@ def test_load_secrets_failure_is_ignored(monkeypatch: pytest.MonkeyPatch) -> Non
     assert view._google_key.value == ""
     assert view._deepgram_key.value == ""
     assert view._soniox_key.value == ""
-    assert basic_messages == ["Failed to load secrets: boom"]
+    assert len(basic_messages) == 1
+    assert "boom" not in repr(basic_messages)
 
 
 def test_load_secrets_projects_the_same_prefix_before_read_failure(
@@ -1043,8 +1044,7 @@ def test_load_secrets_projects_the_same_prefix_before_read_failure(
     view._soniox_key.value = "unchanged-soniox"
 
     provider, _general, _prompt, _overlay = settings_view_surface_snapshots(_vnext(settings))
-    with pytest.raises(OSError, match="unavailable"):
-        view._load_secrets(provider, Path("settings.json"))
+    view._load_secrets(provider, Path("settings.json"))
 
     assert view._google_key.value == "google-secret"
     assert view._openrouter_key.value == "openrouter-secret"

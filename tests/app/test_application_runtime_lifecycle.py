@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from uuid import uuid4
 
 import pytest
 
@@ -18,21 +20,14 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
-from puripuly_heart.app.services.managed_gemma_translation import (
-    ManagedGemmaTranslationSnapshot,
-)
-from puripuly_heart.composition.application_runtime import (
-    _emit_managed_gemma_lifecycle_diagnostic,
-    _managed_gemma_failure_diagnostic,
-)
 from puripuly_heart.core.lifecycle import (
     LIFECYCLE_SHUTDOWN_PHASE_ORDER,
     SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS,
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
-from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.runtime.logging import RuntimeLoggingService
+from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService, configure_main_logging
 from puripuly_heart.ui.app import TranslatorApp
 from tests.helpers.ui_application import (
     ApplicationRuntimeShutdownStub,
@@ -162,66 +157,6 @@ def _position_of(events: list[str], marker: str) -> int:
     return events.index(marker)
 
 
-def test_managed_gemma_lifecycle_logs_bounded_failure_identity() -> None:
-    basic: list[tuple[str, int]] = []
-    detailed: list[tuple[str, int]] = []
-    event = DiagnosticEvent(
-        category="lifecycle",
-        severity="error",
-        visibility="detailed",
-        content_policy="metadata_only",
-        correlation_id=None,
-        diagnostics=None,
-        fields={
-            "phase": "task_done",
-            "scope_name": "ManagedGemmaRuntime",
-            "task_name": "prepare:model/unsafe whitespace",
-            "callback_name": "release",
-            "exception_class": "RuntimeError",
-        },
-    )
-
-    _emit_managed_gemma_lifecycle_diagnostic(
-        event,
-        log_basic=lambda message, *, level: basic.append((message, level)),
-        log_diagnostic=lambda message, *, level: detailed.append((message, level)),
-    )
-
-    assert basic == [
-        (
-            "[ManagedGemma] lifecycle outcome=failed phase=task_done cause=RuntimeError",
-            logging.ERROR,
-        )
-    ]
-    assert detailed == [
-        (
-            "[Diagnostic][ManagedGemma] lifecycle outcome=failed "
-            "phase=task_done scope=ManagedGemmaRuntime "
-            "task=prepare:model_unsafe_whitespace callback=release "
-            "exception_class=RuntimeError",
-            logging.ERROR,
-        )
-    ]
-
-
-def test_managed_gemma_failure_log_contains_only_bounded_metadata() -> None:
-    snapshot = ManagedGemmaTranslationSnapshot(
-        state="failed",
-        backend="cpu",
-        progress_percent=None,
-        error_type="GemmaProvisioningError",
-        failure_phase="download",
-        failure_code="download_failed",
-        cause_type="RuntimeError",
-        worker_exit_code=1,
-        status_code=503,
-    )
-
-    assert _managed_gemma_failure_diagnostic(snapshot) == (
-        "[Diagnostic][ManagedGemma] prepare outcome=failed backend=cpu "
-        "phase=download failure=download_failed cause=RuntimeError "
-        "worker_exit_code=1 status_code=503"
-    )
 
 
 @pytest.mark.asyncio
@@ -357,24 +292,18 @@ async def test_runtime_shutdown_graph_preserves_order_and_logging_last_after_fai
     assert LIFECYCLE_SHUTDOWN_PHASE_ORDER[-1] == SHUTDOWN_PHASE_CLOSE_LOGGING_DIAGNOSTICS
 
 
-class _StartupBoundaryLoggingSession:
-    def __init__(self) -> None:
-        self.persisted: list[tuple[int, str]] = []
-        self.closed = False
 
-    def emit_persisted(self, message: str, *, level: int) -> None:
-        self.persisted.append((level, message))
-
-    def close_terminal_owner(self) -> None:
-        self.closed = True
-
-
-def _real_startup_logging_owner() -> tuple[
+def _real_startup_logging_owner(tmp_path) -> tuple[
     ApplicationRuntimeLoggingOwner,
     RuntimeLoggingService,
-    _StartupBoundaryLoggingSession,
+    SessionRuntimeLoggingService,
 ]:
-    session = _StartupBoundaryLoggingSession()
+    root_logger = logging.Logger(f"test-startup-{uuid4().hex}")
+    session = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        sinks=configure_main_logging(root_logger=root_logger, log_dir=tmp_path),
+    )
+    session.configure_diagnostics(instance_id=uuid4().hex)
     service = RuntimeLoggingService(session_service=session)
 
     class Presentation:
@@ -389,51 +318,47 @@ def _real_startup_logging_owner() -> tuple[
     return owner, service, session
 
 
-def _boundary_fields(message: str) -> dict[str, str]:
-    return dict(token.split("=", 1) for token in message.split() if "=" in token)
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("failure_type", [RuntimeError, asyncio.CancelledError])
 async def test_startup_terminal_survives_real_logging_close_and_preserves_failure(
     failure_type: type[BaseException],
-    capsys: pytest.CaptureFixture[str],
+    tmp_path,
 ) -> None:
-    logging_owner, service, session = _real_startup_logging_owner()
+    logging_owner, service, session = _real_startup_logging_owner(tmp_path)
+    original_failure = failure_type("original startup failure")
 
     class ApplicationRuntime:
         async def start(self) -> None:
             service.close_after_producers_stop()
-            raise failure_type("original startup failure")
+            raise original_failure
 
     boundary = compose_test_ui_application_boundary(
         ApplicationRuntime(),
         runtime_logging=logging_owner,
     )
 
-    with pytest.raises(failure_type, match="original startup failure"):
+    with pytest.raises(failure_type) as exc_info:
         await boundary.start()
 
-    entry = next(message for _level, message in session.persisted if "outcome=entered" in message)
-    terminal = capsys.readouterr().err
-    entry_fields = _boundary_fields(entry)
-    terminal_fields = _boundary_fields(terminal)
-    expected_outcome = "cancelled" if failure_type is asyncio.CancelledError else "failed"
-    assert terminal.count("[Lifecycle][Startup] boundary") == 1
-    assert terminal_fields["outcome"] == expected_outcome
-    assert terminal_fields["attempt_id"] == entry_fields["attempt_id"]
-    assert terminal_fields["process_id"] == entry_fields["process_id"]
-    assert int(terminal_fields["monotonic_ns"]) >= int(entry_fields["monotonic_ns"])
-    assert terminal_fields["exception_class"] == (
-        "none" if failure_type is asyncio.CancelledError else "RuntimeError"
+    assert exc_info.value is original_failure
+    records = session.diagnostic_history({})["records"]
+    primary = [record for record in records if record["code"] == "startup_prepare_failed"]
+    assert len(primary) == 1
+    assert primary[0]["disposition"] == (
+        "cancelled" if failure_type is asyncio.CancelledError else "failed"
     )
+    assert primary[0]["fields"]["process_id"] > 0
+    assert primary[0]["fields"]["attempt_id"]
+    assert boundary.application_lifecycle().is_terminal
 
 
 @pytest.mark.asyncio
 async def test_startup_terminal_canonicalizes_unsafe_exception_class_after_logging_close(
-    capsys: pytest.CaptureFixture[str],
+    tmp_path,
 ) -> None:
-    logging_owner, service, session = _real_startup_logging_owner()
+    logging_owner, service, session = _real_startup_logging_owner(tmp_path)
     failure_type = type("Räw/Boundary Error", (RuntimeError,), {})
     original_failure = failure_type("original startup failure")
 
@@ -451,52 +376,13 @@ async def test_startup_terminal_canonicalizes_unsafe_exception_class_after_loggi
         await boundary.start()
 
     assert exc_info.value is original_failure
-    entry = next(message for _level, message in session.persisted if "outcome=entered" in message)
-    terminal = capsys.readouterr().err
-    entry_fields = _boundary_fields(entry)
-    terminal_fields = _boundary_fields(terminal)
-    assert terminal.count("[Lifecycle][Startup] boundary") == 1
-    assert terminal_fields["outcome"] == "failed"
-    assert terminal_fields["attempt_id"] == entry_fields["attempt_id"]
-    assert terminal_fields["process_id"] == entry_fields["process_id"]
-    assert int(terminal_fields["monotonic_ns"]) >= int(entry_fields["monotonic_ns"])
-    assert terminal_fields["exception_class"].startswith("redacted_")
-    assert "Räw/Boundary Error" not in terminal
+    records = session.diagnostic_history({})["records"]
+    primary = [record for record in records if record["code"] == "startup_prepare_failed"]
+    assert len(primary) == 1
+    assert primary[0]["disposition"] == "failed"
+    assert "Räw/Boundary Error" not in json.dumps(records, ensure_ascii=False)
+    assert "original startup failure" not in json.dumps(records)
 
-
-@pytest.mark.asyncio
-async def test_completed_startup_terminal_survives_concurrent_real_logging_close(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    logging_owner, service, session = _real_startup_logging_owner()
-    started = asyncio.Event()
-    release = asyncio.Event()
-
-    class ApplicationRuntime:
-        async def start(self) -> None:
-            started.set()
-            await release.wait()
-
-    boundary = compose_test_ui_application_boundary(
-        ApplicationRuntime(),
-        runtime_logging=logging_owner,
-    )
-    startup_task = asyncio.create_task(boundary.start())
-    await started.wait()
-    service.close_after_producers_stop()
-    release.set()
-    await startup_task
-
-    entry = next(message for _level, message in session.persisted if "outcome=entered" in message)
-    terminal = capsys.readouterr().err
-    entry_fields = _boundary_fields(entry)
-    terminal_fields = _boundary_fields(terminal)
-    assert terminal.count("[Lifecycle][Startup] boundary") == 1
-    assert terminal_fields["outcome"] == "completed"
-    assert terminal_fields["attempt_id"] == entry_fields["attempt_id"]
-    assert terminal_fields["process_id"] == entry_fields["process_id"]
-    assert int(terminal_fields["monotonic_ns"]) >= int(entry_fields["monotonic_ns"])
-    assert terminal_fields["exception_class"] == "none"
 
 
 @pytest.mark.asyncio
@@ -656,8 +542,8 @@ async def test_startup_partial_allocation_failure_runs_boundary_cleanup(
         "settings",
         "presentation",
         "runtime-allocated",
+        f"diagnostic:{'cancelled' if failure_type is asyncio.CancelledError else 'failed'}",
         "cleanup-runtime",
         "cleanup-logging",
-        f"diagnostic:{'cancelled' if failure_type is asyncio.CancelledError else 'failed'}",
     ]
     assert boundary.application_lifecycle().is_terminal

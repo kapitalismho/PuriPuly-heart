@@ -369,10 +369,6 @@ def test_user_facing_error_str_is_diagnostic_safe_without_ui_i18n(
     rendered = str(error)
 
     assert i18n_calls == []
-    assert "managed_release.retry_after_ms" in rendered
-    assert "retry_after_ms=9000" in rendered
-    assert "operation=issue" in rendered
-    assert "trial_unavailable" in rendered
     assert "broker raw payload" not in rendered
     assert "provider-secret-123" not in rendered
     assert "localized" not in rendered
@@ -882,12 +878,12 @@ async def test_discord_listener_bind_failure_maps_to_retry_result_without_broker
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert result.message_key == "managed_release.retry"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="discord_start",
-        code="discord_loopback_unavailable",
-        error_class="retryable",
-        message="Discord OAuth loopback listener unavailable: no Discord OAuth loopback port is available",
-    )
+    assert result.diagnostics is not None
+    assert result.diagnostics.operation == "discord_start"
+    assert result.diagnostics.code == "discord_loopback_unavailable"
+    assert result.diagnostics.error_class == "retryable"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert client.calls == []
     assert callback_calls == []
 
@@ -910,12 +906,12 @@ async def test_discord_redirect_mismatch_closes_listener_and_maps_terminal_resul
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
     assert result.message_key == "managed_release.stop"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="discord_start",
-        code="discord_redirect_mismatch",
-        error_class="terminal",
-        message="Discord OAuth broker returned a different redirect URI",
-    )
+    assert result.diagnostics is not None
+    assert result.diagnostics.operation == "discord_start"
+    assert result.diagnostics.code == "discord_redirect_mismatch"
+    assert result.diagnostics.error_class == "terminal"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert harness.callback_calls == []
     assert harness.listeners[0].closed is True
     assert [name for name, _payload in client.calls] == ["discord_start"]
@@ -934,13 +930,13 @@ async def test_discord_callback_error_maps_to_retry_result_and_closes_listener_w
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert result.message_key == "managed_release.retry"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="discord_callback",
-        code="discord_oauth_callback_error",
-        error_class="retryable",
-        subcode="access_denied",
-        message="Discord OAuth callback failed: access_denied",
-    )
+    assert result.diagnostics is not None
+    assert result.diagnostics.operation == "discord_callback"
+    assert result.diagnostics.code == "discord_oauth_callback_error"
+    assert result.diagnostics.error_class == "retryable"
+    assert result.diagnostics.subcode == "access_denied"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert harness.listeners[0].closed is True
     assert [name for name, _payload in client.calls] == ["discord_start"]
 
@@ -958,12 +954,11 @@ async def test_discord_callback_timeout_maps_to_retry_result_and_closes_listener
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert result.message_key == "managed_release.retry"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="discord_callback",
-        code="discord_oauth_timeout",
-        error_class="retryable",
-        message="timed out waiting for Discord OAuth callback",
-    )
+    assert result.diagnostics is not None
+    assert result.diagnostics.code == "discord_oauth_timeout"
+    assert result.diagnostics.error_class == "retryable"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics.category == "timeout"
     assert harness.listeners[0].closed is True
     assert [name for name, _payload in client.calls] == ["discord_start"]
 
@@ -2250,23 +2245,16 @@ async def test_issue_honors_retry_after_without_starting_parallel_retries() -> N
 
     assert first.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert first.retry_after_ms == 9_000
-    assert first.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="trial_unavailable",
-        error_class="retryable",
-        subcode=None,
-        retry_after_ms=9_000,
-        message="managed OpenRouter release is unavailable",
-    )
+    assert first.diagnostics is not None
+    assert first.diagnostics.code == "trial_unavailable"
+    assert first.diagnostics.error_class == "retryable"
+    assert first.diagnostics.retry_after_ms == 9_000
+    assert first.diagnostics.message is None
+    assert first.diagnostics.failure_diagnostics is not None
     assert second.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert second.retry_after_ms == 9_000
-    assert second.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="trial_unavailable",
-        error_class="retryable",
-        subcode=None,
-        retry_after_ms=9_000,
-        message="managed OpenRouter release is unavailable",
+    assert second.diagnostics.failure_diagnostics.diagnostic_id == (
+        first.diagnostics.failure_diagnostics.diagnostic_id
     )
     assert [name for name, _payload in client.calls] == ["issue"]
 
@@ -2306,23 +2294,16 @@ async def test_prepare_for_translation_honors_retry_after_while_pending_release_
 
     assert issue_result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert issue_result.retry_after_ms == 9_000
-    assert issue_result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="trial_unavailable",
-        error_class="retryable",
-        subcode=None,
-        retry_after_ms=9_000,
-        message="managed OpenRouter release is unavailable",
-    )
+    assert issue_result.diagnostics is not None
+    assert issue_result.diagnostics.code == "trial_unavailable"
+    assert issue_result.diagnostics.error_class == "retryable"
+    assert issue_result.diagnostics.retry_after_ms == 9_000
+    assert issue_result.diagnostics.message is None
+    assert issue_result.diagnostics.failure_diagnostics is not None
     assert prepare_result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
     assert prepare_result.retry_after_ms == 9_000
-    assert prepare_result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="trial_unavailable",
-        error_class="retryable",
-        subcode=None,
-        retry_after_ms=9_000,
-        message="managed OpenRouter release is unavailable",
+    assert prepare_result.diagnostics.failure_diagnostics.diagnostic_id == (
+        issue_result.diagnostics.failure_diagnostics.diagnostic_id
     )
     assert [name for name, _payload in client.calls] == ["issue"]
 
@@ -2416,14 +2397,11 @@ async def test_issue_trial_not_eligible_managed_key_unrecoverable_stops_as_not_e
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
     assert result.message_key == "managed_release.not_eligible"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="trial_not_eligible",
-        error_class="terminal",
-        subcode="managed_key_unrecoverable",
-        retry_after_ms=None,
-        message="managed key was already issued and cannot be recovered",
-    )
+    assert result.diagnostics.code == "trial_not_eligible"
+    assert result.diagnostics.error_class == "terminal"
+    assert result.diagnostics.subcode == "managed_key_unrecoverable"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.managed_identity.release_token is None
     assert settings.managed_identity.release_token_expires_at is None
@@ -2460,14 +2438,12 @@ async def test_issue_issuance_suspended_retries_with_brake_copy() -> None:
     assert result.message_key == "managed_release.brake"
     assert result.message_kwargs == {"retry_after_ms": 5_000}
     assert result.retry_after_ms == 5_000
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="issuance_suspended",
-        error_class="retryable",
-        subcode="asn_fast_path",
-        retry_after_ms=5_000,
-        message="new entitlement issuance is temporarily suspended",
-    )
+    assert result.diagnostics.code == "issuance_suspended"
+    assert result.diagnostics.error_class == "retryable"
+    assert result.diagnostics.subcode == "asn_fast_path"
+    assert result.diagnostics.retry_after_ms == 5_000
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.managed_identity.release_token == "release-token-1"
     assert settings.managed_identity.release_token_expires_at == "2026-04-08T06:15:00.000Z"
@@ -2503,14 +2479,11 @@ async def test_issue_issuance_suspended_with_revoked_lifecycle_stops_with_contac
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
     assert result.message_key == "managed_release.revoked_contact"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="issuance_suspended",
-        error_class="retryable",
-        subcode="asn_fast_path",
-        retry_after_ms=5_000,
-        message="revoked by policy",
-    )
+    assert result.diagnostics.code == "issuance_suspended"
+    assert result.diagnostics.subcode == "asn_fast_path"
+    assert result.diagnostics.retry_after_ms == 5_000
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.managed_identity.release_token is None
     assert settings.managed_identity.release_token_expires_at is None
@@ -2546,14 +2519,10 @@ async def test_issue_trial_not_eligible_with_revoked_lifecycle_stops_with_contac
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
     assert result.message_key == "managed_release.revoked_contact"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="trial_not_eligible",
-        error_class="terminal",
-        subcode=None,
-        retry_after_ms=None,
-        message="revoked by policy",
-    )
+    assert result.diagnostics.code == "trial_not_eligible"
+    assert result.diagnostics.error_class == "terminal"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.managed_identity.release_token is None
     assert settings.managed_identity.release_token_expires_at is None
@@ -2589,14 +2558,10 @@ async def test_issue_non_trial_code_with_revoked_lifecycle_stops_with_contact_co
 
     assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
     assert result.message_key == "managed_release.revoked_contact"
-    assert result.diagnostics == ManagedOpenRouterReleaseDiagnostics(
-        operation="issue",
-        code="internal_error",
-        error_class="terminal",
-        subcode=None,
-        retry_after_ms=None,
-        message="revoked by policy",
-    )
+    assert result.diagnostics.code == "internal_error"
+    assert result.diagnostics.error_class == "terminal"
+    assert result.diagnostics.message is None
+    assert result.diagnostics.failure_diagnostics is not None
     assert settings.openrouter.selected_source == OpenRouterCredentialSource.MANAGED
     assert settings.managed_identity.release_token is None
     assert settings.managed_identity.release_token_expires_at is None
@@ -3051,4 +3016,6 @@ async def test_managed_openrouter_provider_wraps_unexpected_issue_start_error_as
         )
 
     assert exc_info.value.message_key == "managed_release.retry"
-    assert exc_info.value.diagnostics == ManagedOpenRouterReleaseDiagnostics(message="issue boom")
+    assert exc_info.value.failure_diagnostics is not None
+    assert exc_info.value.failure_diagnostics.category == "unknown"
+    assert "issue boom" not in str(exc_info.value)
