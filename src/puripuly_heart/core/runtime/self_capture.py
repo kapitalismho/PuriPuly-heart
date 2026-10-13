@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -20,6 +21,9 @@ from puripuly_heart.core.audio.ownership import (
     OwnedVadEvent,
     PeerAudioSegmentLedger,
 )
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
     SelfCaptureAdmissionStatus,
@@ -40,6 +44,8 @@ from puripuly_heart.core.stt.backend import STTProviderInputTerminal, STTProvide
 from puripuly_heart.core.stt.diagnostics import recognition_cause
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
+
+logger = logging.getLogger(__name__)
 
 SelfCaptureProviderRequestFactory = Callable[[SelfCaptureSessionConfig, bool], object]
 SelfCaptureSourceFactory = Callable[[SelfCaptureSessionConfig], Awaitable[object] | object]
@@ -537,6 +543,7 @@ class SelfCaptureSessionOwner:
         self._provider_status = SelfCaptureProviderStatus.DETACHED
         self._desired_active = False
         self._generation = 0
+        self._generation_operation: tuple[int, dict[str, str | None]] | None = None
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
@@ -559,6 +566,7 @@ class SelfCaptureSessionOwner:
         self._fault_tasks: set[asyncio.Task[None]] = set()
         self._retired_sources: list[object] = []
         self._failure_reason: SelfCaptureFailureReason | None = None
+        self._primary_failure: tuple[int, ErrorDiagnostics] | None = None
         self._admission_reason: str | None = None
         self._last_cleanup_exception: Exception | None = None
         self._closed = False
@@ -765,7 +773,7 @@ class SelfCaptureSessionOwner:
             self._fault_generation(
                 generation,
                 failure_reason,
-                RuntimeError(reason),
+                terminal.failure_diagnostics if terminal is not None else None,
                 terminal=terminal,
                 recognition_reason=recognition_cause(reason),
             ),
@@ -803,6 +811,7 @@ class SelfCaptureSessionOwner:
                 return self.snapshot
             self._generation += 1
             generation = self._generation
+            self._generation_operation = (generation, current_diagnostic_operation())
             self._desired_active = enabled
             if (
                 enabled
@@ -866,6 +875,7 @@ class SelfCaptureSessionOwner:
                 return self.snapshot
             attachment_token = self._provider_attachment_token
             result: SelfCaptureProviderMutation | None = None
+            failure_exception: Exception | None = None
             if self._attached_provider_matches(config):
                 result_status = SelfCaptureProviderMutationStatus.APPLIED
                 failure_reason = None
@@ -885,6 +895,7 @@ class SelfCaptureSessionOwner:
                 except Exception as exc:
                     result_status = SelfCaptureProviderMutationStatus.FAILED
                     failure_reason = type(exc).__name__
+                    failure_exception = exc
                 else:
                     result_status = result.status
                     failure_reason = result.reason
@@ -915,6 +926,8 @@ class SelfCaptureSessionOwner:
                     failure_code=result.failure_code if result is not None else None,
                     failure_type=result.failure_type if result is not None else failure_reason,
                     failure_stage=result.failure_stage if result is not None else "provider_build",
+                    exception=failure_exception,
+                    failure_diagnostics=result.failure_diagnostics if result is not None else None,
                 )
             self._notify_state_changed()
             return self.snapshot
@@ -1036,6 +1049,7 @@ class SelfCaptureSessionOwner:
                         generation=self._generation,
                         reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                         detail=type(pending_failure).__name__,
+                        exception=pending_failure,
                     )
                     self._notify_state_changed()
         return self.snapshot
@@ -1292,6 +1306,8 @@ class SelfCaptureSessionOwner:
                     detail=type(exc).__name__,
                     failure_stage="provider_warmup",
                     failure_type=type(exc).__name__,
+                    exception=exc,
+                    disposition="degraded",
                 )
 
     async def _transition_provider(
@@ -1328,6 +1344,8 @@ class SelfCaptureSessionOwner:
                 detail=type(exc).__name__,
                 failure_stage="provider_handoff",
                 failure_type=type(exc).__name__,
+                exception=exc,
+                disposition="degraded",
             )
             self._notify_state_changed()
             return
@@ -1368,6 +1386,8 @@ class SelfCaptureSessionOwner:
                 failure_code=result.failure_code,
                 failure_type=result.failure_type,
                 failure_stage=result.failure_stage,
+                failure_diagnostics=result.failure_diagnostics,
+                disposition="degraded",
             )
         self._notify_state_changed()
 
@@ -1453,7 +1473,7 @@ class SelfCaptureSessionOwner:
 
     async def _on_terminal_provider_failure(
         self,
-        exc: Exception,
+        exc: Exception | ErrorDiagnostics,
         *,
         attachment_token: object,
     ) -> None:
@@ -1492,6 +1512,7 @@ class SelfCaptureSessionOwner:
                 generation=generation,
                 reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                 detail=type(exc).__name__,
+                exception=exc,
             )
             self._notify_state_changed()
 
@@ -1499,7 +1520,7 @@ class SelfCaptureSessionOwner:
         self,
         generation: int,
         reason: SelfCaptureFailureReason,
-        exc: Exception | None = None,
+        exc: Exception | ErrorDiagnostics | None = None,
         *,
         completed_task: asyncio.Task[None] | None = None,
         terminal: STTProviderTurnTerminal | None = None,
@@ -1519,7 +1540,7 @@ class SelfCaptureSessionOwner:
         self,
         generation: int,
         reason: SelfCaptureFailureReason,
-        exc: Exception | None = None,
+        exc: Exception | ErrorDiagnostics | None = None,
         *,
         completed_task: asyncio.Task[None] | None = None,
         terminal: STTProviderTurnTerminal | None = None,
@@ -1545,6 +1566,7 @@ class SelfCaptureSessionOwner:
                 type(exc).__name__ if exc is not None and failure_stage is not None else None
             ),
             failure_stage=failure_stage,
+            exception=exc,
             terminal=terminal,
             recognition_reason=recognition_reason,
             desired_active_before=desired_active_before,
@@ -1577,8 +1599,6 @@ class SelfCaptureSessionOwner:
         self._state = SelfCaptureSessionState.FAULTED
         if reason is not SelfCaptureFailureReason.ADMISSION_REJECTED:
             self._desired_active = False
-        if release_provider:
-            await self._release_provider(mode="abort")
         self._provider_status = (
             SelfCaptureProviderStatus.FAILED
             if reason is SelfCaptureFailureReason.PROVIDER_FAILED
@@ -1600,11 +1620,25 @@ class SelfCaptureSessionOwner:
                 else (type(exc).__name__ if exc is not None else None)
             ),
             failure_stage=mutation.failure_stage if mutation is not None else failure_stage,
+            exception=exc,
+            failure_diagnostics=mutation.failure_diagnostics if mutation is not None else None,
             desired_active_before=desired_active_before,
             desired_active_after=self._desired_active,
             action=("deactivate" if desired_active_before and not self._desired_active else None),
             target_state=SelfCaptureSessionState.FAULTED,
         )
+        if release_provider:
+            try:
+                await self._release_provider(mode="abort")
+            except Exception as cleanup_exc:
+                self._emit(
+                    SelfCaptureDiagnosticEvent.FAILURE,
+                    generation=generation,
+                    reason=SelfCaptureFailureReason.CLEANUP_FAILED,
+                    exception=cleanup_exc,
+                    disposition="degraded",
+                )
+                raise
         self._notify_state_changed()
 
     async def _teardown(
@@ -1620,6 +1654,9 @@ class SelfCaptureSessionOwner:
     ) -> None:
         if generation != self._generation:
             return
+        primary_reason = (
+            self._failure_reason if target_state is SelfCaptureSessionState.FAULTED else None
+        )
         loop_task = self._loop_task
         source = self._source
         self._loop_task = None
@@ -1669,14 +1706,16 @@ class SelfCaptureSessionOwner:
             self._desired_active = False
         if failures:
             self._last_cleanup_exception = failures[0]
-            self._failure_reason = SelfCaptureFailureReason.CLEANUP_FAILED
+            self._failure_reason = primary_reason or SelfCaptureFailureReason.CLEANUP_FAILED
             self._state = SelfCaptureSessionState.FAULTED
-            self._emit(
-                SelfCaptureDiagnosticEvent.FAILURE,
-                generation=generation,
-                reason=SelfCaptureFailureReason.CLEANUP_FAILED,
-                detail=type(failures[0]).__name__,
-            )
+            for failure in failures:
+                self._emit(
+                    SelfCaptureDiagnosticEvent.FAILURE,
+                    generation=generation,
+                    reason=SelfCaptureFailureReason.CLEANUP_FAILED,
+                    exception=failure,
+                    disposition="degraded" if primary_reason is not None else "failed",
+                )
             self._notify_state_changed()
             raise failures[0]
         self._last_cleanup_exception = None
@@ -1805,7 +1844,55 @@ class SelfCaptureSessionOwner:
         desired_active_after: bool | None = None,
         action: str | None = None,
         target_state: SelfCaptureSessionState | None = None,
+        exception: BaseException | ErrorDiagnostics | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+        disposition: str = "failed",
     ) -> None:
+        if event is SelfCaptureDiagnosticEvent.FAILURE:
+            stage = failure_stage or {
+                SelfCaptureFailureReason.SOURCE_OPEN_FAILED: "source_open",
+                SelfCaptureFailureReason.VAD_FAILED: "vad",
+                SelfCaptureFailureReason.PROVIDER_FAILED: "turn_terminal",
+                SelfCaptureFailureReason.CLEANUP_FAILED: "cleanup",
+                SelfCaptureFailureReason.SESSION_FAILED: "source_read",
+            }.get(reason, "readiness")
+            native = failure_diagnostics or (
+                terminal.failure_diagnostics if terminal is not None else None
+            )
+            if native is None and isinstance(exception, ErrorDiagnostics):
+                native = exception
+            if native is None:
+                native = stt_failure_report(
+                    exception, provider=self._config.provider_id if self._config else "stt",
+                    operation=stage, channel="self",
+                ).diagnostics
+                native = replace(
+                    native, component="capture.self", operation=stage,
+                    code=f"capture.self.{reason.value if reason is not None else 'unknown'}",
+                    generation=generation,
+                    fields={
+                        **native.fields, "observed_state": self._state.value,
+                        **({"warmup_usable": True} if stage == "provider_warmup" else {}),
+                    },
+                )
+            if (
+                self._generation_operation is not None
+                and self._generation_operation[0] == generation
+                and native.turn_id is None
+            ):
+                native = replace(native, **self._generation_operation[1])
+            primary = self._primary_failure
+            if reason is SelfCaptureFailureReason.CLEANUP_FAILED and primary is not None:
+                if primary[0] == generation and primary[1].diagnostic_id != native.diagnostic_id:
+                    native = replace(native, cause_id=primary[1].diagnostic_id)
+            elif disposition == "failed":
+                self._primary_failure = (generation, native)
+            failure_diagnostics = native
+            emit_failure(
+                logger, native, stage=stage,
+                severity="warning" if disposition == "degraded" else "error",
+                disposition=disposition,
+            )
         if self._diagnostic_sink is None:
             return
         self._diagnostic_sink(
@@ -1819,6 +1906,7 @@ class SelfCaptureSessionOwner:
                 failure_code=failure_code,
                 failure_type=failure_type,
                 failure_stage=failure_stage,
+                failure_diagnostics=failure_diagnostics,
                 recognition_reason=recognition_reason,
                 utterance_id=(
                     terminal.identity.segment.segment_id if terminal is not None else None

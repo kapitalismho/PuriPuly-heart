@@ -264,3 +264,69 @@ async def test_process_exit_before_authentication_fails_without_waiting_for_time
 
     assert asyncio.get_running_loop().time() - started_at < 2.0
     assert tuple(tmp_path.iterdir()) == ()
+
+
+async def test_failed_termination_keeps_incomplete_client_and_independent_closes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_GPU_WORKER_IGNORE_SHUTDOWN", "1")
+    client = await _factory(cooperative_shutdown_s=0.01).start(mode="persistent")
+    await client.next_event()
+    terminate = gpu_worker_process_module._terminate_process
+
+    async def fail_terminate(*args: object, **kwargs: object) -> None:
+        raise OSError(5, "forbidden-termination-path-token")
+
+    monkeypatch.setattr(gpu_worker_process_module, "_terminate_process", fail_terminate)
+    try:
+        with pytest.raises(GpuWorkerClosedError) as caught:
+            await asyncio.wait_for(client.close(), timeout=2.0)
+        receipt = client.lifecycle_receipt()
+        assert caught.value.code == "worker_cleanup_failed"
+        assert caught.value.cleanup_complete is False
+        assert client.is_closed is False
+        assert receipt["close_complete"] is False
+        assert receipt["writer_closed"] is True
+        assert receipt["server_closed"] is True
+        assert receipt["tasks_closed"] is True
+        assert caught.value.cleanup_failures[0]["errno"] == 5
+        assert "forbidden-termination-path-token" not in repr(receipt)
+    finally:
+        monkeypatch.setattr(gpu_worker_process_module, "_terminate_process", terminate)
+        await asyncio.wait_for(client.force_close(), timeout=2.0)
+    assert client.is_closed
+    assert client.returncode is not None
+
+
+async def test_startup_cause_survives_failed_cleanup_and_factory_retries_cleanup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_GPU_WORKER_SKIP_AUTH", "1")
+    factory = _factory(startup_timeout_s=0.1)
+    terminate = gpu_worker_process_module._terminate_process
+
+    async def fail_terminate(*args: object, **kwargs: object) -> None:
+        raise PermissionError(5, "forbidden-startup-cleanup-body")
+
+    monkeypatch.setattr(gpu_worker_process_module, "_terminate_process", fail_terminate)
+    try:
+        with pytest.raises(GpuWorkerClosedError) as caught:
+            await factory.start(mode="discovery")
+        assert caught.value.code == "authentication_timeout"
+        assert caught.value.cleanup_complete is False
+        assert caught.value.cleanup_failures[0]["cleanup_stage"] == "process_terminate"
+        assert caught.value.cleanup_failures[0]["errno"] == 5
+        assert factory.startup_cleanup_snapshot()["pending_startups"] == 1
+        with pytest.raises(GpuWorkerClosedError):
+            await factory.close_pending_startups()
+        assert factory.startup_cleanup_snapshot()["close_complete"] is False
+        with pytest.raises(GpuWorkerClosedError) as rejected:
+            await factory.start(mode="discovery")
+        assert rejected.value.code == "startup_cleanup_failed"
+        assert factory.startup_cleanup_snapshot()["pending_startups"] == 1
+        assert "forbidden-startup-cleanup-body" not in repr(factory.startup_cleanup_snapshot())
+    finally:
+        monkeypatch.setattr(gpu_worker_process_module, "_terminate_process", terminate)
+        await asyncio.wait_for(factory.close_pending_startups(), timeout=2.0)
+    await factory.close_pending_startups()
+    assert factory.startup_cleanup_snapshot()["close_complete"] is True

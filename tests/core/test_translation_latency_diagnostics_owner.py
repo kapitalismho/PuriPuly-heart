@@ -30,6 +30,17 @@ class RuntimeLogging:
         self.basic: list[str] = []
         self.detailed: list[str] = []
 
+    def emit_failure(
+        self, diagnostics, *, severity="error", disposition="failed", stage=None, exception=None,
+    ) -> dict:
+        from puripuly_heart.core.diagnostics import normalize_diagnostic
+
+        record = normalize_diagnostic(
+            diagnostics, instance_id=None, severity=severity, disposition=disposition,
+            stage=stage, exception=exception,
+        )
+        self.basic.append(f"[Failure] code={record['code']}")
+        return record
     def emit_basic(self, message: str, *, level: int = 20) -> None:
         _ = level
         self.basic.append(message)

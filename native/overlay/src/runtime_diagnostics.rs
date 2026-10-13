@@ -21,6 +21,8 @@ pub(crate) struct OwnerStatusInput<'a> {
     pub(crate) in_flight_stage: Option<PresentationStage>,
     pub(crate) primary_failure_reason: Option<&'static str>,
     pub(crate) cleanup_failure_reason: Option<&'static str>,
+    pub(crate) diagnostic_dropped: u64,
+    pub(crate) reliable_delivery_failures: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +68,8 @@ pub(crate) fn project_owner_status(input: OwnerStatusInput<'_>) -> OwnerStatusPr
             "in_flight_stage": input.in_flight_stage,
             "primary_failure_reason": input.primary_failure_reason,
             "cleanup_failure_reason": input.cleanup_failure_reason,
+            "diagnostic_dropped": input.diagnostic_dropped,
+            "reliable_delivery_failures": input.reliable_delivery_failures,
         }),
     }
 }

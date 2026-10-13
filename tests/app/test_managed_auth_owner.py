@@ -155,12 +155,16 @@ async def test_qq_failure_maps_service_message_at_owner_boundary() -> None:
 
 @pytest.mark.asyncio
 async def test_committed_qq_auth_remains_successful_after_runtime_rebuild_error(caplog):
+    committed = TransactionResult("settings_commit_success_runtime_applied", None, None)
+    results = []
     owner = _owner(
         [_state(managed_china=True)],
         qq_result=ManagedAuthExecutionResult(
             succeeded=True,
             runtime_rebuild="if_missing",
+            transaction_result=committed,
         ),
+        results=results,
     )
 
     async def fail(mode):
@@ -168,7 +172,10 @@ async def test_committed_qq_auth_remains_successful_after_runtime_rebuild_error(
 
     owner.runtime_ensurer = fail
     assert await owner.start_qq(qq_identity="mock", credential="mock") is True
-    assert "stage=translation_start code=translation_init_failed" in caplog.text
+    assert results[0] is committed
+    assert results[-1].status == "settings_commit_success_runtime_degraded"
+    assert results[-1].diagnostics.fields["exception_class"] == "RuntimeError"
+    assert results[-1].diagnostics.fields["phase"] == "runtime_apply"
     assert "sensitive-rebuild-error" not in caplog.text
 
 

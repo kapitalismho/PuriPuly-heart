@@ -10,6 +10,7 @@ import pytest
 
 from puripuly_heart.core import messages
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.orchestrator.channel_runtime import _MergeBuffer
 from puripuly_heart.core.orchestrator.peer_translation_channel import (
@@ -2064,7 +2065,9 @@ async def test_peer_failure_waiting_for_ui_is_retired_without_replay() -> None:
 
 
 @pytest.mark.asyncio
-async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_log() -> None:
+async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     raw_detail = "provider raw detail token=translation-secret-789"
     runtime_logging, log_stream = _make_runtime_logging_capture()
     harness = compose_translation_test_harness(
@@ -2091,8 +2094,18 @@ async def test_translation_provider_failure_uses_message_ref_and_safe_runtime_lo
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
         assert raw_detail not in runtime_log
-        assert "category=unknown" in runtime_log
-        assert "code=provider.unknown" in runtime_log
+        failures = [
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        ]
+        assert any(
+            diagnostic.diagnostic_id == error_event.payload.diagnostics.diagnostic_id
+            and diagnostic.category == messages.DIAGNOSTIC_CATEGORY_UNKNOWN
+            and diagnostic.code == "provider.unknown"
+            for diagnostic in failures
+        )
+        assert raw_detail not in caplog.text
     finally:
         runtime_logging.close()
 
@@ -2236,7 +2249,7 @@ async def test_self_osc_sent_channel_uses_utterance_runtime_when_peer_chatbox_ac
         overlay_sink=RecordingOverlaySink(),
     )
 
-    utterance_id = await harness.self_owner.submit_text("self text", source="You")
+    utterance_id = (await harness.self_owner.submit_text("self text", source="You")).turn_id
     events = [harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())]
 
     assert [event.type for event in events] == [
@@ -2388,13 +2401,13 @@ async def test_translation_newer_self_row_replaces_older_translated_self_row_wit
         clock=clock,
     )
 
-    first_id = await harness.self_owner.submit_text("first", source="You")
+    first_id = (await harness.self_owner.submit_text("first", source="You")).turn_id
     await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
 
     assert [block.id for block in presenter.snapshot().blocks] == [f"self:{first_id}"]
     assert presenter.snapshot().blocks[0].secondary_text == "translated first"
 
-    second_id = await harness.self_owner.submit_text("second", source="You")
+    second_id = (await harness.self_owner.submit_text("second", source="You")).turn_id
 
     assert [block.id for block in presenter.snapshot().blocks] == [f"self:{second_id}"]
     assert presenter.snapshot().blocks[0].secondary_text == ""
@@ -2437,7 +2450,7 @@ async def test_self_translation_failure_closes_overlay_line_as_incomplete() -> N
         overlay_sink=sink,
     )
 
-    utterance_id = await harness.self_owner.submit_text("self text", source="You")
+    utterance_id = (await harness.self_owner.submit_text("self text", source="You")).turn_id
     await asyncio.gather(*harness.self_runtime.translation_tasks.values(), return_exceptions=True)
 
     assert [event.type for event in sink.events] == [
@@ -2692,7 +2705,7 @@ async def test_self_translation_cancellation_closes_overlay_line_as_incomplete()
         overlay_sink=sink,
     )
 
-    utterance_id = await harness.self_owner.submit_text("self text", source="You")
+    utterance_id = (await harness.self_owner.submit_text("self text", source="You")).turn_id
     await llm.started.wait()
     await harness.self_runtime.reset_runtime_state()
 

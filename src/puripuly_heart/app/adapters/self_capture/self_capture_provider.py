@@ -145,6 +145,7 @@ class SelfCaptureProviderAdapter:
             failure_code=result.failure_code,
             failure_type=result.failure_type,
             failure_stage=result.failure_stage,
+            failure_diagnostics=result.failure_diagnostics,
         )
 
 

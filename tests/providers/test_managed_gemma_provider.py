@@ -94,7 +94,7 @@ async def test_provider_logs_basic_translate_failure() -> None:
         runtime_logging=runtime_logging,
     )
 
-    with pytest.raises(RuntimeError, match="llama down"):
+    with pytest.raises(RuntimeError) as exc_info:
         await provider.translate(
             utterance_id=uuid4(),
             text="안녕",
@@ -103,12 +103,8 @@ async def test_provider_logs_basic_translate_failure() -> None:
             target_language="en",
         )
 
-    assert len(runtime_logging.basic_messages) == 1
-    failure, level = runtime_logging.basic_messages[0]
-    assert level == logging.ERROR
-    assert failure.startswith("[Basic][LLM] Gemma request failed [translate]:")
-    assert "operation=translate provider=managed_gemma" in failure
-    assert "exception_type=RuntimeError" in failure
+    assert exc_info.value is runtime.error
+    assert runtime_logging.basic_messages == []
 
 
 @pytest.mark.asyncio

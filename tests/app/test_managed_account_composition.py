@@ -351,7 +351,6 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
 ) -> None:
-    diagnostics: list[tuple[str, BaseException]] = []
 
     class Service:
         def __init__(self, *, fail_first_close: bool) -> None:
@@ -369,7 +368,6 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
         settings=compose_settings_owner(tmp_path / "settings.json"),
         config_path=tmp_path / "settings.json",
         callback_received=lambda: None,
-        diagnostic_sink=lambda message, exception: diagnostics.append((message, exception)),
         service=cast(ManagedOpenRouterReleaseService, previous),
     )
 
@@ -387,12 +385,13 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
         create_replacement,
     )
 
-    with pytest.raises(RuntimeError, match="retired close failed"):
+    with pytest.raises(RuntimeError) as captured:
         await runtime.rebuild(secrets=SecretStore())
 
     assert runtime.service is replacement
     assert previous.close_calls == 1
-    assert diagnostics[0][0].endswith("close failed")
+    assert captured.value.diagnostics.code == "managed_release_cleanup_failed"
+    assert captured.value.diagnostics.fields["exception_class"] == "RuntimeError"
 
     await runtime.retry_retired()
     await runtime.close()

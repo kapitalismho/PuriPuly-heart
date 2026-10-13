@@ -758,7 +758,7 @@ async def test_httpx_openrouter_client_logs_basic_translate_failure_without_runt
     client = HttpxOpenRouterClient(api_key="k", model="m", base_url="https://example")
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.openrouter"):
-        with pytest.raises(OpenRouterResponseError):
+        with pytest.raises(OpenRouterResponseError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="SYSTEM",
@@ -766,9 +766,9 @@ async def test_httpx_openrouter_client_logs_basic_translate_failure_without_runt
                 target_language="en",
             )
 
-    assert len(caplog.records) == 1
-    assert caplog.records[0].levelno == logging.ERROR
-    assert "quota exceeded" not in caplog.messages[0]
+    assert caplog.records == []
+    assert exc_info.value.failure_diagnostics.status_code == 429
+    assert exc_info.value.failure_diagnostics.category == "rate_limit"
 
 
 @pytest.mark.asyncio
@@ -800,7 +800,7 @@ async def test_httpx_openrouter_client_runtime_logging_logs_basic_translate_fail
     )
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.openrouter"):
-        with pytest.raises(OpenRouterResponseError):
+        with pytest.raises(OpenRouterResponseError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="SYSTEM",
@@ -809,13 +809,10 @@ async def test_httpx_openrouter_client_runtime_logging_logs_basic_translate_fail
             )
 
     assert runtime_logging.detailed_messages == []
-    assert len(runtime_logging.basic_messages) == 1
-    failure, level = runtime_logging.basic_messages[0]
-    assert level == logging.ERROR
-    assert "category=rate_limit code=provider.rate_limit" in failure
-    assert "operation=translate status=429 provider=openrouter" in failure
-    assert "exception_type=OpenRouterResponseError" in failure
-    assert "quota exceeded" not in failure
+    assert runtime_logging.basic_messages == []
+    assert exc_info.value.failure_diagnostics.status_code == 429
+    assert exc_info.value.failure_diagnostics.category == "rate_limit"
+    assert "quota exceeded" not in str(exc_info.value.failure_diagnostics)
     assert caplog.messages == []
 
 

@@ -95,6 +95,7 @@ class _ActivationConfig:
 class _ActivationOutcome:
     activation: GpuWorkerActivation | None = None
     failure_code: str | None = None
+    failure: BaseException | None = None
 
 
 @dataclass(order=True, slots=True)
@@ -158,6 +159,7 @@ class SharedGpuASRRuntime:
         self._queue: list[_PendingWork] = []
         self._active_channels: dict[GpuASRChannel, set[object]] = {}
         self._client: GpuWorkerClientPort | None = None
+        self._retired_clients: list[GpuWorkerClientPort] = []
         self._activation: GpuWorkerActivation | None = None
         self._config: _ActivationConfig | None = None
         self._active_work: _PendingWork | None = None
@@ -203,6 +205,10 @@ class SharedGpuASRRuntime:
         return self._last_failure_code
 
     @property
+    def startup_cleanup_snapshot(self) -> Mapping[str, object]:
+        return self._process_factory.startup_cleanup_snapshot()
+
+    @property
     def configured_device_id(self) -> str | None:
         return self._config.device_id if self._config is not None else None
 
@@ -210,13 +216,13 @@ class SharedGpuASRRuntime:
         async with self._discovery_lock:
             self._ensure_open()
             self._discovery_state = GpuDiscoveryState.RUNNING
-            client = await self._process_factory.start(mode="discovery")
-            task = start_lifecycle_task(
-                self._scope,
-                client.discover(),
-                name=f"discovery-{uuid4().hex}",
-            )
+            client: GpuWorkerClientPort | None = None
+            primary: BaseException | None = None
             try:
+                client = await self._process_factory.start(mode="discovery")
+                task = start_lifecycle_task(
+                    self._scope, client.discover(), name=f"discovery-{uuid4().hex}",
+                )
                 done, _pending = await asyncio.wait({task}, timeout=self._discovery_pending_seconds)
                 if not done:
                     self._discovery_state = GpuDiscoveryState.PENDING
@@ -226,13 +232,21 @@ class SharedGpuASRRuntime:
                 await self._emit("discovery_ready", {"device_count": len(devices)})
                 return devices
             except BaseException as exc:
+                primary = exc
                 if isinstance(exc, asyncio.CancelledError):
                     raise
                 self._discovery_state = GpuDiscoveryState.FAILED
                 await self._emit("discovery_failed", {"failure": _failure_code(exc)})
                 raise
             finally:
-                await client.close()
+                if client is not None:
+                    try:
+                        await self._close_unowned_client(client)
+                    except Exception:
+                        self._retain_client_cleanup(client)
+                        if primary is None:
+                            self._discovery_state = GpuDiscoveryState.FAILED
+                            raise
 
     async def activate_channel(
         self,
@@ -440,6 +454,29 @@ class SharedGpuASRRuntime:
                 self._last_failure_code = None
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        if self._close_requested:
+            for client in tuple(self._retired_clients):
+                try:
+                    await self._close_unowned_client(client)
+                except Exception as exc:
+                    terminal = False
+                    stop_error = ExceptionGroup("GPU independent cleanup failed", [stop_error, exc]) if stop_error else exc
+                else:
+                    self._retired_clients.remove(client)
+            try:
+                await asyncio.wait_for(
+                    self._process_factory.close_pending_startups(),
+                    timeout=self._force_close_seconds,
+                )
+            except Exception as exc:
+                terminal = False
+                stop_error = (
+                    ExceptionGroup("GPU shutdown and startup cleanup failed", [stop_error, exc])
+                    if stop_error is not None else exc
+                )
+                self._state = GpuASRRuntimeState.FAILED
+                if self._last_failure_code is None:
+                    self._last_failure_code = "startup_cleanup_failed"
         if self._close_requested and terminal:
             async with self._lock:
                 self._active_channels.clear()
@@ -454,6 +491,9 @@ class SharedGpuASRRuntime:
         self,
         config: _ActivationConfig,
     ) -> asyncio.Task[_ActivationOutcome]:
+        self._retired_clients = [client for client in self._retired_clients if not client.is_closed]
+        if self._retired_clients:
+            raise GpuASRManualRetryRequired("worker_cleanup_failed")
         self._state = GpuASRRuntimeState.STARTING
         self._last_failure_code = None
         self._file_cleanup_failure = None
@@ -475,7 +515,7 @@ class SharedGpuASRRuntime:
         outcome = await asyncio.shield(task)
         if outcome.activation is not None:
             return outcome.activation
-        raise GpuASRManualRetryRequired(outcome.failure_code or "manual_retry_required")
+        raise GpuASRManualRetryRequired(outcome.failure_code or "manual_retry_required") from outcome.failure
 
     async def _run_activation(
         self,
@@ -483,7 +523,6 @@ class SharedGpuASRRuntime:
         config: _ActivationConfig,
     ) -> _ActivationOutcome:
         client: GpuWorkerClientPort | None = None
-        ownership_transferred = False
         event_task: asyncio.Task[None] | None = None
         temporary_directory = tempfile.TemporaryDirectory(prefix="puripuly-gpu-asr-audio-")
         try:
@@ -492,7 +531,6 @@ class SharedGpuASRRuntime:
                 if generation != self._generation or self._state != GpuASRRuntimeState.STARTING:
                     raise GpuASRRuntimeError("GPU activation was superseded")
                 self._client = client
-                ownership_transferred = True
                 event_task = start_lifecycle_task(
                     self._scope,
                     self._consume_events(generation, client),
@@ -506,11 +544,13 @@ class SharedGpuASRRuntime:
         except BaseException as exc:
             if event_task is not None:
                 event_task.cancel()
-            if client is not None and not client.is_closed:
-                if not ownership_transferred:
+            if client is not None and not client.is_closed and (
+                self._client is not client or generation == self._generation
+            ):
+                try:
                     await self._close_unowned_client(client)
-                elif self._client is client and generation == self._generation:
-                    await self._close_unowned_client(client)
+                except Exception:
+                    self._retain_client_cleanup(client)
             if event_task is not None:
                 await asyncio.gather(event_task, return_exceptions=True)
             await run_owned_thread_call(temporary_directory.cleanup)
@@ -519,9 +559,10 @@ class SharedGpuASRRuntime:
             failure_code = _failure_code(exc)
             async with self._lock:
                 if generation != self._generation:
-                    return _ActivationOutcome(failure_code=failure_code)
+                    return _ActivationOutcome(failure_code=failure_code, failure=exc)
                 self._activation_task = None
-                self._client = None
+                if self._client is client and (client is None or client.is_closed):
+                    self._client = None
                 self._event_task = None
                 self._state = GpuASRRuntimeState.FAILED
                 self._last_failure_code = failure_code
@@ -533,7 +574,7 @@ class SharedGpuASRRuntime:
                     **_failure_diagnostic_fields(exc),
                 },
             )
-            return _ActivationOutcome(failure_code=failure_code)
+            return _ActivationOutcome(failure_code=failure_code, failure=exc)
         async with self._lock:
             if (
                 generation != self._generation
@@ -563,7 +604,10 @@ class SharedGpuASRRuntime:
             if event_task is not None:
                 event_task.cancel()
             if not client.is_closed:
-                await self._close_unowned_client(client)
+                try:
+                    await self._close_unowned_client(client)
+                except Exception:
+                    self._retain_client_cleanup(client)
             if event_task is not None:
                 await asyncio.gather(event_task, return_exceptions=True)
             await run_owned_thread_call(temporary_directory.cleanup)
@@ -586,6 +630,10 @@ class SharedGpuASRRuntime:
         except BaseException:
             if not client.is_closed:
                 await asyncio.wait_for(client.force_close(), timeout=self._force_close_seconds)
+
+    def _retain_client_cleanup(self, client: GpuWorkerClientPort) -> None:
+        if client not in self._retired_clients:
+            self._retired_clients.append(client)
 
     async def _reap_pending_work(
         self,
@@ -708,8 +756,11 @@ class SharedGpuASRRuntime:
             else:
                 try:
                     await cancel_task
-                except GpuWorkerClosedError:
-                    already_closed = True
+                except GpuWorkerClosedError as exc:
+                    already_closed = client.is_closed
+                    if not already_closed:
+                        errors.append(exc)
+                        force_required = True
                 except Exception as exc:
                     errors.append(exc)
                     force_required = True
@@ -729,12 +780,15 @@ class SharedGpuASRRuntime:
             else:
                 try:
                     await close_task
-                except GpuWorkerClosedError:
-                    already_closed = True
+                except GpuWorkerClosedError as exc:
+                    already_closed = client.is_closed
+                    if not already_closed:
+                        errors.append(exc)
+                        force_required = True
                 except Exception as exc:
                     errors.append(exc)
                     force_required = True
-        terminal = True
+        terminal = already_closed or client.is_closed
         if force_required and not already_closed:
             force_task = start_lifecycle_task(
                 self._scope,
@@ -752,6 +806,7 @@ class SharedGpuASRRuntime:
             else:
                 try:
                     await force_task
+                    terminal = client.is_closed
                 except Exception as exc:
                     errors.append(exc)
                     terminal = False
@@ -1016,7 +1071,9 @@ class SharedGpuASRRuntime:
                 )
                 self._activation_task = recovery_task
                 if not work.future.done():
-                    work.future.set_exception(GpuASRDecodeDropped(exception.code))
+                    dropped = GpuASRDecodeDropped(exception.code)
+                    dropped.__cause__ = exception
+                    work.future.set_exception(dropped)
                 if self._active_work is work:
                     self._active_work = None
         if terminal_failure is not None:
@@ -1051,6 +1108,8 @@ class SharedGpuASRRuntime:
         except asyncio.CancelledError:
             raise
         except BaseException as cleanup_exception:
+            if not previous_client.is_closed:
+                self._retain_client_cleanup(previous_client)
             return await self._finish_decode_recovery_failure(
                 generation,
                 config,
@@ -1087,7 +1146,7 @@ class SharedGpuASRRuntime:
         resolved_failure_code = failure_code or _failure_code(exception)
         async with self._lock:
             if generation != self._generation:
-                return _ActivationOutcome(failure_code=resolved_failure_code)
+                return _ActivationOutcome(failure_code=resolved_failure_code, failure=exception)
             self._activation_task = None
             self._client = None
             self._activation = None
@@ -1120,7 +1179,7 @@ class SharedGpuASRRuntime:
                 "fallback": "none",
             },
         )
-        return _ActivationOutcome(failure_code=resolved_failure_code)
+        return _ActivationOutcome(failure_code=resolved_failure_code, failure=exception)
 
     async def _consume_events(self, generation: int, client: GpuWorkerClientPort) -> None:
         try:
@@ -1148,10 +1207,14 @@ class SharedGpuASRRuntime:
             if active is not None and not active.future.done():
                 active.future.set_exception(exception)
             self._active_work = None
-            self._client = None
             self._activation = None
-            await client.close()
-            await self._cleanup_temporary_directory_locked()
+            try:
+                await self._close_unowned_client(client)
+            except Exception:
+                self._retain_client_cleanup(client)
+            else:
+                self._client = None
+                await self._cleanup_temporary_directory_locked()
             self._queue_event.set()
             await self._emit(
                 "worker_failed",
@@ -1283,6 +1346,7 @@ class SharedGpuASRRuntime:
             for task in tasks:
                 task.cancel()
             temporary_directory = self._temporary_directory
+            self._retain_client_cleanup(client)
             self._client = None
             self._activation = None
             self._active_work = None
@@ -1302,11 +1366,11 @@ class SharedGpuASRRuntime:
             timeout=self._force_close_seconds,
         )
         if not done:
-            force_close = getattr(client, "force_close", None)
-            if callable(force_close):
-                await asyncio.wait_for(force_close(), timeout=self._force_close_seconds)
+            await asyncio.wait_for(client.force_close(), timeout=self._force_close_seconds)
             close_task.cancel()
         await asyncio.gather(close_task, *tasks, return_exceptions=True)
+        if client.is_closed and client in self._retired_clients:
+            self._retired_clients.remove(client)
         await self._await_file_cleanup()
         if temporary_directory is not None:
             await run_owned_thread_call(temporary_directory.cleanup)

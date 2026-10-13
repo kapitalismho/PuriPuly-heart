@@ -6,10 +6,10 @@ import json
 import math
 import os
 from collections import OrderedDict
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.managed_gemma_translation import ManagedGemmaTranslationSelection
@@ -70,11 +70,19 @@ from puripuly_heart.config.translation_values import (
     provider_llm_for_translation,
     supported_translation_connections,
 )
+from puripuly_heart.core.diagnostics import (
+    diagnostic_operation,
+    normalize_diagnostic,
+    sanitize_diagnostic_fields,
+)
 from puripuly_heart.core.messages import (
+    CONTENT_POLICY_METADATA_ONLY,
+    DIAGNOSTIC_VISIBILITY_BASIC,
     TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
+    ErrorDiagnostics,
     TransactionResult,
 )
 
@@ -137,6 +145,8 @@ QUERIES = {
     "overlay.status",
     "osc.status",
     "consent.peer_translation",
+    "diagnostics.history",
+    "diagnostics.health",
 }
 MODEL_BACKENDS = ("cpu", "gpu")
 COMMAND_ARGUMENTS = {
@@ -339,7 +349,7 @@ def _secret_keys(application: UiApplicationBoundary) -> tuple[str, ...]:
 
 def _known_secret(application: UiApplicationBoundary, name: str) -> str:
     if name not in _secret_keys(application):
-        raise ValueError("unknown or undeclared secret")
+        raise InvalidArgumentsError("unknown or undeclared secret")
     return name
 
 
@@ -398,6 +408,10 @@ class _Operation:
     interrupt_requested: bool = False
 
 
+class InvalidArgumentsError(ValueError):
+    """Only deliberate validation of caller input uses this exception."""
+
+
 class UnknownOperationError(ValueError):
     pass
 
@@ -435,8 +449,12 @@ class ApplicationControlOwner:
 
     def bind_instance(self, instance_id: str) -> None:
         if not instance_id or (self.instance_id is not None and self.instance_id != instance_id):
-            raise ValueError("instance identity cannot change within a host")
+            raise InvalidArgumentsError("instance identity cannot change within a host")
         self.instance_id = instance_id
+        self.events.instance_id = instance_id
+        runtime_logging = getattr(self.application, "_runtime_logging", None)
+        if runtime_logging is not None:
+            runtime_logging.bind_instance(instance_id)
         self.settings.observe_commits(self._publish_committed)
 
     async def wait_for_stop_request(self) -> None:
@@ -514,6 +532,16 @@ class ApplicationControlOwner:
                 for key, value in COMMANDS.items()
             },
             "queries": sorted(QUERIES),
+            "query_arguments": {
+                "diagnostics.history": {
+                    "operation_id": "optional operation identity",
+                    "diagnostic_id": "optional failure identity",
+                    "instance_id": "optional originating host identity",
+                    "after": "optional nonnegative diagnostic sequence",
+                    "limit": "integer 1..100, default 50",
+                },
+                "diagnostics.health": {},
+            },
             "settings_fields": sorted(SETTINGS_FIELDS),
             "secret_keys": list(_secret_keys(self.application)),
             "topics": [
@@ -1004,13 +1032,85 @@ class ApplicationControlOwner:
             },
         }
 
+    def _gpu_runtime_snapshot(self) -> dict | None:
+        runtime = self.pipeline.local_asr_runtime
+        if runtime is None:
+            return None
+        snapshot = runtime.snapshot.gpu
+        data = _json(snapshot)
+        cleanup = snapshot.startup_cleanup
+        if not isinstance(cleanup, Mapping):
+            data["startup_cleanup"] = {
+                "availability": "unavailable", "pending_startups": None,
+                "close_complete": None, "cleanup_failures": [],
+            }
+            return data
+        pending = cleanup.get("pending_startups")
+        complete = cleanup.get("close_complete")
+        failures = cleanup.get("cleanup_failures", [])
+        rejected = 0
+        safe_failures = []
+        if isinstance(failures, (list, tuple)):
+            for failure in failures[:4]:
+                if isinstance(failure, Mapping):
+                    fields, removed = sanitize_diagnostic_fields(failure)
+                    safe_failures.append(fields)
+                    rejected += removed
+                else:
+                    rejected += 1
+        else:
+            rejected += 1
+        data["startup_cleanup"] = {
+            "availability": "observed",
+            "pending_startups": pending if type(pending) is int and 0 <= pending < 2**31 else None,
+            "close_complete": complete if type(complete) is bool else None,
+            "cleanup_failures": safe_failures,
+            "detail_rejected": rejected,
+            "truncated": isinstance(failures, (list, tuple)) and len(failures) > 4,
+        }
+        return data
+
+    def _output_diagnostic_health(self) -> dict:
+        owner = self.pipeline.output_runtime
+        if owner is None:
+            return {"availability": "unavailable"}
+        source = owner.diagnostic_delivery_health
+        result = {
+            "availability": "observed",
+            "owner_history": source["owner_history"],
+            "owner_history_capacity": source["owner_history_capacity"],
+            "owner_history_evictions": source["owner_history_evictions"],
+            "observer": source["observer"],
+            "observer_failure_count": source["observer_failure_count"],
+            "observer_failure_diagnostic_id": source["observer_failure_diagnostic_id"],
+            "last_observer_failure_type": source["last_observer_failure_type"],
+        }
+        if result["last_observer_failure_type"] is not None:
+            fields, rejected = sanitize_diagnostic_fields({"exception_class": result["last_observer_failure_type"]})
+            result["last_observer_failure_type"] = fields.get("exception_class", "unclassified")
+            result["detail_rejected"] = rejected
+        return result
+
     async def query(self, name: str, arguments: dict) -> dict:
         if name not in QUERIES:
-            raise ValueError("unknown application query")
+            raise InvalidArgumentsError("unknown application query")
         if not isinstance(arguments, dict):
-            raise ValueError("query arguments must be an object")
+            raise InvalidArgumentsError("query arguments must be an object")
+        if name in {"diagnostics.history", "diagnostics.health"}:
+            runtime_logging = getattr(self.application, "_runtime_logging", None)
+            if runtime_logging is None:
+                return {"instance_id": self.instance_id, "availability": "unavailable"}
+            if name == "diagnostics.history":
+                return runtime_logging.diagnostic_history(arguments)
+            if arguments:
+                raise InvalidArgumentsError("diagnostic health does not accept arguments")
+            return {
+                **runtime_logging.diagnostic_health(),
+                "events": self.events.delivery_health(),
+                "output": self._output_diagnostic_health(),
+            }
         if arguments:
-            raise ValueError("query does not accept arguments")
+            raise InvalidArgumentsError("query does not accept arguments")
         revision = self._current_revision()
         canonical = self.settings.committed_settings
         base = {"instance_id": self.instance_id, "revision": revision}
@@ -1035,6 +1135,7 @@ class ApplicationControlOwner:
                 "translation_runtime_ready": self.application.state().translation_runtime_ready,
                 "overlay_target": self.application.state().overlay_target,
                 "stopping": self._stop_requested.is_set(),
+                "scene_observation": self.application.scene_observation(),
             }
         if name in {"audio.target", "audio.processes"}:
             options = (
@@ -1059,11 +1160,7 @@ class ApplicationControlOwner:
             return {
                 **base,
                 "state": _json(owner.snapshot) if owner is not None else None,
-                "runtime": (
-                    _json(self.pipeline.local_asr_runtime.snapshot.gpu)
-                    if self.pipeline.local_asr_runtime is not None
-                    else None
-                ),
+                "runtime": self._gpu_runtime_snapshot(),
             }
         if name == "models.status":
             owner = self.provisioning()
@@ -1099,7 +1196,7 @@ class ApplicationControlOwner:
                 "challenge": (
                     dict(self._auth_challenge) if self._auth_challenge is not None else None
                 ),
-                "chatgpt": _chatgpt_status(self.application),
+                "chatgpt": _chatgpt_status(self.application, self._retain_diagnostic),
             }
         if name == "consent.peer_translation":
             return {
@@ -1110,15 +1207,16 @@ class ApplicationControlOwner:
         if name == "secrets.presence":
             keys = _secret_keys(self.application)
             result = self.application.settings_secrets().load_values(keys)
-            if result.snapshot is None or result.read_error is not None:
+            if result.snapshot is None or result.diagnostics is not None:
+                diagnostic = (
+                    self._retain_diagnostic(result.diagnostics, disposition="failed")
+                    if result.diagnostics is not None else None
+                )
                 return {
                     **base,
                     "status": "failed",
-                    "error": (
-                        type(result.read_error).__name__
-                        if result.read_error is not None
-                        else "secret_store_unavailable"
-                    ),
+                    "error": {"code": diagnostic["code"] if diagnostic else "secret_store_unavailable"},
+                    "diagnostics": diagnostic,
                 }
             return {
                 **base,
@@ -1145,7 +1243,7 @@ class ApplicationControlOwner:
             or not request_id
             or len(request_id) > 128
         ):
-            raise ValueError("invalid application command or request identity")
+            raise InvalidArgumentsError("invalid application command or request identity")
         signature = hashlib.sha256(
             json.dumps(
                 [command, arguments, expected_revision], sort_keys=True, ensure_ascii=False
@@ -1155,7 +1253,7 @@ class ApplicationControlOwner:
         if previous is not None:
             prior = self._operations[previous]
             if prior.request_signature != signature:
-                raise ValueError("request identity reused with different mutation")
+                raise InvalidArgumentsError("request identity reused with different mutation")
             return dict(prior.receipt)
         if len(self._operations) >= 256 and not self._evict_terminal():
             raise RuntimeError("application operation capacity reached")
@@ -1194,6 +1292,98 @@ class ApplicationControlOwner:
             pass
 
     async def _execute(
+        self, command: str, arguments: dict, expected_revision: int | None, operation_id: str
+    ) -> None:
+        receipt = self._operations[operation_id].receipt
+        with diagnostic_operation(self.instance_id, operation_id, receipt["request_id"]):
+            await self._execute_owned(command, arguments, expected_revision, operation_id)
+
+    @staticmethod
+    def _text_admission_data(admission) -> dict:
+        from puripuly_heart.core.orchestrator.self_translation_channel import (
+            TextSubmissionAdmission,
+        )
+
+        if admission is None:
+            return {
+                "status": "rejected", "error": {"code": "text_admission_unavailable"},
+                "admission": "unavailable", "turn_id": None, "child_turn_ids": [],
+                "output_delivery": "unobserved",
+            }
+        if not isinstance(admission, TextSubmissionAdmission):
+            raise TypeError("text admission requires an owned typed result")
+        if admission.status not in {"admitted", "rejected"} or not isinstance(admission.turn_id, UUID):
+            raise TypeError("text admission identity is invalid")
+        if not all(isinstance(turn_id, UUID) for turn_id in admission.child_turn_ids):
+            raise TypeError("text admission child identity is invalid")
+        result = {
+            "status": "applied" if admission.status == "admitted" else "rejected",
+            "admission": admission.status, "turn_id": str(admission.turn_id),
+            "child_turn_ids": [str(turn_id) for turn_id in admission.child_turn_ids],
+            "output_delivery": "unobserved",
+        }
+        if admission.status != "admitted":
+            result["error"] = {"code": "text_not_admitted"}
+        return result
+
+    def _retain_diagnostic(
+        self, diagnostics: ErrorDiagnostics, *, disposition: str, stage: str | None = None,
+        exception: BaseException | None = None, severity: str = "error",
+    ) -> dict:
+        runtime_logging = getattr(self.application, "_runtime_logging", None)
+        if runtime_logging is not None:
+            return runtime_logging.emit_failure(
+                diagnostics, disposition=disposition, stage=stage, exception=exception, severity=severity,
+            )
+        return normalize_diagnostic(
+            diagnostics, instance_id=self.instance_id, severity=severity,
+            disposition=disposition, stage=stage, exception=exception,
+        )
+
+    def _notify_presentation(self, receipt: dict, primary: dict | None = None) -> None:
+        try:
+            self.sync_ui()
+        except Exception as exc:
+            diagnostics = ErrorDiagnostics(
+                component="application_notification", operation="snapshot_notification",
+                code="presentation_sync_failed", category="lifecycle",
+                visibility=DIAGNOSTIC_VISIBILITY_BASIC, content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None, retry_after_ms=None, fields={"notification_delivered": False},
+                cause_id=primary["diagnostic_id"] if primary is not None else None,
+            )
+            evidence = self._retain_diagnostic(
+                diagnostics, disposition="degraded", severity="warning",
+                stage="dashboard_notification", exception=exc,
+            )
+            secondary = receipt.setdefault("secondary_diagnostics", [])
+            if len(secondary) < 4:
+                secondary.append(evidence)
+            else:
+                receipt["secondary_truncated"] = True
+            self.events.publish({
+                "topic": "error", "operation_id": evidence["operation_id"],
+                "code": evidence["code"], "diagnostic_id": evidence["diagnostic_id"],
+            })
+
+
+    def _transaction_receipt(self, transaction: TransactionResult, status: str) -> dict:
+        data = {
+            "status": transaction.status,
+            "message": transaction.message.key if transaction.message is not None else None,
+            "diagnostics": None,
+        }
+        if transaction.diagnostics is not None:
+            data["diagnostics"] = self._retain_diagnostic(
+                transaction.diagnostics, disposition="degraded" if status == "degraded" else "failed",
+            )
+        data["secondary_diagnostics"] = [
+            self._retain_diagnostic(diagnostic, disposition="degraded")
+            for diagnostic in transaction.secondary_diagnostics[:4]
+        ]
+        data["secondary_truncated"] = len(transaction.secondary_diagnostics) > 4
+        return data
+
+    async def _execute_owned(
         self, command: str, arguments: dict, expected_revision: int | None, operation_id: str
     ) -> None:
         operation = self._operations[operation_id]
@@ -1256,7 +1446,7 @@ class ApplicationControlOwner:
                             command, arguments, locale_choices=self.locale_choices
                         )
                         if not isinstance(arguments["text"], str) or not arguments["text"].strip():
-                            raise ValueError("text must be non-empty")
+                            raise InvalidArgumentsError("text must be non-empty")
                         deferred = ("text", arguments["text"])
                     else:
                         result = await self._dispatch(command, arguments, operation_id=operation_id)
@@ -1269,8 +1459,9 @@ class ApplicationControlOwner:
                         if deferred[0] == "install":
                             result = await self._install_result(deferred[1])
                         else:
-                            await self.application.submit_text(deferred[1])
-                            result = True
+                            result = self._text_admission_data(
+                                await self.application.submit_text(deferred[1])
+                            )
                     transaction = captured.current
                     status = "applied"
                     if transaction is not None and command in {
@@ -1283,7 +1474,7 @@ class ApplicationControlOwner:
                         "overlay.position.reset",
                     }:
                         status = _transaction_status(transaction)
-                        operation.receipt["transaction"] = _transaction_data(transaction)
+                        operation.receipt["transaction"] = self._transaction_receipt(transaction, status)
                     elif result is False:
                         status = "failed"
                     elif isinstance(result, dict) and "status" in result:
@@ -1304,24 +1495,15 @@ class ApplicationControlOwner:
                                 "channels": mismatch,
                             }
                     operation.receipt.update(status=status, revision=self._current_revision())
-                    if command in {"settings.apply", "provider.apply"} and status in {
-                        "applied",
-                        "degraded",
-                    }:
-                        try:
-                            self.sync_ui()
-                        except Exception:
-                            self.events.publish(
-                                {
-                                    "topic": "error",
-                                    "operation_id": operation_id,
-                                    "code": "presentation_sync_failed",
-                                }
-                            )
                     if isinstance(result, dict):
                         operation.receipt.update({k: v for k, v in result.items() if k != "status"})
                         if "status" in result and result["status"] != "applied":
                             operation.receipt["status"] = result["status"]
+                    if command in {"settings.apply", "provider.apply"} and operation.receipt["status"] in {"applied", "degraded"}:
+                        self._notify_presentation(
+                            operation.receipt,
+                            (operation.receipt.get("transaction") or {}).get("diagnostics"),
+                        )
                     completed = True
         except asyncio.CancelledError:
             operation.receipt["status"] = "interrupted" if not self._open else "cancelled"
@@ -1329,14 +1511,34 @@ class ApplicationControlOwner:
             operation.receipt.update(
                 status="action_required", error={"code": "capture_target_unavailable"}
             )
-        except (ValueError, TypeError, KeyError) as exc:
+        except InvalidArgumentsError:
             operation.receipt.update(
-                status="rejected", error={"code": "invalid_arguments", "type": type(exc).__name__}
+                status="rejected", error={"code": "invalid_arguments", "type": "InvalidArgumentsError"}
             )
         except Exception as exc:
+            source = vars(exc).get("diagnostics")
+            owning_cause = (
+                self._retain_diagnostic(source, disposition="failed")
+                if isinstance(source, ErrorDiagnostics) else None
+            )
+            if owning_cause is not None:
+                operation.receipt["cause_diagnostics"] = owning_cause
+            diagnostics = ErrorDiagnostics(
+                component="application_control", operation=command,
+                code="application_operation_failed", category="unknown",
+                visibility="diagnostic_only" if owning_cause is not None else DIAGNOSTIC_VISIBILITY_BASIC,
+                content_policy=CONTENT_POLICY_METADATA_ONLY,
+                status_code=None, retry_after_ms=None, fields={},
+                operation_id=operation_id, request_id=operation.receipt["request_id"],
+                cause_id=owning_cause["diagnostic_id"] if owning_cause is not None else None,
+            )
+            diagnostic = self._retain_diagnostic(
+                diagnostics, disposition="failed", stage="dispatch", exception=exc,
+            )
             operation.receipt.update(
                 status="failed",
-                error={"code": "application_operation_failed", "type": type(exc).__name__},
+                error={"code": "application_operation_failed", "type": diagnostic["fields"].get("exception_class", "unclassified")},
+                diagnostics=diagnostic, diagnostic_id=diagnostic["diagnostic_id"],
             )
         finally:
             if (
@@ -1369,7 +1571,9 @@ class ApplicationControlOwner:
                             None,
                             None,
                         )
-                    operation.receipt["transaction"] = _transaction_data(transaction)
+                    operation.receipt["transaction"] = self._transaction_receipt(
+                        transaction, operation.receipt["status"]
+                    )
                 operation.receipt["revision"] = captured.committed_revision
             operation.receipt["terminal"] = operation.receipt["status"] in TERMINAL
             if self._lock_owner is asyncio.current_task():
@@ -1389,6 +1593,10 @@ class ApplicationControlOwner:
                     "status": operation.receipt["status"],
                     "terminal": operation.receipt["terminal"],
                     "revision": self._current_revision(),
+                    "diagnostic_id": operation.receipt.get("diagnostic_id")
+                    or (operation.receipt.get("transaction", {}).get("diagnostics") or {}).get("diagnostic_id"),
+                    "turn_id": operation.receipt.get("turn_id"),
+                    "child_turn_ids": operation.receipt.get("child_turn_ids", []),
                 }
             )
             self._trim()
@@ -1412,7 +1620,7 @@ class ApplicationControlOwner:
             model_ids = (snapshot.gpu_model_id,)
         model_backends = {item.model_id: item.backend for item in snapshot.models}
         if not model_ids or any(model_backends.get(model_id) != backend for model_id in model_ids):
-            raise ValueError("unsupported model ids")
+            raise InvalidArgumentsError("unsupported model ids")
         settings = self.application.compatibility_settings()
         request = LocalASRInstallRequest(
             backend=backend,
@@ -1443,7 +1651,7 @@ class ApplicationControlOwner:
         _validate_command_args(command, args, locale_choices=self.locale_choices)
         if command == "app.stop":
             self._stop_requested.set()
-            return True
+            return {"status": "applied", "cleanup_outcome": "unobserved"}
         if command == "capture.set":
             enabled = _boolean(args, "enabled")
             channel = args["channel"]
@@ -1456,7 +1664,7 @@ class ApplicationControlOwner:
                     await app.accept_peer_translation_eula_and_enable()
                     current = getattr(self.results, "current", None)
                     if current is not None and current is not before:
-                        consent_transaction = _transaction_data(current)
+                        consent_transaction = self._transaction_receipt(current, _transaction_status(current))
                         consent_status = _transaction_status(current)
                         if consent_status in {"persistence_failed", "failed"}:
                             return {
@@ -1541,9 +1749,8 @@ class ApplicationControlOwner:
         if command == "text.submit":
             text = args["text"]
             if not isinstance(text, str) or not text.strip():
-                raise ValueError("text must be non-empty")
-            await app.submit_text(text)
-            return True
+                raise InvalidArgumentsError("text must be non-empty")
+            return self._text_admission_data(await app.submit_text(text))
         if command == "microphone.test":
             if not _boolean(args, "enabled"):
                 await app.stop_microphone_test()
@@ -1582,7 +1789,7 @@ class ApplicationControlOwner:
                 None,
             )
             if selected is None:
-                raise ValueError("unknown audio target option")
+                raise InvalidArgumentsError("unknown audio target option")
             if selected.disabled:
                 raise PeerCaptureTargetUnavailable("audio target is unavailable")
             return await app.apply_loopback_capture_option(value)
@@ -1599,13 +1806,13 @@ class ApplicationControlOwner:
             backend = args.get("backend", "cpu")
             verify = args.get("verify_checksums", False)
             if not isinstance(verify, bool):
-                raise ValueError("verify_checksums must be boolean")
+                raise InvalidArgumentsError("verify_checksums must be boolean")
             if backend == "cpu":
                 snapshot = await owner.inspect_cpu(verify_checksums=verify)
             elif backend == "gpu":
                 snapshot = await owner.inspect_gpu(explicit_intent=True, verify_checksums=verify)
             else:
-                raise ValueError("unsupported model backend")
+                raise InvalidArgumentsError("unsupported model backend")
             return {"status": "applied", "models": _json(snapshot)}
         if command == "models.cancel":
             owner = self.provisioning()
@@ -1613,7 +1820,7 @@ class ApplicationControlOwner:
                 return {"status": "failed", "error": {"code": "model_owner_unavailable"}}
             backend = args.get("backend", "gpu")
             if backend not in ("cpu", "gpu"):
-                raise ValueError("unsupported model backend")
+                raise InvalidArgumentsError("unsupported model backend")
             active = owner.snapshot.activity_for(backend) is not None
             if active:
                 await owner.cancel_install(backend)
@@ -1641,7 +1848,7 @@ class ApplicationControlOwner:
             }
         if command == "models.retry":
             if args.get("backend", "gpu") != "gpu":
-                raise ValueError("only GPU activation retry is supported")
+                raise InvalidArgumentsError("only GPU activation retry is supported")
             owner = self.gpu()
             if owner is None:
                 return {"status": "failed", "error": {"code": "gpu_owner_unavailable"}}
@@ -1742,7 +1949,7 @@ class ApplicationControlOwner:
                 result["reason"] = reason
             if transaction is not None:
                 result["transaction"] = {
-                    **_transaction_data(transaction),
+                    **self._transaction_receipt(transaction, _transaction_status(transaction)),
                     "effect": "overlay_intent_only",
                 }
                 transaction_status = _transaction_status(transaction)
@@ -1775,32 +1982,32 @@ class ApplicationControlOwner:
                     return {
                         "status": _transaction_status(result),
                         "calibration": _json(value),
-                        "transaction": _transaction_data(result),
+                        "transaction": self._transaction_receipt(result, _transaction_status(result)),
                     }
                 return {"status": "applied", "calibration": _json(value)}
             if action == "cancel":
                 return _json(app.cancel_overlay_calibration())
-            raise ValueError("unknown calibration action")
-        raise ValueError("unsupported command")
+            raise InvalidArgumentsError("unknown calibration action")
+        raise InvalidArgumentsError("unsupported command")
 
     async def _login(self, args: dict, operation_id: str) -> dict:
         provider = _string(args, "provider")
         if provider not in {"qq", "discord", "openrouter", "chatgpt"}:
-            raise ValueError("unsupported account provider")
+            raise InvalidArgumentsError("unsupported account provider")
         app = self.application
         before = getattr(self.results, "current", None)
         if provider == "qq":
             identity = _string(args, "qq_identity")
             credential = _string(args, "credential")
             if not identity or not credential:
-                raise ValueError("QQ account and credential are required")
+                raise InvalidArgumentsError("QQ account and credential are required")
             result = await app.start_qq_managed_auth_from_dialog(
                 qq_identity=identity, credential=credential, referral_id=args.get("referral_id")
             )
         else:
             open_browser = args.get("open_browser", False)
             if not isinstance(open_browser, bool):
-                raise ValueError("open_browser must be boolean")
+                raise InvalidArgumentsError("open_browser must be boolean")
 
             def authorization_url(url: str) -> None:
                 self._auth_challenge = {
@@ -1823,13 +2030,27 @@ class ApplicationControlOwner:
                     open_browser=open_browser,
                     authorization_url_sink=authorization_url,
                 )
-                self.sync_ui()
+                primary = (
+                    self._retain_diagnostic(connect.diagnostics, disposition="failed")
+                    if connect.diagnostics is not None else None
+                )
+                evidence = {
+                    "diagnostics": primary,
+                    "diagnostic_id": primary["diagnostic_id"] if primary is not None else None,
+                    "secondary_diagnostics": [
+                        self._retain_diagnostic(item, disposition="degraded")
+                        for item in connect.secondary_diagnostics[:4]
+                    ],
+                    "secondary_truncated": len(connect.secondary_diagnostics) > 4,
+                }
+                self._notify_presentation(evidence, primary)
                 if connect.succeeded:
                     return {
                         "status": "applied",
                         "provider": provider,
                         "authorization": "complete",
                         "first_sign_in": connect.first_sign_in,
+                        **evidence,
                     }
                 return {
                     "status": (
@@ -1839,6 +2060,7 @@ class ApplicationControlOwner:
                     ),
                     "provider": provider,
                     "reason": connect.failure_code or "authorization_failed",
+                    **evidence,
                 }
             if provider == "discord":
                 result = await app.start_discord_managed_auth_from_dialog(
@@ -1864,7 +2086,7 @@ class ApplicationControlOwner:
                 )
             else:
                 if "referral_id" in args:
-                    raise ValueError("referral_id is not valid for OpenRouter authorization")
+                    raise InvalidArgumentsError("referral_id is not valid for OpenRouter authorization")
                 target = app.build_managed_openrouter_byok_target()
                 if target is None:
                     from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
@@ -1887,7 +2109,7 @@ class ApplicationControlOwner:
                 )
         transaction = getattr(self.results, "current", None)
         transaction_data = (
-            {"transaction": _transaction_data(transaction)}
+            {"transaction": self._transaction_receipt(transaction, _transaction_status(transaction))}
             if transaction is not None and transaction is not before
             else {}
         )
@@ -1930,16 +2152,32 @@ class ApplicationControlOwner:
     async def _logout(self, args: dict) -> dict:
         provider = _string(args, "provider")
         if provider not in {"qq", "discord", "openrouter", "chatgpt"}:
-            raise ValueError("unsupported account provider")
+            raise InvalidArgumentsError("unsupported account provider")
         app = self.application
         if provider == "chatgpt":
             signed_out = await app.sign_out_chatgpt()
-            self.sync_ui()
-            return {
-                "status": "applied",
+            diagnostics = signed_out.diagnostics
+            status = "applied" if signed_out.local_credentials_removed is True else "failed"
+            diagnostic = (
+                self._retain_diagnostic(diagnostics, disposition="failed" if status == "failed" else "degraded")
+                if diagnostics is not None else None
+            )
+            result = {
+                "status": status,
                 "provider": provider,
-                "scope": "remote_revoked" if signed_out.remote_revoked else "local_only",
+                "local_credentials_removed": signed_out.local_credentials_removed,
+                "remote_revoked": signed_out.remote_revoked,
+                "scope": "remote_revoked" if signed_out.remote_revoked else "local_only" if signed_out.local_credentials_removed is True else "unknown",
+                "diagnostics": diagnostic,
+                "diagnostic_id": diagnostic["diagnostic_id"] if diagnostic is not None else None,
+                "secondary_diagnostics": [
+                    self._retain_diagnostic(item, disposition="degraded")
+                    for item in signed_out.secondary_diagnostics[:4]
+                ],
+                "secondary_truncated": len(signed_out.secondary_diagnostics) > 4,
             }
+            self._notify_presentation(result, diagnostic)
+            return result
         current = app.compatibility_settings()
         managed = current.state.managed_connection
         if provider in {"qq", "discord"} and (
@@ -1978,7 +2216,7 @@ class ApplicationControlOwner:
             transaction = getattr(self.results, "current", None)
             if transaction is not None and transaction is not before:
                 status = _transaction_status(transaction)
-                result = {"status": status, "transaction": _transaction_data(transaction)}
+                result = {"status": status, "transaction": self._transaction_receipt(transaction, _transaction_status(transaction))}
             else:
                 result = {"status": "applied" if succeeded else "failed"}
             result.update(provider=provider, scope="local_only")
@@ -1996,7 +2234,7 @@ class ApplicationControlOwner:
             if runtime is False:
                 result["status"] = "degraded"
                 result["reason"] = "runtime_rebuild_failed"
-        self.sync_ui()
+        self._notify_presentation(result, (result.get("transaction") or {}).get("diagnostics"))
         return result
 
     async def _apply_provider(self, args: dict) -> object:
@@ -2005,7 +2243,7 @@ class ApplicationControlOwner:
             provider = STTProviderName(args["provider"])
             channel = args["channel"]
             if channel not in ("self", "peer", "both"):
-                raise ValueError("invalid provider channel")
+                raise InvalidArgumentsError("invalid provider channel")
             edits.extend(
                 (SelfSttProviderEdit if target == "self" else PeerSttProviderEdit)(provider)
                 for target in ("self", "peer")
@@ -2021,7 +2259,7 @@ class ApplicationControlOwner:
                         )
                     )
         if not edits:
-            raise ValueError("provider.apply requires self or peer")
+            raise InvalidArgumentsError("provider.apply requires self or peer")
         return await self.application.apply_provider_intent(ProviderApplyIntent(tuple(edits)))
 
     async def _validate_settings_changes(
@@ -2084,15 +2322,15 @@ class ApplicationControlOwner:
             )
             connection = changes["translation.connection"]
             if connection not in {item.value for item in supported_translation_connections(model)}:
-                raise ValueError("unsupported translation model and connection combination")
+                raise InvalidArgumentsError("unsupported translation model and connection combination")
 
     async def _apply_fields(self, args: dict) -> object:
         changes = args.get("changes", args)
         if type(changes) is not dict or not changes:
-            raise ValueError("settings.apply requires nonempty changes object")
+            raise InvalidArgumentsError("settings.apply requires nonempty changes object")
         unsupported = changes.keys() - SETTINGS_FIELDS
         if unsupported:
-            raise ValueError("unknown settings fields")
+            raise InvalidArgumentsError("unknown settings fields")
         canonical = self.application.compatibility_settings()
         if canonical is None:
             raise RuntimeError("settings not loaded")
@@ -2162,7 +2400,7 @@ class ApplicationControlOwner:
                 else:
                     connection = selection.connection
                 if connection not in supported_translation_connections(model):
-                    raise ValueError("unsupported translation model and connection combination")
+                    raise InvalidArgumentsError("unsupported translation model and connection combination")
                 history = dict(selection.connection_history)
                 updates = ()
                 if key == "translation.connection_history":
@@ -2173,7 +2411,7 @@ class ApplicationControlOwner:
                         if historic_connection not in supported_translation_connections(
                             historic_model
                         ):
-                            raise ValueError("unsupported translation connection history")
+                            raise InvalidArgumentsError("unsupported translation connection history")
                     history.update(updates)
                 elif key in {"translation.model", "translation.connection"}:
                     updates = ((model, connection),)
@@ -2229,7 +2467,7 @@ class ApplicationControlOwner:
                     "peer_target",
                     "peer_source_mode",
                 }:
-                    raise ValueError("languages requires known language choices")
+                    raise InvalidArgumentsError("languages requires known language choices")
                 languages = updated.intent.languages
                 updated = materialize_language_selection(
                     updated,
@@ -2248,7 +2486,7 @@ class ApplicationControlOwner:
                 )
             elif key == "telemetry.enabled":
                 if not isinstance(value, bool):
-                    raise ValueError("telemetry.enabled must be boolean")
+                    raise InvalidArgumentsError("telemetry.enabled must be boolean")
                 updated = self.settings.with_telemetry_enabled(updated, value)
             else:
                 if key in {"stt.provider", "peer_stt.provider"}:
@@ -2333,62 +2571,64 @@ class ApplicationControlOwner:
         include_transcripts: bool = False,
         include_translations: bool = False,
         after: int | None = None,
+        cursor_instance_id: str | None = None,
     ) -> AsyncIterator[dict]:
         if channel not in (None, "self", "peer"):
-            raise ValueError("unsupported channel")
+            raise InvalidArgumentsError("unsupported channel")
         if set(topics) - set(self.capabilities()["topics"]):
-            raise ValueError("unsupported event topic")
+            raise InvalidArgumentsError("unsupported event topic")
         return self.events.subscribe(
             topics=topics,
             channel=channel,
             include_transcripts=include_transcripts,
             include_translations=include_translations,
             after=after,
+            cursor_instance_id=cursor_instance_id,
         )
 
 
 def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[str, ...]) -> None:
     if type(args) is not dict:
-        raise ValueError("command arguments must be an object")
+        raise InvalidArgumentsError("command arguments must be an object")
     if command not in COMMAND_ARGUMENTS:
-        raise ValueError("unknown application command")
+        raise InvalidArgumentsError("unknown application command")
     if command == "settings.apply":
         if "changes" in args:
             if args.keys() != {"changes"}:
-                raise ValueError("settings changes cannot be mixed with direct fields")
+                raise InvalidArgumentsError("settings changes cannot be mixed with direct fields")
             changes = args["changes"]
             if type(changes) is not dict or not changes:
-                raise ValueError("settings.apply requires a nonempty changes object")
+                raise InvalidArgumentsError("settings.apply requires a nonempty changes object")
         else:
             changes = args
             if not changes:
-                raise ValueError("settings.apply requires changes")
+                raise InvalidArgumentsError("settings.apply requires changes")
         if changes.keys() - SETTINGS_FIELDS:
-            raise ValueError("unknown settings field")
+            raise InvalidArgumentsError("unknown settings field")
         for name, value in changes.items():
             _validate_settings_field(name, value, locale_choices=locale_choices)
         return
     if command == "provider.apply":
         if "channel" in args:
             if args.keys() != {"channel", "provider"}:
-                raise ValueError("channel provider selection requires channel and provider only")
+                raise InvalidArgumentsError("channel provider selection requires channel and provider only")
             if type(args["channel"]) is not str or args["channel"] not in {
                 "self",
                 "peer",
                 "both",
             }:
-                raise ValueError("invalid provider channel")
+                raise InvalidArgumentsError("invalid provider channel")
             _validate_stt_provider(args["provider"])
             return
         if not args or args.keys() - {"self", "peer"}:
-            raise ValueError("provider.apply requires self and/or peer provider values")
+            raise InvalidArgumentsError("provider.apply requires self and/or peer provider values")
         for provider in args.values():
             _validate_stt_provider(provider)
         return
 
     allowed = COMMAND_ARGUMENTS[command].keys()
     if args.keys() - allowed:
-        raise ValueError("unknown command arguments")
+        raise InvalidArgumentsError("unknown command arguments")
     required = {
         "capture.set": {"channel", "enabled"},
         "translation.set": {"enabled"},
@@ -2406,51 +2646,51 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
         "auth.logout": {"provider"},
     }.get(command, set())
     if required - args.keys():
-        raise ValueError("missing command arguments")
+        raise InvalidArgumentsError("missing command arguments")
 
     if command == "capture.set":
         if type(args["channel"]) is not str or args["channel"] not in {"self", "peer"}:
-            raise ValueError("channel must be self or peer")
+            raise InvalidArgumentsError("channel must be self or peer")
         if type(args["enabled"]) is not bool:
-            raise ValueError("enabled must be a boolean")
+            raise InvalidArgumentsError("enabled must be a boolean")
         accept_terms = args.get("accept_terms", False)
         if type(accept_terms) is not bool:
-            raise ValueError("accept_terms must be a boolean")
+            raise InvalidArgumentsError("accept_terms must be a boolean")
         if accept_terms and (args["channel"] != "peer" or not args["enabled"]):
-            raise ValueError("accept_terms is only valid when enabling peer capture")
+            raise InvalidArgumentsError("accept_terms is only valid when enabling peer capture")
     elif command in {"translation.set", "microphone.test", "overlay.set"}:
         if type(args["enabled"]) is not bool:
-            raise ValueError("enabled must be a boolean")
+            raise InvalidArgumentsError("enabled must be a boolean")
     elif command == "overlay.lock":
         if type(args["locked"]) is not bool:
-            raise ValueError("locked must be a boolean")
+            raise InvalidArgumentsError("locked must be a boolean")
     elif command == "text.submit":
         if type(args["text"]) is not str or not args["text"].strip():
-            raise ValueError("text must be a non-empty string")
+            raise InvalidArgumentsError("text must be a non-empty string")
     elif command == "audio.target.set":
         if type(args["value"]) is not str or not args["value"]:
-            raise ValueError("audio target value must be a non-empty string")
+            raise InvalidArgumentsError("audio target value must be a non-empty string")
     elif command in {"secrets.set", "secrets.verify"}:
         if type(args["name"]) is not str or not args["name"]:
-            raise ValueError("secret name must be a non-empty string")
+            raise InvalidArgumentsError("secret name must be a non-empty string")
         if type(args["value"]) is not str or not args["value"]:
-            raise ValueError("secret value must be a non-empty string")
+            raise InvalidArgumentsError("secret value must be a non-empty string")
     elif command == "secrets.delete":
         if type(args["name"]) is not str or not args["name"]:
-            raise ValueError("secret name must be a non-empty string")
+            raise InvalidArgumentsError("secret name must be a non-empty string")
     elif command == "overlay.size":
         from puripuly_heart.config.desktop_overlay_values import (
             DESKTOP_FLET_SIZE_PRESET_ORDER,
         )
 
         if type(args["preset"]) is not str or args["preset"] not in DESKTOP_FLET_SIZE_PRESET_ORDER:
-            raise ValueError("unsupported overlay size preset")
+            raise InvalidArgumentsError("unsupported overlay size preset")
     elif command in {"models.install", "models.prepare", "models.cancel", "models.retry"}:
         backend = args.get("backend", "cpu" if command == "models.prepare" else "gpu")
         if type(backend) is not str or backend not in MODEL_BACKENDS:
-            raise ValueError("unsupported model backend")
+            raise InvalidArgumentsError("unsupported model backend")
         if command == "models.retry" and backend != "gpu":
-            raise ValueError("only GPU activation retry is supported")
+            raise InvalidArgumentsError("only GPU activation retry is supported")
         if command == "models.install" and "model_ids" in args:
             model_ids = args["model_ids"]
             if (
@@ -2458,15 +2698,15 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
                 or any(type(model_id) is not str or not model_id for model_id in model_ids)
                 or len(set(model_ids)) != len(model_ids)
             ):
-                raise ValueError("model_ids must be a list of unique non-empty strings")
+                raise InvalidArgumentsError("model_ids must be a list of unique non-empty strings")
         if command == "models.prepare" and (
             "verify_checksums" in args and type(args["verify_checksums"]) is not bool
         ):
-            raise ValueError("verify_checksums must be a boolean")
+            raise InvalidArgumentsError("verify_checksums must be a boolean")
     elif command in {"auth.login", "auth.logout"}:
         provider = args["provider"]
         if type(provider) is not str or provider not in {"qq", "discord", "openrouter", "chatgpt"}:
-            raise ValueError("unsupported account provider")
+            raise InvalidArgumentsError("unsupported account provider")
         if command == "auth.login":
             _validate_auth_login_args(args, provider)
     elif command == "overlay.calibrate":
@@ -2478,14 +2718,14 @@ def _validate_auth_login_args(args: dict, provider: str) -> None:
 
     open_browser = args.get("open_browser", False)
     if type(open_browser) is not bool:
-        raise ValueError("open_browser must be a boolean")
+        raise InvalidArgumentsError("open_browser must be a boolean")
     referral_id = args.get("referral_id")
     if referral_id is not None and (
         type(referral_id) is not str
         or not referral_id
         or normalize_owned_referral_id(referral_id) is None
     ):
-        raise ValueError("invalid referral ID")
+        raise InvalidArgumentsError("invalid referral ID")
     if provider == "qq":
         if args.keys() - {
             "provider",
@@ -2494,35 +2734,39 @@ def _validate_auth_login_args(args: dict, provider: str) -> None:
             "referral_id",
             "open_browser",
         }:
-            raise ValueError("QQ login has unsupported arguments")
+            raise InvalidArgumentsError("QQ login has unsupported arguments")
         if (
             type(args.get("qq_identity")) is not str
             or not args["qq_identity"]
             or type(args.get("credential")) is not str
             or not args["credential"]
         ):
-            raise ValueError("QQ identity and credential are required")
+            raise InvalidArgumentsError("QQ identity and credential are required")
         if open_browser:
-            raise ValueError("QQ login does not support browser opening")
+            raise InvalidArgumentsError("QQ login does not support browser opening")
         return
     if args.keys() - {"provider", "referral_id", "open_browser"}:
-        raise ValueError("OAuth login does not accept QQ credentials")
+        raise InvalidArgumentsError("OAuth login does not accept QQ credentials")
     if provider == "openrouter" and referral_id is not None:
-        raise ValueError("referral_id is not valid for OpenRouter authorization")
+        raise InvalidArgumentsError("referral_id is not valid for OpenRouter authorization")
     if provider == "chatgpt" and referral_id is not None:
-        raise ValueError("referral_id is not valid for ChatGPT authorization")
+        raise InvalidArgumentsError("referral_id is not valid for ChatGPT authorization")
 
 
-def _chatgpt_status(application: object) -> dict[str, bool]:
+def _chatgpt_status(application: object, retain: Callable[..., dict]) -> dict:
     snapshot_provider = getattr(application, "chatgpt_account_snapshot", None)
     if not callable(snapshot_provider):
-        return {"signed_in": False, "in_progress": False, "sign_in_required": False}
+        return {"signed_in": None, "in_progress": None, "sign_in_required": None, "availability": "unavailable"}
     snapshot = snapshot_provider()
     required = getattr(application, "chatgpt_sign_in_required", None)
+    diagnostics = snapshot.diagnostics
+    evidence = retain(diagnostics, disposition="degraded", severity="warning") if diagnostics is not None else None
     return {
-        "signed_in": bool(snapshot.signed_in),
-        "in_progress": bool(snapshot.in_progress),
-        "sign_in_required": bool(required()) if callable(required) else False,
+        "signed_in": snapshot.signed_in,
+        "in_progress": snapshot.in_progress,
+        "sign_in_required": required() if callable(required) else None,
+        "diagnostics": evidence,
+        "diagnostic_id": evidence["diagnostic_id"] if evidence is not None else None,
     }
 
 
@@ -2533,34 +2777,34 @@ def _validate_calibration_args(args: dict) -> None:
 
     action = args["action"]
     if type(action) is not str or action not in {"begin", "change", "apply", "cancel"}:
-        raise ValueError("unsupported overlay calibration action")
+        raise InvalidArgumentsError("unsupported overlay calibration action")
     if action != "change":
         if args.keys() != {"action"}:
-            raise ValueError("calibration field and value only apply to change")
+            raise InvalidArgumentsError("calibration field and value only apply to change")
         return
     if args.keys() != {"action", "field", "value"}:
-        raise ValueError("calibration change requires field and value only")
+        raise InvalidArgumentsError("calibration change requires field and value only")
     field = args["field"]
     value = args["value"]
     if type(field) is not str:
-        raise ValueError("calibration field must be a string")
+        raise InvalidArgumentsError("calibration field must be a string")
     if field == "anchor":
         if type(value) is not str or value not in OVERLAY_CALIBRATION_ANCHORS:
-            raise ValueError("unsupported calibration anchor")
+            raise InvalidArgumentsError("unsupported calibration anchor")
         return
     if field not in {"offset_x", "offset_y", "distance", "text_scale", "background_alpha"}:
-        raise ValueError("unsupported calibration field")
+        raise InvalidArgumentsError("unsupported calibration field")
     if type(value) not in (int, float) or not math.isfinite(value):
-        raise ValueError("calibration value must be a finite number")
+        raise InvalidArgumentsError("calibration value must be a finite number")
     if field in {"distance", "text_scale"} and value <= 0:
-        raise ValueError(f"{field} must be greater than zero")
+        raise InvalidArgumentsError(f"{field} must be greater than zero")
     if field == "background_alpha" and not 0 <= value <= 1:
-        raise ValueError("background_alpha must be between zero and one")
+        raise InvalidArgumentsError("background_alpha must be between zero and one")
 
 
 def _validate_stt_provider(value: object) -> None:
     if type(value) is not str or value not in {item.value for item in STTProviderName}:
-        raise ValueError("unsupported STT provider")
+        raise InvalidArgumentsError("unsupported STT provider")
 
 
 def _supported_language_codes() -> frozenset[str]:
@@ -2589,7 +2833,7 @@ def _validate_settings_field(
     choices: dict[str, set[str]] | None = None,
 ) -> None:
     if name not in SETTINGS_FIELDS:
-        raise ValueError("unknown settings field")
+        raise InvalidArgumentsError("unknown settings field")
     if name in BOOLEAN_FIELDS:
         valid = type(value) is bool
     elif name in NUMBER_FIELDS:
@@ -2605,7 +2849,7 @@ def _validate_settings_field(
     else:
         valid = type(value) is str
     if not valid:
-        raise ValueError("settings field has an invalid value type")
+        raise InvalidArgumentsError("settings field has an invalid value type")
 
     from puripuly_heart.config.desktop_overlay_values import (
         DESKTOP_FLET_SIZE_PRESET_ORDER,
@@ -2723,7 +2967,10 @@ def _validate_settings_field(
     elif name == "local_llm.base_url":
         valid = bool(value)
         if valid:
-            normalize_local_llm_base_url(value)
+            try:
+                normalize_local_llm_base_url(value)
+            except ValueError as exc:
+                raise InvalidArgumentsError("unsupported local LLM URL") from exc
     elif name == "local_llm.model":
         valid = bool(value)
     elif name in {"local_llm.extra_body_json", "stt.custom.extra_json"}:
@@ -2740,20 +2987,20 @@ def _validate_settings_field(
     elif name in {"audio.input_host_api", "audio.input_device", "audio.output_device"}:
         valid = choices is None or value in choices.get(name, set())
     if not valid:
-        raise ValueError("unsupported settings field value")
+        raise InvalidArgumentsError("unsupported settings field value")
 
 
 def _string(args: dict, key: str) -> str:
     value = args[key]
     if not isinstance(value, str):
-        raise ValueError(f"{key} must be a string")
+        raise InvalidArgumentsError(f"{key} must be a string")
     return value
 
 
 def _boolean(args: dict, key: str) -> bool:
     value = args[key]
     if not isinstance(value, bool):
-        raise ValueError(f"{key} must be a boolean")
+        raise InvalidArgumentsError(f"{key} must be a boolean")
     return value
 
 
@@ -2770,17 +3017,3 @@ def _transaction_status(result: TransactionResult) -> str:
     return "failed"
 
 
-def _transaction_data(result: TransactionResult) -> dict:
-    return {
-        "status": result.status,
-        "message": result.message.key if result.message is not None else None,
-        "diagnostics": (
-            {
-                "code": result.diagnostics.code,
-                "category": result.diagnostics.category,
-                "component": result.diagnostics.component,
-            }
-            if result.diagnostics is not None
-            else None
-        ),
-    }

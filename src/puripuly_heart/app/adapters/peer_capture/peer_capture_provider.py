@@ -7,6 +7,7 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
     ProviderRuntimeBuildRequest,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureProviderMutation,
     PeerCaptureProviderMutationStatus,
@@ -53,6 +54,7 @@ class PeerCaptureProviderAdapter:
         return self._mutation(
             result.status,
             getattr(result, "failure_code", None) or result.failure_type,
+            result.failure_diagnostics,
         )
 
     async def handoff(
@@ -70,6 +72,7 @@ class PeerCaptureProviderAdapter:
         return self._mutation(
             result.status,
             getattr(result, "failure_code", None) or result.failure_type,
+            result.failure_diagnostics,
         )
 
     async def cancel_handoff(self) -> bool:
@@ -122,12 +125,16 @@ class PeerCaptureProviderAdapter:
         return request
 
     @staticmethod
-    def _mutation(status: str, failure_type: str | None) -> PeerCaptureProviderMutation:
+    def _mutation(
+        status: str, failure_type: str | None, failure_diagnostics: ErrorDiagnostics | None
+    ) -> PeerCaptureProviderMutation:
         try:
             mapped_status = PeerCaptureProviderMutationStatus(status)
         except ValueError:
             mapped_status = PeerCaptureProviderMutationStatus.FAILED
-        return PeerCaptureProviderMutation(mapped_status, reason=failure_type)
+        return PeerCaptureProviderMutation(
+            mapped_status, reason=failure_type, failure_diagnostics=failure_diagnostics
+        )
 
 
 __all__ = ["PeerCaptureProviderAdapter"]

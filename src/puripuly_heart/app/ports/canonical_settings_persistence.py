@@ -6,11 +6,21 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 
 class CanonicalSettingsPersistenceError(RuntimeError):
-    def __init__(self, status: str, message: str | None = None) -> None:
+    def __init__(
+        self,
+        status: str,
+        message: str | None = None,
+        *,
+        diagnostics: ErrorDiagnostics | None = None,
+        secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
+    ) -> None:
         self.status = status
+        self.diagnostics = diagnostics
+        self.secondary_diagnostics = secondary_diagnostics
         super().__init__(message or status)
 
 

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
@@ -33,6 +34,11 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitRequest,
     SettingsRepositoryPort,
 )
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    safe_exception_fields,
+    sanitize_diagnostics,
+)
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -47,6 +53,8 @@ from puripuly_heart.core.messages import (
     TransactionResult,
     UserMessageRef,
 )
+
+logger = logging.getLogger(__name__)
 
 from .managed_auth_claims import (
     MANAGED_AUTH_CLAIM_SOURCE_DISCORD,
@@ -222,7 +230,7 @@ class ManagedConnectionAuthService:
                 phase="local_secret_write",
                 secret_write_succeeded=False,
                 settings_commit_succeeded=False,
-                diagnostics_present=broker_result.diagnostics is not None,
+                cause=broker_result.diagnostics,
                 message=broker_result.message,
             )
 
@@ -257,7 +265,7 @@ class ManagedConnectionAuthService:
                     phase="delivery_ack_token_store",
                     secret_write_succeeded=False,
                     settings_commit_succeeded=False,
-                    diagnostics_present=broker_result.diagnostics is not None,
+                    cause=broker_result.diagnostics,
                     message=broker_result.message,
                 )
             commit_result = await self._commit_settings(
@@ -265,7 +273,7 @@ class ManagedConnectionAuthService:
                 broker_result=broker_result,
                 settings_values=settings_values,
                 secret_message=None,
-                secret_diagnostics_present=False,
+                secret_diagnostics=None,
             )
             if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 return commit_result
@@ -293,7 +301,7 @@ class ManagedConnectionAuthService:
                 broker_result=broker_result,
                 settings_values=_settings_values_without_pending_operation(settings_values),
                 secret_message=secret_write_result.message,
-                secret_diagnostics_present=secret_write_result.diagnostics is not None,
+                secret_diagnostics=secret_write_result.diagnostics,
             )
             if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
                 return commit_result
@@ -313,27 +321,28 @@ class ManagedConnectionAuthService:
                     request=request,
                     broker_result=broker_result,
                     ack_status=ack_result.status,
-                    diagnostics_present=ack_result.diagnostics is not None,
+                    cause=ack_result.diagnostics,
                     message=ack_result.message or commit_result.message,
                 )
             try:
                 clear_result = await self.secret_store.clear_secret(
                     secret_key_for_ack_source(broker_result.delivery_ack.source)
                 )
-            except Exception:
+            except Exception as exc:
                 return _delivery_ack_pending_result(
                     request=request,
                     broker_result=broker_result,
                     ack_status="token_clear_failed",
-                    diagnostics_present=False,
+                    cause=None,
                     message=commit_result.message,
+                    exception=exc,
                 )
             if not clear_result.succeeded:
                 return _delivery_ack_pending_result(
                     request=request,
                     broker_result=broker_result,
                     ack_status="token_clear_failed",
-                    diagnostics_present=clear_result.diagnostics is not None,
+                    cause=clear_result.diagnostics,
                     message=clear_result.message or commit_result.message,
                 )
             self._apply_ack_referral(ack_result, broker_result.delivery_ack.source)
@@ -348,25 +357,54 @@ class ManagedConnectionAuthService:
                 broker_result=broker_result,
                 settings_values=cleared_values,
                 secret_message=commit_result.message,
-                secret_diagnostics_present=commit_result.diagnostics is not None,
+                secret_diagnostics=commit_result.diagnostics,
             )
             if clear_commit.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+                restoration_cause = None
                 try:
                     restore_result = await self.secret_store.set_secret(
                         secret_key_for_ack_source(broker_result.delivery_ack.source),
                         broker_result.delivery_ack.delivery_ack_token,
                     )
                     token_restored = restore_result.succeeded
-                except Exception:
+                except Exception as exc:
                     token_restored = False
+                    restoration_cause = _metadata_diagnostics(
+                        operation="restore_delivery_ack_token",
+                        code="delivery_ack_token_restore_failed",
+                        fields={"phase": "restore_delivery_ack_token"},
+                        exception=exc,
+                    )
+                else:
+                    if not token_restored:
+                        restoration_cause = restore_result.diagnostics or _metadata_diagnostics(
+                            operation="restore_delivery_ack_token",
+                            code="delivery_ack_token_restore_failed",
+                            fields={"phase": "restore_delivery_ack_token"},
+                        )
                 return _delivery_ack_pending_result(
                     request=request,
                     broker_result=broker_result,
                     ack_status=(
                         "metadata_clear_failed" if token_restored else "token_restore_failed"
                     ),
-                    diagnostics_present=clear_commit.diagnostics is not None,
+                    cause=clear_commit.diagnostics,
                     message=clear_commit.message or commit_result.message,
+                    secondary_diagnostics=(
+                        *clear_commit.secondary_diagnostics,
+                        *(
+                            (
+                                replace(
+                                    restoration_cause,
+                                    cause_id=clear_commit.diagnostics.diagnostic_id
+                                    if clear_commit.diagnostics is not None
+                                    else restoration_cause.cause_id,
+                                ),
+                            )
+                            if restoration_cause is not None
+                            else ()
+                        ),
+                    )[:4],
                 )
             commit_result = clear_commit
 
@@ -427,7 +465,8 @@ class ManagedConnectionAuthService:
     async def _local_secret_present(self, request: ManagedConnectionAuthRequest) -> bool:
         try:
             stored = await self.secret_store.get_secret(request.local_secret_key)
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             return False
         return stored is not None and bool(stored.value)
 
@@ -437,13 +476,15 @@ class ManagedConnectionAuthService:
             cleared = clear_pending_operation_if_source(state, MANAGED_OPERATION_SOURCE_DISCORD)
             if cleared:
                 state.persist()
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             pass
         if not cleared:
             return
         try:
             await clear_resume_token(self.secret_store)
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             pass
 
     async def _ensure_pending_operation(
@@ -460,7 +501,7 @@ class ManagedConnectionAuthService:
                 code="managed_operation_state_unavailable",
                 phase="persist_managed_operation",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
             )
         installation_id = identity_result.local_identity_revision or state.installation_id
         installation_id = installation_id.strip() if isinstance(installation_id, str) else ""
@@ -471,7 +512,7 @@ class ManagedConnectionAuthService:
                 code="managed_operation_installation_unavailable",
                 phase="persist_managed_operation",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
             )
         pending = read_pending_operation(state)
         existing_token = await read_resume_token(self.secret_store)
@@ -493,7 +534,7 @@ class ManagedConnectionAuthService:
                 code="managed_operation_token_store_failed_before_issue",
                 phase="persist_managed_operation",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
             )
         operation = ManagedOperationIdentity(
             operation_id=new_managed_operation_id(),
@@ -504,7 +545,7 @@ class ManagedConnectionAuthService:
         write_pending_operation(state, operation)
         try:
             state.persist()
-        except Exception:
+        except Exception as exc:
             await self._clear_terminal_operation(state)
             return _pre_issue_failed_result(
                 request=request,
@@ -512,7 +553,8 @@ class ManagedConnectionAuthService:
                 code="managed_operation_persist_failed_before_issue",
                 phase="persist_managed_operation",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
+                exception=exc,
             )
         return (operation, resume_token)
 
@@ -568,7 +610,8 @@ class ManagedConnectionAuthService:
                 resume_token,
                 operation.installation_id,
             )
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             first_probe = None
         if first_probe is None or (
             not first_probe.succeeded
@@ -625,7 +668,8 @@ class ManagedConnectionAuthService:
                     source=MANAGED_OPERATION_SOURCE_DISCORD,
                 )
             )
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             return None
 
     async def _call_resume(
@@ -642,7 +686,8 @@ class ManagedConnectionAuthService:
                     source=MANAGED_OPERATION_SOURCE_DISCORD,
                 )
             )
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             return None
 
     async def _drive_operation_recovery(
@@ -740,7 +785,8 @@ class ManagedConnectionAuthService:
                 update_pending_operation_state(state, probe.operation_status)
                 try:
                     state.persist()
-                except Exception:
+                except Exception as exc:
+                    _observe_managed_failure("managed_authentication", exc)
                     return _operation_recovery_pending_result(
                         request, operation=operation, polls=polls
                     )
@@ -850,7 +896,8 @@ class ManagedConnectionAuthService:
             self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
             try:
                 self.claim_guard.managed_state.persist()
-            except Exception:
+            except Exception as exc:
+                _observe_managed_failure("managed_authentication", exc)
                 return _operation_recovery_pending_result(request, operation=operation, polls=0)
         await self._clear_terminal_operation_safe()
         return TransactionResult(
@@ -903,7 +950,8 @@ class ManagedConnectionAuthService:
                     self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
                     try:
                         self.claim_guard.managed_state.persist()
-                    except Exception:
+                    except Exception as exc:
+                        _observe_managed_failure("managed_authentication", exc)
                         return _operation_recovery_pending_result(
                             request, operation=operation, polls=0
                         )
@@ -960,7 +1008,7 @@ class ManagedConnectionAuthService:
             return _delivery_ack_recovery_pending_result(
                 request=request,
                 ack_status=result.status,
-                diagnostics_present=result.diagnostics is not None,
+                cause=result.diagnostics,
                 message=message,
             )
         if result.status == "none":
@@ -969,7 +1017,8 @@ class ManagedConnectionAuthService:
             self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
             try:
                 self.claim_guard.managed_state.persist()
-            except Exception:
+            except Exception as exc:
+                _observe_managed_failure("managed_authentication", exc)
                 return TransactionResult(
                     status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
                     message=message,
@@ -1017,14 +1066,15 @@ class ManagedConnectionAuthService:
                     metadata=request.broker_metadata,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return _pre_issue_failed_result(
                 request=request,
                 operation="preflight_managed_identity",
                 code="local_identity_preflight_exception",
                 phase="local_identity_preflight",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
+                exception=exc,
             )
 
         if not identity_result.succeeded or not identity_result.local_public_key:
@@ -1034,7 +1084,7 @@ class ManagedConnectionAuthService:
                 code="local_identity_preflight_failed",
                 phase="local_identity_preflight",
                 message=identity_result.message,
-                diagnostics_present=identity_result.diagnostics is not None,
+                cause=identity_result.diagnostics,
             )
 
         return identity_result
@@ -1050,14 +1100,15 @@ class ManagedConnectionAuthService:
                     metadata=request.broker_metadata,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return _pre_issue_failed_result(
                 request=request,
                 operation="start_discord_auth",
                 code="discord_auth_exception",
                 phase="discord_auth",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
+                exception=exc,
             )
 
         if not discord_result.succeeded or not _discord_auth_issue_material_present(discord_result):
@@ -1067,7 +1118,7 @@ class ManagedConnectionAuthService:
                 code="discord_auth_failed",
                 phase="discord_auth",
                 message=discord_result.message,
-                diagnostics_present=discord_result.diagnostics is not None,
+                cause=discord_result.diagnostics,
             )
 
         return discord_result
@@ -1100,14 +1151,15 @@ class ManagedConnectionAuthService:
                     metadata=request.broker_metadata,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return _pre_issue_failed_result(
                 request=request,
                 operation="issue_managed_connection",
                 code="broker_issue_exception",
                 phase="broker_issue",
                 message=None,
-                diagnostics_present=False,
+                cause=None,
+                exception=exc,
             )
 
         if not broker_result.succeeded:
@@ -1118,7 +1170,7 @@ class ManagedConnectionAuthService:
                     code="broker_issue_unknown_outcome",
                     phase="broker_issue",
                     message=broker_result.message,
-                    diagnostics_present=broker_result.diagnostics is not None,
+                    cause=broker_result.diagnostics,
                 )
             return _pre_issue_failed_result(
                 request=request,
@@ -1126,7 +1178,7 @@ class ManagedConnectionAuthService:
                 code="broker_issue_failed",
                 phase="broker_issue",
                 message=broker_result.message,
-                diagnostics_present=broker_result.diagnostics is not None,
+                cause=broker_result.diagnostics,
             )
 
         return broker_result
@@ -1143,7 +1195,7 @@ class ManagedConnectionAuthService:
                 request.local_secret_key,
                 broker_result.managed_secret_key,
             )
-        except Exception:
+        except Exception as exc:
             return _remote_active_local_missing_result(
                 request=request,
                 broker_result=broker_result,
@@ -1152,8 +1204,9 @@ class ManagedConnectionAuthService:
                 phase="local_secret_write",
                 secret_write_succeeded=False,
                 settings_commit_succeeded=False,
-                diagnostics_present=False,
+                cause=None,
                 message=None,
+                exception=exc,
             )
 
         if not secret_write_result.succeeded:
@@ -1165,7 +1218,7 @@ class ManagedConnectionAuthService:
                 phase="local_secret_write",
                 secret_write_succeeded=False,
                 settings_commit_succeeded=False,
-                diagnostics_present=secret_write_result.diagnostics is not None,
+                cause=secret_write_result.diagnostics,
                 message=secret_write_result.message,
             )
 
@@ -1178,7 +1231,7 @@ class ManagedConnectionAuthService:
         broker_result: BrokerIssueResult,
         settings_values: Mapping[str, object],
         secret_message: UserMessageRef | None,
-        secret_diagnostics_present: bool,
+        secret_diagnostics: ErrorDiagnostics | None,
     ) -> TransactionResult:
         try:
             settings_commit_result = await self.settings_repository.save(
@@ -1188,7 +1241,7 @@ class ManagedConnectionAuthService:
                     reason=request.reason,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return _remote_active_local_missing_result(
                 request=request,
                 broker_result=broker_result,
@@ -1197,8 +1250,9 @@ class ManagedConnectionAuthService:
                 phase="local_settings_commit",
                 secret_write_succeeded=True,
                 settings_commit_succeeded=False,
-                diagnostics_present=False,
+                cause=None,
                 message=secret_message,
+                exception=exc,
             )
 
         if not settings_commit_result.succeeded or settings_commit_result.snapshot is None:
@@ -1210,31 +1264,14 @@ class ManagedConnectionAuthService:
                 phase="local_settings_commit",
                 secret_write_succeeded=True,
                 settings_commit_succeeded=False,
-                diagnostics_present=settings_commit_result.diagnostics is not None,
+                cause=settings_commit_result.diagnostics,
                 message=settings_commit_result.message or secret_message,
             )
 
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
             message=settings_commit_result.message or secret_message,
-            diagnostics=(
-                settings_commit_result.diagnostics
-                if settings_commit_result.diagnostics is not None
-                else (
-                    _metadata_diagnostics(
-                        operation="commit_settings",
-                        code="settings_commit_succeeded_after_managed_issue",
-                        fields={
-                            "phase": "local_settings_commit",
-                            "secret_write_succeeded": True,
-                            "settings_commit_succeeded": True,
-                            "secret_diagnostics_present": secret_diagnostics_present,
-                        },
-                    )
-                    if secret_diagnostics_present
-                    else None
-                )
-            ),
+            diagnostics=settings_commit_result.diagnostics or secret_diagnostics,
         )
 
     async def _store_managed_user_identifier(
@@ -1256,7 +1293,8 @@ class ManagedConnectionAuthService:
                 OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
                 installation_id,
             )
-        except Exception:
+        except Exception as exc:
+            _observe_managed_failure("managed_authentication", exc)
             await self._clear_managed_user_identifier()
             return
         if not user_write.succeeded or not installation_write.succeeded:
@@ -1269,7 +1307,8 @@ class ManagedConnectionAuthService:
         ):
             try:
                 await self.secret_store.clear_secret(key)
-            except Exception:
+            except Exception as exc:
+                _observe_managed_failure("managed_authentication", exc)
                 pass
 
     def _record_successful_claim_after_commit(
@@ -1284,7 +1323,7 @@ class ManagedConnectionAuthService:
         self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
         try:
             self.claim_guard.managed_state.persist()
-        except Exception:
+        except Exception as exc:
             return _remote_active_local_missing_result(
                 request=request,
                 broker_result=broker_result,
@@ -1293,8 +1332,9 @@ class ManagedConnectionAuthService:
                 phase="local_claim_persist",
                 secret_write_succeeded=True,
                 settings_commit_succeeded=True,
-                diagnostics_present=False,
+                cause=None,
                 message=message,
+                exception=exc,
             )
         return None
 
@@ -1381,7 +1421,8 @@ def _pre_issue_failed_result(
     code: str,
     phase: str,
     message: UserMessageRef | None,
-    diagnostics_present: bool,
+    cause: ErrorDiagnostics | None,
+    exception: BaseException | None = None,
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
@@ -1389,13 +1430,16 @@ def _pre_issue_failed_result(
         diagnostics=_metadata_diagnostics(
             operation=operation,
             code=code,
+            cause=cause,
+            exception=exception,
             fields={
                 "phase": phase,
                 "local_secret_key": request.local_secret_key,
                 "remote_active": False,
-                "diagnostics_present": diagnostics_present,
+                "diagnostics_present": cause is not None,
             },
         ),
+        secondary_diagnostics=(sanitize_diagnostics(cause),) if cause is not None else (),
     )
 
 
@@ -1502,7 +1546,8 @@ def _remote_active_local_missing_result(
     phase: str,
     secret_write_succeeded: bool,
     settings_commit_succeeded: bool,
-    diagnostics_present: bool,
+    cause: ErrorDiagnostics | None,
+    exception: BaseException | None = None,
     message: UserMessageRef | None,
 ) -> TransactionResult:
     fields: dict[str, DiagnosticFieldValue] = {
@@ -1512,7 +1557,7 @@ def _remote_active_local_missing_result(
         "broker_issue_succeeded": True,
         "secret_write_succeeded": secret_write_succeeded,
         "settings_commit_succeeded": settings_commit_succeeded,
-        "diagnostics_present": diagnostics_present,
+        "diagnostics_present": cause is not None,
     }
     if broker_result.broker_connection_id is not None:
         fields["broker_connection_id"] = broker_result.broker_connection_id
@@ -1525,7 +1570,10 @@ def _remote_active_local_missing_result(
             operation=operation,
             code=code,
             fields=fields,
+            cause=cause,
+            exception=exception,
         ),
+        secondary_diagnostics=(sanitize_diagnostics(cause),) if cause is not None else (),
     )
 
 
@@ -1534,29 +1582,41 @@ def _delivery_ack_pending_result(
     request: ManagedConnectionAuthRequest,
     broker_result: BrokerIssueResult,
     ack_status: str,
-    diagnostics_present: bool,
+    cause: ErrorDiagnostics | None,
+    exception: BaseException | None = None,
     message: UserMessageRef | None,
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
 ) -> TransactionResult:
     fields: dict[str, DiagnosticFieldValue] = {
         "phase": "remote_delivery_ack",
         "local_secret_key": request.local_secret_key,
-        "remote_active": False,
+        "remote_active": ack_status
+        in {"token_clear_failed", "metadata_clear_failed", "token_restore_failed"},
         "broker_issue_succeeded": True,
         "secret_write_succeeded": True,
         "settings_commit_succeeded": True,
         "delivery_ack_status": ack_status,
-        "diagnostics_present": diagnostics_present,
     }
-    if broker_result.managed_credential_ref is not None:
-        fields["managed_credential_ref"] = broker_result.managed_credential_ref
+    safe_cause = sanitize_diagnostics(cause) if cause is not None else None
     return TransactionResult(
         status=TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
         message=message,
-        diagnostics=_metadata_diagnostics(
-            operation="acknowledge_managed_key_delivery",
-            code="remote_delivery_ack_pending",
+        diagnostics=replace(
+            safe_cause,
+            fields={**fields, **safe_cause.fields},
+        )
+        if safe_cause is not None
+        else _metadata_diagnostics(
+            operation="clear_delivery_ack_token"
+            if ack_status == "token_clear_failed"
+            else "acknowledge_managed_key_delivery",
+            code="delivery_ack_token_clear_failed"
+            if ack_status == "token_clear_failed"
+            else "remote_delivery_ack_pending",
             fields=fields,
+            exception=exception,
         ),
+        secondary_diagnostics=secondary_diagnostics[:4],
     )
 
 
@@ -1564,7 +1624,8 @@ def _delivery_ack_recovery_pending_result(
     *,
     request: ManagedConnectionAuthRequest,
     ack_status: str,
-    diagnostics_present: bool,
+    cause: ErrorDiagnostics | None,
+    exception: BaseException | None = None,
     message: UserMessageRef | None,
 ) -> TransactionResult:
     return TransactionResult(
@@ -1573,13 +1634,16 @@ def _delivery_ack_recovery_pending_result(
         diagnostics=_metadata_diagnostics(
             operation="recover_managed_key_delivery",
             code="delivery_ack_recovery_pending",
+            cause=cause,
+            exception=exception,
             fields={
                 "phase": "remote_delivery_ack_recovery",
                 "local_secret_key": request.local_secret_key,
                 "delivery_ack_status": ack_status,
-                "diagnostics_present": diagnostics_present,
+                "diagnostics_present": cause is not None,
             },
         ),
+        secondary_diagnostics=(sanitize_diagnostics(cause),) if cause is not None else (),
     )
 
 
@@ -1778,17 +1842,44 @@ def _metadata_diagnostics(
     operation: str,
     code: str,
     fields: Mapping[str, DiagnosticFieldValue],
+    cause: ErrorDiagnostics | None = None,
+    exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
-    return ErrorDiagnostics(
+    if cause is None and exception is not None:
+        candidate = getattr(exception, "diagnostics", None)
+        cause = candidate if isinstance(candidate, ErrorDiagnostics) else None
+    cause = sanitize_diagnostics(cause) if cause is not None else None
+    diagnostics = ErrorDiagnostics(
         component="managed_connection_auth",
         operation=operation,
         code=code,
         category=DIAGNOSTIC_CATEGORY_TRANSACTION,
         visibility=DIAGNOSTIC_VISIBILITY_BASIC,
         content_policy=CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
-        fields=fields,
+        status_code=cause.status_code if cause else None,
+        retry_after_ms=cause.retry_after_ms if cause else None,
+        fields={
+            **(cause.fields if cause else {}),
+            **fields,
+            **(safe_exception_fields(exception) if exception is not None else {}),
+        },
+        cause_id=cause.diagnostic_id if cause else None,
+    )
+    return sanitize_diagnostics(diagnostics)
+
+
+def _observe_managed_failure(phase: str, exception: BaseException) -> None:
+    emit_failure(
+        logger,
+        _metadata_diagnostics(
+            operation=phase,
+            code="managed_application_failed",
+            fields={"phase": phase, "observation_succeeded": False},
+            exception=exception,
+        ),
+        severity="warning",
+        disposition="degraded",
+        stage=phase,
     )
 
 

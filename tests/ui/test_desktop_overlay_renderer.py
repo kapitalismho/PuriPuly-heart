@@ -5603,8 +5603,11 @@ async def test_desktop_overlay_malformed_initial_snapshot_is_startup_error_with_
         await server.wait_closed()
 
     expected = {"type": "startup_error", "failure_reason": "renderer_init_failed"}
-    assert bridge_event == expected
-    assert expected in sink.events
+    assert bridge_event["type"] == expected["type"]
+    assert bridge_event["failure_reason"] == expected["failure_reason"]
+    assert bridge_event["cause_class_1"] == "ValueError"
+    assert bridge_event["overlay_instance_id"] == "desktop-overlay-test"
+    assert any(event.get("failure_reason") == "renderer_init_failed" for event in sink.events)
     assert sink.events[-1] == {
         "type": "shutdown_complete",
         "overlay_instance_id": "desktop-overlay-test",
@@ -5659,10 +5662,9 @@ async def test_desktop_overlay_rejects_unframed_initial_runtime_controls() -> No
         server.close()
         await server.wait_closed()
 
-    assert bridge_event == {
-        "type": "startup_error",
-        "failure_reason": "runtime_control_invalid",
-    }
+    assert bridge_event["type"] == "startup_error"
+    assert bridge_event["failure_reason"] == "runtime_control_invalid"
+    assert bridge_event["overlay_instance_id"] == "desktop-overlay-test"
     assert window.snapshots == []
 
 
@@ -5730,8 +5732,11 @@ async def test_desktop_overlay_window_start_failure_reports_window_configuration
         await bridge.stop()
 
     expected = {"type": "startup_error", "failure_reason": "window_configuration_failed"}
-    assert bridge_event == expected
-    assert expected in sink.events
+    assert bridge_event["type"] == expected["type"]
+    assert bridge_event["failure_reason"] == expected["failure_reason"]
+    assert bridge_event["exception_class"] == "RuntimeError"
+    assert bridge_event["overlay_instance_id"] == "desktop-overlay-test"
+    assert any(event.get("failure_reason") == "window_configuration_failed" for event in sink.events)
     assert sink.events[-1] == {
         "type": "shutdown_complete",
         "overlay_instance_id": "desktop-overlay-test",
@@ -6143,10 +6148,9 @@ async def test_desktop_overlay_invalid_runtime_control_reports_error_without_dis
         }
         runtime_error = await asyncio.wait_for(received.get(), timeout=1.0)
 
-        assert runtime_error == {
-            "type": "runtime_error",
-            "failure_reason": "runtime_control_invalid",
-        }
+        assert runtime_error["type"] == "runtime_error"
+        assert runtime_error["failure_reason"] == "runtime_control_invalid"
+        assert runtime_error["overlay_instance_id"] == "desktop-overlay-test"
         assert window.runtime_controls == []
         assert await asyncio.wait_for(run_task, timeout=1.0) == 1
     finally:
@@ -6269,7 +6273,9 @@ async def test_desktop_overlay_parent_monitor_loss_reports_error_and_shutdown_is
         parent_monitor.exited.set()
         runtime_error = await _next_bridge_event(bridge, expected_type="runtime_error")
 
-        assert runtime_error == {"type": "runtime_error", "failure_reason": "runtime_disconnected"}
+        assert runtime_error["type"] == "runtime_error"
+        assert runtime_error["failure_reason"] == "runtime_disconnected"
+        assert runtime_error["overlay_instance_id"] == "desktop-overlay-test"
         assert await asyncio.wait_for(run_task, timeout=1.0) == 1
 
         await renderer.shutdown()
@@ -6371,3 +6377,66 @@ def test_desktop_renderer_on_legacy_active_peer_source_stays_promoted_primary() 
     assert line.slot == "primary"
     assert line.promoted is True
     assert line.font_size == plan.primary_font_size
+
+
+@pytest.mark.asyncio
+async def test_desktop_shutdown_retains_failed_window_and_retries_independent_resources() -> None:
+    class FailedWindow(FakeRendererWindow):
+        async def close(self) -> None:
+            self.close_calls += 1
+            if self.close_calls == 1:
+                raise OSError(5, "SYNTHETIC_PRIVATE_PERSONAL_PATH_CREDENTIAL")
+
+    sink = RecordingLifecycleSink()
+    window = FailedWindow()
+    port = RecordingRendererDiagnosticPort()
+    monitor = ClosableFakeParentMonitor()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(), window=window, lifecycle_sink=sink,
+        diagnostic_port=port, parent_monitor=monitor,
+    )
+    await renderer.shutdown()
+    assert port.closed
+    assert monitor.close_calls == 1
+    assert renderer.is_shutdown is False
+    receipt = renderer.diagnostic_delivery_receipt()
+    assert receipt["cleanup_failure_reason"] == "shutdown_cleanup_failed"
+    assert receipt["cleanup_fields"]["exception_class"] == "OSError"
+    assert receipt["cleanup_fields"]["errno"] == 5
+    assert "SYNTHETIC_PRIVATE" not in json.dumps(receipt)
+    assert not any(event["type"] == "shutdown_complete" for event in sink.events)
+    await renderer.shutdown()
+    assert renderer.is_shutdown is True
+    assert window.close_calls == 2
+    assert monitor.close_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["window", "ui_update"])
+async def test_desktop_runtime_window_failure_preserves_safe_cause(boundary: str) -> None:
+    class FailedWindow(FakeRendererWindow):
+        async def run_until_closed(self) -> None:
+            raise OSError(5, "SYNTHETIC_PRIVATE_CREDENTIAL_BODY_PATH")
+
+        async def dispatch_runtime_control(self, payload: dict[str, object]) -> None:
+            raise OSError(5, "SYNTHETIC_PRIVATE_CREDENTIAL_BODY_PATH")
+
+    sink = RecordingLifecycleSink()
+    renderer = desktop_overlay.DesktopOverlayRenderer(
+        _manifest(), window=FailedWindow(), lifecycle_sink=sink,
+        parent_monitor=FakeParentMonitor(),
+    )
+    try:
+        if boundary == "window":
+            outcome = await renderer._window_loop()
+        else:
+            await renderer.enqueue_runtime_control({"type": "runtime_control"})
+            outcome = await renderer._ui_update_loop()
+        assert outcome is not None and outcome.exit_code == 1
+        failure = next(event for event in sink.events if event["type"] == "runtime_error")
+        assert failure["failure_reason"] == "window_configuration_failed"
+        assert failure["exception_class"] == "OSError"
+        assert failure["errno"] == 5
+        assert "SYNTHETIC_PRIVATE" not in json.dumps(sink.events)
+    finally:
+        await renderer.shutdown()

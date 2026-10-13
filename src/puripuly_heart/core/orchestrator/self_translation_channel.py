@@ -5,11 +5,12 @@ import logging
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from typing import Protocol
+from typing import Literal, Protocol
 from uuid import UUID, uuid4
 
 from puripuly_heart.core.audio.ownership import OwnedStreamInput, OwnedVadEvent
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import current_diagnostic_operation
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.local_asr.local_asr_provider_runtime import (
     LocalASRProviderRuntimePort,
@@ -68,6 +69,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTRecognitionUnit,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
 from puripuly_heart.core.stt.recognition_units import recognition_transcript
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
 from puripuly_heart.domain.events import (
@@ -84,6 +86,13 @@ from puripuly_heart.domain.models import Transcript, Translation
 _PROMO_INTERVAL_SEC = 300.0
 
 
+@dataclass(frozen=True, slots=True)
+class TextSubmissionAdmission:
+    status: Literal["admitted", "rejected"]
+    turn_id: UUID
+    child_turn_ids: tuple[UUID, ...]
+
+
 class SelfTranslationChannelPort(Protocol):
     async def handle_vad_event(self, event: VadEvent) -> None: ...
 
@@ -93,7 +102,7 @@ class SelfTranslationChannelPort(Protocol):
 
     async def handle_stt_event_loop_exception(self, exc: Exception) -> None: ...
 
-    async def submit_text(self, text: str, *, source: str = "You") -> UUID: ...
+    async def submit_text(self, text: str, *, source: str = "You") -> TextSubmissionAdmission: ...
 
     def mark_promo_eligible(self) -> None: ...
 
@@ -129,6 +138,7 @@ class SelfTranslationChannelOwner:
     _scoped_publication_text: dict[STTProviderTurnIdentity, str] = field(default_factory=dict)
     _scoped_endpoint_publication_ids: dict[UUID, UUID] = field(default_factory=dict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
+    _scoped_terminal_reports: OrderedDict[STTProviderTurnIdentity, None] = field(default_factory=OrderedDict)
     _task_scope: LifecycleScope = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -331,11 +341,12 @@ class SelfTranslationChannelOwner:
         if len(self._retired_local_vad_ids) > 4096:
             self._retired_local_vad_ids.popitem(last=False)
 
-    async def submit_text(self, text: str, *, source: str = "You") -> UUID:
+    async def submit_text(self, text: str, *, source: str = "You") -> TextSubmissionAdmission:
         self._require_ingress()
         text = text.strip()
         if not text:
             raise ValueError("text must be non-empty")
+        operation_identity = current_diagnostic_operation()
         utterance_id = uuid4()
         self.runtime.remember_source(utterance_id, source)
         transcript = Transcript(
@@ -344,16 +355,23 @@ class SelfTranslationChannelOwner:
             is_final=True,
             created_at=self.clock.now(),
         )
-        await self._handle_transcript(transcript, is_final=True, source=source)
-        await self._ensure_translation(
+        await self._handle_transcript(
+            transcript, is_final=True, source=source, **operation_identity
+        )
+        child_ids = await self._ensure_translation(
             transcript,
             turn_kind="manual",
             wait_for_parent=(
                 not self.translation_requests.provider_available
                 or not self.config_snapshot().value.translation_enabled
             ),
+            **operation_identity,
         )
-        return utterance_id
+        return TextSubmissionAdmission(
+            status="admitted" if child_ids else "rejected",
+            turn_id=utterance_id,
+            child_turn_ids=child_ids,
+        )
 
     async def handle_recognition_unit(self, unit: STTRecognitionUnit) -> None:
         self._require_ingress()
@@ -505,16 +523,27 @@ class SelfTranslationChannelOwner:
                     event.outcome,
                     event.identity.provider_epoch_id,
                     event.identity.provider_turn_id,
-                    event.failure_reason or event.outcome,
+                    recognition_cause(event.failure_reason),
                     level=(logging.ERROR if event.outcome == "failed" else logging.INFO),
                 )
-            if self._scoped_terminal_requires_user_error(event):
+            if (
+                self._scoped_terminal_requires_user_error(event)
+                and event.identity not in self._scoped_terminal_reports
+            ):
+                self._scoped_terminal_reports[event.identity] = None
+                if len(self._scoped_terminal_reports) > 4096:
+                    self._scoped_terminal_reports.popitem(last=False)
                 scope_provider = (
                     event.identity.settings_scope[0] if event.identity.settings_scope else "stt"
                 )
                 report = self.diagnostics.record_stt_turn_failure(
                     SttTurnFailureDiagnostic(
-                        exception=RuntimeError(event.failure_reason or event.outcome),
+                        exception=None,
+                        failure_diagnostics=event.failure_diagnostics or recognition_failure_diagnostics(
+                            None, provider=str(scope_provider), channel="self",
+                            operation="turn_terminal", reason=event.failure_reason or event.outcome,
+                            identity=event.identity,
+                        ),
                         provider=scope_provider,
                         channel="self",
                     )
@@ -646,6 +675,7 @@ class SelfTranslationChannelOwner:
             "closed",
             "stopped",
             "toggle_off",
+            "stream_input_ownership_changed",
         }:
             return False
         return True
@@ -683,6 +713,8 @@ class SelfTranslationChannelOwner:
                 is_final=True,
                 source=child.source,
                 parent_utterance_id=child.parent_utterance_id,
+                operation_id=child.operation_id,
+                request_id=child.request_id,
             )
 
     async def on_parent_admitted(
@@ -962,6 +994,8 @@ class SelfTranslationChannelOwner:
         is_final: bool,
         source: str | None,
         parent_utterance_id: UUID | None = None,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> None:
         if transcript.channel != "self":
             raise ValueError("Self translation owner received a non-Self transcript")
@@ -979,6 +1013,8 @@ class SelfTranslationChannelOwner:
                     utterance_id=transcript.utterance_id,
                     payload=transcript,
                     source=source,
+                    operation_id=operation_id,
+                    request_id=request_id,
                 )
             )
             if not is_final:
@@ -1020,7 +1056,9 @@ class SelfTranslationChannelOwner:
         prestarted_secondary_translation: _PrestartedTranslation | None = None,
         wait_for_parent: bool = False,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-    ) -> None:
+        operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> tuple[UUID, ...]:
         config_snapshot = config_snapshot or self.config_snapshot()
         source = self.runtime.get_source(transcript.utterance_id) or "Mic"
         child_ids = await self.translation_turns.submit(
@@ -1032,6 +1070,8 @@ class SelfTranslationChannelOwner:
                 precomputed_translation=precomputed_translation,
                 prestarted_secondary_translation=prestarted_secondary_translation,
                 config_snapshot=config_snapshot,
+                operation_id=operation_id,
+                request_id=request_id,
             ),
             wait_for_parent=wait_for_parent,
         )
@@ -1039,6 +1079,7 @@ class SelfTranslationChannelOwner:
             for utterance_id, task in tuple(self.runtime.translation_tasks.items()):
                 if task is prestarted_secondary_translation.task:
                     self.runtime.translation_tasks.pop(utterance_id, None)
+        return child_ids
 
     def _process_request_for_child(
         self,
@@ -1065,6 +1106,8 @@ class SelfTranslationChannelOwner:
             turn_order=child.turn_order,
             turn_kind=child.turn_kind,
             parent_output_count=child.parent_output_count,
+            operation_id=child.operation_id,
+            request_id=child.request_id,
         )
 
     def _send_stt_connected_notification(self) -> None:

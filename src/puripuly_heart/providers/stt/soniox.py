@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, ClassVar, Literal, Sequence
 from uuid import uuid4
 
@@ -17,6 +17,7 @@ from websockets.exceptions import ProtocolError
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -31,7 +32,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
-from puripuly_heart.core.stt.diagnostics import recognition_cause
+from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
@@ -250,12 +251,43 @@ class SonioxRealtimeSTTBackend(STTBackend):
                         return True
                     if isinstance(message, bytes):
                         message = message.decode("utf-8", errors="ignore")
-                    data = json.loads(message)
+                    try:
+                        data = json.loads(message)
+                    except json.JSONDecodeError as exc:
+                        exc.failure_diagnostics = recognition_failure_diagnostics(
+                            exc, provider="soniox", channel=None, operation="probe",
+                            reason="soniox_protocol_ambiguity",
+                        )
+                        raise
+                    if not isinstance(data, dict):
+                        error = TypeError("Soniox verification response was not an object")
+                        error.failure_diagnostics = recognition_failure_diagnostics(
+                            error, provider="soniox", channel=None, operation="probe",
+                            reason="soniox_protocol_ambiguity",
+                        )
+                        raise error
                     if "error" in data or "error_code" in data or "error_type" in data:
-                        raise RuntimeError("Soniox request failed")
+                        code = _safe_code(data.get("error_code"), maximum=999999)
+                        diagnostics = recognition_failure_diagnostics(
+                            None, provider="soniox", channel=None, operation="probe",
+                            reason="soniox_request_failed",
+                        )
+                        if type(code) is int:
+                            diagnostics = replace(
+                                diagnostics, status_code=code if 100 <= code <= 599 else None,
+                                category={
+                                    401: "auth", 403: "auth", 408: "timeout", 429: "rate_limit",
+                                    500: "service_unavailable", 502: "service_unavailable",
+                                    503: "service_unavailable", 504: "service_unavailable",
+                                }.get(code, "unknown"),
+                                fields={**diagnostics.fields, "provider_code": code},
+                            )
+                        error = RuntimeError("Soniox request failed")
+                        error.failure_diagnostics = diagnostics
+                        raise error
                     return True
             except Exception:
-                raise Exception("Connection failed") from None
+                raise
 
         return await _check()
 
@@ -281,6 +313,7 @@ class _SonioxSession(STTBackendSession):
 
     speaker_session_scope: str = field(init=False, default_factory=lambda: uuid4().hex)
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
+    _failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
     _audio_q: asyncio.Queue[bytes | _AudioWrite | object] = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
     _send_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
@@ -371,9 +404,13 @@ class _SonioxSession(STTBackendSession):
                         continue
                     self._handle_message(message)
                     code = _safe_code(data.get("error_code"), maximum=999999)
-                    if not _retryable_server_error(data, code):
-                        raise PermanentSTTScopedSessionError("soniox_request_failed") from None
-                    raise RuntimeError("soniox_request_failed") from None
+                    error = (
+                        PermanentSTTScopedSessionError("soniox_request_failed")
+                        if not _retryable_server_error(data, code)
+                        else RuntimeError("soniox_request_failed")
+                    )
+                    error.failure_diagnostics = self._failure_diagnostics
+                    raise error from exc
             if not _retryable_transport_failure("soniox_write_failed", exc, self._ws):
                 raise PermanentSTTScopedSessionError("soniox_connection_rejected") from exc
             raise
@@ -883,6 +920,23 @@ class _SonioxSession(STTBackendSession):
             idle_fin_received=protocol_detail == "fin_without_turn",
         )
         provider_turn_id = identity.provider_turn_id if identity is not None else None
+        diagnostics = recognition_failure_diagnostics(
+            exception, provider="soniox", channel=self._event_projection.channel or "unknown",
+            operation="protocol" if trigger == "protocol_error" else "receive",
+            reason=reason, identity=identity,
+        )
+        if type(server_error_code) is int:
+            diagnostics = replace(
+                diagnostics,
+                status_code=server_error_code if 100 <= server_error_code <= 599 else None,
+                fields={**diagnostics.fields, "provider_code": server_error_code},
+                category={
+                    401: "auth", 403: "auth", 408: "timeout", 429: "rate_limit",
+                    500: "service_unavailable", 502: "service_unavailable",
+                    503: "service_unavailable", 504: "service_unavailable",
+                }.get(server_error_code, "unknown"),
+            )
+        self._failure_diagnostics = diagnostics
         if identity is not None:
             text = "".join(token.text for token in self._scoped_tokens)
             self._event_projection.terminal(
@@ -897,6 +951,7 @@ class _SonioxSession(STTBackendSession):
                     failure_retryable=failure_retryable,
                     epoch_disposition="retire",
                     provenance=tuple(self._scoped_provenance),
+                    failure_diagnostics=diagnostics,
                 )
             )
         self._clear_scoped_turn()
@@ -905,6 +960,7 @@ class _SonioxSession(STTBackendSession):
             reason=reason,
             provider_turn_id=provider_turn_id,
             failure_retryable=failure_retryable,
+            failure_diagnostics=diagnostics,
         )
 
     @staticmethod

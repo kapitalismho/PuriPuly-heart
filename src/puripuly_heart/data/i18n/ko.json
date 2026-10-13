@@ -544,6 +544,7 @@
   "provider.openrouter.payment_required": "크레딧 잔액을 확인해주세요.",
   "stt.failure": "음성 인식 오류가 발생했어요({category}). 다시 시도해 주세요.",
   "settings.mutation.runtime_apply_failed": "설정은 저장됐지만 런타임 적용에 실패했어요.",
+  "settings.mutation.failed_pending": "설정 변경이 완료되지 않았어요. 편집 내용은 대기 상태로 유지돼요.",
   "debug_preview.qq_auth_recoverable_error": "QQ 복구 가능 오류",
   "debug_preview.qq_auth_translation_gated": "QQ 번역 게이트",
   "managed_auth.error.claim_conflict": "이 기기에는 이미 다른 Managed 인증 기록이 있어요.",

@@ -544,6 +544,7 @@
   "provider.openrouter.payment_required": "请检查积分余额。",
   "stt.failure": "语音识别出错（{category}）。请重试。",
   "settings.mutation.runtime_apply_failed": "设置已保存，但运行时应用失败。",
+  "settings.mutation.failed_pending": "设置更改未完成。编辑内容仍处于待应用状态。",
   "debug_preview.qq_auth_recoverable_error": "QQ 可恢复错误",
   "debug_preview.qq_auth_translation_gated": "QQ 翻译门控",
   "managed_auth.error.claim_conflict": "这台设备已有其他 Managed 认证记录。",

@@ -650,8 +650,8 @@ def _assert_remote_active_unsafe_settings_rejection(
     assert result.diagnostics.fields["settings_values_accepted"] is False
     assert result.diagnostics.fields["secret_write_succeeded"] is False
     assert result.diagnostics.fields["settings_commit_succeeded"] is False
-    assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
-    assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+    assert "broker_connection_id" not in result.diagnostics.fields
+    assert "remote_key_revision" not in result.diagnostics.fields
 
 
 def test_request_and_port_dtos_are_frozen_slotted_and_repr_safe() -> None:
@@ -1441,8 +1441,8 @@ async def test_broker_success_then_secret_write_failure_reports_remote_active_lo
     assert result.diagnostics.fields["phase"] == "local_secret_write"
     assert result.diagnostics.fields["remote_active"] is True
     assert result.diagnostics.fields["secret_write_succeeded"] is False
-    assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
-    assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+    assert "broker_connection_id" not in result.diagnostics.fields
+    assert "remote_key_revision" not in result.diagnostics.fields
 
 
 @pytest.mark.asyncio
@@ -1488,8 +1488,8 @@ async def test_broker_success_then_settings_commit_failure_reports_remote_active
     assert result.diagnostics.fields["remote_active"] is True
     assert result.diagnostics.fields["secret_write_succeeded"] is True
     assert result.diagnostics.fields["settings_commit_succeeded"] is False
-    assert result.diagnostics.fields["broker_connection_id"] == "broker-conn-1"
-    assert result.diagnostics.fields["remote_key_revision"] == "remote-r1"
+    assert "broker_connection_id" not in result.diagnostics.fields
+    assert "remote_key_revision" not in result.diagnostics.fields
 
 
 def _operation_status_result(

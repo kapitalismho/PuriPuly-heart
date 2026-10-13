@@ -24,7 +24,6 @@ from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityState
 from puripuly_heart.app.services.managed.managed_operation import (
     MANAGED_OPERATION_RESUME_TOKEN_SECRET,
     MANAGED_OPERATION_SOURCE_DISCORD,
-    is_valid_operation_id,
     is_valid_resume_token,
     new_managed_operation_id,
     new_managed_operation_resume_token,
@@ -46,6 +45,7 @@ from puripuly_heart.core.discord_oauth_loopback import (
     DiscordOAuthLoopbackListener,
     bind_first_available,
 )
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.hardware_fingerprint import compute_hardware_hash
 from puripuly_heart.core.llm.provider import LLMProvider
 from puripuly_heart.core.managed_identity import (
@@ -53,6 +53,8 @@ from puripuly_heart.core.managed_identity import (
     load_existing_managed_identity_bundle,
     regenerate_managed_identity_bundle,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_operation_id
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.domain.models import Translation
@@ -149,6 +151,7 @@ class ManagedOpenRouterReleaseDiagnostics:
     subcode: str | None = None
     retry_after_ms: int | None = None
     message: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 def format_managed_openrouter_diagnostics(
@@ -268,18 +271,32 @@ class ManagedOpenRouterReleaseError(Exception):
     retry_after_ms: int | None = None
     managed_lifecycle: str | None = None
     http_status: int | None = field(default=None, compare=False)
+    failure_diagnostics: ErrorDiagnostics | None = field(default=None, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.failure_diagnostics is None:
+            object.__setattr__(
+                self, "failure_diagnostics",
+                provider_failure_report(
+                    self, provider="openrouter", operation="provider_build"
+                ).diagnostics,
+            )
 
     def __str__(self) -> str:
         return self.message or self.code
 
     def to_diagnostics(self) -> ManagedOpenRouterReleaseDiagnostics:
+        diagnostics = provider_failure_report(
+            self, provider="openrouter", operation="provider_build"
+        ).diagnostics
+        object.__setattr__(self, "failure_diagnostics", diagnostics)
         return ManagedOpenRouterReleaseDiagnostics(
             operation=self.operation,
             code=self.code,
             error_class=self.error_class,
             subcode=self.subcode,
             retry_after_ms=self.retry_after_ms,
-            message=self.message,
+            failure_diagnostics=self.failure_diagnostics,
         )
 
 
@@ -1797,29 +1814,20 @@ class ManagedOpenRouterUserFacingError(RuntimeError):
     message_key: str
     message_kwargs: Mapping[str, object] = field(default_factory=dict)
     diagnostics: ManagedOpenRouterReleaseDiagnostics | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
+
+    def __post_init__(self) -> None:
+        if self.failure_diagnostics is None and self.diagnostics is not None:
+            self.failure_diagnostics = self.diagnostics.failure_diagnostics
 
     def __str__(self) -> str:
-        parts = [
-            "ManagedOpenRouterUserFacingError",
-            f"message_key={_safe_diagnostic_label(self.message_key) or 'unknown'}",
-        ]
-        for key, value in sorted(self.message_kwargs.items()):
-            safe_key = _safe_diagnostic_label(key)
-            if not safe_key:
-                continue
-            if isinstance(value, str):
-                continue
-            safe_value = _safe_diagnostic_scalar(value)
-            if safe_value is not None:
-                parts.append(f"{safe_key}={safe_value}")
-
-        diagnostics = self.diagnostics
-        if diagnostics is not None:
-            for name in ("operation", "code", "error_class", "subcode", "retry_after_ms"):
-                safe_value = _safe_diagnostic_scalar(getattr(diagnostics, name, None))
-                if safe_value is not None:
-                    parts.append(f"{name}={safe_value}")
-        return " ".join(parts)
+        diagnostics = self.failure_diagnostics
+        if diagnostics is None:
+            return "ManagedOpenRouterUserFacingError cause=unknown"
+        return (
+            f"ManagedOpenRouterUserFacingError code={diagnostics.code or 'unknown'} "
+            f"category={diagnostics.category} status={diagnostics.status_code}"
+        )
 
 
 def _safe_diagnostic_label(value: object) -> str | None:
@@ -1880,13 +1888,18 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
             except Exception as exc:
                 raise ManagedOpenRouterUserFacingError(
                     message_key="managed_release.retry",
-                    diagnostics=ManagedOpenRouterReleaseDiagnostics(message=str(exc)),
+                    failure_diagnostics=provider_failure_report(
+                        exc, provider="openrouter", operation="provider_build"
+                    ).diagnostics,
                 ) from exc
             if not isinstance(result, ManagedOpenRouterReleaseResult):
                 raise ManagedOpenRouterUserFacingError(
                     message_key="managed_release.retry",
-                    diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                        message="managed release service returned an unsupported result"
+                    failure_diagnostics=replace(
+                        provider_failure_report(
+                            None, provider="openrouter", operation="provider_build"
+                        ).diagnostics,
+                        category="invalid_response", code="provider.invalid_response",
                     ),
                 )
             if result.behavior != ManagedOpenRouterReleaseBehavior.READY or not result.api_key:
@@ -1900,7 +1913,9 @@ class ManagedOpenRouterLLMProvider(LLMProvider):
             except Exception as exc:
                 raise ManagedOpenRouterUserFacingError(
                     message_key="managed_release.retry",
-                    diagnostics=ManagedOpenRouterReleaseDiagnostics(message=str(exc)),
+                    failure_diagnostics=provider_failure_report(
+                        exc, provider="openrouter", operation="provider_build"
+                    ).diagnostics,
                 ) from exc
             if self.on_delegate_ready is not None:
                 callback_result = self.on_delegate_ready()

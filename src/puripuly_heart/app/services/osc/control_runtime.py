@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
+import logging
 import time
 from collections.abc import Callable, Mapping
 
@@ -18,7 +19,13 @@ from puripuly_heart.app.ports.ui_models import (
     OscControlPresentationState,
 )
 from puripuly_heart.app.services.vrc_mic_sync import VrcMicSyncOwner
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    safe_exception_fields,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.oscquery import (
     VRCHAT_OSC_DEFAULT_INPUT_PORT,
     OscQueryRuntime,
@@ -27,7 +34,9 @@ from puripuly_heart.core.runtime.oscquery import (
 from .control_application import SettingsBackedOscControlApplication
 from .control_router import OscControlRouter
 from .noop_query import NoopOscQueryService
-from .state_publisher import OscCanonicalState, OscStatePublisher
+from .state_publisher import OscCanonicalState, OscStatePublicationError, OscStatePublisher
+
+logger = logging.getLogger(__name__)
 
 
 class OscControlIntegrationOwner:
@@ -78,6 +87,8 @@ class OscControlIntegrationOwner:
         self._automatic_query_task: asyncio.Task[None] | None = None
         self._scope = LifecycleScope("OscControlIntegrationOwner")
         self._query_failure: str | None = None
+        self._publication_failure: ErrorDiagnostics | None = None
+        self._resync_operation_identity: dict[str, str | None] = {}
         self._apply_settings_callback = apply_settings
 
         application = SettingsBackedOscControlApplication(
@@ -192,6 +203,16 @@ class OscControlIntegrationOwner:
                 else None
             ),
             "query_failure": self._query_failure,
+            "state_publication": (
+                {
+                    "diagnostic_id": self._publication_failure.diagnostic_id,
+                    "code": self._publication_failure.code,
+                    "local_send_completed": self._publication_failure.fields.get("local_send_completed"),
+                    "local_send_requested": self._publication_failure.fields.get("local_send_requested"),
+                    "disposition": "partial" if self._publication_failure.fields.get("local_send_completed", 0) else "failed",
+                }
+                if self._publication_failure is not None else None
+            ),
             "local_availability": availability,
             "remote_delivery": "unacknowledged",
         }
@@ -334,8 +355,20 @@ class OscControlIntegrationOwner:
                 or self._closed
             ):
                 return
-            self._query_failure = type(exc).__name__
-            self._report_error(f"OSCQuery automatic discovery unavailable: {type(exc).__name__}")
+            self._query_failure = "oscquery_unavailable"
+            emit_failure(
+                logger,
+                ErrorDiagnostics(
+                    component="osc_control", operation="discovery", code="oscquery_unavailable",
+                    category="network", visibility="basic", content_policy="metadata_only",
+                    status_code=None, retry_after_ms=None,
+                    fields={"remote_delivery": "unacknowledged"},
+                    generation=resync_generation,
+                    **self._resync_operation_identity,
+                ),
+                severity="warning", disposition="degraded", stage="automatic_discovery",
+                exception=exc,
+            )
             await self._receiver_owner.ensure_receiver()
             await self._set_sender_destination(self._host, VRCHAT_OSC_DEFAULT_INPUT_PORT)
             self._publish_start(resync_generation)
@@ -452,6 +485,7 @@ class OscControlIntegrationOwner:
 
     def _begin_resync(self) -> int:
         self._resync_generation += 1
+        self._resync_operation_identity = current_diagnostic_operation()
         self._resync_deadline = time.monotonic() + self._resync_timeout_seconds
         self._resync_unsettled = set(OSC_PARAMETER_DEFINITIONS)
         self._resync_ready_generation = None
@@ -487,10 +521,12 @@ class OscControlIntegrationOwner:
         if publisher is None:
             return
         try:
-            publisher.start(self._state_provider())
-        except Exception:
+            published = publisher.start(self._state_provider())
+        except Exception as exc:
+            self._record_publication_failure("startup_state", exc, origin=self._resync_operation_identity)
             return
         self._mark_resync_ready(generation)
+        self._record_publication_success("startup_state", len(published))
 
     def _publish_delta(self) -> None:
         if self._mode == "off":
@@ -498,8 +534,12 @@ class OscControlIntegrationOwner:
         publisher = self._ensure_publisher()
         if publisher is None:
             return
-        with contextlib.suppress(Exception):
-            publisher.publish_state(self._state_provider())
+        try:
+            published = publisher.publish_state(self._state_provider())
+        except Exception as exc:
+            self._record_publication_failure("delta_state", exc)
+        else:
+            self._record_publication_success("delta_state", len(published))
 
     def publish_delta(self) -> None:
         self._publish_delta()
@@ -511,9 +551,11 @@ class OscControlIntegrationOwner:
         if publisher is None:
             return
         try:
-            publisher.publish_full(self._state_provider())
-        except Exception:
+            published = publisher.publish_full(self._state_provider())
+        except Exception as exc:
+            self._record_publication_failure("full_state", exc)
             return
+        self._record_publication_success("full_state", len(published))
 
     async def _publish_snapshot(
         self,
@@ -530,15 +572,50 @@ class OscControlIntegrationOwner:
         try:
             state = self._state_provider()
             if reason == "avatar_change":
-                publisher.on_avatar_change(state)
+                published = publisher.on_avatar_change(state)
             elif reason == "discovery":
-                publisher.on_discovery(state)
+                published = publisher.on_discovery(state)
             else:
-                publisher.start(state)
+                published = publisher.start(state)
         except Exception as exc:
-            self._report_error(f"OSC state publication failed: {type(exc).__name__}")
+            self._record_publication_failure("snapshot_state", exc, origin=self._resync_operation_identity if generation is not None else None)
             return
         self._mark_resync_ready(generation)
+        self._record_publication_success("snapshot_state", len(published))
+
+    def _record_publication_failure(
+        self, stage: str, exception: Exception, *, origin: dict[str, str | None] | None = None
+    ) -> None:
+        fields = {"remote_delivery": "unacknowledged", **safe_exception_fields(exception)}
+        if isinstance(exception, OscStatePublicationError):
+            fields.update(
+                local_send_completed=exception.completed,
+                local_send_requested=exception.requested,
+            )
+        diagnostics = ErrorDiagnostics(
+            component="osc_control", operation="publish_state", code="osc_state_send_failed",
+            category="network", visibility="basic", content_policy="metadata_only",
+            status_code=None, retry_after_ms=None, fields=fields,
+            generation=self._resync_generation,
+            **(current_diagnostic_operation() if origin is None else origin),
+        )
+        self._publication_failure = diagnostics
+        emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=stage)
+
+    def _record_publication_success(self, stage: str, completed: int) -> None:
+        failure = self._publication_failure
+        self._publication_failure = None
+        if failure is None:
+            return
+        diagnostics = ErrorDiagnostics(
+            component="osc_control", operation="publish_state", code="osc_state_send_recovered",
+            category="network", visibility="basic", content_policy="metadata_only",
+            status_code=None, retry_after_ms=None,
+            fields={"local_send_completed": completed, "local_send_requested": completed, "remote_delivery": "unacknowledged"},
+            generation=self._resync_generation, cause_id=failure.diagnostic_id,
+            operation_id=failure.operation_id, request_id=failure.request_id,
+        )
+        emit_failure(logger, diagnostics, severity="info", disposition="recovered", stage=stage)
 
     async def _inspect_avatar_tree(self, tree: object) -> None:
         parameters = _extract_avatar_parameters(tree)

@@ -79,7 +79,6 @@ from puripuly_heart.app.services.local_asr_readiness import (
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialSelectedModelProvider,
-    ProviderCredentialVerificationDiagnosticsSink,
     ProviderCredentialVerificationErrorSink,
     ProviderCredentialVerificationInteractionOwner,
     ProviderCredentialVerificationOwner,
@@ -138,7 +137,6 @@ def create_manual_typing_owner(
     output_provider: Callable[[], SelfChatboxTypingPort | None],
     completion_provider: Callable[[object], object | None],
     log_diagnostic: Callable[[str], object],
-    log_error: Callable[[str], object],
     idle_timeout_seconds: float,
     submit_timeout_seconds: float,
 ) -> ManualTypingOwner:
@@ -146,7 +144,6 @@ def create_manual_typing_owner(
         output_provider=output_provider,
         completion_provider=completion_provider,
         log_diagnostic=log_diagnostic,
-        log_error=log_error,
         idle_timeout_seconds=idle_timeout_seconds,
         submit_timeout_seconds=submit_timeout_seconds,
     )
@@ -158,13 +155,11 @@ def create_provider_credential_verification_interaction_owner(
     selected_model_provider: ProviderCredentialSelectedModelProvider,
     connection_provider: Callable[[str], AlibabaConnection] | None = None,
     low_latency: bool,
-    diagnostics_sink: ProviderCredentialVerificationDiagnosticsSink | None = None,
     error_sink: ProviderCredentialVerificationErrorSink | None = None,
 ) -> ProviderCredentialVerificationInteractionOwner:
     return ProviderCredentialVerificationInteractionOwner(
         verification_owner=ProviderCredentialVerificationOwner(
             verifier=verifier,
-            diagnostics_sink=diagnostics_sink,
         ),
         selected_model_provider=selected_model_provider,
         connection_provider=connection_provider,

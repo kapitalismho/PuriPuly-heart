@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterStatusRefreshResult,
     TalkTogetherPassStatus,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter_handoff import is_effectively_exhausted
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 
@@ -374,10 +377,43 @@ class ManagedUsageOwner:
         )
 
     def _warn(self, message: str, exception: BaseException | None = None) -> None:
+        diagnostics = getattr(exception, "diagnostics", None)
+        if exception is not None:
+            if not isinstance(diagnostics, ErrorDiagnostics):
+                diagnostics = ErrorDiagnostics(
+                    component="managed_usage",
+                    operation="managed_usage_refresh",
+                    code="managed_usage_refresh_failed",
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"phase": "managed_usage_refresh", **safe_exception_fields(exception)},
+                )
+            emit_failure(
+                logging.getLogger(__name__), diagnostics, severity="warning", disposition="degraded"
+            )
         try:
             self.warning_sink(message, exception)
-        except Exception:
-            return
+        except Exception as exc:
+            secondary = ErrorDiagnostics(
+                component="managed_usage",
+                operation="auth_notification",
+                code="managed_usage_notification_failed",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"phase": "auth_notification", **safe_exception_fields(exc)},
+                cause_id=diagnostics.diagnostic_id
+                if isinstance(diagnostics, ErrorDiagnostics)
+                else None,
+            )
+            emit_failure(
+                logging.getLogger(__name__), secondary, severity="warning", disposition="degraded"
+            )
 
 
 __all__ = [

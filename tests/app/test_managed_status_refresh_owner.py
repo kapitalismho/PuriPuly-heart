@@ -88,3 +88,41 @@ async def test_owner_rejects_new_refresh_work_after_ingress_stops() -> None:
     assert invoked is False
 
     await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_refresh_keeps_admission_identity_and_secondary_notification_cause(caplog):
+    from uuid import uuid4
+
+    from puripuly_heart.core.diagnostics import diagnostic_operation
+
+    instance_id, operation_id, request_id = (uuid4().hex for _ in range(3))
+    failure = RuntimeError("synthetic_secret_provider_body")
+    finished = asyncio.Event()
+
+    async def fail():
+        finished.set()
+        raise failure
+
+    def fail_notification(event, metadata, exception):
+        raise TypeError("synthetic_secret_provider_body")
+
+    owner = ManagedStatusRefreshOwner(diagnostics_sink=fail_notification)
+    with diagnostic_operation(instance_id, operation_id, request_id):
+        assert owner.schedule_status_refresh(fail)
+    await finished.wait()
+    await asyncio.sleep(0)
+    await owner.close()
+    diagnostic = failure.diagnostics
+    assert diagnostic.operation_id == operation_id
+    assert diagnostic.request_id == request_id
+    assert diagnostic.generation == 1
+    assert diagnostic.fields["exception_class"] == "RuntimeError"
+    causes = [
+        record._puripuly_heart_failure[0]
+        for record in caplog.records
+        if hasattr(record, "_puripuly_heart_failure")
+    ]
+    assert causes[-1].cause_id == diagnostic.diagnostic_id
+    assert causes[-1].fields["exception_class"] == "TypeError"
+    assert "synthetic_secret_provider_body" not in caplog.text

@@ -112,6 +112,8 @@ class UIEvent:
     channel: ChannelId | None = None
     runtime_log_handled: bool = False
     delivery_authority: UIEventDeliveryAuthority | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         resolved_channel = self.channel

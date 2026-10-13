@@ -28,7 +28,6 @@ from puripuly_heart.core.messages import (
     DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
     SEVERITY_ERROR,
     SEVERITY_INFO,
-    SEVERITY_WARNING,
     ErrorDiagnostics,
 )
 from puripuly_heart.core.observability import (
@@ -93,9 +92,9 @@ class _StructuredObservabilitySink:
         self.persisted_records.append(record)
 
 
-class _SynchronousFailingRuntimeLogSink:
-    def emit_runtime_log(self, _event: RuntimeLogEvent) -> Awaitable[None]:
-        raise RuntimeError("synchronous runtime-log sink failure")
+class _SynchronousFailingProviderObservationSink:
+    def emit_provider_observation(self, _event: ProviderObservationEvent) -> Awaitable[None]:
+        raise RuntimeError("synchronous provider-observation sink failure")
 
 
 class _CloseRaisingAwaitable:
@@ -112,11 +111,11 @@ class _CloseRaisingAwaitable:
         raise RuntimeError("awaitable close failure")
 
 
-class _CloseRaisingRuntimeLogSink:
+class _CloseRaisingProviderObservationSink:
     def __init__(self) -> None:
         self.awaitable = _CloseRaisingAwaitable()
 
-    def emit_runtime_log(self, _event: RuntimeLogEvent) -> Awaitable[None]:
+    def emit_provider_observation(self, _event: ProviderObservationEvent) -> Awaitable[None]:
         return self.awaitable
 
 
@@ -173,7 +172,7 @@ class _BlockingStream:
 def _wait_for_log_text(log_file, text: str) -> None:
     deadline = time.monotonic() + 2.0
     while time.monotonic() < deadline:
-        if text in log_file.read_text(encoding="utf-8"):
+        if log_file.exists() and text in log_file.read_text(encoding="utf-8"):
             return
         time.sleep(0.01)
     assert text in log_file.read_text(encoding="utf-8")
@@ -229,7 +228,7 @@ def test_persisted_records_identify_date_and_process_without_changing_live_outpu
         logging.INFO,
         __file__,
         1,
-        "[Test] correlation",
+        "[Lifecycle] boundary",
         (),
         None,
         extra={LIVE_AUDIENCE_RECORD_ATTRIBUTE: LIVE_AUDIENCE_BASIC},
@@ -263,8 +262,8 @@ def test_configure_main_logging_routes_file_writes_through_queue(tmp_path) -> No
         assert sinks.file_queue_handler in root_logger.handlers
         assert sinks.file_handler not in root_logger.handlers
 
-        root_logger.info("[Test] queued_file_record")
-        _wait_for_log_text(sinks.log_file, "queued_file_record")
+        root_logger.info("[Lifecycle] boundary phase=enqueue")
+        _wait_for_log_text(sinks.log_file, "phase=enqueue")
     finally:
         sinks.close()
 
@@ -415,6 +414,7 @@ def test_configure_main_logging_names_single_backup_with_log_extension(tmp_path)
             tmp_path / "puripuly_heart.backup.log"
         )
 
+        sinks.file_handler.stream = sinks.file_handler._open()
         sinks.file_handler.stream.write("old log line\n")
         sinks.file_handler.flush()
         sinks.file_handler.doRollover()
@@ -459,8 +459,8 @@ def test_configure_main_logging_keeps_shared_queue_alive_until_last_close(tmp_pa
         first.close()
         assert second.file_queue_handler in root_logger.handlers
 
-        root_logger.info("[Test] second_writer_active")
-        _wait_for_log_text(second.log_file, "second_writer_active")
+        root_logger.info("[Lifecycle] boundary phase=send")
+        _wait_for_log_text(second.log_file, "phase=send")
 
         second.close()
         assert second.file_queue_handler not in root_logger.handlers
@@ -498,11 +498,11 @@ def test_terminal_logging_owner_drains_and_releases_supplied_sinks(tmp_path) -> 
     session = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
     owner = RuntimeLoggingService(session_service=session)
     try:
-        owner.emit_persisted("[Lifecycle] terminal_delivery_sentinel")
+        owner.emit_persisted("[Lifecycle] boundary phase=cleanup")
         owner.close_after_producers_stop()
         released = tmp_path / "released.log"
         sinks.log_file.replace(released)
-        assert "terminal_delivery_sentinel" in released.read_text(encoding="utf-8")
+        assert "phase=cleanup" in released.read_text(encoding="utf-8")
     finally:
         owner.close_after_producers_stop()
         sinks.close(force=True)
@@ -523,8 +523,8 @@ def test_default_session_logging_services_share_queue_until_last_close(
         assert second.log_file == first.log_file
 
         first.close()
-        second.emit_basic("service two writes after service one close")
-        _wait_for_log_text(second.log_file, "service two writes after service one close")
+        second.emit_basic("[Lifecycle] boundary phase=readiness")
+        _wait_for_log_text(second.log_file, "[Lifecycle] boundary phase=readiness")
 
         second.close()
         queue_handlers = [
@@ -544,8 +544,8 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
     second_dir = tmp_path / "second"
 
     first = configure_main_logging(root_logger=root_logger, log_dir=first_dir)
-    root_logger.info("[Test] before_log_dir_switch")
-    _wait_for_log_text(first.log_file, "before_log_dir_switch")
+    root_logger.info("[Lifecycle] boundary phase=begin")
+    _wait_for_log_text(first.log_file, "phase=begin")
 
     second = configure_main_logging(root_logger=root_logger, log_dir=second_dir)
 
@@ -553,9 +553,9 @@ def test_configure_main_logging_removes_stale_queue_when_log_dir_changes(tmp_pat
         assert first.file_queue_handler not in root_logger.handlers
         assert second.file_queue_handler in root_logger.handlers
 
-        root_logger.info("[Test] after_log_dir_switch")
-        _wait_for_log_text(second.log_file, "after_log_dir_switch")
-        assert "after_log_dir_switch" not in first.log_file.read_text(encoding="utf-8")
+        root_logger.info("[Lifecycle] boundary phase=seal")
+        _wait_for_log_text(second.log_file, "phase=seal")
+        assert "phase=seal" not in first.log_file.read_text(encoding="utf-8")
     finally:
         first.close()
         second.close()
@@ -571,16 +571,16 @@ def test_bounded_file_queue_drops_under_pressure_without_blocking_producers(tmp_
     assert sinks.file_queue_handler is not None
     delaying_handler = _DelayingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Test] hold_listener",
+        delayed_message="[Lifecycle] boundary phase=source_read",
     )
     sinks.file_queue_listener.handlers = (delaying_handler,)
 
     try:
-        root_logger.info("[Test] hold_listener")
+        root_logger.info("[Lifecycle] boundary phase=source_read")
         _wait_until(lambda: delaying_handler.started)
         started = time.monotonic()
         for index in range(3000):
-            root_logger.info("[Test] pressure index=%s", index)
+            root_logger.info("[Lifecycle] boundary attempts=%s", index)
         elapsed = time.monotonic() - started
 
         assert elapsed < 1.0
@@ -598,30 +598,30 @@ def test_file_queue_reserves_capacity_and_evicts_info_before_error(tmp_path) -> 
     assert sinks.file_queue_handler is not None
     delaying_handler = _DelayingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Test] hold_priority_listener",
+        delayed_message="[Lifecycle] boundary phase=provider_warmup",
         delay_s=1.0,
     )
     sinks.file_queue_listener.handlers = (delaying_handler,)
 
     try:
-        root_logger.info("[Test] hold_priority_listener")
+        root_logger.info("[Lifecycle] boundary phase=provider_warmup")
         _wait_until(lambda: delaying_handler.started)
         for index in range(3000):
-            root_logger.info("[Test] low_value index=%s", index)
-        root_logger.error("[Provider] terminal_failure cause=unavailable")
+            root_logger.info("[Lifecycle] boundary attempts=%s", index)
+        root_logger.error("[Provider] provider.network")
 
         assert sinks.file_queue is not None
         with sinks.file_queue.mutex:
             retained = [record.getMessage() for record in sinks.file_queue.queue]
-        assert retained[-1] == "[Provider] terminal_failure cause=unavailable"
+        assert retained[-1] == "[Provider] provider.network"
         retained_indexes = [
             int(message.rpartition("=")[2])
             for message in retained[:-1]
-            if message.startswith("[Test] low_value index=")
+            if message.startswith("[Lifecycle] boundary attempts=")
         ]
         assert retained_indexes == sorted(retained_indexes)
         assert sinks.file_queue_handler.dropped_records > 0
-        _wait_for_log_text(sinks.log_file, "terminal_failure")
+        _wait_for_log_text(sinks.log_file, "provider.network")
     finally:
         sinks.close()
 
@@ -638,6 +638,7 @@ def test_timed_out_close_leaves_listener_owned_cleanup_and_prevents_second_write
     sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
     listener = sinks.file_queue_listener
     assert listener is not None
+    sinks.file_handler.stream = sinks.file_handler._open()
     original_stream = sinks.file_handler.stream
     assert original_stream is not None
     blocked_stream = _BlockingStream(original_stream)
@@ -680,7 +681,7 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
     assert sinks.file_queue_handler is not None
     delaying_handler = _DelayingForwardingHandler(
         sinks.file_handler,
-        delayed_message="[Test] hold_terminal_listener",
+        delayed_message="[Lifecycle] boundary phase=source_open",
         delay_s=0.5,
     )
     sinks.file_queue_listener.handlers = (delaying_handler,)
@@ -690,21 +691,21 @@ def test_terminal_file_record_survives_queue_pressure_and_later_reports_loss(tmp
     )
 
     try:
-        root_logger.info("[Test] hold_terminal_listener")
+        root_logger.info("[Lifecycle] boundary phase=source_open")
         _wait_until(lambda: delaying_handler.started)
         assert sinks.file_queue is not None
         for _ in range(3000):
-            root_logger.info("[Test] queued_pressure")
+            root_logger.info("[Lifecycle] boundary phase=event_loop")
 
-        runtime_logging.emit_persisted("[Lifecycle] terminal-one")
-        _wait_for_log_text(sinks.log_file, "[Lifecycle] terminal-one")
-        runtime_logging.emit_persisted("[Lifecycle] terminal-two")
-        _wait_for_log_text(sinks.log_file, "[Lifecycle] terminal-two")
+        runtime_logging.emit_persisted("[Lifecycle] boundary phase=abort")
+        _wait_for_log_text(sinks.log_file, "[Lifecycle] boundary phase=abort")
+        runtime_logging.emit_persisted("[Lifecycle] boundary phase=seal")
+        _wait_for_log_text(sinks.log_file, "[Lifecycle] boundary phase=seal")
 
         terminal_two = next(
             line
             for line in sinks.log_file.read_text(encoding="utf-8").splitlines()
-            if "[Lifecycle] terminal-two" in line
+            if "[Lifecycle] boundary phase=seal" in line
         )
         assert re.search(r"logging_delivery_dropped=[1-9]\d*", terminal_two)
         assert "logging_delivery_failures=0" in terminal_two
@@ -766,8 +767,8 @@ def test_emit_persisted_delivers_through_file_queue(tmp_path) -> None:
     runtime_logging = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
 
     try:
-        runtime_logging.emit_persisted("[Lifecycle] persisted_critical_record")
-        _wait_for_log_text(sinks.log_file, "persisted_critical_record")
+        runtime_logging.emit_persisted("[Lifecycle] boundary phase=cleanup")
+        _wait_for_log_text(sinks.log_file, "phase=cleanup")
     finally:
         runtime_logging.close()
         sinks.close()
@@ -790,16 +791,16 @@ def test_emit_persisted_preserves_queued_record_order_before_direct_write(tmp_pa
         runtime_logging.emit_basic("basic before persisted")
         _wait_until(lambda: delaying_handler.started)
 
-        runtime_logging.emit_persisted("[Lifecycle] persisted_after_queued_basic")
+        runtime_logging.emit_persisted("[Lifecycle] boundary phase=enqueue")
 
         _wait_for_log_text(sinks.log_file, "basic before persisted")
-        _wait_for_log_text(sinks.log_file, "persisted_after_queued_basic")
+        _wait_for_log_text(sinks.log_file, "phase=enqueue")
         log_lines = sinks.log_file.read_text(encoding="utf-8").splitlines()
         basic_index = next(
             index for index, line in enumerate(log_lines) if "basic before persisted" in line
         )
         persisted_index = next(
-            index for index, line in enumerate(log_lines) if "persisted_after_queued_basic" in line
+            index for index, line in enumerate(log_lines) if "phase=enqueue" in line
         )
         assert basic_index < persisted_index
     finally:
@@ -1021,8 +1022,8 @@ def test_configure_main_logging_reconfigures_after_close(tmp_path) -> None:
     try:
         assert second.file_queue_handler is not first.file_queue_handler
         assert second.file_queue_handler in root_logger.handlers
-        root_logger.info("[Test] after_reconfigure")
-        _wait_for_log_text(second.log_file, "after_reconfigure")
+        root_logger.info("[Lifecycle] boundary phase=receive")
+        _wait_for_log_text(second.log_file, "phase=receive")
     finally:
         second.close()
 
@@ -1044,62 +1045,17 @@ def test_emit_diagnostic_lazy_formats_for_file_audience_only() -> None:
         runtime_logging.close()
 
 
-@pytest.mark.asyncio
-async def test_session_runtime_logging_emits_structured_events_without_changing_text() -> None:
-    stream = io.StringIO()
-    stream_handler = logging.StreamHandler(stream)
-    runner = _ObservabilityRunner()
-    sink = _StructuredObservabilitySink()
-    runtime_logging = SessionRuntimeLoggingService(
-        root_logger=logging.getLogger(f"test.runtime_logging.structured.root.{uuid4()}"),
-        session_logger=logging.getLogger(f"test.runtime_logging.structured.session.{uuid4()}"),
-        sinks=RuntimeLoggingSinks(
-            stream_handler=stream_handler,
-            file_handler=logging.NullHandler(),
-            log_file=Path("runtime.log"),
-        ),
-        runtime_log_sink=sink,
-        diagnostics_sink=sink,
-        persisted_diagnostic_store=sink,
-        observability_runner=runner,
-    )
-
+def test_plain_runtime_text_does_not_mint_unknown_diagnostic_events() -> None:
+    runtime_logging, stream = _make_runtime_logging_capture()
+    events: list[dict] = []
+    runtime_logging.configure_diagnostics(instance_id=uuid4().hex, event_sink=events.append)
     try:
         runtime_logging.emit_basic("legacy basic text", level=logging.WARNING)
         assert runtime_logging.emit_diagnostic("first diagnostic text") is True
-        assert (
-            runtime_logging.emit_diagnostic("second diagnostic text", level=logging.ERROR) is True
-        )
         runtime_logging.emit_persisted("legacy persisted text", level=logging.ERROR)
-        await runner.drain()
-
         assert stream.getvalue().splitlines() == ["legacy basic text"]
-        assert [event.visibility for event in sink.runtime_events] == [
-            DIAGNOSTIC_VISIBILITY_BASIC,
-        ]
-        assert [event.severity for event in sink.runtime_events] == [
-            SEVERITY_WARNING,
-        ]
-        for event in sink.runtime_events:
-            assert event.category == DIAGNOSTIC_CATEGORY_UNKNOWN
-            assert event.content_policy == CONTENT_POLICY_METADATA_ONLY
-            assert isinstance(event.correlation_id, str)
-            assert event.message is None
-            assert event.diagnostics is None
-            assert event.fields["renderer"] == "legacy_text"
-            field_text = repr(dict(event.fields))
-            assert "first diagnostic text" not in field_text
-            assert "second diagnostic text" not in field_text
-
-        assert [event.visibility for event in sink.diagnostic_events] == [
-            DIAGNOSTIC_VISIBILITY_BASIC,
-        ]
-        persisted = sink.persisted_records[-1]
-        assert persisted.storage_key == "runtime.log"
-        assert persisted.diagnostic.severity == SEVERITY_ERROR
-        assert persisted.diagnostic.visibility == DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY
-        assert persisted.diagnostic.content_policy == CONTENT_POLICY_METADATA_ONLY
-        assert "legacy persisted text" not in repr(dict(persisted.diagnostic.fields))
+        assert events == []
+        assert runtime_logging.diagnostic_history({})["records"] == []
     finally:
         runtime_logging.close()
 
@@ -1279,12 +1235,13 @@ def test_session_runtime_logging_preserves_text_when_observability_construction_
     runner = _ObservabilityRunner()
     runtime_logging, stream = _make_runtime_logging_capture()
     runtime_logging.configure_structured_observability(
-        runtime_log_sink=_SynchronousFailingRuntimeLogSink(),
+        provider_observation_sink=_SynchronousFailingProviderObservationSink(),
         observability_runner=runner,
     )
 
     try:
         runtime_logging.emit_basic("legacy text survives construction failure")
+        runtime_logging.observe_provider_operation(provider="openrouter", operation="translate", outcome="success")
 
         assert stream.getvalue().splitlines() == ["legacy text survives construction failure"]
         assert runner.awaitables == []
@@ -1294,15 +1251,16 @@ def test_session_runtime_logging_preserves_text_when_observability_construction_
 
 def test_session_runtime_logging_preserves_text_when_observability_cleanup_fails() -> None:
     runner = _RaisingObservabilityRunner()
-    sink = _CloseRaisingRuntimeLogSink()
+    sink = _CloseRaisingProviderObservationSink()
     runtime_logging, stream = _make_runtime_logging_capture()
     runtime_logging.configure_structured_observability(
-        runtime_log_sink=sink,
+        provider_observation_sink=sink,
         observability_runner=runner,
     )
 
     try:
         runtime_logging.emit_basic("legacy text survives cleanup failure")
+        runtime_logging.observe_provider_operation(provider="openrouter", operation="translate", outcome="success")
 
         assert stream.getvalue().splitlines() == ["legacy text survives cleanup failure"]
         assert runner.awaitables == [sink.awaitable]

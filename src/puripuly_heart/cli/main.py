@@ -106,11 +106,13 @@ def build_parser() -> argparse.ArgumentParser:
     follow_parser.add_argument(
         "--after", type=int, help="Resume after a received nonnegative sequence number"
     )
+    follow_parser.add_argument("--instance-id", help="Originating host identity for replay cursor")
     logs = sub.add_parser("logs", help="Follow bounded, content-redacted application logs")
     logs_sub = logs.add_subparsers(dest="action", required=True)
-    logs_sub.add_parser("follow").add_argument(
-        "--level", choices=("debug", "info", "warning", "error"), default="warning"
-    )
+    log_follow = logs_sub.add_parser("follow")
+    log_follow.add_argument("--level", choices=("debug", "info", "warning", "error"), default="warning")
+    log_follow.add_argument("--after", type=int, help="Replay after an event sequence")
+    log_follow.add_argument("--instance-id", help="Originating host identity for replay cursor")
     secret = sub.add_parser("secrets", help="Set a secret without exposing it in process arguments")
     secret_sub = secret.add_subparsers(dest="action", required=True)
     secret_set = secret_sub.add_parser("set")
@@ -596,6 +598,7 @@ async def _stop(record: Any, args: argparse.Namespace) -> int:
                     "terminal": True,
                     "instance_id": record.instance_id,
                     "operation_id": result["operation_id"],
+                    "cleanup_outcome": "unobserved",
                 }
             )
             return 0
@@ -815,9 +818,10 @@ async def _run(args: argparse.Namespace) -> int:
                 "include_transcripts": args.include_transcripts,
                 "include_translations": args.include_translations,
                 "after": args.after,
+                "cursor_instance_id": args.instance_id,
             }
             if args.domain == "events"
-            else {"topics": ["logs"]}
+            else {"topics": ["logs"], "after": args.after, "cursor_instance_id": args.instance_id}
         )
         levels = {"debug": 10, "info": 20, "warning": 30, "error": 40}
         async for event in follow(record, values):
@@ -869,9 +873,13 @@ def main(argv: list[str] | None = None) -> int:
         return 130
     except (ControlTransportError, ValueError, OSError, json.JSONDecodeError) as exc:
         code = exc.code if isinstance(exc, ControlTransportError) else "invalid_input"
+        message = (
+            "Local input or control resource could not be accessed"
+            if isinstance(exc, OSError) else str(exc)
+        )
         print(
             json.dumps(
-                {"output_version": 1, "error": {"code": code, "message": str(exc)}},
+                {"output_version": 1, "error": {"code": code, "message": message}},
                 ensure_ascii=False,
             ),
             file=sys.stderr,

@@ -3,17 +3,17 @@ from __future__ import annotations
 import logging
 from collections import OrderedDict
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import cast
 from uuid import UUID
 
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import (
-    format_error_report_for_log,
     provider_failure_report,
     stt_failure_report,
 )
-from puripuly_heart.core.messages import UserErrorReport
+from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigSnapshot,
 )
@@ -50,9 +50,10 @@ class SttEventLoopFailureDiagnostic:
 
 @dataclass(frozen=True, slots=True)
 class SttTurnFailureDiagnostic:
-    exception: Exception
+    exception: Exception | None
     provider: object | None
     channel: ChannelId
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +65,10 @@ class TranslationFailureDiagnostic:
     parent_utterance_id: UUID | None = None
     target_index: int | None = None
     target_language: str | None = None
+    utterance_id: UUID | None = None
+    turn_generation: int | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -269,37 +274,32 @@ class TranslationLatencyDiagnosticsOwner:
             self.fallback_logger.info(formatted)
         return True
 
+    def _emit_failure(
+        self, diagnostics: ErrorDiagnostics, *, severity: str = "error",
+        disposition: str = "failed", stage: str | None = None,
+    ) -> None:
+        if self.runtime_logging is not None:
+            self.runtime_logging.emit_failure(
+                diagnostics, severity=severity, disposition=disposition, stage=stage
+            )
+        else:
+            emit_failure(
+                self.fallback_logger, diagnostics,
+                severity=severity, disposition=disposition, stage=stage,
+            )
+
     def record_stt_event_loop_failure(
         self,
         diagnostic: SttEventLoopFailureDiagnostic,
     ) -> None:
-        if self.runtime_logging is None:
-            self.emit(
-                RuntimeDiagnostic(
-                    message="[Translation] STT event loop crashed: %s",
-                    args=(diagnostic.exception,),
-                    level=logging.ERROR,
-                    safe_exceptions=True,
-                )
-            )
-            return
-        provider, channel = self._stt_failure_context(
-            diagnostic.provider,
-            default_channel=diagnostic.default_channel,
+        provider, channel = (
+            self._stt_failure_context(diagnostic.provider, default_channel=diagnostic.default_channel)
+            if self.runtime_logging is not None else ("stt", diagnostic.default_channel)
         )
         report = stt_failure_report(
-            diagnostic.exception,
-            provider=provider,
-            operation="event_loop",
-            channel=channel,
+            diagnostic.exception, provider=provider, operation="event_loop", channel=channel
         )
-        self.emit(
-            RuntimeDiagnostic(
-                message="[Translation] STT event loop crashed: %s",
-                args=(format_error_report_for_log(report),),
-                level=logging.ERROR,
-            )
-        )
+        self._emit_failure(report.diagnostics, stage="event_loop")
 
     def record_stt_turn_failure(
         self,
@@ -310,17 +310,15 @@ class TranslationLatencyDiagnosticsOwner:
             default_channel=diagnostic.channel,
         )
         report = stt_failure_report(
-            diagnostic.exception,
+            diagnostic.failure_diagnostics or diagnostic.exception,
             provider=provider,
             operation="turn_terminal",
             channel=channel,
         )
-        self.emit(
-            RuntimeDiagnostic(
-                message="[Translation] scoped STT turn failed: %s",
-                args=(format_error_report_for_log(report),),
-                level=logging.ERROR,
-            )
+        self._emit_failure(
+            report.diagnostics,
+            severity="warning" if report.diagnostics.fields.get("recovery_pending") else "error",
+            stage=report.diagnostics.operation or "turn_terminal",
         )
         return report
 
@@ -333,17 +331,27 @@ class TranslationLatencyDiagnosticsOwner:
             provider="llm",
             operation="translate",
         )
-        self.emit(
-            RuntimeDiagnostic(
-                message="[Translation] %s translation failed · Cause %s",
-                args=(
-                    diagnostic.channel.title(),
-                    format_error_report_for_log(report),
-                ),
-                level=logging.ERROR,
-                fallback_level=logging.ERROR,
-                diagnostic_only=diagnostic.diagnostic_only,
-            )
+        fields = dict(report.diagnostics.fields)
+        if diagnostic.parent_utterance_id is not None:
+            fields["parent_utterance_id"] = str(diagnostic.parent_utterance_id)
+        if diagnostic.target_index is not None:
+            fields["target_index"] = diagnostic.target_index
+        report = replace(
+            report,
+            diagnostics=replace(
+                report.diagnostics, channel=diagnostic.channel,
+                turn_id=str(diagnostic.utterance_id) if diagnostic.utterance_id else None,
+                generation=diagnostic.turn_generation,
+                operation_id=diagnostic.operation_id,
+                request_id=diagnostic.request_id,
+                fields=fields,
+            ),
+        )
+        self._emit_failure(
+            report.diagnostics,
+            severity="warning" if diagnostic.diagnostic_only else "error",
+            disposition="degraded" if diagnostic.diagnostic_only else "failed",
+            stage="translate",
         )
         return report
 

@@ -34,6 +34,8 @@ class OverlayPublicationScope:
     target_index: int = 0
     target_count: int = 1
     retained_payload_bytes: int = 0
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -58,6 +60,8 @@ class OverlayEvent:
     target_index: int = 0
     target_count: int = 1
     retained_payload_bytes: int = 0
+    operation_id: str | None = None
+    request_id: str | None = None
 
     EVENT_TYPE: ClassVar[str] = "overlay_event"
 
@@ -479,6 +483,8 @@ class OverlayEventAdapter:
             "target_index": target_index,
             "target_count": target_count,
             "retained_payload_bytes": retained_payload_bytes,
+            "operation_id": output_scope.operation_id if output_scope is not None else None,
+            "request_id": output_scope.request_id if output_scope is not None else None,
         }
 
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import ClassVar, Final, Protocol
 
 from puripuly_heart.app.ports._settings_values import freeze_settings_values
@@ -12,6 +13,7 @@ from puripuly_heart.app.ports.settings_repository import (
     SettingsRepositoryPort,
     SettingsSnapshot,
 )
+from puripuly_heart.core.diagnostics import safe_exception_fields
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_LIFECYCLE,
@@ -21,11 +23,19 @@ from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
+    TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
     ErrorDiagnostics,
     RuntimeApplyResult,
     TransactionResult,
     UserMessageRef,
 )
+
+
+class SettingsMutationInterrupted(asyncio.CancelledError):
+    def __init__(self, transaction_result: TransactionResult) -> None:
+        self.transaction_result = transaction_result
+        super().__init__("Settings runtime application interrupted after commit")
+
 
 SETTINGS_MUTATION_SURFACE_TRANSLATION_PROVIDER: Final = "settings.translation_provider"
 SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO: Final = "settings.stt_language_audio"
@@ -193,29 +203,44 @@ class SettingsMutationService:
                 diagnostics=validation_result.diagnostics,
             )
 
-        commit_result = await self.settings_repository.save(
-            SettingsCommitRequest(
-                values=request.values,
-                expected_revision=request.expected_revision,
-                reason=request.reason,
+        try:
+            commit_result = await self.settings_repository.save(
+                SettingsCommitRequest(
+                    values=request.values,
+                    expected_revision=request.expected_revision,
+                    reason=request.reason,
+                )
             )
-        )
+        except Exception as exc:
+            return TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
+                message=None,
+                diagnostics=_phase_diagnostics("settings_save_failed", "settings_save", exc),
+            )
         if not commit_result.succeeded or commit_result.snapshot is None:
             return TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,
                 message=commit_result.message,
                 diagnostics=commit_result.diagnostics,
+                secondary_diagnostics=getattr(
+                    self.settings_repository, "secondary_diagnostics", ()
+                ),
             )
 
         snapshot = commit_result.snapshot
+        secondary = list(getattr(self.settings_repository, "secondary_diagnostics", ()))
         if self.snapshot_publisher is not None:
             try:
                 await self.snapshot_publisher.publish_settings_snapshot(
                     snapshot,
                     correlation_id=request.correlation_id,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                secondary.append(
+                    _phase_diagnostics(
+                        "settings_snapshot_notification_failed", "snapshot_notification", exc
+                    )
+                )
 
         try:
             runtime_result = await self.runtime_apply.apply_runtime(
@@ -225,23 +250,56 @@ class SettingsMutationService:
                     correlation_id=request.correlation_id,
                 )
             )
-        except Exception:
-            return _runtime_apply_exception_transaction_result()
+        except asyncio.CancelledError:
+            runtime_result = RuntimeApplyResult(
+                status="degraded",
+                message=None,
+                diagnostics=_phase_diagnostics("runtime_apply_interrupted", "runtime_apply", None),
+            )
+            transaction_result = TransactionResult(
+                status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
+                message=None,
+                diagnostics=runtime_result.diagnostics,
+                secondary_diagnostics=tuple(secondary[:4]),
+            )
+            if self.runtime_result_publisher is not None:
+                try:
+                    await self.runtime_result_publisher.publish_runtime_apply_result(
+                        runtime_result, correlation_id=request.correlation_id
+                    )
+                except Exception:
+                    pass
+            raise SettingsMutationInterrupted(transaction_result)
+        except Exception as exc:
+            runtime_result = RuntimeApplyResult(
+                status="failed",
+                message=UserMessageRef(
+                    key="settings.mutation.runtime_apply_failed",
+                    params={"phase": "runtime_apply"},
+                    severity=SEVERITY_WARNING,
+                ),
+                diagnostics=_phase_diagnostics("runtime_apply_exception", "runtime_apply", exc),
+            )
 
         transaction_result = _transaction_result_for_commit_and_runtime(
             commit_result=commit_result,
             runtime_result=runtime_result,
         )
+        secondary.extend(runtime_result.secondary_diagnostics)
         if self.runtime_result_publisher is not None:
             try:
                 await self.runtime_result_publisher.publish_runtime_apply_result(
                     runtime_result,
                     correlation_id=request.correlation_id,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                secondary.append(
+                    _phase_diagnostics(
+                        "runtime_result_notification_failed", "runtime_notification", exc
+                    )
+                )
 
-        return transaction_result
+        return replace(transaction_result, secondary_diagnostics=tuple(secondary[:4]))
 
 
 def _transaction_result_for_commit_and_runtime(
@@ -267,30 +325,26 @@ def _transaction_result_for_commit_and_runtime(
     )
 
 
-def _runtime_apply_exception_transaction_result() -> TransactionResult:
-    return TransactionResult(
-        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
-        message=UserMessageRef(
-            key="settings.mutation.runtime_apply_failed",
-            params={"phase": "runtime_apply"},
-            severity=SEVERITY_WARNING,
-        ),
-        diagnostics=ErrorDiagnostics(
-            component="settings_mutation",
-            operation="runtime_apply",
-            code="runtime_apply_exception",
-            category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            status_code=None,
-            retry_after_ms=None,
-            fields={"phase": "runtime_apply"},
-        ),
+def _phase_diagnostics(code: str, phase: str, exception: BaseException | None) -> ErrorDiagnostics:
+    return ErrorDiagnostics(
+        component="settings_mutation",
+        operation=phase,
+        code=code,
+        category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
+        visibility=DIAGNOSTIC_VISIBILITY_BASIC,
+        content_policy=CONTENT_POLICY_METADATA_ONLY,
+        status_code=None,
+        retry_after_ms=None,
+        fields={
+            "phase": phase,
+            **(safe_exception_fields(exception) if exception is not None else {}),
+        },
     )
 
 
 __all__ = [
     "OverlayOscOutputSettingsMutation",
+    "SettingsMutationInterrupted",
     "RuntimeApplyResultPublisher",
     "SETTINGS_MUTATION_SURFACE_OVERLAY_OSC_OUTPUT",
     "SETTINGS_MUTATION_SURFACE_STT_LANGUAGE_AUDIO",

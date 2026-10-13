@@ -341,8 +341,9 @@ class FakeOscQueue:
     def set_typing_reason(self, reason: str, active: bool) -> None:
         pass
 
-    def send_immediate(self, text: str) -> bool:
-        return True
+    def send_immediate(self, text: str) -> tuple[bool, None]:
+        
+        return True, None
 
     def process_due(self) -> None:
         pass

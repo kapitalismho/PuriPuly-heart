@@ -12,6 +12,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
 )
 from puripuly_heart.app.ports.application_runtime_logging import ApplicationRuntimeLoggingPort
 from puripuly_heart.app.ports.canonical_settings_persistence import (
+    CanonicalSettingsPersistenceError,
     CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
 )
@@ -40,6 +41,7 @@ from puripuly_heart.config.settings_vnext.schema import (
     with_telemetry_enabled,
     with_translation_runtime_policy,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
@@ -69,9 +71,9 @@ class CanonicalSettingsPatchRepository:
     base_settings: AppSettingsVNext | None = None
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
-    save_failure_sink: Callable[[str], None] | None = None
     commit_sink: Callable[[], None] | None = None
     commit_succeeded: bool = False
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
     async def load(self) -> SettingsSnapshot:
         settings = self.owner.canonical or self.committed_settings
@@ -110,26 +112,57 @@ class CanonicalSettingsPatchRepository:
                 self.owner.bind_provider_verification(self.provider_verification_binding)
             await self.owner.persist_async()
             self.commit_succeeded = True
-            if self.commit_sink is not None:
-                self.commit_sink()
+            self.secondary_diagnostics = self.owner.notification_diagnostics
         except asyncio.CancelledError:
             self.owner.rollback()
             raise
-        except Exception:
-            self.owner.rollback()
-            if self.save_failure_sink is not None:
-                self.save_failure_sink("Failed to save settings mutation")
+        except Exception as exc:
+            diagnostics = self.owner.last_failure or _settings_mutation_diagnostics(
+                component="settings_repository",
+                operation="save",
+                code="settings_save_failed",
+                surface=self.surface,
+                exception=exc,
+            )
+            diagnostics = replace(
+                diagnostics, fields={**diagnostics.fields, "surface": self.surface}
+            )
+            secondary: list[ErrorDiagnostics] = list(self.owner.persistence_secondary_diagnostics)
+            try:
+                self.owner.rollback()
+            except Exception as rollback_exc:
+                secondary.append(
+                    replace(
+                        _settings_mutation_diagnostics(
+                            component="settings_repository",
+                            operation="rollback",
+                            code="settings_rollback_failed",
+                            surface=self.surface,
+                            exception=rollback_exc,
+                        ),
+                        cause_id=diagnostics.diagnostic_id,
+                    )
+                )
+            self.secondary_diagnostics = tuple(secondary)
             return SettingsCommitResult(
                 succeeded=False,
                 snapshot=None,
                 message=None,
-                diagnostics=_settings_mutation_diagnostics(
-                    component="settings_repository",
-                    operation="save",
-                    code="settings_save_failed",
-                    surface=self.surface,
-                ),
+                diagnostics=diagnostics,
             )
+        if self.commit_sink is not None:
+            try:
+                self.commit_sink()
+            except Exception as exc:
+                self.secondary_diagnostics += (
+                    _settings_mutation_diagnostics(
+                        component="settings_repository",
+                        operation="commit_notification",
+                        code="settings_commit_notification_failed",
+                        surface=self.surface,
+                        exception=exc,
+                    ),
+                )
         self.committed_settings = next_settings
         self.owner.remember_projection(next_settings)
         return SettingsCommitResult(
@@ -181,6 +214,9 @@ class SettingsOwner:
     commit_listener: Callable[[AppSettingsVNext], None] | None = None
     _commit_loop: asyncio.AbstractEventLoop | None = None
     _commit_thread: int | None = None
+    last_failure: ErrorDiagnostics | None = None
+    notification_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    persistence_secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
     def require_canonical(self) -> AppSettingsVNext:
         if self.canonical is None:
@@ -251,9 +287,22 @@ class SettingsOwner:
     def _publish_commit(self, snapshot: AppSettingsVNext) -> None:
         self.committed_settings = snapshot
         if self.commit_listener is not None:
-            self.commit_listener(snapshot)
+            try:
+                self.commit_listener(snapshot)
+            except Exception as exc:
+                self.notification_diagnostics = (
+                    _settings_mutation_diagnostics(
+                        component="settings_repository",
+                        operation="commit_notification",
+                        code="settings_commit_notification_failed",
+                        exception=exc,
+                    ),
+                )
 
     def persist(self) -> None:
+        self.last_failure = None
+        self.notification_diagnostics = ()
+        self.persistence_secondary_diagnostics = ()
         loop = self._commit_loop
         different_thread = (
             self.commit_listener is not None and threading.get_ident() != self._commit_thread
@@ -261,7 +310,23 @@ class SettingsOwner:
         if different_thread and (loop is None or not loop.is_running()):
             raise RuntimeError("settings commit observer loop is unavailable")
         snapshot = copy.deepcopy(self.require_canonical())
-        self.persistence.persist(self.path, snapshot)
+        try:
+            self.persistence.persist(self.path, snapshot)
+        except Exception as exc:
+            self.last_failure = (
+                exc.diagnostics if isinstance(exc, CanonicalSettingsPersistenceError) else None
+            ) or _settings_mutation_diagnostics(
+                component="settings_repository",
+                operation="save",
+                code="settings_save_failed",
+                exception=exc,
+            )
+            self.persistence_secondary_diagnostics = (
+                exc.secondary_diagnostics
+                if isinstance(exc, CanonicalSettingsPersistenceError)
+                else ()
+            )
+            raise
         if different_thread:
             completed = threading.Event()
 
@@ -292,7 +357,17 @@ class SettingsOwner:
             self.persist_current()
         except Exception as exc:
             if failure_sink is not None:
-                failure_sink(exc)
+                try:
+                    failure_sink(exc)
+                except Exception as notification_exc:
+                    self.notification_diagnostics = (
+                        _settings_mutation_diagnostics(
+                            component="settings_repository",
+                            operation="failure_notification",
+                            code="settings_failure_notification_failed",
+                            exception=notification_exc,
+                        ),
+                    )
             return False
         return True
 
@@ -530,7 +605,6 @@ class SettingsOwner:
         base_settings: AppSettingsVNext | None = None,
         surface: str = "translation_provider",
         provider_verification_binding: ProviderVerificationBinding | None = None,
-        save_failure_sink: Callable[[str], None] | None = None,
         commit_sink: Callable[[], None] | None = None,
     ) -> CanonicalSettingsPatchRepository:
         return CanonicalSettingsPatchRepository(
@@ -539,7 +613,6 @@ class SettingsOwner:
             base_settings=base_settings,
             surface=surface,
             provider_verification_binding=provider_verification_binding,
-            save_failure_sink=save_failure_sink,
             commit_sink=commit_sink,
         )
 

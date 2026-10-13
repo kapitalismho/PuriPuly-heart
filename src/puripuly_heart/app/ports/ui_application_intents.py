@@ -26,10 +26,11 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 
 
 class UiInputRuntimePort(Protocol):
-    async def submit_text(self, text: str) -> None: ...
+    async def submit_text(self, text: str) -> TextSubmissionAdmission | None: ...
 
     def set_manual_input_activity(self, has_text: bool) -> None: ...
 

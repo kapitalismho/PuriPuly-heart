@@ -52,7 +52,6 @@ async def test_startup_restores_pre_fallback_canonical_when_persist_fails() -> N
         provisioning=provisioning,
         gpu_state=lambda: SimpleNamespace(selected_provider_requires_model=False),
         manual_fallback=ManualLocalASRFallbackOwner(),
-        save_failure_sink=lambda _exc: None,
         calibration=Mock(),
         presentation=Mock(),
         sync_presentation=lambda: None,

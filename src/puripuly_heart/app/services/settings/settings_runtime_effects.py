@@ -655,12 +655,7 @@ class SettingsRuntimeEffectsAdapter:
 
         if transition.previous_locale != settings.intent.ui.locale:
             self._presentation.set_locale(settings.intent.ui.locale)
-            try:
-                self._presentation.apply_locale()
-            except Exception:
-                self._runtime_logging.emit_basic("Failed to apply locale")
-                if strict_runtime_errors:
-                    raise
+            self._presentation.apply_locale()
 
         self._overlay.publish_presentation()
         publish_delta = getattr(self._vrc_mic_sync, "publish_delta", None)
@@ -680,22 +675,10 @@ class SettingsRuntimeEffectsAdapter:
         )
         if owner is None:
             return
-        try:
-            if channel == "self":
-                await owner.clear_language_runtime_state()
-            else:
-                await owner.clear_language_runtime_state(channel=channel)
-        except Exception as exc:
-            if strict_runtime_errors:
-                self._runtime_logging.emit_basic(
-                    f"Failed to clear language runtime state for {channel}"
-                )
-            else:
-                self._runtime_logging.emit_basic(
-                    f"Failed to clear language runtime state for {channel}: {exc}"
-                )
-            if strict_runtime_errors:
-                raise
+        if channel == "self":
+            await owner.clear_language_runtime_state()
+        else:
+            await owner.clear_language_runtime_state(channel=channel)
 
     def _canonical_settings(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         return self._settings.project(

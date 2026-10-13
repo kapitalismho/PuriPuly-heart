@@ -182,6 +182,12 @@ class FakeGpuWorkerFactory:
     async def start(self, *, mode: GpuWorkerMode) -> FakeGpuWorkerClient:
         self.modes.append(mode)
         return self.clients.pop(0)
+    async def close_pending_startups(self) -> None:
+        return None
+
+    def startup_cleanup_snapshot(self) -> dict[str, object]:
+        return {"pending_startups": 0, "close_complete": True, "cleanup_failures": []}
+
 
 
 async def _activate(

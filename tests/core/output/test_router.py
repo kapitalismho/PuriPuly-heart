@@ -395,6 +395,9 @@ async def test_system_disclosure_port_failure_records_safe_skip_and_continues_ro
     failed = decisions[0]
     assert failed.route == "system_disclosure_chatbox"
     assert failed.reason == "destination_publish_failed"
-    assert failed.metadata == {"channel": "system", "error_type": "RuntimeError"}
+    assert failed.metadata["channel"] == "system"
+    assert failed.metadata["exception_class"] == "RuntimeError"
+    assert failed.diagnostics is not None
+    assert failed.diagnostics.code == "destination_publish_failed"
     assert "chatbox publish failed" not in repr(failed)
     assert tuple(observer.decisions) == decisions

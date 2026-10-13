@@ -244,6 +244,8 @@ pub struct PresentationRuntime {
     spatial_pose_unavailable: bool,
     readiness_status_context: ReadinessStatusContext,
     last_renderer_degradation: Option<RendererDegradationSummary>,
+    diagnostic_dropped: u64,
+    reliable_delivery_failures: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -349,6 +351,8 @@ impl PresentationRuntime {
             retained_frame: None,
             readiness_status_context: ReadinessStatusContext::default(),
             last_renderer_degradation: None,
+            diagnostic_dropped: 0,
+            reliable_delivery_failures: 0,
         };
         if runtime.state.seed_snapshot(&snapshot) {
             runtime.redraw_requested = true;
@@ -460,6 +464,8 @@ impl PresentationRuntime {
                 .map(|record| record.stage),
             primary_failure_reason,
             cleanup_failure_reason,
+            diagnostic_dropped: self.diagnostic_dropped,
+            reliable_delivery_failures: self.reliable_delivery_failures,
         });
         bridge
             .send_json(projection.payload)
@@ -1681,7 +1687,10 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         &mut self,
         bridge: &mut BridgeClient,
         health_challenge_id: Option<u64>,
+        logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
+        self.runtime.diagnostic_dropped = logger.dropped_records();
+        self.runtime.reliable_delivery_failures = logger.reliable_delivery_failures();
         let now = Instant::now();
         let due_elapsed_ms = self
             .readiness_no_progress_deadline
@@ -1711,7 +1720,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         bridge: &mut BridgeClient,
         primary_failure_reason: Option<&'static str>,
         cleanup_failure_reason: Option<&'static str>,
-    ) {
+    ) -> Result<(), RuntimeFailure> {
         let now = Instant::now();
         let due_elapsed_ms = self
             .readiness_no_progress_deadline
@@ -1722,7 +1731,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 now.saturating_duration_since(started).as_millis() as u64
             })
             .unwrap_or(0);
-        let _ = self
+        self
             .runtime
             .emit_owner_status(
                 bridge,
@@ -1734,7 +1743,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 primary_failure_reason,
                 cleanup_failure_reason,
             )
-            .await;
+            .await
     }
 
     async fn finish_run(
@@ -1749,9 +1758,25 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             .as_ref()
             .err()
             .map(RuntimeFailure::failure_reason);
+        self.runtime.diagnostic_dropped = logger.dropped_records();
+        self.runtime.reliable_delivery_failures = logger.reliable_delivery_failures();
         if primary_failure_reason.is_some() || cleanup_failure_reason.is_some() {
-            self.emit_terminal_status(bridge, primary_failure_reason, cleanup_failure_reason)
+            let terminal_status = self
+                .emit_terminal_status(bridge, primary_failure_reason, cleanup_failure_reason)
                 .await;
+            // Independent reserved pipe event preserves both causes if the bridge is lost.
+            // A failed write remains unavailable; process exit is not cleanup acknowledgement.
+            let _ = logger.emit_stdout_event(&json!({
+                "type": if self.runtime.ready_sent() { "runtime_error" } else { "startup_error" },
+                "overlay_instance_id": bridge.overlay_instance_id(),
+                "runtime_generation": bridge.runtime_generation(),
+                "failure_reason": primary_failure_reason.or(cleanup_failure_reason),
+                "primary_failure_reason": primary_failure_reason,
+                "cleanup_failure_reason": cleanup_failure_reason,
+                "diagnostic_dropped": logger.dropped_records(),
+                "reliable_delivery_failures": logger.reliable_delivery_failures(),
+                "evidence_state": if terminal_status.is_ok() { "retained" } else { "incomplete" },
+            })).await;
         }
         let outcome = match result {
             Err(primary) => Err(primary),
@@ -2022,7 +2047,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         bridge: &mut BridgeClient,
         logger: &OverlayLogger,
     ) -> Result<(), RuntimeFailure> {
-        self.emit_current_status(bridge, None).await?;
+        if let Err(error) = self.emit_current_status(bridge, None, logger).await {
+            return self.finish_run(bridge, logger, Err(error)).await;
+        }
         self.next_status_due = Instant::now() + Duration::from_millis(250);
         if self.runtime.has_accepted_due_work() {
             self.arm_due_deadline();
@@ -2153,7 +2180,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                             return Err(RuntimeFailure::ReadinessStalled);
                         }
                         if now >= self.next_status_due {
-                            self.emit_current_status(bridge, None).await?;
+                            self.emit_current_status(bridge, None, logger).await?;
                             self.next_status_due = now
                                 + if self.readiness_no_progress_deadline.is_some() {
                                     Duration::from_millis(250)
@@ -2252,7 +2279,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             };
             if let Some(message) = message {
                 if let Ok(BridgeIncoming::HealthChallenge(challenge)) = &message {
-                    self.emit_current_status(bridge, Some(challenge.challenge_id))
+                    self.emit_current_status(bridge, Some(challenge.challenge_id), logger)
                         .await?;
                     continue;
                 }
@@ -2478,15 +2505,9 @@ async fn run_with_manifest_and_profile(
             Ok(()) => 0,
             Err(RuntimeFailure::RuntimeDisconnected) => 1,
             Err(error) => {
-                let detail: String = match &error {
-                    RuntimeFailure::Render(message) | RuntimeFailure::OpenVr(message) => {
-                        message.chars().take(512).collect()
-                    }
-                    _ => String::new(),
-                };
                 let _ = logger
                     .error(format!(
-                        "runtime_failure reason={} revision={} detail={detail:?}",
+                        "runtime_failure reason={} revision={}",
                         error.failure_reason(),
                         owner.runtime().state().snapshot().revision,
                     ))
@@ -3788,6 +3809,40 @@ mod tests {
         assert!(!String::from_utf8(stdout.contents())
             .unwrap()
             .contains("\"type\":\"shutdown_complete\""));
+        logger.shutdown().unwrap();
+        drop(bridge);
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn terminal_pipe_preserves_primary_cleanup_and_delivery_health_without_private_detail() {
+        let (mut bridge, server) = controlled_test_bridge(None).await;
+        let stdout = ControlledSink::new(ControlledSinkMode::Success);
+        let logger = controlled_logger(stdout.clone());
+        let mut owner = NativePresentationOwner::new(
+            OverlayPresentationSnapshot::default(),
+            CaptionRenderer::new_for_test().unwrap(),
+            HideFailureProbe,
+        );
+        let result = owner.finish_run(
+            &mut bridge,
+            &logger,
+            Err(RuntimeFailure::Render("private-token-body-path".into())),
+        ).await;
+        assert!(matches!(result, Err(RuntimeFailure::Render(_))));
+        assert!(owner.resources_released());
+        let emitted = String::from_utf8(stdout.contents()).unwrap();
+        let terminal = emitted.lines()
+            .filter_map(|line| line.strip_prefix("EVENT "))
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .find(|value| value["type"] == "startup_error").unwrap();
+        assert_eq!(terminal["failure_reason"], "render_failed");
+        assert_eq!(terminal["primary_failure_reason"], "render_failed");
+        assert_eq!(terminal["cleanup_failure_reason"], "openvr_failed");
+        assert_eq!(terminal["diagnostic_dropped"], 0);
+        assert_eq!(terminal["reliable_delivery_failures"], 0);
+        assert!(!emitted.contains("private-token-body-path"));
+        assert!(!emitted.contains("\"type\":\"shutdown_complete\""));
         logger.shutdown().unwrap();
         drop(bridge);
         server.await.unwrap();

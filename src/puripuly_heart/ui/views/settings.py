@@ -2845,11 +2845,6 @@ class SettingsView(ft.Column):
                     or ""
                     for secret in extension.secrets
                 }
-            if result.read_error is not None:
-                self._emit_runtime_basic(
-                    f"Failed to load HTTP extension secrets: {result.read_error}",
-                    level=logging.WARNING,
-                )
         controls: list[ft.Control] = []
         if extension is not None:
             for secret in extension.secrets:
@@ -4013,8 +4008,6 @@ class SettingsView(ft.Column):
                     self._openrouter_key.value = snapshot.openrouter_api_key
                 if snapshot.deepseek_api_key is not None:
                     self._deepseek_key.value = snapshot.deepseek_api_key
-            if result.read_error is not None:
-                raise result.read_error
             if snapshot is not None:
                 self._restore_api_key_icons(provider)
 
@@ -4221,9 +4214,6 @@ class SettingsView(ft.Column):
         ):
             self._alibaba_key_beijing.value = snapshot.alibaba_api_key_beijing
             self._alibaba_key_singapore.value = snapshot.alibaba_api_key_singapore
-
-        if result.read_error is not None:
-            raise result.read_error
 
         # Restore verification status icons from saved settings
         self._restore_api_key_icons(settings)

@@ -39,6 +39,7 @@ from puripuly_heart.app.services.managed.managed_key_delivery_ack import (
     ManagedKeyDeliveryAckService,
 )
 from puripuly_heart.core import messages
+from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_operation_id
 
 LOCAL_SECRET_KEY = "openrouter_managed_api_key"
 RESUME_TOKEN_SECRET = "openrouter_managed_operation_resume_token"
@@ -372,10 +373,10 @@ def test_operation_identifiers_have_canonical_length_and_alphabet() -> None:
         assert len(operation_id) == len("ph-mop-v1_") + 32
         assert len(token) == 43
         assert "=" not in operation_id and "=" not in token
-        assert mop.is_valid_operation_id(operation_id)
+        assert is_valid_operation_id(operation_id)
         assert mop.is_valid_resume_token(token)
-    assert not mop.is_valid_operation_id("ph-mop-v1_short")
-    assert not mop.is_valid_operation_id(None)
+    assert not is_valid_operation_id("ph-mop-v1_short")
+    assert not is_valid_operation_id(None)
     assert not mop.is_valid_resume_token("abc")
     assert not mop.is_valid_resume_token("a" * 42 + "=")
 
@@ -405,7 +406,7 @@ async def test_operation_and_token_persisted_before_first_issue_post() -> None:
     assert len(broker.issue_calls) == 1
     issue_request = broker.issue_calls[0]
     assert issue_request.operation_id is not None
-    assert mop.is_valid_operation_id(issue_request.operation_id)
+    assert is_valid_operation_id(issue_request.operation_id)
     assert issue_request.resume_token is not None
     assert mop.is_valid_resume_token(issue_request.resume_token)
     assert seen["operation_id"] == issue_request.operation_id
@@ -462,7 +463,7 @@ async def test_issue_timeout_routes_to_status_and_resume_without_fresh_issue() -
     assert secrets.values[LOCAL_SECRET_KEY] == RAW_CREDENTIAL
     assert state.pending_managed_operation_id is None
     status_request = broker.status_calls[0]
-    assert mop.is_valid_operation_id(status_request.operation_id)
+    assert is_valid_operation_id(status_request.operation_id)
     assert broker.issue_calls[0].operation_id == status_request.operation_id
     assert status_request.installation_id == "install-1"
 

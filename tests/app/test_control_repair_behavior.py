@@ -623,9 +623,14 @@ async def test_manual_output_wait_allows_safe_mutations_but_orders_provider_tran
     release = asyncio.Event()
     translated = []
 
+    from uuid import uuid4
+
+    from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+
     async def slow_output(_text):
         entered.set()
         await release.wait()
+        return TextSubmissionAdmission("admitted", uuid4(), ())
 
     async def translation(enabled, **_kwargs):
         translated.append(enabled)
@@ -702,9 +707,14 @@ async def test_long_output_wait_orders_cli_overlay_audio_and_gui_settings_captur
     entered = asyncio.Event()
     release = asyncio.Event()
 
+    from uuid import uuid4
+
+    from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+
     async def slow_output(_text):
         entered.set()
         await release.wait()
+        return TextSubmissionAdmission("admitted", uuid4(), ())
 
     async def no_audio_effects(_settings):
         pass
@@ -1330,3 +1340,146 @@ async def test_auth_login_keeps_other_existing_outcomes(
     assert result["status"] == expected_status
     assert result.get("reason") == expected_reason
     assert result["provider"] == provider
+
+
+@pytest.mark.asyncio
+async def test_settings_failure_is_joinable_after_event_retention_and_state_inspection(offline, monkeypatch):
+    from uuid import uuid4
+    monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-diagnostics-data"))
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(str(uuid4()))
+        before = await control.query("settings.current", {})
+        def denied(_self, *_args):
+            raise PermissionError(13, "FORBIDDEN_SETTINGS_EXCEPTION_SENTINEL")
+        monkeypatch.setattr(type(control.settings.persistence), "persist", denied)
+        accepted = await control.submit(
+            "settings.apply", {"changes": {"locale": "ja"}}, request_id=uuid4().hex,
+        )
+        receipt = await control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["status"] == "persistence_failed"
+        cause = receipt["transaction"]["diagnostics"]
+        assert cause["code"] == "settings_save_failed"
+        assert cause["operation_id"] == receipt["operation_id"]
+        assert cause["instance_id"] == receipt["instance_id"]
+        assert (await control.query("settings.current", {}))["revision"] == before["revision"]
+        retained = await control.query("diagnostics.history", {"operation_id": receipt["operation_id"]})
+        assert any(item["diagnostic_id"] == cause["diagnostic_id"] for item in retained["records"])
+        stream = control.subscribe(topics=["logs", "operation"], after=0)
+        async with asyncio.timeout(5):
+            while True:
+                event = await anext(stream)
+                if event.get("diagnostic", {}).get("diagnostic_id") == cause["diagnostic_id"]:
+                    assert event["diagnostic"] == cause
+                    break
+        await stream.aclose()
+        operation_event = next(item for item in control.events.history if item["topic"] == "operation" and item["operation_id"] == receipt["operation_id"])
+        assert operation_event["diagnostic_id"] == cause["diagnostic_id"]
+        assert "FORBIDDEN" not in json.dumps(retained)
+    finally:
+        await app.stop()
+
+
+@pytest.mark.parametrize("exception_type", [ValueError, TypeError, KeyError])
+@pytest.mark.asyncio
+async def test_execution_defects_are_not_argument_rejections_and_keep_safe_causes(offline, monkeypatch, exception_type):
+    from uuid import uuid4
+    monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-control-errors"))
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(str(uuid4()))
+        invalid = await control.submit("translation.set", {"enabled": "wrong"}, request_id=uuid4().hex)
+        rejected = await control.wait(invalid["operation_id"], timeout=5)
+        assert rejected["status"] == "rejected" and rejected["error"]["code"] == "invalid_arguments"
+        async def broken(_self, _command, _arguments, **_kwargs):
+            try:
+                raise PermissionError(13, "FORBIDDEN_NATIVE_SENTINEL")
+            except PermissionError as native:
+                raise exception_type("FORBIDDEN_INTERNAL_SENTINEL") from native
+        monkeypatch.setattr(type(control), "_dispatch", broken)
+        accepted = await control.submit("translation.set", {"enabled": False}, request_id=uuid4().hex)
+        receipt = await control.wait(accepted["operation_id"], timeout=5)
+        assert receipt["status"] == "failed" and receipt["error"]["code"] == "application_operation_failed"
+        record = receipt["diagnostics"]
+        assert record["operation_id"] == receipt["operation_id"]
+        assert record["stage"] == "dispatch" and record["category"] == "unknown"
+        assert record["fields"]["exception_class"] == exception_type.__name__
+        assert record["fields"]["cause_class_1"] == "PermissionError"
+        assert record["fields"]["errno"] == 13
+        assert "FORBIDDEN" not in json.dumps(receipt)
+        assert (await control.query("diagnostics.history", {"diagnostic_id": record["diagnostic_id"]}))["records"] == [record]
+    finally:
+        await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_runtime_error_report_crosses_composed_event_bridge_with_source_identity(offline, monkeypatch):
+    from uuid import uuid4
+
+    from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
+    from puripuly_heart.domain.events import UIEvent, UIEventType
+    monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-report-bridge"))
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(str(uuid4()))
+        turn = uuid4()
+        cause = ErrorDiagnostics(
+            component="provider.stt", operation="receive", code="provider_receive_failed",
+            category="network", visibility="basic", content_policy="metadata_only",
+            status_code=503, retry_after_ms=None,
+            fields={"message": "FORBIDDEN_PROVIDER_BODY_SENTINEL", "provider": "soniox"},
+            channel="self", turn_id=str(turn), generation=5,
+        )
+        report = UserErrorReport(UserMessageRef("stt.failure", {}, "error"), cause)
+        stream = control.subscribe(topics=["error"], after=control.events.sequence)
+        pending = asyncio.create_task(anext(stream))
+        await asyncio.sleep(0)
+        await control.pipeline.ui_events.put(
+            UIEvent(UIEventType.ERROR, payload=report, channel="self", source="stt", utterance_id=turn)
+        )
+        event = await asyncio.wait_for(pending, 5)
+        await stream.aclose()
+        record = event["error"]["diagnostics"]
+        assert record["diagnostic_id"] == cause.diagnostic_id
+        assert record["code"] == "provider_receive_failed"
+        assert record["turn_id"] == str(turn) and record["generation"] == 5
+        assert record["operation_id"] is None
+        assert record["detail"]["state"] == "rejected"
+        assert "FORBIDDEN" not in json.dumps(event)
+        assert (await control.query("diagnostics.history", {"diagnostic_id": cause.diagnostic_id}))["records"] == [record]
+    finally:
+        await app.stop()
+
+
+def test_native_manual_admission_preserves_ids_without_output_ack():
+    from uuid import uuid4
+
+    from puripuly_heart.app.services.application_control import ApplicationControlOwner
+    from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+    turn, child = uuid4(), uuid4()
+    result = ApplicationControlOwner._text_admission_data(TextSubmissionAdmission("admitted", turn, (child,)))
+    assert result == {"status": "applied", "admission": "admitted", "turn_id": str(turn), "child_turn_ids": [str(child)], "output_delivery": "unobserved"}
+    rejected = ApplicationControlOwner._text_admission_data(None)
+    assert rejected["status"] == "rejected" and rejected["turn_id"] is None
+    with pytest.raises(TypeError):
+        ApplicationControlOwner._text_admission_data(True)
+
+
+def test_unknown_account_observation_preserves_owning_diagnostic():
+    from puripuly_heart.app.services.application_control import _chatgpt_status
+    from puripuly_heart.core.messages import ErrorDiagnostics
+    cause = ErrorDiagnostics(component="chatgpt_account", operation="read", code="chatgpt_secret_store_failed", category="auth", visibility="basic", content_policy="metadata_only", status_code=None, retry_after_ms=None, fields={})
+    observed = []
+    def retain(diagnostic, **_):
+        observed.append(diagnostic)
+        return {"diagnostic_id": diagnostic.diagnostic_id}
+    app = SimpleNamespace(chatgpt_account_snapshot=lambda: SimpleNamespace(signed_in=None, in_progress=False, diagnostics=cause))
+    result = _chatgpt_status(app, retain)
+    assert result["signed_in"] is None and result["sign_in_required"] is None
+    assert result["diagnostic_id"] == cause.diagnostic_id and observed == [cause]

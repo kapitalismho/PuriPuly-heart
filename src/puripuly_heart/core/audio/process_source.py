@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import logging
 import queue
 import threading
 import time
 from collections.abc import AsyncIterator, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Protocol
 
 import janus
@@ -22,6 +23,11 @@ from puripuly_heart.core.audio.source import (
     CaptureProgressionSnapshot,
     PhysicalCaptureProgression,
 )
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.messages import ErrorDiagnostics
+
+logger = logging.getLogger(__name__)
 
 PROCESS_CAPTURE_SAMPLE_RATE_HZ = 48000
 PROCESS_CAPTURE_CHANNELS = 2
@@ -90,7 +96,7 @@ class ProcTapProcessAudioCaptureFactory:
                 raise
             raise ProcessAudioCaptureSetupError(
                 "process capture mode could not be verified"
-            ) from None
+            ) from exc
         return capture
 
 
@@ -102,8 +108,8 @@ def verify_proctap_process_specific(capture: object) -> bool:
         raise ProcessAudioCaptureSetupError("process capture mode could not be verified")
     try:
         verified = verifier()
-    except Exception:
-        raise ProcessAudioCaptureSetupError("process capture mode could not be verified") from None
+    except Exception as exc:
+        raise ProcessAudioCaptureSetupError("process capture mode could not be verified") from exc
     if verified is not True:
         raise ProcessAudioCaptureSetupError("process capture mode could not be verified")
     return True
@@ -126,6 +132,7 @@ class ProcessAudioCaptureSource:
     _watch: ProcessIdentityWatchPort | None = field(init=False, default=None, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
     _terminal_reason: str | None = field(init=False, default=None, repr=False)
+    _terminal_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
     _queue_drop_count: int = field(init=False, default=0, repr=False)
     _lock: threading.RLock = field(init=False, default_factory=threading.RLock, repr=False)
     _progression: PhysicalCaptureProgression = field(init=False, repr=False)
@@ -170,6 +177,10 @@ class ProcessAudioCaptureSource:
     @property
     def terminal_reason(self) -> str | None:
         return self._terminal_reason
+
+    @property
+    def terminal_diagnostics(self) -> ErrorDiagnostics | None:
+        return self._terminal_diagnostics
 
     @property
     def queue_drop_count(self) -> int:
@@ -228,31 +239,55 @@ class ProcessAudioCaptureSource:
             self._progression.mark_admitted(capture)
         except queue.Full:
             self._queue_drop_count += 1
-        except Exception:
+        except Exception as exc:
             self._progression.observe_unknown_discontinuity(
                 observed_at_monotonic_s=time.monotonic()
             )
-            self._signal_terminal_failure("source_failure")
+            self._signal_terminal_failure("source_failure", exc)
 
     def _on_process_terminal(self) -> None:
         self._signal_terminal_failure("target_exited")
 
-    def _signal_terminal_failure(self, reason: str) -> None:
+    def _signal_terminal_failure(self, reason: str, exception: BaseException | None = None) -> None:
         with self._lock:
             if self._terminal_reason is not None:
                 return
             self._terminal_reason = reason
+            self._terminal_diagnostics = replace(
+                stt_failure_report(
+                    exception, provider="stt", channel="peer", operation="source_read"
+                ).diagnostics,
+                component="capture.peer",
+                code=(
+                    "capture.peer.target_exited" if reason == "target_exited"
+                    else "capture.peer.source_failure"
+                ),
+            )
             self._signal_terminal()
 
     def _release_native_resources(self) -> None:
         watch, self._watch = self._watch, None
         capture, self._capture = self._capture, None
-        if watch is not None:
-            with contextlib.suppress(Exception):
-                watch.close()
-        if capture is not None:
-            with contextlib.suppress(Exception):
-                capture.close()
+        for resource in (watch, capture):
+            if resource is None:
+                continue
+            try:
+                resource.close()
+            except Exception as exc:
+                diagnostics = stt_failure_report(
+                    exc, provider="stt", channel="peer", operation="cleanup"
+                ).diagnostics
+                diagnostics = replace(
+                    diagnostics, component="capture.peer", code="capture.peer.cleanup_failed",
+                    cause_id=(
+                        self._terminal_diagnostics.diagnostic_id
+                        if self._terminal_diagnostics is not None else None
+                    ),
+                    fields={**diagnostics.fields, "cleanup_confirmed": False},
+                )
+                emit_failure(
+                    logger, diagnostics, severity="warning", disposition="degraded", stage="cleanup"
+                )
 
     def _signal_terminal(self) -> None:
         try:

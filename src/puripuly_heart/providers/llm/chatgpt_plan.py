@@ -15,11 +15,13 @@ from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.chatgpt.oauth import ChatGptAuthError, ChatGptReauthRequired
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
-from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.llm.provider import LLMProvider, LLMRequestExecution
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
@@ -36,14 +38,12 @@ _SUBSCRIPTION_STATUS_BY_CODE: Final[Mapping[str, int]] = {
 }
 
 
-class ChatGptPlanResponseError(RuntimeError):
+class ChatGptPlanResponseError(LLMResponseError):
     diagnostic_provider = "chatgpt"
 
     def __init__(self, status_code: int | None, code: str | None = None) -> None:
-        self.status_code = status_code
         self.subscription_code = code
-        detail = f"status={status_code}" + (f" code={code}" if code else "")
-        super().__init__(f"ChatGPT plan request failed ({detail})")
+        super().__init__("ChatGPT plan request failed", provider="chatgpt", status_code=status_code)
 
 
 WebSocketConnector = Callable[[str, Mapping[str, str]], Awaitable[Any]]
@@ -821,15 +821,15 @@ class ChatGptPlanLLMProvider(LLMProvider):
                 return
 
     def _log_failure(self, operation: str, exc: BaseException) -> None:
-        report = provider_failure_report(exc, provider="chatgpt", operation=operation)
-        rendered = "[Basic][LLM] ChatGPT plan request failed [%s]: %s" % (
-            operation,
-            format_error_report_for_log(report),
-        )
-        if self.runtime_logging is not None:
-            self.runtime_logging.emit_basic(rendered, level=logging.ERROR)
-            return
-        logger.error(rendered)
+        if getattr(exc, "failure_diagnostics", None) is None:
+            exc.failure_diagnostics = provider_failure_report(
+                exc, provider="chatgpt", operation="translate"
+            ).diagnostics
+        if operation != "translate":
+            emit_failure(
+                logger, exc.failure_diagnostics, severity="warning", disposition="degraded",
+                stage="provider_build", exception=exc,
+            )
 
 
 __all__ = [

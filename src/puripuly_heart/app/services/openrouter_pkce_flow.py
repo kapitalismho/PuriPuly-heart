@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 
@@ -28,14 +29,15 @@ from puripuly_heart.config.prompts import normalize_system_prompt_override
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
 )
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.error_messages import (
-    format_error_report_for_log,
     openrouter_auth_failure_report,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+    ErrorDiagnostics,
     TransactionResult,
 )
 from puripuly_heart.core.openrouter.authentication import (
@@ -215,7 +217,6 @@ class OpenRouterPkceApplicationOwner:
                 flow="openrouter_pkce",
                 context_values={"launch_source": launch_source},
             ),
-            save_failure_sink=self.failure_diagnostics_sink,
         )
         transaction = SecretSettingsTransaction(
             secret_store=self.secret_store_factory(current),
@@ -300,11 +301,32 @@ class OpenRouterPkceApplicationOwner:
         self, launch_source: str, exception: Exception, *, stage: OpenRouterAuthStage
     ) -> None:
         report = openrouter_auth_failure_report(exception, stage=stage)
-        self.failure_message_sink(report.message.key)
-        self.failure_diagnostics_sink(
-            "[OpenRouterAuth] failed " + format_error_report_for_log(report)
-        )
-        self.failure_route(launch_source)
+        emit_failure(logging.getLogger(__name__), report.diagnostics, stage=stage)
+        for callback, argument in (
+            (self.failure_message_sink, report.message.key),
+            (self.failure_route, launch_source),
+        ):
+            try:
+                callback(argument)
+            except Exception as exc:
+                emit_failure(
+                    logging.getLogger(__name__),
+                    ErrorDiagnostics(
+                        component="application_notification",
+                        operation="auth_notification",
+                        code="application_state_notification_failed",
+                        category="lifecycle",
+                        visibility="basic",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={"phase": "auth_notification", **safe_exception_fields(exc)},
+                        cause_id=report.diagnostics.diagnostic_id,
+                    ),
+                    severity="warning",
+                    disposition="degraded",
+                    stage="auth_notification",
+                )
 
 
 __all__ = [

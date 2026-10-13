@@ -8,13 +8,15 @@ import time
 import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.audio.ownership import SegmentTerminalOutcome
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason, boundary_wait_ms
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -29,6 +31,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 
 logger = logging.getLogger(__name__)
@@ -228,7 +231,22 @@ class QwenAudioStreamingSTTBackend(STTBackend):
         session = await backend.open_session()
         try:
             await asyncio.wait_for(session.stop(), timeout=7.0)
-            return session.task_finished_count == 1
+            verified = session.task_finished_count == 1
+            if not verified:
+                diagnostics = recognition_failure_diagnostics(
+                    session._failure, provider="qwen_audio", channel=None, operation="probe",
+                    reason="provider_not_ready",
+                )
+                emit_failure(
+                    logger, replace(
+                        diagnostics, **current_diagnostic_operation(),
+                        fields={
+                            **diagnostics.fields, "verification_scope": "key_probe",
+                            "recognition_readiness": "unobserved",
+                        },
+                    ), stage="probe",
+                )
+            return verified
         finally:
             await session.close()
 
@@ -375,7 +393,7 @@ class _QwenAudioSession(STTBackendSession):
         except Exception as exc:
             self._log_failure("connect_failed", cause=exc)
             self._state = QwenAudioSessionState.FAILED
-            raise QwenAudioProtocolError(f"Qwen Audio connection failed: {exc}") from exc
+            raise QwenAudioProtocolError("Qwen Audio connection failed") from exc
         self._recv_task = asyncio.create_task(self._recv_loop(), name="qwen-audio-recv")
         self._keepalive_task = asyncio.create_task(
             self._keepalive_loop(), name="qwen-audio-keepalive"
@@ -462,7 +480,7 @@ class _QwenAudioSession(STTBackendSession):
                     self._stage_at = sent_at
         except Exception as exc:
             await self._fail(
-                QwenAudioProtocolError(f"Qwen Audio run-task send failed: {exc}"),
+                QwenAudioProtocolError("Qwen Audio run-task send failed"),
                 reason="run_task_send_failed",
                 cause=exc,
             )
@@ -543,7 +561,7 @@ class _QwenAudioSession(STTBackendSession):
         except Exception as exc:
             if self._state not in (QwenAudioSessionState.CLOSING, QwenAudioSessionState.FAILED):
                 await self._fail(
-                    QwenAudioProtocolError(f"Qwen Audio socket failure: {exc}"),
+                    QwenAudioProtocolError("Qwen Audio socket failure"),
                     reason="receive_failed",
                     cause=exc,
                 )
@@ -652,7 +670,10 @@ class _QwenAudioSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            await self._fail(QwenAudioProtocolError(f"Qwen Audio queued audio send failed: {exc}"))
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio queued audio send failed"),
+                cause=exc, reason="qwen_write_failed",
+            )
         finally:
             self._flushing_audio = False
             if self._flush_task is current_task:
@@ -807,7 +828,10 @@ class _QwenAudioSession(STTBackendSession):
                 self._wait_for_task_finished(task_id), name="qwen-audio-task-finish-timeout"
             )
         except Exception as exc:
-            await self._fail(QwenAudioProtocolError(f"Qwen Audio finish-task send failed: {exc}"))
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio finish-task send failed"),
+                cause=exc, reason="qwen_write_failed",
+            )
 
     async def _send_audio_now(self, pcm16le: bytes) -> None:
         if not pcm16le:
@@ -833,7 +857,8 @@ class _QwenAudioSession(STTBackendSession):
                     raise
                 except Exception as exc:
                     await self._fail(
-                        QwenAudioProtocolError(f"Qwen Audio keepalive send failed: {exc}")
+                        QwenAudioProtocolError("Qwen Audio keepalive send failed"),
+                        cause=exc, reason="qwen_keepalive_failed",
                     )
                     return
                 logger.debug(
@@ -901,7 +926,10 @@ class _QwenAudioSession(STTBackendSession):
                     await self._send_audio_now(pcm16le)
                     self._event_projection.payload_written(identity, payload_sequence)
         except Exception as exc:
-            await self._fail(QwenAudioProtocolError(f"Qwen Audio audio send failed: {exc}"))
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio audio send failed"),
+                cause=exc, reason="qwen_write_failed",
+            )
 
     async def seal_turn(
         self,
@@ -958,6 +986,7 @@ class _QwenAudioSession(STTBackendSession):
         failure_reason: str | None = None,
         retire: bool = False,
         provenance: STTNativeProvenance,
+        failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         if not self._event_projection.is_current(identity):
             return
@@ -970,6 +999,7 @@ class _QwenAudioSession(STTBackendSession):
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
                 provenance=(provenance,),
+                failure_diagnostics=failure_diagnostics,
             )
         )
         self._scoped_task_id = None
@@ -997,7 +1027,10 @@ class _QwenAudioSession(STTBackendSession):
                             await self._send_audio_now(pcm16le)
                             return
                 except Exception as exc:
-                    await self._fail(QwenAudioProtocolError(f"Qwen Audio audio send failed: {exc}"))
+                    await self._fail(
+                        QwenAudioProtocolError("Qwen Audio audio send failed"),
+                        cause=exc, reason="qwen_write_failed",
+                    )
                     return
             if self._state is QwenAudioSessionState.TASK_ACTIVE:
                 if self._boundary_requested:
@@ -1116,7 +1149,10 @@ class _QwenAudioSession(STTBackendSession):
         try:
             await asyncio.sleep(self.task_finish_timeout_s)
             if self._task_id == task_id and self._state is QwenAudioSessionState.FINISHING_TASK:
-                await self._fail(QwenAudioProtocolError("Qwen Audio task-finished timeout"))
+                await self._fail(
+                    QwenAudioProtocolError("Qwen Audio task-finished timeout"),
+                    reason="task_finish_timeout", cause=TimeoutError(),
+                )
         except asyncio.CancelledError:
             return
 
@@ -1143,19 +1179,38 @@ class _QwenAudioSession(STTBackendSession):
             future.set_exception(exc)
         self._cancel_finish_timeout()
         identity = self._event_projection.active_identity
-        reason = type(exc).__name__
+        diagnostics = recognition_failure_diagnostics(
+            cause or exc, provider="qwen_audio",
+            channel=self._event_projection.channel or "unknown",
+            operation="receive", reason=reason, identity=identity,
+        )
+        provider_code = code
+        if isinstance(exc, QwenAudioTaskFailedError):
+            provider_code = exc.error_code
+        if (
+            isinstance(provider_code, str) and len(provider_code) <= 6
+            and provider_code.isascii() and provider_code.isdecimal()
+        ):
+            provider_code = int(provider_code)
+        if type(provider_code) is int and 0 <= provider_code <= 999999:
+            diagnostics = replace(
+                diagnostics, fields={**diagnostics.fields, "provider_code": provider_code}
+            )
+        exc.failure_diagnostics = diagnostics
+        if cause is not None:
+            exc.__cause__ = cause
+        reason = reason if reason in {
+            "provider_task_failed", "task_start_timeout", "task_finish_timeout",
+            "qwen_write_failed", "qwen_keepalive_failed", "run_task_send_failed",
+            "receive_failed", "receive_eof", "session_failed",
+        } else "session_failed"
         if identity is not None:
-            if isinstance(exc, QwenAudioTaskFailedError):
-                reason = (
-                    "hotword_parameters_rejected"
-                    if exc.hotwords_rejected
-                    else f"task_failed:{exc.error_code}"
-                )
             self._terminalize_scoped(
                 identity,
                 outcome="failed",
                 failure_reason=reason,
                 retire=True,
+                failure_diagnostics=diagnostics,
                 provenance=STTNativeProvenance(
                     native_task_id=self._scoped_task_id,
                     barrier="task-failed",
@@ -1165,6 +1220,7 @@ class _QwenAudioSession(STTBackendSession):
             orderly=False,
             reason=reason,
             provider_turn_id=identity.provider_turn_id if identity is not None else None,
+            failure_diagnostics=diagnostics,
         )
         await self._resolve_pending_empty()
         self._accept_terminals = False
@@ -1277,6 +1333,17 @@ class _QwenAudioSession(STTBackendSession):
                 await ws.close()
             except Exception as exc:
                 close_error = exc
+                diagnostics = recognition_failure_diagnostics(
+                    exc, provider="qwen_audio", channel=self._event_projection.channel,
+                    operation="cleanup", reason="provider_cleanup_failed",
+                )
+                primary = getattr(self._failure, "failure_diagnostics", None)
+                emit_failure(
+                    logger, replace(
+                        diagnostics, cause_id=primary.diagnostic_id if primary else None,
+                        fields={**diagnostics.fields, "cleanup_confirmed": False},
+                    ), severity="warning", disposition="degraded", stage="cleanup",
+                )
             logger.info(
                 "[QwenAudio] close elapsed_ms=%d startup_ms=%d ws_close_code=%s "
                 "outcome=%s cause_class=%s",

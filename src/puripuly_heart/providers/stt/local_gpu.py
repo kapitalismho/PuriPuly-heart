@@ -29,6 +29,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.local_qwen_hallucination import (
     is_known_local_qwen_hallucination,
 )
@@ -224,6 +225,7 @@ class _LocalGpuSTTSession(STTBackendSession):
         final_language_runs: tuple[FinalLanguageRun, ...] = (),
         failure_reason: str | None = None,
         retire: bool = False,
+        exception: BaseException | None = None,
     ) -> None:
         if not self._event_projection.can_terminal(identity):
             return
@@ -236,6 +238,14 @@ class _LocalGpuSTTSession(STTBackendSession):
                 text_authority="authoritative" if outcome in ("final", "empty") else "none",
                 failure_reason=failure_reason,
                 epoch_disposition="retire" if retire else "reuse",
+                failure_diagnostics=(
+                    recognition_failure_diagnostics(
+                        exception, provider="local_qwen_gpu", channel=self.backend.channel,
+                        operation="decode", reason=failure_reason or "local_decode_failed",
+                        identity=identity,
+                    )
+                    if outcome in {"failed", "expired", "degraded"} else None
+                ),
             )
         )
 
@@ -311,6 +321,7 @@ class _LocalGpuSTTSession(STTBackendSession):
                     scoped_identity,
                     outcome=outcome,
                     failure_reason=type(exc).__name__,
+                    exception=exc,
                 )
             return
         except GpuASRWorkDiscarded as exc:
@@ -321,7 +332,8 @@ class _LocalGpuSTTSession(STTBackendSession):
                 self._terminalize_scoped(
                     scoped_identity,
                     outcome="failed",
-                    failure_reason=str(exc) or type(exc).__name__,
+                    failure_reason="local_decode_failed",
+                    exception=exc,
                 )
             return
         except BaseException as exc:
@@ -332,7 +344,8 @@ class _LocalGpuSTTSession(STTBackendSession):
                 self._terminalize_scoped(
                     scoped_identity,
                     outcome="failed",
-                    failure_reason=type(exc).__name__,
+                    failure_reason="local_decode_failed",
+                    exception=exc,
                     retire=True,
                 )
             return

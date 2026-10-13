@@ -544,6 +544,7 @@
   "provider.openrouter.payment_required": "クレジット残高を確認してください。",
   "stt.failure": "音声認識でエラーが発生しました（{category}）。もう一度お試しください。",
   "settings.mutation.runtime_apply_failed": "設定は保存されましたが、ランタイムへの適用に失敗しました。",
+  "settings.mutation.failed_pending": "設定の変更は完了しませんでした。編集内容は保留されています。",
   "debug_preview.qq_auth_recoverable_error": "QQ回復可能エラー",
   "debug_preview.qq_auth_translation_gated": "QQ翻訳ゲート",
   "managed_auth.error.claim_conflict": "このデバイスには別のManaged認証記録があります。",

@@ -93,7 +93,10 @@ class CaptureDiagnosticsAdapter:
         )
 
     def self_capture(self, diagnostic: SelfCaptureDiagnostic) -> None:
-        if diagnostic.event is not SelfCaptureDiagnosticEvent.FAILURE:
+        if (
+            diagnostic.event is not SelfCaptureDiagnosticEvent.FAILURE
+            or diagnostic.failure_diagnostics is not None
+        ):
             return
         fields = [
             "[SelfCapture] failed",

@@ -525,7 +525,7 @@ async def test_successor_begin_failure_drains_predecessor_terminal_from_retiring
 
     assert [(item.outcome, item.text, item.failure_reason) for item in emitted] == [
         ("final", "a-final-text", None),
-        ("failed", "", "provider_begin_failed:RuntimeError"),
+        ("failed", "", "provider_begin_failed"),
     ]
     assert [item.identity for item in emitted] == [
         session.requests[0].identity,
@@ -1202,7 +1202,7 @@ async def test_local_write_timeout_keeps_one_quarantined_resource() -> None:
     terminals = [item for item in emitted if isinstance(item, STTProviderTurnTerminal)]
     assert factory_calls == 1
     assert [item.outcome for item in terminals] == ["failed", "failed"]
-    assert terminals[1].failure_reason == "provider_not_ready:RuntimeError"
+    assert terminals[1].failure_reason == "provider_not_ready"
 
     session.send_gate.set()
     await wait_until(lambda: engine.cleanup_debt == 0)
@@ -1345,8 +1345,8 @@ async def test_cloud_cleanup_quarantines_one_epoch_until_physical_release() -> N
     assert len(terminals) == 3
     assert [item.outcome for item in terminals] == ["failed", "failed", "failed"]
     assert [item.failure_reason for item in terminals[1:]] == [
-        "provider_not_ready:RuntimeError",
-        "provider_not_ready:RuntimeError",
+        "provider_not_ready",
+        "provider_not_ready",
     ]
     assert len(provider_failures) == 1
     assert session.calls.count(("stop",)) == 1
@@ -1448,9 +1448,12 @@ async def test_recovery_is_three_attempts_with_point_eight_and_one_point_six_bac
     assert delays == [0.8, 1.6]
     terminal = next(item for item in emitted if isinstance(item, STTProviderTurnTerminal))
     assert terminal.outcome == "failed"
-    assert terminal.failure_reason == "provider_not_ready:RuntimeError"
+    assert terminal.failure_reason == "provider_not_ready"
     assert len(terminal_failures) == 1
-    assert str(terminal_failures[0]) == "provider_recovery_exhausted"
+    assert terminal_failures[0].diagnostic_id
+    assert terminal_failures[0].channel == engine.channel
+    assert terminal.failure_diagnostics is not None
+    assert terminal.failure_diagnostics.fields["outcome"] == "failed"
     await engine.close()
 
 
@@ -1497,7 +1500,7 @@ async def test_ready_then_failed_epochs_exhaust_one_recovery_episode() -> None:
     assert len(sessions) == 3
     assert [terminal.outcome for terminal in terminals] == ["failed"] * 4
     assert [terminal.failure_reason for terminal in terminals[:3]] == ["ready_then_failed"] * 3
-    assert terminals[3].failure_reason == "provider_not_ready:RuntimeError"
+    assert terminals[3].failure_reason == "provider_not_ready"
     await engine.close()
 
 
@@ -2003,7 +2006,8 @@ async def test_soniox_error_before_configuration_send_prioritizes_structured_fai
                 assert configurations == []
                 assert len(failures) == 1
                 if error and not retryable:
-                    assert str(failures[0]) == "soniox_request_failed"
+                    assert failures[0].code == "stt.soniox_request_failed"
+                    assert failures[0].channel == channel
                 assert delays == ([0.8, 1.6] if retryable else [])
                 assert engine._session is None
                 assert not engine.cleanup_debt
@@ -3660,7 +3664,8 @@ async def test_stream_recovery_connection_failure_exhausts_once_not_on_every_fra
             await engine.handle_stream_input(stream_input(ledger, left, left + 4))
         await wait_until(lambda: len(failures) == 1)
         assert opens == 3
-        assert str(failures[0]) == "provider_recovery_exhausted"
+        assert failures[0].diagnostic_id
+        assert failures[0].channel == engine.channel
     finally:
         await engine.close()
 
@@ -3780,7 +3785,9 @@ async def test_continuous_stream_recovery_waits_for_physical_cleanup_and_stops_i
         await engine.handle_stream_input(stream_input(ledger, 10, 14))
         await engine.handle_stream_input(stream_input(ledger, 14, 18))
         assert opens == 1
-        assert [str(failure) for failure in failures] == ["provider_resource_quarantined"]
+        assert len(failures) == 1
+        assert failures[0].category == "timeout"
+        assert failures[0].code == "stt.provider_stream_write_timeout"
         session.release.set()
         await wait_until(lambda: engine.cleanup_debt == 0)
         await engine.handle_stream_input(stream_input(ledger, 18, 22))
@@ -4221,7 +4228,9 @@ async def test_retired_stream_recovery_exhaustion_faults_once_and_stops_reopenin
         for left in range(6, 46, 4):
             await engine.handle_stream_input(stream_input(ledger, left, left + 4))
         assert opens == 3
-        assert [str(exc) for exc in failures] == ["provider_recovery_exhausted"]
+        assert len(failures) == 1
+        assert failures[0].diagnostic_id
+        assert failures[0].channel == engine.channel
     finally:
         await engine.close()
 

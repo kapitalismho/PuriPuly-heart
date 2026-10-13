@@ -212,6 +212,7 @@ class STTScopedTurnNormalizer:
             recovery_pending=terminal.recovery_pending,
             provenance=tuple(self._provenance),
             included_contributions=tuple(self._contributions),
+            failure_diagnostics=terminal.failure_diagnostics,
         )
         return self._terminal
 

@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 
+from puripuly_heart.core.diagnostics import (
+    current_diagnostic_operation,
+    emit_failure,
+    safe_exception_fields,
+)
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 ManagedStatusRefreshWork = Callable[[], Awaitable[None]]
 ManagedStatusRefreshDiagnosticsSink = Callable[
@@ -62,6 +69,9 @@ class ManagedStatusRefreshOwner:
         if self._ingress_stopped or self._task_scope.is_closed:
             return False
 
+        identity = current_diagnostic_operation()
+        generation = self._task_sequence + 1
+
         async def run() -> None:
             try:
                 await work()
@@ -75,6 +85,8 @@ class ManagedStatusRefreshOwner:
                         "error_type": type(exc).__name__,
                     },
                     exc,
+                    generation=generation,
+                    **identity,
                 )
 
         self._task_sequence += 1
@@ -94,6 +106,8 @@ class ManagedStatusRefreshOwner:
                     "error_type": type(exc).__name__,
                 },
                 exc,
+                generation=generation,
+                **identity,
             )
             return False
         return True
@@ -103,13 +117,59 @@ class ManagedStatusRefreshOwner:
         event: str,
         metadata: Mapping[str, object],
         exception: BaseException | None = None,
+        *,
+        generation: int | None = None,
+        operation_id: str | None = None,
+        request_id: str | None = None,
     ) -> None:
+        diagnostics = getattr(exception, "diagnostics", None)
+        if not isinstance(diagnostics, ErrorDiagnostics):
+            diagnostics = ErrorDiagnostics(
+                component="managed_status_refresh",
+                operation=event,
+                code=event,
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={
+                    "phase": event,
+                    "refresh_kind": metadata.get("kind"),
+                    **(safe_exception_fields(exception) if exception is not None else {}),
+                },
+                generation=generation,
+                operation_id=operation_id,
+                request_id=request_id,
+            )
+            if exception is not None and type(exception).__module__ == "builtins":
+                exception.diagnostics = diagnostics
+        emit_failure(
+            logging.getLogger(__name__), diagnostics, severity="warning", disposition="degraded"
+        )
         if self.diagnostics_sink is None:
             return
         try:
             self.diagnostics_sink(event, metadata, exception)
-        except Exception:
-            return
+        except Exception as exc:
+            secondary = ErrorDiagnostics(
+                component="managed_status_refresh",
+                operation="auth_notification",
+                code="managed_status_notification_failed",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"phase": "auth_notification", **safe_exception_fields(exc)},
+                cause_id=diagnostics.diagnostic_id,
+                generation=generation,
+                operation_id=operation_id,
+                request_id=request_id,
+            )
+            emit_failure(
+                logging.getLogger(__name__), secondary, severity="warning", disposition="degraded"
+            )
 
 
 __all__ = ["ManagedStatusRefreshOwner"]

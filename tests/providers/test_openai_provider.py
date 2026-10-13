@@ -324,7 +324,8 @@ async def test_httpx_openai_client_reports_status_without_upstream_body_or_key(
         )
 
     rendered = " ".join(caplog.messages) + str(exc_info.value)
-    assert "status=401" in rendered
+    assert exc_info.value.status_code == 401
+    assert exc_info.value.failure_diagnostics.category == "auth"
     assert secret not in rendered
     assert "private upstream detail" not in rendered
     await client.close()

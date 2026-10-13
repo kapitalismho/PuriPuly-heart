@@ -34,7 +34,12 @@ class SettingsVNextCanonicalPersistenceAdapter:
         if result.settings is None:
             status = getattr(result.status, "value", result.status)
             message = result.error.message if result.error is not None else status
-            raise CanonicalSettingsPersistenceError(str(status), message)
+            raise CanonicalSettingsPersistenceError(
+                str(status),
+                message,
+                diagnostics=result.error.diagnostics if result.error else None,
+                secondary_diagnostics=result.error.secondary_diagnostics if result.error else (),
+            )
         if result.migrated:
             failure_types: set[str] = set()
             failed_count = 0
@@ -61,7 +66,12 @@ class SettingsVNextCanonicalPersistenceAdapter:
         if not result.ok:
             status = getattr(result.status, "value", result.status)
             message = result.error.message if result.error is not None else status
-            raise CanonicalSettingsPersistenceError(str(status), message)
+            raise CanonicalSettingsPersistenceError(
+                str(status),
+                message,
+                diagnostics=result.error.diagnostics if result.error else None,
+                secondary_diagnostics=result.error.secondary_diagnostics if result.error else (),
+            )
 
     def bind_provider_verification(
         self,

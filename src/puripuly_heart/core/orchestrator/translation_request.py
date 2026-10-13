@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
@@ -13,11 +14,13 @@ from puripuly_heart.config.prompts import (
     warm_prompt_cache,
 )
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.language import get_llm_language_name, map_detected_language_for_llm
 from puripuly_heart.core.llm.latency import observe_request
 from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterUserFacingError
 from puripuly_heart.core.messages import (
     SEVERITY_ERROR,
+    ErrorDiagnostics,
     SafeMessageParam,
     UserErrorReport,
     UserMessageRef,
@@ -221,6 +224,8 @@ class TranslationProcessRequest:
     parent_output_count: int = 1
     expected_provider_generation: int | None = None
     prestarted: bool = False
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if (self.turn_generation is None) != (self.turn_order is None):
@@ -632,6 +637,7 @@ class TranslationRequestOwner:
                 "stale_provider_completion",
                 source_language=request.detected_language,
                 context_texts=prepared_context_texts,
+                failure_diagnostics=self._record_stale_provider_completion(request),
             )
         request_source = self._request_source_language(
             request.channel,
@@ -757,6 +763,7 @@ class TranslationRequestOwner:
                 "stale_provider_completion",
                 source_language=source_language,
                 context_texts=context_texts,
+                failure_diagnostics=self._record_stale_provider_completion(request),
             )
         except Exception as exc:
             report = self._record_failure(request, exc)
@@ -766,6 +773,7 @@ class TranslationRequestOwner:
                 request,
                 "failed",
                 "provider_error",
+                failure_diagnostics=report.diagnostics,
                 source_language=source_language,
                 context_texts=context_texts,
             )
@@ -792,8 +800,31 @@ class TranslationRequestOwner:
                 turn_kind=request.turn_kind,
                 parent_output_count=request.parent_output_count,
                 context_texts=context_texts,
+                operation_id=request.operation_id,
+                request_id=request.request_id,
             ),
         )
+
+    @staticmethod
+    def _record_stale_provider_completion(request: TranslationProcessRequest) -> ErrorDiagnostics:
+        diagnostics = ErrorDiagnostics(
+            component="translation.turn", operation="provider_generation",
+            code="translation.stale_provider_completion", category="lifecycle",
+            visibility="basic", content_policy="metadata_only",
+            status_code=None, retry_after_ms=None,
+            channel=request.channel, turn_id=str(request.utterance_id),
+            generation=request.turn_generation,
+            operation_id=request.operation_id, request_id=request.request_id,
+            fields={
+                "parent_utterance_id": str(request.parent_utterance_id),
+                "target_index": request.target_index, "outcome": "failed",
+            },
+        )
+        emit_failure(
+            logging.getLogger(__name__), diagnostics,
+            severity="info", disposition="superseded", stage="provider_generation",
+        )
+        return diagnostics
 
     def _capture_provider_request(self) -> tuple[TranslationBackend, int] | None:
         backend, generation = self.provider_runtime.current_provider_generation()
@@ -911,6 +942,10 @@ class TranslationRequestOwner:
                 parent_utterance_id=request.parent_utterance_id,
                 target_index=request.target_index,
                 target_language=request.target_language,
+                utterance_id=request.utterance_id,
+                turn_generation=request.turn_generation,
+                operation_id=request.operation_id,
+                request_id=request.request_id,
             )
         )
 
@@ -941,6 +976,7 @@ class TranslationRequestOwner:
         *,
         source_language: str | None = None,
         context_texts: tuple[str, ...] | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> TranslationTurnProcessResult:
         return TranslationTurnProcessResult(
             outcome,
@@ -964,7 +1000,11 @@ class TranslationRequestOwner:
                 turn_kind=request.turn_kind,
                 parent_output_count=request.parent_output_count,
                 context_texts=context_texts,
+                operation_id=request.operation_id,
+                request_id=request.request_id,
+                failure_diagnostics=failure_diagnostics,
             ),
+            failure_diagnostics=failure_diagnostics,
         )
 
     @staticmethod

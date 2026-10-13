@@ -52,9 +52,9 @@ class RecordingChatbox:
             raise RuntimeError("chatbox failed")
         self.messages.append(message)
 
-    def send_immediate(self, text: str) -> bool:
+    def send_immediate(self, text: str) -> tuple[bool, None]:
         _ = text
-        return True
+        return True, None
 
     def send_typing(self, is_typing: bool) -> None:
         _ = is_typing

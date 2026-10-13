@@ -542,7 +542,6 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         apply_order24=lambda _value: _false(),
         remember_order22=lambda _value: None,
         mutation_service_provider=lambda: None,
-        save_failure_sink=lambda _message: None,
         results=results,
         sync_memory=lambda _value: None,
         capture_runtime_signatures=components.capture_signatures_before_canonical_mutation,

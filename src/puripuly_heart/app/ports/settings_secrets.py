@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Generic, Protocol, TypeVar
+
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 
 class SettingsSecretKey(StrEnum):
@@ -57,7 +59,7 @@ SecretSnapshotT = TypeVar("SecretSnapshotT")
 class SettingsSecretLoadResult(Generic[SecretSnapshotT]):
     snapshot: SecretSnapshotT | None
     error_message: str | None = None
-    read_error: Exception | None = field(default=None, repr=False)
+    diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -70,6 +72,7 @@ class SettingsSecretMutation:
 class SettingsSecretMutationResult:
     succeeded: bool
     error_type: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
 
 
 class SettingsSecretsPort(Protocol):

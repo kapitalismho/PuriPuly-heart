@@ -39,14 +39,10 @@ async def test_replay_window_and_gap_boundary(event_count, after, expected_gap):
     gaps = [item for item in items if item["topic"] == "gap"]
     assert len(gaps) == (expected_gap is not None)
     if expected_gap is not None:
-        assert gaps == [
-            {
-                "sequence": expected_gap,
-                "topic": "gap",
-                "after": after,
-                "snapshot_required": True,
-            }
-        ]
+        assert gaps[0]["sequence"] == expected_gap
+        assert gaps[0]["after"] == after
+        assert gaps[0]["reason"] == "history_evicted"
+        assert gaps[0]["snapshot_required"] is True
     replayed = [item for item in items if item["topic"] != "gap"]
     assert [item["sequence"] for item in replayed] == expected_sequences
     assert [item["index"] for item in replayed] == list(range(max(after, oldest - 1), event_count))
@@ -72,12 +68,10 @@ async def test_slow_subscriber_gets_gap_then_retained_events_in_order():
     replayed = await _collect(stream, 256)
     await stream.aclose()
 
-    assert gap == {
-        "sequence": 44,
-        "topic": "gap",
-        "after": 0,
-        "snapshot_required": True,
-    }
+    assert gap["sequence"] == 44
+    assert gap["after"] == 0
+    assert gap["reason"] == "history_evicted"
+    assert gap["snapshot_required"] is True
     assert [item["sequence"] for item in replayed] == list(range(45, 301))
     assert [item["index"] for item in replayed] == list(range(44, 300))
     assert events.subscribers == set()
@@ -197,5 +191,6 @@ async def test_subscriber_projection_is_copy_isolated_and_unsubscribe_cleans_up(
     second = (await _collect(second_stream, 1))[0]
     await second_stream.aclose()
 
-    assert second == {"sequence": 1, "topic": "state", "channel": "self"}
+    assert second["sequence"] == 1 and second["topic"] == "state" and second["channel"] == "self"
+    assert second["instance_id"] is None
     assert events.history[0]["topic"] == "state"

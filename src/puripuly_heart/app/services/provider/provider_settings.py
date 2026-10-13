@@ -20,6 +20,7 @@ from puripuly_heart.app.services.secret_settings_transaction import (
     SecretSettingsTransaction,
 )
 from puripuly_heart.app.services.settings_mutation import (
+    SettingsMutationInterrupted,
     SettingsMutationService,
     SttLanguageAudioSettingsMutation,
     TranslationProviderSettingsMutation,
@@ -39,6 +40,7 @@ from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
+    ErrorDiagnostics,
     TransactionResult,
 )
 
@@ -50,6 +52,7 @@ from .provider_runtime_apply import (
     _provider_runtime_apply_unavailable_result,
     _runtime_apply_failed_result,
     _runtime_apply_result_as_degraded_transaction,
+    _settings_mutation_diagnostics,
     _stt_language_audio_save_failed_transaction_result,
     _translation_provider_save_failed_transaction_result,
 )
@@ -70,7 +73,6 @@ class ProviderCompatibilityProjection(Protocol):
 
 ProviderSecretStoreFactory = Callable[[ProviderCompatibilityProjection], SecretStorePort]
 ProviderActiveSecretProvider = Callable[[ProviderCompatibilityProjection, str], str | None]
-ProviderSettingsSaveFailureSink = Callable[[str], None]
 ProviderSettingsMerge = Callable[[ProviderCompatibilityProjection], ProviderCompatibilityProjection]
 ProviderSettingsAsyncEffect = Callable[[ProviderCompatibilityProjection], Awaitable[None]]
 ProviderSettingsRoute = Callable[[ProviderCompatibilityProjection], Awaitable[bool]]
@@ -88,7 +90,9 @@ ProviderSupersededSettingsConsumer = Callable[[ProviderCompatibilityProjection],
 
 
 class ProviderStrictSettingsSaveFailed(Exception):
-    pass
+    def __init__(self, diagnostics: ErrorDiagnostics) -> None:
+        self.diagnostics = diagnostics
+        super().__init__("Provider settings persistence failed")
 
 
 def _noop_rolling_stt_secret_rebind(_secret_key: str, _value: str) -> None:
@@ -119,7 +123,6 @@ class ProviderApplicationOwner:
     apply_order24: ProviderSettingsRoute
     remember_order22: ProviderSettingsSync
     mutation_service_provider: ProviderSettingsMutationServiceProvider
-    save_failure_sink: ProviderSettingsSaveFailureSink
     results: SettingsTransactionResultOwner
     sync_memory: ProviderSettingsSync
     capture_runtime_signatures: Callable[[], None]
@@ -151,15 +154,35 @@ class ProviderApplicationOwner:
         try:
             if persist_settings and pending is not None and not force_rebuild_llm:
                 if await self._apply_combined(next_settings):
-                    return self._last_result_committed()
+                    return (
+                        self.results.current is not None
+                        and self.results.current.status
+                        == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                    )
                 if await self._apply_translation(next_settings):
-                    return self._last_result_committed()
+                    return (
+                        self.results.current is not None
+                        and self.results.current.status
+                        == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                    )
                 if await self.apply_order24(next_settings):
-                    return self._last_result_committed()
-            return await self._apply_direct(
+                    return (
+                        self.results.current is not None
+                        and self.results.current.status
+                        == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                    )
+            applied = await self._apply_direct(
                 next_settings,
                 force_rebuild_llm=force_rebuild_llm,
                 persist_settings=persist_settings,
+            )
+            return applied and (
+                not persist_settings
+                or (
+                    self.results.current is not None
+                    and self.results.current.status
+                    == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
+                )
             )
         finally:
             if refresh_ui:
@@ -233,21 +256,23 @@ class ProviderApplicationOwner:
                     route_order22=False,
                     strict_persistence_errors=True,
                 )
-            except ProviderStrictSettingsSaveFailed:
+            except ProviderStrictSettingsSaveFailed as exc:
                 if committed_before_full_draft is not None:
                     self.sync_memory(committed_before_full_draft)
                 self._set_result(
                     _translation_provider_save_failed_transaction_result(
-                        operation="apply_order21_order22_order24_provider_full_draft_save"
+                        operation="apply_order21_order22_order24_provider_full_draft_save",
+                        exception=exc.__cause__,
                     )
                 )
-            except Exception:
+            except Exception as exc:
                 self._set_result(
                     _runtime_apply_result_as_degraded_transaction(
                         _runtime_apply_failed_result(
                             operation="apply_order21_order22_order24_provider_runtime",
                             code="provider_runtime_apply_exception",
                             surface="translation_provider",
+                            exception=exc,
                         )
                     )
                 )
@@ -295,7 +320,6 @@ class ProviderApplicationOwner:
         repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
-            save_failure_sink=self.save_failure_sink,
         )
         runtime_apply = ProviderRuntimeApplyAdapter(
             owner=self.runtime,
@@ -316,6 +340,10 @@ class ProviderApplicationOwner:
                     correlation_id=None,
                 )
             )
+        except SettingsMutationInterrupted as exc:
+            result = exc.transaction_result
+            self._set_result(result)
+            raise
         finally:
             if getattr(repository, "commit_succeeded", False) or (
                 result is not None and _settings_mutation_committed(result)
@@ -346,23 +374,25 @@ class ProviderApplicationOwner:
                     route_order22=False,
                     strict_persistence_errors=True,
                 )
-            except ProviderStrictSettingsSaveFailed:
+            except ProviderStrictSettingsSaveFailed as exc:
                 preserve_retry = self.llm_retry_pending()
                 self.sync_memory(committed_settings)
                 if preserve_retry:
                     self.mark_llm_retry()
                 self._set_result(
                     _translation_provider_save_failed_transaction_result(
-                        operation="apply_translation_provider_full_draft_save"
+                        operation="apply_translation_provider_full_draft_save",
+                        exception=exc.__cause__,
                     )
                 )
-            except Exception:
+            except Exception as exc:
                 self._set_result(
                     _runtime_apply_result_as_degraded_transaction(
                         _runtime_apply_failed_result(
                             operation="apply_translation_provider_runtime",
                             code="provider_runtime_apply_exception",
                             surface="translation_provider",
+                            exception=exc,
                         )
                     )
                 )
@@ -410,7 +440,6 @@ class ProviderApplicationOwner:
             base_settings=base_settings,
             committed_settings=committed_settings,
             surface="stt_language_audio",
-            save_failure_sink=self.save_failure_sink,
         )
         runtime_apply: RuntimeApplyPort = ProviderRuntimeApplyAdapter(
             owner=self.runtime,
@@ -435,6 +464,10 @@ class ProviderApplicationOwner:
                     correlation_id=None,
                 )
             )
+        except SettingsMutationInterrupted as exc:
+            result = exc.transaction_result
+            self._set_result(result)
+            raise
         finally:
             if getattr(repository, "commit_succeeded", False) or (
                 result is not None and _settings_mutation_committed(result)
@@ -465,8 +498,27 @@ class ProviderApplicationOwner:
                     base_settings=base_settings,
                     committed_settings=committed_settings,
                 )
-            except Exception:
-                self.save_failure_sink("Failed to compensate local ASR provider settings apply")
+            except Exception as exc:
+                secondary = _settings_mutation_diagnostics(
+                    component="provider_application",
+                    operation="compensate_local_asr",
+                    code="settings_compensation_failed",
+                    exception=exc,
+                )
+                self._set_result(
+                    replace(
+                        result,
+                        secondary_diagnostics=(
+                            *result.secondary_diagnostics,
+                            replace(
+                                secondary,
+                                cause_id=result.diagnostics.diagnostic_id
+                                if result.diagnostics
+                                else None,
+                            ),
+                        )[:4],
+                    )
+                )
             self.remember_order22(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
@@ -486,24 +538,24 @@ class ProviderApplicationOwner:
                     route_order22=False,
                     strict_persistence_errors=True,
                 )
-            except ProviderStrictSettingsSaveFailed:
+            except ProviderStrictSettingsSaveFailed as exc:
                 await self._resync_committed_provider_runtime(
                     base_settings=base_settings,
                     committed_settings=committed_settings,
                     plan=plan,
+                    failure_result=_stt_language_audio_save_failed_transaction_result(
+                        operation="apply_stt_language_audio_provider_full_draft_save",
+                        exception=exc,
+                    ),
                 )
-                self._set_result(
-                    _stt_language_audio_save_failed_transaction_result(
-                        operation="apply_stt_language_audio_provider_full_draft_save"
-                    )
-                )
-            except Exception:
+            except Exception as exc:
                 self._set_result(
                     _runtime_apply_result_as_degraded_transaction(
                         _runtime_apply_failed_result(
                             operation="apply_stt_language_audio_provider_runtime",
                             code="provider_runtime_apply_exception",
                             surface="stt_language_audio",
+                            exception=exc,
                         )
                     )
                 )
@@ -575,19 +627,27 @@ class ProviderApplicationOwner:
             if strict_persistence_errors:
                 try:
                     self.settings.persist()
-                except Exception:
+                except Exception as exc:
                     self.settings.rollback()
-                    raise ProviderStrictSettingsSaveFailed from None
+                    raise ProviderStrictSettingsSaveFailed(
+                        self.settings.last_failure
+                        or _settings_mutation_diagnostics(
+                            component="settings_repository",
+                            operation="save",
+                            code="settings_save_failed",
+                            exception=exc,
+                        )
+                    ) from exc
                 self.settings.remember_projection(next_settings)
-            elif (
-                self.settings.save_current(
-                    failure_sink=lambda exc: self.save_failure_sink(
-                        f"Failed to save settings: {exc}"
+            elif self.settings.save_current() is False:
+                self.settings.rollback()
+                self._set_result(
+                    TransactionResult(
+                        status="settings_commit_failed",
+                        message=None,
+                        diagnostics=self.settings.last_failure,
                     )
                 )
-                is False
-            ):
-                self.settings.rollback()
                 return False
             committed = True
             runtime_result = await ProviderRuntimeApplyAdapter(
@@ -629,13 +689,47 @@ class ProviderApplicationOwner:
         base_settings: ProviderCompatibilityProjection,
         committed_settings: ProviderCompatibilityProjection,
         plan: ProviderRuntimeApplyPlan,
+        failure_result: TransactionResult,
     ) -> None:
-        self.sync_memory(base_settings)
+        phase = "restore_memory"
         try:
+            self.sync_memory(base_settings)
+            phase = "resync_committed_runtime"
             await self.runtime.apply(copy.deepcopy(committed_settings), plan)
-        except Exception:
-            self.save_failure_sink("Failed to resync committed order22 provider runtime")
-            self.sync_memory(committed_settings)
+        except Exception as exc:
+            secondary = _settings_mutation_diagnostics(
+                component="provider_application",
+                operation=phase,
+                code="settings_runtime_resync_failed",
+                exception=exc,
+            )
+            restoration_failure = None
+            try:
+                self.sync_memory(committed_settings)
+            except Exception as restore_exc:
+                restoration_failure = replace(
+                    _settings_mutation_diagnostics(
+                        component="provider_application",
+                        operation="restore_memory",
+                        code="settings_memory_restore_failed",
+                        exception=restore_exc,
+                    ),
+                    cause_id=secondary.diagnostic_id,
+                )
+            failure_result = replace(
+                failure_result,
+                secondary_diagnostics=(
+                    *failure_result.secondary_diagnostics,
+                    replace(
+                        secondary,
+                        cause_id=failure_result.diagnostics.diagnostic_id
+                        if failure_result.diagnostics is not None
+                        else None,
+                    ),
+                    *((restoration_failure,) if restoration_failure is not None else ()),
+                )[:4],
+            )
+        self._set_result(failure_result)
 
     def _set_result(self, result: TransactionResult) -> None:
         self.results.set(result)
@@ -686,7 +780,6 @@ class ProviderSettingsOwner:
     binding: ProviderVerificationBindingOwner
     secret_store_factory: ProviderSecretStoreFactory
     active_secret_provider: ProviderActiveSecretProvider
-    save_failure_sink: ProviderSettingsSaveFailureSink | None = None
     secret_change: ProviderSecretChangeOwner = field(default_factory=ProviderSecretChangeOwner)
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
 
@@ -800,7 +893,6 @@ class ProviderSettingsOwner:
             base_settings=current,
             committed_settings=updated,
             surface="provider_secret_change",
-            save_failure_sink=self.save_failure_sink,
         )
         transaction = SecretSettingsTransaction(
             secret_store=self.secret_store_factory(current),
@@ -845,7 +937,6 @@ __all__ = [
     "ProviderActiveSecretProvider",
     "ProviderStrictSettingsSaveFailed",
     "ProviderSecretStoreFactory",
-    "ProviderSettingsSaveFailureSink",
     "ProviderSettingsOwner",
     "provider_verification_context",
 ]

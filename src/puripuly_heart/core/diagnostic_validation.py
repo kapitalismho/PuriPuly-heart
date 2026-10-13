@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Final, Literal, TypeAlias
@@ -1113,17 +1113,7 @@ def _copy_diagnostics_with_fields(
     diagnostics: ErrorDiagnostics,
     fields: Mapping[str, object],
 ) -> ErrorDiagnostics:
-    return ErrorDiagnostics(
-        component=diagnostics.component,
-        operation=diagnostics.operation,
-        code=diagnostics.code,
-        category=diagnostics.category,
-        visibility=diagnostics.visibility,
-        content_policy=diagnostics.content_policy,
-        status_code=diagnostics.status_code,
-        retry_after_ms=diagnostics.retry_after_ms,
-        fields=fields,
-    )
+    return replace(diagnostics, fields=fields)
 
 
 def _is_supported_diagnostic_value(value: object) -> bool:

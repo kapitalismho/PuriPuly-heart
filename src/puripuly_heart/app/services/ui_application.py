@@ -67,10 +67,13 @@ from puripuly_heart.app.services.application_startup import ApplicationStartupOw
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import provider_llm_for_translation
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.updater import check_for_update
@@ -217,6 +220,7 @@ class UiApplicationBoundary:
         osc_state_publisher: Callable[[], object] | None = None,
         output_status_provider: Callable[[], dict[str, dict[str, object]]] | None = None,
         http_extension_registry: object | None = None,
+        scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -235,6 +239,7 @@ class UiApplicationBoundary:
         self._state_owner = state
         self._osc_state_publisher = osc_state_publisher
         self._output_status_provider = output_status_provider
+        self._scene_observation_provider = scene_observation_provider
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )
@@ -308,6 +313,22 @@ class UiApplicationBoundary:
             raise RuntimeError("application output owners are not composed")
         return self._output_status_provider()
 
+    def scene_observation(self) -> dict[str, object]:
+        snapshot = (
+            self._scene_observation_provider()
+            if self._scene_observation_provider is not None
+            else None
+        )
+        return {
+            "observation_succeeded": snapshot.get("process_observation_succeeded")
+            if snapshot
+            else None,
+            "process_present": snapshot.get("process_present") if snapshot else None,
+            "observation_diagnostic_id": snapshot.get("observation_diagnostic_id")
+            if snapshot
+            else None,
+        }
+
     async def wait_overlay_transition(self) -> dict[str, object]:
         return await self._overlay.wait_overlay_transition()
 
@@ -332,11 +353,21 @@ class UiApplicationBoundary:
         try:
             await self._startup.start()
         except BaseException as exc:
-            try:
-                await self.stop()
-            except BaseException:
-                pass
             cancelled = isinstance(exc, asyncio.CancelledError)
+            primary = getattr(exc, "diagnostics", None)
+            if not isinstance(primary, ErrorDiagnostics):
+                phase = getattr(self._startup, "phase", "startup_prepare")
+                primary = ErrorDiagnostics(
+                    component="application_startup",
+                    operation=phase,
+                    code="startup_prepare_failed",
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"phase": phase, **safe_exception_fields(exc)},
+                )
             self._emit_startup_diagnostic(
                 ApplicationStartupDiagnostic(
                     outcome="cancelled" if cancelled else "failed",
@@ -344,8 +375,14 @@ class UiApplicationBoundary:
                     process_id=process_id,
                     monotonic_ns=time.monotonic_ns(),
                     exception_class=None if cancelled else type(exc).__name__,
+                    diagnostics=primary,
                 )
             )
+            self.application_lifecycle().set_primary_failure(primary.diagnostic_id)
+            try:
+                await self.stop()
+            except BaseException:
+                pass
             raise
         self._emit_startup_diagnostic(
             ApplicationStartupDiagnostic(
@@ -404,9 +441,27 @@ class UiApplicationBoundary:
         callback = self._osc_state_publisher
         if callback is None:
             return
-        result = callback()
-        if inspect.isawaitable(result):
-            await result
+        try:
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+        except Exception as exc:
+            emit_failure(
+                logging.getLogger(__name__),
+                ErrorDiagnostics(
+                    component="application_notification",
+                    operation="osc_state_notification",
+                    code="application_state_notification_failed",
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"phase": "osc_state_notification", **safe_exception_fields(exc)},
+                ),
+                severity="warning",
+                disposition="degraded",
+            )
 
     def emit_application_shutdown_diagnostic(
         self,
@@ -420,8 +475,8 @@ class UiApplicationBoundary:
     def log_diagnostic(self, message: str, *, level: int = logging.INFO) -> None:
         self._runtime_logging.emit_diagnostic(message, level=level)
 
-    async def submit_text(self, text: str) -> None:
-        await self._input_runtime.submit_text(text)
+    async def submit_text(self, text: str) -> TextSubmissionAdmission | None:
+        return await self._input_runtime.submit_text(text)
 
     def set_manual_input_activity(self, has_text: bool) -> None:
         self._input_runtime.set_manual_input_activity(has_text)

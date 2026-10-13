@@ -544,6 +544,7 @@
   "provider.openrouter.payment_required": "Проверьте баланс средств.",
   "stt.failure": "Ошибка распознавания речи ({category}). Попробуйте снова.",
   "settings.mutation.runtime_apply_failed": "Настройки сохранены, но не удалось применить на лету.",
+  "settings.mutation.failed_pending": "Изменение настроек не завершено. Правка остаётся ожидающей.",
   "debug_preview.qq_auth_recoverable_error": "QQ восстанавливаемая ошибка",
   "debug_preview.qq_auth_translation_gated": "QQ перевод заблокирован",
   "managed_auth.error.claim_conflict": "Это устройство уже имеет другой запрос управляемой аутентификации.",

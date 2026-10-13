@@ -81,6 +81,7 @@ from puripuly_heart.core.http_extensions import (
     http_extension_secret_key_prefix,
 )
 from puripuly_heart.core.local_translation.devices import list_llama_vulkan_devices
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryResult,
     AppActiveDayTelemetryService,
@@ -107,10 +108,10 @@ class UiInputRuntimeAdapter:
     self_capture: SelfCaptureApplicationOwner
     connection_readiness: LlmConnectionReadinessOwner | None = None
 
-    async def submit_text(self, text: str) -> None:
+    async def submit_text(self, text: str) -> TextSubmissionAdmission | None:
         owner = self.pipeline.self_translation_channel
         submit = None if owner is None else lambda: owner.submit_text(text, source="You")
-        await self.manual_typing.submit(submit)
+        return await self.manual_typing.submit(submit)
 
     def set_manual_input_activity(self, has_text: bool) -> None:
         self.manual_typing.set_input_activity(has_text)

@@ -158,3 +158,32 @@ def test_state_publisher_publishes_peer_asr_ids_for_new_providers(
     OscStatePublisher(sender).start(state_from_settings(settings))
 
     assert ("/avatar/parameters/PuriPuly_PeerASR", expected_id) in sender.messages
+
+
+def test_partial_local_state_send_preserves_prefix_cache_and_failed_parameter() -> None:
+    from puripuly_heart.app.services.osc.state_publisher import OscStatePublicationError
+
+    class PartialSender(FakeSender):
+        fail = True
+
+        def send_message(self, address: str, *values: object) -> None:
+            if self.fail and len(self.messages) == 2:
+                raise OSError(5, "forbidden-udp-body")
+            super().send_message(address, *values)
+
+    sender = PartialSender()
+    publisher = OscStatePublisher(sender)
+    with pytest.raises(OscStatePublicationError) as caught:
+        publisher.start(OscCanonicalState())
+    failure = caught.value
+    assert failure.completed == 2
+    assert failure.requested == 15
+    assert len(publisher.last_published) == 2
+    assert failure.parameter not in publisher.last_published
+    assert isinstance(failure.__cause__, OSError)
+    assert failure.__cause__.errno == 5
+    assert "forbidden-udp-body" not in str(failure)
+    sender.fail = False
+    remaining = publisher.publish_delta(OscCanonicalState())
+    assert len(remaining) == 13
+    assert len(publisher.last_published) == 15

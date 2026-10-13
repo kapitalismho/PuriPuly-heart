@@ -421,14 +421,20 @@ def _assert_secret_snapshot_matches(
         )
     if snapshot.existed is not expected_existed:
         pytest.fail(
-            f"{label} existed mismatch: "
-            f"actual={snapshot.existed!r}, expected={expected_existed!r}"
+            f"{label} existed mismatch: actual={snapshot.existed!r}, expected={expected_existed!r}"
         )
     _assert_secret_value_matches(
         snapshot.value,
         expected_value,
         label=f"{label} value",
     )
+
+
+def _compensation(result: messages.TransactionResult) -> messages.ErrorDiagnostics:
+    assert result.diagnostics is not None
+    outcome = result.secondary_diagnostics[0]
+    assert outcome.cause_id == result.diagnostics.diagnostic_id
+    return outcome
 
 
 @pytest.mark.asyncio
@@ -671,15 +677,10 @@ async def test_verify_provider_secret_failure_commits_failed_evidence_without_ra
     assert evidence["error_code"] == "unauthorized"
     assert "response_body" not in evidence
     assert result.diagnostics is not None
-    assert result.diagnostics.component == "secret_settings_transaction"
-    assert result.diagnostics.operation == "verify_provider_secret"
+    assert result.diagnostics.rejected_fields > 0
+    assert result.diagnostics.diagnostic_id == verifier.result.diagnostics.diagnostic_id
     assert result.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
-    _assert_diagnostics_field_matches(
-        result.diagnostics.fields,
-        "provider",
-        "openrouter",
-        label="verification failed diagnostics",
-    )
+    assert result.diagnostics.fields == {}
 
 
 @pytest.mark.asyncio
@@ -937,13 +938,13 @@ async def test_settings_commit_failure_after_set_restores_previous_secret_withou
     assert result.diagnostics is not None
     assert result.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
     _assert_diagnostics_field_matches(
-        result.diagnostics.fields,
+        _compensation(result).fields,
         "secret_key",
         "openrouter_api_key",
         label="set commit failure diagnostics",
     )
     _assert_diagnostics_field_matches(
-        result.diagnostics.fields,
+        _compensation(result).fields,
         "previous_secret_existed",
         True,
         label="set commit failure diagnostics",
@@ -1009,7 +1010,7 @@ async def test_settings_save_exception_after_set_restores_previous_secret() -> N
     assert publisher.publications == []
     assert result.diagnostics is not None
     _assert_diagnostics_field_matches(
-        result.diagnostics.fields,
+        _compensation(result).fields,
         "previous_secret_existed",
         True,
         label="save exception restore diagnostics",
@@ -1068,7 +1069,7 @@ async def test_absent_secret_set_commit_failure_clears_newly_written_secret_on_r
     assert publisher.publications == []
     assert result.diagnostics is not None
     _assert_diagnostics_field_matches(
-        result.diagnostics.fields,
+        _compensation(result).fields,
         "previous_secret_existed",
         False,
         label="absent set restore diagnostics",
@@ -1076,9 +1077,7 @@ async def test_absent_secret_set_commit_failure_clears_newly_written_secret_on_r
 
 
 @pytest.mark.asyncio
-async def test_restore_failure_after_settings_commit_failure_reports_compensation_failure_only() -> (
-    None
-):
+async def test_restore_failure_preserves_primary_commit_and_secondary_compensation_causes() -> None:
     secret_settings = _service_module()
     events: list[tuple[str, str]] = []
     store = RecordingSecretStore(
@@ -1123,12 +1122,14 @@ async def test_restore_failure_after_settings_commit_failure_reports_compensatio
     )
     assert publisher.publications == []
     assert result.diagnostics is not None
-    assert result.diagnostics.component == "secret_settings_transaction"
-    assert result.diagnostics.operation == "restore_secret"
-    assert result.diagnostics.code == "settings_commit_failed_secret_restore_failed"
+    assert result.diagnostics.code == "settings_commit_failed"
+    assert _compensation(result).component == "secret_settings_transaction"
+    assert _compensation(result).operation == "restore_secret"
+    assert _compensation(result).code == "settings_commit_failed_secret_restore_failed"
+    assert result.secondary_diagnostics[1].rejected_fields > 0
     assert result.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
     _assert_diagnostics_fields_match(
-        result.diagnostics.fields,
+        _compensation(result).fields,
         {
             "secret_key": "openrouter_api_key",
             "action": "set",
@@ -1254,7 +1255,7 @@ async def test_clear_absent_secret_commit_failure_restores_absent_snapshot_by_cl
     assert publisher.publications == []
     assert result.diagnostics is not None
     _assert_diagnostics_field_matches(
-        result.diagnostics.fields,
+        _compensation(result).fields,
         "previous_secret_existed",
         False,
         label="absent clear restore diagnostics",

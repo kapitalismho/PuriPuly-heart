@@ -7,6 +7,7 @@ import tempfile
 import webbrowser
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import flet as ft
 from puripuly_heart.core.discord_oauth_loopback import (
@@ -35,11 +36,17 @@ from puripuly_heart.app.services.application_shutdown import (
 )
 from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 from puripuly_heart.config.provider_values import QwenRegion
+from puripuly_heart.core.diagnostics import (
+    diagnostic_operation,
+    emit_failure,
+    safe_exception_fields,
+)
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.qq_auth_diagnostics import exception_fields, log_qq_auth
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.components.chatgpt_auth_dialog import ChatGptAuthDialog
@@ -1042,10 +1049,41 @@ class TranslatorApp:
             try:
                 while self._settings_mutation_queue:
                     next_task = self._settings_mutation_queue.pop(0)
+                    operation_id = uuid4().hex
                     try:
-                        await next_task()
-                    except Exception:
-                        logger.exception("Settings mutation task failed")
+                        control = getattr(self.application, "control", None)
+                        instance_id = (
+                            getattr(control(), "instance_id", None) if callable(control) else None
+                        )
+                        with diagnostic_operation(instance_id, operation_id, operation_id):
+                            result = await next_task()
+                        if result is False:
+                            self._show_snackbar(
+                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                            )
+                    except Exception as exc:
+                        emit_failure(
+                            logger,
+                            ErrorDiagnostics(
+                                component="gui_settings_queue",
+                                operation="queued_mutation",
+                                code="settings_background_task_failed",
+                                category="transaction",
+                                visibility="basic",
+                                content_policy="metadata_only",
+                                status_code=None,
+                                retry_after_ms=None,
+                                fields={"phase": "queued_mutation", **safe_exception_fields(exc)},
+                                operation_id=operation_id,
+                            ),
+                            stage="queued_mutation",
+                        )
+                        try:
+                            self._show_snackbar(
+                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                            )
+                        except Exception:
+                            pass
             finally:
                 self._settings_mutation_worker_active = False
 
@@ -1076,6 +1114,7 @@ class TranslatorApp:
                         if result:
                             self.view_settings.acknowledge_provider_apply_settings(pending_settings)
                             self.application.refresh_settings_projection()
+                        return bool(result)
 
                     self._queue_settings_mutation_task(_task)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
@@ -1086,6 +1125,7 @@ class TranslatorApp:
                     if result:
                         self.view_settings.acknowledge_prompt_apply_settings(pending)
                         self.application.refresh_settings_projection()
+                    return bool(result)
 
                 self._queue_settings_mutation_task(_task)
 
@@ -1494,6 +1534,7 @@ class TranslatorApp:
             if result:
                 self.view_settings.acknowledge_prompt_apply_settings(intent)
                 self.application.refresh_settings_projection()
+            return bool(result)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1546,6 +1587,7 @@ class TranslatorApp:
                 )
                 if verification is not None:
                     self._run_page_task(verification)
+            return bool(result)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1633,8 +1675,21 @@ class TranslatorApp:
             self._refresh_chatgpt_account_card()
             try:
                 result = await self.application.connect_chatgpt()
-            except Exception:
-                self._log_basic("[ChatGPT] sign-in task failed", level=logging.ERROR)
+            except Exception as exc:
+                emit_failure(
+                    logger,
+                    ErrorDiagnostics(
+                        component="chatgpt_account",
+                        operation="sign_in",
+                        code="chatgpt_sign_in_failed",
+                        category="auth",
+                        visibility="basic",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={"phase": "sign_in", **safe_exception_fields(exc)},
+                    ),
+                )
                 result = ChatGptConnectResult(succeeded=False, failure_code="failed")
             dialog = getattr(self, "_chatgpt_auth_dialog", None)
             if dialog is not None:

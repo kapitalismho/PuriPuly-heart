@@ -406,6 +406,7 @@ async def test_renderer_envelope_feeds_manager_eligibility() -> None:
         excinfo.value.failure_reason,
         startup_error=excinfo.value,
         default_phase=None,
+        exception=excinfo.value,
     )
     assert "overlay_instance_id" not in (excinfo.value.evidence or {})
     assert envelope["evidence"]["overlay_instance_id"] == "overlay-live"

@@ -66,6 +66,8 @@ class TranslationUiMessage:
     publication_generation: int | None = None
     source_order: int | None = None
     parent_utterance_id: UUID | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if (
@@ -116,6 +118,8 @@ class ChatboxProjection:
     turn_order: int | None = None
     target_indexes: tuple[int, ...] = ()
     target_languages: tuple[str, ...] = ()
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +164,8 @@ class SelfTranslationTurnSnapshot:
     admitted_at: float = 0.0
     first_success_at: float | None = None
     all_targets_terminal_at: float | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
 
     @property
     def text(self) -> str:
@@ -184,6 +190,8 @@ class _SelfTranslationTurnAggregate:
     revision: int = 0
     visible_signature: tuple[tuple[str, str], ...] = ()
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -625,6 +633,8 @@ class TranslationUiMessageQueue:
             event_type=event.type.value,
             accepted_handoff=accepted,
             ui_queue_submitted=reason == "ui_queue_submitted",
+            operation_id=event.operation_id,
+            request_id=event.request_id,
         )
 
     def _ensure_peer_writer(self) -> None:
@@ -859,6 +869,8 @@ class TranslationUiMessageQueue:
             event_type=event.type.value,
             accepted_handoff=accepted_handoff,
             ui_queue_submitted=ui_queue_submitted,
+            operation_id=event.operation_id,
+            request_id=event.request_id,
         )
 
     @staticmethod
@@ -1017,6 +1029,8 @@ class TranslationOutputProjectionOwner:
             child_target_indexes={child.utterance_id: child.target_index for child in children},
             child_sequences={child.utterance_id: child.sequence for child in children},
             admitted_at=self.clock.now(),
+            operation_id=first.operation_id,
+            request_id=first.request_id,
         )
         self._self_turns[first.parent_utterance_id] = aggregate
         self.diagnostics.emit(
@@ -1277,6 +1291,8 @@ class TranslationOutputProjectionOwner:
             source=message.source,
             channel=message.channel,
             runtime_log_handled=message.runtime_log_handled,
+            operation_id=message.operation_id,
+            request_id=message.request_id,
         )
         if (
             scoped_peer_event
@@ -1299,6 +1315,8 @@ class TranslationOutputProjectionOwner:
                 event_type=message.event_type.value,
                 accepted_handoff=False,
                 ui_queue_submitted=False,
+                operation_id=message.operation_id,
+                request_id=message.request_id,
             )
         return await self.ui_messages.publish(
             event,
@@ -1863,6 +1881,8 @@ class TranslationOutputProjectionOwner:
             admitted_at=aggregate.admitted_at,
             first_success_at=aggregate.first_success_at,
             all_targets_terminal_at=aggregate.all_targets_terminal_at,
+            operation_id=aggregate.operation_id,
+            request_id=aggregate.request_id,
         )
 
     async def _publish_self_snapshot(
@@ -1920,6 +1940,8 @@ class TranslationOutputProjectionOwner:
                     turn_order=snapshot.turn_order,
                     target_indexes=target_indexes,
                     target_languages=target_languages,
+                    operation_id=snapshot.operation_id,
+                    request_id=snapshot.request_id,
                 )
             )
             if result.decision.decision != "published":
@@ -2219,6 +2241,8 @@ class TranslationOutputProjectionOwner:
             target_index=eligible_target_index,
             target_count=eligible_target_count,
             retained_payload_bytes=retained_payload_bytes,
+            operation_id=submission.operation_id,
+            request_id=submission.request_id,
         )
 
     async def project_translation_result(
@@ -2265,6 +2289,7 @@ class TranslationOutputProjectionOwner:
                     close_is_final=True,
                     finalize_latency=True,
                     speaker_assignment=submission.speaker_assignment,
+                    output_scope=output_scope,
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
@@ -2287,6 +2312,8 @@ class TranslationOutputProjectionOwner:
                             source=submission.source,
                             turn_generation=submission.turn_generation,
                             turn_order=submission.turn_order,
+                            operation_id=submission.operation_id,
+                            request_id=submission.request_id,
                         )
                     )
                 else:
@@ -2304,6 +2331,8 @@ class TranslationOutputProjectionOwner:
                         translation_text=None,
                         include_source=configuration.chatbox_include_source,
                         source=submission.source,
+                        operation_id=submission.operation_id,
+                        request_id=submission.request_id,
                     )
                 )
             else:
@@ -2384,6 +2413,7 @@ class TranslationOutputProjectionOwner:
                     close_is_final=False,
                     finalize_latency=not denied_fallback_to_chatbox,
                     speaker_assignment=submission.speaker_assignment,
+                    output_scope=output_scope,
                 )
             if fallback_to_chatbox and await self._await_translation_destination(
                 submission,
@@ -2398,6 +2428,8 @@ class TranslationOutputProjectionOwner:
                         translation_text=None,
                         include_source=configuration.chatbox_include_source,
                         source=submission.source,
+                        operation_id=submission.operation_id,
+                        request_id=submission.request_id,
                     )
                 )
             elif deny_peer_chatbox_attempt:
@@ -2456,6 +2488,8 @@ class TranslationOutputProjectionOwner:
                     publication_generation=submission.publication_generation,
                     source_order=submission.source_order,
                     parent_utterance_id=submission.parent_utterance_id,
+                    operation_id=submission.operation_id,
+                    request_id=submission.request_id,
                 )
             )
         elif dual_target_self:
@@ -2473,6 +2507,8 @@ class TranslationOutputProjectionOwner:
                             utterance_id=utterance_id,
                             payload=translation,
                             source=submission.source,
+                            operation_id=submission.operation_id,
+                            request_id=submission.request_id,
                         )
                     )
                     await self.emit_translation(
@@ -2505,6 +2541,8 @@ class TranslationOutputProjectionOwner:
                     utterance_id=utterance_id,
                     payload=translation,
                     source=submission.source,
+                    operation_id=submission.operation_id,
+                    request_id=submission.request_id,
                 )
             )
             await self.emit_translation(
@@ -2575,6 +2613,8 @@ class TranslationOutputProjectionOwner:
                         if submission.turn_generation is not None
                         else ()
                     ),
+                    operation_id=submission.operation_id,
+                    request_id=submission.request_id,
                 )
             )
         elif deny_peer_chatbox_attempt:
@@ -2806,6 +2846,8 @@ class TranslationOutputProjectionOwner:
             target_indexes=projection.target_indexes,
             target_languages=projection.target_languages,
             self_speech=projection.channel == "self" and projection.source == "Mic",
+            operation_id=projection.operation_id,
+            request_id=projection.request_id,
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(
@@ -2854,6 +2896,8 @@ class TranslationOutputProjectionOwner:
                 payload=message,
                 source=projection.source,
                 channel=projection.channel,
+                operation_id=projection.operation_id,
+                request_id=projection.request_id,
             )
         )
         self.diagnostics.clear_latency_timeline(

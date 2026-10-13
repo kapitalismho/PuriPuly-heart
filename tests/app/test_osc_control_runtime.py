@@ -290,7 +290,7 @@ async def test_output_snapshot_separates_local_bind_and_discovery_from_remote_de
     await fallback.wait_automatic_query_start()
     degraded = fallback.output_snapshot()
     assert degraded["query_service_started"] is False
-    assert degraded["query_failure"] == "OSError"
+    assert degraded["query_failure"] == "oscquery_unavailable"
     assert degraded["local_availability"] == "available"
     assert degraded["effective_send_port"] == 9000
     assert degraded["remote_delivery"] == "unacknowledged"

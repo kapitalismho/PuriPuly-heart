@@ -48,7 +48,7 @@ puripuly.exe app stop
 - `app list` enumerates discoverable current-user instances. `app discover` and `app status` query the instance matching `--config` and report its instance identity, process ID, channel and translation state. The PID is observation only; it is not the control identity or a signal target.
 - `app restart` stops the instance for that settings identity before starting it again.
 - A query or mutation does not launch a missing host implicitly. A missing instance is an explicit `instance_not_found` error; start one deliberately with `app start`.
-- `app stop` waits until the original instance endpoint is gone and the observed original process identity has exited. `app stop --no-wait` returns the accepted shutdown receipt instead. It never kills a process by PID.
+- `app stop` waits until the original instance endpoint is gone and the observed original process identity has exited. Its `cleanup_outcome: unobserved` distinguishes that process-stop observation from successful completion of every teardown callback, file flush, or resource release. `app stop --no-wait` returns the accepted shutdown receipt instead, also without a cleanup-success claim. It never kills a process by PID.
 - `Ctrl+C` interrupts a foreground host/client with exit code 130. A background host is independent of the short-lived launch client. On Windows, the host retains its kill-on-close child-process Job Object; the CLI client does not inherit that host containment.
 
 For direct host startup, `python -m puripuly_heart.main run-headless --config <settings-file>` is the explicit GUI-free runtime command. The CLI form `app start --foreground` is equivalent for control use and establishes local discovery. Do not use the legacy native `--headless` launcher dispatch as a service contract: it does not itself define an application-control host, and Python's no-command fallback starts the GUI. The ordinary no-command application launch remains GUI startup.
@@ -83,6 +83,8 @@ puripuly.exe query providers.status
 puripuly.exe query settings.current
 puripuly.exe query settings.choices
 puripuly.exe query consent.peer_translation
+puripuly.exe query diagnostics.history
+puripuly.exe query diagnostics.health
 ```
 
 Use `capabilities` to discover the supported query names. Queries are side-effect-free observations; discovery commands such as audio-device enumeration may read the current desktop/audio environment, but do not enable capture or start recording.
@@ -123,6 +125,8 @@ Manual text goes through the normal self transcript/translation/output pipeline,
 puripuly.exe text submit --file .\message.txt
 Get-Content -Raw .\message.txt | puripuly.exe text submit --stdin
 ```
+
+The receipt reports `admission`, the pipeline's existing `turn_id` and `child_turn_ids`, and `output_delivery: unobserved`. The existing bounded completion wait manages typing; it is not a destination acknowledgment and does not establish translation/output success. Later translation/output failures retain the explicitly admitted operation/request relationship, so query diagnostic history for the original operation and inspect the affected destination separately. An applied admission is not retroactively rewritten as successful translation or display.
 
 ## Typed settings and provider changes
 
@@ -189,7 +193,7 @@ puripuly.exe query <query-name> [--arguments '<JSON object>' | --file <query.jso
 puripuly.exe command <command-name> [--arguments '<JSON object>' | --file <arguments.json>] [--expected-revision <revision>] [--no-wait]
 ```
 
-The catalog rejects unknown names; it is not RPC reflection. Query names currently take no arguments. `command` accepts only names and argument shapes returned by `capabilities`. Use `--file` for JSON payloads that include sensitive or private content. Protected operations have dedicated `secrets`, `auth`, and `text` commands; the generic command form deliberately rejects `secrets.set`, `secrets.verify`, `auth.login`, and `text.submit`.
+The catalog rejects unknown names; it is not RPC reflection. `capabilities.query_arguments` describes the finite argument shapes for named queries; queries without declared arguments reject them. `command` accepts only names and argument shapes returned by `capabilities`. Use `--file` for JSON payloads that include sensitive or private content. Protected operations have dedicated `secrets`, `auth`, and `text` commands; the generic command form deliberately rejects `secrets.set`, `secrets.verify`, `auth.login`, and `text.submit`.
 
 Global options are `--config <settings-file>` and `--timeout <seconds>` (greater than 0 and at most 3600). Mutations wait for a terminal result by default. `--no-wait` returns an accepted operation identity without claiming completion.
 
@@ -244,6 +248,8 @@ puripuly.exe secrets verify soniox_api_key
 
 Verification reads a secret using the same hidden-input/stdin rule and is separate from storage. The declared secret identifiers are listed in `capabilities` and `secrets presence`; loaded HTTP-extension declarations are included. A key without a supported verification protocol returns terminal `action_required` (`verification: unavailable`), not a fabricated verification success. Secret values are never returned in settings, query results, operation receipts, or logs. Delete is local storage deletion.
 
+Verification is a limited key/protocol probe, not proof of healthy live recognition: diagnostic metadata distinguishes `verification_scope: key_probe` from `recognition_readiness: unobserved`. A failed probe preserves known typed transport/status causes; an unsuccessful boolean alone is not evidence of invalid credentials. Probe timeout-success behavior, where established by a provider protocol, does not establish successful recognition.
+
 Authentication commands are explicit:
 
 ```powershell
@@ -262,6 +268,8 @@ QQ authorization that is still awaiting managed-operation recovery reports `acti
 
 ChatGPT login authorizes GPT 6 Luna on the `chatgpt` translation connection with the user's ChatGPT plan. It does not change the selected translation model or connection. `auth status` reports `chatgpt.signed_in`, `chatgpt.in_progress`, and `chatgpt.sign_in_required` without the account email.
 
+When secret observation fails, `signed_in` is `null` rather than a fabricated signed-out result; inspect its diagnostic reference. Local credential deletion and confirmed remote revocation remain separate outcomes. Secondary listener, storage, or notification failures do not replace the original authentication cause or retroactively invalidate a completed durable settings transition.
+
 Account logout is local-only and does not revoke a remote provider grant, except ChatGPT logout, which also requests revocation of the refresh token and reports `scope: remote_revoked` or `scope: local_only` when revocation was not confirmed. Logging out an inactive account preserves unrelated BYOK, local, or other-account translation; only the affected active route is stopped/rebuilt. Failed logout persistence does not silently leave that route's translation disabled. Authentication and model operations can require a human step or missing entitlement and report `action_required`. The CLI never auto-accepts consent. Peer terms are available through `capture terms`; an informed user can explicitly accept them when enabling peer capture as described above.
 
 ## Output, events, logs, and privacy
@@ -272,7 +280,7 @@ Account logout is local-only and does not revoke a remote provider grant, except
 - Queries and default event/log views omit credentials and conversation content. Recognition and translation content subscriptions require both the corresponding event topic and explicit `--include-transcripts` / `--include-translations` selection. Non-content topics expose typed metadata only; `osc_sent` never includes chatbox text, even with both content flags enabled. Keep those flags off unless the caller needs content and can protect the output.
 - Subscribers have bounded independent buffers. Slow consumers do not block capture/translation; event sequence gaps are explicit. Use `--after` to resume and refresh a snapshot with queries after a gap. Ordering is per owner/topic/channel; do not infer one global order across self, peer, UI, and provider streams.
 - `events follow` defaults to operation, settings, session-state, error and gap topics. Topics can be selected with repeatable `--topic`; `--channel` filters self or peer events. For content, explicitly add `--topic transcript` or `--topic translation` and the corresponding include flag.
-- `logs follow` defaults to warning and follows sanitized application metadata; choose `--level debug|info|warning|error` to change the threshold. Logs are bounded diagnostics, not a durable audit trail, and do not contain transcript/translation bodies or credentials.
+- `logs follow` defaults to warning and follows sanitized application metadata; choose `--level debug|info|warning|error` to change the threshold. Failure events carry the same safe diagnostic record available from retained history. Use `--after <event-sequence> --instance-id <originating-host>` for scoped replay; without `--after`, only new events are followed. `events follow` also accepts `--instance-id`. Neither interface returns mixed-content main-file bytes.
 - QQ authentication also emits bounded `[QQAuth]` diagnostics through the normal live and persisted application logs. Successful committed recovery is logged as success even without a user-facing message; local-key absence is distinguished from a pending remote delivery acknowledgment. These records use allowlisted stages, codes, and available HTTP/transport classifications, not raw exceptions, response bodies, QQ identities, credentials, keys, tokens, or proxy URLs.
 
 ```powershell
@@ -281,6 +289,65 @@ puripuly.exe events follow --topic transcript --channel self --include-transcrip
 puripuly.exe events follow --topic translation --channel peer --include-translations
 puripuly.exe logs follow --level warning
 ```
+
+## Retained diagnostics and delivery health
+
+An independently attached client can inspect a prior failure without subscribing before it happened:
+
+```powershell
+puripuly.exe query diagnostics.history
+puripuly.exe query diagnostics.history --arguments '{"operation_id":"<operation-id>","instance_id":"<originating-instance-id>","limit":10}'
+puripuly.exe query diagnostics.history --arguments '{"diagnostic_id":"<diagnostic-id>"}'
+puripuly.exe query diagnostics.history --arguments '{"after":42,"limit":100}'
+puripuly.exe query diagnostics.health
+puripuly.exe operation status <operation-id>
+```
+
+Use real identities and cursors returned by the host, not the example placeholders. `diagnostics.history` accepts only optional `operation_id`, `diagnostic_id`, `instance_id`, `after`, and `limit`. `diagnostics.health` takes no arguments. Both use the existing authenticated same-user local connection; they neither grant mutation authority nor enable conversation access.
+
+### Identity and interpretation
+
+Schema version 1 records contain a distinct `diagnostic_id`, UTC `occurred_at`, current `instance_id`, `diagnostic_sequence`, repository-owned component/operation/stage, severity, actual disposition, stable code/category, and known cause/operation/request/channel/turn/generation identities. Unavailable relationships are `null`, not inferred from nearby events. Allowlisted native/status/provider details and bounded exception-class cause relationships may be present; raw exception messages, stack traces, arbitrary child JSON/stderr, response bodies, credentials, URLs, personal paths, audio, and conversation content are excluded.
+
+`detail.state`, `detail.rejected_fields`, and `detail.truncated` disclose incomplete optional evidence. A rejected detail must not hide an otherwise permitted code or identity. Repeated projection of the same owning diagnostic is deduplicated; a new operation or generation is not silently joined to the previous failure. Unknown defects remain explicitly unknown and identify the safe owning boundary rather than a guessed diagnosis.
+
+Disposition is one of `failed`, `degraded`, `recovered`, `cancelled`, `superseded`, `disabled`, `unknown`, or `action_required`. It describes an observation, not permission to retry. Owner state and terminal receipts remain authoritative: persistence failure, committed-but-degraded runtime application, cancellation, expected empty recognition, and disabled destinations are not interchangeable. Primary and bounded secondary cleanup causes remain separate. Local UDP send success does not acknowledge remote delivery; output admission does not establish physical display.
+
+The same record is available as `diagnostic` on `logs` events with `kind: failure`; operation events carry diagnostic references. **Diagnostic history cursors and event replay cursors are different sequences.** Use history's `next_after` only for `diagnostics.history`; use an event's `sequence` only for follow/replay.
+
+`gpu.status.runtime.startup_cleanup` reports pending startup cleanup, confirmed completion, and bounded safe cleanup failures. Missing owner evidence is unavailable, not proof that an absent worker was fully closed. `app.status.scene_observation` distinguishes a successful process probe from a failed observation; a failed enumeration cannot establish that VRChat is not running. Neither query exposes process command lines, participant identities, or raw scene logs.
+
+### Bounds, gaps, and restart
+
+| Surface | Bound |
+| --- | --- |
+| One diagnostic record | 4,096 encoded metadata bytes; at most 32 optional producer fields |
+| Secondary cause projection | At most four; additional causes report truncation |
+| Current-instance diagnostic history | At most 256 records and 512 KiB encoded metadata |
+| History query | Default 50 records, maximum 100 |
+| Event replay history | 256 entries |
+| Subscriber wake buffer | 32 entries; wakeups coalesced independently per subscriber |
+| Cross-thread diagnostic dispatch | 256 pending metadata events |
+| Existing main-file queue | 2,048 records, including 64 priority slots |
+| Existing file retention | 20 MiB main file and one backup |
+
+History returns records in ascending diagnostic sequence order. Inspect `oldest_sequence`, `latest_sequence`, `next_after`, `gap`, `evicted_records`, `truncated`, and `retention`; a bounded result is not proof of complete evidence. History is in memory for the current host, resets on restart, and is not a database or durable audit. Retain the originating instance alongside any operation or diagnostic ID.
+
+Malformed arguments, negative cursors, invalid identity syntax, unknown keys, and limits outside 1–100 produce `invalid_arguments` and CLI exit 3. A validly shaped future cursor returns lookup `invalid_cursor`; a different host identity returns `foreign_instance`. Both are successful queries (exit 0) with empty records and an explicit gap, not evidence that no failure occurred. `not_retained` means no matching retained evidence, not that an operation succeeded or never failed. Unavailable history is explicit. Follow/replay gaps identify eviction, foreign-instance, or invalid-cursor conditions and request a fresh snapshot.
+
+### Delivery health is not persistence acknowledgment
+
+`diagnostics.health` reports `history`, `events`, `file`, and available output-owner delivery observations independently of successful file writing:
+
+- History reports availability, retained bytes/records, eviction, rejected detail/records, duplicate projections, subscriber/file projection failures, and bounded cross-thread dispatch pressure.
+- Events report retained sequences, subscriber count, eviction, gaps, and disconnected consumers. Slow consumers have independent bounded work and do not backpressure application producers.
+- File reports writer availability, queue capacity and pending work, enqueued/written/dropped/rejected records, delivery failures, writer liveness, and time since progress. `shutdown_attempt_complete` is distinct from confirmed `shutdown_complete`; cleanup failures remain visible. Pending work includes in-flight/buffered unfinished records. `stalled` means a pending episode without observed writer progress for at least two seconds; it is not a guessed disk diagnosis.
+- Output reports bounded owner-history retention/eviction and coalesced observer failures, including the first `observer_failure_diagnostic_id` and current failure count. A failed optional observer does not retroactively fail translation or acknowledge a destination.
+
+File counters cover the existing whole main-file stream, including its permitted conversation records. `persistence` distinguishes `pending`, `incomplete`, `unknown`, and `written_not_durable`; `durable` is false. Enqueued is not written, and written is not an fsync/durability claim. A record's `file_evidence` is `unknown` unless unavailability is established; aggregate counts cannot establish persistence of that individual record. Failed-file and overflow episodes expose `delivery_diagnostic_id` or `loss_diagnostic_id` through retained history without recursively writing another record to the failed sink. Their file evidence is unavailable. Bounded shutdown, queue loss, failed storage, and uninstrumented sinks must not be interpreted as lossless logging.
+
+The live Basic/Logs audience remains concise and factual; selected technical metadata is file-only and available through the metadata CLI. Detailed mode is not restored. Existing explicitly permitted conversation logging remains separate, so the main log still requires review and redaction before sharing.
+
 
 ## Exit codes
 

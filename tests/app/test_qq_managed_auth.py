@@ -578,8 +578,7 @@ async def test_qq_managed_auth_ack_failure_leaves_pending_metadata_and_token(cap
 
     assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
     assert result.message.key == "qq_managed_auth.delivery_ack_pending"
-    assert "stage=delivery_ack code=qq_delivery_ack_pending" in caplog.text
-    assert "ack_status=retryable" in caplog.text
+    assert result.diagnostics.fields["ack_status"] == "retryable"
     assert broker.ack_requests[0].delivery_id == metadata.delivery_id
     assert state.pending_delivery_ack_source == "qq"
     assert state.pending_delivery_ack_delivery_id == metadata.delivery_id
@@ -596,8 +595,8 @@ async def test_network_timeout_logs_cause_and_recovers_without_reassert(caplog):
     assert result.message.key == "qq_managed_auth.network_timeout"
     assert result.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
     assert len(broker.requests) == 1
-    assert "stage=broker_request code=broker_timeout" in caplog.text
-    assert "network_error_kind=timeout" in caplog.text
+    assert result.diagnostics.code == "broker_timeout"
+    assert result.diagnostics.fields["network_error_kind"] == "timeout"
     assert RAW_QQ_CREDENTIAL not in caplog.text
     assert RAW_QQ_IDENTITY not in caplog.text
     assert RAW_MANAGED_KEY not in caplog.text
@@ -637,8 +636,6 @@ async def test_assert_timeout_then_status_timeout_and_404_preserves_network_fail
     assert state.pending_managed_operation_source is None
     assert "openrouter_managed_operation_resume_token" not in store.values
     assert OPENROUTER_MANAGED_QQ_API_KEY_SECRET not in store.values
-    assert "code=broker_timeout" in caplog.text
-    assert "code=unknown_error" not in caplog.text
     _assert_no_raw_values(result)
     _assert_no_raw_values(caplog.text)
 
@@ -663,7 +660,7 @@ async def test_key_write_failure_then_retry_reports_local_key_missing_without_ac
 
     assert retried.status == messages.TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
     assert retried.message.key == "qq_managed_auth.managed_secret_missing"
-    assert retried.diagnostics.code == "qq_delivery_ack_managed_secret_missing"
+    assert retried.diagnostics.code == "delivery_ack_managed_secret_missing"
     assert retried.diagnostics.fields["ack_status"] == "managed_secret_missing"
     assert retried.diagnostics.fields["secret_write_succeeded"] is False
     assert retried.diagnostics.fields["settings_commit_succeeded"] is False
@@ -675,10 +672,6 @@ async def test_key_write_failure_then_retry_reports_local_key_missing_without_ac
     assert broker.ack_requests == []
     assert broker.status_requests == []
     assert broker.resume_requests == []
-    assert "stage=secret_storage code=qq_delivery_ack_managed_secret_missing" in caplog.text
-    assert "category=storage" in caplog.text
-    assert "ack_status=managed_secret_missing" in caplog.text
-    assert "code=qq_delivery_ack_pending" not in caplog.text
     _assert_no_raw_values(retried)
     _assert_no_raw_values(caplog.text)
 
@@ -688,15 +681,14 @@ async def test_credential_failure_and_secret_failure_log_their_stages(caplog):
     service, broker, store, state = _service(_failure_result("invalid_credential"))
     result = await service.authenticate(_request())
     assert result.message.key == "qq_managed_auth.invalid_credential"
-    assert "stage=broker_request" in caplog.text
-    assert "qq_failure_subcode=invalid_credential" in caplog.text
+    assert result.diagnostics.fields["qq_failure_subcode"] == "invalid_credential"
     caplog.clear()
     store = RecordingSecretStore()
     store.raise_set_keys.add(OPENROUTER_MANAGED_QQ_API_KEY_SECRET)
     service, broker, store, state = _service(_success_result(), store=store)
     result = await service.authenticate(_request())
     assert result.message.key == "qq_managed_auth.secret_write_failed"
-    assert "stage=secret_storage code=qq_secret_write_exception" in caplog.text
+    assert result.diagnostics.fields["exception_class"] == "RuntimeError"
     assert state.active_managed_credential_ref == "previous-ref"
     for value in (RAW_QQ_IDENTITY, RAW_QQ_CREDENTIAL, RAW_MANAGED_KEY):
         assert value not in caplog.text
@@ -842,7 +834,9 @@ async def test_shared_ack_service_checks_token_restore_result_after_clear_persis
     assert state.pending_delivery_ack_source == "qq"
     assert "openrouter_managed_qq_delivery_ack_token" not in store.values
     assert result.diagnostics is not None
-    assert result.diagnostics.code == "delivery_ack_token_restore_failed"
+    assert result.diagnostics.code == "delivery_ack_clear_persist_failed"
+    assert result.secondary_diagnostics[0].code == "delivery_ack_token_restore_failed"
+    assert result.secondary_diagnostics[0].cause_id == result.diagnostics.diagnostic_id
 
 
 @pytest.mark.asyncio
@@ -1400,3 +1394,83 @@ async def test_qq_managed_auth_own_ack_recovers_while_discord_operation_preserve
     assert state.pending_delivery_ack_source is None
     assert "openrouter_managed_qq_delivery_ack_token" not in store.values
     _assert_no_raw_values(result)
+
+
+@pytest.mark.asyncio
+async def test_qq_compensation_retains_owning_commit_identity_and_native_secondary_causes():
+    import errno
+
+    from puripuly_heart.app.ports.canonical_settings_persistence import (
+        CanonicalSettingsPersistenceError,
+    )
+
+    primary = messages.ErrorDiagnostics(
+        component="settings_repository",
+        operation="save",
+        code="settings_save_failed",
+        category="transaction",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={
+            "phase": "settings_replace",
+            "exception_class": "PermissionError",
+            "errno": errno.EACCES,
+            "winerror": 5,
+        },
+    )
+
+    class State(RecordingManagedState):
+        def persist(self):
+            self.persist_calls += 1
+            if self.persist_calls == 2:
+                raise CanonicalSettingsPersistenceError(
+                    "save_failed", "safe failure", diagnostics=primary
+                )
+            if self.persist_calls == 3:
+                raise OSError(errno.ENOSPC, RAW_QQ_CREDENTIAL)
+
+    class Store(RecordingSecretStore):
+        async def restore_secret(self, snapshot):
+            raise KeyError(RAW_QQ_CREDENTIAL)
+
+    store = Store()
+    store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] = "previous-qq-key"
+    state = State()
+    service, broker, _, _ = _service(_success_result(), store=store, state=state)
+    result = await service.authenticate(_request())
+    assert result.status == messages.TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORE_FAILED
+    assert result.diagnostics.diagnostic_id == primary.diagnostic_id
+    assert result.diagnostics.occurred_at == primary.occurred_at
+    assert result.diagnostics.fields["errno"] == errno.EACCES
+    assert result.diagnostics.fields["compensation_succeeded"] is False
+    assert len(result.secondary_diagnostics) == 2
+    state_cause, secret_cause = result.secondary_diagnostics
+    assert state_cause.cause_id == primary.diagnostic_id
+    assert state_cause.fields["errno"] == errno.ENOSPC
+    assert secret_cause.cause_id == primary.diagnostic_id
+    assert secret_cause.fields["exception_class"] == "KeyError"
+    assert state.active_managed_credential_ref == "previous-ref"
+    assert store.values[OPENROUTER_MANAGED_QQ_API_KEY_SECRET] == RAW_MANAGED_KEY
+    assert broker.ack_requests == []
+    _assert_no_raw_values(result)
+
+
+@pytest.mark.asyncio
+async def test_qq_local_secret_observation_failure_is_not_confirmed_absence():
+    class Store(RecordingSecretStore):
+        async def get_secret(self, key):
+            raise PermissionError(13, RAW_QQ_CREDENTIAL)
+
+    service, _, _, _ = _service(_success_result(), store=Store())
+    present, diagnostic = await service._local_qq_key_observation()
+    assert present is None
+    assert diagnostic.fields["exception_class"] == "PermissionError"
+    assert diagnostic.fields["errno"] == 13
+    assert RAW_QQ_CREDENTIAL not in repr(diagnostic)
+
+    service, _, _, _ = _service(_success_result(), store=RecordingSecretStore())
+    present, diagnostic = await service._local_qq_key_observation()
+    assert present is False
+    assert diagnostic is None

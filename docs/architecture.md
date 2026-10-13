@@ -134,6 +134,7 @@ GUI and headless hosts share application owners and runtime resources; presentat
 - `ApplicationControlOwner` exposes typed operations and owner-backed queries. CLI, GUI, and OSC mutations share application ordering and resource-conflict boundaries.
 - Queries distinguish persisted intent from effective runtime state. Operations belong to the application, not the requesting client connection.
 - The local control host owns authenticated same-user access and instance identity. Event subscriptions are bounded and privacy-filtered; slow clients cannot block runtime producers.
+- Retained diagnostic queries expose current-instance metadata and delivery health, not raw log files or a second state authority. Receipts and owner snapshots determine effects; diagnostic references explain failure, degradation, recovery, and incomplete cleanup.
 
 Entry points are listed in Runtime Ownership; command and protocol details belong in the [CLI guide](cli.md).
 
@@ -165,6 +166,8 @@ Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `te
 
 - Provider adapters translate native events into shared STT contracts. Local audio completion and transcript delivery are distinct.
 - Capture scope and provider lifetime authorize recognition results; provider recovery remains inside the recognition boundary.
+- Typed turn/input/epoch and provider-mutation results retain the original safe cause before terminal reason reduction. Capture generation, provider generation/epoch and turn identity remain distinct; cleanup/exhaustion link the first cause rather than replacing it.
+- Failed warmup of an attached lazy-retryable engine does not itself stop usable Self capture or establish GPU readiness. The current-generation attached phase, effective capture and GPU-owner readiness are separate observations. Existing retry/fallback policy is unchanged.
 - Local execution uses Python-process ASR or a native GPU worker. Python owns the worker connection and lifecycle; Rust owns device discovery, model activation, and transcription.
 
 Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. Behavior: `tests/core/test_stt_scoped_engine.py`.
@@ -175,6 +178,8 @@ Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. B
 - `TranslationTurnLifecycleOwner` owns admission, cancellation, and publication. `TranslationRequestOwner` owns request preparation and provider authority.
 - Self and Peer have separate channel admission while sharing provider capacity. Peer execution may be concurrent, but context preparation and publication preserve admitted order.
 - Runtime owners manage provider replacement; managed local Gemma remains behind the same `LLMProvider` boundary.
+- Manual admission returns existing parent/child turn identities and explicitly carries originating operation/request identity through asynchronous work. Admission, bounded typing-completion management, translation success and destination delivery remain different facts.
+- Diagnostic classification uses typed status, transport and documented protocol cause, not arbitrary exception prose. Existing rolling retry/exclusion heuristics remain operational policy only; their decision is not evidence of a known diagnostic cause.
 
 Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `core/runtime/provider_rebuild.py`. Behavior: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`.
 
@@ -198,6 +203,7 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
 
 - Destinations have independent bounded delivery. A destination failure must not block other destinations or replay recognition and translation.
 - Presentation does not gate translation execution. Output receipts distinguish application handoff from presentation, not physical display.
+- Publication/turn and explicitly admitted operation/request identities cross each destination boundary unchanged. Optional observer failure is separate delivery-health evidence, not a new translation failure. OSC owners distinguish a successfully sent local prefix, a failed remainder, and later observed recovery; no local send acknowledges remote receipt.
 - Caption and overlay preferences control destinations, not capture.
 - Runtime errors use the shared dashboard error path; interactive validation stays on its owning surface.
 
@@ -213,17 +219,23 @@ Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_
 
 `OverlayPresenter` owns caption admission and lifetime independently of providers. Python owns logical caption state; native rendering must not redefine that lifetime.
 
+Child failure/status ingress validates finite safe metadata and rejects stale instance/generation before coalescing. Primary runtime and secondary cleanup causes remain separate across the native/Python bridge. Diagnostic-drop and reliable-terminal-delivery loss are distinct observations; reserved lifecycle/control capacity remains independent of ordinary diagnostic traffic. A child acknowledgment or process exit alone does not establish graceful terminal cleanup or physical HMD presentation.
+
 Behavior: `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.rs`.
 
 ## Runtime Logging
 
-`SessionRuntimeLoggingService` owns console, file, and Logs-view delivery. Translation owners produce accepted conversation records; capture/provider/overlay owners produce lifecycle and failure evidence.
+`SessionRuntimeLoggingService` owns console, file, Logs-view delivery, and bounded current-instance diagnostic retention. Translation owners produce accepted conversation records; capture/provider/overlay owners produce lifecycle and failure evidence.
 
-- File delivery is asynchronous and bounded; producers do not wait for file I/O.
-- Technical diagnostics are metadata-only and exclude credentials, user text, and audio. Accepted conversation records use a separate secret-protected path.
+- Owners preserve causes in existing `ErrorDiagnostics` and typed results before converting to messages or fallback outcomes. `core.diagnostics.emit_failure` packages typed metadata for the existing logging ingress without importing the file writer into domain owners.
+- Record identity, occurrence time, and known cause links survive projection. Operation/request identity is carried explicitly through admitted asynchronous work; channel, turn, provider epoch, and generation remain source-owner authority. An expired command context cannot assign unrelated later work to that command.
+- Ingress validates bounded metadata before memory, CLI, and file projection. Unknown causes stay unknown; optional-detail rejection remains observable without erasing permitted code or identity. Rendered prose is not a classification source.
+- One retained fact supplies the permitted Basic summary, selected main-file metadata, CLI observation, and receipt reference. Basic/file-only audiences remain distinct; no Detailed mode is introduced.
+- File delivery is asynchronous and bounded. Live health observes queue, writer, rejection, and subscriber loss independently of writing to the failed sink. Enqueue, write, and durable persistence are distinct; current-run history is not a durable audit.
+- Technical diagnostics exclude credentials, user text, audio, arbitrary exception/child content, and personal paths. Accepted conversation records retain their separate secret-protected path and explicit CLI content opt-ins.
 - Timing records describe application-observable stages, not physical display.
 
-Implementation: `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior: `tests/core/test_runtime_logging.py`.
+Implementation: `core/diagnostics.py`, `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior: `tests/core/test_runtime_logging.py`. Schema, query limits, and loss semantics belong in the [CLI guide](cli.md#retained-diagnostics-and-delivery-health).
 
 ## Runtime Layout
 
@@ -250,6 +262,8 @@ Every task, process, source, and provider session has an owner responsible for i
 Stop ingress, drain or cancel owned work, close external resources, then clear runtime references.
 
 The application shutdown adapter coordinates capture, translation, output, child processes, and services. Ordered teardown survives ordinary UI-task cancellation; child processes remain owned for the host lifetime.
+
+Primary operational failures and bounded secondary cleanup failures remain separate. GPU startup resources that fail cleanup stay with the process factory owned by `SharedGpuASRRuntime`; runtime shutdown invokes that factory's explicit cleanup port. Neither an absent client nor a failed termination attempt establishes completed resource release. Independent output destinations continue cleanup when one destination fails.
 
 Exact handoff and teardown ordering belongs to owner implementations and lifecycle tests. Application entry point: `app/adapters/application_runtime_shutdown.py`.
 

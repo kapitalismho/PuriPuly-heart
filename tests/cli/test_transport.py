@@ -292,13 +292,12 @@ async def test_ui_event_subscriptions_project_only_explicit_content_over_loopbac
         masked = await receive()
         assert masked[0]["state"] == STTSessionState.STREAMING.value
         assert "state" not in masked[1]
-        assert masked[2] == {
-            "sequence": 3,
-            "topic": "osc_sent",
-            "channel": "peer",
-            "source": "offline",
-            "utterance_id": str(utterance_id),
-        }
+        assert masked[2]["sequence"] == 3
+        assert masked[2]["topic"] == "osc_sent"
+        assert masked[2]["channel"] == "peer"
+        assert masked[2]["utterance_id"] == str(utterance_id)
+        assert masked[2]["source"] == "unknown"
+        assert masked[2]["instance_id"] is None
         assert "OFFLINE_" not in json.dumps(masked)
 
         transcripts = await receive(include_transcripts=True, include_translations=False)

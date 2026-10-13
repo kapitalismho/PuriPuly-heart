@@ -9,6 +9,11 @@ from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import (
+    LLMResponseError,
+    record_probe_cleanup_failure,
+    record_probe_failure,
+)
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
@@ -49,14 +54,7 @@ def _model_entry_matches(entry: object, requested_model: str) -> bool:
     return False
 
 
-def _log_basic_missing_text(
-    *, runtime_logging: ProviderObservationPort | None, operation: str
-) -> None:
-    message = "[Basic][LLM] Gemini response missing text [%s]" % operation
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(message, level=logging.ERROR)
-        return
-    logger.error(message)
+
 
 
 class GeminiClient(Protocol):
@@ -147,6 +145,7 @@ class GeminiLLMProvider:
             return False
         client = None
         http_options = None
+        primary_failure = None
         try:
             from google import genai  # type: ignore
 
@@ -156,11 +155,18 @@ class GeminiLLMProvider:
             async for entry in await client.aio.models.list(config={"page_size": 1000}):
                 if not requested_model or _model_entry_matches(entry, requested_model):
                     return True
+            primary_failure = record_probe_failure(None, provider="gemini")
             return False
-        except Exception:
+        except Exception as exc:
+            primary_failure = record_probe_failure(exc, provider="gemini")
             return False
         finally:
-            await _close_owned_client(client, http_options)
+            try:
+                await _close_owned_client(client, http_options)
+            except Exception as exc:
+                record_probe_cleanup_failure(exc, provider="gemini", primary_failure=primary_failure)
+                if primary_failure is None:
+                    raise
 
 
 @dataclass(slots=True)
@@ -263,8 +269,8 @@ class GoogleGenaiGeminiClient:
             result = str(response.text).strip()
 
             return result
-        _log_basic_missing_text(runtime_logging=self.runtime_logging, operation="translate")
-        raise RuntimeError("Gemini response did not contain text")
+        
+        raise LLMResponseError("Gemini response did not contain text", provider="gemini")
 
     async def close(self) -> None:
         client, http_options = self._client, self._http_options

@@ -1809,7 +1809,9 @@ def test_post_replace_validation_and_restoration_failure_returns_safe_error(
     assert result.status == compat.SettingsPersistenceStatus.SAVE_FAILED
     assert result.settings is None
     assert result.error is not None
-    assert result.error.message == "save_failed:RuntimeError"
+    assert result.error.diagnostics.fields["exception_class"] == "ValueError"
+    assert result.error.secondary_diagnostics[0].fields["exception_class"] == "OSError"
+    assert result.error.secondary_diagnostics[0].cause_id == result.error.diagnostics.diagnostic_id
     assert validation_sentinel not in result.error.message
     assert restoration_sentinel not in result.error.message
     assert result.backup_path is not None

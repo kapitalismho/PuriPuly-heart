@@ -570,6 +570,7 @@ def compose_application_runtime(
         sinks=runtime_logging_sinks,
     )
     runtime_logging.control_event_sink = control_events.publish
+    control_events.diagnostic_recorder = runtime_logging.emit_failure
     settings = compose_settings_owner(
         config_path,
         retired_asset_cleanup_logging=runtime_logging,
@@ -1274,7 +1275,6 @@ def compose_application_runtime(
                 output_provider=output_provider,
                 completion_provider=completion_provider,
                 log_diagnostic=log_diagnostic,
-                log_error=log_error,
                 idle_timeout_seconds=MANUAL_INPUT_TYPING_IDLE_TIMEOUT_S,
                 submit_timeout_seconds=MANUAL_SUBMIT_TYPING_TIMEOUT_S,
             )
@@ -1447,7 +1447,6 @@ def compose_application_runtime(
                 mutation_service_provider=lambda: None,
                 consume_superseded_settings=signatures.consume_superseded,
                 active_local_asr_change=active_local_asr_change,
-                failure_sink=log_error,
                 success_sink=log_basic,
             )
         return settings_application
@@ -1547,7 +1546,6 @@ def compose_application_runtime(
                     value.intent.secrets,
                     config_path=config_path,
                 ).get(secret_key),
-                save_failure_sink=log_error,
                 results=require_settings_application().results,
             )
         return provider_settings
@@ -1568,21 +1566,6 @@ def compose_application_runtime(
                     ),
                 ),
                 low_latency=(FIXED_TRANSLATION_POLICY.fast_translation_enabled),
-                diagnostics_sink=lambda event, metadata, exception: (
-                    log_error(str(metadata["report"]))
-                    if metadata.get("provider") == "openrouter" and "report" in metadata
-                    else log_diagnostic(
-                        "[ProviderVerification] Credential verification "
-                        f"failed event={event} "
-                        f"provider={metadata.get('provider')} "
-                        f"error_type={metadata.get('error_type')}",
-                        level=logging.WARNING,
-                        exception=exception,
-                    )
-                ),
-                error_sink=lambda provider, error_text: log_error(
-                    f"Verification error for {provider}: {error_text}"
-                ),
             )
         return credential_verification
 
@@ -1982,7 +1965,6 @@ def compose_application_runtime(
         apply_order24=(require_settings_application().apply_ui_prompt_clipboard_state),
         remember_order22=require_projection().remember_order22,
         mutation_service_provider=lambda: None,
-        save_failure_sink=log_error,
         results=require_settings_application().results,
         sync_memory=(require_settings_application().runtime_effects.restore_memory),
         capture_runtime_signatures=capture_runtime_signatures_before_mutation,
@@ -2095,7 +2077,6 @@ def compose_application_runtime(
         provisioning=require_provisioning(),
         gpu_state=gpu_state,
         manual_fallback=manual_fallback,
-        save_failure_sink=lambda exc: log_error(f"Failed to save settings: {exc}"),
         calibration=require_calibration(),
         presentation=presentation,
         sync_presentation=sync_ui_from_settings,
@@ -2254,6 +2235,11 @@ def compose_application_runtime(
             },
             "osc": require_vrc_mic_sync().output_snapshot(),
         },
+        scene_observation_provider=lambda: (
+            pipeline_launcher.vrchat_scene.lifecycle_owner_snapshot()
+            if pipeline_launcher.vrchat_scene is not None
+            else None
+        ),
         http_extension_registry=HttpExtensionRegistryService(
             http_extensions,
             SystemDirectoryOpener(),

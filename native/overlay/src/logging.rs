@@ -61,6 +61,7 @@ pub struct OverlayLogger {
     diagnostic_sender: Option<std_mpsc::SyncSender<LogRecord>>,
     reliable_sender: Option<std_mpsc::SyncSender<LogRecord>>,
     dropped_records: Arc<AtomicU64>,
+    reliable_delivery_failures: Arc<AtomicU64>,
     shutting_down: Arc<AtomicBool>,
     writer: Mutex<WriterOwner>,
 }
@@ -82,16 +83,28 @@ impl OverlayLogger {
     }
 
     pub async fn emit_stdout_event(&self, payload: &Value) -> io::Result<()> {
-        self.write_reliable(true, format!("EVENT {payload}")).await
+        let result = self.write_reliable(true, format!("EVENT {payload}")).await;
+        if result.is_err() {
+            increment_saturating(&self.reliable_delivery_failures);
+        }
+        result
     }
 
     pub async fn emit_stderr_event(&self, payload: &Value) -> io::Result<()> {
-        self.write_reliable(false, format!("EVENT {payload}")).await
+        let result = self.write_reliable(false, format!("EVENT {payload}")).await;
+        if result.is_err() {
+            increment_saturating(&self.reliable_delivery_failures);
+        }
+        result
     }
 
     pub fn dropped_records(&self) -> u64 {
         self.dropped_records.load(Ordering::Relaxed)
     }
+    pub fn reliable_delivery_failures(&self) -> u64 {
+        self.reliable_delivery_failures.load(Ordering::Relaxed)
+    }
+
 
     pub(crate) fn from_streams(stdout: LogStream, stderr: LogStream) -> Self {
         let (diagnostic_sender, diagnostic_receiver) =
@@ -131,6 +144,7 @@ impl OverlayLogger {
             diagnostic_sender: Some(diagnostic_sender),
             reliable_sender: Some(reliable_sender),
             dropped_records,
+            reliable_delivery_failures: Arc::new(AtomicU64::new(0)),
             shutting_down,
             writer: Mutex::new(WriterOwner {
                 writer: Some(writer),
@@ -602,6 +616,7 @@ mod tests {
             .emit_stdout_event(&serde_json::json!({"type": "overlay_ready"}))
             .await;
         assert_eq!(event_result.unwrap_err().kind(), io::ErrorKind::TimedOut);
+        assert_eq!(logger.reliable_delivery_failures(), 1);
         released.store(true, Ordering::Release);
         logger.shutdown().unwrap();
     }

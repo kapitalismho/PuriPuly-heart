@@ -7,12 +7,14 @@ import concurrent.futures
 import contextlib
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, AsyncIterator, Callable, ClassVar, Sequence
 from uuid import uuid4
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -26,6 +28,7 @@ from puripuly_heart.core.stt.backend import (
     STTRecognitionUnit,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.core.stt.stream_input import STTStreamInputMap
 from puripuly_heart.domain.recognition import (
@@ -198,16 +201,6 @@ _SAFE_API_STATUSES = frozenset(
         "GO_AWAY",
     }
 )
-_SAFE_RETIREMENT_REASONS = frozenset(
-    {
-        "gemini_write_failed",
-        "gemini_receive_failed",
-        "gemini_go_away",
-        "gemini_connection_ended",
-        "gemini_recognition_buffer_overflow",
-        "gemini_write_cancelled",
-    }
-)
 
 
 def _transport_failure_fields(exc: BaseException | None) -> tuple[str, int | str, str, str]:
@@ -248,15 +241,6 @@ def _transport_failure_fields(exc: BaseException | None) -> tuple[str, int | str
     return exception_class, api_code, api_status, message_kind
 
 
-def _safe_epoch(value: str | None) -> str:
-    if (
-        value
-        and len(value) <= 64
-        and value.isascii()
-        and all(character.isalnum() or character in "._-" for character in value)
-    ):
-        return value
-    return "none"
 
 
 @dataclass(slots=True)
@@ -351,6 +335,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     _queued_audio_bytes: int = field(init=False, default=0)
     _audio_since_fence: bool = field(init=False, default=False)
     _protocol_failed: bool = field(init=False, default=False)
+    _failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
     _client_resources: _GeminiClientResources | None = field(init=False, default=None, repr=False)
     _connected_at_s: float | None = field(init=False, default=None, repr=False)
     _go_away_timer: asyncio.TimerHandle | None = field(init=False, default=None, repr=False)
@@ -396,7 +381,8 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._setup_future = raw
         try:
             resources = await asyncio.wrap_future(raw)
-        except BaseException:
+        except BaseException as exc:
+            self._retain_startup_cause(exc)
             try:
                 await self._teardown()
             except asyncio.CancelledError, Exception:
@@ -415,7 +401,8 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             if factory is None:
                 factory = resources.client.aio.live.connect
             live_context = factory(model=self.model, config=resources.config)
-        except BaseException:
+        except BaseException as exc:
+            self._retain_startup_cause(exc)
             try:
                 await self._teardown()
             except asyncio.CancelledError, Exception:
@@ -431,6 +418,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 from .genai_network import annotate_live_error
 
                 annotate_live_error(exc, resources.client)
+            self._retain_startup_cause(exc)
             try:
                 await self._teardown()
             except asyncio.CancelledError, Exception:
@@ -509,23 +497,45 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         live_context, self._live_context = self._live_context, None
         live_session, self._live_session = self._live_session, None
         if live_context is not None:
-            with contextlib.suppress(Exception):
-                await live_context.__aexit__(None, None, None)
+            await self._best_effort_close(live_context.__aexit__(None, None, None))
         elif live_session is not None:
-            with contextlib.suppress(Exception):
-                await live_session.close()
+            await self._best_effort_close(live_session.close())
         await self._release_client_resources()
         self._teardown_done = True
 
     async def _close_resources(self, resources: _GeminiClientResources) -> None:
-        with contextlib.suppress(Exception):
-            await resources.client.aio.aclose()
-        with contextlib.suppress(Exception):
-            await asyncio.to_thread(resources.client.close)
-        with contextlib.suppress(Exception):
-            await resources.async_transport.aclose()
-        with contextlib.suppress(Exception):
-            await asyncio.to_thread(resources.sync_transport.close)
+        await self._best_effort_close(resources.client.aio.aclose())
+        await self._best_effort_close(asyncio.to_thread(resources.client.close))
+        await self._best_effort_close(resources.async_transport.aclose())
+        await self._best_effort_close(asyncio.to_thread(resources.sync_transport.close))
+
+    def _retain_startup_cause(self, exception: BaseException) -> None:
+        if isinstance(exception, asyncio.CancelledError):
+            return
+        diagnostics = recognition_failure_diagnostics(
+            exception, provider="gemini_transcribe",
+            channel=self._event_projection.channel, operation="readiness",
+            reason="provider_not_ready",
+        )
+        self._failure_diagnostics = diagnostics
+        exception.failure_diagnostics = diagnostics
+
+    async def _best_effort_close(self, awaitable) -> None:
+        try:
+            await awaitable
+        except Exception as exc:
+            diagnostics = recognition_failure_diagnostics(
+                exc, provider="gemini_transcribe",
+                channel=self._stream.channel if self._stream else self._event_projection.channel,
+                operation="cleanup", reason="provider_cleanup_failed",
+            )
+            emit_failure(
+                logger, replace(
+                    diagnostics,
+                    cause_id=self._failure_diagnostics.diagnostic_id if self._failure_diagnostics else None,
+                    fields={**diagnostics.fields, "cleanup_confirmed": False},
+                ), severity="warning", disposition="degraded", stage="cleanup",
+            )
 
     async def _release_client_resources(self) -> None:
         resources, self._client_resources = self._client_resources, None
@@ -577,7 +587,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             raise
         except Exception as exc:
             self._resolve_write(getattr(item, "completion", None), exc)
-            self._log_transport_diagnostic("transport_failure", "send", exception=exc)
             self._put_event(exc)
             self._scoped_transport_failure("gemini_write_failed", exception=exc)
         finally:
@@ -596,7 +605,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self._log_transport_diagnostic("transport_failure", "receive", exception=exc)
             self._put_event(exc)
             self._scoped_transport_failure("gemini_receive_failed", exception=exc)
         finally:
@@ -614,7 +622,13 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         content = getattr(message, "server_content", None)
         final = getattr(content, "input_transcription", None)
         if final is not None:
-            text = str(getattr(final, "text", None) or "")
+            text = getattr(final, "text", None)
+            if text is None:
+                text = ""
+            if not isinstance(text, str):
+                error = TypeError("Gemini transcription text must be a string")
+                error.diagnostic_category = "invalid_response"
+                raise error
             if self._event_projection.is_legacy:
                 self._put_event(STTBackendTranscriptEvent(text=text, is_final=True))
             elif self._stream is not None:
@@ -711,36 +725,6 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                 return
             self._resolve_write(getattr(item, "completion", None), error)
 
-    def _log_transport_diagnostic(
-        self,
-        event: str,
-        operation: str,
-        *,
-        reason: str = "none",
-        exception: BaseException | None = None,
-    ) -> None:
-        channel = (
-            self._stream.channel
-            if self._stream is not None
-            else (self._scoped_request.channel if self._scoped_request is not None else "none")
-        )
-        exception_class, api_code, api_status, message_kind = _transport_failure_fields(exception)
-        logger.log(
-            logging.ERROR if exception is not None else logging.INFO,
-            "[GeminiTranscribe] %s provider=gemini_transcribe channel=%s epoch=%s "
-            "operation=%s reason=%s exception_class=%s api_code=%s api_status=%s "
-            "message_kind=%s go_away=%s",
-            event,
-            channel if channel in {"self", "peer"} else "none",
-            _safe_epoch(self._event_projection.provider_epoch_id),
-            operation,
-            reason if reason in _SAFE_RETIREMENT_REASONS else "none",
-            exception_class,
-            api_code,
-            api_status,
-            message_kind,
-            str(self._go_away_active).lower(),
-        )
 
     def _scoped_transport_failure(
         self,
@@ -752,21 +736,66 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         self._cancel_go_away_timer()
         if self._protocol_failed:
             return
-        self._log_transport_diagnostic(
-            "epoch_retired", "retire", reason=reason, exception=exception
-        )
         self._protocol_failed = True
         request, self._scoped_request = self._scoped_request, None
+        diagnostics = recognition_failure_diagnostics(
+            exception, provider="gemini_transcribe",
+            channel=request.channel if request is not None else (
+                self._stream.channel if self._stream is not None
+                else self._event_projection.channel or "unknown"
+            ),
+            operation="write" if reason == "gemini_write_failed" else "receive", reason=reason,
+            identity=request.identity if request is not None else None,
+        )
+        _exception_class, api_code, api_status, message_kind = _transport_failure_fields(exception)
+        native_fields = {
+            **diagnostics.fields, "api_status": api_status,
+            "message_kind": "go_away" if reason == "gemini_go_away" else message_kind,
+            "provider_epoch_id": self._event_projection.provider_epoch_id,
+        }
+        if type(api_code) is int:
+            native_fields["api_code"] = api_code
+        status_code = api_code if type(api_code) is int and 100 <= api_code <= 599 else diagnostics.status_code
+        if exception is not None:
+            category = {
+                "INVALID_ARGUMENT": "invalid_response", "DEADLINE_EXCEEDED": "timeout",
+                "UNAUTHENTICATED": "auth", "PERMISSION_DENIED": "auth",
+                "RESOURCE_EXHAUSTED": "rate_limit", "UNAVAILABLE": "service_unavailable",
+                "INTERNAL": "service_unavailable", "DATA_LOSS": "invalid_response",
+            }.get(api_status, diagnostics.category)
+            if category == "unknown" and status_code is not None:
+                category = (
+                    "auth" if status_code in {401, 403} else
+                    "rate_limit" if status_code == 429 else
+                    "timeout" if status_code == 408 else
+                    "service_unavailable" if status_code >= 500 else
+                    "invalid_response" if status_code >= 400 else category
+                )
+            diagnostics = replace(diagnostics, category=category, status_code=status_code)
+        diagnostics = replace(
+            diagnostics, fields=native_fields,
+            generation=diagnostics.generation if request is not None else (
+                self._stream.activation_generation if self._stream is not None else None
+            ),
+        )
+        self._failure_diagnostics = diagnostics
+        emit_failure(
+            logger, diagnostics, stage=diagnostics.operation,
+            severity="info" if reason == "gemini_go_away" else "error",
+            disposition="degraded" if reason == "gemini_go_away" else "failed",
+        )
         if request is not None:
             self._event_projection.terminal(
                 STTProviderInputTerminal(
-                    request.identity, "failed", request.channel, reason, "retire"
+                    request.identity, "failed", request.channel, reason, "retire",
+                    failure_diagnostics=diagnostics,
                 )
             )
         self._event_projection.end_epoch(
             orderly=orderly,
             reason=reason,
             provider_turn_id=request.identity.provider_turn_id if request else None,
+            failure_diagnostics=diagnostics,
         )
         self._fail_pending_writes()
 

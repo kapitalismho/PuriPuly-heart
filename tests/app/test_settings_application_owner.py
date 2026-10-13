@@ -226,7 +226,6 @@ async def test_settings_application_owner_routes_mixed_surfaces_in_transaction_o
         mutation_service_provider=lambda: service,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=lambda _message: None,
     )
     pending = replace(
         settings.canonical,
@@ -274,7 +273,6 @@ async def test_settings_application_owner_logs_coded_failed_apply_result() -> No
         current_settings=lambda: settings.canonical,
     )
     projection.remember_all(settings.canonical)
-    failures: list[str] = []
 
     class FailedMutationService:
         async def mutate(self, _request: object) -> TransactionResult:
@@ -307,7 +305,6 @@ async def test_settings_application_owner_logs_coded_failed_apply_result() -> No
         mutation_service_provider=FailedMutationService,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=failures.append,
     )
     pending = replace(
         settings.canonical,
@@ -320,11 +317,8 @@ async def test_settings_application_owner_logs_coded_failed_apply_result() -> No
         ),
     )
 
-    assert await owner.apply(pending)
-    assert failures[-1] == (
-        "[Settings] apply_result outcome=failed effective=previous "
-        "status=settings_commit_failed cause=settings_write_rejected"
-    )
+    assert await owner.apply(pending) is False
+    assert owner.results.current.diagnostics.code == "settings_write_rejected"
 
 
 @pytest.mark.asyncio
@@ -373,7 +367,6 @@ async def test_settings_application_owner_can_suppress_language_view_reload(
         mutation_service_provider=lambda: None,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=lambda _message: None,
     )
     pending = replace(
         settings.canonical,
@@ -400,7 +393,6 @@ async def test_settings_application_owner_names_degrading_runtime_apply_exceptio
         current_settings=lambda: settings.canonical,
     )
     projection.remember_all(settings.canonical)
-    failures: list[str] = []
     applied: list[object] = []
 
     class ApplyingMutationService:
@@ -438,7 +430,6 @@ async def test_settings_application_owner_names_degrading_runtime_apply_exceptio
         mutation_service_provider=lambda: None,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=failures.append,
     )
     pending = replace(
         settings.canonical,
@@ -450,16 +441,12 @@ async def test_settings_application_owner_names_degrading_runtime_apply_exceptio
 
     assert await owner.apply(pending)
 
-    assert failures[-1] == (
-        "[Settings] runtime_apply_failed surface=stt_language_audio "
-        "operation=apply_stt_language_audio_runtime "
-        "exception_type=SelfCaptureRuntimeApplyError "
-        "exception_code=self_stt_runtime_apply_not_converged"
-    )
     runtime_result = applied[-1]
     assert runtime_result.status == RUNTIME_APPLY_STATUS_FAILED
     assert runtime_result.diagnostics is not None
     assert runtime_result.diagnostics.code == "self_stt_runtime_apply_not_converged"
+    assert runtime_result.diagnostics.component == "settings_application"
+    assert runtime_result.diagnostics.fields["phase"] == "runtime_apply"
 
 
 @pytest.mark.asyncio
@@ -485,7 +472,6 @@ async def test_settings_application_owner_owns_direct_persistence_sequence() -> 
         mutation_service_provider=lambda: None,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=lambda _message: None,
     )
     pending = replace(
         settings.canonical,
@@ -533,7 +519,6 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
         )
         projection.remember_all(current)
         effects = FakeRuntimeEffects([], failure)
-        failure_receipts: list[str] = []
         owner = SettingsApplicationOwner(
             settings=settings,
             projection=projection,
@@ -547,7 +532,6 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
             mutation_service_provider=lambda: None,
             consume_superseded_settings=lambda _settings: False,
             active_local_asr_change=lambda _base, _next: False,
-            failure_sink=failure_receipts.append,
         )
         committed = replace(
             current,
@@ -587,12 +571,11 @@ async def test_direct_runtime_failure_finalizes_commit_and_preserves_it_on_next_
         with monkeypatch.context() as patch:
             patch.setattr(persistence, "persist", fail_persist)
             await owner.apply_direct(rejected)
-        assert failure_receipts[-1] == (
-            "[Settings] apply_result outcome=failed effective=previous "
-            "status=settings_commit_failed cause=settings_persist_failed "
-            "exception_type=OSError"
-        )
-        assert "save failed" not in failure_receipts[-1]
+        result = owner.results.current
+        assert result.status == "settings_commit_failed"
+        assert result.diagnostics is settings.last_failure
+        assert result.diagnostics.fields["exception_class"] == "OSError"
+        assert "save failed" not in repr(result.diagnostics)
 
         assert settings.mutation_depth == 0
         assert settings.rollback_pending is False
@@ -636,7 +619,6 @@ async def test_routed_mutation_cancellation_finalizes_committed_settings(
         mutation_service_provider=lambda: None,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=lambda _message: None,
     )
     committed = replace(
         current,
@@ -725,7 +707,6 @@ async def test_activation_notice_edit_commits_or_restores_without_generic_runtim
         mutation_service_provider=lambda: None,
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
-        failure_sink=lambda _message: None,
     )
     pending = settings_application_module.materialize_immediate_settings_intent(
         current,

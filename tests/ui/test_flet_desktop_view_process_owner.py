@@ -626,7 +626,9 @@ async def test_close_waits_for_in_flight_launch_reap(
         await asyncio.sleep(0.05)
         release_spawn.set()
         with pytest.raises(TimeoutError):
-            await asyncio.wait_for(asyncio.shield(close_task), timeout=0.2)
+            await asyncio.wait_for(asyncio.shield(close_task), timeout=0.02)
+        assert not launch_task.done()
+        assert owner.cleanup_snapshot["cleanup_complete"] is False
         process.exit(0)
         await asyncio.wait_for(launch_task, timeout=2.0)
         await asyncio.wait_for(close_task, timeout=2.0)
@@ -662,11 +664,16 @@ async def test_failed_rejected_reap_fails_close(
         launch_task = asyncio.create_task(launch("flet://failed", None, True))
         await asyncio.wait_for(entered.wait(), timeout=2.0)
         close_task = asyncio.create_task(owner.close())
-        with pytest.raises(RuntimeError, match="Rejected Flet desktop view process"):
+        with pytest.raises(RuntimeError, match="Rejected Flet desktop view cleanup incomplete"):
             await asyncio.wait_for(launch_task, timeout=2.0)
         with pytest.raises(RuntimeError, match="launch cleanup failed"):
             await asyncio.wait_for(close_task, timeout=2.0)
+    assert pid_file.exists()
+    assert owner.cleanup_snapshot["pending_processes"] == 1
+    process.exit()
+    await owner.close()
     assert not pid_file.exists()
+    assert owner.cleanup_snapshot["cleanup_complete"] is True
 
 
 @pytest.mark.asyncio
@@ -702,8 +709,57 @@ async def test_cancelled_spawn_keeps_handle_and_fails_close(
         release.set()
         with pytest.raises(asyncio.CancelledError):
             await asyncio.wait_for(launch_task, timeout=2.0)
-        with pytest.raises(RuntimeError, match="launch cleanup failed"):
-            await asyncio.wait_for(close_task, timeout=2.0)
+        await asyncio.wait_for(close_task, timeout=2.0)
     assert process.returncode is not None
     assert process.terminate_calls >= 1
     assert not pid_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_owner_bounds_failed_kill_retains_cause_and_later_close_recovers(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture,
+) -> None:
+    class FailedKillProcess(FakeProcess):
+        def terminate(self) -> None:
+            raise OSError(5, "SYNTHETIC_PRIVATE_CREDENTIAL_BODY")
+
+        def kill(self) -> None:
+            raise OSError(13, "SYNTHETIC_PRIVATE_PERSONAL_PATH")
+
+    process = FailedKillProcess(terminate_exits=False, kill_exits=False)
+    pid_file = _pid_file(tmp_path)
+    owner = FletDesktopViewProcessOwner(
+        graceful_timeout_s=0.0, terminate_timeout_s=0.0,
+        process_job=FakeProcessJob(), close_requester=FakeCloseRequester(),
+        trace_sink=lambda _event, _fields: (_ for _ in ()).throw(ValueError("SYNTHETIC_PRIVATE_OBSERVER_TOKEN")),
+    )
+    await owner.attach(process, str(pid_file))
+    with pytest.raises(RuntimeError) as caught:
+        await asyncio.wait_for(owner.close(), timeout=0.5)
+    assert isinstance(caught.value.__cause__, OSError)
+    assert caught.value.__cause__.errno == 5
+    assert owner.cleanup_snapshot["cleanup_complete"] is False
+    assert owner.cleanup_snapshot["observer_failure_diagnostic_id"] is not None
+    assert owner.cleanup_snapshot["pending_processes"] == 1
+    assert pid_file.exists()
+    assert "SYNTHETIC_PRIVATE" not in caplog.text
+    process.exit()
+    await owner.close()
+    assert owner.cleanup_snapshot["cleanup_complete"] is True
+    assert not pid_file.exists()
+
+
+@pytest.mark.asyncio
+async def test_owner_retains_cancelled_inflight_startup_without_false_close() -> None:
+    owner = FletDesktopViewProcessOwner(
+        graceful_timeout_s=0.0, terminate_timeout_s=0.0,
+        process_job=FakeProcessJob(), close_requester=FakeCloseRequester(),
+    )
+    assert await owner.begin_launch()
+    with pytest.raises(RuntimeError, match="launch cleanup failed"):
+        await asyncio.wait_for(owner.close(), timeout=0.5)
+    assert owner.cleanup_snapshot["pending_startups"] == 1
+    assert owner.cleanup_snapshot["cleanup_complete"] is False
+    await owner.end_launch()
+    await owner.close()
+    assert owner.cleanup_snapshot["cleanup_complete"] is True

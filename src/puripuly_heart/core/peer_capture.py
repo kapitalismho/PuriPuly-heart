@@ -6,6 +6,8 @@ from enum import Enum
 from typing import Literal, Protocol
 from uuid import UUID
 
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 
 class PeerCaptureSessionState(str, Enum):
     STOPPED = "stopped"
@@ -167,6 +169,7 @@ class PeerCaptureProviderMutation:
     status: PeerCaptureProviderMutationStatus
     reason: str | None = None
     attachment_token: object | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +181,7 @@ class PeerCaptureDiagnostic:
     capture_kind: str | None
     reason: PeerCaptureFailureReason | None = None
     detail: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -209,9 +213,10 @@ class PeerCaptureSessionSnapshot:
     smart_turn_availability: str = "disabled"
     requested_language: PeerCaptureLanguageFacts | None = None
     effective_language: PeerCaptureLanguageFacts | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
-PeerCaptureTerminalFailureHandler = Callable[[Exception], Awaitable[None]]
+PeerCaptureTerminalFailureHandler = Callable[[Exception | ErrorDiagnostics], Awaitable[None]]
 
 
 class PeerCaptureAdmissionPort(Protocol):

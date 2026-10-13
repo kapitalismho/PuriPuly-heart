@@ -1042,7 +1042,7 @@ def _create_rolling_stt_backend(
                 build=build_deepgram,
             )
         )
-    return RollingSTTBackend(providers=tuple(definitions))
+    return RollingSTTBackend(providers=tuple(definitions), channel=config.channel)
 
 
 def _resolved_qwen_audio_language_hints(config: ResolvedSTTConfig) -> tuple[str, ...]:

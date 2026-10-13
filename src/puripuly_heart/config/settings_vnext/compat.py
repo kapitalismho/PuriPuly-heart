@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -12,6 +12,8 @@ from typing import Any
 
 from puripuly_heart.config.settings_vnext import defaults, migration, serialization
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.diagnostics import safe_exception_fields
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,34 @@ class SettingsPersistenceStatus(str, Enum):
 class SettingsPersistenceError:
     stage: SettingsPersistenceStatus
     message: str
+    diagnostics: ErrorDiagnostics | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.diagnostics is None:
+            object.__setattr__(
+                self,
+                "diagnostics",
+                ErrorDiagnostics(
+                    component="settings_repository",
+                    operation="save"
+                    if self.stage == SettingsPersistenceStatus.SAVE_FAILED
+                    else "load",
+                    code="settings_save_failed"
+                    if self.stage == SettingsPersistenceStatus.SAVE_FAILED
+                    else f"settings_{self.stage.value}",
+                    category="transaction",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={
+                        "phase": "settings_save"
+                        if self.stage == SettingsPersistenceStatus.SAVE_FAILED
+                        else self.stage.value,
+                    },
+                ),
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +85,12 @@ class VNextSettingsSaveResult:
 
 class BackupCreationError(OSError):
     pass
+
+
+class _SettingsWriteFailure(Exception):
+    def __init__(self, error: SettingsPersistenceError) -> None:
+        self.error = error
+        super().__init__("Settings disk operation failed")
 
 
 def load_vnext_settings(
@@ -161,17 +197,17 @@ def load_vnext_settings(
     try:
         _validate_persisted_settings(path, settings)
     except Exception as exc:
+        error = safe_persistence_error(
+            SettingsPersistenceStatus.SAVE_FAILED, exc, phase="settings_validate"
+        )
         restore_error = _restore_original_bytes(path, original_bytes)
         if restore_error is not None:
-            exc = RuntimeError(
-                f"{type(exc).__name__}: persisted validation failed; "
-                f"{type(restore_error).__name__}: source restoration failed"
-            )
+            error = _combined_restore_error(error, restore_error)
         _log_migration_failure(source_shape, SettingsPersistenceStatus.SAVE_FAILED)
         return VNextSettingsLoadResult(
             status=SettingsPersistenceStatus.SAVE_FAILED,
             backup_path=backup_path,
-            error=_error(SettingsPersistenceStatus.SAVE_FAILED, exc),
+            error=error,
         )
 
     return VNextSettingsLoadResult(
@@ -329,17 +365,32 @@ def _atomic_write_text(path: Path, content: str, *, encoding: str) -> None:
         suffix=".tmp",
     )
     tmp_path = Path(temporary_name)
+    phase = "settings_write"
     try:
         with os.fdopen(descriptor, "w", encoding=encoding) as handle:
             handle.write(content)
+        phase = "settings_validate"
         _validate_canonical_text(tmp_path.read_text(encoding=encoding), None)
+        phase = "settings_replace"
         tmp_path.replace(path)
-    except Exception:
+    except Exception as exc:
+        error = safe_persistence_error(SettingsPersistenceStatus.SAVE_FAILED, exc, phase=phase)
         try:
             tmp_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-        raise
+        except Exception as cleanup_exc:
+            secondary = safe_persistence_error(
+                SettingsPersistenceStatus.SAVE_FAILED, cleanup_exc, phase="temporary_cleanup"
+            ).diagnostics
+            error = replace(
+                error,
+                secondary_diagnostics=(
+                    replace(
+                        secondary,
+                        cause_id=error.diagnostics.diagnostic_id,
+                    ),
+                ),
+            )
+        raise _SettingsWriteFailure(error) from exc
 
 
 def _atomic_write_bytes(path: Path, content: bytes) -> None:
@@ -355,12 +406,26 @@ def _atomic_write_bytes(path: Path, content: bytes) -> None:
         if tmp_path.read_bytes() != content:
             raise OSError("restored settings bytes failed validation")
         tmp_path.replace(path)
-    except Exception:
+    except Exception as exc:
+        error = safe_persistence_error(
+            SettingsPersistenceStatus.SAVE_FAILED, exc, phase="settings_restore"
+        )
         try:
             tmp_path.unlink(missing_ok=True)
-        except Exception:
-            pass
-        raise
+        except Exception as cleanup_exc:
+            secondary = safe_persistence_error(
+                SettingsPersistenceStatus.SAVE_FAILED, cleanup_exc, phase="temporary_cleanup"
+            ).diagnostics
+            error = replace(
+                error,
+                secondary_diagnostics=(
+                    replace(
+                        secondary,
+                        cause_id=error.diagnostics.diagnostic_id,
+                    ),
+                ),
+            )
+        raise _SettingsWriteFailure(error) from exc
 
 
 def _restore_original_bytes(path: Path, original_bytes: bytes) -> Exception | None:
@@ -375,12 +440,18 @@ def _combined_restore_error(
     save_error: SettingsPersistenceError | None,
     restore_error: Exception,
 ) -> SettingsPersistenceError:
-    save_error_type = "unknown"
-    if save_error is not None and ":" in save_error.message:
-        save_error_type = save_error.message.rsplit(":", maxsplit=1)[-1]
-    return SettingsPersistenceError(
-        SettingsPersistenceStatus.SAVE_FAILED,
-        f"save_failed:{save_error_type}; source restoration failed:{type(restore_error).__name__}",
+    primary = save_error or SettingsPersistenceError(
+        SettingsPersistenceStatus.SAVE_FAILED, "save_failed:unknown"
+    )
+    restored = _error(SettingsPersistenceStatus.SAVE_FAILED, restore_error)
+    secondary = tuple(
+        replace(cause, cause_id=primary.diagnostics.diagnostic_id if primary.diagnostics else None)
+        for cause in (restored.diagnostics, *restored.secondary_diagnostics)
+        if cause is not None
+    )
+    return replace(
+        primary,
+        secondary_diagnostics=(*primary.secondary_diagnostics, *secondary)[:4],
     )
 
 
@@ -416,10 +487,33 @@ def _log_migration_failure(
 def safe_persistence_error(
     status: SettingsPersistenceStatus,
     exc: Exception,
+    *,
+    phase: str | None = None,
 ) -> SettingsPersistenceError:
+    if isinstance(exc, _SettingsWriteFailure):
+        return exc.error
+    fields = safe_exception_fields(exc)
     return SettingsPersistenceError(
         status,
-        f"{status.value}:{type(exc).__name__}",
+        f"{status.value}:{fields['exception_class']}",
+        diagnostics=ErrorDiagnostics(
+            component="settings_repository",
+            operation="save" if status == SettingsPersistenceStatus.SAVE_FAILED else "load",
+            code="settings_save_failed"
+            if status == SettingsPersistenceStatus.SAVE_FAILED
+            else f"settings_{status.value}",
+            category="transaction",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={
+                "phase": phase or "settings_save"
+                if status == SettingsPersistenceStatus.SAVE_FAILED
+                else status.value,
+                **fields,
+            },
+        ),
     )
 
 

@@ -361,8 +361,10 @@ async def test_verify_api_key_reports_auth_rejection_as_unauthorized() -> None:
     )
     emitter = asyncio.create_task(emit_auth_error())
     try:
-        with pytest.raises(Exception, match="unauthorized"):
+        with pytest.raises(Exception) as raised:
             await asyncio.wait_for(task, timeout=5)
+        assert raised.value.failure_diagnostics.category == "auth"
+        assert raised.value.failure_diagnostics.code == "stt.scribe_auth_error"
     finally:
         emitter.cancel()
         await asyncio.gather(emitter, return_exceptions=True)

@@ -48,9 +48,9 @@ class RecordingChatbox:
     def enqueue(self, message: OSCMessage) -> None:
         self.messages.append(message)
 
-    def send_immediate(self, text: str) -> bool:
+    def send_immediate(self, text: str) -> tuple[bool, None]:
         self.immediate_messages.append(text)
-        return True
+        return True, None
 
     def send_typing(self, is_typing: bool) -> None:
         self.typing.append(is_typing)
@@ -2269,4 +2269,59 @@ async def test_retired_peer_generation_cancels_active_and_rejects_late_output() 
         for decision in owner.routing_decisions
     )
     assert late.decision.reason == "publication_generation_retired"
+    await owner.close()
+
+
+async def test_throwing_ui_delivery_close_preserves_independent_cleanup_and_retry() -> None:
+    class UiDelivery:
+        has_resources = True
+        calls = 0
+
+        async def close(self) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise OSError(5, "forbidden-close-path-token")
+            self.has_resources = False
+
+    chatbox = RecordingChatbox()
+    bridge = CloseAwareBridge()
+    owner = _output_runtime_class()(chatbox=chatbox)
+    delivery = UiDelivery()
+    owner.bind_ui_delivery(delivery)
+    owner.start_ui_event_bridge(bridge)
+    await owner.wait_for_ui_event_bridge_started()
+
+    with pytest.raises(OSError):
+        await owner.close()
+
+    assert owner.state == "closing"
+    assert owner.has_resources
+    assert bridge.close_calls == 1
+    assert chatbox.clear_typing_reasons_calls == 1
+    assert chatbox.drop_pending_calls == 1
+    await owner.close()
+    assert owner.state == "closed"
+    assert not owner.has_resources
+    assert delivery.calls == 2
+
+
+async def test_optional_observer_loss_does_not_change_local_publication_outcome() -> None:
+    def observer(decision: object) -> None:
+        raise OSError(5, "forbidden-observer-body")
+
+    chatbox = RecordingChatbox()
+    owner = _output_runtime_class()(chatbox=chatbox, routing_observer=observer, diagnostics_capacity=1)
+    publication_id = uuid4()
+    result = await owner.publish_chatbox(
+        publication_id=publication_id, channel="self",
+        transcript_text="synthetic private text", translation_text=None, include_source=True,
+    )
+    assert result.decision.decision == "published"
+    assert chatbox.messages[0].utterance_id == publication_id
+    assert owner.routing_decisions[-1] is result.decision
+    health = owner.diagnostic_delivery_health
+    assert health["observer"] == "degraded"
+    assert health["observer_failure_count"] >= 1
+    assert health["owner_history_evictions"] >= 1
+    assert "forbidden-observer-body" not in repr(health)
     await owner.close()

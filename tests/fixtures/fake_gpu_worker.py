@@ -14,6 +14,10 @@ with open(config_path, encoding="utf-8") as config_file:
 if os.environ.get("FAKE_GPU_WORKER_EXIT_BEFORE_AUTH") == "1":
     raise SystemExit(23)
 
+if os.environ.get("FAKE_GPU_WORKER_SKIP_AUTH") == "1":
+    while True:
+        time.sleep(60)
+
 connection = socket.create_connection((config["connect_host"], config["connect_port"]))
 writer_lock = threading.Lock()
 stopping = threading.Event()

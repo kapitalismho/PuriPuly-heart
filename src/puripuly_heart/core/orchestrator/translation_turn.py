@@ -9,7 +9,10 @@ from dataclasses import dataclass, field, replace
 from typing import Literal, Protocol
 from uuid import UUID, uuid5
 
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
@@ -194,6 +197,8 @@ class TranslationTurnRequest:
         repr=False,
         compare=False,
     )
+    operation_id: str | None = None
+    request_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.transcript.is_final:
@@ -272,6 +277,8 @@ class TranslationTurnChild:
         repr=False,
         compare=False,
     )
+    operation_id: str | None = None
+    request_id: str | None = None
 
     @property
     def channel(self) -> ChannelId:
@@ -302,6 +309,9 @@ class TranslationOutputSubmission:
     parent_output_count: int = 1
     context_texts: tuple[str, ...] | None = None
     speaker_assignment: SpeakerAssignment | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
     def __post_init__(self) -> None:
         if self.outcome == "translated" and self.translation is None:
@@ -337,6 +347,7 @@ class TranslationOutputSubmission:
 class TranslationTurnProcessResult:
     outcome: TranslationTurnOutcome
     output: TranslationOutputSubmission | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
     def __post_init__(self) -> None:
         if self.output is not None and self.output.outcome != self.outcome:
@@ -365,6 +376,7 @@ class _TranslationTurnParent:
     semantic_done_event: asyncio.Event = field(default_factory=asyncio.Event)
     closed_event: asyncio.Event = field(default_factory=asyncio.Event)
     closed: bool = False
+    failure_diagnostics: ErrorDiagnostics | None = None
 
     @property
     def child_ids(self) -> tuple[UUID, ...]:
@@ -513,7 +525,7 @@ class TranslationTurnLifecycleOwner:
         parent_id = request.transcript.utterance_id
         if parent_id in self._closed_parent_ids or parent_id in self._parents:
             await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
-            await self._reject_parent(parent_id)
+            await self._reject_parent(request)
             return ()
         if (
             not self._accepting
@@ -521,7 +533,7 @@ class TranslationTurnLifecycleOwner:
             or request.transcript.channel in self._blocked_channels
         ):
             await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
-            await self._reject_parent(parent_id)
+            await self._reject_parent(request)
             return ()
         channel = request.transcript.channel
         turn_generation = self._channel_turn_generations[channel]
@@ -559,8 +571,10 @@ class TranslationTurnLifecycleOwner:
                     if self.on_parent_admitted is not None:
                         try:
                             await self.on_parent_admitted(parent.children)
-                        except Exception:
-                            logger.exception("translation parent admission adapter failed")
+                        except Exception as exc:
+                            self._record_parent_failure(
+                                parent, exc, "translation.parent_admission_failed", "admission"
+                            )
                             await self._terminalize_parent_remaining(parent, "failed")
                     if self._parent_cancellation_requested(parent):
                         await self._terminalize_parent_remaining(parent, "cancelled")
@@ -610,8 +624,10 @@ class TranslationTurnLifecycleOwner:
                     break
                 try:
                     await self.on_child_created(child)
-                except Exception:
-                    logger.exception("translation child creation adapter failed")
+                except Exception as exc:
+                    self._record_child_failure(
+                        child, exc, "translation.child_creation_failed", stage="child_creation"
+                    )
                     await self._terminalize_child(child, "failed")
             if not parent.closed:
                 if self._parent_cancellation_requested(parent):
@@ -626,6 +642,8 @@ class TranslationTurnLifecycleOwner:
                     if not parent_task.done():
                         self._parent_tasks[parent_id] = parent_task
         except (Exception, asyncio.CancelledError) as exc:
+            if not isinstance(exc, asyncio.CancelledError):
+                self._record_parent_failure(parent, exc, "translation.parent_admission_failed", "admission")
             if not parent.closed:
                 self._cancelling_parent_ids.add(parent_id)
                 await self._terminalize_parent_remaining(
@@ -637,11 +655,17 @@ class TranslationTurnLifecycleOwner:
             await parent.closed_event.wait()
         return parent.child_ids
 
-    async def _reject_parent(self, parent_utterance_id: UUID) -> None:
+    async def _reject_parent(self, request: TranslationTurnRequest) -> None:
         try:
-            await self.on_parent_rejected(parent_utterance_id)
-        except Exception:
-            logger.exception("translation parent rejection adapter failed")
+            await self.on_parent_rejected(request.transcript.utterance_id)
+        except Exception as exc:
+            diagnostics = replace(
+                provider_failure_report(exc, provider="llm", operation="rejection").diagnostics,
+                component="translation.turn", code="translation.parent_rejection_failed",
+                channel=request.transcript.channel, turn_id=str(request.transcript.utterance_id),
+                operation_id=request.operation_id, request_id=request.request_id,
+            )
+            emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="rejection")
 
     async def submit_parent(
         self,
@@ -866,6 +890,8 @@ class TranslationTurnLifecycleOwner:
                         request.prestarted_secondary_translation if target_index == 1 else None
                     ),
                     config_snapshot=request.config_snapshot,
+                    operation_id=request.operation_id,
+                    request_id=request.request_id,
                 )
             )
         return tuple(children)
@@ -931,8 +957,8 @@ class TranslationTurnLifecycleOwner:
         except asyncio.CancelledError:
             await self._terminalize_parent_remaining(parent, "cancelled")
             raise
-        except Exception:
-            logger.exception("translation parent execution failed")
+        except Exception as exc:
+            self._record_parent_failure(parent, exc, "translation.parent_execution_failed", "parent_execution")
             await self._terminalize_parent_remaining(parent, "failed")
         finally:
             if speech_slot:
@@ -1001,11 +1027,11 @@ class TranslationTurnLifecycleOwner:
             current_task = asyncio.current_task()
             if current_task is not None and current_task.cancelling():
                 raise
-        except Exception:
+        except Exception as exc:
             if not child_task.done():
                 child_task.cancel()
                 await asyncio.gather(child_task, return_exceptions=True)
-            logger.exception("translation child execution adapter failed")
+            self._record_child_failure(child, exc, "translation.child_execution_failed")
             await self._terminalize_child(child, "failed")
         finally:
             self._active_tasks.pop(child.utterance_id, None)
@@ -1122,9 +1148,12 @@ class TranslationTurnLifecycleOwner:
                 result = await self._process_child(child)
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                logger.exception("translation child execution adapter failed")
-                result = TranslationTurnProcessResult("failed")
+            except Exception as exc:
+                result = TranslationTurnProcessResult(
+                    "failed", failure_diagnostics=self._record_child_failure(
+                        child, exc, "translation.child_execution_failed"
+                    )
+                )
             if self.is_child_cancellation_requested(child):
                 raise asyncio.CancelledError
             self._mark_child_semantic_done(child)
@@ -1198,9 +1227,12 @@ class TranslationTurnLifecycleOwner:
                 self._output_submitted_child_ids.add(child.utterance_id)
             except asyncio.CancelledError:
                 raise
-            except Exception:
-                logger.exception("translation output submission failed")
-                result = TranslationTurnProcessResult("failed")
+            except Exception as exc:
+                result = TranslationTurnProcessResult(
+                    "failed", failure_diagnostics=self._record_child_failure(
+                        child, exc, "translation.output_submission_failed", stage="output_submit"
+                    )
+                )
         await self._terminalize_child(child, result.outcome)
         return result
 
@@ -1221,15 +1253,71 @@ class TranslationTurnLifecycleOwner:
                 ),
                 timeout=self.child_watchdog_s,
             )
-        except TimeoutError:
-            return TranslationTurnProcessResult("failed")
+        except TimeoutError as exc:
+            return TranslationTurnProcessResult(
+                "failed", failure_diagnostics=self._record_child_failure(child, exc, "translation.child_timeout")
+            )
         except asyncio.CancelledError:
             raise
-        except Exception:
-            return TranslationTurnProcessResult("failed")
+        except Exception as exc:
+            return TranslationTurnProcessResult(
+                "failed", failure_diagnostics=self._record_child_failure(
+                    child, exc, "translation.child_execution_failed"
+                )
+            )
         if isinstance(result, str):
             return TranslationTurnProcessResult(result)
         return result
+
+    def _record_child_failure(
+        self, child: TranslationTurnChild, exception: Exception, code: str,
+        *, stage: str = "child_execution", secondary: bool = False,
+    ) -> ErrorDiagnostics:
+        native = provider_failure_report(exception, provider="llm", operation=stage).diagnostics
+        preserved = isinstance(getattr(exception, "failure_diagnostics", None), ErrorDiagnostics)
+        parent = self._parents.get(child.parent_utterance_id)
+        diagnostics = replace(
+            native, component=native.component if preserved else "translation.turn",
+            code=native.code if preserved else code, channel=child.channel,
+            turn_id=str(child.utterance_id), generation=child.turn_generation,
+            operation_id=child.operation_id, request_id=child.request_id,
+            cause_id=parent.failure_diagnostics.diagnostic_id
+            if secondary and parent is not None and parent.failure_diagnostics is not None else native.cause_id,
+            fields={
+                **native.fields, "parent_utterance_id": str(child.parent_utterance_id),
+                "target_index": child.target_index,
+            },
+        )
+        if parent is not None and not secondary:
+            parent.failure_diagnostics = parent.failure_diagnostics or diagnostics
+        emit_failure(
+            logger, diagnostics, stage=stage,
+            severity="warning" if secondary else "error",
+            disposition="degraded" if secondary else "failed",
+        )
+        return diagnostics
+
+    def _record_parent_failure(
+        self, parent: _TranslationTurnParent, exception: Exception, code: str, stage: str,
+        *, secondary: bool = False,
+    ) -> None:
+        child = parent.children[0] if parent.children else None
+        native = provider_failure_report(exception, provider="llm", operation=stage).diagnostics
+        diagnostics = replace(
+            native, component="translation.turn", code=code, channel=parent.channel,
+            turn_id=str(parent.parent_utterance_id), generation=parent.turn_generation,
+            operation_id=child.operation_id if child is not None else None,
+            request_id=child.request_id if child is not None else None,
+            cause_id=parent.failure_diagnostics.diagnostic_id
+            if secondary and parent.failure_diagnostics is not None else native.cause_id,
+        )
+        if not secondary:
+            parent.failure_diagnostics = parent.failure_diagnostics or diagnostics
+        emit_failure(
+            logger, diagnostics, stage=stage,
+            severity="warning" if secondary else "error",
+            disposition="degraded" if secondary else "failed",
+        )
 
     def _request_cancellation(self) -> None:
         self._cancelling_parent_ids.update(self._parents)
@@ -1327,6 +1415,8 @@ class TranslationTurnLifecycleOwner:
                                 source_order=child.transcript.source_order,
                                 turn_kind=child.turn_kind,
                                 parent_output_count=child.parent_output_count,
+                                operation_id=child.operation_id,
+                                request_id=child.request_id,
                             )
                         )
                     except Exception:
@@ -1371,8 +1461,13 @@ class TranslationTurnLifecycleOwner:
                 channel,
                 self._channel_turn_generations[channel],
             )
-        except Exception:
-            logger.exception("translation turn generation observer failed")
+        except Exception as exc:
+            diagnostics = replace(
+                provider_failure_report(exc, provider="llm", operation="turn_generation").diagnostics,
+                component="translation.turn", code="translation.turn_generation_observer_failed",
+                channel=channel, generation=self._channel_turn_generations[channel],
+            )
+            emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage="turn_generation")
 
     def child_output_was_submitted(self, child_utterance_id: UUID) -> bool:
         return child_utterance_id in self._output_submitted_child_ids
@@ -1415,8 +1510,10 @@ class TranslationTurnLifecycleOwner:
             await self._cancel_prestarted_translation(child.prestarted_translation)
         try:
             await self.on_child_terminal(child, outcome)
-        except Exception:
-            logger.exception("translation child terminal adapter failed")
+        except Exception as exc:
+            self._record_child_failure(
+                child, exc, "translation.child_retirement_failed", stage="retirement", secondary=True
+            )
         finally:
             self._output_submitted_child_ids.discard(child.utterance_id)
             parent.completed_child_ids.add(child.utterance_id)
@@ -1461,8 +1558,10 @@ class TranslationTurnLifecycleOwner:
         try:
             try:
                 await self.on_parent_closed(parent.parent_utterance_id)
-            except Exception:
-                logger.exception("translation parent closure adapter failed")
+            except Exception as exc:
+                self._record_parent_failure(
+                    parent, exc, "translation.parent_retirement_failed", "retirement", secondary=True
+                )
         finally:
             parent.semantic_done_event.set()
             parent.closed_event.set()

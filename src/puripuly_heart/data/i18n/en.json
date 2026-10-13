@@ -544,6 +544,7 @@
   "provider.openrouter.payment_required": "Please check your credit balance.",
   "stt.failure": "Speech recognition error ({category}). Please try again.",
   "settings.mutation.runtime_apply_failed": "Settings were saved, but runtime apply failed.",
+  "settings.mutation.failed_pending": "The settings change did not complete. The edit remains pending.",
   "debug_preview.qq_auth_recoverable_error": "QQ recoverable error",
   "debug_preview.qq_auth_translation_gated": "QQ translation gated",
   "managed_auth.error.claim_conflict": "This device already has a different Managed authentication claim.",

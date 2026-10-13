@@ -160,7 +160,9 @@ async def test_sign_in_then_sign_out_revokes_and_keeps_client_and_host() -> None
     assert await session.access_token() == "a"
     assert server.refresh_calls == 0
 
-    assert await session.sign_out() is True
+    result = await session.sign_out()
+    assert result.remote_revoked is True
+    assert result.local_credentials_removed is True
     assert server.revoke_calls == 1
     assert session.status().signed_in is False
     assert store.get(CHATGPT_CLIENT_ID_SECRET) == "oaiapp_client"
@@ -174,6 +176,10 @@ async def test_sign_out_reports_unconfirmed_remote_revocation() -> None:
     server.revoke_status = 500
     session = _session(store, server, [1000.0])
 
-    assert await session.sign_out() is False
+    result = await session.sign_out()
+    assert result.remote_revoked is False
+    assert result.local_credentials_removed is True
+    assert result.diagnostics.status_code == 500
+    assert result.diagnostics.operation == "remote_revoke"
     assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
     await session.close()

@@ -242,6 +242,8 @@ class OverlayGenerationStartOwner:
                 "startup_timeout_ms": request.startup_timeout_ms,
                 "renderer_events": renderer_events,
                 "overlay_instance_id": overlay_instance_id,
+                "operation_id": runtime.operation_id,
+                "request_id": runtime.request_id,
                 "diagnostics": diagnostics,
                 "task_factory": runtime.create_child_task,
                 "selected_target": request.target,

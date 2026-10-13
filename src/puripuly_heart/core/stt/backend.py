@@ -12,6 +12,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioSegmentSettingsSnapshot,
     SegmentTerminalOutcome,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
@@ -111,6 +112,7 @@ class STTProviderTurnTerminal:
     recovery_pending: bool = False
     provenance: tuple[STTNativeProvenance, ...] = ()
     included_contributions: tuple[STTTextContribution, ...] = ()
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 class STTContributionConsumptionLedger:
@@ -200,6 +202,7 @@ class STTProviderEpochEnded:
     reason: str
     provider_turn_id: str | None = None
     failure_retryable: bool = False
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +213,7 @@ class STTProviderInputTerminal:
     failure_reason: str | None = None
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
     recovery_pending: bool = False
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass(frozen=True, slots=True)

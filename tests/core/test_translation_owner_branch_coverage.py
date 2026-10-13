@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseDiagnostics,
+    ManagedOpenRouterReleaseError,
     ManagedOpenRouterUserFacingError,
 )
 
@@ -262,6 +263,11 @@ class _RuntimeLogSinks:
     stream_handler: logging.Handler
     file_handler: logging.Handler
     log_file: object
+    file_queue_handler: object | None = None
+    file_queue_listener: object | None = None
+    file_queue: object | None = None
+    abandoned_records: int = 0
+    _closed: bool = False
 
 
 def _make_runtime_logging_capture() -> tuple[SessionRuntimeLoggingService, io.StringIO]:
@@ -776,14 +782,11 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
     harness = compose_translation_test_harness(
         stt=None,
         llm=ManagedAuthFailingLLM(
-            diagnostics=ManagedOpenRouterReleaseDiagnostics(
-                operation="issue",
-                code="trial_unavailable",
-                error_class="retryable",
-                subcode="broker_backoff",
-                retry_after_ms=9000,
-                message="broker is temporarily unavailable",
-            )
+            diagnostics=ManagedOpenRouterReleaseError(
+                operation="issue", code="trial_unavailable", error_class="retryable",
+                subcode="broker_backoff", retry_after_ms=9000,
+                message="broker is temporarily unavailable", http_status=503,
+            ).to_diagnostics()
         ),
         osc=RecordingOscQueue(),
         clock=FakeClock(),
@@ -803,11 +806,9 @@ async def test_translate_and_enqueue_logs_managed_auth_diagnostics() -> None:
         assert payload.message.key == "managed_release.retry_after_ms"
         assert dict(payload.message.params) == {"retry_after_ms": 9000}
         assert payload.diagnostics.code == "provider.service_unavailable"
-        assert payload.diagnostics.fields["exception_type"] == "ManagedOpenRouterUserFacingError"
-        assert payload.diagnostics.fields["managed_operation"] == "issue"
-        assert payload.diagnostics.fields["managed_code"] == "trial_unavailable"
-        assert payload.diagnostics.fields["managed_error_class"] == "retryable"
-        assert payload.diagnostics.fields["managed_subcode"] == "broker_backoff"
+        assert payload.diagnostics.fields["exception_class"] == "unclassified"
+        assert payload.diagnostics.status_code == 503
+        assert payload.diagnostics.diagnostic_id
         assert "broker is temporarily unavailable" not in repr(payload)
         messages = _runtime_log_messages(log_stream)
         assert "broker is temporarily unavailable" not in "\n".join(messages)
@@ -913,9 +914,8 @@ async def test_peer_stt_event_loop_failure_with_runtime_logging_is_safe() -> Non
         )
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
-        assert (
-            "[Translation] STT event loop crashed: category=network code=stt.network" in runtime_log
-        )
+        evidence = runtime_logging.diagnostic_history({})["records"]
+        assert any(item["code"] == "stt.network" and item["channel"] == "peer" for item in evidence)
         assert raw_detail not in runtime_log
         assert "translation-stt-secret-123" not in runtime_log
         assert "Traceback (most recent call last):" not in runtime_log
@@ -939,9 +939,8 @@ async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_st
         await harness.dispatch_stt_failure(ConnectionError(raw_detail))
 
         runtime_log = "\n".join(_runtime_log_messages(log_stream))
-        assert (
-            "[Translation] STT event loop crashed: category=network code=stt.network" in runtime_log
-        )
+        evidence = runtime_logging.diagnostic_history({})["records"]
+        assert any(item["code"] == "stt.network" for item in evidence)
         assert raw_detail not in runtime_log
         assert "translation-stt-secret-456" not in runtime_log
         assert "Traceback (most recent call last):" not in runtime_log
@@ -1124,7 +1123,8 @@ async def test_submit_text_validates_input_and_enqueues_without_llm() -> None:
     with pytest.raises(ValueError, match="text must be non-empty"):
         await harness.self_owner.submit_text("   ")
 
-    utterance_id = await harness.self_owner.submit_text("hello", source="You")
+    admission = await harness.self_owner.submit_text("hello", source="You")
+    utterance_id = admission.turn_id
     events = [await harness.ui_events.get(), await harness.ui_events.get()]
     assert [event.type for event in events] == [UIEventType.TRANSCRIPT_FINAL, UIEventType.OSC_SENT]
     assert harness.osc.messages[-1].utterance_id == utterance_id
@@ -1137,7 +1137,8 @@ async def test_submit_text_clipboard_source_uses_manual_fallback_without_llm() -
     harness = compose_translation_test_harness(stt=None, llm=None, osc=osc, clock=FakeClock())
     harness.replace_configuration(translation_enabled=False)
 
-    utterance_id = await harness.self_owner.submit_text("clipboard fallback", source="Clipboard")
+    admission = await harness.self_owner.submit_text("clipboard fallback", source="Clipboard")
+    utterance_id = admission.turn_id
     events = [await harness.ui_events.get(), await harness.ui_events.get()]
 
     assert [event.type for event in events] == [UIEventType.TRANSCRIPT_FINAL, UIEventType.OSC_SENT]

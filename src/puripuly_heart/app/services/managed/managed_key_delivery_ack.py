@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.broker_client import (
     BrokerClientPort,
@@ -16,6 +17,11 @@ from puripuly_heart.app.services.managed.managed_operation import (
     other_source_pending_operation,
 )
 from puripuly_heart.config.provider_values import normalize_owned_referral_id
+from puripuly_heart.core.diagnostics import (
+    emit_failure,
+    safe_exception_fields,
+    sanitize_diagnostics,
+)
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_CATEGORY_TRANSACTION,
@@ -36,14 +42,19 @@ class ManagedKeyDeliveryAckServiceResult:
     status: str
     diagnostics: ErrorDiagnostics | None = None
     ack_result: ManagedKeyDeliveryAckResult | None = None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
 
 
 class ManagedKeyDeliveryAckTokenStoreError(Exception):
-    pass
+    def __init__(self, message: str, diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.diagnostics = diagnostics
+        super().__init__(message)
 
 
 class ManagedKeyDeliveryAckTokenClearError(Exception):
-    pass
+    def __init__(self, message: str, diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.diagnostics = diagnostics
+        super().__init__(message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,9 +68,19 @@ class ManagedKeyDeliveryAckService:
         try:
             result = await self.secret_store.set_secret(key, metadata.delivery_ack_token)
         except Exception as exc:
-            raise ManagedKeyDeliveryAckTokenStoreError("delivery ACK token store failed") from exc
+            raise ManagedKeyDeliveryAckTokenStoreError(
+                "delivery ACK token store failed",
+                _diagnostics(
+                    operation="store_delivery_ack_token",
+                    code="secret_write_failed",
+                    fields={"source": metadata.source},
+                    exception=exc,
+                ),
+            ) from exc
         if not result.succeeded:
-            raise ManagedKeyDeliveryAckTokenStoreError("delivery ACK token store failed")
+            raise ManagedKeyDeliveryAckTokenStoreError(
+                "delivery ACK token store failed", result.diagnostics
+            )
         self.managed_state.pending_delivery_ack_source = metadata.source
         self.managed_state.pending_delivery_ack_delivery_id = metadata.delivery_id
         self.managed_state.pending_delivery_ack_managed_credential_ref = (
@@ -90,8 +111,17 @@ class ManagedKeyDeliveryAckService:
             )
         try:
             managed_secret = await self.secret_store.get_secret(managed_secret_key)
-        except Exception:
-            managed_secret = None
+        except Exception as exc:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="managed_secret_missing",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="delivery_ack_managed_secret_missing",
+                    fields={"source": source, "managed_secret_present": None},
+                    exception=exc,
+                ),
+            )
         if managed_secret is None or not managed_secret.value:
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=False,
@@ -100,6 +130,7 @@ class ManagedKeyDeliveryAckService:
                     operation="recover_managed_key_delivery",
                     code="delivery_ack_managed_secret_missing",
                     fields={"source": source, "managed_secret_present": False},
+                    cause=managed_secret.diagnostics if managed_secret is not None else None,
                 ),
             )
         return await self.retry_pending()
@@ -113,14 +144,15 @@ class ManagedKeyDeliveryAckService:
             return ManagedKeyDeliveryAckServiceResult(succeeded=True, status="none")
         try:
             token_read = await self.secret_store.get_secret(secret_key_for_ack_source(source))
-        except Exception:
+        except Exception as exc:
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=False,
                 status="token_read_failed",
                 diagnostics=_diagnostics(
                     operation="read_delivery_ack_token",
                     code="delivery_ack_token_read_failed",
-                    fields={"source": source, "token_present": False},
+                    fields={"source": source, "token_present": None},
+                    exception=exc,
                 ),
             )
         if not token_read.value:
@@ -130,7 +162,11 @@ class ManagedKeyDeliveryAckService:
                 diagnostics=_diagnostics(
                     operation="read_delivery_ack_token",
                     code="delivery_ack_token_missing",
-                    fields={"source": source, "token_present": False},
+                    fields={
+                        "source": source,
+                        "token_present": None if token_read.diagnostics is not None else False,
+                    },
+                    cause=token_read.diagnostics,
                 ),
             )
         try:
@@ -141,7 +177,7 @@ class ManagedKeyDeliveryAckService:
                     delivery_ack_token=token_read.value,
                 )
             )
-        except Exception:
+        except Exception as exc:
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=False,
                 status="ack_exception",
@@ -149,6 +185,7 @@ class ManagedKeyDeliveryAckService:
                     operation="acknowledge_managed_key_delivery",
                     code="delivery_ack_exception",
                     fields={"source": source},
+                    exception=exc,
                 ),
             )
         if ack_result.succeeded and ack_result.status in {"acknowledged", "already_acknowledged"}:
@@ -162,7 +199,7 @@ class ManagedKeyDeliveryAckService:
             previous_operation_state = self.managed_state.pending_managed_operation_state
             try:
                 await self.clear_pending(source)
-            except ManagedKeyDeliveryAckTokenClearError:
+            except ManagedKeyDeliveryAckTokenClearError as exc:
                 return ManagedKeyDeliveryAckServiceResult(
                     succeeded=False,
                     status="token_clear_failed",
@@ -170,6 +207,7 @@ class ManagedKeyDeliveryAckService:
                         operation="clear_delivery_ack_token",
                         code="delivery_ack_token_clear_failed",
                         fields={"source": source},
+                        exception=exc,
                     ),
                     ack_result=ack_result,
                 )
@@ -184,14 +222,27 @@ class ManagedKeyDeliveryAckService:
                 self.managed_state.pending_managed_operation_state = None
             try:
                 self.managed_state.persist()
-            except Exception:
+            except Exception as exc:
+                primary = _diagnostics(
+                    operation="clear_delivery_ack_metadata",
+                    code="delivery_ack_clear_persist_failed",
+                    fields={"source": source},
+                    exception=exc,
+                )
+                restoration_cause = None
                 try:
                     restore_result = await self.secret_store.set_secret(
                         secret_key_for_ack_source(source),
                         token_read.value,
                     )
-                except Exception:
+                except Exception as restore_exc:
                     restore_result = None
+                    restoration_cause = _diagnostics(
+                        operation="restore_delivery_ack_token",
+                        code="delivery_ack_token_restore_failed",
+                        fields={"source": source},
+                        exception=restore_exc,
+                    )
                 self.managed_state.pending_delivery_ack_source = source
                 self.managed_state.pending_delivery_ack_delivery_id = delivery_id
                 self.managed_state.pending_delivery_ack_managed_credential_ref = (
@@ -210,28 +261,44 @@ class ManagedKeyDeliveryAckService:
                     return ManagedKeyDeliveryAckServiceResult(
                         succeeded=False,
                         status="token_restore_failed",
-                        diagnostics=_diagnostics(
-                            operation="restore_delivery_ack_token",
-                            code="delivery_ack_token_restore_failed",
-                            fields={"source": source},
+                        diagnostics=primary,
+                        secondary_diagnostics=(
+                            replace(
+                                restoration_cause
+                                or _diagnostics(
+                                    operation="restore_delivery_ack_token",
+                                    code="delivery_ack_token_restore_failed",
+                                    fields={"source": source},
+                                    cause=restore_result.diagnostics
+                                    if restore_result is not None
+                                    else None,
+                                ),
+                                cause_id=primary.diagnostic_id,
+                            ),
                         ),
                         ack_result=ack_result,
                     )
                 return ManagedKeyDeliveryAckServiceResult(
                     succeeded=False,
                     status="pending_clear_persist_failed",
-                    diagnostics=_diagnostics(
-                        operation="clear_delivery_ack_metadata",
-                        code="delivery_ack_clear_persist_failed",
-                        fields={"source": source},
-                    ),
+                    diagnostics=primary,
                     ack_result=ack_result,
                 )
             if not preserve_operation:
                 try:
                     await clear_resume_token(self.secret_store)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    emit_failure(
+                        logging.getLogger(__name__),
+                        _diagnostics(
+                            operation="clear_delivery_ack_metadata",
+                            code="managed_application_failed",
+                            fields={"source": source},
+                            exception=exc,
+                        ),
+                        severity="warning",
+                        disposition="degraded",
+                    )
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=True,
                 status=ack_result.status,
@@ -258,10 +325,18 @@ class ManagedKeyDeliveryAckService:
                 )
             except Exception as exc:
                 raise ManagedKeyDeliveryAckTokenClearError(
-                    "delivery ACK token clear failed"
+                    "delivery ACK token clear failed",
+                    _diagnostics(
+                        operation="clear_delivery_ack_token",
+                        code="delivery_ack_token_clear_failed",
+                        fields={"source": pending_source},
+                        exception=exc,
+                    ),
                 ) from exc
             if not result.succeeded:
-                raise ManagedKeyDeliveryAckTokenClearError("delivery ACK token clear failed")
+                raise ManagedKeyDeliveryAckTokenClearError(
+                    "delivery ACK token clear failed", result.diagnostics
+                )
         self.managed_state.pending_delivery_ack_source = None
         self.managed_state.pending_delivery_ack_delivery_id = None
         self.managed_state.pending_delivery_ack_managed_credential_ref = None
@@ -280,9 +355,19 @@ async def store_pending_ack_in_settings_values(
             metadata.delivery_ack_token,
         )
     except Exception as exc:
-        raise ManagedKeyDeliveryAckTokenStoreError("delivery ACK token store failed") from exc
+        raise ManagedKeyDeliveryAckTokenStoreError(
+            "delivery ACK token store failed",
+            _diagnostics(
+                operation="store_delivery_ack_token",
+                code="secret_write_failed",
+                fields={"source": metadata.source},
+                exception=exc,
+            ),
+        ) from exc
     if not result.succeeded:
-        raise ManagedKeyDeliveryAckTokenStoreError("delivery ACK token store failed")
+        raise ManagedKeyDeliveryAckTokenStoreError(
+            "delivery ACK token store failed", result.diagnostics
+        )
     values = _copy_mapping(settings_values)
     state = values.setdefault("state", {})
     if not isinstance(state, dict):
@@ -437,7 +522,15 @@ def _diagnostics(
     operation: str,
     code: str,
     fields: Mapping[str, DiagnosticFieldValue],
+    exception: BaseException | None = None,
+    cause: ErrorDiagnostics | None = None,
 ) -> ErrorDiagnostics:
+    if cause is None and exception is not None:
+        candidate = getattr(exception, "diagnostics", None)
+        cause = candidate if isinstance(candidate, ErrorDiagnostics) else None
+    if cause is not None:
+        safe = sanitize_diagnostics(cause)
+        return replace(safe, fields={**fields, **safe.fields})
     return ErrorDiagnostics(
         component="managed_key_delivery_ack",
         operation=operation,
@@ -447,7 +540,11 @@ def _diagnostics(
         content_policy=CONTENT_POLICY_METADATA_ONLY,
         status_code=None,
         retry_after_ms=None,
-        fields=fields,
+        fields={
+            "phase": operation,
+            **fields,
+            **(safe_exception_fields(exception) if exception is not None else {}),
+        },
     )
 
 
