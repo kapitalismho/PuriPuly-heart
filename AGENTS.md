@@ -2,6 +2,7 @@
 
 - Code comments are added only when explicitly requested.
 - Merge, push, publish, deployment, release, and worktree cleanup proceed only with explicit approval.
+- Write all content published to GitHub in English.
 - Use `docs/architecture.md` as the system map when a task requires reasoning about how the system fits together.
 - Report suspected architecture drift introduced by your changes to the user.
 - Report any user-visible changes after completing the work.
