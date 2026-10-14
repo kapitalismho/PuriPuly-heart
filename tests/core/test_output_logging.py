@@ -375,7 +375,12 @@ async def test_overlay_failure_has_one_typed_cause_and_preserves_translation_sta
             if line.startswith("[Failure] ")
         ]
         assert len(persisted_failures) == 2
-        assert sum(record["diagnostic_id"] == failure["diagnostic_id"] for record in persisted_failures) == 1
+        assert (
+            sum(
+                record["diagnostic_id"] == failure["diagnostic_id"] for record in persisted_failures
+            )
+            == 1
+        )
         for rendered in (live.getvalue(), log_file.read_text(encoding="utf-8")):
             assert "destination_result" not in rendered
             assert "Overlay sink emit failed" not in rendered
@@ -421,7 +426,9 @@ def test_shutdown_backlog_logs_only_real_discarded_work(output_logs, has_backlog
         "output_runtime_closing",
     ],
 )
-async def test_expected_overlay_cancellation_is_retained_without_rendered_noise(output_logs, reason):
+async def test_expected_overlay_cancellation_is_retained_without_rendered_noise(
+    output_logs, reason
+):
     service, live, log_file = output_logs
 
     class CancelledSink:
