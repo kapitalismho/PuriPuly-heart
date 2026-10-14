@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import io
+import json
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from uuid import uuid4
 
+import httpx
 import pytest
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
@@ -24,10 +29,17 @@ from puripuly_heart.core.local_stt_catalog import (
     LocalCPUInstallSnapshot,
     LocalCPUModelInstall,
 )
-from puripuly_heart.core.local_stt_runtime_installer import RuntimeLocalSTTStatusUpdate
+from puripuly_heart.core.local_stt_runtime_installer import (
+    LocalSTTRuntimeInstallCancelled,
+    LocalSTTRuntimeInstallError,
+    RuntimeLocalSTTStatusUpdate,
+)
 
+from puripuly_heart.core.diagnostics import diagnostic_operation
+from puripuly_heart.core.runtime import local_asr_provisioning as provisioning_module
 from puripuly_heart.core.runtime.local_asr_provisioning import LocalASRProvisioningOwner
 from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
+from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService, configure_main_logging
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 
@@ -388,6 +400,102 @@ async def test_failed_repair_keeps_integrity_and_exposes_only_safe_failure_type(
     assert "do-not-publish" not in repr(owner.diagnostics)
 
     await owner.close()
+
+
+@pytest.mark.parametrize("failure_kind", ["http", "unknown", "cancelled"])
+@pytest.mark.asyncio
+async def test_install_failure_retains_admission_identity_and_safe_native_cause(
+    tmp_path, monkeypatch, failure_kind
+) -> None:
+    private = "private-model-body-key-path-237"
+    if failure_kind == "http":
+        response = httpx.Response(
+            503, request=httpx.Request("GET", f"https://example.invalid/{private}")
+        )
+        native = httpx.HTTPStatusError(private, request=response.request, response=response)
+        failure = LocalSTTRuntimeInstallError(private)
+        failure.__cause__ = native
+    elif failure_kind == "cancelled":
+        failure = LocalSTTRuntimeInstallCancelled(private)
+    else:
+        failure = RuntimeError(f"status=503 auth timeout {private}")
+    states = _all_states()
+    states[LOCAL_STT_MODEL_ID] = _state("missing", LOCAL_STT_MODEL_ID)
+    release = asyncio.Event()
+    backend = MutableProvisioningBackend(states, release_install=release, failure=failure)
+    owner = _owner(backend, model_root=tmp_path / "models")
+    root = logging.getLogger(f"test.model-diagnostic.{uuid4().hex}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path / "logs")
+    basic = io.StringIO()
+    sinks.stream_handler.setStream(basic)
+    service = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    instance, operation, request = str(uuid4()), uuid4().hex, uuid4().hex
+    events = []
+    service.configure_diagnostics(instance_id=instance, event_sink=events.append)
+    monkeypatch.setattr(provisioning_module, "logger", root)
+    try:
+        with diagnostic_operation(instance, operation, request):
+            task = owner.start_install(
+                LocalASRInstallRequest(
+                    backend="cpu",
+                    model_ids=(LOCAL_STT_MODEL_ID,),
+                    locale="en",
+                    origin="application_control",
+                )
+            )
+        await backend.install_started.wait()
+        generation = owner.snapshot.activity_for("cpu").generation
+        unrelated_operation = uuid4().hex
+        with diagnostic_operation(instance, unrelated_operation, uuid4().hex):
+            release.set()
+            result = await task
+        records = service.diagnostic_history({"operation_id": operation})["records"]
+        assert service.diagnostic_history({"operation_id": unrelated_operation})["records"] == []
+        assert result.snapshot.state_for(LOCAL_STT_MODEL_ID).integrity == "missing"
+        if failure_kind == "cancelled":
+            assert result.cancelled is True
+            assert result.failed_model_ids == ()
+            assert records == []
+            assert events == []
+        else:
+            assert result.cancelled is False
+            assert result.failed_model_ids == (LOCAL_STT_MODEL_ID,)
+            assert result.snapshot.state_for(LOCAL_STT_MODEL_ID).status == "download_failed"
+            assert len(records) == 1
+            record = records[0]
+            assert record["component"] == "local_asr_provisioning"
+            assert record["operation"] == "models.install"
+            assert record["stage"] == "installation"
+            assert record["code"] == "local_asr_install_failed"
+            assert record["disposition"] == "failed"
+            assert record["request_id"] == request
+            assert record["generation"] == generation
+            assert record["fields"]["model_id"] == LOCAL_STT_MODEL_ID
+            assert record["category"] == (
+                "service_unavailable" if failure_kind == "http" else "unknown"
+            )
+            assert record["status_code"] == (503 if failure_kind == "http" else None)
+            assert events[0]["diagnostic"] == record
+        assert basic.getvalue() == ""
+        assert private not in json.dumps(records)
+        assert private not in json.dumps(events)
+    finally:
+        await owner.close()
+        service.close()
+        sinks.close(force=True)
+        root.handlers.clear()
+    if failure_kind == "cancelled":
+        return
+    file_text = sinks.log_file.read_text(encoding="utf-8")
+    persisted = [
+        json.loads(line.partition("[Failure] ")[2])
+        for line in file_text.splitlines()
+        if "[Failure] {" in line
+    ]
+    assert persisted == records
+    assert private not in file_text
+    assert str(tmp_path) not in file_text
 
 
 @pytest.mark.asyncio

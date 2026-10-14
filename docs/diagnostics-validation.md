@@ -354,3 +354,66 @@ Three comments were assessed against their actual impact and repair complexity. 
 Malformed operation/diagnostic filters previously returned `not_retained`. The shared payload pattern now distinguishes bounded continuous hexadecimal and UUID-shaped identities from the reported hyphen-only/trailing-separator values. Existing native prefix syntax, short overlay hexadecimal identities, admission sentinel, managed-operation identities, integer capture epochs and host instance syntax remain unchanged. Some strings can still validly parse as an existing prefix plus hexadecimal payload; this is not a UUID-only redesign.
 
 The two affected whole test files passed 50 cases under the project Python environment. Global Black and Ruff checks passed. A separate isolated real headless host and CLI returned `invalid_arguments` with exit three for `operation_id=--------` and `diagnostic_id=dead----`, while a valid unknown hexadecimal ID returned `not_retained` with exit zero. An actual handoff-service result retained the same native identity, specific component/code and degraded disposition through history, event and file projections; Basic used the specific labels, while unsupported private detail still reported rejection. No account, browser, paid-provider, capture, GPU/HMD or GUI action was exercised. The probe host stopped, logging closed and its temporary directory was removed; no stronger graceful-host-cleanup claim is made.
+
+## PR #234 diagnostic selection — #237
+
+### Inspected revisions and selection boundary
+
+- PR #234 head: [`86d0e698de7cefb8b6360f8e119ec63beb4ae2b0`](https://github.com/kapitalismho/PuriPuly-heart/commit/86d0e698de7cefb8b6360f8e119ec63beb4ae2b0), based on `75c4485a6787d504f5335d1602973f63b4d0c234`.
+- Merged #235, current GitHub `dev`, and this worktree's starting HEAD: [`e4c77a272f5f1867b5cc7753c6071c20ba943339`](https://github.com/kapitalismho/PuriPuly-heart/commit/e4c77a272f5f1867b5cc7753c6071c20ba943339). The final #235 premerge head was `3b185120f633f1117ce9dde0e1e12f54a97ee306`, not the earlier `0a4fec7d` probe baseline.
+- The 77-file #234 comparison was inventoried; review was limited to diagnostic additions and immediate producers. Model management, new source/download/import behavior, floating chat/windows/IPC/preferences, recording/playback, BYOK fixes and Beta packaging remain excluded. None is a dependency or acceptance obligation.
+
+### Dispositions
+
+| #234 change and concrete producer | Disposition against merged upstream |
+| --- | --- |
+| [ASR installer source exhaustion](https://github.com/kapitalismho/PuriPuly-heart/blob/86d0e698de7cefb8b6360f8e119ec63beb4ae2b0/src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py): native HTTP/transport cause and status before the install wrapper; existing provisioning catch adds a `ModelDownload` summary. | **Independently useful; retained narrowly.** Existing CPU/GPU install and repair producers already use this installer. The controlled CPU failure below established that the original owner/composition exposed only a Basic exception-type summary and failed model state, not retained cause/status. Preserve the first native cause and classify it with existing typed error machinery, then emit one owner-authored `ErrorDiagnostics`. Do not copy #234's last-attempt-only reduction, feature helper, `failure_codes` result protocol or new source policies. |
+| [Managed Gemma provisioning logs](https://github.com/kapitalismho/PuriPuly-heart/blob/86d0e698de7cefb8b6360f8e119ec63beb4ae2b0/src/puripuly_heart/core/local_translation/provisioning.py): `ModelDownload` failure summaries for existing download/verification. | **Useful metadata already covered.** `ManagedGemmaTranslationOwner._failure_metadata` and composed Basic/diagnostic sinks already expose phase/code, safe cause type and available HTTP/OS codes for the existing producer. Do not add a second generic summary. The proposed `GemmaInstallInvalidError` → `checksum_failed` mapping is not justified: that exception also represents missing files and size mismatches, so it would assert a cause not established by the type. New disk preflight is operational policy, not a logging correction. |
+| Model-assets dialog, `install_assets`, local Gemma import/file picker, public mirror downloader and explicit-source callbacks. | **Dependent on excluded functionality.** Their picker/import/source/task codes describe producers not being adopted. Catalog/download support without a logging call is not an independent logging improvement. Do not import their callbacks, codes, labels or tests. |
+| `QuickTranslateOwner` translation/backend, preferences, window/IPC and presentation logs; optional quick-history callback in `event_dispatch`; child presentation reports. | **Feature-dependent, with ordinary upstream failures already covered.** The new window/history/IPC producers are excluded. Existing manual submission and translation failures retain `manual_typing` and translation-owner diagnostics; actual dashboard/history destination exceptions retain `output_runtime` publication identity through the existing dispatcher. No floating admission or request-correlation adaptation is retained. |
+| `AudioTest` device-open/capture/preflight logs in the existing microphone test. | **Duplicate existing observations; no demonstrated independent benefit.** Existing capture callbacks retain failed readiness/state, while the composed `MicTest` Basic path reports source-open/capture and failed recognition-stop causes. The extra generic feature records do not preserve an additional typed cause or identity. The new recording timeout, channel fallback and device-metadata callbacks change or depend on excluded recording behavior. |
+| `AudioTest` playback/start/completion/restore logs in microphone owner, UI and application boundary. | **Dependent on excluded recording/playback and capture-restoration behavior.** These producers do not exist in the retained upstream feature set. |
+| [Shared `log_feature`](https://github.com/kapitalismho/PuriPuly-heart/blob/86d0e698de7cefb8b6360f8e119ec63beb4ae2b0/src/puripuly_heart/core/feature_diagnostics.py) and desktop-feature log-lifecycle tests. | **No independent helper/test import.** The helper sends ordinary Basic text through existing `emit_basic_log`; its stage/code check is lexical, not a finite catalog, and it has no owning diagnostic identity. Existing session logging already owns Basic/file delivery and view replay. Synthetic helper calls surviving a dialog close do not prove a missing upstream failure record. Preserve the merged typed ingress, privacy filters and bounded retention instead. |
+| GPU worker `CREATE_NO_WINDOW`, packaging changes and other non-diagnostic edits. | **Outside the diagnostic selection.** The worker flag is a process-window behavior change, not a new diagnostic producer. |
+
+### Retained implementation and controlled before/after evidence
+
+The existing `LocalASRProvisioningOwner` now captures the operation/request identity at installation admission and emits `local_asr_install_failed`, component `local_asr_provisioning`, operation `models.install`, stage `installation`. It reuses `provider_failure_report` for typed status/category and safe exception/transport metadata. The validated existing model ID and source-owner generation travel with that fact. Only the live producer's component, stage, code and finite existing ASR model IDs were registered; no arbitrary feature vocabulary was admitted.
+
+The existing installer still attempts its existing sources and produces the same aggregate error/result behavior. On exhausted fallback, its wrapper chains the first native failure rather than replacing it with the last source's error or inferring a cause from rendered prose. This is one terminal install observation, not a per-source failure audit. Unknown causes remain unknown. Expected cancellation bypasses failure emission. The existing Basic summary is unchanged; the additional record is technical file/CLI evidence only. No GUI logging widget or interaction changed, and diagnostic projection does not change model integrity, installation state or retry authority.
+
+The throwaway Windows probe used the established Python 3.14.7 environment with this worktree's `src` on `PYTHONPATH`. It launched the real `run-headless` composition and independent authenticated CLI clients. Only controlled fixture inputs were supplied at the existing provisioning factory: a temporary model root and manifest source URLs directed to a loopback HTTP server returning 503 with private URL/body sentinels. The normal installer, provisioning owner, control host, logging ingress and CLI were exercised. Settings, discovery/data and empty encrypted-file secrets were temporary; provider credential fallbacks were removed, telemetry and OSC were off, and no capture was requested.
+
+| Observation | Merged baseline | Retained correction |
+| --- | --- | --- |
+| `models.install` for CPU `qwen3-asr-0.6b-int8-sherpa` | Terminal `degraded`, CLI exit 4 | Same terminal status and exit code |
+| Effective model state | Integrity `missing`, operation `download_failed` | Unchanged |
+| Operation-filtered `diagnostics.history` | `not_retained`, no records; unfiltered history also empty | One `local_asr_install_failed` record, category `service_unavailable`, HTTP status 503 |
+| Failure identity and projections | No retained diagnostic identity | Admission operation/request and generation 1 retained; authenticated `logs follow` replay and the selected main-file JSON equal the history record |
+| Privacy and host shutdown | Private URL/body markers absent; owned host exit 0 | Private URL/body markers and personal paths absent from selected diagnostic projections; owned host exit 0 |
+
+Baseline instance: `606b949a-bb9f-4317-9c1e-59cc9d502229`, operation `b23498816be746169728a779649cc742`. Final source-composed instance: `77be846c-4675-47d1-b519-fb9098327449`, operation `e465794c444b43b0b29cc1f79a8cb7e3`, request `76a8c78d9f56a0d17c225fe218b4fb92`, diagnostic `ccd2a19552174d09b1ea79efd4ee8b1d`. A diagnostic-ID lookup returned that same record. Cause/exception classes unsupported by the merged finite catalog intentionally remain `unclassified`; the typed HTTP status/category is not lost and no exception-class catalog was widened. Observed selected file bytes establish the matching projection, not fsync or durable persistence; `file_evidence` remains `unknown`.
+
+### Regression coverage and limits
+
+The eight affected/adjacent behavior suites passed **155 tests in 50.64 seconds** using the established interpreter and this worktree's source:
+
+```text
+tests/core/test_local_stt_runtime_installer.py
+tests/core/runtime/test_local_asr_provisioning.py
+tests/core/test_diagnostics.py
+tests/core/test_diagnostic_delivery.py
+tests/core/test_runtime_logging.py
+tests/core/test_speech_diagnostic_causes.py
+tests/app/test_application_control_contract.py
+tests/app/test_local_asr_gpu_provisioning.py
+```
+
+The installer regression distinguishes the first failing source from the fallback source. Owner regressions cover native HTTP versus misleading arbitrary exception prose, private metadata exclusion across history/event/file, preserved admission identity after its context expires while an unrelated operation is active, validated model identity/generation, unchanged failed integrity, and normal cancellation without a failure record. The existing delivery suite covers repeated projections retaining one failure identity. An initial cancellation-test attempt wrongly assumed an empty file must exist; that test-only assumption was removed without changing runtime behavior.
+
+No GUI run is claimed because the Basic/view surface is unchanged. Real model downloads, disk exhaustion, physical microphone/GPU/OpenVR/HMD execution, paid-provider health and excluded desktop/Beta behavior were not exercised or required. Verification above was completed in the source worktree before committing or publishing. No merge, deployment or release is implied by this evidence. Logging ownership and architecture boundaries remain unchanged.
+
+After the final test-only import-order correction, the whole provisioning-owner module passed **19 tests in 0.48 seconds**, and Ruff passed for all six affected Python files. Black formatted the changed owner file and left the other five affected Python files unchanged.
+
+A pre-publication Black check also reported all six affected Python files unchanged.
+

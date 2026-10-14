@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 import threading
 import time
 from collections import deque
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from pathlib import Path
 
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
@@ -62,6 +66,8 @@ GPUManifestLoader = Callable[[], LocalSTTAssetManifest]
 ProvisioningInstaller = Callable[..., Awaitable[InstalledLocalSTTManifest]]
 ProvisioningResidueCleaner = Callable[..., tuple[Path, ...] | None]
 DownloadRuntimeFactory = Callable[[], LocalSTTDownloadRuntime]
+
+logger = logging.getLogger(__name__)
 
 
 class LocalASRProvisioningOwner:
@@ -243,12 +249,14 @@ class LocalASRProvisioningOwner:
         self._require_open("start install")
         self._validate_request(request)
         runtime = self._runtime_for(request.backend)
+        diagnostic_identity = current_diagnostic_operation()
         task = runtime.start(
             origin=request.origin,
             run_download=lambda cancel_event, generation: self._run_install(
                 request,
                 cancel_event=cancel_event,
                 generation=generation,
+                diagnostic_identity=diagnostic_identity,
             ),
         )
         if result_handler is not None:
@@ -394,6 +402,7 @@ class LocalASRProvisioningOwner:
         *,
         cancel_event: threading.Event,
         generation: int,
+        diagnostic_identity: dict[str, str | None],
     ) -> LocalASRInstallResult:
         await self._ensure_startup_cleanup(
             wait_for_lease=True,
@@ -498,6 +507,20 @@ class LocalASRProvisioningOwner:
                     break
                 except Exception as exc:
                     failed.append(model_id)
+                    native = provider_failure_report(
+                        exc, provider="local_asr", operation="models.install"
+                    ).diagnostics
+                    diagnostics = replace(
+                        native,
+                        component="local_asr_provisioning",
+                        code="local_asr_install_failed",
+                        visibility="diagnostic_only",
+                        fields={**native.fields, "model_id": model_id},
+                        operation_id=diagnostic_identity.get("operation_id"),
+                        request_id=diagnostic_identity.get("request_id"),
+                        generation=generation,
+                    )
+                    emit_failure(logger, diagnostics, disposition="failed", stage="installation")
                     await self._restore_integrity_after_interruption(request.backend, model_id)
                     self._set_operation(model_id, operation="download_failed")
                     await self._emit_diagnostic(

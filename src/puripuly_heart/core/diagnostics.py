@@ -19,6 +19,10 @@ from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.diagnostic_codes import is_supported_diagnostic_code
 from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
 from puripuly_heart.core.lifecycle import LIFECYCLE_SHUTDOWN_PHASE_ORDER
+from puripuly_heart.core.local_stt_assets import (
+    LOCAL_QWEN_GPU_MODEL_ID,
+    REQUIRED_CPU_LOCAL_STT_MODEL_IDS,
+)
 from puripuly_heart.core.messages import DIAGNOSTIC_CATEGORIES, SEVERITIES, ErrorDiagnostics
 from puripuly_heart.core.network_diagnostics import TRANSPORT_ENUM_FIELDS, TRANSPORT_NUMERIC_FIELDS
 from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_operation_id
@@ -143,6 +147,7 @@ _ENUM_FIELDS = {
     **TRANSPORT_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "channel": frozenset({"self", "peer"}),
+    "model_id": frozenset((*REQUIRED_CPU_LOCAL_STT_MODEL_IDS, LOCAL_QWEN_GPU_MODEL_ID)),
     "destination": frozenset(
         {
             "conversation_feed",
@@ -406,6 +411,7 @@ _COMPONENTS = frozenset(
         "managed_connection_auth",
         "qq_managed_auth",
         "manual_typing",
+        "local_asr_provisioning",
     }
 )
 _BOUNDARIES = (
@@ -436,6 +442,7 @@ _BOUNDARIES = (
             "source_read",
             "probe",
             "translate",
+            "installation",
             "save",
             "settings_save",
             "rollback",

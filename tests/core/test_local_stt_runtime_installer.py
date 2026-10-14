@@ -14,6 +14,7 @@ import threading
 import time
 from pathlib import Path
 
+import httpx
 import pytest
 from puripuly_heart.core.local_stt_assets import (
     InstalledLocalSTTManifest,
@@ -320,7 +321,7 @@ async def test_ensure_local_stt_installed_raises_after_both_sources_fail(
     )
     statuses: list[RuntimeLocalSTTStatusUpdate] = []
 
-    with pytest.raises(LocalSTTRuntimeInstallError):
+    with pytest.raises(LocalSTTRuntimeInstallError) as caught:
         await ensure_local_stt_installed(
             preferred_source="huggingface",
             model_root=temp_dir / "appdata" / "models",
@@ -331,6 +332,9 @@ async def test_ensure_local_stt_installed_raises_after_both_sources_fail(
     assert statuses[0] == RuntimeLocalSTTStatusUpdate(status="downloading", percent=0)
     assert statuses[-1] == RuntimeLocalSTTStatusUpdate(status="download_failed", percent=None)
     assert not ((temp_dir / "appdata" / "models") / manifest.install_dirname).exists()
+    assert isinstance(caught.value.__cause__, httpx.HTTPStatusError)
+    assert caught.value.__cause__.response.status_code == 404
+    assert caught.value.__cause__.request.url.path == "/missing-a/model.int8.onnx"
 
 
 @pytest.mark.asyncio

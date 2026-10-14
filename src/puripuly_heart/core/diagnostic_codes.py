@@ -23,6 +23,7 @@ DOMAIN_CODES = (
             "worker_cleanup_failed",
             "startup_cleanup_failed",
             "worker_startup_failed",
+            "local_asr_install_failed",
             "worker_activation_failed",
             "worker_startup_cancelled",
             "worker_executable_missing",

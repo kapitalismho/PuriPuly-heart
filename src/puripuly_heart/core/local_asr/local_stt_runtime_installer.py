@@ -527,6 +527,7 @@ async def _ensure_local_stt_installed_with_lease(
 
     _raise_if_cancelled(cancel_event)
     failures: list[str] = []
+    first_error: Exception | None = None
     last_progress_percent: int | None = None
 
     for source_name in _source_order(
@@ -588,8 +589,12 @@ async def _ensure_local_stt_installed_with_lease(
             shutil.rmtree(staging_dir, ignore_errors=True)
             raise
         except Exception as exc:
+            if first_error is None:
+                first_error = exc
             failures.append(f"{source_name}: {exc}")
             shutil.rmtree(staging_dir, ignore_errors=True)
 
     await _emit_status(on_status, "download_failed", percent=None)
-    raise LocalSTTRuntimeInstallError("; ".join(failures) or "runtime local STT install failed")
+    raise LocalSTTRuntimeInstallError(
+        "; ".join(failures) or "runtime local STT install failed"
+    ) from first_error

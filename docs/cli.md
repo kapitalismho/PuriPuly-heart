@@ -321,6 +321,8 @@ The same record is available as `diagnostic` on `logs` events with `kind: failur
 
 `gpu.status.runtime.startup_cleanup` reports pending startup cleanup, confirmed completion, and bounded safe cleanup failures. Missing owner evidence is unavailable, not proof that an absent worker was fully closed. `app.status.scene_observation` distinguishes a successful process probe from a failed observation; a failed enumeration cannot establish that VRChat is not running. Neither query exposes process command lines, participant identities, or raw scene logs.
 
+Existing ASR model installation failures retain `local_asr_provisioning` / `models.install` / `local_asr_install_failed` evidence with the validated model ID, installation generation, and originating operation/request IDs when known. Exhausting the existing source fallback preserves the first native cause; typed HTTP status and transport classification are retained without parsing exception prose. Query by the install operation ID or replay `logs` to inspect this file-only technical evidence. Basic installation summaries, model integrity, terminal install status, source fallback and cancellation behavior are unchanged; the diagnostic does not authorize a retry.
+
 ### Bounds, gaps, and restart
 
 | Surface | Bound |
