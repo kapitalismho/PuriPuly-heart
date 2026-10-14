@@ -458,7 +458,7 @@ export async function markReservedIssueReferralFailed(
   },
 ): Promise<void> {
   assertIssueReferralFailureReason(input.failureReason);
-  await db
+  const result = await db
     .prepare(
       `UPDATE referral_rewards
           SET referred_bonus_status = 'failed',
@@ -480,12 +480,14 @@ export async function markReservedIssueReferralFailed(
       input.referredInstallationId,
     )
     .run();
-  logReferralRewardOutcome({
-    outcome: 'failed',
-    referralId: input.referralId,
-    referredInstallationId: input.referredInstallationId,
-    reason: input.failureReason,
-  });
+  if (Number(result.meta.changes ?? 0) > 0) {
+    logReferralRewardOutcome({
+      outcome: 'failed',
+      referralId: input.referralId,
+      referredInstallationId: input.referredInstallationId,
+      reason: input.failureReason,
+    });
+  }
 }
 
 export async function markReservedIssueReferralCredited(

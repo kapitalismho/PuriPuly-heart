@@ -564,6 +564,8 @@ _BOUNDARIES = (
             "overlay.position.reset",
             "overlay.calibrate",
             "typing_state",
+            "typing_reason",
+            "typing_clear",
             "chatbox_page",
             "ui_event_delivery",
             "settings_replace",

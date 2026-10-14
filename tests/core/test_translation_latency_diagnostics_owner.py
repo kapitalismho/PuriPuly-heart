@@ -627,7 +627,7 @@ def test_owner_sanitizes_stt_failure_and_tracks_overlay_failure_state() -> None:
             default_channel="self",
         )
     )
-    owner.record_overlay_sink_failure("RuntimeError")
+    owner.record_overlay_sink_failure()
 
     combined = "\n".join(logging.basic + logging.detailed)
     assert "private speech" not in combined

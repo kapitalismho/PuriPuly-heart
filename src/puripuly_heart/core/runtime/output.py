@@ -679,7 +679,13 @@ class OutputRuntime:
             publication_id=str(publication_id),
             publication_kind=publication_kind,
             reason=None,
-            metadata={"channel": channel, **publication_metadata},
+            metadata={
+                "channel": channel,
+                "stage": "paginator_handoff",
+                "outcome": "accepted",
+                "physical_ack": False,
+                **publication_metadata,
+            },
             message=message,
         )
 
@@ -687,84 +693,45 @@ class OutputRuntime:
         self,
         reason: str,
         active: bool,
-    ) -> OutputPublicationResult:
-        operation_uuid = uuid4()
+    ) -> None:
         if self._state != "open":
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SELF_CHATBOX,
-                publication_id=str(operation_uuid),
-                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
-                reason=(
-                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
-                ),
-                metadata={"channel": "self", "state": self._state, "operation": "typing_reason"},
-            )
+            return
         try:
             self.chatbox.set_typing_reason(reason, active)
         except Exception as exc:
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SELF_CHATBOX,
-                publication_id=str(operation_uuid),
-                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
-                reason="destination_publish_failed",
-                metadata={
-                    "channel": "self",
-                    "operation": "typing_reason",
-                    "active": active,
-                    "error_type": safe_exception_fields(exc)["exception_class"],
-                    **safe_exception_fields(exc),
-                },
-            )
-        return self._observe_result(
-            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
-            route=OUTPUT_ROUTE_SELF_CHATBOX,
-            publication_id=str(operation_uuid),
-            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
-            reason=None,
-            metadata={"channel": "self", "operation": "typing_reason", "active": active},
-        )
+            self._emit_typing_failure("typing_reason", exc)
 
     def clear_self_chatbox_typing_reasons(
         self,
-    ) -> OutputPublicationResult:
-        operation_uuid = uuid4()
+    ) -> None:
         if self._state != "open":
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SELF_CHATBOX,
-                publication_id=str(operation_uuid),
-                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
-                reason=(
-                    "output_runtime_closed" if self._state == "closed" else "output_runtime_closing"
-                ),
-                metadata={"channel": "self", "state": self._state, "operation": "typing_clear"},
-            )
+            return
         try:
             self.chatbox.clear_typing_reasons()
         except Exception as exc:
-            return self._observe_result(
-                status=OUTPUT_ROUTING_DECISION_SKIPPED,
-                route=OUTPUT_ROUTE_SELF_CHATBOX,
-                publication_id=str(operation_uuid),
-                publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
-                reason="destination_publish_failed",
-                metadata={
-                    "channel": "self",
-                    "operation": "typing_clear",
-                    "error_type": safe_exception_fields(exc)["exception_class"],
-                    **safe_exception_fields(exc),
-                },
-            )
-        return self._observe_result(
-            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
-            route=OUTPUT_ROUTE_SELF_CHATBOX,
-            publication_id=str(operation_uuid),
-            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
-            reason=None,
-            metadata={"channel": "self", "operation": "typing_clear"},
+            self._emit_typing_failure("typing_clear", exc)
+
+    @staticmethod
+    def _emit_typing_failure(operation: str, exception: Exception) -> None:
+        origin = current_diagnostic_operation()
+        diagnostics = ErrorDiagnostics(
+            component="output_runtime",
+            operation=operation,
+            code="destination_publish_failed",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={
+                "destination": OUTPUT_ROUTE_SELF_CHATBOX,
+                **safe_exception_fields(exception),
+            },
+            channel="self",
+            operation_id=origin["operation_id"],
+            request_id=origin["request_id"],
         )
+        emit_failure(logger, diagnostics, disposition="degraded", stage="typing_state")
 
     def publish_system_disclosure_chatbox(
         self,
@@ -828,7 +795,12 @@ class OutputRuntime:
             publication_id=str(disclosure_uuid),
             publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
             reason=None,
-            metadata={"channel": "system"},
+            metadata={
+                "channel": "system",
+                "stage": "paginator_handoff",
+                "outcome": "accepted",
+                "physical_ack": False,
+            },
             message=message,
         )
 
@@ -913,7 +885,13 @@ class OutputRuntime:
             publication_id=str(disclosure_uuid),
             publication_kind=PUBLICATION_KIND_SYSTEM_DISCLOSURE,
             reason=None,
-            metadata={"channel": "system", "delivery": "immediate"},
+            metadata={
+                "channel": "system",
+                "delivery": "immediate",
+                "stage": "local_send",
+                "outcome": "sent",
+                "physical_ack": False,
+            },
         )
 
     async def publish_overlay_event(
@@ -1118,6 +1096,7 @@ class OutputRuntime:
                 "stage": resolved_receipt.stage,
                 "outcome": resolved_receipt.outcome,
                 "scene_revision": resolved_receipt.scene_revision,
+                "physical_ack": False,
             },
         )
 
@@ -2026,6 +2005,12 @@ class OutputRuntime:
                 ),
                 "event_type": event_type,
                 "accepted_handoff": accepted_handoff,
+                "stage": "ui_queue" if ui_queue_submitted else "admission",
+                "outcome": (
+                    "submitted"
+                    if ui_queue_submitted
+                    else "accepted" if accepted_handoff else "rejected"
+                ),
                 "ui_queue_submitted": ui_queue_submitted,
                 "physical_ack": False,
             },

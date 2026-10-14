@@ -278,18 +278,20 @@ export async function failManagedOperationTerminal(
 
 export async function expireManagedOperation(db: D1Database, operation: ManagedOperationRecord, now: Date): Promise<void> {
   const nowIso = now.toISOString();
-  logManagedOperationEvent('managed_operation_expired', {
-    operation_id: operation.operation_id,
-    issue_source: operation.issue_source,
-    state: operation.state,
-    failure_reason: 'authorization_expired',
-  });
-  await db
+  const result = await db
     .prepare(
       `UPDATE managed_operations SET state = 'FAILED', failure_reason = 'authorization_expired', client_action = 'action_required', updated_at = ? WHERE operation_id = ? AND state <> 'ACTIVE' AND state <> 'FAILED'`,
     )
     .bind(nowIso, operation.operation_id)
     .run();
+  if (Number(result.meta.changes ?? 0) > 0) {
+    logManagedOperationEvent('managed_operation_expired', {
+      operation_id: operation.operation_id,
+      issue_source: operation.issue_source,
+      state: 'FAILED',
+      failure_reason: 'authorization_expired',
+    });
+  }
   const current = await getManagedOperation(db, operation.operation_id);
   const acknowledged = await hasAcknowledgedOperationDelivery(db, operation.operation_id);
   if (current && current.referral_status === 'reserved' && !acknowledged) {
@@ -752,11 +754,13 @@ export async function sweepStaleManagedOperations(
     await transitionManagedOperation(db, operation.operation_id, 'RETRY_READY', now, { from: ['CLEAN'] });
     retryReady += 1;
   }
-  logManagedOperationEvent('managed_operation_sweep_completed', {
-    expired,
-    reconciled,
-    retry_ready: retryReady,
-  });
+  if (expired || reconciled || retryReady) {
+    logManagedOperationEvent('managed_operation_sweep_completed', {
+      expired,
+      reconciled,
+      retry_ready: retryReady,
+    });
+  }
   return { expired, reconciled, retryReady };
 }
 

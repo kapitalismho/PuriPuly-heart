@@ -9,6 +9,7 @@ from uuid import uuid4
 import pytest
 
 from puripuly_heart.core.clock import FakeClock
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.overlay.presenter import (
     PEER_REPLACEMENT_INTERVAL_SECONDS,
@@ -400,10 +401,11 @@ async def test_output_runtime_owns_typing_and_immediate_system_side_effects() ->
     owner = OutputRuntime(chatbox=chatbox, clock=FakeClock(_now=10.0))
 
     await owner.start()
-    typing_on = owner.set_self_chatbox_typing_reason("manual_input", True)
-    typing_off = owner.set_self_chatbox_typing_reason("manual_input", False)
+    owner.set_self_chatbox_typing_reason("manual_input", True)
+    owner.set_self_chatbox_typing_reason("manual_input", False)
     owner.set_self_chatbox_typing_reason("manual_submit:1", True)
-    typing_clear = owner.clear_self_chatbox_typing_reasons()
+    owner.clear_self_chatbox_typing_reasons()
+    assert owner.routing_decisions == ()
     disclosure_id = uuid4()
     immediate = owner.publish_system_immediate_chatbox(
         text="PuriPuly ON!",
@@ -414,19 +416,12 @@ async def test_output_runtime_owns_typing_and_immediate_system_side_effects() ->
         disclosure_id=disclosure_id,
     )
 
-    assert typing_on.decision.decision == "published"
-    assert typing_off.decision.decision == "published"
-    assert typing_clear.decision.decision == "published"
     assert immediate.decision.decision == "published"
     assert duplicate.decision.reason == "duplicate_publication"
     assert chatbox.typing_reasons == set()
     assert chatbox.clear_typing_reasons_calls == 1
     assert chatbox.immediate_messages == ["PuriPuly ON!"]
     assert [decision.metadata["channel"] for decision in owner.routing_decisions] == [
-        "self",
-        "self",
-        "self",
-        "self",
         "system",
         "system",
     ]
@@ -547,16 +542,14 @@ async def test_disabled_activation_notices_leave_self_pagination_typing_and_over
         translation_text=None,
         include_source=True,
     )
-    typing_on = owner.set_self_chatbox_typing_reason("manual_input", True)
+    owner.set_self_chatbox_typing_reason("manual_input", True)
     immediate = owner.publish_system_immediate_chatbox(text="PuriPuly ON!")
     disclosure = owner.publish_system_disclosure_chatbox(text="Listen peer disclosure")
     event = _overlay_event(event_id="self-with-notices-off", channel="self")
     overlay_result = await owner.publish_overlay_event(event)
-    typing_off = owner.set_self_chatbox_typing_reason("manual_input", False)
+    owner.set_self_chatbox_typing_reason("manual_input", False)
 
     assert ordinary.decision.decision == "published"
-    assert typing_on.decision.decision == "published"
-    assert typing_off.decision.decision == "published"
     assert overlay_result.decision.decision == "published"
     assert overlay.events == [event]
     assert sender.typing == [True, False]
@@ -577,17 +570,28 @@ async def test_disabled_activation_notices_leave_self_pagination_typing_and_over
 
 
 @pytest.mark.asyncio
-async def test_output_runtime_isolates_typing_and_immediate_failures() -> None:
+async def test_output_runtime_isolates_typing_and_immediate_failures(caplog) -> None:
     OutputRuntime = _output_runtime_class()
     owner = OutputRuntime(chatbox=FailingChatboxControls(), clock=FakeClock(_now=10.0))
 
     await owner.start()
-    typing = owner.set_self_chatbox_typing_reason("manual_input", True)
-    clear = owner.clear_self_chatbox_typing_reasons()
+    owner.set_self_chatbox_typing_reason("manual_input", True)
+    owner.clear_self_chatbox_typing_reasons()
     immediate = owner.publish_system_immediate_chatbox(text="secret-system-text")
 
-    assert typing.decision.reason == "destination_publish_failed"
-    assert clear.decision.reason == "destination_publish_failed"
+    diagnostics = [
+        getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+        for record in caplog.records
+        if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+    ]
+    assert [diagnostic.operation for diagnostic in diagnostics] == [
+        "typing_reason",
+        "typing_clear",
+        "publish",
+    ]
+    assert all(diagnostic.code == "destination_publish_failed" for diagnostic in diagnostics)
+    assert all("publication_id" not in diagnostic.fields for diagnostic in diagnostics[:2])
+    assert len(owner.routing_decisions) == 1
     assert immediate.decision.reason == "destination_publish_failed"
     assert "secret-system-text" not in repr(immediate.decision)
 
@@ -600,12 +604,10 @@ async def test_output_runtime_rejects_typing_and_immediate_after_close() -> None
 
     await owner.start()
     await owner.close()
-    typing = owner.set_self_chatbox_typing_reason("manual_input", True)
-    clear = owner.clear_self_chatbox_typing_reasons()
+    owner.set_self_chatbox_typing_reason("manual_input", True)
+    owner.clear_self_chatbox_typing_reasons()
     immediate = owner.publish_system_immediate_chatbox(text="PuriPuly ON!")
 
-    assert typing.decision.reason == "output_runtime_closed"
-    assert clear.decision.reason == "output_runtime_closed"
     assert immediate.decision.reason == "output_runtime_closed"
     assert chatbox.typing == []
     assert chatbox.clear_typing_reasons_calls == 1
@@ -2324,9 +2326,16 @@ async def test_optional_observer_loss_does_not_change_local_publication_outcome(
     assert result.decision.decision == "published"
     assert chatbox.messages[0].utterance_id == publication_id
     assert owner.routing_decisions[-1] is result.decision
+    await owner.publish_chatbox(
+        publication_id=uuid4(),
+        channel="self",
+        transcript_text="second synthetic private text",
+        translation_text=None,
+        include_source=True,
+    )
     health = owner.diagnostic_delivery_health
     assert health["observer"] == "degraded"
-    assert health["observer_failure_count"] >= 1
-    assert health["owner_history_evictions"] >= 1
+    assert health["observer_failure_count"] == 2
+    assert health["owner_history_evictions"] == 1
     assert "forbidden-observer-body" not in repr(health)
     await owner.close()

@@ -718,15 +718,8 @@ class TranslationLatencyDiagnosticsOwner:
             sink_type=diagnostic.sink_type,
         )
 
-    def record_overlay_sink_failure(self, error_type: object) -> None:
+    def record_overlay_sink_failure(self) -> None:
         self._last_error_source = "overlay_sink"
-        self.emit(
-            RuntimeDiagnostic(
-                message="[Translation] Overlay sink emit failed: %s",
-                args=(error_type,),
-                level=logging.ERROR,
-            )
-        )
 
     def record_overlay_sink_duration(
         self,

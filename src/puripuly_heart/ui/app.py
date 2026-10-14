@@ -2451,13 +2451,8 @@ class TranslatorApp:
         state: str,
         failure_reason: str | None = None,
     ) -> None:
-        previous_state = getattr(self, "overlay_state", "unknown")
-        self._log_basic(f"[Overlay] State changed: {previous_state} -> {state}")
         self.overlay_state = state
         self.overlay_failure_reason = failure_reason
-        self._log_diagnostic(
-            f"[Overlay] State detail: overlay_state={state} failure_reason={failure_reason}"
-        )
         self._sync_settings_overlay_runtime_state()
         self.refresh_overlay_peer_contract()
 

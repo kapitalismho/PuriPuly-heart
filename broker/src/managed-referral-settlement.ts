@@ -762,7 +762,7 @@ function logSettlementEvent(
   job: ClaimedJob,
   extra: Record<string, string | number | null> = {},
 ): void {
-  (event === 'managed_referral_settlement_released' ? console.warn : console.info)(event, {
+  (event === 'managed_referral_settlement_release_attempted' ? console.warn : console.info)(event, {
     settlement_job_id: job.id,
     source: job.source,
     referral_reward_id: job.referral_reward_id,
@@ -858,7 +858,7 @@ async function retryClaim(db: D1Database, job: ClaimedJob, now: Date, errorCode:
 }
 
 async function releaseManagedReferralSettlementJob(db: D1Database, job: ClaimedJob, now: Date, errorCode: string): Promise<void> {
-  logSettlementEvent('managed_referral_settlement_released', job, { error_code: errorCode.slice(0, 64) });
+  logSettlementEvent('managed_referral_settlement_release_attempted', job, { error_code: errorCode.slice(0, 64) });
   const delayMs = Math.min(MAX_RETRY_DELAY_MS, INITIAL_RETRY_DELAY_MS * 2 ** Math.min(job.attempt_count, 6));
   const nextAttemptAt = new Date(now.getTime() + delayMs).toISOString();
   await db

@@ -159,9 +159,9 @@ class ChatboxPaginator:
         """Forward typing indicator to the OSC sender."""
         self._legacy_typing_active = bool(is_typing)
         if not is_typing and self._typing_reasons:
-            self._apply_typing_state()
+            self._apply_typing_state(operation="typing_state")
             return
-        self._send_typing_state(self._is_typing_active())
+        self._send_typing_state(self._is_typing_active(), operation="typing_state")
 
     def set_typing_reason(self, reason: str, active: bool) -> None:
         reason = reason.strip()
@@ -178,23 +178,25 @@ class ChatboxPaginator:
         if not self._typing_reasons and self._last_typing_state == self._is_typing_active():
             return
         self._typing_reasons.clear()
-        self._apply_typing_state()
+        self._apply_typing_state(operation="typing_clear")
 
     def _is_typing_active(self) -> bool:
         return self._legacy_typing_active or bool(self._typing_reasons)
 
-    def _apply_typing_state(self, *, was_typing: bool | None = None) -> None:
+    def _apply_typing_state(
+        self, *, was_typing: bool | None = None, operation: str = "typing_reason"
+    ) -> None:
         is_typing = self._is_typing_active()
         previous = self._last_typing_state if was_typing is None else was_typing
         if is_typing != previous or is_typing != self._last_typing_state:
-            self._send_typing_state(is_typing)
+            self._send_typing_state(is_typing, operation=operation)
 
-    def _send_typing_state(self, is_typing: bool) -> None:
+    def _send_typing_state(self, is_typing: bool, *, operation: str) -> None:
         try:
             self.sender.send_typing(is_typing)
             self._last_typing_state = bool(is_typing)
         except OSError as exc:
-            self._emit_local_send_failure("typing_state", exc)
+            self._emit_local_send_failure("typing_state", exc, operation=operation)
 
     def drop_pending(self) -> None:
         """Drop queued chatbox pages/messages during output runtime shutdown."""
@@ -220,10 +222,11 @@ class ChatboxPaginator:
         self._active_message = None
         self._active_page_index = 0
         self._active_page_count = 0
-        self._emit_basic(
-            "[Basic][OSC] chatbox backlog dropped on output shutdown "
-            f"pages={dropped_pages} messages={dropped_messages}"
-        )
+        if dropped_pages or dropped_messages:
+            self._emit_basic(
+                "[Basic][OSC] chatbox backlog dropped on output shutdown "
+                f"pages={dropped_pages} messages={dropped_messages}"
+            )
 
     def _is_paginating(self) -> bool:
         return bool(self._pending_pages)
@@ -495,14 +498,19 @@ class ChatboxPaginator:
         )
 
     def _emit_local_send_failure(
-        self, stage: str, exception: OSError, *, message: OSCMessage | None = None
+        self,
+        stage: str,
+        exception: OSError,
+        *,
+        message: OSCMessage | None = None,
+        operation: str = "publish",
     ) -> None:
-        diagnostics = self._local_send_diagnostics(exception, message=message)
+        diagnostics = self._local_send_diagnostics(exception, message=message, operation=operation)
         emit_failure(logger, diagnostics, severity="warning", disposition="degraded", stage=stage)
 
     @staticmethod
     def _local_send_diagnostics(
-        exception: OSError, *, message: OSCMessage | None = None
+        exception: OSError, *, message: OSCMessage | None = None, operation: str = "publish"
     ) -> ErrorDiagnostics:
         active = message
         fields = {
@@ -514,7 +522,7 @@ class ChatboxPaginator:
             fields["publication_id"] = str(active.utterance_id)
         return ErrorDiagnostics(
             component="osc_control",
-            operation="publish",
+            operation=operation,
             code="osc_local_send_failed",
             category="network",
             visibility="basic",

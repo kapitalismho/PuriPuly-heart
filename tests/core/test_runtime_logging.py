@@ -37,7 +37,6 @@ from puripuly_heart.core.observability import (
     ProviderObservationEvent,
     RuntimeLogEvent,
 )
-from puripuly_heart.core.output.models import OutputRoutingDecision
 from puripuly_heart.core.runtime.logging import (
     LIVE_AUDIENCE_BASIC,
     LIVE_AUDIENCE_RECORD_ATTRIBUTE,
@@ -1269,48 +1268,6 @@ def test_session_runtime_logging_preserves_text_when_observability_cleanup_fails
         assert stream.getvalue().splitlines() == ["legacy text survives cleanup failure"]
         assert runner.awaitables == [sink.awaitable]
         assert sink.awaitable.closed is True
-    finally:
-        runtime_logging.close()
-
-
-@pytest.mark.asyncio
-async def test_session_runtime_logging_observes_destination_result_in_basic() -> None:
-    runtime_logging, stream = _make_runtime_logging_capture()
-    decision = OutputRoutingDecision(
-        decision="denied",
-        route="self_chatbox",
-        publication_id="peer-utterance-1",
-        publication_kind="peer_subtitle",
-        reason="peer_chatbox_denied",
-        metadata={
-            "channel": "peer",
-            "stage": "logical_pacing",
-            "outcome": "waiting",
-            "physical_ack": False,
-            "wait_reason": "protected_rows",
-            "handoff_wait_ms": 1250,
-            "pending_batches": 3,
-            "unsafe": "secret peer transcript",
-        },
-    )
-
-    try:
-        await runtime_logging.observe_output_routing(decision)
-
-        log_text = stream.getvalue()
-        assert "[Output] destination_result" in log_text
-        assert "decision=denied" in log_text
-        assert "route=self_chatbox" in log_text
-        assert "publication_kind=peer_subtitle" in log_text
-        assert "reason=peer_chatbox_denied" in log_text
-        assert "stage=logical_pacing" in log_text
-        assert "outcome=waiting" in log_text
-        assert "physical_ack=false" in log_text
-        assert "wait_reason=protected_rows" in log_text
-        assert "handoff_wait_ms=1250" in log_text
-        assert "pending_batches=3" in log_text
-        assert "unsafe" not in log_text
-        assert "secret peer transcript" not in log_text
     finally:
         runtime_logging.close()
 

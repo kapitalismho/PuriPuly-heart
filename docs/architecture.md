@@ -205,6 +205,7 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
 - Destinations have independent bounded delivery. A destination failure must not block other destinations or replay recognition and translation.
 - Presentation does not gate translation execution. Output receipts distinguish application handoff from presentation, not physical display.
 - Publication/turn and explicitly admitted operation/request identities cross each destination boundary unchanged. Optional observer failure is separate delivery-health evidence, not a new translation failure. OSC owners retain a failed publication obligation until actual local sends complete it; an empty or unrelated delta and old cache equality cannot establish recovery. No local send acknowledges remote receipt.
+- Chatbox typing reasons are control state, not utterance publications. Repeated input activity creates no publication identity or routing observation; the paginator still owns aggregate typing transitions and local-send failure evidence.
 - Caption and overlay preferences control destinations, not capture.
 - Runtime errors use the shared dashboard error path; interactive validation stays on its owning surface.
 
@@ -234,6 +235,7 @@ Behavior: `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.
 - Record identity, occurrence time, and known cause links survive projection. Operation/request identity is carried explicitly through admitted asynchronous work; channel, turn, provider epoch, and generation remain source-owner authority. An expired command context cannot assign unrelated later work to that command.
 - Ingress validates bounded metadata before memory, CLI, and file projection. Unknown causes stay unknown; optional-detail rejection remains observable without erasing permitted code or identity. Rendered prose is not a classification source.
 - One retained fact supplies the permitted Basic summary, selected main-file metadata, CLI observation, and receipt reference. Basic/file-only audiences remain distinct; no Detailed mode is introduced.
+- Rendered output logs select meaningful effects rather than mirror every owner decision. Expected policy/no-op decisions remain in bounded owner history without routine log rows; intermediate overlay handoff/pacing evidence is file-only. Typed output failures are not repeated as generic destination or translation-error summaries, and GUI overlay notifications do not duplicate owner lifecycle logs.
 - File delivery is asynchronous and bounded. Live health observes queue, writer, rejection, and subscriber loss independently of writing to the failed sink. Enqueue, write, and durable persistence are distinct; current-run history is not a durable audit.
 - Technical diagnostics exclude credentials, user text, audio, arbitrary exception/child content, and personal paths. Accepted conversation records retain their separate secret-protected path and explicit CLI content opt-ins.
 - Timing records describe application-observable stages, not physical display.

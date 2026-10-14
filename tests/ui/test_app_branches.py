@@ -3597,7 +3597,7 @@ def test_toggle_handlers_do_not_log_click_requests() -> None:
     assert controller.detailed_messages == []
 
 
-def test_on_overlay_state_changed_routes_runtime_logs() -> None:
+def test_on_overlay_state_changed_synchronizes_every_notification_without_duplicate_logs() -> None:
     controller = RuntimeLoggingController()
     app = TranslatorApp.__new__(TranslatorApp)
     app._ui_application = compose_test_ui_application_boundary(controller)
@@ -3615,12 +3615,16 @@ def test_on_overlay_state_changed_routes_runtime_logs() -> None:
     )
 
     app.on_overlay_state_changed(state="failed", failure_reason="runtime_crashed")
+    app.on_overlay_state_changed(state="failed", failure_reason="runtime_crashed")
 
-    assert controller.basic_messages == ["[Overlay] State changed: off -> failed"]
-    assert controller.detailed_messages == [
-        "[Overlay] State detail: overlay_state=failed failure_reason=runtime_crashed"
+    assert controller.basic_messages == []
+    assert controller.detailed_messages == []
+    assert app.overlay_state == "failed"
+    assert app.overlay_failure_reason == "runtime_crashed"
+    assert seen == [
+        ("failed", "runtime_crashed", None, False),
+        ("failed", "runtime_crashed", None, False),
     ]
-    assert seen == [("failed", "runtime_crashed", None, False)]
 
 
 @pytest.mark.asyncio

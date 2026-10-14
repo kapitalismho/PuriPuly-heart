@@ -217,6 +217,15 @@ class RealtimeLogHandler(logging.Handler):
 
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]
+_OUTPUT_STAGE_TOKENS = {
+    "decision": frozenset({"accepted", "waiting"}),
+    "route": frozenset({"subtitle_overlay"}),
+    "reason": frozenset({"accepted_handoff", "logical_pacing_wait"}),
+    "stage": frozenset({"admission_accepted", "logical_pacing"}),
+    "outcome": frozenset({"pending", "waiting"}),
+    "physical_ack": frozenset({"false"}),
+    "wait_reason": frozenset({"replacement_gate", "protected_rows"}),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -317,6 +326,7 @@ def _is_metadata_only_text(message: str) -> bool:
         }
         and not known_stage
         and not is_supported_diagnostic_code(event, frozenset())
+        and not (tags == ["Output"] and event == "destination_stage")
     ):
         return False
     for token in tokens[1:]:
@@ -332,6 +342,19 @@ def _is_metadata_only_text(message: str) -> bool:
             value in {"none", "unclassified"} or validator(value) == value
         ):
             continue
+        if tags == ["Output"] and event == "destination_stage":
+            if key in _OUTPUT_STAGE_TOKENS:
+                if value not in _OUTPUT_STAGE_TOKENS[key]:
+                    return False
+                continue
+            if key == "publication_id" and re.fullmatch(r"evt-[0-9]{1,20}", value):
+                continue
+            if (
+                key in {"handoff_wait_ms", "pending_batches"}
+                and value.isdecimal()
+                and len(value) <= 20
+            ):
+                continue
         if tags == ["Soniox"] and event in {"turn_end", "session_fault"}:
             if key in {"epoch", "turn", "utterance_id"} and (
                 value == "none" or re.fullmatch(r"[0-9a-fA-F-]{32,36}", value)
@@ -1384,6 +1407,34 @@ class SessionRuntimeLoggingService:
                 disposition="degraded" if decision.decision != "failed" else "failed",
                 stage="destination_delivery",
             )
+            return
+        if (
+            decision.decision == "denied"
+            and decision.route == "self_chatbox"
+            and decision.reason == "peer_chatbox_denied"
+        ):
+            return
+        if decision.decision == "skipped" and decision.reason in {
+            "activation_notice_disabled",
+            "destination_unconfigured",
+            "duplicate_publication",
+            "publication_generation_retired",
+            "stale_source_order",
+            "stale_retired",
+            "stale",
+            "preview_superseded",
+            "destination_replaced",
+            "cancelled_local",
+            "output_runtime_closing",
+        }:
+            return
+        if (
+            decision.decision == "published"
+            and decision.route == "subtitle_overlay"
+            and decision.reason in {"accepted_handoff", "logical_pacing_wait"}
+        ):
+            self.emit_diagnostic(_format_output_routing_decision(decision))
+            return
         self.emit_basic(_format_output_routing_decision(decision))
 
     async def observe_output_routing(self, decision: OutputRoutingDecision) -> None:
@@ -1890,9 +1941,16 @@ def _redact_observability_fields_for_sink(
 
 
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
+    intermediate = decision.decision == "published" and decision.reason in {
+        "accepted_handoff",
+        "logical_pacing_wait",
+    }
+    status: str = decision.decision
+    if intermediate:
+        status = "waiting" if decision.reason == "logical_pacing_wait" else "accepted"
     parts = [
-        "[Output] destination_result",
-        f"decision={decision.decision}",
+        "[Output] destination_stage" if intermediate else "[Output] destination_result",
+        f"decision={status}",
         f"route={decision.route}",
         f"publication_id={decision.publication_id}",
         f"publication_kind={decision.publication_kind}",

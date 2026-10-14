@@ -910,9 +910,7 @@ class TranslationOutputProjectionOwner:
 
     def _observe_peer_overlay_delivery(self, decision: OutputRoutingDecision) -> None:
         if decision.reason == "destination_publish_failed":
-            self.diagnostics.record_overlay_sink_failure(
-                decision.metadata.get("error_type", "Exception")
-            )
+            self.diagnostics.record_overlay_sink_failure()
         if decision.metadata.get("event_type") not in {
             "peer_transcript_final",
             "translation_final",
@@ -1347,11 +1345,11 @@ class TranslationOutputProjectionOwner:
         self,
         reason: str,
         active: bool,
-    ) -> OutputPublicationResult:
-        return self.output_runtime.set_self_chatbox_typing_reason(reason, active)
+    ) -> None:
+        self.output_runtime.set_self_chatbox_typing_reason(reason, active)
 
-    def clear_self_chatbox_typing_reasons(self) -> OutputPublicationResult:
-        return self.output_runtime.clear_self_chatbox_typing_reasons()
+    def clear_self_chatbox_typing_reasons(self) -> None:
+        self.output_runtime.clear_self_chatbox_typing_reasons()
 
     async def replace_overlay_sink(
         self,
@@ -1555,9 +1553,7 @@ class TranslationOutputProjectionOwner:
         ):
             self.diagnostics.abandon_pending_latency_output("peer", event.utterance_id)
         if result.decision.reason == "destination_publish_failed":
-            self.diagnostics.record_overlay_sink_failure(
-                result.decision.metadata.get("error_type", "Exception")
-            )
+            self.diagnostics.record_overlay_sink_failure()
             return
 
     async def sync_active_self(
