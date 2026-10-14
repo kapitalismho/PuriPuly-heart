@@ -9,18 +9,18 @@
 ## Test
 
 - Prefer contract and behavior tests over implementation-detail tests.
-- Test observable outcomes and invariants so behavior-preserving refactors normally do not require test changes.
+- Test observable outcomes and invariants, keeping tests stable across behavior-preserving refactors.
 - Derive the promised outcome, preserved invariants, and relevant failure/recovery behavior before choosing checks. Follow affected owners and consumers using `docs/architecture.md`; ask whether all selected checks could pass while the outcome is wrong.
-- Use the current `capabilities` and documented controls in `docs/cli.md` for actual-app checks. Inspect terminal operations and owner-backed effective state, not just CLI exit codes, admission receipts, saved intent, or logs. A persistence-across-restart claim needs a fresh host using the saved isolated profile.
-- Confirm the intended checkout/import or executable and instance are running. Check presentation and input separately in the actual GUI when the claim reaches them; headless readiness does not prove visible behavior.
-- Use isolated synthetic state for probes. Inspect startup secrets, discovery, provider, telemetry, and output behavior: a separate `--config` alone is not isolation. Coordinate owned processes and ports; do not use private audio, live credentials, paid providers, downloads, or an active VRChat session merely to finish verification.
-- Confirm the selected tests actually execute; retain failures, skips, missing dependencies, and unperformed checks. Do not weaken meaningful assertions to obtain green. Expand verification only for a concrete gap or invalidated evidence.
+- Use the current `capabilities` and documented controls in `docs/cli.md` for actual-app checks. Follow operations to terminal results and inspect owner-backed effective state, interpreting CLI exit codes, admission receipts, saved intent, and logs at their respective boundaries. Verify persistence across restart with a fresh host using the saved isolated profile.
+- Confirm the intended checkout/import or executable and instance are running. Check presentation and input separately in the actual GUI when the claim reaches them, and describe headless readiness within its observed boundary.
+- Use isolated synthetic state for probes. Inspect startup secrets, discovery, provider, telemetry, and output behavior alongside the selected `--config`. Coordinate owned processes and ports. Choose synthetic inputs, empty secrets, local fixtures, and owned output destinations; keep private audio, live credentials, paid providers, new model downloads, and active VRChat sessions outside routine verification.
+- Confirm the selected tests actually execute; retain failures, skips, missing dependencies, and unperformed checks. Preserve meaningful assertions and use failure evidence to guide implementation or verification corrections. Expand verification for a concrete gap or invalidated evidence.
 
 ## Shared work context
 
 - Read the current issue and applicable decisions before work or a meaningful GitHub update; preserve exclusions even when a newer summary conflicts. Use readable Projects only within existing conventions and granted permissions.
-- An authorized publishing role should leave the scoped result, useful evidence and limits, and the next decision understandable without local-session access. Link an adequate PR explanation instead of duplicating it; never publish personal paths, credentials, or private transcripts. Missing publication permission does not invalidate local execution.
-- Local OMP loading, activation/reversal, and the bounded verification pilot are documented in `docs/omp-workflow.md`. General role policy remains in the effective user-managed OMP sources, not in product code.
+- An authorized publishing role should leave the scoped result, useful evidence and limits, and the next decision understandable independently of local-session access. Link adequate existing explanations and publish non-sensitive facts while retaining personal paths, credentials, and private transcripts locally. Track local execution and publication authority separately.
+- Maintain general role policy in the effective user-managed OMP sources and product-specific guidance in this project.
 
 ## Experimentation
 
