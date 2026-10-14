@@ -360,6 +360,7 @@ async def test_overlay_failure_has_one_typed_cause_and_preserves_translation_sta
         decision = harness.output_runtime.routing_decisions[-1]
         assert decision.diagnostics.diagnostic_id == failure["diagnostic_id"]
         assert failure["fields"]["destination"] == "subtitle_overlay"
+        assert failure["fields"]["exception_class"] == "RuntimeError"
         assert failure["channel"] == channel
         observer = next(record for record in records if record["code"] == "output_observer_failed")
         assert observer["cause_id"] == failure["diagnostic_id"]
@@ -381,9 +382,13 @@ async def test_overlay_failure_has_one_typed_cause_and_preserves_translation_sta
             )
             == 1
         )
-        for rendered in (live.getvalue(), log_file.read_text(encoding="utf-8")):
+        for rendered in (
+            live.getvalue(),
+            log_file.read_text(encoding="utf-8"),
+            json.dumps(records),
+        ):
             assert "destination_result" not in rendered
-            assert "Overlay sink emit failed" not in rendered
+            assert "Traceback (most recent call last):" not in rendered
             assert "private overlay payload" not in rendered
             assert "private observer detail" not in rendered
     finally:

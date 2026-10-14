@@ -250,15 +250,6 @@ def active_self_metadata_for_merge(
 
 
 @dataclass(slots=True)
-class RaisingOverlaySink:
-    error: Exception = field(default_factory=lambda: RuntimeError("overlay down"))
-
-    async def emit(self, event: object) -> None:
-        _ = event
-        raise self.error
-
-
-@dataclass(slots=True)
 class _RuntimeLogSinks:
     stream_handler: logging.Handler
     file_handler: logging.Handler
@@ -950,62 +941,6 @@ async def test_handle_stt_event_loop_exception_with_runtime_logging_uses_safe_st
         assert "Traceback (most recent call last):" not in runtime_log
     finally:
         runtime_logging.close()
-
-
-@pytest.mark.asyncio
-async def test_emit_overlay_event_logs_safe_exception_metadata() -> None:
-    basic_runtime_logging, basic_stream = _make_runtime_logging_capture()
-    detailed_runtime_logging, detailed_stream = _make_runtime_logging_capture()
-
-    basic_harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=RaisingOverlaySink(),
-        clock=FakeClock(),
-        runtime_logging=basic_runtime_logging,
-    )
-    detailed_harness = compose_translation_test_harness(
-        stt=None,
-        llm=None,
-        osc=RecordingOscQueue(),
-        overlay_sink=RaisingOverlaySink(),
-        clock=FakeClock(),
-        runtime_logging=detailed_runtime_logging,
-    )
-
-    try:
-        await basic_harness.output_projection.publish_overlay_event(
-            basic_harness.output_projection.overlay_event_adapter.utterance_closed(
-                utterance_id=uuid4(),
-                channel="self",
-                is_final=True,
-            )
-        )
-        await detailed_harness.output_projection.publish_overlay_event(
-            detailed_harness.output_projection.overlay_event_adapter.utterance_closed(
-                utterance_id=uuid4(),
-                channel="self",
-                is_final=True,
-            )
-        )
-
-        basic_messages = _runtime_log_messages(basic_stream)
-        detailed_messages = _runtime_log_messages(detailed_stream)
-
-        assert "[Translation] Overlay sink emit failed: RuntimeError" in basic_messages
-        assert not any(
-            "Traceback (most recent call last):" in message for message in basic_messages
-        )
-
-        assert "[Translation] Overlay sink emit failed: RuntimeError" in detailed_messages
-        assert not any(
-            "Traceback (most recent call last):" in message for message in detailed_messages
-        )
-        assert not any("overlay down" in message for message in detailed_messages)
-    finally:
-        basic_runtime_logging.close()
-        detailed_runtime_logging.close()
 
 
 @pytest.mark.asyncio

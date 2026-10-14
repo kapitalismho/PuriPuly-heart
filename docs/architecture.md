@@ -240,7 +240,7 @@ Behavior: `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.
 - Technical diagnostics exclude credentials, user text, audio, arbitrary exception/child content, and personal paths. Accepted conversation records retain their separate secret-protected path and explicit CLI content opt-ins.
 - Timing records describe application-observable stages, not physical display.
 
-Implementation: `core/diagnostics.py`, `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior: `tests/core/test_runtime_logging.py`. Schema, query limits, and loss semantics belong in the [CLI guide](cli.md#retained-diagnostics-and-delivery-health).
+Implementation: `core/diagnostics.py`, `core/runtime_logging.py`, `app/services/application_runtime_logging.py`. Behavior: `tests/core/test_runtime_logging.py`; output failure correlation, privacy, and noise suppression: `tests/core/test_output_logging.py`. Schema, query limits, and loss semantics belong to the [CLI guide](cli.md#retained-diagnostics-and-delivery-health).
 
 ## Runtime Layout
 
