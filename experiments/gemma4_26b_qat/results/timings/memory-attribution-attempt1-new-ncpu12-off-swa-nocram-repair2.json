@@ -1,0 +1,129 @@
+{
+  "profile": "new-ncpu12-off-swa-nocram-repair2",
+  "source_file": "memory-attribution-attempt1.json",
+  "status": "completed",
+  "scope": "Three attribution-diagnostic texts, not a latency-selection benchmark; same already-tested flags.",
+  "observations": [
+    {
+      "prefill_ms": 2376.921,
+      "prefill_tps": 383.6896556511555,
+      "decode_ms": 518.31,
+      "decode_tps": 40.51629333796377,
+      "prompt_evaluated_tokens": 912,
+      "prompt_cached_tokens": 0,
+      "prompt_total_tokens": 912,
+      "predicted_output_tokens": 22
+    },
+    {
+      "prefill_ms": 1349.399,
+      "prefill_tps": 672.8921542108747,
+      "decode_ms": 280.519,
+      "decode_tps": 42.77785105465227,
+      "prompt_evaluated_tokens": 908,
+      "prompt_cached_tokens": 0,
+      "prompt_total_tokens": 908,
+      "predicted_output_tokens": 13
+    },
+    {
+      "prefill_ms": 1159.528,
+      "prefill_tps": 778.7651527173125,
+      "decode_ms": 254.095,
+      "decode_tps": 43.290895137645364,
+      "prompt_evaluated_tokens": 903,
+      "prompt_cached_tokens": 0,
+      "prompt_total_tokens": 903,
+      "predicted_output_tokens": 12
+    }
+  ],
+  "group": {
+    "prefill_ms": {
+      "n": 3,
+      "median": 1349.399,
+      "p95": 2376.921,
+      "min": 1159.528,
+      "max": 2376.921
+    },
+    "prefill_tps": {
+      "n": 3,
+      "median": 672.8921542108747,
+      "p95": 778.7651527173125,
+      "min": 383.6896556511555,
+      "max": 778.7651527173125
+    },
+    "decode_ms": {
+      "n": 3,
+      "median": 280.519,
+      "p95": 518.31,
+      "min": 254.095,
+      "max": 518.31
+    },
+    "decode_tps": {
+      "n": 3,
+      "median": 42.77785105465227,
+      "p95": 43.290895137645364,
+      "min": 40.51629333796377,
+      "max": 43.290895137645364
+    },
+    "prompt_evaluated_tokens": {
+      "n": 3,
+      "median": 908,
+      "p95": 912,
+      "min": 903,
+      "max": 912
+    },
+    "prompt_cached_tokens": {
+      "n": 3,
+      "median": 0,
+      "p95": 0,
+      "min": 0,
+      "max": 0
+    },
+    "prompt_total_tokens": {
+      "n": 3,
+      "median": 908,
+      "p95": 912,
+      "min": 903,
+      "max": 912
+    },
+    "predicted_output_tokens": {
+      "n": 3,
+      "median": 13,
+      "p95": 22,
+      "min": 12,
+      "max": 22
+    },
+    "decode_eval_tokens": {
+      "n": 3,
+      "median": 13,
+      "p95": 22,
+      "min": 12,
+      "max": 22
+    }
+  },
+  "native_ordered_records": [
+    {
+      "prefill_ms": 2376.92,
+      "prompt_evaluated_tokens": 912,
+      "prefill_tps": 383.69,
+      "decode_ms": 518.31,
+      "decode_eval_tokens": 22,
+      "decode_tps": 40.52
+    },
+    {
+      "prefill_ms": 1349.4,
+      "prompt_evaluated_tokens": 908,
+      "prefill_tps": 672.89,
+      "decode_ms": 280.52,
+      "decode_eval_tokens": 13,
+      "decode_tps": 42.78
+    },
+    {
+      "prefill_ms": 1159.53,
+      "prompt_evaluated_tokens": 903,
+      "prefill_tps": 778.77,
+      "decode_ms": 254.09,
+      "decode_eval_tokens": 12,
+      "decode_tps": 43.29
+    }
+  ]
+}

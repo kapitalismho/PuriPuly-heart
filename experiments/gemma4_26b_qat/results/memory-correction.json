@@ -1,0 +1,26 @@
+{
+  "status":"accepted_correction_original_records_preserved",
+  "withdrawn_fields":["mapped_resident_at_ready[*].rss_bytes","mapped_resident_after_repeated[*].rss_bytes"],
+  "withdrawal":"These psutil7.2.2 Windows values are neither residency nor correct64-bit virtual-map size. Do not use them for RAM reclaim/spill/resident-expert conclusions.",
+  "source":"https://github.com/giampaolo/psutil/blob/release-7.2.2/psutil/arch/windows/proc.c#L1088-L1140",
+  "mechanism":"memory_maps returns VirtualQueryEx.RegionSize (no QueryWorkingSetEx), then Py_BuildValue final unsigned32 I truncates the64-bit SIZE_T.",
+  "exact_arithmetic":{"file_bytes":14249047104,"page_bytes":4096,"page_rounded_mapping_bytes":14249050112,"modulo_2_pow32":1364148224,"truncated_away_bytes":12884901888},
+  "replacement":"windows_memory.observe_memory / mapped_gguf_observation use pointer-width VirtualQueryEx, per-AllocationBase QueryVirtualMemoryInformation.CommitSize and batched no-touch QueryWorkingSetEx. New fields mapped_file_at_ready/mapped_file_after_repeated replace the old names for future executions; old data are not rewritten.",
+  "file_backing_vs_private":"Host experts4900.50MiB (5.138546688GB) are existing file-backed tensor payload. CPU_Mapped5663.88MiB is a min-to-max file-offset span wrapper over an existing pointer, not a new allocation or resident bytes. Subtracting either from process PrivateUsage to invent an8GB private-heap remainder is invalid.",
+  "windows_mapping_source":"https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-mmap.cpp#L595-L647",
+  "windows_mapping_behavior":"MapViewOfFile maps the full GGUF read-only and unmap_fragment is a Windows no-op. Full virtual map persists even when most tensors offload toGPU. Residency is separately observed, not inferred from this source.",
+  "original_simultaneous_app_private_peak":{"PrivateUsage_bytes":13750480896,"WorkingSetSize_bytes":14667976704,"GPU_committed_bytes":13385277440,"private_minus_GPUcommit_bytes":365203456,"interpretation":"Simultaneous numerical relationship from owned raw app samples, not a causal/disjoint partition. Not an8GB unexplained residual."},
+  "new_observation":"memory-attribution-attempt1.json: OFF/2048 ready and post-three-text snapshots; all4 scans succeeded with0 unavailable allocation/query bytes and no target reads/locks/touches.",
+  "new_post_work_findings":{
+    "both_profiles_GGUF_virtual_span_bytes":14249050112,
+    "both_profiles_GGUF_valid_shareable_bytes":13919584256,
+    "both_profiles_GGUF_private_commit_charge_bytes":0,
+    "OFF_private_allocation_commit_bytes":11608563712,
+    "OFF_valid_private_allocation_bytes":849432576,
+    "cache2048_private_allocation_commit_bytes":13588746240,
+    "cache2048_valid_private_allocation_bytes":773742592,
+    "cache2048_simultaneous_before_scan":{"PrivateUsage_bytes":13703684096,"WorkingSetSize_bytes":14770565120,"GPU_committed_bytes":13385277440},
+    "interpretation":"About13.92GB of the high working set is valid shareable pages from the whole retained GGUF, not just~5.14GB selected host experts. The~13.6GB CPU-VA private commit charge has only~0.774GB valid private allocation pages in this snapshot; it is not13.6GB resident CPU heap. Large nonresident committed private ranges have PAGE_READWRITE|PAGE_WRITECOMBINE protection and scale with GPU allocation, supporting GPU-related commitment without proving allocator callsite or permanent duplicate DRAM."
+  },
+  "limits":"Scans take~2.7–2.84seconds and are bracketed, not atomic. Some counters change during scan; do not force exact equality of sums/differences. Actual AMD WDDM allocation flags/callsites and physical backing-store duplication are unavailable. The commitment is visible in CPU VA here; it must NOT be claimed absent from CPU allocation totals."
+}

@@ -1,0 +1,18 @@
+{
+  "finding":"F1",
+  "reviewed_candidate":"84f04d09b6235f07da5fb0248ec7571e75befcc7",
+  "observed_at_utc":"2026-10-15T11:34:49.240928+00:00",
+  "llama_server_processes":[],
+  "adapter_luid":"luid_0x00000000_0x0000f60b_phys_0",
+  "system_available_physical_bytes":14913495040,
+  "system_committed_bytes":42597830656,
+  "device_gpu_dedicated_bytes":3631579136,
+  "device_gpu_shared_bytes":369217536,
+  "device_gpu_committed_bytes":4187688960,
+  "counter_errors":{},
+  "preserved_invariants":"Same fixed artifact/runtime/workload/4608 total context/three1536 slots/prompt hashes/sampling/output cap/resource accounting; product sources and existing run records unchanged.",
+  "scope":"Bounded matched n-cpu-moe12 OFF/1024/2048/3072, all SWA-full/cache-ram0. Fresh separately named2048 control required for changed background conditions. Original selected profile and its app evidence retained for their original environment.",
+  "comparison_rationale":"Prior checks can all pass while cache-OFF or another budget is a better final-policy local frontier point. Measure latency, CPU cost, dedicated/shared GPU and available RAM/paging together; app-probe eligible alternatives with the same30-completion/restart/release workload.",
+  "pressure_policy":"Do not change unrelated processes. Actual sampled serving pressure, not a presumed free-memory cutoff, determines whether comparisons are conclusive. Current subtle comparisons use the fresh2048 control, not the older environment's medians.",
+  "privacy":"Only process names/PIDs and relevant memory/counter facts observed; no command lines, private state or unrelated catalogs."
+}

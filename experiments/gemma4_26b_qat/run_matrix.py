@@ -16,13 +16,13 @@ import urllib.error
 import urllib.request
 
 from windows_metrics import Sampler
+from windows_memory import mapped_gguf_observation
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
 os.environ["PURIPULY_HEART_PROMPTS_DIR"] = str(REPO / "prompts")
 from puripuly_heart.config.prompts import get_default_prompt, render_translation_prompt_template
 from puripuly_heart.providers.llm.messages import build_translation_user_message
-import psutil
 
 CASES = [
     ("English", "Korean", "Mina did not buy 12 tickets; she bought 2.", ["2", "12"]),
@@ -62,6 +62,13 @@ PROFILES = {
     "new-ncpu12-cache2048": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048"]),
     "new-ncpu12-cache2048-swa": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full"]),
     "new-ncpu12-cache2048-swa-nocram": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-off-swa-nocram": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-cache1024-swa-nocram": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "1024", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-cache3072-swa-nocram": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "3072", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-cache2048-swa-nocram-repair-control": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-off-swa-nocram-repair2": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-cache1024-swa-nocram-repair2": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "1024", "--swa-full", "--cache-ram", "0"]),
+    "new-ncpu12-cache2048-swa-nocram-repair2-control": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full", "--cache-ram", "0"]),
     "old-full": ("b10423", ["--n-gpu-layers", "99"]),
     "e4b-product": ("b10423", ["--n-gpu-layers", "99"]),
 }
@@ -122,7 +129,9 @@ def run(args, profile: str):
     model = args.e4b if profile == "e4b-product" else args.root / "models" / "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
     executable = args.root / "runtimes" / build / "llama-server.exe"
     output_dir = args.root / "runs" / profile
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir.exists() or (args.results / f"{profile}.json").exists():
+        raise FileExistsError(f"Preserve existing evidence; use a new profile identity/root: {profile}")
+    output_dir.mkdir(parents=True)
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
@@ -170,7 +179,7 @@ def run(args, profile: str):
                     raise TimeoutError("Readiness timeout after 360 seconds")
                 time.sleep(0.2)
             result["cold_readiness_seconds"] = time.perf_counter() - started
-            result["mapped_resident_at_ready"] = [{"file": Path(m.path).name, "rss_bytes": m.rss} for m in psutil.Process(process.pid).memory_maps() if m.path.lower().endswith(".gguf")]
+            result["mapped_file_at_ready"] = mapped_gguf_observation(process.pid)
             with urllib.request.urlopen(base + "/slots") as response:
                 result["slots"] = json.load(response)
             result["prefix_metadata"] = []
@@ -194,7 +203,7 @@ def run(args, profile: str):
                     futures = [executor.submit(request_translation, base, CASES[(rep % 3)*4+i], i, "three_slots", rep*3+i, 0.6) for i in range(3)]
                     for future in futures:
                         result["requests"].append(future.result())
-            result["mapped_resident_after_repeated"] = [{"file": Path(m.path).name, "rss_bytes": m.rss} for m in psutil.Process(process.pid).memory_maps() if m.path.lower().endswith(".gguf")]
+            result["mapped_file_after_repeated"] = mapped_gguf_observation(process.pid)
             result["status"] = "completed"
         except Exception as error:
             result["status"] = "failed"

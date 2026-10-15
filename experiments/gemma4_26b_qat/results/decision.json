@@ -1,89 +1,76 @@
 {
-  "issue": 245,
-  "baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de",
-  "execution_status": "complete_for_assigned_experiments",
-  "feasibility": "positive_bounded_manual_translation_on_tested_windows_vulkan_stack",
-  "selection_status": "experimental_recommendation_pending_product_owner_adoption_tradeoff",
-  "recommended_profile": {
-    "id": "new-ncpu12-cache2048-swa-nocram",
-    "runtime_tag": "b11537",
-    "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
-    "model_sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
-    "placement_flags": ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full", "--cache-ram", "0"],
-    "total_context": 4608,
-    "parallel_slots": 3,
-    "context_per_slot": 1536,
-    "reasoning": "off",
-    "gpu_backend": "Vulkan0",
-    "standalone": {
-      "completed": 43,
-      "cold_readiness_seconds_n1": 4.949,
-      "hot_wall_seconds_n5": {"median": 0.416174, "p95": 0.558347},
-      "alternating_wall_seconds_n20": {"median": 0.560685, "p95": 0.782531},
-      "three_slot_wall_seconds_n15": {"median": 0.791123, "p95": 1.173747},
-      "serving_cpu_one_core_percent_sampled": 7.580269743439924,
-      "cache_small_batch_hit_rate_percent": 88.71
+  "issue":245,
+  "baseline_commit":"7a8151be6114a950f062e2430bd36f899d57e4de",
+  "reviewed_checkpoint":"84f04d09b6235f07da5fb0248ec7571e75befcc7",
+  "execution_status":"complete_for_assigned_experiments_and_accepted_F1_repair",
+  "feasibility":"positive_bounded_manual_text_translation_on_tested_windows_vulkan_stack",
+  "selection_status":"experimental_report_complete_pending_Director_REPAIR_VERIFY_adoption_is_separate",
+  "checkpoint_repair":{
+    "finding":"F1 selected final-policy n12 placement lacked matched OFF and nearby cache budgets",
+    "addressed":"OFF/1024/fresh2048/3072 all with SWA-full/cache-ram0 and unchanged43-request workload; three actual pressure-qualified runs retained and only those repeated under recovered conditions. All four eligible options app-probed with30 texts/two fresh instances/release.",
+    "request_fixture_or_assertion_changes":"None. Same artifact/runtime/prompts/seed/temperature/limit/4608 total context/three1536 slots; digit-check false alarms remain and are content-reviewed, not suppressed.",
+    "original_records":"Preserved. New run identities; duplicate-run guard; aggregators retain existing per-run compact ledgers. Only aggregate/report projections updated.",
+    "evidence":"repair-matrix.json"
+  },
+  "recommended_profile":{
+    "id":"new-ncpu12-cache3072-swa-nocram",
+    "supersedes":"new-ncpu12-cache2048-swa-nocram experimental recommendation, not its historical observations",
+    "runtime_tag":"b11537",
+    "runtime_commit":"8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "model_sha256":"a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+    "placement_flags":["--n-gpu-layers","99","--n-cpu-moe","12","--moe-cache-mib","3072","--swa-full","--cache-ram","0"],
+    "total_context":4608,"parallel_slots":3,"context_per_slot":1536,"backend":"Vulkan0","reasoning":"off",
+    "maximum_observed_server_dedicated_gpu":{"bytes":13856235520,"GB":13.85623552,"GiB":12.904624938964844},
+    "meets_preferred_8_decimal_GB_dedicated_target":false,
+    "standalone":{
+      "completed":43,
+      "cold_readiness_seconds_n1":4.961237200011965,
+      "hot_seconds":{"n":5,"median":0.3431211999995867,"p95":0.35458689999359194},
+      "alternation_seconds":{"n":20,"median":0.3973203499990632,"p95":0.6346623999997973},
+      "three_slot_seconds":{"n":15,"median":0.5440838000067743,"p95":0.8424469000019599},
+      "serving_cpu_one_core_percent":3.5374601192598867,
+      "small_batch_cache_hit_rate_percent":96.93,
+      "minimum_available_physical_bytes":5262532608
     },
-    "actual_app": {
-      "completed": 30,
-      "fresh_app_instances": 2,
-      "wall_seconds": {"median": 0.794667, "p95": 1.411893, "max": 3.840673},
-      "server_sampled_dedicated_gpu": {"bytes": 12780429312, "GB": 12.780429312, "GiB": 11.902702331542969},
-      "server_sampled_shared_gpu_bytes": 609263616,
-      "whole_device_sampled_dedicated_gpu_bytes": 15857037312,
-      "server_working_set_GB_rounded": 14.781,
-      "server_private_commit_GB_rounded": 13.750,
-      "minimum_available_host_ram_bytes": 7886368768,
-      "completed_event_ids_matched_to_admission": true,
-      "persisted_language_observed_in_fresh_process": true,
-      "both_app_hosts_observed_exited": true,
-      "server_graceful_exit_code": 0
+    "actual_app":{
+      "completed":30,"fresh_instances":2,
+      "timing_boundary":"Text-submit CLI launch through matched translation-completion event; includes CLI/admission/translation/observation, excludes audio collection/endpointing/STT/GUI rendering.",
+      "text_submit_to_completion_seconds":{"n":30,"median":0.6814515500009293,"p95":1.394611800002167,"max":4.192841600000975},
+      "server_dedicated_gpu":{"bytes":13855969280,"GB":13.85596928,"GiB":12.904376983642578},
+      "server_shared_gpu_bytes":614989824,
+      "whole_device_dedicated_gpu_bytes":17429037056,
+      "server_working_set_bytes":14771621888,
+      "server_private_commit_bytes":14830891008,
+      "minimum_available_physical_bytes":2016010240,
+      "server_cpu_seconds_sampled":5.59375,
+      "all_completion_IDs_matched":true,
+      "persisted_language_observed_in_fresh_process":true,
+      "both_app_hosts_exited":true,
+      "server_graceful_exit_code":0
     },
-    "meets_preferred_8_decimal_GB_server_dedicated_target": false,
-    "rationale": "Short-subtitle app latency approaches maximum offload while saving 2.658 GB dedicated GPU and approximately 2.7 GB private commit. It is much faster than tested low-CPU sub-8-GB placements. No approved latency SLA is inferred."
+    "why":"Against fresh same-policy2048 control: approximately1.076GB extra dedicated/private charge buys .126s lower text wall median and better standalone alternation/occupied-slot latency with much lower logical upload counts. CPU remains low. App p95 is nearly equal and cold maximum is worse: not universal tail dominance or an approved SLA."
   },
-  "alternatives": [
-    {"profile":"new-cpu-moe-off-swa-nocram","app_server_gpu_GB":2.905038848,"app_wall_median_seconds":1.810934,"tradeoff":"Lowest GPU/private commit; substantially more CPU expert computation."},
-    {"profile":"new-cpu-moe-cache3072-swa-nocram","app_server_gpu_GB":6.129500160,"app_wall_median_seconds":1.747955,"tradeoff":"Sub-8-GB and low residual CPU; cache misses/transfers cost latency."},
-    {"profile":"new-partial14-swa-nocram","app_server_gpu_GB":7.380492288,"app_wall_median_seconds":1.388296,"tradeoff":"Faster sub-8-GB ordinary partial offload, but approximately 1.67 core-equivalents standalone serving CPU."},
-    {"profile":"new-ncpu24-cache2048-swa-nocram","app_server_gpu_GB":7.629275136,"app_wall_median_seconds":1.574054,"tradeoff":"Near preferred target, low residual CPU; materially slower than above-target n12 placement."},
-    {"profile":"new-full-swa-nocram","app_server_gpu_GB":15.438389248,"app_wall_median_seconds":0.700407,"tradeoff":"Lowest measured app latency, additional 2.658 GB dedicated GPU versus recommendation."},
-    {"profile":"e4b-product","app_server_gpu_GB":2.854756352,"app_wall_median_seconds":0.701513,"tradeoff":"Current shipped reference, not equal-quality/model evidence; substantially lower host memory."}
+  "current_matched_alternatives":[
+    {"profile":"new-ncpu12-off-swa-nocram-repair2","app_gpu_GB":10.628890624,"text_wall_median_seconds":1.0531853499924182,"standalone_CPU_one_core_percent":126.37231603020591,"qualification":"App low-free-RAM/paging, close timing comparisons qualified. Clean standalone preserves CPU-versus-GPU tradeoff; actual30 completions retained."},
+    {"profile":"new-ncpu12-cache1024-swa-nocram-repair2","app_gpu_GB":11.754078208,"text_wall_median_seconds":1.0561097500030883,"standalone_CPU_one_core_percent":7.429052645632966,"qualification":"App low-free-RAM/paging, not .003s rank proof against OFF. Low residual CPU, smaller GPU, slower clean standalone than2048/3072."},
+    {"profile":"new-ncpu12-cache2048-swa-nocram-repair2-control","app_gpu_GB":12.780429312,"text_wall_seconds":{"median":0.8074507499986794,"p95":1.4090299000090454,"max":3.963926700002048},"standalone_CPU_one_core_percent":7.950340374341856,"tradeoff":"Saves approximately1.076GB GPU/private charge, almost equal app p95 and lower cold maximum; explicit owner headroom alternative."}
   ],
-  "coverage": {
-    "standalone_successful_profiles": 27,
-    "standalone_completed_outputs": 1161,
-    "standalone_distinct_source_sentences": 12,
-    "standalone_failed_model_loads": 1,
-    "actual_app_successful_profiles": 8,
-    "actual_app_completed_outputs": 240,
-    "actual_app_distinct_source_sentences": 5,
-    "actual_app_fresh_instances": 16,
-    "actual_app_failed_attempts_before_submission": 1,
-    "actual_app_retained_stt_degraded_settings_receipts": 248,
-    "initial_independently_reviewed_outputs": 344,
-    "full_standalone_unique_input_output_pairs_reviewed_by_execution_owner": 29,
-    "qat_within_vs_in_five_minutes_occurrences": {"within":44,"total":156}
+  "retained_historical_frontier":"All-host OFF2.905GB/highCPU, all-host cache3072~6.13GB/lowCPU, partial14~7.38GB/highCPU, n24/cache2048~7.63GB/lowCPU, maximum offload15.438GB remain documented. Historical maximum-offload .700s is not a matched comparison proving current3072 .681s faster.",
+  "E4B_references":{
+    "generic_endpoint":{"profile":"e4b-product","text_wall_median_seconds":0.7015132999949856,"prefill_ms_median":348.825,"decode_ms_median":183.0,"decode_tps_median":82.0,"scope":"Generic local_llm/ollama provider path, NOT current managed product latency or slot/prefix policy."},
+    "true_managed":{"profile":"managed-e4b-stock","completed":30,"fresh_app_and_model_processes":2,"text_wall_seconds":{"median":1.4078963499923702,"p95":1.4985588999988977,"max":1.50635229999898},"prefill_ms_median":1035.382,"prefill_tps_median":805.3791940851734,"decode_ms_median":196.4105,"decode_tps_median":81.8045,"prompt_evaluated_tokens_median":863,"prompt_cached_tokens_median":0,"zero_prompt_cache_hit_requests":22,"dedicated_gpu_bytes":2855346176,"server_working_set_bytes":4666949632,"server_private_commit_bytes":4914057216,"scope":"Unmodified managed_gemma/gpu, stock b10423, true3-slot owner/prefix persistence; required E4B+MTP install validated before activation, CPU executable absent fail-closed, no model download. Native stderr unavailable;30 structured diagnostic rows recovered and UUID-correlated without rerun. Preparation/restore windows outside text timer; no audio/GUI claim."}
   },
-  "failure_findings": [
-    "4096-MiB cache failed a 2861438976-byte bank/device maximum-buffer-size check before readiness; not total VRAM exhaustion or an 8-GB cutoff.",
-    "Initial cache2048 serving succeeded but required forced shutdown; destructor statistics unavailable for that record, not synthesized.",
-    "Initial app harness rejected expected keyless-STT degraded language receipt before manual text submission. Director authorized manual translation with exact provider.stt/stt.provider_not_ready boundary retained."
-  ],
-  "owner_decision": {
-    "owner": "Product owner, communicated through Director",
-    "decision": "Accept the recommended above-8-GB GPU/private-commit premium for measured latency, or prioritize headroom and choose the documented sub-8-GB frontier.",
-    "approved_latency_SLA": null,
-    "production_rollout": "Not authorized. Retain E4B until separate managed 26B integration/resource acceptance and rollout authorization."
+  "split_timing_coverage":{
+    "human":"../TIMINGS.md",
+    "machine":"timing-summary.json and timings/<original-record>.json",
+    "matrix_identities_including_failure":35,"app_attempt_identities_including_failure":14,
+    "matrix_timed_requests":1462,"app_timing_records":390,"memory_diagnostic_texts":6,
+    "statistics":"n/median/p95/min/max for prefill_ms/prefill_tps/decode_ms/decode_tps and actual token counters; first-prefix/hot/pair/three-slot matrix groups; actual app first/hot/pair groups and explicit sequential-app three-slot N/A.",
+    "token_conventions":"Uncached prompt_n only for prefill TPS; cache_n is prior prompt reuse, tokens_cached is final KV occupancy. Native printed eval count can equal output count although reported rate accounts one fewer; native TPS retained, never inflated by recomputing output/duration. Managed printed generation counter unavailable, not estimated."
   },
-  "limits": [
-    "Only the measured RX 7900 XTX 24-GiB-class device; no 8-GB-card, VRChat co-render, GUI presentation or live audio/ASR claim.",
-    "Headless unmodified app uses an external user-managed endpoint, not managed 26B provisioning/prefix cache/lifecycle readiness.",
-    "App-only restart preserves the external model process; model restart persistence is not established by this probe.",
-    "Sampled GPU peaks are lower bounds; absent app GPU counter rows remain unavailable, not zero. Whole-adapter memory separately encloses background allocations.",
-    "Early default RAM-cache profiles experienced host-memory pressure; those tails are not clean cache-only causal comparisons.",
-    "Physical PCIe bytes, per-request cache counters, per-process hard-paging, power and exact lifetime GPU high-water unavailable.",
-    "Small synthetic fidelity set, unresolved name reading, minor temporal precision drift and E4B gender/noun caveats; no broad quality superiority claim."
-  ],
-  "evidence": ["../RESULTS.md", "../QUALITY.md", "identity.json", "build-provenance.json", "summary.json", "app-summary.json", "quality-unique.json", "mechanisms.json", "release.json"]
+  "RAM_attribution":"memory-correction.json explicitly withdraws old psutil mapped_resident fields (RegionSize mislabeled and32-bit-truncated). Four successful64-bit/no-touch snapshots show full14.249GB GGUF map,13.9196GB valid shareable file pages after work, approximately.774GB valid private allocation pages at n12/2048 despite13.59GB CPU-VA private commit. Write-combined private charge12.7738GB tracks dedicated GPU12.7760GB, not8GB unexplained resident heap. Exact allocator/driver flags unavailable; scans bracketed/non-atomic; reclaim may cost page-in.",
+  "coverage":{"successful_matrix_run_identities":34,"matrix_completions":1462,"matrix_distinct_sources":12,"matrix_failed_loads":1,"successful_generic_app_runs":12,"successful_true_managed_runs":1,"app_completions":390,"app_distinct_sources":5,"fresh_app_hosts":26,"failed_pre_submission_app_attempts":1,"controlled_STT_degraded_settings_receipts":403,"independent_initial_quality_outputs":344,"complete_matrix_unique_input_output_pairs":29,"qat_within_vs_in_five_minutes":{"within":61,"total":198}},
+  "owner_decision":{"owner":"Product owner through Director","decision":"Accept3072's GPU/private-commit premium for measured median/occupancy benefit over2048, or prioritize headroom and select2048/sub8GB frontier. Real mmap working-set cost and missing full-live-pipeline evidence remain separate.","approved_latency_SLA":null,"rollout":"Retain shipped E4B until separately authorized managed26B integration and rollout. No PR/merge/deploy authorized; Director owns experimental-branch commit/push/publication."},
+  "limits":["Only measured RX7900XTX24GiB-class machine; no8GB-card or VRChat co-render performance proof.","QAT app uses external endpoint, not managed26B provisioning/prefix/fallback/lifecycle integration.","Manual text only under explicitly inactive keyless STT; no audio collection/endpointing/STT/GUI latency.","Sampled GPU peaks lower bounds; absent app GPU rows unavailable. Background/paging varies and pressure qualifications retained.","Physical PCIe bytes, per-process hard faults, exact lifetime GPU high-water and actual driver backing flags/callsites unavailable.","Small synthetic fidelity set; name ambiguity/time precision/E4B gender/noun caveats retained; no model quality superiority claim."],
+  "evidence":["../RESULTS.md","../TIMINGS.md","../QUALITY.md","identity.json","build-provenance.json","summary.json","app-summary.json","repair-matrix.json","managed-e4b-recovery.json","managed-extraction-check.json","timing-summary.json","memory-correction.json","memory-attribution-attempt1.json","repair-release.json"]
 }

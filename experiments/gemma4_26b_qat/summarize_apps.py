@@ -58,6 +58,18 @@ def main():
             row["evaluated_prompt_tokens_total"] = sum(t["evaluated_prompt_tokens"] for t in timings)
             row["generation_eval_tokens_total"] = sum(t["generation_eval_tokens"] for t in timings)
             row["generation_tokens_per_second"] = distribution([t["generation_tokens_per_second"] for t in timings])
+        recovery_path = args.results / "managed-e4b-recovery.json"
+        if profile == "managed-e4b-stock" and recovery_path.exists():
+            recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+            native = recovery["native_observations"]
+            row.update(original_capture_status=record["status"], status=recovery["status"], managed_recovery_file=recovery_path.name, managed_servers=record.get("managed_servers"), preparation_windows=recovery["preparation_windows"])
+            row["server_timing_records"] = native
+            row["server_timing_count_matches_completions"] = len(native) == len(requests)
+            row["timing_attribution"] = "Structured native-response diagnostics correlated by host PID/request ID to completed utterance UUID; original legacy-performance capture classification retained. Stock native stderr unavailable."
+            row["evaluated_prompt_tokens_total"] = sum(t["prompt_evaluated_tokens"] for t in native)
+            row["generation_eval_tokens_total"] = None
+            row["generation_counter_unavailable_reason"] = "Stock managed stderr DEVNULL; API predicted-output count is distinct from a physical decode-evaluation counter."
+            row["generation_tokens_per_second"] = distribution([t["decode_tps"] for t in native])
         sample_path = raw / "samples.json"
         if sample_path.exists():
             samples = json.loads(sample_path.read_text(encoding="utf-8"))
@@ -75,7 +87,18 @@ def main():
             row["app_cpu_seconds_per_observed_instance"] = app_cpu_segments
             row["app_cpu_seconds_total_sampled"] = sum(app_cpu_segments)
             row["observed_wall_seconds"] = samples[-1]["time"]-first if samples else None
-            row["server_cpu_seconds_sampled"] = max(s["server"].get("cpu_seconds", 0) for s in samples) if samples else None
+            row["server_cpu_seconds_sampled"] = max(s["server"].get("cpu_seconds", 0) for s in samples if s.get("server")) if any(s.get("server") for s in samples) else None
+            server_segments, server_segment = [], None
+            for sample in samples:
+                if sample.get("server") is not None:
+                    server_segment = max(server_segment or 0, sample["server"].get("cpu_seconds", 0))
+                elif server_segment is not None:
+                    server_segments.append(server_segment)
+                    server_segment = None
+            if server_segment is not None:
+                server_segments.append(server_segment)
+            row["server_cpu_seconds_per_observed_instance"] = server_segments
+            row["server_cpu_seconds_total_sampled"] = sum(server_segments)
             bins = {}
             for sample in samples:
                 bins.setdefault(int(sample["time"]-first), []).append(sample)
@@ -91,9 +114,11 @@ def main():
                         if key == "system_available_physical_bytes":
                             item[owner][key + "_min"] = min(values) if values else None
                 compact.append(item)
-            (args.results / f"app-{profile}-attempt{attempt}.samples.jsonl").write_text("".join(json.dumps(sample, separators=(",", ":")) + "\n" for sample in compact), encoding="utf-8")
+            compact_path = args.results / f"app-{profile}-attempt{attempt}.samples.jsonl"
+            if not compact_path.exists():
+                compact_path.write_text("".join(json.dumps(sample, separators=(",", ":")) + "\n" for sample in compact), encoding="utf-8")
             row["sample_cadence_seconds"] = distribution([b["time"]-a["time"] for a,b in zip(samples, samples[1:])])
-            row["minimum_available_physical_bytes"] = min(s["server"]["system_available_physical_bytes"] for s in samples) if samples else None
+            row["minimum_available_physical_bytes"] = min(s["server"]["system_available_physical_bytes"] for s in samples if s.get("server")) if any(s.get("server") for s in samples) else None
         rows.append(row)
     (args.results / "app-summary.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps([{key: row.get(key) for key in ("profile", "attempt", "status", "completed_translations", "completion_wall_seconds", "server_timing_count_matches_completions", "degraded_settings_count")} for row in rows]))

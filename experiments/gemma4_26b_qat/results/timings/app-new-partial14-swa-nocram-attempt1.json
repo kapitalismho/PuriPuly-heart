@@ -1,0 +1,83 @@
+{
+  "profile": "new-partial14-swa-nocram",
+  "attempt": 1,
+  "status": "failed_before_manual_submission",
+  "source_file": "app-new-partial14-swa-nocram-attempt1.json",
+  "source": "Original ordered native server timing lines; actual prompt-eval and generation-eval token counts. Generic OAI app did not persist API prompt-total/cache-hit/output counters, which remain unavailable.",
+  "native_count_matches_translation_count": false,
+  "error_or_unavailable_reason": "CLI stop observed original process exit/endpoint disappearance; no separate host-release snapshot was recorded on this failed attempt. Raw full probe evidence is preserved only in the external owned artifact directory. Unrelated process/device catalogs and personal paths are intentionally omitted.",
+  "groups": {
+    "all_text_submissions": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      }
+    }
+  },
+  "observations": [],
+  "association_limit": "Ordered association for sequential synthetic text submissions only; no native task-ID to app UUID proof. App completion UUID matching is independently retained in original records. First text of a new app is NOT necessarily cold prefix: generic server survives app restart; managed prefix preparation/restore precedes text.",
+  "wall_metric_boundary": "CLI text-submit launch to matched completed translation event; not native inference alone or audio/STT/GUI latency.",
+  "unavailable_phase_reasons": {
+    "three_slots": "Actual app probe submitted sequentially; simultaneous occupancy is measured in standalone matrix, not fabricated for app.",
+    "first_prefix": "First text per fresh app is not guaranteed cold: explicit preparation/restore or surviving external server precedes it."
+  }
+}

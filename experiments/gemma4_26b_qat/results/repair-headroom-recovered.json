@@ -1,0 +1,15 @@
+{
+  "finding":"F1",
+  "observed_at_utc":"2026-10-15T11:40:48.411209+00:00",
+  "llama_server_processes":[],
+  "adapter_luid":"luid_0x00000000_0x0000f60b_phys_0",
+  "system_available_physical_bytes":18578919424,
+  "system_committed_bytes":39448662016,
+  "device_gpu_dedicated_bytes":3151642624,
+  "device_gpu_shared_bytes":340824064,
+  "device_gpu_committed_bytes":3596001280,
+  "counter_errors":{},
+  "reason_for_separately_named_repeats":"Initial matched2048/OFF/1024 requests completed, but serving free RAM was approximately0.48–0.92GB with substantial system paging. During1024 background memory released naturally;3072 then served with minimum5.26GB free. Retain every record and repeat only the first three under recovered conditions, not because a timing was slow. Unrelated processes were not changed.",
+  "reuse":"The clean3072 point remains eligible; final local comparisons use clean repeats plus clean3072, not the older selected-context median or pressure-affected initial rows.",
+  "caution":"A free-RAM snapshot alone is not evidence that serving is uncontested; inspect phase-specific free RAM, paging, sharedGPU and latency before selection."
+}

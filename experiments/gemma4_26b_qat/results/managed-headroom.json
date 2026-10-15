@@ -1,0 +1,15 @@
+{
+  "observed_at_utc":"2026-10-15T11:57:47.521484+00:00",
+  "llama_server_processes":[],
+  "system_available_physical_bytes":15629139968,
+  "system_committed_bytes":44220547072,
+  "device_gpu_dedicated_bytes":3511963648,
+  "device_gpu_shared_bytes":369102848,
+  "device_gpu_committed_bytes":4090335232,
+  "adapter_luid":"luid_0x00000000_0x0000f60b_phys_0",
+  "counter_errors":{},
+  "purpose":"True isolated stock managed E4B reference, not generic endpoint promotion. Same five synthetic texts/four language pairs/two fresh app instances; prefix-preparation wall window separated from text-submit-to-matched-translation completion. Audio collection, endpointing, STT and GUI excluded.",
+  "assets":"Existing E4B and required MTP artifact discovered by filename only; probe copies them into new isolated install, validates both exact pinned SHA256 values and authoritative expected manifest before any app activation. No installer/download call for preflight.",
+  "runtime":"Existing verified b10423 complete Vulkan DLL tree staged under an explicit isolated runtime-root/vulkan. CPU executable absent to fail closed on any attempted GPU fallback. No product source changes.",
+  "diagnostics":"Only new isolated app log may be read. Stock managed native stdout/stderr are DEVNULL; per-translation native owner performance records and read-only native metrics are separate from CLI wall time. Missing metrics remain unavailable."
+}

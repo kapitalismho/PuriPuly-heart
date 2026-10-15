@@ -31,7 +31,9 @@ def main():
         for request in requests:
             key = (request["input"], request["output"])
             unique_outputs.setdefault(key, []).append({"profile": result["profile"], "phase": request["phase"], "index": request["index"]})
-        row = {key: result.get(key) for key in ("profile", "status", "error", "build", "command", "cold_readiness_seconds", "sample_count", "cpu_seconds", "cpu_one_core_percent", "process_exit_code", "shutdown", "counter_errors", "memory_peaks", "phase_memory_peaks", "mapped_resident_at_ready", "mapped_resident_after_repeated", "placement_cache_log")}
+        row = {key: result.get(key) for key in ("profile", "status", "error", "build", "command", "cold_readiness_seconds", "sample_count", "cpu_seconds", "cpu_one_core_percent", "process_exit_code", "shutdown", "counter_errors", "memory_peaks", "phase_memory_peaks", "mapped_resident_at_ready", "mapped_resident_after_repeated", "mapped_file_at_ready", "mapped_file_after_repeated", "placement_cache_log")}
+        if result.get("mapped_resident_at_ready") is not None:
+            row["mapped_resident_correction"] = "WITHDRAWN as residency/size evidence: psutil7.2.2 Windows RegionSize mislabeled rss and truncated to unsigned32. Original retained; see memory-correction.json and new pointer-width snapshots."
         row["gpu_adapter_luid"] = result.get("gpu_adapter_luid")
         row["counter_instances"] = result.get("counter_instances")
         row["elapsed_seconds"] = result.get("elapsed_seconds")
@@ -69,7 +71,9 @@ def main():
                     if key == "system_available_physical_bytes":
                         item[key + "_min"] = min(values) if values else None
                 compact.append(item)
-            (args.results / (result["profile"] + ".samples.jsonl")).write_text("".join(json.dumps(sample, separators=(",", ":")) + "\n" for sample in compact), encoding="utf-8")
+            compact_path = args.results / (result["profile"] + ".samples.jsonl")
+            if not compact_path.exists():
+                compact_path.write_text("".join(json.dumps(sample, separators=(",", ":")) + "\n" for sample in compact), encoding="utf-8")
             row["minimum_available_physical_bytes"] = min(s["system_available_physical_bytes"] for s in samples) if samples else None
         rows.append(row)
     (args.results / "summary.json").write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")

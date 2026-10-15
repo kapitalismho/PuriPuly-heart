@@ -220,6 +220,66 @@
         "index": 6
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "hot_same_pair",
         "index": 2
@@ -261,6 +321,51 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 6
       },
@@ -681,6 +786,121 @@
         "index": 0
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "first_prefix",
         "index": 0
@@ -749,6 +969,56 @@
         "profile": "new-ncpu12-cache2048",
         "phase": "three_slots",
         "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
       },
       {
         "profile": "new-ncpu12-off",
@@ -957,6 +1227,16 @@
         "index": 0
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "three_slots",
         "index": 0
@@ -975,6 +1255,36 @@
         "profile": "new-ncpu12-cache2048",
         "phase": "three_slots",
         "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
       },
       {
         "profile": "new-ncpu12-off",
@@ -1169,12 +1479,32 @@
         "index": 9
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "three_slots",
         "index": 9
       },
       {
         "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 9
       },
@@ -1300,9 +1630,29 @@
         "index": 12
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
         "profile": "new-ncpu12-cache2048",
         "phase": "pair_alternation",
         "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
       },
       {
         "profile": "new-ncpu12-off",
@@ -1723,6 +2073,76 @@
         "index": 12
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 4
@@ -1769,6 +2189,61 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 12
       },
@@ -2109,6 +2584,56 @@
         "index": 4
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "hot_same_pair",
         "index": 1
@@ -2147,6 +2672,41 @@
         "profile": "new-ncpu12-cache2048",
         "phase": "hot_same_pair",
         "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
       },
       {
         "profile": "new-ncpu12-off",
@@ -2555,6 +3115,106 @@
         "index": 11
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "first_prefix",
         "index": 2
@@ -2626,6 +3286,81 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 11
       },
@@ -3114,6 +3849,46 @@
         "index": 7
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 7
@@ -3137,6 +3912,36 @@
         "profile": "new-ncpu12-cache2048",
         "phase": "pair_alternation",
         "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
       },
       {
         "profile": "new-ncpu12-off",
@@ -3357,6 +4162,46 @@
         "index": 15
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 3
@@ -3383,6 +4228,36 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "pair_alternation",
         "index": 15
       },
@@ -3569,6 +4444,26 @@
         "index": 11
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 11
@@ -3580,6 +4475,21 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "pair_alternation",
         "index": 11
       },
@@ -3666,6 +4576,11 @@
       },
       {
         "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
         "phase": "three_slots",
         "index": 8
       },
@@ -3826,6 +4741,41 @@
         "index": 8
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 10
@@ -3852,6 +4802,36 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 8
       },
@@ -4202,6 +5182,86 @@
         "index": 14
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 6
@@ -4258,6 +5318,66 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 14
       },
@@ -4748,6 +5868,86 @@
         "index": 13
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 5
@@ -4804,6 +6004,66 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 13
       },
@@ -5160,6 +6420,46 @@
         "index": 7
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 9
@@ -5186,6 +6486,36 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 7
       },
@@ -5551,6 +6881,86 @@
         "index": 10
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "pair_alternation",
         "index": 1
@@ -5607,6 +7017,66 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "three_slots",
         "index": 10
       },
@@ -5912,6 +7382,26 @@
         "index": 1
       },
       {
+        "profile": "new-ncpu12-cache1024-swa-nocram-repair2",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache1024-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair-control",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram-repair2-control",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
         "profile": "new-ncpu12-cache2048-swa-nocram",
         "phase": "first_prefix",
         "index": 1
@@ -5923,6 +7413,21 @@
       },
       {
         "profile": "new-ncpu12-cache2048",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache3072-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram-repair2",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off-swa-nocram",
         "phase": "first_prefix",
         "index": 1
       },

@@ -1,0 +1,739 @@
+{
+  "profile": "new-cpu-moe-off-swa-nocram",
+  "attempt": 1,
+  "status": "completed",
+  "source_file": "app-new-cpu-moe-off-swa-nocram-attempt1.json",
+  "source": "Original ordered native server timing lines; actual prompt-eval and generation-eval token counts. Generic OAI app did not persist API prompt-total/cache-hit/output counters, which remain unavailable.",
+  "native_count_matches_translation_count": true,
+  "error_or_unavailable_reason": null,
+  "groups": {
+    "all_text_submissions": {
+      "prefill_ms": {
+        "n": 30,
+        "median": 1027.785,
+        "p95": 1066.34,
+        "min": 732.56,
+        "max": 5710.93
+      },
+      "prefill_tps": {
+        "n": 30,
+        "median": 217.78,
+        "p95": 235.29,
+        "min": 28.31,
+        "max": 235.6
+      },
+      "decode_ms": {
+        "n": 30,
+        "median": 625.325,
+        "p95": 786.59,
+        "min": 429.89,
+        "max": 786.89
+      },
+      "decode_tps": {
+        "n": 30,
+        "median": 25.509999999999998,
+        "p95": 25.9,
+        "min": 24.1,
+        "max": 26.02
+      },
+      "prompt_evaluated_tokens": {
+        "n": 30,
+        "median": 222.5,
+        "p95": 244,
+        "min": 29,
+        "max": 848
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 30,
+        "median": 17.0,
+        "p95": 21,
+        "min": 12,
+        "max": 21
+      }
+    },
+    "first_text_per_fresh_app": {
+      "prefill_ms": {
+        "n": 2,
+        "median": 3367.735,
+        "p95": 5710.93,
+        "min": 1024.54,
+        "max": 5710.93
+      },
+      "prefill_tps": {
+        "n": 2,
+        "median": 88.4,
+        "p95": 148.49,
+        "min": 28.31,
+        "max": 148.49
+      },
+      "decode_ms": {
+        "n": 2,
+        "median": 485.225,
+        "p95": 491.29,
+        "min": 479.16,
+        "max": 491.29
+      },
+      "decode_tps": {
+        "n": 2,
+        "median": 24.735,
+        "p95": 25.04,
+        "min": 24.43,
+        "max": 25.04
+      },
+      "prompt_evaluated_tokens": {
+        "n": 2,
+        "median": 438.5,
+        "p95": 848,
+        "min": 29,
+        "max": 848
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 2,
+        "median": 13.0,
+        "p95": 13,
+        "min": 13,
+        "max": 13
+      }
+    },
+    "subsequent_text_submissions": {
+      "prefill_ms": {
+        "n": 28,
+        "median": 1027.785,
+        "p95": 1055.12,
+        "min": 732.56,
+        "max": 1066.34
+      },
+      "prefill_tps": {
+        "n": 28,
+        "median": 218.39,
+        "p95": 235.29,
+        "min": 69.1,
+        "max": 235.6
+      },
+      "decode_ms": {
+        "n": 28,
+        "median": 625.9749999999999,
+        "p95": 786.59,
+        "min": 429.89,
+        "max": 786.89
+      },
+      "decode_tps": {
+        "n": 28,
+        "median": 25.560000000000002,
+        "p95": 25.9,
+        "min": 24.1,
+        "max": 26.02
+      },
+      "prompt_evaluated_tokens": {
+        "n": 28,
+        "median": 222.5,
+        "p95": 244,
+        "min": 52,
+        "max": 244
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 28,
+        "median": 17.0,
+        "p95": 21,
+        "min": 12,
+        "max": 21
+      }
+    },
+    "hot_same_pair": {
+      "prefill_ms": {
+        "n": 4,
+        "median": 751.385,
+        "p95": 767.56,
+        "min": 732.56,
+        "max": 767.56
+      },
+      "prefill_tps": {
+        "n": 4,
+        "median": 78.485,
+        "p95": 87.97,
+        "min": 69.1,
+        "max": 87.97
+      },
+      "decode_ms": {
+        "n": 4,
+        "median": 476.28999999999996,
+        "p95": 488.1,
+        "min": 429.89,
+        "max": 488.1
+      },
+      "decode_tps": {
+        "n": 4,
+        "median": 25.195,
+        "p95": 25.59,
+        "min": 24.59,
+        "max": 25.59
+      },
+      "prompt_evaluated_tokens": {
+        "n": 4,
+        "median": 59.0,
+        "p95": 66,
+        "min": 52,
+        "max": 66
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 4,
+        "median": 13.0,
+        "p95": 13,
+        "min": 12,
+        "max": 13
+      }
+    },
+    "pair_alternation": {
+      "prefill_ms": {
+        "n": 24,
+        "median": 1032.425,
+        "p95": 1055.12,
+        "min": 993.29,
+        "max": 1066.34
+      },
+      "prefill_tps": {
+        "n": 24,
+        "median": 219.70499999999998,
+        "p95": 235.29,
+        "min": 193.34,
+        "max": 235.6
+      },
+      "decode_ms": {
+        "n": 24,
+        "median": 629.05,
+        "p95": 786.59,
+        "min": 503.77,
+        "max": 786.89
+      },
+      "decode_tps": {
+        "n": 24,
+        "median": 25.585,
+        "p95": 25.9,
+        "min": 24.1,
+        "max": 26.02
+      },
+      "prompt_evaluated_tokens": {
+        "n": 24,
+        "median": 229.5,
+        "p95": 244,
+        "min": 194,
+        "max": 244
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 24,
+        "median": 17.0,
+        "p95": 21,
+        "min": 14,
+        "max": 21
+      }
+    },
+    "three_slots": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      }
+    }
+  },
+  "observations": [
+    {
+      "prefill_ms": 5710.93,
+      "prompt_evaluated_tokens": 848,
+      "prefill_tps": 148.49,
+      "decode_ms": 491.29,
+      "decode_eval_tokens": 13,
+      "decode_tps": 24.43,
+      "translation_ordinal": 0,
+      "cycle": 0,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1055.12,
+      "prompt_evaluated_tokens": 204,
+      "prefill_tps": 193.34,
+      "decode_ms": 768.67,
+      "decode_eval_tokens": 21,
+      "decode_tps": 26.02,
+      "translation_ordinal": 1,
+      "cycle": 0,
+      "pair": "en->ko"
+    },
+    {
+      "prefill_ms": 999.9,
+      "prompt_evaluated_tokens": 194,
+      "prefill_tps": 194.02,
+      "decode_ms": 506.09,
+      "decode_eval_tokens": 14,
+      "decode_tps": 25.69,
+      "translation_ordinal": 2,
+      "cycle": 0,
+      "pair": "ja->en"
+    },
+    {
+      "prefill_ms": 1019.21,
+      "prompt_evaluated_tokens": 212,
+      "prefill_tps": 208.0,
+      "decode_ms": 626.31,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.55,
+      "translation_ordinal": 3,
+      "cycle": 0,
+      "pair": "zh-CN->en"
+    },
+    {
+      "prefill_ms": 1032.27,
+      "prompt_evaluated_tokens": 226,
+      "prefill_tps": 218.93,
+      "decode_ms": 631.12,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.35,
+      "translation_ordinal": 4,
+      "cycle": 0,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 752.53,
+      "prompt_evaluated_tokens": 52,
+      "prefill_tps": 69.1,
+      "decode_ms": 488.1,
+      "decode_eval_tokens": 13,
+      "decode_tps": 24.59,
+      "translation_ordinal": 5,
+      "cycle": 0,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1051.46,
+      "prompt_evaluated_tokens": 233,
+      "prefill_tps": 221.6,
+      "decode_ms": 780.76,
+      "decode_eval_tokens": 21,
+      "decode_tps": 25.62,
+      "translation_ordinal": 6,
+      "cycle": 0,
+      "pair": "en->ko"
+    },
+    {
+      "prefill_ms": 1020.83,
+      "prompt_evaluated_tokens": 219,
+      "prefill_tps": 214.53,
+      "decode_ms": 505.9,
+      "decode_eval_tokens": 14,
+      "decode_tps": 25.7,
+      "translation_ordinal": 7,
+      "cycle": 0,
+      "pair": "ja->en"
+    },
+    {
+      "prefill_ms": 1025.66,
+      "prompt_evaluated_tokens": 240,
+      "prefill_tps": 234.0,
+      "decode_ms": 625.01,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.6,
+      "translation_ordinal": 8,
+      "cycle": 0,
+      "pair": "zh-CN->en"
+    },
+    {
+      "prefill_ms": 1042.18,
+      "prompt_evaluated_tokens": 244,
+      "prefill_tps": 234.12,
+      "decode_ms": 663.9,
+      "decode_eval_tokens": 17,
+      "decode_tps": 24.1,
+      "translation_ordinal": 9,
+      "cycle": 0,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 767.56,
+      "prompt_evaluated_tokens": 66,
+      "prefill_tps": 85.99,
+      "decode_ms": 480.7,
+      "decode_eval_tokens": 13,
+      "decode_tps": 24.96,
+      "translation_ordinal": 10,
+      "cycle": 0,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1066.34,
+      "prompt_evaluated_tokens": 233,
+      "prefill_tps": 218.5,
+      "decode_ms": 786.89,
+      "decode_eval_tokens": 21,
+      "decode_tps": 25.42,
+      "translation_ordinal": 11,
+      "cycle": 0,
+      "pair": "en->ko"
+    },
+    {
+      "prefill_ms": 1007.92,
+      "prompt_evaluated_tokens": 219,
+      "prefill_tps": 217.28,
+      "decode_ms": 510.48,
+      "decode_eval_tokens": 14,
+      "decode_tps": 25.47,
+      "translation_ordinal": 12,
+      "cycle": 0,
+      "pair": "ja->en"
+    },
+    {
+      "prefill_ms": 1032.58,
+      "prompt_evaluated_tokens": 240,
+      "prefill_tps": 232.43,
+      "decode_ms": 625.64,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.57,
+      "translation_ordinal": 13,
+      "cycle": 0,
+      "pair": "zh-CN->en"
+    },
+    {
+      "prefill_ms": 1051.18,
+      "prompt_evaluated_tokens": 244,
+      "prefill_tps": 232.12,
+      "decode_ms": 619.29,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.84,
+      "translation_ordinal": 14,
+      "cycle": 0,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1024.54,
+      "prompt_evaluated_tokens": 29,
+      "prefill_tps": 28.31,
+      "decode_ms": 479.16,
+      "decode_eval_tokens": 13,
+      "decode_tps": 25.04,
+      "translation_ordinal": 15,
+      "cycle": 1,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1029.91,
+      "prompt_evaluated_tokens": 204,
+      "prefill_tps": 198.08,
+      "decode_ms": 786.59,
+      "decode_eval_tokens": 21,
+      "decode_tps": 25.43,
+      "translation_ordinal": 16,
+      "cycle": 1,
+      "pair": "en->ko"
+    },
+    {
+      "prefill_ms": 993.44,
+      "prompt_evaluated_tokens": 194,
+      "prefill_tps": 195.28,
+      "decode_ms": 506.38,
+      "decode_eval_tokens": 14,
+      "decode_tps": 25.67,
+      "translation_ordinal": 17,
+      "cycle": 1,
+      "pair": "ja->en"
+    },
+    {
+      "prefill_ms": 1024.56,
+      "prompt_evaluated_tokens": 212,
+      "prefill_tps": 206.92,
+      "decode_ms": 630.11,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.39,
+      "translation_ordinal": 18,
+      "cycle": 1,
+      "pair": "zh-CN->en"
+    },
+    {
+      "prefill_ms": 1035.36,
+      "prompt_evaluated_tokens": 226,
+      "prefill_tps": 218.28,
+      "decode_ms": 629.6,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.41,
+      "translation_ordinal": 19,
+      "cycle": 1,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 732.56,
+      "prompt_evaluated_tokens": 52,
+      "prefill_tps": 70.98,
+      "decode_ms": 429.89,
+      "decode_eval_tokens": 12,
+      "decode_tps": 25.59,
+      "translation_ordinal": 20,
+      "cycle": 1,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1054.05,
+      "prompt_evaluated_tokens": 233,
+      "prefill_tps": 221.05,
+      "decode_ms": 772.12,
+      "decode_eval_tokens": 21,
+      "decode_tps": 25.9,
+      "translation_ordinal": 21,
+      "cycle": 1,
+      "pair": "en->ko"
+    },
+    {
+      "prefill_ms": 993.29,
+      "prompt_evaluated_tokens": 219,
+      "prefill_tps": 220.48,
+      "decode_ms": 506.69,
+      "decode_eval_tokens": 14,
+      "decode_tps": 25.66,
+      "translation_ordinal": 22,
+      "cycle": 1,
+      "pair": "ja->en"
+    },
+    {
+      "prefill_ms": 1018.66,
+      "prompt_evaluated_tokens": 240,
+      "prefill_tps": 235.6,
+      "decode_ms": 638.2,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.07,
+      "translation_ordinal": 23,
+      "cycle": 1,
+      "pair": "zh-CN->en"
+    },
+    {
+      "prefill_ms": 1037.01,
+      "prompt_evaluated_tokens": 244,
+      "prefill_tps": 235.29,
+      "decode_ms": 619.38,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.83,
+      "translation_ordinal": 24,
+      "cycle": 1,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 750.24,
+      "prompt_evaluated_tokens": 66,
+      "prefill_tps": 87.97,
+      "decode_ms": 471.88,
+      "decode_eval_tokens": 13,
+      "decode_tps": 25.43,
+      "translation_ordinal": 25,
+      "cycle": 1,
+      "pair": "ko->en"
+    },
+    {
+      "prefill_ms": 1047.52,
+      "prompt_evaluated_tokens": 233,
+      "prefill_tps": 222.43,
+      "decode_ms": 777.43,
+      "decode_eval_tokens": 21,
+      "decode_tps": 25.73,
+      "translation_ordinal": 26,
+      "cycle": 1,
+      "pair": "en->ko"
+    },
+    {
+      "prefill_ms": 1009.72,
+      "prompt_evaluated_tokens": 219,
+      "prefill_tps": 216.89,
+      "decode_ms": 503.77,
+      "decode_eval_tokens": 14,
+      "decode_tps": 25.81,
+      "translation_ordinal": 27,
+      "cycle": 1,
+      "pair": "ja->en"
+    },
+    {
+      "prefill_ms": 1036.38,
+      "prompt_evaluated_tokens": 240,
+      "prefill_tps": 231.57,
+      "decode_ms": 628.5,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.46,
+      "translation_ordinal": 28,
+      "cycle": 1,
+      "pair": "zh-CN->en"
+    },
+    {
+      "prefill_ms": 1037.5,
+      "prompt_evaluated_tokens": 244,
+      "prefill_tps": 235.18,
+      "decode_ms": 631.66,
+      "decode_eval_tokens": 17,
+      "decode_tps": 25.33,
+      "translation_ordinal": 29,
+      "cycle": 1,
+      "pair": "ko->en"
+    }
+  ],
+  "association_limit": "Ordered association for sequential synthetic text submissions only; no native task-ID to app UUID proof. App completion UUID matching is independently retained in original records. First text of a new app is NOT necessarily cold prefix: generic server survives app restart; managed prefix preparation/restore precedes text.",
+  "wall_metric_boundary": "CLI text-submit launch to matched completed translation event; not native inference alone or audio/STT/GUI latency.",
+  "unavailable_phase_reasons": {
+    "three_slots": "Actual app probe submitted sequentially; simultaneous occupancy is measured in standalone matrix, not fabricated for app.",
+    "first_prefix": "First text per fresh app is not guaranteed cold: explicit preparation/restore or surviving external server precedes it."
+  }
+}

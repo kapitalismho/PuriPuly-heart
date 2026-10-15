@@ -1,0 +1,28 @@
+{
+  "status":"passed_retained_synthetic_log_extraction",
+  "command":"<APP_PYTHON>/python.exe experiments/gemma4_26b_qat/managed_e4b_probe.py --root <ARTIFACT_ROOT> --attempt 1 --extract-only --extraction-output <ARTIFACT_ROOT>/managed-extraction-check-final.json",
+  "process_exit_code":0,
+  "execution_boundary":"Final changed capture_diagnostics helper and extraction-only CLI/control-flow were exercised against retained synthetic managed logs and original public capture. Output written only to external owned artifact root. No model/app launch, state activation, live parser experiment or original-record overwrite.",
+  "source_record":"app-managed-e4b-stock-attempt1.json",
+  "source_log":"<ARTIFACT_ROOT>/app/managed-e4b-stock-attempt1/Local/puripuly-heart/puripuly_heart.log",
+  "extracted_status":"completed_with_structured_native_diagnostics",
+  "joined_records":30,
+  "unique_successful_terminal_request_records":30,
+  "unique_completed_utterance_UUIDs":30,
+  "effective_Vulkan_process_evidence_from_retained_capture":true,
+  "native_phase_values":{
+    "prefill_ms":{"n":30,"median":1035.382,"p95":1099.236,"min":95.1,"max":1120.112},
+    "prefill_tps":{"n":30,"median":805.3791940851734,"p95":856.0532844750282,"min":44.924716542317356,"max":860.1125701384026},
+    "decode_ms":{"n":30,"median":196.4105,"p95":268.336,"min":147.986,"max":268.854},
+    "decode_tps":{"n":30,"median":81.8045,"p95":82.221,"min":40.914,"max":82.265},
+    "prompt_evaluated_tokens_median":863,
+    "prompt_cached_tokens_median":0,
+    "prompt_total_tokens_median":877,
+    "API_predicted_output_tokens_median":17,
+    "native_printed_decode_count":"Unavailable; stock managed stderr DEVNULL, not estimated from output."
+  },
+  "bracketed_native_prefix_evaluation_windows":3,
+  "zero_evaluation_apply_or_restore_windows":28,
+  "original_classification":"inconclusive_effective_backend_or_metrics retained in original capture; legacy Performance text was redacted. Recovery is separate and directly joined, not suppressed missing evidence.",
+  "limits":"No claim that the final live-launch path was rerun after helper extraction cleanup. Its common extraction/classification function was executed; unchanged prior actual-app/model observations remain the runtime evidence."
+}
