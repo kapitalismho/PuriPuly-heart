@@ -1,0 +1,51 @@
+# Translation quality gate
+
+The first compatibility gate executed twelve frozen synthetic evaluations on each of b10423 CPU+MTP, b11537 CPU+MTP, b10423 Vulkan without MTP, and b11537 Vulkan without MTP: 48 completed translations, no empty response, output-limit stop, mechanical marker flag, corruption or observed reasoning leakage. All four profiles produced the same translation text for each of these twelve seed42/temperature0.6 requests. **Automatic sanity success and cross-runtime parity are not an unqualified semantic pass.** Independent read-only semantic scrutiny found one shared temporal-anchor concern below. This is a bounded runtime-regression sanity gate, not a replacement for #64's external648-sample model-selection evidence or a universal quality guarantee.
+
+Exact outputs and terminal/token telemetry are in `results/requests.jsonl`, phase `quality`. Inputs and mechanical checks are frozen in `measure.py`. Human semantic review used the following invariants:
+
+| Case | Meaning/invariants inspected | Compatibility verdict |
+| --- | --- | --- |
+| en-ko-negation | Mina did **not** buy twelve tickets; name and 12 retained | Pass |
+| ko-en-time | Jisu comes at 3:15 PM; prohibition on lateness retained | Pass |
+| ja-en-negation | Yuna does **not** possess the blue key | Pass |
+| zh-en-number | Lin did **not** cancel two Friday tickets | Pass |
+| en-ja-name | Ask Kai to wait seven minutes, explicitly **not seventeen** | Pass |
+| en-ko-decimal | Red box costs 4.50 dollars, **not 45** | Pass |
+| ko-en-tone | Reassurance; no obligation to help right now | Pass |
+| ja-ko-time | Meet at station tomorrow at 9 AM | Pass |
+| en-ko-context | Speaker meant blue, not red; no unsupported context addition | Pass |
+| zh-en-quote | Tell Anna “I won't be late”; embedded negation retained | Pass |
+| en-ja-fragment | “Maybe later, after lunch.” → “たぶん、お昼過ぎかな。” preserves uncertainty/fragment, but conventionally means after noon, not necessarily after eating lunch; meal-completion condition/later relation weakened | Shared semantic concern, all four arms; no update regression |
+| ko-en-mixed | Address Alex; room B-21, **not B-12** | Pass |
+
+Output-token ceilings are safety limits, not benchmark lengths. No compatibility translation was deliberately truncated to produce a speed number. Per-token speed uses native actual counts; wall/TTFT comparisons do not require cross-kernel token equality. Tuning uses three different development source texts, not these final evaluation inputs.
+
+The fixed five-line synthetic context is deliberately non-authoritative background. Current product prompt assembly and serialization remain intact. For repeated performance requests, a synthetic `Step <request_index>:` marker near the beginning of the first history line changes each turn, preventing a misleading exact-full-user-prompt cache hit while retaining the language-pair system prefix. The exact mutation is in `measure.py`; it was frozen before the first tuning/final timing run.
+
+## Independent semantic scrutiny and provenance
+
+Independent inspection of the four completed quality runs and their48 matching rows confirmed12/12 exact output/hash parity, EOS stops,9–23 predicted tokens against the128 safety ceiling, and no visible reasoning leakage, wrappers, replacement-character corruption, harmful repetition or exhaustion truncation. The other eleven cases have no material semantic concern identified in that inspection, with minor register/classifier naturalness differences noted. The `en-ja-fragment` concern prevents calling the set12/12 semantically correct: lunch can occur after noon, so the output may allow an action before the meal finishes. It is shared by baseline/candidate and both backends, not a demonstrated runtime regression. No model/prompt fix or extra quality sweep is part of this negative-update investigation.
+
+Mechanical markers do not assess semantic relations or all negations. For example, the decimal case's substring check alone cannot prove the4.50-versus45 relation; semantic inspection of the actual output does. Token equality proves parity, not correctness.
+
+Historical quality rows predate the later `history` record addition and do **not** capture a full user/context hash or rendered user request. Their system/formatted-prefix hashes agree across runs, but that is not a complete immutable full-prompt audit. The unchanged frozen `CONTEXT5` workload definition inspected with those rows is:
+
+```text
+[self] We are meeting near the station.
+[peer] The blue box is beside the door.
+[self] Mina will arrive later.
+[peer] I have not bought the tickets yet.
+[self] Let us check the time first.
+```
+
+This is preserved definition/provenance, **not a retroactively captured request hash**. Quality phase uses these literal labelled lines without performance's Step mutation. The later literal-confirmation phase applies the real resolver's bullets/quotes and filters; actual-app warm context is generated by the real pipeline. Those data are not pooled into the earlier quality gate.
+
+## Later context-stress limits
+
+All eight literal arms at request_index0 produce `미나는 12장짜리 티켓을 사지 않았대요.` with the same recorded five-entry history hash `5b737fc42671e7b70fac586a659f5044bc17a8c6df39466aa839abef181d400c`. The12-count numeral becomes a ticket/product modifier rather than an unambiguous purchase quantity, and `-대요` adds hearsay absent from the plain English assertion. This is a shared **semantic fidelity concern**, not merely cosmetic fluency. It also recurs at CPU indices3/9 and old Vulkan index6; candidate Vulkan index6 instead preserves the plain assertion/quantity. No candidate degradation is established by that distribution.
+
+The actual candidate Vulkan warm-history source `Mina did not buy 17 tickets.` produces `미나는 17장짜리 티켓을 사지 않았어.` with context_entries5. It has the same attachment ambiguity, but **no12→17 substitution** and no added hearsay: the source itself says17. The receipt and matching completed event refer to one sample, not multiple independent failures. Natural object ellipsis and `Jisu`/`Jisoo` romanization are not counted as quality defects.
+
+Names/numeric tokens/negation surviving is useful, but not sufficient semantic evidence. Exact outputs remain in `requests.jsonl` /the actual-app JSON; no positive overall quality or unconditional rollout claim is based on these stress samples.
+

@@ -1,0 +1,4671 @@
+{
+  "app-new-cpu-cache0-app": {
+    "raw": "app-new-cpu-cache0-app.json",
+    "label": "app-new-cpu-cache0",
+    "failure": null,
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "abb28c16-1cb2-458b-ae26-ea5376184451",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 41140.2765669,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 48436,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ja",
+            "en",
+            2
+          ],
+          [
+            "de",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            2
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 41150.9124,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 14,
+            "prompt_ms": 161.469,
+            "generation_ms": 488.924,
+            "generation_tps": 26.588999517307396,
+            "drafted_tokens": 21,
+            "accepted_tokens": 6
+          },
+          "text": "미나는 티켓 12장을 사지 않았어요.",
+          "wall_ms": 656.172199996945,
+          "user_message_sha256": "f4f457dfeb29b9844f0eb9c47f2f84ced1fcd8c4625e4a79e0b59900a6c902db",
+          "context_entries": 0
+        },
+        "completed_translations": 38,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓 12장을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "지수는 오후 3시 15분에 와요. 늦지 마세요.",
+            "texts": [
+              "Jisoo is coming at 3:15 PM. Don't be late."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "The blue key is not mine.",
+            "texts": [
+              "파란 열쇠는 제 게 아니에요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "ユナは青い鍵を持っていません。",
+            "texts": [
+              "Yuna doesn't have the blue key."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Anna hat nicht 17, sondern 7 Karten.",
+            "texts": [
+              "Anna doesn't have 17, she has 7 cards."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex will wait for 7 minutes, not 17.",
+            "texts": [
+              "알렉스는 17분이 아니라 7분 기다릴 거예요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex, B-12 방이 아니라 B-21 방이에요.",
+            "texts": [
+              "Alex, it's room B-21, not B-12."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓을 12개 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 13 tickets.",
+            "texts": [
+              "미나는 13장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 14 tickets.",
+            "texts": [
+              "미나는 14장 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 15 tickets.",
+            "texts": [
+              "미나는 15장 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 16 tickets.",
+            "texts": [
+              "미나는 16장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 17 tickets.",
+            "texts": [
+              "미나는 17장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 18 tickets.",
+            "texts": [
+              "미나는 18장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 19 tickets.",
+            "texts": [
+              "미나는 19장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 20 tickets.",
+            "texts": [
+              "미나는 20장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 21 tickets.",
+            "texts": [
+              "미나는 21장 티켓도 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 22 tickets.",
+            "texts": [
+              "미나는 22장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 23 tickets.",
+            "texts": [
+              "미나는 23장 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 24 tickets.",
+            "texts": [
+              "미나는 24장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 25 tickets.",
+            "texts": [
+              "미나는 25장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 26 tickets.",
+            "texts": [
+              "미나는 26장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 27 tickets.",
+            "texts": [
+              "미나는 27장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 28 tickets.",
+            "texts": [
+              "미나는 28장도 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 29 tickets.",
+            "texts": [
+              "미나는 29장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 30 tickets.",
+            "texts": [
+              "미나는 30장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 31 tickets.",
+            "texts": [
+              "미나는 31장을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 32 tickets.",
+            "texts": [
+              "미나는 32장을 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 33 tickets.",
+            "texts": [
+              "미나는 33장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 34 tickets.",
+            "texts": [
+              "미나는 34장도 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 35 tickets.",
+            "texts": [
+              "미나는 35장을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 36 tickets.",
+            "texts": [
+              "미나는 36장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 37 tickets.",
+            "texts": [
+              "미나는 37장 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 38 tickets.",
+            "texts": [
+              "미나는 38장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 39 tickets.",
+            "texts": [
+              "미나는 39장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 40 tickets.",
+            "texts": [
+              "미나는 40장을 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 41 tickets.",
+            "texts": [
+              "미나는 41장의 티켓을 사지 않았어요."
+            ]
+          }
+        ],
+        "prefix_prepares": [
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41149.8274948,
+            "slot": 0,
+            "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+            "wall_ms": 3345.511700004863
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41154.5409423,
+            "slot": 1,
+            "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+            "wall_ms": 3347.441500001878
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41159.911126,
+            "slot": 2,
+            "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+            "wall_ms": 3319.1674999980023
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41161.5278594,
+            "slot": 1,
+            "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+            "wall_ms": 729.0266999989399
+          }
+        ],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 41163.8736955,
+            "result": true,
+            "wall_ms": 50.95679999794811,
+            "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+            "slot_id": 2
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 41149.889292,
+            "path": "/slots/0",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "n_saved": 825,
+              "n_written": 68311380,
+              "timings": {
+                "save_ms": 59.575
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41154.5983624,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "n_saved": 823,
+              "n_written": 68196636,
+              "timings": {
+                "save_ms": 55.334
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41159.9665773,
+            "path": "/slots/2",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "n_saved": 819,
+              "n_written": 67967148,
+              "timings": {
+                "save_ms": 53.844
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41161.5899178,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.cpu.bin",
+              "n_saved": 807,
+              "n_written": 88912468,
+              "timings": {
+                "save_ms": 60.472
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41163.873353,
+            "path": "/slots/2",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "n_restored": 823,
+              "n_read": 68196636,
+              "timings": {
+                "restore_ms": 49.342
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41146.4816785,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41151.1932875,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41156.5917478,
+            "identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41160.7985685,
+            "identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41163.8225308,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 41196.5002202,
+            "pid": 45716,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 41196.2156567,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 41196.5004246,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": [
+          {
+            "pid": 45716,
+            "observation": {
+              "status": "no_matching_process_counter_instances",
+              "instances": 0,
+              "dedicated_bytes": null,
+              "shared_bytes": null
+            }
+          }
+        ],
+        "resource_snapshots": [
+          {
+            "kind": "native_resources",
+            "monotonic": 41150.912861,
+            "pid": 45716,
+            "working_set": 6051737600,
+            "private_commit": 3567607808,
+            "peak_working_set": 6054887424,
+            "peak_private_commit": 3576680448
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41155.37359,
+            "pid": 45716,
+            "working_set": 6136422400,
+            "private_commit": 3651817472,
+            "peak_working_set": 6139572224,
+            "peak_private_commit": 3655028736
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41156.3166182,
+            "pid": 45716,
+            "working_set": 6136610816,
+            "private_commit": 3651813376,
+            "peak_working_set": 6139760640,
+            "peak_private_commit": 3655028736
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41160.5138614,
+            "pid": 45716,
+            "working_set": 6221373440,
+            "private_commit": 3736244224,
+            "peak_working_set": 6224523264,
+            "peak_private_commit": 3739455488
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41162.2880711,
+            "pid": 45716,
+            "working_set": 6242783232,
+            "private_commit": 3757264896,
+            "peak_working_set": 6245933056,
+            "peak_private_commit": 3760447488
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41163.5448494,
+            "pid": 45716,
+            "working_set": 6263939072,
+            "private_commit": 3778285568,
+            "peak_working_set": 6267088896,
+            "peak_private_commit": 3781505024
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41164.74512,
+            "pid": 45716,
+            "working_set": 6264147968,
+            "private_commit": 3778408448,
+            "peak_working_set": 6267297792,
+            "peak_private_commit": 3781623808
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41165.9928453,
+            "pid": 45716,
+            "working_set": 6264188928,
+            "private_commit": 3778408448,
+            "peak_working_set": 6267338752,
+            "peak_private_commit": 3781623808
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41166.8105287,
+            "pid": 45716,
+            "working_set": 6264213504,
+            "private_commit": 3778408448,
+            "peak_working_set": 6267363328,
+            "peak_private_commit": 3781623808
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41167.5773283,
+            "pid": 45716,
+            "working_set": 6285209600,
+            "private_commit": 3799433216,
+            "peak_working_set": 6288359424,
+            "peak_private_commit": 3802648576
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41168.4129014,
+            "pid": 45716,
+            "working_set": 6306246656,
+            "private_commit": 3820453888,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41169.3605834,
+            "pid": 45716,
+            "working_set": 6264287232,
+            "private_commit": 3778412544,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41170.1509734,
+            "pid": 45716,
+            "working_set": 6285279232,
+            "private_commit": 3799433216,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41171.0721104,
+            "pid": 45716,
+            "working_set": 6285287424,
+            "private_commit": 3799433216,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41172.0472082,
+            "pid": 45716,
+            "working_set": 6285291520,
+            "private_commit": 3799433216,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41173.029014,
+            "pid": 45716,
+            "working_set": 6285258752,
+            "private_commit": 3799363584,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41174.0234827,
+            "pid": 45716,
+            "working_set": 6285271040,
+            "private_commit": 3799363584,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41175.1416156,
+            "pid": 45716,
+            "working_set": 6285279232,
+            "private_commit": 3799367680,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41176.1228062,
+            "pid": 45716,
+            "working_set": 6285279232,
+            "private_commit": 3799363584,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41177.1830732,
+            "pid": 45716,
+            "working_set": 6285287424,
+            "private_commit": 3799363584,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41178.1894385,
+            "pid": 45716,
+            "working_set": 6285287424,
+            "private_commit": 3799363584,
+            "peak_working_set": 6309396480,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41179.178273,
+            "pid": 45716,
+            "working_set": 6306267136,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309416960,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41180.1400307,
+            "pid": 45716,
+            "working_set": 6306267136,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309416960,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41181.1221785,
+            "pid": 45716,
+            "working_set": 6306267136,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309416960,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41182.243463,
+            "pid": 45716,
+            "working_set": 6306267136,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309416960,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41183.2476285,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41184.2824223,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820388352,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41185.2633653,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41186.3619279,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41187.4196147,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41188.5304296,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41189.5045843,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41190.4854289,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41191.4702916,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41192.4611731,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41193.4355899,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41194.4877734,
+            "pid": 45716,
+            "working_set": 6306316288,
+            "private_commit": 3820384256,
+            "peak_working_set": 6309466112,
+            "peak_private_commit": 3823669248
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41195.4693735,
+            "pid": 45716,
+            "working_set": 6306672640,
+            "private_commit": 3820773376,
+            "peak_working_set": 6309822464,
+            "peak_private_commit": 3823980544
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41196.2152492,
+            "pid": 45716,
+            "working_set": 6306672640,
+            "private_commit": 3820773376,
+            "peak_working_set": 6309822464,
+            "peak_private_commit": 3823980544
+          }
+        ],
+        "observed_history_entry_counts": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      {
+        "cycle": 1,
+        "instance_id": "bca21c6e-04bd-447d-aaff-6fd704b26dba",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 41198.5407653,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 17772,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 41204.5756612,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 193.695,
+            "generation_ms": 389.966,
+            "generation_tps": 35.90056569034223,
+            "drafted_tokens": 15,
+            "accepted_tokens": 10
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어요.",
+          "wall_ms": 589.6938000005321,
+          "user_message_sha256": "f4f457dfeb29b9844f0eb9c47f2f84ced1fcd8c4625e4a79e0b59900a6c902db",
+          "context_entries": 0
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어요."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 41203.6322249,
+            "result": true,
+            "wall_ms": 47.96930000156863,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 41203.6319151,
+            "path": "/slots/0",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "n_restored": 825,
+              "n_read": 68311380,
+              "timings": {
+                "restore_ms": 46.607
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41203.583977,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 41205.6208825,
+            "pid": 6048,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 41205.3490938,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 41205.62107,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": [
+          {
+            "pid": 6048,
+            "observation": {
+              "status": "no_matching_process_counter_instances",
+              "instances": 0,
+              "dedicated_bytes": null,
+              "shared_bytes": null
+            }
+          }
+        ],
+        "resource_snapshots": [
+          {
+            "kind": "native_resources",
+            "monotonic": 41204.5761248,
+            "pid": 6048,
+            "working_set": 5933764608,
+            "private_commit": 3553550336,
+            "peak_working_set": 5936795648,
+            "peak_private_commit": 3631583232
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41205.3486755,
+            "pid": 6048,
+            "working_set": 5933764608,
+            "private_commit": 3553550336,
+            "peak_working_set": 5936795648,
+            "peak_private_commit": 3631583232
+          }
+        ],
+        "observed_history_entry_counts": [
+          0
+        ]
+      },
+      {
+        "cycle": 2,
+        "instance_id": "6254bec7-ed1a-41f9-aff4-7ba9df7aa03d",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 41207.4486287,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 27596,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 41213.5478443,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 14,
+            "prompt_ms": 167.671,
+            "generation_ms": 483.223,
+            "generation_tps": 26.90269295956525,
+            "drafted_tokens": 21,
+            "accepted_tokens": 6
+          },
+          "text": "미나는 티켓 12장을 사지 않았어.",
+          "wall_ms": 656.570200000715,
+          "user_message_sha256": "f4f457dfeb29b9844f0eb9c47f2f84ced1fcd8c4625e4a79e0b59900a6c902db",
+          "context_entries": 0
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓 12장을 사지 않았어."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 41212.548568,
+            "result": true,
+            "wall_ms": 46.77030000311788,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 41212.5482043,
+            "path": "/slots/0",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "n_restored": 825,
+              "n_read": 68311380,
+              "timings": {
+                "restore_ms": 45.306
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41212.5015302,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 41214.5352563,
+            "pid": 44848,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 41214.2659548,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 41214.5354372,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": [
+          {
+            "pid": 44848,
+            "observation": {
+              "status": "no_matching_process_counter_instances",
+              "instances": 0,
+              "dedicated_bytes": null,
+              "shared_bytes": null
+            }
+          }
+        ],
+        "resource_snapshots": [
+          {
+            "kind": "native_resources",
+            "monotonic": 41213.5483548,
+            "pid": 44848,
+            "working_set": 5934477312,
+            "private_commit": 3554537472,
+            "peak_working_set": 5937504256,
+            "peak_private_commit": 3632484352
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41214.2655593,
+            "pid": 44848,
+            "working_set": 5934477312,
+            "private_commit": 3554537472,
+            "peak_working_set": 5937504256,
+            "peak_private_commit": 3632484352
+          }
+        ],
+        "observed_history_entry_counts": [
+          0
+        ]
+      }
+    ],
+    "command_statuses": {
+      "None": 18,
+      "applied": 57,
+      "stopped": 3
+    },
+    "command_errors": [],
+    "foreign_cache_control": {
+      "source_label": "app-old-cpu-guarded",
+      "copied_filenames": [
+        "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+        "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+        "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+        "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin",
+        "index.json"
+      ],
+      "policy": "exact process-local runtime identity must make foreign files ineligible; never restore cross-revision KV"
+    },
+    "udp_datagram_count": 120
+  },
+  "app-new-cpu-guarded-app": {
+    "raw": "app-new-cpu-guarded-app.json",
+    "label": "app-new-cpu-guarded",
+    "failure": null,
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "0bd0d6be-8262-4315-a25a-f3692309e5d3",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39522.1202141,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 43172,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ja",
+            "en",
+            2
+          ],
+          [
+            "de",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            2
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39532.8822007,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 167.23,
+            "generation_ms": 424.858,
+            "generation_tps": 32.95218637756615,
+            "drafted_tokens": 18,
+            "accepted_tokens": 8
+          },
+          "text": "미나는 12장 티켓을 사지 않았어.",
+          "wall_ms": 597.7591999981087
+        },
+        "completed_translations": 8,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "지수는 오후 3시 15분에 와요. 늦지 마세요.",
+            "texts": [
+              "Jisoo is coming at 3:15 PM. Don't be late."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "The blue key is not mine.",
+            "texts": [
+              "파란 열쇠는 제 것이 아니에요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "ユナは青い鍵を持っていません。",
+            "texts": [
+              "Yuna doesn't have the blue key."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Anna hat nicht 17, sondern 7 Karten.",
+            "texts": [
+              "Anna doesn't have 17, she has 7 cards."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex will wait for 7 minutes, not 17.",
+            "texts": [
+              "알렉스는 17분이 아니라 7분 기다릴 거예요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex, B-12 방이 아니라 B-21 방이에요.",
+            "texts": [
+              "Alex, it's room B-21, not B-12."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장이나 사지 않았어요."
+            ]
+          }
+        ],
+        "prefix_prepares": [
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39531.8537001,
+            "slot": 0,
+            "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+            "wall_ms": 3490.3486000039265
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39536.6749119,
+            "slot": 1,
+            "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+            "wall_ms": 3504.3055999994976
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39542.36895,
+            "slot": 2,
+            "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+            "wall_ms": 3540.3287000008277
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39544.0430252,
+            "slot": 1,
+            "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+            "wall_ms": 770.766999994521
+          }
+        ],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39546.4609922,
+            "result": true,
+            "wall_ms": 51.13230000279145,
+            "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+            "slot_id": 2
+          }
+        ],
+        "slot_http": [],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39528.3630854,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39533.1703729,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39538.8283833,
+            "identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39543.2720123,
+            "identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39546.4096343,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39549.6233128,
+            "pid": 48552,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39549.3123597,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39549.6235054,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      },
+      {
+        "cycle": 1,
+        "instance_id": "4c991e71-70fa-4a45-9aa7-39c0fa1ddc8b",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39551.2400023,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 45348,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39557.2277906,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 12,
+            "prompt_ms": 174.572,
+            "generation_ms": 356.786,
+            "generation_tps": 30.83080614149658,
+            "drafted_tokens": 15,
+            "accepted_tokens": 6
+          },
+          "text": "미나는 12장을 안 샀어.",
+          "wall_ms": 537.0650000040769
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장을 안 샀어."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39556.3449988,
+            "result": true,
+            "wall_ms": 46.70659999828786,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39556.2980175,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.cpu.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.cpu.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.cpu.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39558.2379189,
+            "pid": 11628,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39557.9590766,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39558.2381582,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      }
+    ],
+    "command_statuses": {
+      "None": 14,
+      "applied": 23,
+      "stopped": 2
+    },
+    "command_errors": [],
+    "foreign_cache_control": {
+      "source_label": "app-old-cpu-guarded",
+      "copied_filenames": [
+        "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+        "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+        "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+        "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin",
+        "index.json"
+      ],
+      "policy": "exact process-local runtime identity must make foreign files ineligible; never restore cross-revision KV"
+    },
+    "udp_datagram_count": 27
+  },
+  "app-new-vulkan-cache0-app": {
+    "raw": "app-new-vulkan-cache0-app.json",
+    "label": "app-new-vulkan-cache0",
+    "failure": null,
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "a77d4800-9dd4-48ab-a05e-7f771ffb10bb",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 41216.4720599,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 38444,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ja",
+            "en",
+            2
+          ],
+          [
+            "de",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            2
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 41222.6811305,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 90.185,
+            "generation_ms": 179.0,
+            "generation_tps": 78.2122905027933,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어.",
+          "wall_ms": 274.9121999950148,
+          "user_message_sha256": "f4f457dfeb29b9844f0eb9c47f2f84ced1fcd8c4625e4a79e0b59900a6c902db",
+          "context_entries": 0
+        },
+        "completed_translations": 38,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "지수는 오후 3시 15분에 와요. 늦지 마세요.",
+            "texts": [
+              "Jisu is coming at 3:15 PM. Don't be late."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "The blue key is not mine.",
+            "texts": [
+              "파란 열쇠는 제 게 아니에요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "ユナは青い鍵を持っていません。",
+            "texts": [
+              "Yuna doesn't have the blue key."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Anna hat nicht 17, sondern 7 Karten.",
+            "texts": [
+              "Anna doesn't have 17, but 7 cards."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex will wait for 7 minutes, not 17.",
+            "texts": [
+              "알렉스는 17분이 아니라 7분 기다릴 거예요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex, B-12 방이 아니라 B-21 방이에요.",
+            "texts": [
+              "Alex, it's room B-21, not B-12."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장을 안 샀어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 13 tickets.",
+            "texts": [
+              "미나는 13장 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 14 tickets.",
+            "texts": [
+              "미나는 14장을 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 15 tickets.",
+            "texts": [
+              "미나는 15장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 16 tickets.",
+            "texts": [
+              "미나는 16장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 17 tickets.",
+            "texts": [
+              "미나는 17장짜리 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 18 tickets.",
+            "texts": [
+              "미나는 18장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 19 tickets.",
+            "texts": [
+              "미나는 19장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 20 tickets.",
+            "texts": [
+              "미나는 20장도 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 21 tickets.",
+            "texts": [
+              "미나는 21장도 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 22 tickets.",
+            "texts": [
+              "미나는 22장 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 23 tickets.",
+            "texts": [
+              "미나는 23장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 24 tickets.",
+            "texts": [
+              "미나는 24장도 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 25 tickets.",
+            "texts": [
+              "미나는 25장을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 26 tickets.",
+            "texts": [
+              "미나는 26장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 27 tickets.",
+            "texts": [
+              "미나는 27장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 28 tickets.",
+            "texts": [
+              "미나는 28장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 29 tickets.",
+            "texts": [
+              "미나는 29장 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 30 tickets.",
+            "texts": [
+              "미나는 30장을 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 31 tickets.",
+            "texts": [
+              "미나는 31장을 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 32 tickets.",
+            "texts": [
+              "미나는 32장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 33 tickets.",
+            "texts": [
+              "미나는 33장 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 34 tickets.",
+            "texts": [
+              "미나는 34장을 안 샀어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 35 tickets.",
+            "texts": [
+              "미나는 35장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 36 tickets.",
+            "texts": [
+              "미나는 36장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 37 tickets.",
+            "texts": [
+              "미나는 37장을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 38 tickets.",
+            "texts": [
+              "미나는 38장의 티켓을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 39 tickets.",
+            "texts": [
+              "미나는 39장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 40 tickets.",
+            "texts": [
+              "미나는 40장을 사지 않았어요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 41 tickets.",
+            "texts": [
+              "미나는 41장도 안 샀어."
+            ]
+          }
+        ],
+        "prefix_prepares": [
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41222.025694,
+            "slot": 0,
+            "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+            "wall_ms": 826.230900005612
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41223.7315082,
+            "slot": 1,
+            "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+            "wall_ms": 796.6044999993755
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41225.9168938,
+            "slot": 2,
+            "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+            "wall_ms": 795.7543000011356
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 41226.7883439,
+            "slot": 1,
+            "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+            "wall_ms": 218.8395999983186
+          }
+        ],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 41228.216432,
+            "result": true,
+            "wall_ms": 33.00609999860171,
+            "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "slot_id": 2
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 41222.0580952,
+            "path": "/slots/0",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "n_saved": 825,
+              "n_written": 68311364,
+              "timings": {
+                "save_ms": 30.228
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41223.7610798,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "n_saved": 823,
+              "n_written": 68196620,
+              "timings": {
+                "save_ms": 28.063
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41225.9476328,
+            "path": "/slots/2",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "n_saved": 819,
+              "n_written": 67967132,
+              "timings": {
+                "save_ms": 29.438
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41226.8246093,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin",
+              "n_saved": 807,
+              "n_written": 88912444,
+              "timings": {
+                "save_ms": 34.903
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 41228.2161652,
+            "path": "/slots/2",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "n_restored": 823,
+              "n_read": 68196620,
+              "timings": {
+                "restore_ms": 31.631
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41221.1991846,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41222.9346933,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41225.1208997,
+            "identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41226.5692742,
+            "identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41228.1832168,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 41245.2435462,
+            "pid": 44380,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 41244.9750202,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 41245.2437471,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": [
+          {
+            "pid": 44380,
+            "observation": {
+              "status": "no_matching_process_counter_instances",
+              "instances": 0,
+              "dedicated_bytes": null,
+              "shared_bytes": null
+            }
+          }
+        ],
+        "resource_snapshots": [
+          {
+            "kind": "native_resources",
+            "monotonic": 41222.6815139,
+            "pid": 44380,
+            "working_set": 3662557184,
+            "private_commit": 3911737344,
+            "peak_working_set": 3662557184,
+            "peak_private_commit": 3911761920
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41224.2382819,
+            "pid": 44380,
+            "working_set": 3748716544,
+            "private_commit": 3999498240,
+            "peak_working_set": 3748716544,
+            "peak_private_commit": 3999522816
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41224.8705565,
+            "pid": 44380,
+            "working_set": 3748909056,
+            "private_commit": 4004642816,
+            "peak_working_set": 3748909056,
+            "peak_private_commit": 4004683776
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41226.3173122,
+            "pid": 44380,
+            "working_set": 3828367360,
+            "private_commit": 4083150848,
+            "peak_working_set": 3828367360,
+            "peak_private_commit": 4083200000
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41227.2440066,
+            "pid": 44380,
+            "working_set": 3849781248,
+            "private_commit": 4100513792,
+            "peak_working_set": 3849781248,
+            "peak_private_commit": 4100579328
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41227.9406081,
+            "pid": 44380,
+            "working_set": 3870928896,
+            "private_commit": 4116475904,
+            "peak_working_set": 3870928896,
+            "peak_private_commit": 4121571328
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41228.7215053,
+            "pid": 44380,
+            "working_set": 3876917248,
+            "private_commit": 4122361856,
+            "peak_working_set": 3876917248,
+            "peak_private_commit": 4122402816
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41229.4239689,
+            "pid": 44380,
+            "working_set": 3877044224,
+            "private_commit": 4122427392,
+            "peak_working_set": 3877044224,
+            "peak_private_commit": 4122427392
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41229.9029363,
+            "pid": 44380,
+            "working_set": 3877109760,
+            "private_commit": 4122447872,
+            "peak_working_set": 3877109760,
+            "peak_private_commit": 4122468352
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41230.3346572,
+            "pid": 44380,
+            "working_set": 3898167296,
+            "private_commit": 4143501312,
+            "peak_working_set": 3898167296,
+            "peak_private_commit": 4143566848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41230.7530145,
+            "pid": 44380,
+            "working_set": 3919187968,
+            "private_commit": 4164538368,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41231.2697641,
+            "pid": 44380,
+            "working_set": 3877257216,
+            "private_commit": 4122501120,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41231.6840399,
+            "pid": 44380,
+            "working_set": 3898277888,
+            "private_commit": 4138377216,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41232.2210319,
+            "pid": 44380,
+            "working_set": 3898314752,
+            "private_commit": 4138381312,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41232.7413077,
+            "pid": 44380,
+            "working_set": 3904364544,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41233.2535809,
+            "pid": 44380,
+            "working_set": 3904393216,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41233.7411512,
+            "pid": 44380,
+            "working_set": 3904425984,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41234.2313583,
+            "pid": 44380,
+            "working_set": 3904446464,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41234.7471627,
+            "pid": 44380,
+            "working_set": 3904471040,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41235.267083,
+            "pid": 44380,
+            "working_set": 3904491520,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41235.7568629,
+            "pid": 44380,
+            "working_set": 3904524288,
+            "private_commit": 4144406528,
+            "peak_working_set": 3919187968,
+            "peak_private_commit": 4164558848
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41236.2339275,
+            "pid": 44380,
+            "working_set": 3931582464,
+            "private_commit": 4171493376,
+            "peak_working_set": 3931582464,
+            "peak_private_commit": 4171497472
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41236.7521883,
+            "pid": 44380,
+            "working_set": 3931598848,
+            "private_commit": 4171513856,
+            "peak_working_set": 3931598848,
+            "peak_private_commit": 4171542528
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41237.2666534,
+            "pid": 44380,
+            "working_set": 3931623424,
+            "private_commit": 4171513856,
+            "peak_working_set": 3931623424,
+            "peak_private_commit": 4171563008
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41237.7786434,
+            "pid": 44380,
+            "working_set": 3931643904,
+            "private_commit": 4171513856,
+            "peak_working_set": 3931643904,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41238.2938156,
+            "pid": 44380,
+            "working_set": 3931656192,
+            "private_commit": 4171513856,
+            "peak_working_set": 3931656192,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41238.773561,
+            "pid": 44380,
+            "working_set": 3931684864,
+            "private_commit": 4171513856,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41239.2462656,
+            "pid": 44380,
+            "working_set": 3925975040,
+            "private_commit": 4165779456,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41239.7609109,
+            "pid": 44380,
+            "working_set": 3925983232,
+            "private_commit": 4165779456,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41240.2798985,
+            "pid": 44380,
+            "working_set": 3925987328,
+            "private_commit": 4165779456,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41240.7529067,
+            "pid": 44380,
+            "working_set": 3926011904,
+            "private_commit": 4165779456,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41241.2665501,
+            "pid": 44380,
+            "working_set": 3926032384,
+            "private_commit": 4165779456,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41241.782949,
+            "pid": 44380,
+            "working_set": 3926044672,
+            "private_commit": 4165779456,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41242.2547463,
+            "pid": 44380,
+            "working_set": 3920064512,
+            "private_commit": 4159778816,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41242.7658537,
+            "pid": 44380,
+            "working_set": 3920072704,
+            "private_commit": 4159782912,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41243.303866,
+            "pid": 44380,
+            "working_set": 3920080896,
+            "private_commit": 4159782912,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41243.7764118,
+            "pid": 44380,
+            "working_set": 3920097280,
+            "private_commit": 4159782912,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41244.270793,
+            "pid": 44380,
+            "working_set": 3920105472,
+            "private_commit": 4159782912,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41244.9746041,
+            "pid": 44380,
+            "working_set": 3920105472,
+            "private_commit": 4159782912,
+            "peak_working_set": 3931684864,
+            "peak_private_commit": 4171571200
+          }
+        ],
+        "observed_history_entry_counts": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      {
+        "cycle": 1,
+        "instance_id": "ae51dcaf-2f2a-42a1-b9e7-bbd504dc3c10",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 41247.085183,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 22356,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 41251.3155632,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 95.627,
+            "generation_ms": 175.108,
+            "generation_tps": 79.95065902186079,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어.",
+          "wall_ms": 276.8639999994775,
+          "user_message_sha256": "f4f457dfeb29b9844f0eb9c47f2f84ced1fcd8c4625e4a79e0b59900a6c902db",
+          "context_entries": 0
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 41250.681164,
+            "result": true,
+            "wall_ms": 30.818200000794604,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 41250.680817,
+            "path": "/slots/0",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "n_restored": 825,
+              "n_read": 68311364,
+              "timings": {
+                "restore_ms": 29.344
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41250.6500633,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 41252.2813679,
+            "pid": 48176,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 41252.0364087,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 41252.2815513,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": [
+          {
+            "pid": 48176,
+            "observation": {
+              "status": "no_matching_process_counter_instances",
+              "instances": 0,
+              "dedicated_bytes": null,
+              "shared_bytes": null
+            }
+          }
+        ],
+        "resource_snapshots": [
+          {
+            "kind": "native_resources",
+            "monotonic": 41251.3159367,
+            "pid": 48176,
+            "working_set": 3627843584,
+            "private_commit": 3865296896,
+            "peak_working_set": 3627843584,
+            "peak_private_commit": 3865321472
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41252.0360241,
+            "pid": 48176,
+            "working_set": 3627843584,
+            "private_commit": 3865296896,
+            "peak_working_set": 3627843584,
+            "peak_private_commit": 3865321472
+          }
+        ],
+        "observed_history_entry_counts": [
+          0
+        ]
+      },
+      {
+        "cycle": 2,
+        "instance_id": "2fd061cb-fc5c-426a-90dc-25966a9a96d6",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 41254.0940032,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 34772,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 41258.2998077,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 93.137,
+            "generation_ms": 175.228,
+            "generation_tps": 79.895907046819,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어요.",
+          "wall_ms": 273.72789999935776,
+          "user_message_sha256": "f4f457dfeb29b9844f0eb9c47f2f84ced1fcd8c4625e4a79e0b59900a6c902db",
+          "context_entries": 0
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어요."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 41257.6917975,
+            "result": true,
+            "wall_ms": 30.515700003888924,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 41257.6914201,
+            "path": "/slots/0",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "n_restored": 825,
+              "n_read": 68311364,
+              "timings": {
+                "restore_ms": 29.026
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 41257.661,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 41259.2383415,
+            "pid": 48696,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 41258.9906779,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 41259.2385203,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": [
+          {
+            "pid": 48696,
+            "observation": {
+              "status": "no_matching_process_counter_instances",
+              "instances": 0,
+              "dedicated_bytes": null,
+              "shared_bytes": null
+            }
+          }
+        ],
+        "resource_snapshots": [
+          {
+            "kind": "native_resources",
+            "monotonic": 41258.3001784,
+            "pid": 48696,
+            "working_set": 3627892736,
+            "private_commit": 3865354240,
+            "peak_working_set": 3627892736,
+            "peak_private_commit": 3865419776
+          },
+          {
+            "kind": "native_resources",
+            "monotonic": 41258.990224,
+            "pid": 48696,
+            "working_set": 3627892736,
+            "private_commit": 3865354240,
+            "peak_working_set": 3627892736,
+            "peak_private_commit": 3865419776
+          }
+        ],
+        "observed_history_entry_counts": [
+          0
+        ]
+      }
+    ],
+    "command_statuses": {
+      "None": 18,
+      "applied": 57,
+      "stopped": 3
+    },
+    "command_errors": [],
+    "foreign_cache_control": {
+      "source_label": "app-old-vulkan-guarded",
+      "copied_filenames": [
+        "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+        "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+        "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+        "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin",
+        "index.json"
+      ],
+      "policy": "exact process-local runtime identity must make foreign files ineligible; never restore cross-revision KV"
+    },
+    "udp_datagram_count": 120
+  },
+  "app-new-vulkan-guarded-app": {
+    "raw": "app-new-vulkan-guarded-app.json",
+    "label": "app-new-vulkan-guarded",
+    "failure": null,
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39778.5635034,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 31804,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ja",
+            "en",
+            2
+          ],
+          [
+            "de",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            2
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39790.7904187,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 672.833,
+            "generation_ms": 189.045,
+            "generation_tps": 74.05644158798171,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어.",
+          "wall_ms": 867.2529000032227
+        },
+        "completed_translations": 8,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "지수는 오후 3시 15분에 와요. 늦지 마세요.",
+            "texts": [
+              "Jisu is coming at 3:15 PM. Don't be late."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "The blue key is not mine.",
+            "texts": [
+              "파란 열쇠는 제 게 아니에요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "ユナは青い鍵を持っていません。",
+            "texts": [
+              "Yuna doesn't have the blue key."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Anna hat nicht 17, sondern 7 Karten.",
+            "texts": [
+              "Anna doesn't have 17, she has 7 cards."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex will wait for 7 minutes, not 17.",
+            "texts": [
+              "알렉스는 17분이 아니라 7분 동안 기다릴 거예요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex, B-12 방이 아니라 B-21 방이에요.",
+            "texts": [
+              "Alex, it's room B-21, not B-12."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓 12개를 사지 않았어요."
+            ]
+          }
+        ],
+        "prefix_prepares": [
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39789.5503447,
+            "slot": 0,
+            "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+            "wall_ms": 2212.2721999985515
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39791.8743002,
+            "slot": 1,
+            "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+            "wall_ms": 828.1102000037208
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39794.1132657,
+            "slot": 2,
+            "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+            "wall_ms": 827.6970000006258
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39794.9970235,
+            "slot": 1,
+            "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+            "wall_ms": 238.2041000018944
+          }
+        ],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39796.4736926,
+            "result": true,
+            "wall_ms": 31.798000003618654,
+            "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "slot_id": 2
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 39789.5824245,
+            "path": "/slots/0",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "n_saved": 825,
+              "n_written": 68311364,
+              "timings": {
+                "save_ms": 30.01
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39791.9036022,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "n_saved": 823,
+              "n_written": 68196620,
+              "timings": {
+                "save_ms": 28.052
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39794.1430412,
+            "path": "/slots/2",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "n_saved": 819,
+              "n_written": 67967132,
+              "timings": {
+                "save_ms": 28.408
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39795.0342883,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin",
+              "n_saved": 807,
+              "n_written": 88912444,
+              "timings": {
+                "save_ms": 35.854
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39796.4733757,
+            "path": "/slots/2",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "n_restored": 823,
+              "n_read": 68196620,
+              "timings": {
+                "restore_ms": 30.129
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39787.3377874,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39791.0459493,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39793.2853379,
+            "identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39794.7584037,
+            "identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39796.4416395,
+            "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39798.7259828,
+            "pid": 32376,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39798.4283097,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39798.7261771,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      },
+      {
+        "cycle": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39800.3152078,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 49068,
+            "runtime_build": "b11537",
+            "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39804.5389228,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 14,
+            "prompt_ms": 95.307,
+            "generation_ms": 165.317,
+            "generation_tps": 78.63680081298354,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 티켓 12장을 사지 않았어.",
+          "wall_ms": 266.11390000471147
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓 12장을 사지 않았어."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39803.9162038,
+            "result": true,
+            "wall_ms": 29.27340000314871,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 39803.9159008,
+            "path": "/slots/0",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "n_restored": 825,
+              "n_read": 68311364,
+              "timings": {
+                "restore_ms": 27.92
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39803.8866619,
+            "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+              "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+              "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+              "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39805.5032115,
+            "pid": 45476,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39805.253726,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39805.5034255,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      }
+    ],
+    "command_statuses": {
+      "None": 14,
+      "applied": 23,
+      "stopped": 2
+    },
+    "command_errors": [],
+    "foreign_cache_control": {
+      "source_label": "app-old-vulkan-guarded",
+      "copied_filenames": [
+        "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+        "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+        "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+        "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin",
+        "index.json"
+      ],
+      "policy": "exact process-local runtime identity must make foreign files ineligible; never restore cross-revision KV"
+    },
+    "udp_datagram_count": 27
+  },
+  "app-old-cpu-app": {
+    "raw": "app-old-cpu-app.json",
+    "label": "app-old-cpu",
+    "failure": {
+      "type": "RuntimeError",
+      "message": "CLI command failed: ('settings', 'apply', '--arguments', '{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}'): {'output_version': 1, 'instance_id': 'bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f', 'operation_id': '3e7c1eb8927c4099904a46c55b8387dd', 'request_id': '4fef9ee78a33562e787ca1a3d67e40d8', 'status': 'degraded', 'terminal': True, 'revision': 1, 'transaction': {'status': 'settings_commit_success_runtime_degraded', 'message': 'settings.mutation.runtime_apply_failed', 'diagnostics': {'schema_version': 1, 'diagnostic_id': '1dccabe9c876428a9a83a3421fd56f3d', 'instance_id': 'bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f', 'occurred_at': '2026-10-15T01:54:53.114+00:00', 'component': 'provider.stt', 'operation': 'provider_build', 'stage': 'provider_build', 'severity': 'error', 'disposition': 'failed', 'code': 'stt.provider_not_ready', 'category': 'unknown', 'cause_id': None, 'operation_id': '3e7c1eb8927c4099904a46c55b8387dd', 'request_id': '4fef9ee78a33562e787ca1a3d67e40d8', 'channel': 'self', 'turn_id': None, 'generation': 0, 'status_code': None, 'retry_after_ms': None, 'fields': {'exception_class': 'ValueError', 'provider': 'soniox', 'transport': 'unknown', 'tls_source': 'unknown', 'proxy_source': 'unknown', 'tls_backend': 'unknown', 'recognition_cause': 'provider_not_ready'}, 'file_evidence': 'unknown', 'detail': {'state': 'available', 'rejected_fields': 0, 'truncated': False}, 'diagnostic_sequence': 2}, 'secondary_diagnostics': [], 'secondary_omitted_count': 0, 'secondary_truncated': False}}: "
+    },
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "empty encrypted_file with throwaway process environment passphrase, no keyring",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "host_exit_code": null,
+        "host_identities": [],
+        "effective_backends": [],
+        "pair_slot_sequence": [],
+        "first_translation": null,
+        "completed_translations": 0,
+        "admission_event_correlations": [],
+        "prefix_prepares": [],
+        "restores": [],
+        "slot_http": [],
+        "cache_lookups": [],
+        "native_exits": [],
+        "cleanup": [],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      }
+    ],
+    "command_statuses": {
+      "None": 7,
+      "applied": 2,
+      "degraded": 1,
+      "stopped": 1
+    },
+    "command_errors": [
+      {
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+        ],
+        "exit_code": 4,
+        "wall_ms": 222.34060000482714,
+        "output": {
+          "output_version": 1,
+          "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+          "operation_id": "3e7c1eb8927c4099904a46c55b8387dd",
+          "request_id": "4fef9ee78a33562e787ca1a3d67e40d8",
+          "status": "degraded",
+          "terminal": true,
+          "revision": 1,
+          "transaction": {
+            "status": "settings_commit_success_runtime_degraded",
+            "message": "settings.mutation.runtime_apply_failed",
+            "diagnostics": {
+              "schema_version": 1,
+              "diagnostic_id": "1dccabe9c876428a9a83a3421fd56f3d",
+              "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+              "occurred_at": "2026-10-15T01:54:53.114+00:00",
+              "component": "provider.stt",
+              "operation": "provider_build",
+              "stage": "provider_build",
+              "severity": "error",
+              "disposition": "failed",
+              "code": "stt.provider_not_ready",
+              "category": "unknown",
+              "cause_id": null,
+              "operation_id": "3e7c1eb8927c4099904a46c55b8387dd",
+              "request_id": "4fef9ee78a33562e787ca1a3d67e40d8",
+              "channel": "self",
+              "turn_id": null,
+              "generation": 0,
+              "status_code": null,
+              "retry_after_ms": null,
+              "fields": {
+                "exception_class": "ValueError",
+                "provider": "soniox",
+                "transport": "unknown",
+                "tls_source": "unknown",
+                "proxy_source": "unknown",
+                "tls_backend": "unknown",
+                "recognition_cause": "provider_not_ready"
+              },
+              "file_evidence": "unknown",
+              "detail": {
+                "state": "available",
+                "rejected_fields": 0,
+                "truncated": false
+              },
+              "diagnostic_sequence": 2
+            },
+            "secondary_diagnostics": [],
+            "secondary_omitted_count": 0,
+            "secondary_truncated": false
+          }
+        },
+        "stderr": ""
+      }
+    ],
+    "foreign_cache_control": null,
+    "udp_datagram_count": 0
+  },
+  "app-old-cpu-guarded-app": {
+    "raw": "app-old-cpu-guarded-app.json",
+    "label": "app-old-cpu-guarded",
+    "failure": null,
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "4b0ee215-2908-48ae-b7ad-53fc67bb0f12",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39393.4925785,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 35576,
+            "runtime_build": "b10423",
+            "runtime_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ja",
+            "en",
+            2
+          ],
+          [
+            "de",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            2
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39404.0064747,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 164.281,
+            "generation_ms": 428.218,
+            "generation_tps": 32.69362801190048,
+            "drafted_tokens": 18,
+            "accepted_tokens": 10
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어.",
+          "wall_ms": 598.4672000049613
+        },
+        "completed_translations": 8,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "지수는 오후 3시 15분에 와요. 늦지 마세요.",
+            "texts": [
+              "Jisoo is coming at 3:15 PM. Don't be late."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "The blue key is not mine.",
+            "texts": [
+              "파란 열쇠는 제 것이 아니에요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "ユナは青い鍵を持っていません。",
+            "texts": [
+              "Yuna doesn't have the blue key."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Anna hat nicht 17, sondern 7 Karten.",
+            "texts": [
+              "Anna doesn't have 17, but 7 cards."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex will wait for 7 minutes, not 17.",
+            "texts": [
+              "알렉스는 17분이 아니라 7분만 기다릴 거예요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex, B-12 방이 아니라 B-21 방이에요.",
+            "texts": [
+              "Alex, it's room B-21, not B-12."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          }
+        ],
+        "prefix_prepares": [
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39402.9895325,
+            "slot": 0,
+            "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+            "wall_ms": 3260.33599999937
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39407.5211377,
+            "slot": 1,
+            "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+            "wall_ms": 3231.8627999993623
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39412.8408739,
+            "slot": 2,
+            "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+            "wall_ms": 3239.4800999973086
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39414.4150651,
+            "slot": 1,
+            "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+            "wall_ms": 697.1001999991131
+          }
+        ],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39416.5529154,
+            "result": true,
+            "wall_ms": 31.178099998214748,
+            "filename": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+            "slot_id": 2
+          }
+        ],
+        "slot_http": [],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39399.7288966,
+            "identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": []
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39404.2890506,
+            "identity": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39409.6011889,
+            "identity": "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39413.7177216,
+            "identity": "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae",
+            "backend": "cpu",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39416.5215232,
+            "identity": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39422.7004383,
+            "pid": 3008,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39422.3962404,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39422.7006323,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      },
+      {
+        "cycle": 1,
+        "instance_id": "c3643ebb-7253-4eee-af29-2e1e5ab93ad1",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39424.725199,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 43192,
+            "runtime_build": "b10423",
+            "runtime_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "cpu"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39433.875664,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 843,
+            "cached_prompt_tokens": 0,
+            "completion_tokens": 15,
+            "prompt_ms": 3269.286,
+            "generation_ms": 416.9,
+            "generation_tps": 33.58119453106261,
+            "drafted_tokens": 18,
+            "accepted_tokens": 10
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어.",
+          "wall_ms": 3691.9577999942703
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장의 티켓을 사지 않았어."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39429.8331833,
+            "result": true,
+            "wall_ms": 28.101500000047963,
+            "filename": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39429.8047933,
+            "identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370",
+            "backend": "cpu",
+            "eligible": true,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.cpu.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.cpu.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.cpu.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39434.8876964,
+            "pid": 48308,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39434.6041936,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39434.8878959,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      }
+    ],
+    "command_statuses": {
+      "None": 14,
+      "applied": 23,
+      "stopped": 2
+    },
+    "command_errors": [],
+    "foreign_cache_control": null,
+    "udp_datagram_count": 27
+  },
+  "app-old-vulkan-guarded-app": {
+    "raw": "app-old-vulkan-guarded-app.json",
+    "label": "app-old-vulkan-guarded",
+    "failure": null,
+    "isolation": {
+      "settings_seeded_before_first_start": true,
+      "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+      "credential_environment_names_removed": [],
+      "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+      "hf_offline": true,
+      "telemetry": false,
+      "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+      "osc": "mode off plus owned bound loopback UDP sink; no external output",
+      "capture": "never enabled",
+      "overlay_clipboard": "off",
+      "threads_persisted": {
+        "threads": 4,
+        "threads_batch": 12,
+        "draft_threads": 1
+      }
+    },
+    "cycles": [
+      {
+        "cycle": 0,
+        "instance_id": "8786ff2b-caa6-4af4-93ce-cd958b3c43b2",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39748.8462532,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 17588,
+            "runtime_build": "b10423",
+            "runtime_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ja",
+            "en",
+            2
+          ],
+          [
+            "de",
+            "en",
+            1
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ],
+          [
+            "ko",
+            "en",
+            2
+          ],
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39759.3297779,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 591.12,
+            "generation_ms": 302.341,
+            "generation_tps": 46.305330735824775,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 티켓을 12장 사지 않았어.",
+          "wall_ms": 899.080999995931
+        },
+        "completed_translations": 8,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓을 12장 사지 않았어."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "지수는 오후 3시 15분에 와요. 늦지 마세요.",
+            "texts": [
+              "Jisoo is coming at 3:15 PM. Don't be late."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "The blue key is not mine.",
+            "texts": [
+              "파란 열쇠는 제 것이 아니에요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "ユナは青い鍵を持っていません。",
+            "texts": [
+              "Yuna doesn't have the blue key."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Anna hat nicht 17, sondern 7 Karten.",
+            "texts": [
+              "Anna doesn't have 17, but 7 cards."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex will wait for 7 minutes, not 17.",
+            "texts": [
+              "알렉스는 17분 말고 7분 기다릴 거예요."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Alex, B-12 방이 아니라 B-21 방이에요.",
+            "texts": [
+              "Alex, it's room B-21, not B-12."
+            ]
+          },
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 12장 표를 안 샀어."
+            ]
+          }
+        ],
+        "prefix_prepares": [
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39758.0647322,
+            "slot": 0,
+            "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+            "wall_ms": 2433.622700002161
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39760.6947994,
+            "slot": 1,
+            "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+            "wall_ms": 1109.9440999969374
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39763.3267669,
+            "slot": 2,
+            "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+            "wall_ms": 1154.0491999985534
+          },
+          {
+            "kind": "prepare_prefix",
+            "monotonic": 39764.2478562,
+            "slot": 1,
+            "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+            "wall_ms": 267.6188000041293
+          }
+        ],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39765.6901706,
+            "result": true,
+            "wall_ms": 13.37269999930868,
+            "filename": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+            "slot_id": 2
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 39758.0875508,
+            "path": "/slots/0",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "n_saved": 825,
+              "n_written": 34508316,
+              "timings": {
+                "save_ms": 20.97
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39760.7187328,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "n_saved": 823,
+              "n_written": 34475516,
+              "timings": {
+                "save_ms": 22.42
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39763.3487954,
+            "path": "/slots/2",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin",
+              "n_saved": 819,
+              "n_written": 34409916,
+              "timings": {
+                "save_ms": 20.736
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39764.2693285,
+            "path": "/slots/1",
+            "action": "save",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 1,
+              "filename": "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "n_saved": 807,
+              "n_written": 34213116,
+              "timings": {
+                "save_ms": 20.256
+              }
+            }
+          },
+          {
+            "kind": "slot_http",
+            "monotonic": 39765.6899184,
+            "path": "/slots/2",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 2,
+              "filename": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "n_restored": 823,
+              "n_read": 34475516,
+              "timings": {
+                "restore_ms": 12.079
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39755.6308095,
+            "identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": []
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39759.5846513,
+            "identity": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39762.1725046,
+            "identity": "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39763.9800149,
+            "identity": "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae",
+            "backend": "vulkan",
+            "eligible": false,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin"
+            ]
+          },
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39765.6765699,
+            "identity": "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39769.0202857,
+            "pid": 46740,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39768.7290662,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39769.0204949,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      },
+      {
+        "cycle": 1,
+        "instance_id": "057f0247-8cce-43bc-93d2-0e4ba9650312",
+        "host_exit_code": 0,
+        "host_identities": [
+          {
+            "kind": "host_identity",
+            "monotonic": 39770.652126,
+            "python": "<PYTHON>",
+            "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+            "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+            "pid": 23312,
+            "runtime_build": "b10423",
+            "runtime_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+            "process_discovery": "synthetic_empty",
+            "gui": "not_run"
+          }
+        ],
+        "effective_backends": [
+          "vulkan"
+        ],
+        "pair_slot_sequence": [
+          [
+            "en",
+            "ko",
+            0
+          ]
+        ],
+        "first_translation": {
+          "kind": "translate_completed",
+          "monotonic": 39775.856547,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 843,
+            "cached_prompt_tokens": 0,
+            "completion_tokens": 14,
+            "prompt_ms": 1120.503,
+            "generation_ms": 166.166,
+            "generation_tps": 78.23501799405413,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 티켓 12장을 안 샀어.",
+          "wall_ms": 1292.1389000039198
+        },
+        "completed_translations": 1,
+        "admission_event_correlations": [
+          {
+            "admission_terminal_applied": true,
+            "matched_completed_events": 1,
+            "source": "Mina did not buy 12 tickets.",
+            "texts": [
+              "미나는 티켓 12장을 안 샀어."
+            ]
+          }
+        ],
+        "prefix_prepares": [],
+        "restores": [
+          {
+            "kind": "restore_prefix",
+            "monotonic": 39774.2213625,
+            "result": true,
+            "wall_ms": 10.784199999761768,
+            "filename": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+            "slot_id": 0
+          }
+        ],
+        "slot_http": [
+          {
+            "kind": "slot_http",
+            "monotonic": 39774.2211172,
+            "path": "/slots/0",
+            "action": "restore",
+            "status_code": 200,
+            "payload": {
+              "id_slot": 0,
+              "filename": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "n_restored": 825,
+              "n_read": 34508316,
+              "timings": {
+                "restore_ms": 9.719
+              }
+            }
+          }
+        ],
+        "cache_lookups": [
+          {
+            "kind": "cache_lookup",
+            "monotonic": 39774.2103103,
+            "identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370",
+            "backend": "vulkan",
+            "eligible": true,
+            "existing_files": [
+              "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+              "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+              "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+              "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin"
+            ]
+          }
+        ],
+        "native_exits": [
+          {
+            "kind": "native_exit",
+            "monotonic": 39776.810153,
+            "pid": 44864,
+            "returncode": 1
+          }
+        ],
+        "cleanup": [
+          {
+            "kind": "transport_closed",
+            "monotonic": 39776.5510225,
+            "client_cleared": true
+          },
+          {
+            "kind": "owner_close_observed",
+            "monotonic": 39776.8103341,
+            "process_cleared": true,
+            "transport_cleared": true
+          }
+        ],
+        "network_denied": [],
+        "gpu_counters_after_native_exit": null,
+        "resource_snapshots": [],
+        "observed_history_entry_counts": []
+      }
+    ],
+    "command_statuses": {
+      "None": 14,
+      "applied": 23,
+      "stopped": 2
+    },
+    "command_errors": [],
+    "foreign_cache_control": null,
+    "udp_datagram_count": 27
+  }
+}

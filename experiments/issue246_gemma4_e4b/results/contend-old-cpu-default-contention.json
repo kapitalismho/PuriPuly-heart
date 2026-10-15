@@ -1,0 +1,1430 @@
+{
+  "release": "b10423",
+  "backend": "cpu",
+  "label": "contend-old-cpu-default",
+  "controlled_load": {
+    "type": "six synthetic integer-loop processes",
+    "affinity_logical_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "priority": "normal",
+    "physical_core_mapping": "not asserted",
+    "maximum_duration_s": 180
+  },
+  "primary_requests": [
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 0,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "a82c123ecd838eae5e89c46ec32fbccb8831981f7df30c8d8f9acb2b563ffba2"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1683.0160000026808,
+      "template_ms": 4.6641000008094124,
+      "ttft_ms": 928.8865999988047,
+      "timings": {
+        "cache_n": 820,
+        "prompt_n": 103,
+        "prompt_ms": 893.059,
+        "prompt_per_token_ms": 8.67047572815534,
+        "prompt_per_second": 115.33392530616679,
+        "predicted_n": 14,
+        "predicted_ms": 772.797,
+        "predicted_per_token_ms": 59.44592307692308,
+        "predicted_per_second": 16.822011472611823,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6329544704,
+        "private_commit": 3844227072,
+        "peak_working_set": 6332678144,
+        "peak_private_commit": 3847434240,
+        "cpu_seconds": 166.90625,
+        "threads": 19
+      },
+      "sampled_request_peaks": {
+        "working_set": 6329528320,
+        "private_commit": 3844227072
+      },
+      "cpu_seconds": 14.765625,
+      "cpu_percent_one_core": 877.33123154958
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 1,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "b9d6a2e6d8603e6fd4509d852aa275bc5085b79f1984f1fb79345f095f528dbc"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1359.190999995917,
+      "template_ms": 3.2957000003079884,
+      "ttft_ms": 849.7628999975859,
+      "timings": {
+        "cache_n": 818,
+        "prompt_n": 112,
+        "prompt_ms": 829.08,
+        "prompt_per_token_ms": 7.402500000000001,
+        "prompt_per_second": 135.08949679162444,
+        "predicted_n": 19,
+        "predicted_ms": 509.335,
+        "predicted_per_token_ms": 28.296388888888888,
+        "predicted_per_second": 35.34019849411488,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 930,
+        "tokens_cached": 948
+      },
+      "memory_after": {
+        "working_set": 6441865216,
+        "private_commit": 3956539392,
+        "peak_working_set": 6445015040,
+        "peak_private_commit": 3959734272,
+        "cpu_seconds": 179.09375,
+        "threads": 19
+      },
+      "sampled_request_peaks": {
+        "working_set": 6441865216,
+        "private_commit": 3956539392
+      },
+      "cpu_seconds": 12.171875,
+      "cpu_percent_one_core": 895.5235136221887
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 2,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "cc41b4a0841200a4fdfe27dfde830cc3c2fbf4e81930d8a79460dd687bec2a36"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 1094.3086999977822,
+      "template_ms": 4.666999993787613,
+      "ttft_ms": 816.6473999954178,
+      "timings": {
+        "cache_n": 814,
+        "prompt_n": 103,
+        "prompt_ms": 792.63,
+        "prompt_per_token_ms": 7.695436893203883,
+        "prompt_per_second": 129.94713800890707,
+        "predicted_n": 11,
+        "predicted_ms": 281.607,
+        "predicted_per_token_ms": 28.160700000000002,
+        "predicted_per_second": 35.51048091844307,
+        "draft_n": 9,
+        "draft_n_accepted": 9
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 917,
+        "tokens_cached": 929
+      },
+      "memory_after": {
+        "working_set": 6554198016,
+        "private_commit": 4068970496,
+        "peak_working_set": 6557347840,
+        "peak_private_commit": 4072173568,
+        "cpu_seconds": 189.25,
+        "threads": 19
+      },
+      "sampled_request_peaks": {
+        "working_set": 6554198016,
+        "private_commit": 4068970496
+      },
+      "cpu_seconds": 10.09375,
+      "cpu_percent_one_core": 922.3859775601214
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 3,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "d9fdb3fec387f6b9e8539d7d61854646ddb1ba3acc13f53083b86d72c071fe62"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1387.701300001936,
+      "template_ms": 3.5599000038928352,
+      "ttft_ms": 751.6020000039134,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 94,
+        "prompt_ms": 722.49,
+        "prompt_per_token_ms": 7.686063829787234,
+        "prompt_per_second": 130.10560699802073,
+        "predicted_n": 14,
+        "predicted_ms": 635.464,
+        "predicted_per_token_ms": 48.881846153846155,
+        "predicted_per_second": 20.45749247793738,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6645755904,
+        "private_commit": 4160434176,
+        "peak_working_set": 6648905728,
+        "peak_private_commit": 4163637248,
+        "cpu_seconds": 202.0,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 6645796864,
+        "private_commit": 4160499712
+      },
+      "cpu_seconds": 12.71875,
+      "cpu_percent_one_core": 916.5336949660748
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 4,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "b094b4749d668d2b8e8d45e45266e4fa1ee4c97788ea3ca24a1c2fc177221bcc"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1255.1716000016313,
+      "template_ms": 3.198899998096749,
+      "ttft_ms": 807.4940000005881,
+      "timings": {
+        "cache_n": 827,
+        "prompt_n": 103,
+        "prompt_ms": 773.465,
+        "prompt_per_token_ms": 7.509368932038835,
+        "prompt_per_second": 133.1669823456782,
+        "predicted_n": 19,
+        "predicted_ms": 451.426,
+        "predicted_per_token_ms": 25.07922222222222,
+        "predicted_per_second": 39.87364484987573,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 930,
+        "tokens_cached": 948
+      },
+      "memory_after": {
+        "working_set": 6736875520,
+        "private_commit": 4251729920,
+        "peak_working_set": 6740025344,
+        "peak_private_commit": 4254924800,
+        "cpu_seconds": 213.625,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 6736875520,
+        "private_commit": 4251729920
+      },
+      "cpu_seconds": 11.546875,
+      "cpu_percent_one_core": 919.9439343580586
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 5,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "6e9947fd52567a997560a9d66bd9abeb7bf7a0563379b6345b252e0985ab28e0"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 957.353099998727,
+      "template_ms": 4.952800001774449,
+      "ttft_ms": 693.4258000037516,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 94,
+        "prompt_ms": 663.143,
+        "prompt_per_token_ms": 7.054712765957447,
+        "prompt_per_second": 141.74921547841114,
+        "predicted_n": 11,
+        "predicted_ms": 264.946,
+        "predicted_per_token_ms": 26.494600000000002,
+        "predicted_per_second": 37.743540193095946,
+        "draft_n": 9,
+        "draft_n_accepted": 9
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 917,
+        "tokens_cached": 929
+      },
+      "memory_after": {
+        "working_set": 6828109824,
+        "private_commit": 4343148544,
+        "peak_working_set": 6831259648,
+        "peak_private_commit": 4346335232,
+        "cpu_seconds": 222.640625,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 6831259648,
+        "private_commit": 4346302464
+      },
+      "cpu_seconds": 8.875,
+      "cpu_percent_one_core": 927.0351764685153
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 6,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "4cd44b620a6f4a608a4b6653bdaeb9688a8c2c54df00209f2f242f8a93c3f0a4"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1414.594499998202,
+      "template_ms": 4.8500999982934445,
+      "ttft_ms": 770.7730999973137,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 94,
+        "prompt_ms": 741.786,
+        "prompt_per_token_ms": 7.891340425531914,
+        "prompt_per_second": 126.72118373762784,
+        "predicted_n": 14,
+        "predicted_ms": 649.999,
+        "predicted_per_token_ms": 49.99992307692308,
+        "predicted_per_second": 20.00003076927811,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6918877184,
+        "private_commit": 4434079744,
+        "peak_working_set": 6922027008,
+        "peak_private_commit": 4437299200,
+        "cpu_seconds": 236.109375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 6921277440,
+        "private_commit": 4437233664
+      },
+      "cpu_seconds": 13.46875,
+      "cpu_percent_one_core": 952.1279773120225
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 7,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "ad07ecc7f0b13ca6c344983db18d735ea36822e1902191774563af46f8b92817"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1319.8135999991791,
+      "template_ms": 5.404600000474602,
+      "ttft_ms": 827.450000004319,
+      "timings": {
+        "cache_n": 827,
+        "prompt_n": 103,
+        "prompt_ms": 804.456,
+        "prompt_per_token_ms": 7.810252427184466,
+        "prompt_per_second": 128.0368348299969,
+        "predicted_n": 19,
+        "predicted_ms": 492.22,
+        "predicted_per_token_ms": 27.345555555555556,
+        "predicted_per_second": 36.56901385559303,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 930,
+        "tokens_cached": 948
+      },
+      "memory_after": {
+        "working_set": 7010017280,
+        "private_commit": 4525379584,
+        "peak_working_set": 7013167104,
+        "peak_private_commit": 4528574464,
+        "cpu_seconds": 248.609375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7010017280,
+        "private_commit": 4525379584
+      },
+      "cpu_seconds": 12.5,
+      "cpu_percent_one_core": 947.1034394559789
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 8,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "e8b225ba165748988b6a1f12e71c854f0d66978ac2113b83496520cc135ea08b"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 967.3465000014403,
+      "template_ms": 3.185400004440453,
+      "ttft_ms": 711.800700002641,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 94,
+        "prompt_ms": 686.114,
+        "prompt_per_token_ms": 7.299085106382979,
+        "prompt_per_second": 137.0034717262729,
+        "predicted_n": 11,
+        "predicted_ms": 259.347,
+        "predicted_per_token_ms": 25.9347,
+        "predicted_per_second": 38.55837931420067,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 917,
+        "tokens_cached": 927
+      },
+      "memory_after": {
+        "working_set": 7101263872,
+        "private_commit": 4616790016,
+        "peak_working_set": 7104413696,
+        "peak_private_commit": 4619993088,
+        "cpu_seconds": 257.734375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7101263872,
+        "private_commit": 4616790016
+      },
+      "cpu_seconds": 9.125,
+      "cpu_percent_one_core": 943.3021156314118
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 9,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "3fe9fdc9871d060e460266187224418c34fb3a13c1bbe82fbba76fcafaa5cc3a"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1371.0485000046901,
+      "template_ms": 8.237800000642892,
+      "ttft_ms": 737.2801000019535,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 94,
+        "prompt_ms": 709.528,
+        "prompt_per_token_ms": 7.548170212765958,
+        "prompt_per_second": 132.4824390298903,
+        "predicted_n": 14,
+        "predicted_ms": 636.133,
+        "predicted_per_token_ms": 48.93330769230769,
+        "predicted_per_second": 20.43597801088766,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 7191994368,
+        "private_commit": 4707688448,
+        "peak_working_set": 7195144192,
+        "peak_private_commit": 4710907904,
+        "cpu_seconds": 270.3125,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7191994368,
+        "private_commit": 4707688448
+      },
+      "cpu_seconds": 12.53125,
+      "cpu_percent_one_core": 913.9902782401302
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 10,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "0ad1dfa548e9be63663c2e63050689461c01cc2f37af4bc987bf80847db71065"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1227.4684000003617,
+      "template_ms": 3.2711000021663494,
+      "ttft_ms": 778.7804999970831,
+      "timings": {
+        "cache_n": 827,
+        "prompt_n": 104,
+        "prompt_ms": 756.43,
+        "prompt_per_token_ms": 7.273365384615384,
+        "prompt_per_second": 137.4879367555491,
+        "predicted_n": 19,
+        "predicted_ms": 446.066,
+        "predicted_per_token_ms": 24.781444444444443,
+        "predicted_per_second": 40.352772908045004,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 7283109888,
+        "private_commit": 4798984192,
+        "peak_working_set": 7286259712,
+        "peak_private_commit": 4802195456,
+        "cpu_seconds": 282.046875,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7283109888,
+        "private_commit": 4798984192
+      },
+      "cpu_seconds": 11.625,
+      "cpu_percent_one_core": 947.0712239921268
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 11,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "6bb81299a9d62520137bb663ed8bc54828b91671139fc2602f087d27e7443b5c"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 976.7668999993475,
+      "template_ms": 6.308200005150866,
+      "ttft_ms": 712.8609999999753,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 95,
+        "prompt_ms": 684.679,
+        "prompt_per_token_ms": 7.207147368421053,
+        "prompt_per_second": 138.7511519996962,
+        "predicted_n": 11,
+        "predicted_ms": 267.102,
+        "predicted_per_token_ms": 26.710199999999997,
+        "predicted_per_second": 37.43888102672388,
+        "draft_n": 9,
+        "draft_n_accepted": 9
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 930
+      },
+      "memory_after": {
+        "working_set": 7374356480,
+        "private_commit": 4890411008,
+        "peak_working_set": 7377506304,
+        "peak_private_commit": 4893597696,
+        "cpu_seconds": 291.34375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7374356480,
+        "private_commit": 4890411008
+      },
+      "cpu_seconds": 9.265625,
+      "cpu_percent_one_core": 948.6014524044774
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 12,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "5d5e2771682d607c1b7402d8b71279cc31bcc733b57eda87697a25d2c53d42da"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1341.879899999185,
+      "template_ms": 3.2516999999643303,
+      "ttft_ms": 708.0548999947496,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 95,
+        "prompt_ms": 682.466,
+        "prompt_per_token_ms": 7.183852631578947,
+        "prompt_per_second": 139.20107375312472,
+        "predicted_n": 14,
+        "predicted_ms": 637.5,
+        "predicted_per_token_ms": 49.03846153846154,
+        "predicted_per_second": 20.392156862745097,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 924,
+        "tokens_cached": 937
+      },
+      "memory_after": {
+        "working_set": 7465132032,
+        "private_commit": 4981366784,
+        "peak_working_set": 7468281856,
+        "peak_private_commit": 4984590336,
+        "cpu_seconds": 303.734375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7465132032,
+        "private_commit": 4981366784
+      },
+      "cpu_seconds": 12.265625,
+      "cpu_percent_one_core": 914.0628010008534
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 13,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "5ef5c64feedf4e011bb6ba1719b4e2741705ce62187d062afefa3052b22c9992"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1174.552100004803,
+      "template_ms": 3.4599999999045394,
+      "ttft_ms": 757.0848000032129,
+      "timings": {
+        "cache_n": 828,
+        "prompt_n": 103,
+        "prompt_ms": 736.983,
+        "prompt_per_token_ms": 7.155174757281553,
+        "prompt_per_second": 139.75899037019852,
+        "predicted_n": 19,
+        "predicted_ms": 415.031,
+        "predicted_per_token_ms": 23.057277777777777,
+        "predicted_per_second": 43.37025427016295,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 7556263936,
+        "private_commit": 5072674816,
+        "peak_working_set": 7559413760,
+        "peak_private_commit": 5075898368,
+        "cpu_seconds": 314.765625,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7556263936,
+        "private_commit": 5072674816
+      },
+      "cpu_seconds": 11.03125,
+      "cpu_percent_one_core": 939.1877976255709
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 14,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "fe6fe3f960afee90fe5bde5ba1e5702e89e07e3d2f98d40225481c87b938a86f"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 1148.493900000176,
+      "template_ms": 5.346400001144502,
+      "ttft_ms": 874.6089999985998,
+      "timings": {
+        "cache_n": 824,
+        "prompt_n": 94,
+        "prompt_ms": 837.524,
+        "prompt_per_token_ms": 8.909829787234042,
+        "prompt_per_second": 112.23558966668418,
+        "predicted_n": 11,
+        "predicted_ms": 282.556,
+        "predicted_per_token_ms": 28.255599999999998,
+        "predicted_per_second": 35.39121448491627,
+        "draft_n": 9,
+        "draft_n_accepted": 9
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 930
+      },
+      "memory_after": {
+        "working_set": 7647510528,
+        "private_commit": 5164101632,
+        "peak_working_set": 7650660352,
+        "peak_private_commit": 5167276032,
+        "cpu_seconds": 325.125,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7647510528,
+        "private_commit": 5164101632
+      },
+      "cpu_seconds": 10.34375,
+      "cpu_percent_one_core": 900.6360416888949
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 15,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "79e528cdc9681164ad8618904aeba4b9c0c1f00a587b853bc1caf5c638c02f07"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1349.474900001951,
+      "template_ms": 6.87350000225706,
+      "ttft_ms": 732.9939999981434,
+      "timings": {
+        "cache_n": 830,
+        "prompt_n": 94,
+        "prompt_ms": 709.923,
+        "prompt_per_token_ms": 7.552372340425532,
+        "prompt_per_second": 132.4087260167652,
+        "predicted_n": 14,
+        "predicted_ms": 616.132,
+        "predicted_per_token_ms": 47.39476923076923,
+        "predicted_per_second": 21.099374809294112,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 924,
+        "tokens_cached": 937
+      },
+      "memory_after": {
+        "working_set": 7738294272,
+        "private_commit": 5255049216,
+        "peak_working_set": 7741444096,
+        "peak_private_commit": 5258268672,
+        "cpu_seconds": 337.96875,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7738294272,
+        "private_commit": 5255049216
+      },
+      "cpu_seconds": 12.75,
+      "cpu_percent_one_core": 944.8119412952079
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 16,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "ab61259b34db95676de395be997ce230cdded7c55ae5215cf5bfadfa7a075f43"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1187.249200003862,
+      "template_ms": 4.026599999633618,
+      "ttft_ms": 756.4278999998351,
+      "timings": {
+        "cache_n": 828,
+        "prompt_n": 103,
+        "prompt_ms": 734.164,
+        "prompt_per_token_ms": 7.127805825242718,
+        "prompt_per_second": 140.29562876959372,
+        "predicted_n": 19,
+        "predicted_ms": 430.412,
+        "predicted_per_token_ms": 23.911777777777775,
+        "predicted_per_second": 41.8203953421373,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 7829426176,
+        "private_commit": 5346365440,
+        "peak_working_set": 7832576000,
+        "peak_private_commit": 5349580800,
+        "cpu_seconds": 349.328125,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7829426176,
+        "private_commit": 5346365440
+      },
+      "cpu_seconds": 11.21875,
+      "cpu_percent_one_core": 944.9364126725465
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 17,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "af6371bcc916a49bc043a8a1dd75a9a3f592401169fc5880bc45dee46bf8b252"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 984.9344000031124,
+      "template_ms": 3.3085000031860545,
+      "ttft_ms": 718.50870000344,
+      "timings": {
+        "cache_n": 824,
+        "prompt_n": 94,
+        "prompt_ms": 688.099,
+        "prompt_per_token_ms": 7.320202127659575,
+        "prompt_per_second": 136.6082496850017,
+        "predicted_n": 11,
+        "predicted_ms": 265.168,
+        "predicted_per_token_ms": 26.5168,
+        "predicted_per_second": 37.711941109032765,
+        "draft_n": 9,
+        "draft_n_accepted": 9
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 930
+      },
+      "memory_after": {
+        "working_set": 7920672768,
+        "private_commit": 5437788160,
+        "peak_working_set": 7923822592,
+        "peak_private_commit": 5441003520,
+        "cpu_seconds": 358.625,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 7923822592,
+        "private_commit": 5440946176
+      },
+      "cpu_seconds": 9.171875,
+      "cpu_percent_one_core": 931.2168404282577
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 18,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "8942e53526b189b6e5ba8e66a8f1ed7062abf4713637312c34b5809331488016"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1309.0557999967132,
+      "template_ms": 5.584799997450318,
+      "ttft_ms": 718.5673999993014,
+      "timings": {
+        "cache_n": 830,
+        "prompt_n": 94,
+        "prompt_ms": 689.308,
+        "prompt_per_token_ms": 7.333063829787234,
+        "prompt_per_second": 136.36864797739182,
+        "predicted_n": 14,
+        "predicted_ms": 593.533,
+        "predicted_per_token_ms": 45.65638461538462,
+        "predicted_per_second": 21.902741717815186,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 924,
+        "tokens_cached": 937
+      },
+      "memory_after": {
+        "working_set": 8011444224,
+        "private_commit": 5528739840,
+        "peak_working_set": 8014594048,
+        "peak_private_commit": 5531963392,
+        "cpu_seconds": 370.859375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 8011444224,
+        "private_commit": 5528739840
+      },
+      "cpu_seconds": 12.171875,
+      "cpu_percent_one_core": 929.820944227936
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 19,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "ed98255baa0d1e555fdefcbed0c1fa6f9d360212ef50904189eac37cde4ed8bb"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1231.1530000006314,
+      "template_ms": 3.124399998341687,
+      "ttft_ms": 770.5234000022756,
+      "timings": {
+        "cache_n": 828,
+        "prompt_n": 103,
+        "prompt_ms": 741.718,
+        "prompt_per_token_ms": 7.201145631067961,
+        "prompt_per_second": 138.86679303994242,
+        "predicted_n": 19,
+        "predicted_ms": 464.838,
+        "predicted_per_token_ms": 25.824333333333335,
+        "predicted_per_second": 38.72316807145715,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 8102576128,
+        "private_commit": 5620047872,
+        "peak_working_set": 8105725952,
+        "peak_private_commit": 5623271424,
+        "cpu_seconds": 382.34375,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 8102576128,
+        "private_commit": 5620047872
+      },
+      "cpu_seconds": 11.40625,
+      "cpu_percent_one_core": 926.4689279069418
+    },
+    {
+      "arm": "contend-old-cpu-default",
+      "request_index": 20,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "b5e2de71b66d848c21ef5e6d18b2c2eacb15a6591f51f0018984efa15d63984e"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 982.1287000013399,
+      "template_ms": 4.246100004820619,
+      "ttft_ms": 737.644700006058,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 95,
+        "prompt_ms": 710.657,
+        "prompt_per_token_ms": 7.480600000000001,
+        "prompt_per_second": 133.67911664839718,
+        "predicted_n": 11,
+        "predicted_ms": 244.371,
+        "predicted_per_token_ms": 24.4371,
+        "predicted_per_second": 40.92138592549852,
+        "draft_n": 9,
+        "draft_n_accepted": 9
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 930
+      },
+      "memory_after": {
+        "working_set": 8193822720,
+        "private_commit": 5711474688,
+        "peak_working_set": 8196972544,
+        "peak_private_commit": 5714698240,
+        "cpu_seconds": 391.671875,
+        "threads": 17
+      },
+      "sampled_request_peaks": {
+        "working_set": 8195964928,
+        "private_commit": 5714632704
+      },
+      "cpu_seconds": 9.234375,
+      "cpu_percent_one_core": 940.2408258701128
+    }
+  ],
+  "load_start_monotonic": 41607.2076925,
+  "measurement_start_monotonic": 41632.3158908,
+  "measurement_end_monotonic": 41658.2724508,
+  "primary_memory_end": {
+    "working_set": 8193822720,
+    "private_commit": 5711474688,
+    "peak_working_set": 8196972544,
+    "peak_private_commit": 5714698240,
+    "cpu_seconds": 391.75,
+    "threads": 17
+  },
+  "background_completed_requests": 0,
+  "background_errors": [],
+  "worker_cpu_seconds": [
+    {
+      "working_set": 4182016,
+      "private_commit": 843776,
+      "peak_working_set": 4206592,
+      "peak_private_commit": 897024,
+      "cpu_seconds": 0.0,
+      "threads": 1
+    },
+    {
+      "working_set": 4182016,
+      "private_commit": 843776,
+      "peak_working_set": 4206592,
+      "peak_private_commit": 897024,
+      "cpu_seconds": 0.0,
+      "threads": 1
+    },
+    {
+      "working_set": 4182016,
+      "private_commit": 847872,
+      "peak_working_set": 4210688,
+      "peak_private_commit": 905216,
+      "cpu_seconds": 0.0,
+      "threads": 1
+    },
+    {
+      "working_set": 4182016,
+      "private_commit": 835584,
+      "peak_working_set": 4206592,
+      "peak_private_commit": 888832,
+      "cpu_seconds": 0.0,
+      "threads": 1
+    },
+    {
+      "working_set": 4182016,
+      "private_commit": 835584,
+      "peak_working_set": 4206592,
+      "peak_private_commit": 888832,
+      "cpu_seconds": 0.0,
+      "threads": 1
+    },
+    {
+      "working_set": 4182016,
+      "private_commit": 847872,
+      "peak_working_set": 4210688,
+      "peak_private_commit": 913408,
+      "cpu_seconds": 0.0,
+      "threads": 1
+    }
+  ],
+  "owned_load_stopped": true,
+  "load_end_monotonic": 41659.1774969
+}

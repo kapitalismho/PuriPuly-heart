@@ -1,0 +1,1218 @@
+COMPACT PRODUCER EVIDENCE
+{"normalized_sanitized_original_sha256": "69b5dc9243f0544b2a881ec9fdcd37a6b42027f512eb9ef1a465b732203e8c5e", "normalized_original_bytes": 557532, "nonempty_lines": 5079, "retained_lines": 1215, "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."}
+
+0.00.047.851 I srv  llama_server: initializing ...
+0.00.047.860 I cmn  common_param: common_params_print_info: build 11537 (8e2d31e0e) with Clang 20.1.8 for Windows x86_64
+0.00.047.861 I cmn  common_param: common_params_print_info: verbosity = 4 (adjust with the `-lv N` CLI arg)
+0.00.047.863 I cmn  common_param: device_info:
+0.00.048.733 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)
+0.00.048.738 I cmn  common_param:   - CPU     : AMD Ryzen 7 9800X3D 8-Core Processor            (32361 MiB, 13462 MiB free)
+0.00.048.780 I cmn  common_param: system_info: n_threads = 4 (n_threads_batch = 4) / 16 | CPU : SSE3 = 1 | SSSE3 = 1 | AVX = 1 | AVX2 = 1 | F16C = 1 | FMA = 1 | BMI2 = 1 | AVX512 = 1 | AVX512_VBMI = 1 | AVX512_VNNI = 1 | AVX512_BF16 = 1 | LLAMAFILE = 1 | OPENMP = 1 | REPACK = 1 | 
+0.00.048.840 I srv  init_listene: running without SSL
+0.00.048.893 I srv  init_listene: The UI is disabled
+0.00.048.893 I srv  init_listene: Use --ui/--no-ui (or deprecated --webui/--no-webui) to enable/disable
+0.00.048.915 I srv          init: using 1 threads for HTTP server
+0.00.048.967 W srv  llama_server: security: no API key is set and CORS allows all origins (see https://github.com/ggml-org/llama.cpp/pull/25655)
+0.00.056.534 I srv    load_model: loading model '<MODEL>\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf'
+0.00.056.537 I srv    load_model: local path '<MODEL>\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf'
+0.00.056.548 I cmn  common_init_: fitting params to device memory ...
+0.00.056.548 I cmn  common_init_: (for bugs during this step try to reproduce them with -fit off, or provide --verbose logs if the bug only occurs with -fit on)
+0.00.056.576 I common_params_fit_impl: getting device memory data for initial parameters:
+0.00.479.344 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free    self   model   context   compute    unaccounted |
+0.00.479.348 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 23737 + (2810 =  2493 +     192 +     124) +       -1987 |
+0.00.479.349 I common_memory_breakdown_print: |   - Host                  |                  1915 =  1872 +       0 +      43                |
+0.00.548.291 I common_params_fit_impl: projected to use 2810 MiB of device memory vs. 23737 MiB of free device memory
+0.00.548.294 I common_params_fit_impl: will leave 20927 >= 1024 MiB of free device memory, no changes needed
+0.00.548.295 I common_fit_params: successfully fit params to free device memory
+0.00.548.300 I common_fit_params: fitting params to free memory took 0.49 seconds
+0.00.609.165 I llama_model_loader: loaded meta data with 47 key-value pairs and 666 tensors from <MODEL>\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf (version GGUF V3 (latest))
+0.00.609.187 I llama_model_loader: Dumping metadata keys/values. Note: KV overrides do not apply in this output.
+0.00.609.190 I llama_model_loader: - kv   0:                       general.architecture str              = gemma4
+0.00.609.191 I llama_model_loader: - kv   1:                               general.type str              = model
+0.00.609.192 I llama_model_loader: - kv   2:                     general.sampling.top_k i32              = 64
+0.00.609.196 I llama_model_loader: - kv   3:                     general.sampling.top_p f32              = 0.950000
+0.00.609.197 I llama_model_loader: - kv   4:                      general.sampling.temp f32              = 1.000000
+0.00.609.197 I llama_model_loader: - kv   5:                         general.size_label str              = 7.5B
+0.00.609.198 I llama_model_loader: - kv   6:                         gemma4.block_count u32              = 42
+0.00.609.198 I llama_model_loader: - kv   7:                      gemma4.context_length u32              = 131072
+0.00.609.199 I llama_model_loader: - kv   8:                    gemma4.embedding_length u32              = 2560
+0.00.609.200 I llama_model_loader: - kv   9:                 gemma4.feed_forward_length u32              = 10240
+0.00.609.200 I llama_model_loader: - kv  10:                gemma4.attention.head_count u32              = 8
+0.00.609.200 I llama_model_loader: - kv  11:             gemma4.attention.head_count_kv u32              = 2
+0.00.609.201 I llama_model_loader: - kv  12:                      gemma4.rope.freq_base f32              = 1000000.000000
+0.00.609.202 I llama_model_loader: - kv  13:                  gemma4.rope.freq_base_swa f32              = 10000.000000
+0.00.609.203 I llama_model_loader: - kv  14:    gemma4.attention.layer_norm_rms_epsilon f32              = 0.000001
+0.00.609.204 I llama_model_loader: - kv  15:                gemma4.attention.key_length u32              = 512
+0.00.609.204 I llama_model_loader: - kv  16:              gemma4.attention.value_length u32              = 512
+0.00.609.205 I llama_model_loader: - kv  17:             gemma4.final_logit_softcapping f32              = 30.000000
+0.00.609.205 I llama_model_loader: - kv  18:            gemma4.attention.sliding_window u32              = 512
+0.00.609.206 I llama_model_loader: - kv  19:          gemma4.attention.shared_kv_layers u32              = 18
+0.00.609.206 I llama_model_loader: - kv  20:    gemma4.embedding_length_per_layer_input u32              = 256
+0.00.609.221 I llama_model_loader: - kv  21:    gemma4.attention.sliding_window_pattern arr[bool,42]     = [true, true, true, true, true, false,...
+0.00.609.221 I llama_model_loader: - kv  22:            gemma4.attention.key_length_swa u32              = 256
+0.00.609.222 I llama_model_loader: - kv  23:          gemma4.attention.value_length_swa u32              = 256
+0.00.609.222 I llama_model_loader: - kv  24:                gemma4.rope.dimension_count u32              = 512
+0.00.609.222 I llama_model_loader: - kv  25:            gemma4.rope.dimension_count_swa u32              = 256
+0.00.609.223 I llama_model_loader: - kv  26:                       tokenizer.ggml.model str              = gemma4
+0.00.637.561 I llama_model_loader: - kv  27:                      tokenizer.ggml.tokens arr[str,262144]  = ["<pad>", "<eos>", "<bos>", "<unk>", ...
+0.00.708.745 I llama_model_loader: - kv  28:                      tokenizer.ggml.scores arr[f32,262144]  = [-1000.000000, -1000.000000, -1000.00...
+0.00.718.511 I llama_model_loader: - kv  29:                  tokenizer.ggml.token_type arr[i32,262144]  = [3, 3, 3, 3, 3, 1, 1, 1, 1, 1, 1, 1, ...
+0.00.774.846 I llama_model_loader: - kv  30:                      tokenizer.ggml.merges arr[str,514906]  = ["\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n \n", ...
+0.00.774.852 I llama_model_loader: - kv  31:                tokenizer.ggml.bos_token_id u32              = 2
+0.00.774.853 I llama_model_loader: - kv  32:                tokenizer.ggml.eos_token_id u32              = 1
+0.00.774.853 I llama_model_loader: - kv  33:            tokenizer.ggml.unknown_token_id u32              = 3
+0.00.774.854 I llama_model_loader: - kv  34:            tokenizer.ggml.padding_token_id u32              = 0
+0.00.774.854 I llama_model_loader: - kv  35:               tokenizer.ggml.mask_token_id u32              = 4
+0.00.774.855 I llama_model_loader: - kv  36:            tokenizer.ggml.add_space_prefix bool             = false
+0.00.774.856 I llama_model_loader: - kv  37:               tokenizer.ggml.add_bos_token bool             = true
+0.00.774.856 I llama_model_loader: - kv  38:                          general.file_type u32              = 2
+0.00.774.857 I llama_model_loader: - kv  39:                tokenizer.ggml.eot_token_id u32              = 106
+0.00.774.858 I llama_model_loader: - kv  40:                       general.quantized_by str              = unsloth
+0.00.774.858 I llama_model_loader: - kv  41:                           general.basename str              = gemma-4-E4B-it
+0.00.774.861 I llama_model_loader: - kv  42:                               general.name str              = Gemma-4 E4B IT (smart Q4_0, QAT-lossl...
+0.00.774.861 I llama_model_loader: - kv  43:                           general.finetune str              = qat-it
+0.00.774.862 I llama_model_loader: - kv  44:                            general.license str              = gemma
+0.00.774.862 I llama_model_loader: - kv  45:               general.quantization_version u32              = 2
+0.00.774.867 I llama_model_loader: - kv  46:                    tokenizer.chat_template str              = {%- macro format_parameters(propertie...
+0.00.774.868 I llama_model_loader: - type  f32:  321 tensors
+0.00.774.869 I llama_model_loader: - type q4_0:  345 tensors
+0.00.774.870 I print_info: file format = GGUF V3 (latest)
+0.00.774.871 I print_info: file type   = Q4_0
+0.00.774.874 I print_info: file size   = 3.91 GiB (4.50 BPW) 
+0.00.775.908 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free
+0.00.905.155 I load: 0 unused tokens
+0.00.905.285 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.905.470 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+0.00.924.223 I load: printing all EOG tokens:
+0.00.924.226 I load:   - 1 ('<eos>')
+0.00.924.227 I load:   - 50 ('<|tool_response>')
+0.00.924.227 I load:   - 106 ('<turn|>')
+0.00.924.227 I load:   - 212 ('</s>')
+0.00.924.229 W load: '</s>' is a normal token here, removing it from EOG list
+0.00.924.341 I load: special tokens cache size = 24
+0.00.936.552 I load: token to piece cache size = 1.9445 MB
+0.00.936.566 I print_info: arch                  = gemma4
+0.00.936.567 I print_info: vocab_only            = 0
+0.00.936.567 I print_info: no_alloc              = 0
+0.00.936.568 I print_info: n_ctx_train           = 131072
+0.00.936.568 I print_info: n_embd_inp            = 2560
+0.00.936.569 I print_info: n_embd                = 2560
+0.00.936.569 I print_info: n_embd_out            = 2560
+0.00.936.569 I print_info: n_layer               = 42
+0.00.936.570 I print_info: n_layer_all           = 42
+0.00.936.581 I print_info: n_head                = 8
+0.00.936.583 I print_info: n_head_kv             = 2
+0.00.936.583 I print_info: n_rot                 = 512
+0.00.936.583 I print_info: n_swa                 = 512
+0.00.936.584 I print_info: is_swa_any            = 1
+0.00.936.584 I print_info: non_causal_type       = 1
+0.00.936.584 I print_info: n_embd_head_k         = 512
+0.00.936.585 I print_info: n_embd_head_v         = 512
+0.00.936.586 I print_info: n_gqa                 = 4
+0.00.936.595 I print_info: n_embd_k_gqa          = [512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024]
+0.00.936.603 I print_info: n_embd_v_gqa          = [512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024, 512, 512, 512, 512, 512, 1024]
+0.00.936.604 I print_info: f_norm_eps            = 0.0e+00
+0.00.936.605 I print_info: f_norm_rms_eps        = 1.0e-06
+0.00.936.605 I print_info: f_clamp_kqv           = 0.0e+00
+0.00.936.606 I print_info: f_max_alibi_bias      = 0.0e+00
+0.00.936.606 I print_info: f_logit_scale         = 0.0e+00
+0.00.936.607 I print_info: f_attn_scale          = 1.0e+00
+0.00.936.607 I print_info: f_attn_value_scale    = 0.0000
+0.00.936.609 I print_info: n_ff                  = 10240
+0.00.936.609 I print_info: n_expert              = 0
+0.00.936.609 I print_info: n_expert_used         = 0
+0.00.936.610 I print_info: n_expert_groups       = 0
+0.00.936.610 I print_info: n_group_used          = 0
+0.00.936.610 I print_info: causal attn           = 1
+0.00.936.611 I print_info: pooling type          = -1
+0.00.936.611 I print_info: rope type             = 2
+0.00.936.611 I print_info: rope scaling          = linear
+0.00.936.612 I print_info: freq_base_train       = 1000000.0
+0.00.936.613 I print_info: freq_scale_train      = 1
+0.00.936.613 I print_info: freq_base_swa         = 10000.0
+0.00.936.613 I print_info: freq_scale_swa        = 1
+0.00.936.614 I print_info: n_embd_head_k_swa     = 256
+0.00.936.614 I print_info: n_embd_head_v_swa     = 256
+0.00.936.614 I print_info: n_rot_swa             = 256
+0.00.936.615 I print_info: n_ctx_orig_yarn       = 131072
+0.00.936.615 I print_info: rope_yarn_log_mul     = 0.0000
+0.00.936.615 I print_info: rope_finetuned        = unknown
+0.00.936.616 I print_info: model type            = E4B
+0.00.936.617 I print_info: model params          = 7.46 B
+0.00.936.617 I print_info: general.name          = Gemma-4 E4B IT (smart Q4_0, QAT-lossless)
+0.00.936.618 I print_info: vocab type            = BPE
+0.00.936.618 I print_info: n_vocab               = 262144
+0.00.936.618 I print_info: n_merges              = 514906
+0.00.936.619 I print_info: BOS token             = 2 '<bos>'
+0.00.936.619 I print_info: EOS token             = 1 '<eos>'
+0.00.936.620 I print_info: EOT token             = 106 '<turn|>'
+0.00.936.620 I print_info: UNK token             = 3 '<unk>'
+0.00.936.620 I print_info: PAD token             = 0 '<pad>'
+0.00.936.621 I print_info: MASK token            = 4 '<mask>'
+0.00.936.621 I print_info: LF token              = 107 '
+'
+0.00.936.621 I print_info: EOG token             = 1 '<eos>'
+0.00.936.622 I print_info: EOG token             = 50 '<|tool_response>'
+0.00.936.622 I print_info: EOG token             = 106 '<turn|>'
+0.00.936.622 I print_info: max token length      = 93
+0.00.937.604 I load_tensors: loading model tensors, this can take a while... (load_mode = mmap)
+0.01.254.768 I load_tensors: offloading output layer to GPU
+0.01.254.772 I load_tensors: offloading 41 repeating layers to GPU
+0.01.254.772 I load_tensors: offloaded 43/43 layers to GPU
+0.01.254.776 I load_tensors:   CPU_Mapped model buffer size =  1872.00 MiB
+0.01.254.777 I load_tensors:      Vulkan0 model buffer size =  2493.31 MiB
+0.02.112.534 I cmn  common_init_: added <eos> logit bias = -inf
+0.02.112.540 I cmn  common_init_: added <|tool_response> logit bias = -inf
+0.02.112.541 I cmn  common_init_: added <turn|> logit bias = -inf
+0.02.113.534 I llama_context: constructing llama_context
+0.02.113.546 I llama_context: n_seq_max             = 3
+0.02.113.547 I llama_context: n_ctx                 = 4608
+0.02.113.547 I llama_context: n_ctx_seq             = 1536
+0.02.113.548 I llama_context: n_batch               = 512
+0.02.113.549 I llama_context: n_ubatch              = 512
+0.02.113.549 I llama_context: causal_attn           = 1
+0.02.113.550 I llama_context: flash_attn            = enabled
+0.02.113.551 I llama_context: kv_unified            = false
+0.02.113.554 I llama_context: freq_base             = 1000000.0
+0.02.113.556 I llama_context: freq_scale            = 1
+0.02.113.557 I llama_context: n_rs_seq              = 0
+0.02.113.558 I llama_context: n_outputs_max         = 3
+0.02.113.558 I llama_context: n_outputs_max_per_seq = 1
+0.02.113.560 I llama_context: n_ctx_seq (1536) < n_ctx_train (131072) -- the full capacity of the model will not be utilized
+0.02.114.215 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB
+0.02.114.220 I llama_kv_cache_iswa: creating non-SWA KV cache, size = 1536 cells
+0.02.119.553 I llama_kv_cache:    Vulkan0 KV buffer size =    72.00 MiB
+0.02.124.459 I llama_kv_cache: size =   72.00 MiB (  1536 cells,   4 layers,  3/3 seqs), K (f16):   36.00 MiB, V (f16):   36.00 MiB
+0.02.124.466 I llama_kv_cache: n_rot_k = 0, n_embd_head_k_all = 512
+0.02.124.467 I llama_kv_cache: n_rot_v = 0, n_embd_head_k_all = 512
+0.02.124.471 I llama_kv_cache_iswa: creating     SWA KV cache, size = 1024 cells
+0.02.132.540 I llama_kv_cache:    Vulkan0 KV buffer size =   120.00 MiB
+0.02.137.091 I llama_kv_cache: size =  120.00 MiB (  1024 cells,  20 layers,  3/3 seqs), K (f16):   60.00 MiB, V (f16):   60.00 MiB
+0.02.137.099 I llama_kv_cache: n_rot_k = 0, n_embd_head_k_all = 256
+0.02.137.099 I llama_kv_cache: n_rot_v = 0, n_embd_head_k_all = 256
+0.02.137.107 I sched_reserve: reserving ...
+0.02.137.361 I resolve_fused_ops: resolving fused DeepSeek V4 HC support:
+0.02.139.362 I resolve_fused_ops: fused DeepSeek V4 HC pre enabled
+0.02.141.126 I resolve_fused_ops: fused DeepSeek V4 HC comb enabled
+0.02.142.843 I resolve_fused_ops: fused DeepSeek V4 HC post enabled
+0.02.161.277 I sched_reserve:    Vulkan0 compute buffer size =   124.77 MiB
+0.02.161.281 I sched_reserve: Vulkan_Host compute buffer size =    43.61 MiB
+0.02.161.282 I sched_reserve: graph: nodes = 1916, splits = 2, input objects = 5, input tensors = 14
+0.02.161.284 I sched_reserve: reserve took 24.18 ms, sched copies = 1
+0.02.161.445 I cmn          init: llama threadpool init, n_threads = 4
+0.02.161.456 I cmn  common_init_: warming up the model with an empty run - please wait ... (--no-warmup to disable)
+0.02.218.357 I srv    load_model: initializing, n_slots = 3, n_ctx_slot = 1536, kv_unified = 'false'
+0.02.218.378 I spec common_specu: no implementations specified for speculative decoding
+0.02.218.382 I slot   load_model: id  0 | task -1 | new slot, n_ctx = 1536
+0.02.218.385 I slot   load_model: id  1 | task -1 | new slot, n_ctx = 1536
+0.02.218.385 I slot   load_model: id  2 | task -1 | new slot, n_ctx = 1536
+0.02.218.399 I srv    load_model: prompt cache is disabled - use `--cache-ram N` to enable it
+0.02.218.399 I srv    load_model: for more info see https://github.com/ggml-org/llama.cpp/pull/16391
+0.02.218.400 I srv    load_model: context checkpoints enabled, max = 32, min spacing = 8192
+0.02.218.418 W srv          init: --cache-idle-slots requires --cache-ram, disabling
+0.02.226.117 I srv          init: init: chat template, example_format: '<|turn>system
+You are a helpful assistant<turn|>
+<|turn>user
+Hello<turn|>
+<|turn>model
+Hi there<turn|>
+<|turn>user
+How are you?<turn|>
+<|turn>model
+'
+0.02.227.139 I srv          init: init: chat template, thinking = 0
+0.02.227.146 I srv          init: preserve_reasoning kwarg: not supported by template
+0.02.227.168 I srv  llama_server: model loaded
+0.02.227.172 I srv  llama_server: listening on http://127.0.0.1:63895
+0.02.227.218 I srv  update_slots: all slots are idle
+0.02.503.473 I srv  server_strea: conv_id= (empty=1)
+0.02.504.478 I slot get_availabl: id  0 | task -1 | selected slot by id (0)
+0.02.504.482 I slot get_availabl: id  0 | task -1 |  - skipping, slot is empty
+0.02.504.506 I slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.02.504.516 I slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.02.504.519 I slot launch_slot_: id  0 | task 0 | processing task, is_child = 0
+0.02.504.528 I slot   operator(): id  0 | task 0 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 825
+0.02.504.535 I slot   operator(): id  0 | task 0 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.02.537.877 I slot   operator(): id  0 | task 0 | cached n_tokens = 313, memory_seq_rm [313, end)
+0.02.811.172 I slot create_check: id  0 | task 0 | created context checkpoint 1 of 32 (pos_min = 0, pos_max = 312, n_tokens = 313, size = 12.231 MiB)
+0.02.839.892 I slot   operator(): id  0 | task 0 | cached n_tokens = 821, memory_seq_rm [821, end)
+0.02.839.989 I slot init_sampler: id  0 | task 0 | init sampler, took 0.07 ms, tokens: text = 825, total = 825
+0.03.314.412 I slot create_check: id  0 | task 0 | created context checkpoint 2 of 32 (pos_min = 0, pos_max = 820, n_tokens = 821, size = 20.006 MiB)
+0.03.333.921 I slot print_timing: id  0 | task 0 | prompt eval time =     829.38 ms /   825 tokens (    1.01 ms per token,   994.72 tokens per second)
+0.03.333.925 I slot print_timing: id  0 | task 0 |        eval time =       0.00 ms /     1 tokens (    0.00 ms per token,     0.00 tokens per second)
+0.03.333.926 I slot print_timing: id  0 | task 0 |       total time =     829.38 ms /   826 tokens
+0.03.333.926 I slot print_timing: id  0 | task 0 |    graphs reused =          1
+0.03.333.979 I slot      release: id  0 | task 0 | stop processing: n_tokens = 825, truncated = 0
+0.03.333.988 I srv  update_slots: all slots are idle
+0.03.346.515 I srv  server_strea: conv_id= (empty=1)
+0.03.348.400 I slot get_availabl: id  0 | task -1 | selected slot by id (0)
+0.03.348.407 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.888 (820/923) > 0.100
+0.03.348.506 I slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.03.348.517 I slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.03.348.518 I slot launch_slot_: id  0 | task 4 | processing task, is_child = 0
+0.03.348.524 I slot   operator(): id  0 | task 4 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 923
+0.03.348.530 I slot   operator(): id  0 | task 4 | cached n_tokens = 820, memory_seq_rm [820, end)
+0.03.355.065 I slot create_check: id  0 | task 4 | created context checkpoint 3 of 32 (pos_min = 0, pos_max = 819, n_tokens = 820, size = 20.006 MiB)
+0.03.377.253 I slot   operator(): id  0 | task 4 | cached n_tokens = 919, memory_seq_rm [919, end)
+0.03.377.344 I slot init_sampler: id  0 | task 4 | init sampler, took 0.08 ms, tokens: text = 923, total = 923
+0.03.484.553 I slot create_check: id  0 | task 4 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 918, n_tokens = 919, size = 20.006 MiB)
+0.03.669.723 I slot print_timing: id  0 | task 4 | prompt eval time =     154.84 ms /   103 tokens (    1.50 ms per token,   665.21 tokens per second)
+0.03.669.727 I slot print_timing: id  0 | task 4 |        eval time =     166.35 ms /    14 tokens (   12.80 ms per token,    78.15 tokens per second)
+0.03.669.728 I slot print_timing: id  0 | task 4 |       total time =     321.19 ms /   117 tokens
+0.03.669.728 I slot print_timing: id  0 | task 4 |    graphs reused =         13
+0.03.669.779 I slot      release: id  0 | task 4 | stop processing: n_tokens = 936, truncated = 0
+0.03.669.785 I srv  update_slots: all slots are idle
+0.03.682.816 I srv  server_strea: conv_id= (empty=1)
+0.03.683.816 I slot get_availabl: id  1 | task -1 | selected slot by id (1)
+0.03.683.820 I slot get_availabl: id  1 | task -1 |  - skipping, slot is empty
+0.03.683.837 I slot launch_slot_: id  1 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.03.683.847 I slot launch_slot_: id  1 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.03.683.848 I slot launch_slot_: id  1 | task 20 | processing task, is_child = 0
+0.03.683.852 I slot   operator(): id  1 | task 20 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 823
+0.03.683.855 I slot   operator(): id  1 | task 20 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.03.695.236 I slot   operator(): id  1 | task 20 | cached n_tokens = 311, memory_seq_rm [311, end)
+0.03.982.734 I slot create_check: id  1 | task 20 | created context checkpoint 1 of 32 (pos_min = 0, pos_max = 310, n_tokens = 311, size = 12.152 MiB)
+0.03.991.324 I slot   operator(): id  1 | task 20 | cached n_tokens = 819, memory_seq_rm [819, end)
+0.03.991.412 I slot init_sampler: id  1 | task 20 | init sampler, took 0.07 ms, tokens: text = 823, total = 823
+0.04.490.839 I slot create_check: id  1 | task 20 | created context checkpoint 2 of 32 (pos_min = 0, pos_max = 818, n_tokens = 819, size = 20.006 MiB)
+0.04.509.841 I slot print_timing: id  1 | task 20 | prompt eval time =     825.98 ms /   823 tokens (    1.00 ms per token,   996.39 tokens per second)
+0.04.509.845 I slot print_timing: id  1 | task 20 |        eval time =       0.00 ms /     1 tokens (    0.00 ms per token,     0.00 tokens per second)
+0.04.509.846 I slot print_timing: id  1 | task 20 |       total time =     825.98 ms /   824 tokens
+0.04.509.847 I slot print_timing: id  1 | task 20 |    graphs reused =         13
+0.04.509.897 I slot      release: id  1 | task 20 | stop processing: n_tokens = 823, truncated = 0
+0.04.509.906 I srv  update_slots: all slots are idle
+0.04.526.176 I srv  server_strea: conv_id= (empty=1)
+0.04.528.129 I slot get_availabl: id  1 | task -1 | selected slot by id (1)
+0.04.528.143 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.880 (818/930) > 0.100
+0.04.528.328 I slot launch_slot_: id  1 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.04.528.355 I slot launch_slot_: id  1 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.04.528.358 I slot launch_slot_: id  1 | task 24 | processing task, is_child = 0
+0.04.528.367 I slot   operator(): id  1 | task 24 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 930
+0.04.528.376 I slot   operator(): id  1 | task 24 | cached n_tokens = 818, memory_seq_rm [818, end)
+0.04.534.825 I slot create_check: id  1 | task 24 | created context checkpoint 3 of 32 (pos_min = 0, pos_max = 817, n_tokens = 818, size = 20.006 MiB)
+0.04.558.872 I slot   operator(): id  1 | task 24 | cached n_tokens = 926, memory_seq_rm [926, end)
+0.04.558.963 I slot init_sampler: id  1 | task 24 | init sampler, took 0.08 ms, tokens: text = 930, total = 930
+0.04.674.717 I slot create_check: id  1 | task 24 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 925, n_tokens = 926, size = 20.006 MiB)
+0.04.926.544 I slot print_timing: id  1 | task 24 | prompt eval time =     165.31 ms /   112 tokens (    1.48 ms per token,   677.54 tokens per second)
+0.04.926.548 I slot print_timing: id  1 | task 24 |        eval time =     232.86 ms /    19 tokens (   12.94 ms per token,    77.30 tokens per second)
+0.04.926.549 I slot print_timing: id  1 | task 24 |       total time =     398.17 ms /   131 tokens
+0.04.926.549 I slot print_timing: id  1 | task 24 |    graphs reused =         30
+0.04.926.601 I slot      release: id  1 | task 24 | stop processing: n_tokens = 948, truncated = 0
+0.04.926.608 I srv  update_slots: all slots are idle
+0.04.962.454 I srv  server_strea: conv_id= (empty=1)
+0.04.963.410 I slot get_availabl: id  2 | task -1 | selected slot by id (2)
+0.04.963.413 I slot get_availabl: id  2 | task -1 |  - skipping, slot is empty
+0.04.963.430 I slot launch_slot_: id  2 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.04.963.441 I slot launch_slot_: id  2 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.04.963.442 I slot launch_slot_: id  2 | task 45 | processing task, is_child = 0
+0.04.963.446 I slot   operator(): id  2 | task 45 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 819
+0.04.963.449 I slot   operator(): id  2 | task 45 | cached n_tokens = 0, memory_seq_rm [0, end)
+0.04.972.184 I slot   operator(): id  2 | task 45 | cached n_tokens = 307, memory_seq_rm [307, end)
+0.05.276.344 I slot create_check: id  2 | task 45 | created context checkpoint 1 of 32 (pos_min = 0, pos_max = 306, n_tokens = 307, size = 11.996 MiB)
+0.05.285.270 I slot   operator(): id  2 | task 45 | cached n_tokens = 815, memory_seq_rm [815, end)
+0.05.285.360 I slot init_sampler: id  2 | task 45 | init sampler, took 0.07 ms, tokens: text = 819, total = 819
+0.05.771.799 I slot create_check: id  2 | task 45 | created context checkpoint 2 of 32 (pos_min = 0, pos_max = 814, n_tokens = 815, size = 20.006 MiB)
+0.05.790.331 I slot print_timing: id  2 | task 45 | prompt eval time =     826.88 ms /   819 tokens (    1.01 ms per token,   990.47 tokens per second)
+0.05.790.336 I slot print_timing: id  2 | task 45 |        eval time =       0.00 ms /     1 tokens (    0.00 ms per token,     0.00 tokens per second)
+0.05.790.336 I slot print_timing: id  2 | task 45 |       total time =     826.88 ms /   820 tokens
+0.05.790.337 I slot print_timing: id  2 | task 45 |    graphs reused =         30
+0.05.790.386 I slot      release: id  2 | task 45 | stop processing: n_tokens = 819, truncated = 0
+0.05.790.394 I srv  update_slots: all slots are idle
+0.05.803.481 I srv  server_strea: conv_id= (empty=1)
+0.05.805.375 I slot get_availabl: id  2 | task -1 | selected slot by id (2)
+0.05.805.383 I slot get_availabl: id  2 | task -1 |  - checking sim = 0.888 (814/917) > 0.100
+0.05.805.489 I slot launch_slot_: id  2 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.05.805.500 I slot launch_slot_: id  2 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.05.805.502 I slot launch_slot_: id  2 | task 49 | processing task, is_child = 0
+0.05.805.508 I slot   operator(): id  2 | task 49 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 917
+0.05.805.515 I slot   operator(): id  2 | task 49 | cached n_tokens = 814, memory_seq_rm [814, end)
+0.05.811.635 I slot create_check: id  2 | task 49 | created context checkpoint 3 of 32 (pos_min = 0, pos_max = 813, n_tokens = 814, size = 20.006 MiB)
+0.05.817.429 I slot   operator(): id  2 | task 49 | cached n_tokens = 913, memory_seq_rm [913, end)
+0.05.817.525 I slot init_sampler: id  2 | task 49 | init sampler, took 0.08 ms, tokens: text = 917, total = 917
+0.05.947.874 I slot create_check: id  2 | task 49 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 912, n_tokens = 913, size = 20.006 MiB)
+0.06.094.688 I slot print_timing: id  2 | task 49 | prompt eval time =     161.18 ms /   103 tokens (    1.56 ms per token,   639.02 tokens per second)
+0.06.094.692 I slot print_timing: id  2 | task 49 |        eval time =     127.99 ms /    11 tokens (   12.80 ms per token,    78.13 tokens per second)
+0.06.094.693 I slot print_timing: id  2 | task 49 |       total time =     289.17 ms /   114 tokens
+0.06.094.694 I slot print_timing: id  2 | task 49 |    graphs reused =         39
+0.06.094.745 I slot      release: id  2 | task 49 | stop processing: n_tokens = 927, truncated = 0
+0.06.094.751 I srv  update_slots: all slots are idle
+0.06.121.548 I srv  server_strea: conv_id= (empty=1)
+0.06.123.439 I slot get_availabl: id  0 | task -1 | selected slot by id (0)
+0.06.123.444 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.898 (829/923) > 0.100
+0.06.123.551 I slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.06.123.562 I slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.06.123.563 I slot launch_slot_: id  0 | task 62 | processing task, is_child = 0
+0.06.123.567 I slot   operator(): id  0 | task 62 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 923
+0.06.123.571 I slot   operator(): id  0 | task 62 | erased invalidated context checkpoint (pos_min = 0, pos_max = 918, n_tokens = 919, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.06.124.038 I slot   operator(): id  0 | task 62 | cached n_tokens = 829, memory_seq_rm [829, end)
+0.06.130.616 I slot create_check: id  0 | task 62 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.06.155.654 I slot   operator(): id  0 | task 62 | cached n_tokens = 919, memory_seq_rm [919, end)
+0.06.155.749 I slot init_sampler: id  0 | task 62 | init sampler, took 0.08 ms, tokens: text = 923, total = 923
+0.06.274.138 I slot create_check: id  0 | task 62 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 918, n_tokens = 919, size = 20.006 MiB)
+0.06.471.436 I slot print_timing: id  0 | task 62 | prompt eval time =     171.12 ms /    94 tokens (    1.82 ms per token,   549.31 tokens per second)
+0.06.471.441 I slot print_timing: id  0 | task 62 |        eval time =     176.74 ms /    14 tokens (   13.60 ms per token,    73.56 tokens per second)
+0.06.471.442 I slot print_timing: id  0 | task 62 |       total time =     347.86 ms /   108 tokens
+0.06.471.442 I slot print_timing: id  0 | task 62 |    graphs reused =         51
+0.06.471.494 I slot      release: id  0 | task 62 | stop processing: n_tokens = 936, truncated = 0
+0.06.471.501 I srv  update_slots: all slots are idle
+0.06.491.727 I srv  server_strea: conv_id= (empty=1)
+0.06.493.613 I slot get_availabl: id  1 | task -1 | selected slot by id (1)
+0.06.493.620 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.889 (827/930) > 0.100
+0.06.493.729 I slot launch_slot_: id  1 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+0.06.493.739 I slot launch_slot_: id  1 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+0.06.493.741 I slot launch_slot_: id  1 | task 78 | processing task, is_child = 0
+0.06.493.745 I slot   operator(): id  1 | task 78 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 930
+0.06.493.749 I slot   operator(): id  1 | task 78 | erased invalidated context checkpoint (pos_min = 0, pos_max = 925, n_tokens = 926, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.06.494.219 I slot   operator(): id  1 | task 78 | cached n_tokens = 827, memory_seq_rm [827, end)
+0.06.500.529 I slot create_check: id  1 | task 78 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.06.506.747 I slot   operator(): id  1 | task 78 | cached n_tokens = 926, memory_seq_rm [926, end)
+0.06.506.843 I slot init_sampler: id  1 | task 78 | init sampler, took 0.08 ms, tokens: text = 930, total = 930
+0.06.651.125 I slot create_check: id  1 | task 78 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 925, n_tokens = 926, size = 20.006 MiB)
+0.06.916.223 I slot print_timing: id  1 | task 78 | prompt eval time =     177.76 ms /   103 tokens (    1.73 ms per token,   579.43 tokens per second)
+0.06.949.128 I slot   operator(): id  2 | task 99 | erased invalidated context checkpoint (pos_min = 0, pos_max = 912, n_tokens = 913, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.06.956.138 I slot create_check: id  2 | task 99 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.07.099.571 I slot create_check: id  2 | task 99 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 912, n_tokens = 913, size = 20.006 MiB)
+0.07.271.009 I slot   operator(): id  0 | task 112 | erased invalidated context checkpoint (pos_min = 0, pos_max = 918, n_tokens = 919, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.07.271.507 I slot create_check: id  0 | task 112 | superseding context checkpoint at n_tokens = 829
+0.07.278.243 I slot create_check: id  0 | task 112 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.07.426.833 I slot create_check: id  0 | task 112 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 918, n_tokens = 919, size = 20.006 MiB)
+0.07.636.028 I slot   operator(): id  1 | task 128 | erased invalidated context checkpoint (pos_min = 0, pos_max = 925, n_tokens = 926, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.07.636.536 I slot create_check: id  1 | task 128 | superseding context checkpoint at n_tokens = 827
+0.07.643.358 I slot create_check: id  1 | task 128 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.07.793.618 I slot create_check: id  1 | task 128 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 925, n_tokens = 926, size = 20.006 MiB)
+0.08.094.035 I slot   operator(): id  2 | task 149 | erased invalidated context checkpoint (pos_min = 0, pos_max = 912, n_tokens = 913, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.08.094.532 I slot create_check: id  2 | task 149 | superseding context checkpoint at n_tokens = 823
+0.08.101.567 I slot create_check: id  2 | task 149 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.08.248.362 I slot create_check: id  2 | task 149 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 912, n_tokens = 913, size = 20.006 MiB)
+0.08.428.040 I slot   operator(): id  0 | task 162 | erased invalidated context checkpoint (pos_min = 0, pos_max = 918, n_tokens = 919, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.08.428.905 I slot create_check: id  0 | task 162 | superseding context checkpoint at n_tokens = 829
+0.08.435.594 I slot create_check: id  0 | task 162 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.08.579.171 I slot create_check: id  0 | task 162 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 918, n_tokens = 919, size = 20.006 MiB)
+0.08.810.226 I slot   operator(): id  1 | task 178 | erased invalidated context checkpoint (pos_min = 0, pos_max = 925, n_tokens = 926, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.08.810.726 I slot create_check: id  1 | task 178 | superseding context checkpoint at n_tokens = 827
+0.08.817.769 I slot create_check: id  1 | task 178 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.08.971.857 I slot create_check: id  1 | task 178 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.09.248.745 I slot   operator(): id  2 | task 199 | erased invalidated context checkpoint (pos_min = 0, pos_max = 912, n_tokens = 913, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.09.249.280 I slot create_check: id  2 | task 199 | superseding context checkpoint at n_tokens = 823
+0.09.255.897 I slot create_check: id  2 | task 199 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.09.398.835 I slot create_check: id  2 | task 199 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.09.588.168 I slot   operator(): id  0 | task 212 | erased invalidated context checkpoint (pos_min = 0, pos_max = 918, n_tokens = 919, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.09.588.675 I slot create_check: id  0 | task 212 | superseding context checkpoint at n_tokens = 829
+0.09.595.298 I slot create_check: id  0 | task 212 | created context checkpoint 4 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.09.738.100 I slot create_check: id  0 | task 212 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.09.970.139 I slot   operator(): id  1 | task 228 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.09.977.268 I slot create_check: id  1 | task 228 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.10.128.505 I slot create_check: id  1 | task 228 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.10.425.504 I slot   operator(): id  2 | task 249 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.10.431.998 I slot create_check: id  2 | task 249 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.10.576.394 I slot create_check: id  2 | task 249 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.10.760.168 I slot   operator(): id  0 | task 262 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.10.766.787 I slot create_check: id  0 | task 262 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.10.913.611 I slot create_check: id  0 | task 262 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.11.121.268 I slot   operator(): id  1 | task 278 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.11.122.135 I slot create_check: id  1 | task 278 | superseding context checkpoint at n_tokens = 828
+0.11.128.771 I slot create_check: id  1 | task 278 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.11.278.690 I slot create_check: id  1 | task 278 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.11.555.201 I slot   operator(): id  2 | task 299 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.11.555.706 I slot create_check: id  2 | task 299 | superseding context checkpoint at n_tokens = 824
+0.11.562.398 I slot create_check: id  2 | task 299 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.11.701.299 I slot create_check: id  2 | task 299 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.11.868.278 I slot   operator(): id  0 | task 312 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.11.868.777 I slot create_check: id  0 | task 312 | superseding context checkpoint at n_tokens = 830
+0.11.875.759 I slot create_check: id  0 | task 312 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.12.016.527 I slot create_check: id  0 | task 312 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.12.232.594 I slot   operator(): id  1 | task 328 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.12.233.096 I slot create_check: id  1 | task 328 | superseding context checkpoint at n_tokens = 828
+0.12.239.863 I slot create_check: id  1 | task 328 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.12.391.702 I slot create_check: id  1 | task 328 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.12.667.311 I slot   operator(): id  2 | task 349 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.12.667.809 I slot create_check: id  2 | task 349 | superseding context checkpoint at n_tokens = 823
+0.12.674.799 I slot create_check: id  2 | task 349 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.12.818.439 I slot create_check: id  2 | task 349 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.13.002.394 I slot   operator(): id  0 | task 362 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.13.002.897 I slot create_check: id  0 | task 362 | superseding context checkpoint at n_tokens = 829
+0.13.009.925 I slot create_check: id  0 | task 362 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.13.150.395 I slot create_check: id  0 | task 362 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.13.368.737 I slot   operator(): id  1 | task 378 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.13.369.252 I slot create_check: id  1 | task 378 | superseding context checkpoint at n_tokens = 827
+0.13.376.352 I slot create_check: id  1 | task 378 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.13.528.074 I slot create_check: id  1 | task 378 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.13.825.570 I slot   operator(): id  2 | task 399 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.13.826.079 I slot create_check: id  2 | task 399 | superseding context checkpoint at n_tokens = 824
+0.13.832.681 I slot create_check: id  2 | task 399 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.13.976.499 I slot create_check: id  2 | task 399 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.14.160.644 I slot   operator(): id  0 | task 412 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.14.161.164 I slot create_check: id  0 | task 412 | superseding context checkpoint at n_tokens = 830
+0.14.167.701 I slot create_check: id  0 | task 412 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.14.312.471 I slot create_check: id  0 | task 412 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.14.542.523 I slot   operator(): id  1 | task 428 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.14.543.032 I slot create_check: id  1 | task 428 | superseding context checkpoint at n_tokens = 828
+0.14.550.215 I slot create_check: id  1 | task 428 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.14.703.409 I slot create_check: id  1 | task 428 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.15.005.746 I slot   operator(): id  2 | task 449 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.15.006.251 I slot create_check: id  2 | task 449 | superseding context checkpoint at n_tokens = 824
+0.15.013.397 I slot create_check: id  2 | task 449 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.15.161.895 I slot create_check: id  2 | task 449 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.15.340.077 I slot   operator(): id  0 | task 462 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.15.340.597 I slot create_check: id  0 | task 462 | superseding context checkpoint at n_tokens = 830
+0.15.347.663 I slot create_check: id  0 | task 462 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.15.493.361 I slot create_check: id  0 | task 462 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.15.720.612 I slot   operator(): id  1 | task 478 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.15.721.115 I slot create_check: id  1 | task 478 | superseding context checkpoint at n_tokens = 828
+0.15.728.817 I slot create_check: id  1 | task 478 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.15.881.156 I slot create_check: id  1 | task 478 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.16.180.477 I slot   operator(): id  2 | task 499 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.16.180.976 I slot create_check: id  2 | task 499 | superseding context checkpoint at n_tokens = 824
+0.16.187.772 I slot create_check: id  2 | task 499 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.16.329.087 I slot create_check: id  2 | task 499 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.16.516.378 I slot   operator(): id  0 | task 512 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.16.516.899 I slot create_check: id  0 | task 512 | superseding context checkpoint at n_tokens = 829
+0.16.524.275 I slot create_check: id  0 | task 512 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.16.669.244 I slot create_check: id  0 | task 512 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.16.884.924 I slot   operator(): id  1 | task 528 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.16.885.426 I slot create_check: id  1 | task 528 | superseding context checkpoint at n_tokens = 827
+0.16.892.374 I slot create_check: id  1 | task 528 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.17.045.566 I slot create_check: id  1 | task 528 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.17.343.849 I slot   operator(): id  2 | task 549 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.17.344.572 I slot create_check: id  2 | task 549 | superseding context checkpoint at n_tokens = 823
+0.17.350.892 I slot create_check: id  2 | task 549 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.17.492.324 I slot create_check: id  2 | task 549 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.17.681.492 I slot   operator(): id  0 | task 562 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.17.682.001 I slot create_check: id  0 | task 562 | superseding context checkpoint at n_tokens = 830
+0.17.688.765 I slot create_check: id  0 | task 562 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.17.837.840 I slot create_check: id  0 | task 562 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.18.064.124 I slot   operator(): id  1 | task 578 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.18.064.630 I slot create_check: id  1 | task 578 | superseding context checkpoint at n_tokens = 828
+0.18.071.598 I slot create_check: id  1 | task 578 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.18.222.611 I slot create_check: id  1 | task 578 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.18.500.536 I slot   operator(): id  2 | task 599 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.18.501.040 I slot create_check: id  2 | task 599 | superseding context checkpoint at n_tokens = 824
+0.18.508.053 I slot create_check: id  2 | task 599 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.18.650.326 I slot create_check: id  2 | task 599 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.18.840.172 I slot   operator(): id  0 | task 612 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.18.840.684 I slot create_check: id  0 | task 612 | superseding context checkpoint at n_tokens = 830
+0.18.847.701 I slot create_check: id  0 | task 612 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.18.992.428 I slot create_check: id  0 | task 612 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.19.203.699 I slot   operator(): id  1 | task 628 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.19.204.315 I slot create_check: id  1 | task 628 | superseding context checkpoint at n_tokens = 828
+0.19.211.756 I slot create_check: id  1 | task 628 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.19.361.767 I slot create_check: id  1 | task 628 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.19.665.740 I slot   operator(): id  2 | task 649 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.19.666.248 I slot create_check: id  2 | task 649 | superseding context checkpoint at n_tokens = 824
+0.19.673.062 I slot create_check: id  2 | task 649 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.19.815.002 I slot create_check: id  2 | task 649 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.19.999.743 I slot   operator(): id  0 | task 662 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.20.000.248 I slot create_check: id  0 | task 662 | superseding context checkpoint at n_tokens = 830
+0.20.007.670 I slot create_check: id  0 | task 662 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.20.155.996 I slot create_check: id  0 | task 662 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.20.380.879 I slot   operator(): id  1 | task 678 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.20.381.405 I slot create_check: id  1 | task 678 | superseding context checkpoint at n_tokens = 827
+0.20.388.123 I slot create_check: id  1 | task 678 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.20.540.789 I slot create_check: id  1 | task 678 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.20.838.752 I slot   operator(): id  2 | task 699 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.20.839.265 I slot create_check: id  2 | task 699 | superseding context checkpoint at n_tokens = 823
+0.20.846.487 I slot create_check: id  2 | task 699 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.20.993.305 I slot create_check: id  2 | task 699 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.21.175.008 I slot   operator(): id  0 | task 712 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.21.175.512 I slot create_check: id  0 | task 712 | superseding context checkpoint at n_tokens = 829
+0.21.182.065 I slot create_check: id  0 | task 712 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.21.322.989 I slot create_check: id  0 | task 712 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.21.534.025 I slot   operator(): id  1 | task 728 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.21.534.530 I slot create_check: id  1 | task 728 | superseding context checkpoint at n_tokens = 828
+0.21.541.313 I slot create_check: id  1 | task 728 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.21.693.869 I slot create_check: id  1 | task 728 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.22.000.544 I slot   operator(): id  2 | task 749 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.22.001.061 I slot create_check: id  2 | task 749 | superseding context checkpoint at n_tokens = 824
+0.22.008.185 I slot create_check: id  2 | task 749 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.22.157.354 I slot create_check: id  2 | task 749 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.22.330.295 I slot   operator(): id  0 | task 762 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.22.330.802 I slot create_check: id  0 | task 762 | superseding context checkpoint at n_tokens = 830
+0.22.337.194 I slot create_check: id  0 | task 762 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.22.480.000 I slot create_check: id  0 | task 762 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.22.715.011 I slot   operator(): id  1 | task 778 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.22.715.527 I slot create_check: id  1 | task 778 | superseding context checkpoint at n_tokens = 828
+0.22.722.753 I slot create_check: id  1 | task 778 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.22.877.855 I slot create_check: id  1 | task 778 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.23.160.696 I slot   operator(): id  2 | task 799 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.23.161.208 I slot create_check: id  2 | task 799 | superseding context checkpoint at n_tokens = 824
+0.23.169.498 I slot create_check: id  2 | task 799 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.23.316.479 I slot create_check: id  2 | task 799 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.23.506.154 I slot   operator(): id  0 | task 812 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.23.506.660 I slot create_check: id  0 | task 812 | superseding context checkpoint at n_tokens = 830
+0.23.515.165 I slot create_check: id  0 | task 812 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.23.660.285 I slot create_check: id  0 | task 812 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.23.888.158 I slot   operator(): id  1 | task 828 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.23.888.683 I slot create_check: id  1 | task 828 | superseding context checkpoint at n_tokens = 828
+0.23.897.234 I slot create_check: id  1 | task 828 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.24.052.499 I slot create_check: id  1 | task 828 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.24.345.383 I slot   operator(): id  2 | task 849 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.24.345.906 I slot create_check: id  2 | task 849 | superseding context checkpoint at n_tokens = 823
+0.24.353.755 I slot create_check: id  2 | task 849 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.24.495.506 I slot create_check: id  2 | task 849 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.24.680.701 I slot   operator(): id  0 | task 862 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.24.681.205 I slot create_check: id  0 | task 862 | superseding context checkpoint at n_tokens = 829
+0.24.687.651 I slot create_check: id  0 | task 862 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.24.832.878 I slot create_check: id  0 | task 862 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.25.063.165 I slot   operator(): id  1 | task 878 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.25.063.670 I slot create_check: id  1 | task 878 | superseding context checkpoint at n_tokens = 827
+0.25.070.426 I slot create_check: id  1 | task 878 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.25.223.114 I slot create_check: id  1 | task 878 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.25.500.241 I slot   operator(): id  2 | task 899 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.25.500.744 I slot create_check: id  2 | task 899 | superseding context checkpoint at n_tokens = 824
+0.25.507.593 I slot create_check: id  2 | task 899 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.25.650.095 I slot create_check: id  2 | task 899 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.25.841.837 I slot   operator(): id  0 | task 912 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.25.842.623 I slot create_check: id  0 | task 912 | superseding context checkpoint at n_tokens = 830
+0.25.850.345 I slot create_check: id  0 | task 912 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.25.994.486 I slot create_check: id  0 | task 912 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.26.209.916 I slot   operator(): id  1 | task 928 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.26.210.427 I slot create_check: id  1 | task 928 | superseding context checkpoint at n_tokens = 828
+0.26.216.848 I slot create_check: id  1 | task 928 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.26.369.012 I slot create_check: id  1 | task 928 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.26.661.439 I slot   operator(): id  2 | task 949 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.26.661.954 I slot create_check: id  2 | task 949 | superseding context checkpoint at n_tokens = 824
+0.26.668.696 I slot create_check: id  2 | task 949 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.26.809.841 I slot create_check: id  2 | task 949 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.26.996.464 I slot   operator(): id  0 | task 962 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.26.997.003 I slot create_check: id  0 | task 962 | superseding context checkpoint at n_tokens = 830
+0.27.004.042 I slot create_check: id  0 | task 962 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.27.147.459 I slot create_check: id  0 | task 962 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.27.378.744 I slot   operator(): id  1 | task 978 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.27.379.255 I slot create_check: id  1 | task 978 | superseding context checkpoint at n_tokens = 828
+0.27.386.406 I slot create_check: id  1 | task 978 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.27.540.581 I slot create_check: id  1 | task 978 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.27.816.959 I slot   operator(): id  2 | task 999 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.27.817.490 I slot create_check: id  2 | task 999 | superseding context checkpoint at n_tokens = 824
+0.27.824.058 I slot create_check: id  2 | task 999 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.27.966.377 I slot create_check: id  2 | task 999 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.28.154.739 I slot   operator(): id  0 | task 1012 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.28.155.242 I slot create_check: id  0 | task 1012 | superseding context checkpoint at n_tokens = 829
+0.28.162.685 I slot create_check: id  0 | task 1012 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.28.311.887 I slot create_check: id  0 | task 1012 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.28.534.835 I slot   operator(): id  1 | task 1028 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.28.535.363 I slot create_check: id  1 | task 1028 | superseding context checkpoint at n_tokens = 827
+0.28.542.101 I slot create_check: id  1 | task 1028 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.28.695.795 I slot create_check: id  1 | task 1028 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.28.992.431 I slot   operator(): id  2 | task 1049 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.28.993.271 I slot create_check: id  2 | task 1049 | superseding context checkpoint at n_tokens = 823
+0.29.000.460 I slot create_check: id  2 | task 1049 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.29.143.238 I slot create_check: id  2 | task 1049 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.29.326.633 I slot   operator(): id  0 | task 1062 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.29.327.147 I slot create_check: id  0 | task 1062 | superseding context checkpoint at n_tokens = 830
+0.29.334.032 I slot create_check: id  0 | task 1062 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.29.477.111 I slot create_check: id  0 | task 1062 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.29.689.531 I slot   operator(): id  1 | task 1078 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.29.690.092 I slot create_check: id  1 | task 1078 | superseding context checkpoint at n_tokens = 828
+0.29.697.224 I slot create_check: id  1 | task 1078 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.29.847.432 I slot create_check: id  1 | task 1078 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.30.125.397 I slot   operator(): id  2 | task 1099 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.30.126.293 I slot create_check: id  2 | task 1099 | superseding context checkpoint at n_tokens = 824
+0.30.133.532 I slot create_check: id  2 | task 1099 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.30.273.912 I slot create_check: id  2 | task 1099 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.30.453.623 I slot   operator(): id  0 | task 1112 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.30.454.126 I slot create_check: id  0 | task 1112 | superseding context checkpoint at n_tokens = 830
+0.30.461.002 I slot create_check: id  0 | task 1112 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.30.604.103 I slot create_check: id  0 | task 1112 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.30.835.397 I slot   operator(): id  1 | task 1128 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.30.835.904 I slot create_check: id  1 | task 1128 | superseding context checkpoint at n_tokens = 828
+0.30.842.637 I slot create_check: id  1 | task 1128 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.30.995.354 I slot create_check: id  1 | task 1128 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.31.294.014 I slot   operator(): id  2 | task 1149 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.31.294.514 I slot create_check: id  2 | task 1149 | superseding context checkpoint at n_tokens = 824
+0.31.301.503 I slot create_check: id  2 | task 1149 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.31.448.787 I slot create_check: id  2 | task 1149 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.31.628.896 I slot   operator(): id  0 | task 1162 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.31.629.394 I slot create_check: id  0 | task 1162 | superseding context checkpoint at n_tokens = 830
+0.31.635.907 I slot create_check: id  0 | task 1162 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.31.777.933 I slot create_check: id  0 | task 1162 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.31.994.604 I slot   operator(): id  1 | task 1178 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.31.995.132 I slot create_check: id  1 | task 1178 | superseding context checkpoint at n_tokens = 827
+0.32.002.279 I slot create_check: id  1 | task 1178 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.32.153.506 I slot create_check: id  1 | task 1178 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.32.434.928 I slot   operator(): id  2 | task 1199 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.32.435.423 I slot create_check: id  2 | task 1199 | superseding context checkpoint at n_tokens = 823
+0.32.442.444 I slot create_check: id  2 | task 1199 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.32.586.879 I slot create_check: id  2 | task 1199 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.32.754.354 I slot   operator(): id  0 | task 1212 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.32.754.886 I slot create_check: id  0 | task 1212 | superseding context checkpoint at n_tokens = 829
+0.32.761.733 I slot create_check: id  0 | task 1212 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.32.903.059 I slot create_check: id  0 | task 1212 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.33.114.896 I slot   operator(): id  1 | task 1228 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.33.115.404 I slot create_check: id  1 | task 1228 | superseding context checkpoint at n_tokens = 828
+0.33.121.744 I slot create_check: id  1 | task 1228 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.33.273.005 I slot create_check: id  1 | task 1228 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.33.576.392 I slot   operator(): id  2 | task 1249 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.33.576.904 I slot create_check: id  2 | task 1249 | superseding context checkpoint at n_tokens = 824
+0.33.583.870 I slot create_check: id  2 | task 1249 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.33.730.734 I slot create_check: id  2 | task 1249 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.33.900.596 I slot   operator(): id  0 | task 1262 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.33.901.101 I slot create_check: id  0 | task 1262 | superseding context checkpoint at n_tokens = 830
+0.33.907.929 I slot create_check: id  0 | task 1262 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.34.047.907 I slot create_check: id  0 | task 1262 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.34.275.401 I slot   operator(): id  1 | task 1278 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.34.275.910 I slot create_check: id  1 | task 1278 | superseding context checkpoint at n_tokens = 828
+0.34.282.777 I slot create_check: id  1 | task 1278 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.34.434.314 I slot create_check: id  1 | task 1278 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.34.734.167 I slot   operator(): id  2 | task 1299 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.34.734.665 I slot create_check: id  2 | task 1299 | superseding context checkpoint at n_tokens = 824
+0.34.741.931 I slot create_check: id  2 | task 1299 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.34.886.251 I slot create_check: id  2 | task 1299 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.35.066.029 I slot   operator(): id  0 | task 1312 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.35.066.532 I slot create_check: id  0 | task 1312 | superseding context checkpoint at n_tokens = 830
+0.35.073.149 I slot create_check: id  0 | task 1312 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.35.215.366 I slot create_check: id  0 | task 1312 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.35.448.736 I slot   operator(): id  1 | task 1328 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.35.449.247 I slot create_check: id  1 | task 1328 | superseding context checkpoint at n_tokens = 828
+0.35.456.125 I slot create_check: id  1 | task 1328 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.35.609.971 I slot create_check: id  1 | task 1328 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.35.888.145 I slot   operator(): id  2 | task 1349 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.35.888.673 I slot create_check: id  2 | task 1349 | superseding context checkpoint at n_tokens = 823
+0.35.895.055 I slot create_check: id  2 | task 1349 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.36.042.809 I slot create_check: id  2 | task 1349 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.36.230.590 I slot   operator(): id  0 | task 1362 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.36.231.104 I slot create_check: id  0 | task 1362 | superseding context checkpoint at n_tokens = 829
+0.36.237.632 I slot create_check: id  0 | task 1362 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.36.380.195 I slot create_check: id  0 | task 1362 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.36.610.189 I slot   operator(): id  1 | task 1378 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.36.610.697 I slot create_check: id  1 | task 1378 | superseding context checkpoint at n_tokens = 827
+0.36.617.882 I slot create_check: id  1 | task 1378 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.36.772.061 I slot create_check: id  1 | task 1378 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.37.070.132 I slot   operator(): id  2 | task 1399 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.37.070.636 I slot create_check: id  2 | task 1399 | superseding context checkpoint at n_tokens = 824
+0.37.077.268 I slot create_check: id  2 | task 1399 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.37.225.821 I slot create_check: id  2 | task 1399 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.37.395.516 I slot   operator(): id  0 | task 1412 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.37.396.026 I slot create_check: id  0 | task 1412 | superseding context checkpoint at n_tokens = 830
+0.37.402.566 I slot create_check: id  0 | task 1412 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.37.543.535 I slot create_check: id  0 | task 1412 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.37.771.095 I slot   operator(): id  1 | task 1428 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.37.771.606 I slot create_check: id  1 | task 1428 | superseding context checkpoint at n_tokens = 828
+0.37.778.931 I slot create_check: id  1 | task 1428 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.37.933.158 I slot create_check: id  1 | task 1428 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.38.228.294 I slot   operator(): id  2 | task 1449 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.38.228.789 I slot create_check: id  2 | task 1449 | superseding context checkpoint at n_tokens = 824
+0.38.235.183 I slot create_check: id  2 | task 1449 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.38.375.635 I slot create_check: id  2 | task 1449 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.38.562.653 I slot   operator(): id  0 | task 1462 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.38.563.153 I slot create_check: id  0 | task 1462 | superseding context checkpoint at n_tokens = 830
+0.38.570.305 I slot create_check: id  0 | task 1462 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.38.716.510 I slot create_check: id  0 | task 1462 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.38.944.419 I slot   operator(): id  1 | task 1478 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.38.944.926 I slot create_check: id  1 | task 1478 | superseding context checkpoint at n_tokens = 828
+0.38.951.611 I slot create_check: id  1 | task 1478 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.39.102.032 I slot create_check: id  1 | task 1478 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.39.379.106 I slot   operator(): id  2 | task 1499 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.39.379.609 I slot create_check: id  2 | task 1499 | superseding context checkpoint at n_tokens = 824
+0.39.386.136 I slot create_check: id  2 | task 1499 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.39.529.889 I slot create_check: id  2 | task 1499 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.39.722.409 I slot   operator(): id  0 | task 1512 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.39.722.912 I slot create_check: id  0 | task 1512 | superseding context checkpoint at n_tokens = 829
+0.39.729.883 I slot create_check: id  0 | task 1512 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.39.871.783 I slot create_check: id  0 | task 1512 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.40.082.302 I slot   operator(): id  1 | task 1528 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.40.082.820 I slot create_check: id  1 | task 1528 | superseding context checkpoint at n_tokens = 827
+0.40.089.509 I slot create_check: id  1 | task 1528 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.40.242.269 I slot create_check: id  1 | task 1528 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.40.531.948 I slot   operator(): id  2 | task 1549 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.40.532.451 I slot create_check: id  2 | task 1549 | superseding context checkpoint at n_tokens = 823
+0.40.539.213 I slot create_check: id  2 | task 1549 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.40.684.249 I slot create_check: id  2 | task 1549 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.40.867.087 I slot   operator(): id  0 | task 1562 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.40.867.598 I slot create_check: id  0 | task 1562 | superseding context checkpoint at n_tokens = 830
+0.40.874.147 I slot create_check: id  0 | task 1562 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.41.016.226 I slot create_check: id  0 | task 1562 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.41.249.234 I slot   operator(): id  1 | task 1578 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.41.249.748 I slot create_check: id  1 | task 1578 | superseding context checkpoint at n_tokens = 828
+0.41.256.671 I slot create_check: id  1 | task 1578 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.41.407.647 I slot create_check: id  1 | task 1578 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.41.704.878 I slot   operator(): id  2 | task 1599 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.41.705.391 I slot create_check: id  2 | task 1599 | superseding context checkpoint at n_tokens = 824
+0.41.713.000 I slot create_check: id  2 | task 1599 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.41.858.045 I slot create_check: id  2 | task 1599 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.42.039.395 I slot   operator(): id  0 | task 1612 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.42.039.907 I slot create_check: id  0 | task 1612 | superseding context checkpoint at n_tokens = 830
+0.42.047.145 I slot create_check: id  0 | task 1612 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.42.192.129 I slot create_check: id  0 | task 1612 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.42.423.679 I slot   operator(): id  1 | task 1628 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.42.424.174 I slot create_check: id  1 | task 1628 | superseding context checkpoint at n_tokens = 828
+0.42.431.459 I slot create_check: id  1 | task 1628 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.42.583.289 I slot create_check: id  1 | task 1628 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 926, n_tokens = 927, size = 20.006 MiB)
+0.42.880.461 I slot   operator(): id  2 | task 1649 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.42.880.964 I slot create_check: id  2 | task 1649 | superseding context checkpoint at n_tokens = 824
+0.42.887.515 I slot create_check: id  2 | task 1649 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.43.033.026 I slot create_check: id  2 | task 1649 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 913, n_tokens = 914, size = 20.006 MiB)
+0.43.216.666 I slot   operator(): id  0 | task 1662 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.43.217.168 I slot create_check: id  0 | task 1662 | superseding context checkpoint at n_tokens = 830
+0.43.223.874 I slot create_check: id  0 | task 1662 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.43.367.591 I slot create_check: id  0 | task 1662 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 919, n_tokens = 920, size = 20.006 MiB)
+0.43.599.728 I slot   operator(): id  1 | task 1678 | erased invalidated context checkpoint (pos_min = 0, pos_max = 926, n_tokens = 927, n_swa = 512, pos_next = 827, size = 20.006 MiB)
+0.43.600.239 I slot create_check: id  1 | task 1678 | superseding context checkpoint at n_tokens = 827
+0.43.607.107 I slot create_check: id  1 | task 1678 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 826, n_tokens = 827, size = 20.006 MiB)
+0.43.763.159 I slot create_check: id  1 | task 1678 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.44.058.693 I slot   operator(): id  2 | task 1699 | erased invalidated context checkpoint (pos_min = 0, pos_max = 913, n_tokens = 914, n_swa = 512, pos_next = 823, size = 20.006 MiB)
+0.44.059.194 I slot create_check: id  2 | task 1699 | superseding context checkpoint at n_tokens = 823
+0.44.066.752 I slot create_check: id  2 | task 1699 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 822, n_tokens = 823, size = 20.006 MiB)
+0.44.214.696 I slot create_check: id  2 | task 1699 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.44.383.862 I slot   operator(): id  0 | task 1712 | erased invalidated context checkpoint (pos_min = 0, pos_max = 919, n_tokens = 920, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.44.384.375 I slot create_check: id  0 | task 1712 | superseding context checkpoint at n_tokens = 829
+0.44.391.345 I slot create_check: id  0 | task 1712 | created context checkpoint 5 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.44.534.474 I slot create_check: id  0 | task 1712 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.44.744.366 I slot   operator(): id  1 | task 1728 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.44.752.490 I slot create_check: id  1 | task 1728 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.44.904.957 I slot create_check: id  1 | task 1728 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.45.200.738 I slot   operator(): id  2 | task 1749 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.45.208.563 I slot create_check: id  2 | task 1749 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.45.354.096 I slot create_check: id  2 | task 1749 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.45.534.627 I slot   operator(): id  0 | task 1762 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.45.542.654 I slot create_check: id  0 | task 1762 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.45.687.611 I slot create_check: id  0 | task 1762 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.45.899.843 I slot   operator(): id  1 | task 1778 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.45.900.347 I slot create_check: id  1 | task 1778 | superseding context checkpoint at n_tokens = 829
+0.45.906.972 I slot create_check: id  1 | task 1778 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.46.058.165 I slot create_check: id  1 | task 1778 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.46.358.267 I slot   operator(): id  2 | task 1799 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.46.358.764 I slot create_check: id  2 | task 1799 | superseding context checkpoint at n_tokens = 825
+0.46.366.155 I slot create_check: id  2 | task 1799 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.46.510.354 I slot create_check: id  2 | task 1799 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.46.694.820 I slot   operator(): id  0 | task 1812 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.46.695.363 I slot create_check: id  0 | task 1812 | superseding context checkpoint at n_tokens = 831
+0.46.702.029 I slot create_check: id  0 | task 1812 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.46.842.588 I slot create_check: id  0 | task 1812 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.47.076.422 I slot   operator(): id  1 | task 1828 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.47.076.949 I slot create_check: id  1 | task 1828 | superseding context checkpoint at n_tokens = 829
+0.47.083.741 I slot create_check: id  1 | task 1828 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.47.243.819 I slot create_check: id  1 | task 1828 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.47.536.426 I slot   operator(): id  2 | task 1849 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.47.536.926 I slot create_check: id  2 | task 1849 | superseding context checkpoint at n_tokens = 824
+0.47.544.098 I slot create_check: id  2 | task 1849 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.47.689.994 I slot create_check: id  2 | task 1849 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.47.870.372 I slot   operator(): id  0 | task 1862 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.47.870.881 I slot create_check: id  0 | task 1862 | superseding context checkpoint at n_tokens = 830
+0.47.877.547 I slot create_check: id  0 | task 1862 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.48.018.417 I slot create_check: id  0 | task 1862 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.48.239.520 I slot   operator(): id  1 | task 1878 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.48.240.030 I slot create_check: id  1 | task 1878 | superseding context checkpoint at n_tokens = 828
+0.48.246.901 I slot create_check: id  1 | task 1878 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.48.397.817 I slot create_check: id  1 | task 1878 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.48.684.158 I slot   operator(): id  2 | task 1899 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.48.684.676 I slot create_check: id  2 | task 1899 | superseding context checkpoint at n_tokens = 825
+0.48.691.700 I slot create_check: id  2 | task 1899 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.48.834.817 I slot create_check: id  2 | task 1899 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.49.019.405 I slot   operator(): id  0 | task 1912 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.49.019.907 I slot create_check: id  0 | task 1912 | superseding context checkpoint at n_tokens = 831
+0.49.026.526 I slot create_check: id  0 | task 1912 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.49.168.350 I slot create_check: id  0 | task 1912 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.49.377.830 I slot   operator(): id  1 | task 1928 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.49.378.333 I slot create_check: id  1 | task 1928 | superseding context checkpoint at n_tokens = 829
+0.49.385.272 I slot create_check: id  1 | task 1928 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.49.535.887 I slot create_check: id  1 | task 1928 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.49.830.539 I slot   operator(): id  2 | task 1949 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.49.831.046 I slot create_check: id  2 | task 1949 | superseding context checkpoint at n_tokens = 825
+0.49.837.728 I slot create_check: id  2 | task 1949 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.49.984.519 I slot create_check: id  2 | task 1949 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.50.167.062 I slot   operator(): id  0 | task 1962 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.50.167.562 I slot create_check: id  0 | task 1962 | superseding context checkpoint at n_tokens = 831
+0.50.174.057 I slot create_check: id  0 | task 1962 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.50.317.633 I slot create_check: id  0 | task 1962 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.50.565.396 I slot   operator(): id  1 | task 1978 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.50.565.922 I slot create_check: id  1 | task 1978 | superseding context checkpoint at n_tokens = 829
+0.50.573.733 I slot create_check: id  1 | task 1978 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.50.729.262 I slot create_check: id  1 | task 1978 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.51.016.828 I slot   operator(): id  2 | task 1999 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.51.017.331 I slot create_check: id  2 | task 1999 | superseding context checkpoint at n_tokens = 825
+0.51.024.284 I slot create_check: id  2 | task 1999 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.51.165.937 I slot create_check: id  2 | task 1999 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.51.349.938 I slot   operator(): id  0 | task 2012 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.51.350.444 I slot create_check: id  0 | task 2012 | superseding context checkpoint at n_tokens = 830
+0.51.357.178 I slot create_check: id  0 | task 2012 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.51.499.707 I slot create_check: id  0 | task 2012 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.51.734.112 I slot   operator(): id  1 | task 2028 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.51.734.618 I slot create_check: id  1 | task 2028 | superseding context checkpoint at n_tokens = 828
+0.51.741.291 I slot create_check: id  1 | task 2028 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.51.893.393 I slot create_check: id  1 | task 2028 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.52.191.696 I slot   operator(): id  2 | task 2049 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.52.192.201 I slot create_check: id  2 | task 2049 | superseding context checkpoint at n_tokens = 824
+0.52.199.604 I slot create_check: id  2 | task 2049 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.52.348.923 I slot create_check: id  2 | task 2049 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.52.519.483 I slot   operator(): id  0 | task 2062 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.52.520.004 I slot create_check: id  0 | task 2062 | superseding context checkpoint at n_tokens = 831
+0.52.526.752 I slot create_check: id  0 | task 2062 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.52.669.368 I slot create_check: id  0 | task 2062 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.52.877.745 I slot   operator(): id  1 | task 2078 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.52.878.255 I slot create_check: id  1 | task 2078 | superseding context checkpoint at n_tokens = 829
+0.52.884.777 I slot create_check: id  1 | task 2078 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.53.036.036 I slot create_check: id  1 | task 2078 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.53.325.868 I slot   operator(): id  2 | task 2099 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.53.326.365 I slot create_check: id  2 | task 2099 | superseding context checkpoint at n_tokens = 825
+0.53.333.126 I slot create_check: id  2 | task 2099 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.53.473.818 I slot create_check: id  2 | task 2099 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.53.659.981 I slot   operator(): id  0 | task 2112 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.53.660.479 I slot create_check: id  0 | task 2112 | superseding context checkpoint at n_tokens = 831
+0.53.667.760 I slot create_check: id  0 | task 2112 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.53.814.368 I slot create_check: id  0 | task 2112 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.54.024.124 I slot   operator(): id  1 | task 2128 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.54.024.634 I slot create_check: id  1 | task 2128 | superseding context checkpoint at n_tokens = 829
+0.54.031.580 I slot create_check: id  1 | task 2128 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.54.181.978 I slot create_check: id  1 | task 2128 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.54.460.387 I slot   operator(): id  2 | task 2149 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.54.460.881 I slot create_check: id  2 | task 2149 | superseding context checkpoint at n_tokens = 825
+0.54.467.786 I slot create_check: id  2 | task 2149 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.54.608.489 I slot create_check: id  2 | task 2149 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.54.780.036 I slot   operator(): id  0 | task 2162 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.54.780.545 I slot create_check: id  0 | task 2162 | superseding context checkpoint at n_tokens = 831
+0.54.787.084 I slot create_check: id  0 | task 2162 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.54.927.368 I slot create_check: id  0 | task 2162 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.55.149.807 I slot   operator(): id  1 | task 2179 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.55.150.336 I slot create_check: id  1 | task 2179 | superseding context checkpoint at n_tokens = 828
+0.55.157.095 I slot create_check: id  1 | task 2179 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.55.308.999 I slot create_check: id  1 | task 2179 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.55.593.176 I slot   operator(): id  2 | task 2200 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.55.593.684 I slot create_check: id  2 | task 2200 | superseding context checkpoint at n_tokens = 824
+0.55.600.583 I slot create_check: id  2 | task 2200 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.55.746.533 I slot create_check: id  2 | task 2200 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.55.917.479 I slot   operator(): id  0 | task 2213 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.55.917.998 I slot create_check: id  0 | task 2213 | superseding context checkpoint at n_tokens = 830
+0.55.924.680 I slot create_check: id  0 | task 2213 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.56.067.761 I slot create_check: id  0 | task 2213 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.56.295.567 I slot   operator(): id  1 | task 2229 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.56.296.074 I slot create_check: id  1 | task 2229 | superseding context checkpoint at n_tokens = 829
+0.56.302.813 I slot create_check: id  1 | task 2229 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.56.456.393 I slot create_check: id  1 | task 2229 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.56.754.218 I slot   operator(): id  2 | task 2250 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.56.754.728 I slot create_check: id  2 | task 2250 | superseding context checkpoint at n_tokens = 825
+0.56.761.565 I slot create_check: id  2 | task 2250 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.56.907.879 I slot create_check: id  2 | task 2250 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.57.101.988 I slot   operator(): id  0 | task 2263 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.57.102.497 I slot create_check: id  0 | task 2263 | superseding context checkpoint at n_tokens = 831
+0.57.109.314 I slot create_check: id  0 | task 2263 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.57.254.053 I slot create_check: id  0 | task 2263 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.57.484.151 I slot   operator(): id  1 | task 2279 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.57.484.663 I slot create_check: id  1 | task 2279 | superseding context checkpoint at n_tokens = 829
+0.57.491.594 I slot create_check: id  1 | task 2279 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.57.648.422 I slot create_check: id  1 | task 2279 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.57.940.583 I slot   operator(): id  2 | task 2300 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+0.57.941.107 I slot create_check: id  2 | task 2300 | superseding context checkpoint at n_tokens = 825
+0.57.948.283 I slot create_check: id  2 | task 2300 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+0.58.089.336 I slot create_check: id  2 | task 2300 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.58.272.619 I slot   operator(): id  0 | task 2313 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+0.58.273.121 I slot create_check: id  0 | task 2313 | superseding context checkpoint at n_tokens = 831
+0.58.280.235 I slot create_check: id  0 | task 2313 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+0.58.428.675 I slot create_check: id  0 | task 2313 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.58.653.829 I slot   operator(): id  1 | task 2329 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+0.58.654.339 I slot create_check: id  1 | task 2329 | superseding context checkpoint at n_tokens = 829
+0.58.660.848 I slot create_check: id  1 | task 2329 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+0.58.813.045 I slot create_check: id  1 | task 2329 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+0.59.110.383 I slot   operator(): id  2 | task 2350 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+0.59.110.896 I slot create_check: id  2 | task 2350 | superseding context checkpoint at n_tokens = 824
+0.59.117.481 I slot create_check: id  2 | task 2350 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+0.59.263.961 I slot create_check: id  2 | task 2350 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+0.59.450.244 I slot   operator(): id  0 | task 2363 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+0.59.450.751 I slot create_check: id  0 | task 2363 | superseding context checkpoint at n_tokens = 830
+0.59.457.862 I slot create_check: id  0 | task 2363 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+0.59.602.214 I slot create_check: id  0 | task 2363 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+0.59.832.293 I slot   operator(): id  1 | task 2379 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+0.59.832.805 I slot create_check: id  1 | task 2379 | superseding context checkpoint at n_tokens = 828
+0.59.839.850 I slot create_check: id  1 | task 2379 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+0.59.993.468 I slot create_check: id  1 | task 2379 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.00.290.325 I slot   operator(): id  2 | task 2400 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.00.290.837 I slot create_check: id  2 | task 2400 | superseding context checkpoint at n_tokens = 825
+1.00.297.780 I slot create_check: id  2 | task 2400 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.00.439.161 I slot create_check: id  2 | task 2400 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.00.607.601 I slot   operator(): id  0 | task 2413 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.00.608.128 I slot create_check: id  0 | task 2413 | superseding context checkpoint at n_tokens = 831
+1.00.615.073 I slot create_check: id  0 | task 2413 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.00.754.647 I slot create_check: id  0 | task 2413 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.00.988.240 I slot   operator(): id  1 | task 2429 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.00.988.755 I slot create_check: id  1 | task 2429 | superseding context checkpoint at n_tokens = 829
+1.00.996.114 I slot create_check: id  1 | task 2429 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.01.152.217 I slot create_check: id  1 | task 2429 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.01.446.298 I slot   operator(): id  2 | task 2450 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.01.446.815 I slot create_check: id  2 | task 2450 | superseding context checkpoint at n_tokens = 825
+1.01.453.958 I slot create_check: id  2 | task 2450 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.01.597.787 I slot create_check: id  2 | task 2450 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.01.779.756 I slot   operator(): id  0 | task 2463 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.01.780.275 I slot create_check: id  0 | task 2463 | superseding context checkpoint at n_tokens = 831
+1.01.787.343 I slot create_check: id  0 | task 2463 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.01.933.459 I slot create_check: id  0 | task 2463 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.02.162.967 I slot   operator(): id  1 | task 2479 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.02.163.479 I slot create_check: id  1 | task 2479 | superseding context checkpoint at n_tokens = 829
+1.02.170.847 I slot create_check: id  1 | task 2479 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.02.323.799 I slot create_check: id  1 | task 2479 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.02.619.815 I slot   operator(): id  2 | task 2500 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.02.620.337 I slot create_check: id  2 | task 2500 | superseding context checkpoint at n_tokens = 825
+1.02.627.284 I slot create_check: id  2 | task 2500 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.02.774.932 I slot create_check: id  2 | task 2500 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.02.973.380 I slot   operator(): id  0 | task 2513 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+1.02.973.888 I slot create_check: id  0 | task 2513 | superseding context checkpoint at n_tokens = 830
+1.02.980.829 I slot create_check: id  0 | task 2513 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+1.03.127.752 I slot create_check: id  0 | task 2513 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.03.356.179 I slot   operator(): id  1 | task 2529 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+1.03.356.690 I slot create_check: id  1 | task 2529 | superseding context checkpoint at n_tokens = 828
+1.03.363.671 I slot create_check: id  1 | task 2529 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+1.03.519.889 I slot create_check: id  1 | task 2529 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.03.812.837 I slot   operator(): id  2 | task 2550 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+1.03.813.347 I slot create_check: id  2 | task 2550 | superseding context checkpoint at n_tokens = 824
+1.03.820.120 I slot create_check: id  2 | task 2550 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+1.03.963.332 I slot create_check: id  2 | task 2550 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.04.148.016 I slot   operator(): id  0 | task 2563 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.04.148.522 I slot create_check: id  0 | task 2563 | superseding context checkpoint at n_tokens = 831
+1.04.155.547 I slot create_check: id  0 | task 2563 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.04.304.763 I slot create_check: id  0 | task 2563 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.04.530.853 I slot   operator(): id  1 | task 2579 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.04.531.362 I slot create_check: id  1 | task 2579 | superseding context checkpoint at n_tokens = 829
+1.04.538.325 I slot create_check: id  1 | task 2579 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.04.690.327 I slot create_check: id  1 | task 2579 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.04.966.021 I slot   operator(): id  2 | task 2600 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.04.966.532 I slot create_check: id  2 | task 2600 | superseding context checkpoint at n_tokens = 825
+1.04.973.475 I slot create_check: id  2 | task 2600 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.05.115.699 I slot create_check: id  2 | task 2600 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.05.298.087 I slot   operator(): id  0 | task 2613 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.05.298.601 I slot create_check: id  0 | task 2613 | superseding context checkpoint at n_tokens = 831
+1.05.305.517 I slot create_check: id  0 | task 2613 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.05.445.504 I slot create_check: id  0 | task 2613 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.05.666.820 I slot   operator(): id  1 | task 2629 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.05.667.330 I slot create_check: id  1 | task 2629 | superseding context checkpoint at n_tokens = 829
+1.05.674.061 I slot create_check: id  1 | task 2629 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.05.826.542 I slot create_check: id  1 | task 2629 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.06.122.270 I slot   operator(): id  2 | task 2650 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.06.122.779 I slot create_check: id  2 | task 2650 | superseding context checkpoint at n_tokens = 825
+1.06.131.388 I slot create_check: id  2 | task 2650 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.06.276.105 I slot create_check: id  2 | task 2650 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.06.456.476 I slot   operator(): id  0 | task 2663 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.06.456.982 I slot create_check: id  0 | task 2663 | superseding context checkpoint at n_tokens = 831
+1.06.464.696 I slot create_check: id  0 | task 2663 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.06.605.861 I slot create_check: id  0 | task 2663 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.06.816.940 I slot   operator(): id  1 | task 2679 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+1.06.817.453 I slot create_check: id  1 | task 2679 | superseding context checkpoint at n_tokens = 828
+1.06.825.137 I slot create_check: id  1 | task 2679 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+1.06.979.926 I slot create_check: id  1 | task 2679 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.07.261.375 I slot   operator(): id  2 | task 2700 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+1.07.261.885 I slot create_check: id  2 | task 2700 | superseding context checkpoint at n_tokens = 824
+1.07.268.692 I slot create_check: id  2 | task 2700 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+1.07.413.274 I slot create_check: id  2 | task 2700 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.07.601.911 I slot   operator(): id  0 | task 2713 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+1.07.602.420 I slot create_check: id  0 | task 2713 | superseding context checkpoint at n_tokens = 830
+1.07.609.472 I slot create_check: id  0 | task 2713 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+1.07.753.100 I slot create_check: id  0 | task 2713 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.07.987.047 I slot   operator(): id  1 | task 2729 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.07.987.555 I slot create_check: id  1 | task 2729 | superseding context checkpoint at n_tokens = 829
+1.07.994.527 I slot create_check: id  1 | task 2729 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.08.148.789 I slot create_check: id  1 | task 2729 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.08.445.887 I slot   operator(): id  2 | task 2750 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.08.446.395 I slot create_check: id  2 | task 2750 | superseding context checkpoint at n_tokens = 825
+1.08.453.303 I slot create_check: id  2 | task 2750 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.08.592.867 I slot create_check: id  2 | task 2750 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.08.784.239 I slot   operator(): id  0 | task 2763 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.08.784.766 I slot create_check: id  0 | task 2763 | superseding context checkpoint at n_tokens = 831
+1.08.791.909 I slot create_check: id  0 | task 2763 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.08.942.840 I slot create_check: id  0 | task 2763 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.09.152.424 I slot   operator(): id  1 | task 2779 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.09.152.931 I slot create_check: id  1 | task 2779 | superseding context checkpoint at n_tokens = 829
+1.09.159.626 I slot create_check: id  1 | task 2779 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.09.309.357 I slot create_check: id  1 | task 2779 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.09.608.233 I slot   operator(): id  2 | task 2800 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.09.608.741 I slot create_check: id  2 | task 2800 | superseding context checkpoint at n_tokens = 825
+1.09.615.665 I slot create_check: id  2 | task 2800 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.09.759.999 I slot create_check: id  2 | task 2800 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.09.929.261 I slot   operator(): id  0 | task 2813 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.09.929.780 I slot create_check: id  0 | task 2813 | superseding context checkpoint at n_tokens = 831
+1.09.936.355 I slot create_check: id  0 | task 2813 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.10.075.723 I slot create_check: id  0 | task 2813 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.10.309.297 I slot   operator(): id  1 | task 2829 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.10.309.814 I slot create_check: id  1 | task 2829 | superseding context checkpoint at n_tokens = 829
+1.10.317.061 I slot create_check: id  1 | task 2829 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.10.471.043 I slot create_check: id  1 | task 2829 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.10.762.880 I slot   operator(): id  2 | task 2850 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+1.10.763.395 I slot create_check: id  2 | task 2850 | superseding context checkpoint at n_tokens = 824
+1.10.770.078 I slot create_check: id  2 | task 2850 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+1.10.911.715 I slot create_check: id  2 | task 2850 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.11.097.977 I slot   operator(): id  0 | task 2863 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+1.11.098.487 I slot create_check: id  0 | task 2863 | superseding context checkpoint at n_tokens = 830
+1.11.105.442 I slot create_check: id  0 | task 2863 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+1.11.249.019 I slot create_check: id  0 | task 2863 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.11.479.509 I slot   operator(): id  1 | task 2879 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+1.11.480.024 I slot create_check: id  1 | task 2879 | superseding context checkpoint at n_tokens = 828
+1.11.487.258 I slot create_check: id  1 | task 2879 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+1.11.640.576 I slot create_check: id  1 | task 2879 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.11.939.418 I slot   operator(): id  2 | task 2900 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.11.939.921 I slot create_check: id  2 | task 2900 | superseding context checkpoint at n_tokens = 825
+1.11.947.173 I slot create_check: id  2 | task 2900 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.12.090.552 I slot create_check: id  2 | task 2900 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.12.274.238 I slot   operator(): id  0 | task 2913 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.12.274.747 I slot create_check: id  0 | task 2913 | superseding context checkpoint at n_tokens = 831
+1.12.281.714 I slot create_check: id  0 | task 2913 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.12.422.805 I slot create_check: id  0 | task 2913 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.12.656.420 I slot   operator(): id  1 | task 2929 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.12.656.939 I slot create_check: id  1 | task 2929 | superseding context checkpoint at n_tokens = 829
+1.12.664.711 I slot create_check: id  1 | task 2929 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.12.817.012 I slot create_check: id  1 | task 2929 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.13.114.380 I slot   operator(): id  2 | task 2950 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.13.114.887 I slot create_check: id  2 | task 2950 | superseding context checkpoint at n_tokens = 825
+1.13.122.071 I slot create_check: id  2 | task 2950 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.13.268.352 I slot create_check: id  2 | task 2950 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.13.452.097 I slot   operator(): id  0 | task 2963 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.13.452.613 I slot create_check: id  0 | task 2963 | superseding context checkpoint at n_tokens = 831
+1.13.459.390 I slot create_check: id  0 | task 2963 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.13.608.612 I slot create_check: id  0 | task 2963 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.13.832.926 I slot   operator(): id  1 | task 2979 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.13.833.444 I slot create_check: id  1 | task 2979 | superseding context checkpoint at n_tokens = 829
+1.13.840.536 I slot create_check: id  1 | task 2979 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.13.992.683 I slot create_check: id  1 | task 2979 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.14.292.450 I slot   operator(): id  2 | task 3000 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.14.292.958 I slot create_check: id  2 | task 3000 | superseding context checkpoint at n_tokens = 825
+1.14.300.337 I slot create_check: id  2 | task 3000 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.14.447.351 I slot create_check: id  2 | task 3000 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.14.627.660 I slot   operator(): id  0 | task 3013 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+1.14.628.178 I slot create_check: id  0 | task 3013 | superseding context checkpoint at n_tokens = 830
+1.14.634.723 I slot create_check: id  0 | task 3013 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+1.14.784.529 I slot create_check: id  0 | task 3013 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.15.008.357 I slot   operator(): id  1 | task 3029 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+1.15.008.879 I slot create_check: id  1 | task 3029 | superseding context checkpoint at n_tokens = 828
+1.15.015.542 I slot create_check: id  1 | task 3029 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+1.15.170.484 I slot create_check: id  1 | task 3029 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.15.447.701 I slot   operator(): id  2 | task 3050 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+1.15.448.206 I slot create_check: id  2 | task 3050 | superseding context checkpoint at n_tokens = 824
+1.15.455.003 I slot create_check: id  2 | task 3050 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+1.15.600.512 I slot create_check: id  2 | task 3050 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.15.786.734 I slot   operator(): id  0 | task 3063 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.15.787.461 I slot create_check: id  0 | task 3063 | superseding context checkpoint at n_tokens = 831
+1.15.794.843 I slot create_check: id  0 | task 3063 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.15.944.214 I slot create_check: id  0 | task 3063 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.16.168.693 I slot   operator(): id  1 | task 3079 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.16.169.200 I slot create_check: id  1 | task 3079 | superseding context checkpoint at n_tokens = 829
+1.16.176.392 I slot create_check: id  1 | task 3079 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.16.330.989 I slot create_check: id  1 | task 3079 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.16.630.152 I slot   operator(): id  2 | task 3100 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.16.630.681 I slot create_check: id  2 | task 3100 | superseding context checkpoint at n_tokens = 825
+1.16.637.763 I slot create_check: id  2 | task 3100 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.16.783.640 I slot create_check: id  2 | task 3100 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.16.953.285 I slot   operator(): id  0 | task 3113 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.16.953.796 I slot create_check: id  0 | task 3113 | superseding context checkpoint at n_tokens = 831
+1.16.960.126 I slot create_check: id  0 | task 3113 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.17.099.779 I slot create_check: id  0 | task 3113 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.17.334.162 I slot   operator(): id  1 | task 3129 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.17.334.677 I slot create_check: id  1 | task 3129 | superseding context checkpoint at n_tokens = 829
+1.17.341.603 I slot create_check: id  1 | task 3129 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.17.496.713 I slot create_check: id  1 | task 3129 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.17.791.673 I slot   operator(): id  2 | task 3150 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.17.792.175 I slot create_check: id  2 | task 3150 | superseding context checkpoint at n_tokens = 825
+1.17.799.093 I slot create_check: id  2 | task 3150 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.17.947.918 I slot create_check: id  2 | task 3150 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.18.116.429 I slot   operator(): id  0 | task 3163 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.18.116.933 I slot create_check: id  0 | task 3163 | superseding context checkpoint at n_tokens = 831
+1.18.123.833 I slot create_check: id  0 | task 3163 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.18.267.434 I slot create_check: id  0 | task 3163 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.18.499.701 I slot   operator(): id  1 | task 3179 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 828, size = 20.006 MiB)
+1.18.500.232 I slot create_check: id  1 | task 3179 | superseding context checkpoint at n_tokens = 828
+1.18.507.856 I slot create_check: id  1 | task 3179 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 827, n_tokens = 828, size = 20.006 MiB)
+1.18.664.148 I slot create_check: id  1 | task 3179 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.18.940.891 I slot   operator(): id  2 | task 3200 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 824, size = 20.006 MiB)
+1.18.941.414 I slot create_check: id  2 | task 3200 | superseding context checkpoint at n_tokens = 824
+1.18.949.427 I slot create_check: id  2 | task 3200 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 823, n_tokens = 824, size = 20.006 MiB)
+1.19.090.765 I slot create_check: id  2 | task 3200 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.19.279.893 I slot   operator(): id  0 | task 3213 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 830, size = 20.006 MiB)
+1.19.280.395 I slot create_check: id  0 | task 3213 | superseding context checkpoint at n_tokens = 830
+1.19.287.090 I slot create_check: id  0 | task 3213 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 829, n_tokens = 830, size = 20.006 MiB)
+1.19.432.274 I slot create_check: id  0 | task 3213 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.19.662.487 I slot   operator(): id  1 | task 3229 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.19.663.000 I slot create_check: id  1 | task 3229 | superseding context checkpoint at n_tokens = 829
+1.19.670.200 I slot create_check: id  1 | task 3229 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.19.823.773 I slot create_check: id  1 | task 3229 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.20.118.602 I slot   operator(): id  2 | task 3250 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.20.119.487 I slot create_check: id  2 | task 3250 | superseding context checkpoint at n_tokens = 825
+1.20.126.514 I slot create_check: id  2 | task 3250 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.20.270.833 I slot create_check: id  2 | task 3250 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.20.456.613 I slot   operator(): id  0 | task 3263 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.20.457.119 I slot create_check: id  0 | task 3263 | superseding context checkpoint at n_tokens = 831
+1.20.464.224 I slot create_check: id  0 | task 3263 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.20.609.209 I slot create_check: id  0 | task 3263 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.20.818.620 I slot   operator(): id  1 | task 3279 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.20.819.575 I slot create_check: id  1 | task 3279 | superseding context checkpoint at n_tokens = 829
+1.20.826.270 I slot create_check: id  1 | task 3279 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.20.978.098 I slot create_check: id  1 | task 3279 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.21.265.610 I slot   operator(): id  2 | task 3300 | erased invalidated context checkpoint (pos_min = 0, pos_max = 914, n_tokens = 915, n_swa = 512, pos_next = 825, size = 20.006 MiB)
+1.21.266.120 I slot create_check: id  2 | task 3300 | superseding context checkpoint at n_tokens = 825
+1.21.272.880 I slot create_check: id  2 | task 3300 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 824, n_tokens = 825, size = 20.006 MiB)
+1.21.413.791 I slot create_check: id  2 | task 3300 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 914, n_tokens = 915, size = 20.006 MiB)
+1.21.569.790 I srv  update_slots: all slots are idle
+1.21.602.664 I srv  server_strea: conv_id= (empty=1)
+1.21.604.557 I slot get_availabl: id  0 | task -1 | selected slot by id (0)
+1.21.604.563 I slot get_availabl: id  0 | task -1 |  - checking sim = 0.898 (831/925) > 0.100
+1.21.604.675 I slot launch_slot_: id  0 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+1.21.604.685 I slot launch_slot_: id  0 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+1.21.604.686 I slot launch_slot_: id  0 | task 3313 | processing task, is_child = 0
+1.21.604.691 I slot   operator(): id  0 | task 3313 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 925
+1.21.604.694 I slot   operator(): id  0 | task 3313 | erased invalidated context checkpoint (pos_min = 0, pos_max = 920, n_tokens = 921, n_swa = 512, pos_next = 831, size = 20.006 MiB)
+1.21.605.163 I slot   operator(): id  0 | task 3313 | cached n_tokens = 831, memory_seq_rm [831, end)
+1.21.605.204 I slot create_check: id  0 | task 3313 | superseding context checkpoint at n_tokens = 831
+1.21.612.194 I slot create_check: id  0 | task 3313 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 830, n_tokens = 831, size = 20.006 MiB)
+1.21.618.395 I slot   operator(): id  0 | task 3313 | cached n_tokens = 921, memory_seq_rm [921, end)
+1.21.618.489 I slot init_sampler: id  0 | task 3313 | init sampler, took 0.08 ms, tokens: text = 925, total = 925
+1.21.756.061 I slot create_check: id  0 | task 3313 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 920, n_tokens = 921, size = 20.006 MiB)
+1.21.952.957 I slot print_timing: id  0 | task 3313 | prompt eval time =     171.90 ms /    94 tokens (    1.83 ms per token,   546.85 tokens per second)
+1.21.952.962 I slot print_timing: id  0 | task 3313 |        eval time =     176.36 ms /    14 tokens (   13.57 ms per token,    73.71 tokens per second)
+1.21.952.963 I slot print_timing: id  0 | task 3313 |       total time =     348.26 ms /   108 tokens
+1.21.952.963 I slot print_timing: id  0 | task 3313 |    graphs reused =       2522
+1.21.953.017 I slot      release: id  0 | task 3313 | stop processing: n_tokens = 938, truncated = 0
+1.21.953.024 I srv  update_slots: all slots are idle
+1.21.983.967 I srv  server_strea: conv_id= (empty=1)
+1.21.985.853 I slot get_availabl: id  1 | task -1 | selected slot by id (1)
+1.21.985.860 I slot get_availabl: id  1 | task -1 |  - checking sim = 0.889 (829/932) > 0.100
+1.21.985.991 I slot launch_slot_: id  1 | task -1 | sampler chain: logits -> ?penalties -> ?dry -> ?top-n-sigma -> top-k -> ?typical -> top-p -> min-p -> ?xtc -> temp-ext -> dist 
+1.21.986.003 I slot launch_slot_: id  1 | task -1 | sampler params: 
+	repeat_last_n = 64, repeat_penalty = 1.000, frequency_penalty = 0.000, presence_penalty = 0.000
+	dry_multiplier = 0.000, dry_base = 1.750, dry_allowed_length = 2, dry_penalty_last_n = 64
+	top_k = 64, top_p = 0.950, min_p = 0.050, xtc_probability = 0.000, xtc_threshold = 0.100, typical_p = 1.000, top_n_sigma = -1.000, temp = 0.600
+	mirostat = 0, mirostat_lr = 0.100, mirostat_ent = 5.000, adaptive_target = -1.000, adaptive_decay = 0.900
+1.21.986.005 I slot launch_slot_: id  1 | task 3329 | processing task, is_child = 0
+1.21.986.010 I slot   operator(): id  1 | task 3329 | new prompt, n_ctx_slot = 1536, n_keep = 0, task.n_tokens = 932
+1.21.986.015 I slot   operator(): id  1 | task 3329 | erased invalidated context checkpoint (pos_min = 0, pos_max = 927, n_tokens = 928, n_swa = 512, pos_next = 829, size = 20.006 MiB)
+1.21.986.582 I slot   operator(): id  1 | task 3329 | cached n_tokens = 829, memory_seq_rm [829, end)
+1.21.986.628 I slot create_check: id  1 | task 3329 | superseding context checkpoint at n_tokens = 829
+1.21.993.432 I slot create_check: id  1 | task 3329 | created context checkpoint 6 of 32 (pos_min = 0, pos_max = 828, n_tokens = 829, size = 20.006 MiB)
+1.21.999.567 I slot   operator(): id  1 | task 3329 | cached n_tokens = 928, memory_seq_rm [928, end)
+1.21.999.659 I slot init_sampler: id  1 | task 3329 | init sampler, took 0.08 ms, tokens: text = 932, total = 932
+1.22.146.001 I slot create_check: id  1 | task 3329 | created context checkpoint 7 of 32 (pos_min = 0, pos_max = 927, n_tokens = 928, size = 20.006 MiB)
+1.22.411.369 I slot print_timing: id  1 | task 3329 | prompt eval time =     180.66 ms /   103 tokens (    1.75 ms per token,   570.13 tokens per second)
+1.22.411.374 I slot print_timing: id  1 | task 3329 |        eval time =     244.69 ms /    19 tokens (   13.59 ms per token,    73.56 tokens per second)
+1.22.411.375 I slot print_timing: id  1 | task 3329 |       total time =     425.35 ms /   122 tokens
+1.22.411.377 I slot print_timing: id  1 | task 3329 |    graphs reused =       2539
+1.22.411.431 I slot      release: id  1 | task 3329 | stop processing: n_tokens = 950, truncated = 0
+1.22.411.437 I srv  update_slots: all slots are idle
+1.22.581.995 I srv  update_slots: all slots are idle

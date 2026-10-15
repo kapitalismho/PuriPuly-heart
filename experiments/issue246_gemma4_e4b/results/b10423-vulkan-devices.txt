@@ -1,0 +1,2 @@
+Available devices:
+  Vulkan0: AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)

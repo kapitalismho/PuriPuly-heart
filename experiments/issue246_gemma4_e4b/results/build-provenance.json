@@ -1,0 +1,75 @@
+{
+  "source": "Read-only upstream-triage follow-up: retained producer job logs and immutable workflow sources; local archive/DLL hashes are independent evidence in identity.json.",
+  "important_scope": "Windows Vulkan archives merge CPU-job llama-server/tools/shared CPU libraries with a separately MSVC-built ggml-vulkan.dll. Server --version is not the Vulkan DLL compiler identity.",
+  "b10423": {
+    "commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+    "run_id": 31731999834,
+    "attempt": 1,
+    "conclusion": "success",
+    "run_url": "https://github.com/ggml-org/llama.cpp/actions/runs/31731999834",
+    "cpu_job": {
+      "id": 94611104974,
+      "url": "https://github.com/ggml-org/llama.cpp/actions/runs/31731999834/job/94611104974",
+      "runner": "windows-2025-vs2026",
+      "compiler": "C/CXX Clang 20.1.8 with GNU-like command-line",
+      "configure": "cmake -S . -B build -G \"Ninja Multi-Config\" -D CMAKE_TOOLCHAIN_FILE=cmake/x64-windows-llvm.cmake -DLLAMA_BUILD_BORINGSSL=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_OPENMP=ON -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON",
+      "build": "cmake --build build --config Release",
+      "compiler_log": "2026-08-13T22:18:31.5965459Z -- The C compiler identification is Clang 20.1.8 with GNU-like command-line",
+      "workflow": "https://github.com/ggml-org/llama.cpp/blob/a94d563ed801d1da1b8c2432946de07d0231bb3d/.github/workflows/release.yml#L683-L749"
+    },
+    "vulkan_dll_job": {
+      "id": 94611104924,
+      "url": "https://github.com/ggml-org/llama.cpp/actions/runs/31731999834/job/94611104924",
+      "runner": "windows-2025",
+      "generator": "Visual Studio 18 2026",
+      "compiler": "C/CXX MSVC 19.51.36252.0",
+      "vulkan_sdk": "1.4.357.0",
+      "configure": "cmake -S . -B build -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DGGML_CPU=OFF -DGGML_BACKEND_DL=ON -DLLAMA_BUILD_BORINGSSL=ON",
+      "build": "cmake --build build --config Release --target ggml-vulkan",
+      "compiler_log": "2026-08-13T22:19:11.6413962Z -- Building for: Visual Studio 18 2026; 2026-08-13T22:19:11.6416528Z -- The C compiler identification is MSVC 19.51.36252.0",
+      "workflow": "https://github.com/ggml-org/llama.cpp/blob/a94d563ed801d1da1b8c2432946de07d0231bb3d/.github/workflows/release.yml#L880-L977"
+    },
+    "merge_workflow": "https://github.com/ggml-org/llama.cpp/blob/a94d563ed801d1da1b8c2432946de07d0231bb3d/.github/workflows/release.yml#L1613-L1644"
+  },
+  "b11537": {
+    "commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "run_id": 37968245796,
+    "attempt": 1,
+    "conclusion": "success",
+    "run_url": "https://github.com/ggml-org/llama.cpp/actions/runs/37968245796",
+    "cpu_job": {
+      "id": 113983515958,
+      "url": "https://github.com/ggml-org/llama.cpp/actions/runs/37968245796/job/113983515958",
+      "runner": "windows-2025-vs2026",
+      "compiler": "C/CXX Clang 20.1.8 with GNU-like command-line",
+      "configure": "cmake -S . -B build -G \"Ninja Multi-Config\" -D CMAKE_TOOLCHAIN_FILE=cmake/x64-windows-llvm.cmake -DLLAMA_BUILD_BORINGSSL=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON -DGGML_OPENMP=ON -DGGML_OPENMP_FETCH=ON -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_TOOLS=ON -DLLAMA_BUILD_SERVER=ON -DGGML_RPC=ON",
+      "build": "cmake --build build --config Release",
+      "compiler_log": "2026-10-09T19:17:29.9288986Z -- The C compiler identification is Clang 20.1.8 with GNU-like command-line",
+      "workflow": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/.github/workflows/release.yml#L886-L945"
+    },
+    "vulkan_dll_job": {
+      "id": 113981686904,
+      "url": "https://github.com/ggml-org/llama.cpp/actions/runs/37968245796/job/113981686904",
+      "runner": "windows-2025",
+      "generator": "Visual Studio 18 2026",
+      "compiler": "C/CXX MSVC 19.51.36260.0",
+      "vulkan_sdk": "1.4.357.0",
+      "configure": "cmake -S . -B build -DGGML_VULKAN=ON -DGGML_NATIVE=OFF -DGGML_CPU=OFF -DGGML_BACKEND_DL=ON -DLLAMA_BUILD_BORINGSSL=ON",
+      "build": "cmake --build build --config Release --target ggml-vulkan",
+      "compiler_log": "2026-10-09T19:09:38.2062523Z -- Building for: Visual Studio 18 2026; 2026-10-09T19:09:38.2062808Z -- The C compiler identification is MSVC 19.51.36260.0",
+      "workflow": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/.github/workflows/release.yml#L1109-L1203"
+    },
+    "merge_workflow": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/.github/workflows/release-publish.yml#L77-L111"
+  },
+  "retrieval": [
+    "gh api repos/ggml-org/llama.cpp/actions/workflows/release.yml/runs?head_sha=<full_sha>",
+    "gh api repos/ggml-org/llama.cpp/actions/runs/<run_id>/jobs",
+    "gh api repos/ggml-org/llama.cpp/actions/jobs/<job_id>/logs"
+  ],
+  "limits": [
+    "Observed configure commands are not recovered complete CMakeCache.txt files or every expanded compile/link invocation. Unspecified defaults/dependency resolutions are not claimed explicitly passed flags.",
+    "The Vulkan configure command does not expand the job's common CMAKE_ARGS environment; do not append CPU tool/server/RPC options to that command.",
+    "Packaging merge source was inspected; publication-job logs and cryptographic artifact attestations were not retrieved.",
+    "b11630 follow-on uses locally hashed official archives and actual version/help/producer output; its separate Vulkan DLL compiler/build-job provenance was not resolved in this bounded follow-on."
+  ]
+}

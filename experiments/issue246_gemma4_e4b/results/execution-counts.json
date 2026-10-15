@@ -1,0 +1,18 @@
+{
+  "standalone_requests": 2239,
+  "request_statuses": {
+    "completed": 2239
+  },
+  "phase_counts": {
+    "quality": 72,
+    "tuning": 174,
+    "final": 528,
+    "soak": 1178,
+    "literal": 96,
+    "contention": 191
+  },
+  "arms_with_requests": 61,
+  "preflight_failure_records": [
+    "new-cpu-greedy-off-failure.json"
+  ]
+}

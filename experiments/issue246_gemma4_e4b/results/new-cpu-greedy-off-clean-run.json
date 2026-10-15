@@ -1,0 +1,714 @@
+{
+  "release": "b11537",
+  "commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+  "backend": "cpu",
+  "label": "new-cpu-greedy-off-clean",
+  "command": [
+    "<EXTERNAL>\\b11537\\cpu\\llama-server.exe",
+    "--model",
+    "<MODEL>\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+    "--alias",
+    "puripuly-gemma-4-e4b-q4",
+    "--load-mode",
+    "mmap",
+    "--ctx-size",
+    "4608",
+    "--parallel",
+    "3",
+    "--batch-size",
+    "512",
+    "--ubatch-size",
+    "512",
+    "--cache-type-k",
+    "f16",
+    "--cache-type-v",
+    "f16",
+    "--cache-prompt",
+    "--reasoning",
+    "off",
+    "--reasoning-budget",
+    "0",
+    "--warmup",
+    "--perf",
+    "--metrics",
+    "--no-webui",
+    "--threads-http",
+    "1",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "52572",
+    "--prio",
+    "-1",
+    "--slot-save-path",
+    "<EXTERNAL>\\runs\\new-cpu-greedy-off-clean",
+    "--threads",
+    "4",
+    "--threads-batch",
+    "12",
+    "--device",
+    "none",
+    "--n-gpu-layers",
+    "0",
+    "--flash-attn",
+    "off",
+    "--cache-ram",
+    "0",
+    "--verbosity",
+    "4"
+  ],
+  "pid": 48300,
+  "utc": "2026-10-15T01:58:14.913908+00:00",
+  "host_cpu_before_percent": 3.5,
+  "os_page_cache": "uncontrolled; model hash and earlier reads warm OS cache; process restart is not cold OS cache",
+  "readiness_ms": 2311.3242000035825,
+  "M1_model_ready": {
+    "working_set": 5624619008,
+    "private_commit": 3252756480,
+    "peak_working_set": 5624619008,
+    "peak_private_commit": 3252764672,
+    "cpu_seconds": 1.328125,
+    "threads": 20
+  },
+  "gpu_M1": {
+    "status": "unavailable",
+    "error": ""
+  },
+  "mapped_model_regions": [
+    {
+      "path": "<MODEL>\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+      "rss": 4215697408
+    }
+  ],
+  "prefixes": [
+    {
+      "slot": 0,
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "system_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+      "formatted_sha256": "8fddb3f275d731d91c0bfa5d960629128ba942bb606c3b996b43668d05d3a118",
+      "actual_prefix_tokens": 824,
+      "wall_ms": 3371.8898000006448,
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 825,
+        "prompt_ms": 3369.549,
+        "prompt_per_token_ms": 4.084301818181818,
+        "prompt_per_second": 244.83988806810643,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 5788237824,
+        "private_commit": 3300409344,
+        "peak_working_set": 5788237824,
+        "peak_private_commit": 3300433920,
+        "cpu_seconds": 13.40625,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 1,
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "system_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+      "formatted_sha256": "fc5b8c7882222cfa3deec0ee7d59dd5e07e8a3d33e5b162a6cf974d7784c52c3",
+      "actual_prefix_tokens": 822,
+      "wall_ms": 3348.5876000049757,
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 823,
+        "prompt_ms": 3346.217,
+        "prompt_per_token_ms": 4.065877278250304,
+        "prompt_per_second": 245.949381047314,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 5868355584,
+        "private_commit": 3380051968,
+        "peak_working_set": 5868355584,
+        "peak_private_commit": 3380088832,
+        "cpu_seconds": 28.03125,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 2,
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "system_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+      "formatted_sha256": "0e36332f3c18599a295952757e272b14fd475ca0378b7edb046de5afbfcc4cc1",
+      "actual_prefix_tokens": 818,
+      "wall_ms": 3335.4954999958863,
+      "timings": {
+        "cache_n": 0,
+        "prompt_n": 819,
+        "prompt_ms": 3333.214,
+        "prompt_per_token_ms": 4.069858363858364,
+        "prompt_per_second": 245.7087963749102,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 5947752448,
+        "private_commit": 3458883584,
+        "peak_working_set": 5947752448,
+        "peak_private_commit": 3458912256,
+        "cpu_seconds": 41.625,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 0,
+      "pair": [
+        "Chinese (Simplified)",
+        "English"
+      ],
+      "system_sha256": "61a1695131ee3b5fb9da0fe19f499ab16ccc9801326ade42258909632f13d58c",
+      "formatted_sha256": "6f2cb0395e99b015ab5370d03e2dc0113f5ed8c8be5c2a1fe1d41e77b72e6870",
+      "actual_prefix_tokens": 833,
+      "wall_ms": 847.8635999999824,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 186,
+        "prompt_ms": 845.436,
+        "prompt_per_token_ms": 4.545354838709677,
+        "prompt_per_second": 220.00482591231034,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 5969293312,
+        "private_commit": 3479908352,
+        "peak_working_set": 5989838848,
+        "peak_private_commit": 3500986368,
+        "cpu_seconds": 47.53125,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 1,
+      "pair": [
+        "English",
+        "Japanese"
+      ],
+      "system_sha256": "ed15c085838e114379cca5e07e91f6f6fd36477eb9509169b9f0f3a6ce99cc9a",
+      "formatted_sha256": "57e80f1df9c239657a1e1f79f5e1fea29a107bf60e117c9b02ffb9a54a191da8",
+      "actual_prefix_tokens": 831,
+      "wall_ms": 810.9359000009135,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 184,
+        "prompt_ms": 808.466,
+        "prompt_per_token_ms": 4.3938369565217394,
+        "prompt_per_second": 227.5915128156286,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 5990785024,
+        "private_commit": 3500929024,
+        "peak_working_set": 6011375616,
+        "peak_private_commit": 3521998848,
+        "cpu_seconds": 53.703125,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 2,
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "system_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+      "formatted_sha256": "8fddb3f275d731d91c0bfa5d960629128ba942bb606c3b996b43668d05d3a118",
+      "actual_prefix_tokens": 824,
+      "wall_ms": 795.9895000021788,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 177,
+        "prompt_ms": 793.782,
+        "prompt_per_token_ms": 4.48464406779661,
+        "prompt_per_second": 222.9831364278857,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 6012203008,
+        "private_commit": 3522342912,
+        "peak_working_set": 6033170432,
+        "peak_private_commit": 3543379968,
+        "cpu_seconds": 59.0,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 0,
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "system_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+      "formatted_sha256": "fc5b8c7882222cfa3deec0ee7d59dd5e07e8a3d33e5b162a6cf974d7784c52c3",
+      "actual_prefix_tokens": 822,
+      "wall_ms": 827.0229999980074,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 175,
+        "prompt_ms": 824.383,
+        "prompt_per_token_ms": 4.7107600000000005,
+        "prompt_per_second": 212.27997180921975,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 6012399616,
+        "private_commit": 3522347008,
+        "peak_working_set": 6054318080,
+        "peak_private_commit": 3564429312,
+        "cpu_seconds": 63.328125,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 1,
+      "pair": [
+        "Japanese",
+        "Korean"
+      ],
+      "system_sha256": "90391dac712d8a6824db9192e5cc606fbde84876cd40c44dca2e524e34c58f8f",
+      "formatted_sha256": "6aebf5967e906646b1627ccb20c75dc44e3647b4fad2aa56ec51bfe68191304d",
+      "actual_prefix_tokens": 837,
+      "wall_ms": 834.9293999999645,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 190,
+        "prompt_ms": 832.719,
+        "prompt_per_token_ms": 4.382731578947369,
+        "prompt_per_second": 228.16820560116918,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 6012878848,
+        "private_commit": 3522342912,
+        "peak_working_set": 6054518784,
+        "peak_private_commit": 3564433408,
+        "cpu_seconds": 67.828125,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 0,
+      "pair": [
+        "Chinese (Simplified)",
+        "English"
+      ],
+      "system_sha256": "61a1695131ee3b5fb9da0fe19f499ab16ccc9801326ade42258909632f13d58c",
+      "formatted_sha256": "6f2cb0395e99b015ab5370d03e2dc0113f5ed8c8be5c2a1fe1d41e77b72e6870",
+      "actual_prefix_tokens": 833,
+      "wall_ms": 827.6024999941001,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 186,
+        "prompt_ms": 825.333,
+        "prompt_per_token_ms": 4.437274193548387,
+        "prompt_per_second": 225.36358051840895,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 6034145280,
+        "private_commit": 3543367680,
+        "peak_working_set": 6076104704,
+        "peak_private_commit": 3585421312,
+        "cpu_seconds": 73.0,
+        "threads": 20
+      }
+    },
+    {
+      "slot": 1,
+      "pair": [
+        "English",
+        "Japanese"
+      ],
+      "system_sha256": "ed15c085838e114379cca5e07e91f6f6fd36477eb9509169b9f0f3a6ce99cc9a",
+      "formatted_sha256": "57e80f1df9c239657a1e1f79f5e1fea29a107bf60e117c9b02ffb9a54a191da8",
+      "actual_prefix_tokens": 831,
+      "wall_ms": 809.3433000030927,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 184,
+        "prompt_ms": 806.73,
+        "prompt_per_token_ms": 4.384402173913044,
+        "prompt_per_second": 228.08126634685706,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 6034231296,
+        "private_commit": 3543298048,
+        "peak_working_set": 6076190720,
+        "peak_private_commit": 3585421312,
+        "cpu_seconds": 77.8125,
+        "threads": 18
+      }
+    },
+    {
+      "slot": 2,
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "system_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+      "formatted_sha256": "fc5b8c7882222cfa3deec0ee7d59dd5e07e8a3d33e5b162a6cf974d7784c52c3",
+      "actual_prefix_tokens": 822,
+      "wall_ms": 788.7195000002976,
+      "timings": {
+        "cache_n": 648,
+        "prompt_n": 175,
+        "prompt_ms": 786.496,
+        "prompt_per_token_ms": 4.494262857142857,
+        "prompt_per_second": 222.5058995849947,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "memory": {
+        "working_set": 6013337600,
+        "private_commit": 3522281472,
+        "peak_working_set": 6076276736,
+        "peak_private_commit": 3585421312,
+        "cpu_seconds": 82.5,
+        "threads": 18
+      }
+    }
+  ],
+  "effective_generation_settings": {
+    "seed": 42,
+    "temperature": 0.0,
+    "dynatemp_range": 0.0,
+    "dynatemp_exponent": 1.0,
+    "top_k": 64,
+    "top_p": 0.949999988079071,
+    "min_p": 0.05000000074505806,
+    "top_n_sigma": -1.0,
+    "xtc_probability": 0.0,
+    "xtc_threshold": 0.10000000149011612,
+    "typical_p": 1.0,
+    "repeat_last_n": 64,
+    "repeat_penalty": 1.0,
+    "presence_penalty": 0.0,
+    "frequency_penalty": 0.0,
+    "dry_multiplier": 0.0,
+    "dry_base": 1.75,
+    "dry_allowed_length": 2,
+    "dry_penalty_last_n": 64,
+    "dry_sequence_breakers": [
+      "\n",
+      ":",
+      "\"",
+      "*"
+    ],
+    "mirostat": 0,
+    "mirostat_tau": 5.0,
+    "mirostat_eta": 0.10000000149011612,
+    "adaptive_target": -1.0,
+    "adaptive_decay": 0.8999999761581421,
+    "stop": [],
+    "max_tokens": 128,
+    "n_predict": 128,
+    "n_keep": 0,
+    "n_discard": 0,
+    "ignore_eos": false,
+    "stream": true,
+    "logit_bias": [],
+    "n_probs": 0,
+    "min_keep": 0,
+    "grammar": "",
+    "grammar_lazy": false,
+    "grammar_triggers": [],
+    "preserved_tokens": [],
+    "chat_format": "Content-only",
+    "reasoning_format": "deepseek",
+    "reasoning_in_content": false,
+    "generation_prompt": "",
+    "samplers": [
+      "penalties",
+      "dry",
+      "top_n_sigma",
+      "top_k",
+      "typ_p",
+      "top_p",
+      "min_p",
+      "xtc",
+      "temperature"
+    ],
+    "speculative.types": "none",
+    "timings_per_token": false,
+    "post_sampling_probs": false,
+    "backend_sampling": false,
+    "lora": []
+  },
+  "M5_before_shutdown": {
+    "working_set": 6055374848,
+    "private_commit": 3564318720,
+    "peak_working_set": 6076276736,
+    "peak_private_commit": 3585421312,
+    "cpu_seconds": 85.734375,
+    "threads": 18
+  },
+  "gpu_M5": {
+    "status": "unavailable",
+    "error": ""
+  },
+  "slots_end": [
+    {
+      "id": 0,
+      "n_ctx": 1536,
+      "speculative": false,
+      "is_processing": false,
+      "id_task": 186,
+      "n_prompt_tokens": 939,
+      "n_prompt_tokens_processed": 0,
+      "n_prompt_tokens_cache": 0,
+      "params": {
+        "seed": 42,
+        "temperature": 0.0,
+        "dynatemp_range": 0.0,
+        "dynatemp_exponent": 1.0,
+        "top_k": 64,
+        "top_p": 0.949999988079071,
+        "min_p": 0.05000000074505806,
+        "top_n_sigma": -1.0,
+        "xtc_probability": 0.0,
+        "xtc_threshold": 0.10000000149011612,
+        "typical_p": 1.0,
+        "repeat_last_n": 64,
+        "repeat_penalty": 1.0,
+        "presence_penalty": 0.0,
+        "frequency_penalty": 0.0,
+        "dry_multiplier": 0.0,
+        "dry_base": 1.75,
+        "dry_allowed_length": 2,
+        "dry_penalty_last_n": 64,
+        "mirostat": 0,
+        "mirostat_tau": 5.0,
+        "mirostat_eta": 0.10000000149011612,
+        "adaptive_target": -1.0,
+        "adaptive_decay": 0.8999999761581421,
+        "max_tokens": 128,
+        "n_predict": 128,
+        "n_keep": 0,
+        "n_discard": 0,
+        "ignore_eos": false,
+        "stream": true,
+        "n_probs": 0,
+        "min_keep": 0,
+        "chat_format": "Content-only",
+        "reasoning_format": "deepseek",
+        "reasoning_in_content": false,
+        "generation_prompt": "",
+        "samplers": [
+          "penalties",
+          "dry",
+          "top_n_sigma",
+          "top_k",
+          "typ_p",
+          "top_p",
+          "min_p",
+          "xtc",
+          "temperature"
+        ],
+        "speculative.types": "none",
+        "timings_per_token": false,
+        "post_sampling_probs": false,
+        "backend_sampling": false,
+        "lora": []
+      },
+      "next_token": [
+        {
+          "has_next_token": false,
+          "has_new_line": false,
+          "n_remain": -1,
+          "n_decoded": 0
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "n_ctx": 1536,
+      "speculative": false,
+      "is_processing": false,
+      "id_task": 203,
+      "n_prompt_tokens": 930,
+      "n_prompt_tokens_processed": 0,
+      "n_prompt_tokens_cache": 0,
+      "params": {
+        "seed": 42,
+        "temperature": 0.0,
+        "dynatemp_range": 0.0,
+        "dynatemp_exponent": 1.0,
+        "top_k": 64,
+        "top_p": 0.949999988079071,
+        "min_p": 0.05000000074505806,
+        "top_n_sigma": -1.0,
+        "xtc_probability": 0.0,
+        "xtc_threshold": 0.10000000149011612,
+        "typical_p": 1.0,
+        "repeat_last_n": 64,
+        "repeat_penalty": 1.0,
+        "presence_penalty": 0.0,
+        "frequency_penalty": 0.0,
+        "dry_multiplier": 0.0,
+        "dry_base": 1.75,
+        "dry_allowed_length": 2,
+        "dry_penalty_last_n": 64,
+        "mirostat": 0,
+        "mirostat_tau": 5.0,
+        "mirostat_eta": 0.10000000149011612,
+        "adaptive_target": -1.0,
+        "adaptive_decay": 0.8999999761581421,
+        "max_tokens": 128,
+        "n_predict": 128,
+        "n_keep": 0,
+        "n_discard": 0,
+        "ignore_eos": false,
+        "stream": true,
+        "n_probs": 0,
+        "min_keep": 0,
+        "chat_format": "Content-only",
+        "reasoning_format": "deepseek",
+        "reasoning_in_content": false,
+        "generation_prompt": "",
+        "samplers": [
+          "penalties",
+          "dry",
+          "top_n_sigma",
+          "top_k",
+          "typ_p",
+          "top_p",
+          "min_p",
+          "xtc",
+          "temperature"
+        ],
+        "speculative.types": "none",
+        "timings_per_token": false,
+        "post_sampling_probs": false,
+        "backend_sampling": false,
+        "lora": []
+      },
+      "next_token": [
+        {
+          "has_next_token": false,
+          "has_new_line": false,
+          "n_remain": -1,
+          "n_decoded": 0
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "n_ctx": 1536,
+      "speculative": false,
+      "is_processing": false,
+      "id_task": 217,
+      "n_prompt_tokens": 940,
+      "n_prompt_tokens_processed": 0,
+      "n_prompt_tokens_cache": 0,
+      "params": {
+        "seed": 42,
+        "temperature": 0.0,
+        "dynatemp_range": 0.0,
+        "dynatemp_exponent": 1.0,
+        "top_k": 64,
+        "top_p": 0.949999988079071,
+        "min_p": 0.05000000074505806,
+        "top_n_sigma": -1.0,
+        "xtc_probability": 0.0,
+        "xtc_threshold": 0.10000000149011612,
+        "typical_p": 1.0,
+        "repeat_last_n": 64,
+        "repeat_penalty": 1.0,
+        "presence_penalty": 0.0,
+        "frequency_penalty": 0.0,
+        "dry_multiplier": 0.0,
+        "dry_base": 1.75,
+        "dry_allowed_length": 2,
+        "dry_penalty_last_n": 64,
+        "mirostat": 0,
+        "mirostat_tau": 5.0,
+        "mirostat_eta": 0.10000000149011612,
+        "adaptive_target": -1.0,
+        "adaptive_decay": 0.8999999761581421,
+        "max_tokens": 128,
+        "n_predict": 128,
+        "n_keep": 0,
+        "n_discard": 0,
+        "ignore_eos": false,
+        "stream": true,
+        "n_probs": 0,
+        "min_keep": 0,
+        "chat_format": "Content-only",
+        "reasoning_format": "deepseek",
+        "reasoning_in_content": false,
+        "generation_prompt": "",
+        "samplers": [
+          "penalties",
+          "dry",
+          "top_n_sigma",
+          "top_k",
+          "typ_p",
+          "top_p",
+          "min_p",
+          "xtc",
+          "temperature"
+        ],
+        "speculative.types": "none",
+        "timings_per_token": false,
+        "post_sampling_probs": false,
+        "backend_sampling": false,
+        "lora": []
+      },
+      "next_token": [
+        {
+          "has_next_token": false,
+          "has_new_line": false,
+          "n_remain": -1,
+          "n_decoded": 0
+        }
+      ]
+    }
+  ],
+  "exit_code": 1,
+  "owned_process_exited": true,
+  "host_cpu_after_percent": 2.0
+}

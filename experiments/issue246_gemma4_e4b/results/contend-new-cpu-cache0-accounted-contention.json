@@ -1,0 +1,2517 @@
+{
+  "release": "b11537",
+  "backend": "cpu",
+  "label": "contend-new-cpu-cache0-accounted",
+  "controlled_load": {
+    "type": "six synthetic integer-loop process trees",
+    "affinity_logical_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "priority": "normal",
+    "physical_core_mapping": "not asserted",
+    "maximum_duration_s": 180,
+    "launcher_boundary": "Windows venv redirector may be idle; all owned descendants are pinned and accounted"
+  },
+  "primary_requests": [
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 0,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "a82c123ecd838eae5e89c46ec32fbccb8831981f7df30c8d8f9acb2b563ffba2"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1490.126800003054,
+      "template_ms": 4.260900001099799,
+      "ttft_ms": 830.3083999999217,
+      "timings": {
+        "cache_n": 820,
+        "prompt_n": 103,
+        "prompt_ms": 822.796,
+        "prompt_per_token_ms": 7.988310679611651,
+        "prompt_per_second": 125.18291289699997,
+        "predicted_n": 14,
+        "predicted_ms": 659.351,
+        "predicted_per_token_ms": 50.719307692307694,
+        "predicted_per_second": 19.716357448460684,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6137024512,
+        "private_commit": 3651735552,
+        "peak_working_set": 6140153856,
+        "peak_private_commit": 3654955008,
+        "cpu_seconds": 167.53125,
+        "threads": 20
+      },
+      "sampled_request_peaks": {
+        "working_set": 6137004032,
+        "private_commit": 3651735552
+      },
+      "cpu_seconds": 13.15625,
+      "cpu_percent_one_core": 882.8946637274785
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 1,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "b9d6a2e6d8603e6fd4509d852aa275bc5085b79f1984f1fb79345f095f528dbc"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1332.373400000506,
+      "template_ms": 3.1945000009727664,
+      "ttft_ms": 871.3999999963562,
+      "timings": {
+        "cache_n": 818,
+        "prompt_n": 112,
+        "prompt_ms": 860.032,
+        "prompt_per_token_ms": 7.678857142857143,
+        "prompt_per_second": 130.22771245721088,
+        "predicted_n": 19,
+        "predicted_ms": 464.508,
+        "predicted_per_token_ms": 25.805999999999997,
+        "predicted_per_second": 38.75067813686739,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 930,
+        "tokens_cached": 948
+      },
+      "memory_after": {
+        "working_set": 6179459072,
+        "private_commit": 3694170112,
+        "peak_working_set": 6182608896,
+        "peak_private_commit": 3697373184,
+        "cpu_seconds": 178.9375,
+        "threads": 20
+      },
+      "sampled_request_peaks": {
+        "working_set": 6179459072,
+        "private_commit": 3694170112
+      },
+      "cpu_seconds": 11.3125,
+      "cpu_percent_one_core": 849.048772663557
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 2,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "cc41b4a0841200a4fdfe27dfde830cc3c2fbf4e81930d8a79460dd687bec2a36"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 1104.2436999996426,
+      "template_ms": 2.9099000021233223,
+      "ttft_ms": 812.0162999985041,
+      "timings": {
+        "cache_n": 814,
+        "prompt_n": 103,
+        "prompt_ms": 805.83,
+        "prompt_per_token_ms": 7.823592233009709,
+        "prompt_per_second": 127.81852251715623,
+        "predicted_n": 11,
+        "predicted_ms": 291.229,
+        "predicted_per_token_ms": 29.122899999999998,
+        "predicted_per_second": 34.33723976664412,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 917,
+        "tokens_cached": 927
+      },
+      "memory_after": {
+        "working_set": 6221545472,
+        "private_commit": 3736215552,
+        "peak_working_set": 6224695296,
+        "peak_private_commit": 3739402240,
+        "cpu_seconds": 188.5625,
+        "threads": 20
+      },
+      "sampled_request_peaks": {
+        "working_set": 6221545472,
+        "private_commit": 3736215552
+      },
+      "cpu_seconds": 9.546875,
+      "cpu_percent_one_core": 864.5623244219631
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 3,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "d9fdb3fec387f6b9e8539d7d61854646ddb1ba3acc13f53083b86d72c071fe62"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1399.2049000007682,
+      "template_ms": 5.473900004290044,
+      "ttft_ms": 776.9880000050762,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 94,
+        "prompt_ms": 764.873,
+        "prompt_per_token_ms": 8.136946808510638,
+        "prompt_per_second": 122.89621937236639,
+        "predicted_n": 14,
+        "predicted_ms": 624.003,
+        "predicted_per_token_ms": 48.000230769230775,
+        "predicted_per_second": 20.833233173558458,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6242488320,
+        "private_commit": 3757174784,
+        "peak_working_set": 6245679104,
+        "peak_private_commit": 3760410624,
+        "cpu_seconds": 201.71875,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6242529280,
+        "private_commit": 3757240320
+      },
+      "cpu_seconds": 13.046875,
+      "cpu_percent_one_core": 932.4492074029213
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 4,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "b094b4749d668d2b8e8d45e45266e4fa1ee4c97788ea3ca24a1c2fc177221bcc"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1266.9787999984692,
+      "template_ms": 3.504899999825284,
+      "ttft_ms": 800.4102999984752,
+      "timings": {
+        "cache_n": 827,
+        "prompt_n": 103,
+        "prompt_ms": 777.174,
+        "prompt_per_token_ms": 7.545378640776699,
+        "prompt_per_second": 132.5314537027744,
+        "predicted_n": 19,
+        "predicted_ms": 481.927,
+        "predicted_per_token_ms": 26.773722222222222,
+        "predicted_per_second": 37.35005509133126,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 930,
+        "tokens_cached": 948
+      },
+      "memory_after": {
+        "working_set": 6263775232,
+        "private_commit": 3778588672,
+        "peak_working_set": 6266925056,
+        "peak_private_commit": 3781799936,
+        "cpu_seconds": 213.453125,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6263775232,
+        "private_commit": 3778588672
+      },
+      "cpu_seconds": 11.640625,
+      "cpu_percent_one_core": 918.7703061814502
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 5,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "6e9947fd52567a997560a9d66bd9abeb7bf7a0563379b6345b252e0985ab28e0"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 1036.3609999985783,
+      "template_ms": 4.844700000830926,
+      "ttft_ms": 778.0990000028396,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 94,
+        "prompt_ms": 765.598,
+        "prompt_per_token_ms": 8.144659574468085,
+        "prompt_per_second": 122.77984007272747,
+        "predicted_n": 11,
+        "predicted_ms": 256.474,
+        "predicted_per_token_ms": 25.647399999999998,
+        "predicted_per_second": 38.990307009677394,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 917,
+        "tokens_cached": 927
+      },
+      "memory_after": {
+        "working_set": 6284754944,
+        "private_commit": 3799609344,
+        "peak_working_set": 6287904768,
+        "peak_private_commit": 3802816512,
+        "cpu_seconds": 222.84375,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284754944,
+        "private_commit": 3799609344
+      },
+      "cpu_seconds": 9.34375,
+      "cpu_percent_one_core": 901.5922058059708
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 6,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "4cd44b620a6f4a608a4b6653bdaeb9688a8c2c54df00209f2f242f8a93c3f0a4"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1346.4740999988862,
+      "template_ms": 4.243099996529054,
+      "ttft_ms": 729.9111999964225,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 94,
+        "prompt_ms": 714.776,
+        "prompt_per_token_ms": 7.603999999999999,
+        "prompt_per_second": 131.5097317201473,
+        "predicted_n": 14,
+        "predicted_ms": 619.664,
+        "predicted_per_token_ms": 47.66646153846154,
+        "predicted_per_second": 20.979111260295902,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6284767232,
+        "private_commit": 3799609344,
+        "peak_working_set": 6287917056,
+        "peak_private_commit": 3802828800,
+        "cpu_seconds": 235.75,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284767232,
+        "private_commit": 3799609344
+      },
+      "cpu_seconds": 12.8125,
+      "cpu_percent_one_core": 951.559335601821
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 7,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "ad07ecc7f0b13ca6c344983db18d735ea36822e1902191774563af46f8b92817"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1223.231099997065,
+      "template_ms": 8.680799997819122,
+      "ttft_ms": 768.9310999994632,
+      "timings": {
+        "cache_n": 827,
+        "prompt_n": 103,
+        "prompt_ms": 752.639,
+        "prompt_per_token_ms": 7.307174757281554,
+        "prompt_per_second": 136.85179747528363,
+        "predicted_n": 19,
+        "predicted_ms": 450.701,
+        "predicted_per_token_ms": 25.038944444444446,
+        "predicted_per_second": 39.937785804779665,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 930,
+        "tokens_cached": 948
+      },
+      "memory_after": {
+        "working_set": 6284787712,
+        "private_commit": 3799609344,
+        "peak_working_set": 6287937536,
+        "peak_private_commit": 3802828800,
+        "cpu_seconds": 247.234375,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6286499840,
+        "private_commit": 3802759168
+      },
+      "cpu_seconds": 11.46875,
+      "cpu_percent_one_core": 937.5783529398097
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 8,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "e8b225ba165748988b6a1f12e71c854f0d66978ac2113b83496520cc135ea08b"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 1014.2617000019527,
+      "template_ms": 2.8179000000818633,
+      "ttft_ms": 748.5660000020289,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 94,
+        "prompt_ms": 742.645,
+        "prompt_per_token_ms": 7.900478723404255,
+        "prompt_per_second": 126.57460832564685,
+        "predicted_n": 11,
+        "predicted_ms": 265.023,
+        "predicted_per_token_ms": 26.5023,
+        "predicted_per_second": 37.73257415394135,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 917,
+        "tokens_cached": 927
+      },
+      "memory_after": {
+        "working_set": 6284808192,
+        "private_commit": 3799609344,
+        "peak_working_set": 6287958016,
+        "peak_private_commit": 3802828800,
+        "cpu_seconds": 256.90625,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284808192,
+        "private_commit": 3799609344
+      },
+      "cpu_seconds": 9.671875,
+      "cpu_percent_one_core": 953.5877180397702
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 9,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "3fe9fdc9871d060e460266187224418c34fb3a13c1bbe82fbba76fcafaa5cc3a"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1397.4938000028487,
+      "template_ms": 4.260200003045611,
+      "ttft_ms": 807.1949000004679,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 94,
+        "prompt_ms": 793.722,
+        "prompt_per_token_ms": 8.443851063829786,
+        "prompt_per_second": 118.42937451651838,
+        "predicted_n": 14,
+        "predicted_ms": 595.806,
+        "predicted_per_token_ms": 45.83123076923077,
+        "predicted_per_second": 21.81918275411795,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 923,
+        "tokens_cached": 936
+      },
+      "memory_after": {
+        "working_set": 6284931072,
+        "private_commit": 3799613440,
+        "peak_working_set": 6288080896,
+        "peak_private_commit": 3802828800,
+        "cpu_seconds": 270.015625,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284931072,
+        "private_commit": 3799613440
+      },
+      "cpu_seconds": 13.03125,
+      "cpu_percent_one_core": 932.4728310045767
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 10,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "0ad1dfa548e9be63663c2e63050689461c01cc2f37af4bc987bf80847db71065"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1223.9023000001907,
+      "template_ms": 19.395399998757057,
+      "ttft_ms": 810.1260999974329,
+      "timings": {
+        "cache_n": 827,
+        "prompt_n": 104,
+        "prompt_ms": 784.233,
+        "prompt_per_token_ms": 7.540701923076923,
+        "prompt_per_second": 132.61364925985006,
+        "predicted_n": 19,
+        "predicted_ms": 407.096,
+        "predicted_per_token_ms": 22.616444444444443,
+        "predicted_per_second": 44.215614990076055,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 6284931072,
+        "private_commit": 3799617536,
+        "peak_working_set": 6288080896,
+        "peak_private_commit": 3802828800,
+        "cpu_seconds": 281.6875,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284931072,
+        "private_commit": 3799617536
+      },
+      "cpu_seconds": 11.65625,
+      "cpu_percent_one_core": 952.38402607775
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 11,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "6bb81299a9d62520137bb663ed8bc54828b91671139fc2602f087d27e7443b5c"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 937.7047000016319,
+      "template_ms": 3.3900999987963587,
+      "ttft_ms": 693.8612000012654,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 95,
+        "prompt_ms": 684.082,
+        "prompt_per_token_ms": 7.200863157894736,
+        "prompt_per_second": 138.8722404624007,
+        "predicted_n": 11,
+        "predicted_ms": 241.985,
+        "predicted_per_token_ms": 24.198500000000003,
+        "predicted_per_second": 41.324875508812525,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 928
+      },
+      "memory_after": {
+        "working_set": 6284931072,
+        "private_commit": 3799617536,
+        "peak_working_set": 6288080896,
+        "peak_private_commit": 3802836992,
+        "cpu_seconds": 290.640625,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284931072,
+        "private_commit": 3799617536
+      },
+      "cpu_seconds": 8.90625,
+      "cpu_percent_one_core": 949.7926159466301
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 12,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "5d5e2771682d607c1b7402d8b71279cc31bcc733b57eda87697a25d2c53d42da"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1284.5270999969216,
+      "template_ms": 5.990699995891191,
+      "ttft_ms": 700.652399995306,
+      "timings": {
+        "cache_n": 829,
+        "prompt_n": 95,
+        "prompt_ms": 688.252,
+        "prompt_per_token_ms": 7.244757894736842,
+        "prompt_per_second": 138.0308375420631,
+        "predicted_n": 14,
+        "predicted_ms": 583.447,
+        "predicted_per_token_ms": 44.880538461538464,
+        "predicted_per_second": 22.2813726011103,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 924,
+        "tokens_cached": 937
+      },
+      "memory_after": {
+        "working_set": 6284931072,
+        "private_commit": 3799617536,
+        "peak_working_set": 6288080896,
+        "peak_private_commit": 3802836992,
+        "cpu_seconds": 302.6875,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6284931072,
+        "private_commit": 3799617536
+      },
+      "cpu_seconds": 11.984375,
+      "cpu_percent_one_core": 932.9795377636424
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 13,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "5ef5c64feedf4e011bb6ba1719b4e2741705ce62187d062afefa3052b22c9992"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1220.2064000011887,
+      "template_ms": 4.287999996449798,
+      "ttft_ms": 777.6747000025352,
+      "timings": {
+        "cache_n": 828,
+        "prompt_n": 103,
+        "prompt_ms": 768.736,
+        "prompt_per_token_ms": 7.463456310679612,
+        "prompt_per_second": 133.9861799109187,
+        "predicted_n": 19,
+        "predicted_ms": 441.209,
+        "predicted_per_token_ms": 24.51161111111111,
+        "predicted_per_second": 40.796991901797114,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 6305910784,
+        "private_commit": 3820634112,
+        "peak_working_set": 6309060608,
+        "peak_private_commit": 3823857664,
+        "cpu_seconds": 314.328125,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6305910784,
+        "private_commit": 3820634112
+      },
+      "cpu_seconds": 11.609375,
+      "cpu_percent_one_core": 951.4271519956534
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 14,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "fe6fe3f960afee90fe5bde5ba1e5702e89e07e3d2f98d40225481c87b938a86f"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 978.9509000038379,
+      "template_ms": 4.838799999561161,
+      "ttft_ms": 723.048200001358,
+      "timings": {
+        "cache_n": 824,
+        "prompt_n": 94,
+        "prompt_ms": 705.814,
+        "prompt_per_token_ms": 7.508659574468084,
+        "prompt_per_second": 133.17956288767294,
+        "predicted_n": 11,
+        "predicted_ms": 258.922,
+        "predicted_per_token_ms": 25.892200000000003,
+        "predicted_per_second": 38.62166984651748,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 928
+      },
+      "memory_after": {
+        "working_set": 6326890496,
+        "private_commit": 3841654784,
+        "peak_working_set": 6330040320,
+        "peak_private_commit": 3844878336,
+        "cpu_seconds": 323.84375,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6326890496,
+        "private_commit": 3844812800
+      },
+      "cpu_seconds": 9.5,
+      "cpu_percent_one_core": 970.4266066830069
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 15,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "79e528cdc9681164ad8618904aeba4b9c0c1f00a587b853bc1caf5c638c02f07"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1377.7040999993915,
+      "template_ms": 4.381599996122532,
+      "ttft_ms": 753.305400001409,
+      "timings": {
+        "cache_n": 830,
+        "prompt_n": 94,
+        "prompt_ms": 741.395,
+        "prompt_per_token_ms": 7.88718085106383,
+        "prompt_per_second": 126.78801448620507,
+        "predicted_n": 14,
+        "predicted_ms": 619.926,
+        "predicted_per_token_ms": 47.686615384615386,
+        "predicted_per_second": 20.970244835673935,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 924,
+        "tokens_cached": 937
+      },
+      "memory_after": {
+        "working_set": 6347882496,
+        "private_commit": 3862675456,
+        "peak_working_set": 6351032320,
+        "peak_private_commit": 3865886720,
+        "cpu_seconds": 336.78125,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6351020032,
+        "private_commit": 3865825280
+      },
+      "cpu_seconds": 12.875,
+      "cpu_percent_one_core": 934.5257809718129
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 16,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "ab61259b34db95676de395be997ce230cdded7c55ae5215cf5bfadfa7a075f43"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1198.640599999635,
+      "template_ms": 3.379599998879712,
+      "ttft_ms": 760.5899999980466,
+      "timings": {
+        "cache_n": 828,
+        "prompt_n": 103,
+        "prompt_ms": 754.003,
+        "prompt_per_token_ms": 7.3204174757281555,
+        "prompt_per_second": 136.60423101764846,
+        "predicted_n": 19,
+        "predicted_ms": 437.417,
+        "predicted_per_token_ms": 24.300944444444443,
+        "predicted_per_second": 41.15066401168679,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 6347882496,
+        "private_commit": 3862683648,
+        "peak_working_set": 6351032320,
+        "peak_private_commit": 3865886720,
+        "cpu_seconds": 348.140625,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6347882496,
+        "private_commit": 3862683648
+      },
+      "cpu_seconds": 11.34375,
+      "cpu_percent_one_core": 946.3845960168088
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 17,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "af6371bcc916a49bc043a8a1dd75a9a3f592401169fc5880bc45dee46bf8b252"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 1093.7231999996584,
+      "template_ms": 4.9332999988109805,
+      "ttft_ms": 773.3754000000772,
+      "timings": {
+        "cache_n": 824,
+        "prompt_n": 94,
+        "prompt_ms": 755.583,
+        "prompt_per_token_ms": 8.038117021276596,
+        "prompt_per_second": 124.40724579563067,
+        "predicted_n": 11,
+        "predicted_ms": 326.595,
+        "predicted_per_token_ms": 32.6595,
+        "predicted_per_second": 30.61896232336686,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 928
+      },
+      "memory_after": {
+        "working_set": 6347882496,
+        "private_commit": 3862675456,
+        "peak_working_set": 6351032320,
+        "peak_private_commit": 3865886720,
+        "cpu_seconds": 358.515625,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6347882496,
+        "private_commit": 3862683648
+      },
+      "cpu_seconds": 10.3125,
+      "cpu_percent_one_core": 942.8802461174108
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 18,
+      "phase": "contention",
+      "case": "en-ko-negation",
+      "pair": [
+        "English",
+        "Korean"
+      ],
+      "slot": 0,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "8942e53526b189b6e5ba8e66a8f1ed7062abf4713637312c34b5809331488016"
+      },
+      "flags": [],
+      "output": "미나는 12장 표를 안 샀어요.",
+      "output_sha256": "4f2fe67e41732bd423d61798557a4a534f3f65c91e7198ce8adf02cd2b713883",
+      "wall_ms": 1352.086099999724,
+      "template_ms": 3.125700000964571,
+      "ttft_ms": 737.6720000029309,
+      "timings": {
+        "cache_n": 830,
+        "prompt_n": 94,
+        "prompt_ms": 730.51,
+        "prompt_per_token_ms": 7.7713829787234046,
+        "prompt_per_second": 128.67722549999317,
+        "predicted_n": 14,
+        "predicted_ms": 602.548,
+        "predicted_per_token_ms": 46.34984615384615,
+        "predicted_per_second": 21.575044643746224,
+        "draft_n": 21,
+        "draft_n_accepted": 6
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 14,
+        "tokens_evaluated": 924,
+        "tokens_cached": 937
+      },
+      "memory_after": {
+        "working_set": 6347886592,
+        "private_commit": 3862683648,
+        "peak_working_set": 6351036416,
+        "peak_private_commit": 3865903104,
+        "cpu_seconds": 371.328125,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6347886592,
+        "private_commit": 3862683648
+      },
+      "cpu_seconds": 12.734375,
+      "cpu_percent_one_core": 941.831662939409
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 19,
+      "phase": "contention",
+      "case": "ko-en-time",
+      "pair": [
+        "Korean",
+        "English"
+      ],
+      "slot": 1,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "ed98255baa0d1e555fdefcbed0c1fa6f9d360212ef50904189eac37cde4ed8bb"
+      },
+      "flags": [],
+      "output": "Jisu is coming at 3:15 PM. Don't be late.",
+      "output_sha256": "f14fce1142f5d94b8a10a0d44ffbbd6f645467ebc9877e897a0968f522a9126a",
+      "wall_ms": 1281.3499999974738,
+      "template_ms": 3.1798999989405274,
+      "ttft_ms": 867.255600001954,
+      "timings": {
+        "cache_n": 828,
+        "prompt_n": 103,
+        "prompt_ms": 848.802,
+        "prompt_per_token_ms": 8.240796116504855,
+        "prompt_per_second": 121.34749918119891,
+        "predicted_n": 19,
+        "predicted_ms": 423.645,
+        "predicted_per_token_ms": 23.535833333333333,
+        "predicted_per_second": 42.488404206352016,
+        "draft_n": 15,
+        "draft_n_accepted": 13
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 19,
+        "tokens_evaluated": 931,
+        "tokens_cached": 949
+      },
+      "memory_after": {
+        "working_set": 6347886592,
+        "private_commit": 3862683648,
+        "peak_working_set": 6351036416,
+        "peak_private_commit": 3865903104,
+        "cpu_seconds": 382.96875,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6347886592,
+        "private_commit": 3862683648
+      },
+      "cpu_seconds": 11.578125,
+      "cpu_percent_one_core": 903.5880126446971
+    },
+    {
+      "arm": "contend-new-cpu-cache0-accounted",
+      "request_index": 20,
+      "phase": "contention",
+      "case": "ja-en-negation",
+      "pair": [
+        "Japanese",
+        "English"
+      ],
+      "slot": 2,
+      "sampling": {
+        "temperature": 0.6,
+        "seed": 42,
+        "n_predict": 128
+      },
+      "status": "completed",
+      "history": {
+        "representation": "controlled_labelled",
+        "entries": 5,
+        "sha256": "b5e2de71b66d848c21ef5e6d18b2c2eacb15a6591f51f0018984efa15d63984e"
+      },
+      "flags": [],
+      "output": "Yuna doesn't have the blue key.",
+      "output_sha256": "ce190f8293a4034a8901da22af425bd1a3302ca7a23321b7f4d552a0c0cadc23",
+      "wall_ms": 990.1911999986623,
+      "template_ms": 3.2953999980236404,
+      "ttft_ms": 729.9645999955828,
+      "timings": {
+        "cache_n": 823,
+        "prompt_n": 95,
+        "prompt_ms": 717.022,
+        "prompt_per_token_ms": 7.5476,
+        "prompt_per_second": 132.49244793046796,
+        "predicted_n": 11,
+        "predicted_ms": 261.478,
+        "predicted_per_token_ms": 26.1478,
+        "predicted_per_second": 38.24413526185759,
+        "draft_n": 9,
+        "draft_n_accepted": 7
+      },
+      "terminal": {
+        "stop": true,
+        "stop_type": "eos",
+        "stopped_eos": null,
+        "stopped_limit": null,
+        "tokens_predicted": 11,
+        "tokens_evaluated": 918,
+        "tokens_cached": 928
+      },
+      "memory_after": {
+        "working_set": 6347886592,
+        "private_commit": 3862683648,
+        "peak_working_set": 6351036416,
+        "peak_private_commit": 3865903104,
+        "cpu_seconds": 392.359375,
+        "threads": 18
+      },
+      "sampled_request_peaks": {
+        "working_set": 6347886592,
+        "private_commit": 3862683648
+      },
+      "cpu_seconds": 9.328125,
+      "cpu_percent_one_core": 942.0529085708498
+    }
+  ],
+  "worker_trees_after_start": [
+    {
+      "launcher_pid": 25944,
+      "processes": [
+        {
+          "pid": 25944,
+          "creation_time": 1792032404.3574712,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.015625,
+          "threads": 3
+        },
+        {
+          "pid": 46580,
+          "creation_time": 1792032404.362044,
+          "name": "conhost.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 12197888,
+          "private_commit": 5660672,
+          "peak_working_set": 12226560,
+          "peak_private_commit": 5730304,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 48348,
+          "creation_time": 1792032404.3722115,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 11108352,
+          "private_commit": 5820416,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 0.390625,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 29612,
+      "processes": [
+        {
+          "pid": 29612,
+          "creation_time": 1792032404.3677888,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 11816,
+          "creation_time": 1792032404.369538,
+          "name": "conhost.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 12197888,
+          "private_commit": 5672960,
+          "peak_working_set": 12197888,
+          "peak_private_commit": 5689344,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 14088,
+          "creation_time": 1792032404.3796248,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 11112448,
+          "private_commit": 5828608,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5828608,
+          "cpu_seconds": 0.421875,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 44172,
+      "processes": [
+        {
+          "pid": 44172,
+          "creation_time": 1792032404.4326065,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 37992,
+          "creation_time": 1792032404.4344385,
+          "name": "conhost.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 12206080,
+          "private_commit": 5656576,
+          "peak_working_set": 12206080,
+          "peak_private_commit": 5656576,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 41608,
+          "creation_time": 1792032404.4437752,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 11108352,
+          "private_commit": 5824512,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 0.359375,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 23232,
+      "processes": [
+        {
+          "pid": 23232,
+          "creation_time": 1792032404.498174,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 43668,
+          "creation_time": 1792032404.5000355,
+          "name": "conhost.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 12185600,
+          "private_commit": 5656576,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 44828,
+          "creation_time": 1792032404.5108593,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 11116544,
+          "private_commit": 5832704,
+          "peak_working_set": 11124736,
+          "peak_private_commit": 5832704,
+          "cpu_seconds": 0.3125,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 5460,
+      "processes": [
+        {
+          "pid": 5460,
+          "creation_time": 1792032404.616553,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 4210688,
+          "private_commit": 888832,
+          "peak_working_set": 4210688,
+          "peak_private_commit": 888832,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 45040,
+          "creation_time": 1792032404.6186209,
+          "name": "conhost.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 12185600,
+          "private_commit": 5652480,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 29528,
+          "creation_time": 1792032404.6281753,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 11108352,
+          "private_commit": 5820416,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 0.1875,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 2956,
+      "processes": [
+        {
+          "pid": 2956,
+          "creation_time": 1792032404.6797175,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 42404,
+          "creation_time": 1792032404.6816995,
+          "name": "conhost.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 12193792,
+          "private_commit": 5656576,
+          "peak_working_set": 12222464,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 42240,
+          "creation_time": 1792032404.6924074,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 11112448,
+          "private_commit": 5824512,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 0.140625,
+          "threads": 3
+        }
+      ]
+    }
+  ],
+  "load_start_monotonic": 42346.5409055,
+  "measurement_start_monotonic": 42371.6655084,
+  "worker_trees_measurement_start": [
+    {
+      "launcher_pid": 25944,
+      "processes": [
+        {
+          "pid": 25944,
+          "creation_time": 1792032404.3574712,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.015625,
+          "threads": 3
+        },
+        {
+          "pid": 46580,
+          "creation_time": 1792032404.362044,
+          "name": "conhost.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 12197888,
+          "private_commit": 5660672,
+          "peak_working_set": 12226560,
+          "peak_private_commit": 5730304,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 48348,
+          "creation_time": 1792032404.3722115,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 11108352,
+          "private_commit": 5820416,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 20.4375,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 29612,
+      "processes": [
+        {
+          "pid": 29612,
+          "creation_time": 1792032404.3677888,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 11816,
+          "creation_time": 1792032404.369538,
+          "name": "conhost.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 12197888,
+          "private_commit": 5672960,
+          "peak_working_set": 12197888,
+          "peak_private_commit": 5689344,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 14088,
+          "creation_time": 1792032404.3796248,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 11112448,
+          "private_commit": 5828608,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5828608,
+          "cpu_seconds": 23.890625,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 44172,
+      "processes": [
+        {
+          "pid": 44172,
+          "creation_time": 1792032404.4326065,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 37992,
+          "creation_time": 1792032404.4344385,
+          "name": "conhost.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 12206080,
+          "private_commit": 5656576,
+          "peak_working_set": 12206080,
+          "peak_private_commit": 5656576,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 41608,
+          "creation_time": 1792032404.4437752,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 11108352,
+          "private_commit": 5824512,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 24.984375,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 23232,
+      "processes": [
+        {
+          "pid": 23232,
+          "creation_time": 1792032404.498174,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 43668,
+          "creation_time": 1792032404.5000355,
+          "name": "conhost.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 12185600,
+          "private_commit": 5656576,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 44828,
+          "creation_time": 1792032404.5108593,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 11116544,
+          "private_commit": 5832704,
+          "peak_working_set": 11124736,
+          "peak_private_commit": 5832704,
+          "cpu_seconds": 25.234375,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 5460,
+      "processes": [
+        {
+          "pid": 5460,
+          "creation_time": 1792032404.616553,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 4210688,
+          "private_commit": 888832,
+          "peak_working_set": 4210688,
+          "peak_private_commit": 888832,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 45040,
+          "creation_time": 1792032404.6186209,
+          "name": "conhost.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 12185600,
+          "private_commit": 5652480,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 29528,
+          "creation_time": 1792032404.6281753,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 11108352,
+          "private_commit": 5820416,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 25.296875,
+          "threads": 3
+        }
+      ]
+    },
+    {
+      "launcher_pid": 2956,
+      "processes": [
+        {
+          "pid": 2956,
+          "creation_time": 1792032404.6797175,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 4214784,
+          "private_commit": 897024,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 3
+        },
+        {
+          "pid": 42404,
+          "creation_time": 1792032404.6816995,
+          "name": "conhost.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 12193792,
+          "private_commit": 5656576,
+          "peak_working_set": 12222464,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 4
+        },
+        {
+          "pid": 42240,
+          "creation_time": 1792032404.6924074,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 11112448,
+          "private_commit": 5824512,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 25.28125,
+          "threads": 3
+        }
+      ]
+    }
+  ],
+  "measurement_end_monotonic": 42397.4870734,
+  "worker_trees_measurement_end": [
+    {
+      "launcher_pid": 25944,
+      "processes": [
+        {
+          "pid": 25944,
+          "creation_time": 1792032404.3574712,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.015625,
+          "threads": 1
+        },
+        {
+          "pid": 46580,
+          "creation_time": 1792032404.362044,
+          "name": "conhost.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 12161024,
+          "private_commit": 5582848,
+          "peak_working_set": 12226560,
+          "peak_private_commit": 5730304,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 48348,
+          "creation_time": 1792032404.3722115,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 11083776,
+          "private_commit": 5763072,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 38.5625,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 29612,
+      "processes": [
+        {
+          "pid": 29612,
+          "creation_time": 1792032404.3677888,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 11816,
+          "creation_time": 1792032404.369538,
+          "name": "conhost.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 12165120,
+          "private_commit": 5595136,
+          "peak_working_set": 12197888,
+          "peak_private_commit": 5689344,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 14088,
+          "creation_time": 1792032404.3796248,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 11083776,
+          "private_commit": 5767168,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5828608,
+          "cpu_seconds": 47.484375,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 44172,
+      "processes": [
+        {
+          "pid": 44172,
+          "creation_time": 1792032404.4326065,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 37992,
+          "creation_time": 1792032404.4344385,
+          "name": "conhost.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 12165120,
+          "private_commit": 5578752,
+          "peak_working_set": 12206080,
+          "peak_private_commit": 5656576,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 41608,
+          "creation_time": 1792032404.4437752,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 11083776,
+          "private_commit": 5767168,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 49.78125,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 23232,
+      "processes": [
+        {
+          "pid": 23232,
+          "creation_time": 1792032404.498174,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 43668,
+          "creation_time": 1792032404.5000355,
+          "name": "conhost.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 12148736,
+          "private_commit": 5578752,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 44828,
+          "creation_time": 1792032404.5108593,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 11083776,
+          "private_commit": 5767168,
+          "peak_working_set": 11124736,
+          "peak_private_commit": 5832704,
+          "cpu_seconds": 50.609375,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 5460,
+      "processes": [
+        {
+          "pid": 5460,
+          "creation_time": 1792032404.616553,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 4186112,
+          "private_commit": 835584,
+          "peak_working_set": 4210688,
+          "peak_private_commit": 888832,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 45040,
+          "creation_time": 1792032404.6186209,
+          "name": "conhost.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 12148736,
+          "private_commit": 5574656,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 29528,
+          "creation_time": 1792032404.6281753,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 11083776,
+          "private_commit": 5763072,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 50.953125,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 2956,
+      "processes": [
+        {
+          "pid": 2956,
+          "creation_time": 1792032404.6797175,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 42404,
+          "creation_time": 1792032404.6816995,
+          "name": "conhost.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 12156928,
+          "private_commit": 5578752,
+          "peak_working_set": 12222464,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 42240,
+          "creation_time": 1792032404.6924074,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 11083776,
+          "private_commit": 5763072,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 51.0625,
+          "threads": 1
+        }
+      ]
+    }
+  ],
+  "primary_memory_end": {
+    "working_set": 6347886592,
+    "private_commit": 3862683648,
+    "peak_working_set": 6351036416,
+    "peak_private_commit": 3865903104,
+    "cpu_seconds": 393.140625,
+    "threads": 18
+  },
+  "background_completed_requests": 0,
+  "background_errors": [],
+  "worker_trees_before_stop": [
+    {
+      "launcher_pid": 25944,
+      "processes": [
+        {
+          "pid": 25944,
+          "creation_time": 1792032404.3574712,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.015625,
+          "threads": 1
+        },
+        {
+          "pid": 46580,
+          "creation_time": 1792032404.362044,
+          "name": "conhost.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 12161024,
+          "private_commit": 5582848,
+          "peak_working_set": 12226560,
+          "peak_private_commit": 5730304,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 48348,
+          "creation_time": 1792032404.3722115,
+          "name": "python.exe",
+          "affinity": [
+            0
+          ],
+          "working_set": 11083776,
+          "private_commit": 5763072,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 39.203125,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 29612,
+      "processes": [
+        {
+          "pid": 29612,
+          "creation_time": 1792032404.3677888,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 11816,
+          "creation_time": 1792032404.369538,
+          "name": "conhost.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 12165120,
+          "private_commit": 5595136,
+          "peak_working_set": 12197888,
+          "peak_private_commit": 5689344,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 14088,
+          "creation_time": 1792032404.3796248,
+          "name": "python.exe",
+          "affinity": [
+            1
+          ],
+          "working_set": 11083776,
+          "private_commit": 5767168,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5828608,
+          "cpu_seconds": 48.203125,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 44172,
+      "processes": [
+        {
+          "pid": 44172,
+          "creation_time": 1792032404.4326065,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 37992,
+          "creation_time": 1792032404.4344385,
+          "name": "conhost.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 12165120,
+          "private_commit": 5578752,
+          "peak_working_set": 12206080,
+          "peak_private_commit": 5656576,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 41608,
+          "creation_time": 1792032404.4437752,
+          "name": "python.exe",
+          "affinity": [
+            2
+          ],
+          "working_set": 11083776,
+          "private_commit": 5767168,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 50.53125,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 23232,
+      "processes": [
+        {
+          "pid": 23232,
+          "creation_time": 1792032404.498174,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 43668,
+          "creation_time": 1792032404.5000355,
+          "name": "conhost.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 12148736,
+          "private_commit": 5578752,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 44828,
+          "creation_time": 1792032404.5108593,
+          "name": "python.exe",
+          "affinity": [
+            3
+          ],
+          "working_set": 11083776,
+          "private_commit": 5767168,
+          "peak_working_set": 11124736,
+          "peak_private_commit": 5832704,
+          "cpu_seconds": 51.375,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 5460,
+      "processes": [
+        {
+          "pid": 5460,
+          "creation_time": 1792032404.616553,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 4186112,
+          "private_commit": 835584,
+          "peak_working_set": 4210688,
+          "peak_private_commit": 888832,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 45040,
+          "creation_time": 1792032404.6186209,
+          "name": "conhost.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 12148736,
+          "private_commit": 5574656,
+          "peak_working_set": 12214272,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 29528,
+          "creation_time": 1792032404.6281753,
+          "name": "python.exe",
+          "affinity": [
+            4
+          ],
+          "working_set": 11083776,
+          "private_commit": 5763072,
+          "peak_working_set": 11116544,
+          "peak_private_commit": 5820416,
+          "cpu_seconds": 51.6875,
+          "threads": 1
+        }
+      ]
+    },
+    {
+      "launcher_pid": 2956,
+      "processes": [
+        {
+          "pid": 2956,
+          "creation_time": 1792032404.6797175,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 4190208,
+          "private_commit": 843776,
+          "peak_working_set": 4214784,
+          "peak_private_commit": 897024,
+          "cpu_seconds": 0.0,
+          "threads": 1
+        },
+        {
+          "pid": 42404,
+          "creation_time": 1792032404.6816995,
+          "name": "conhost.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 12156928,
+          "private_commit": 5578752,
+          "peak_working_set": 12222464,
+          "peak_private_commit": 5701632,
+          "cpu_seconds": 0.0,
+          "threads": 2
+        },
+        {
+          "pid": 42240,
+          "creation_time": 1792032404.6924074,
+          "name": "python.exe",
+          "affinity": [
+            5
+          ],
+          "working_set": 11083776,
+          "private_commit": 5763072,
+          "peak_working_set": 11120640,
+          "peak_private_commit": 5824512,
+          "cpu_seconds": 51.828125,
+          "threads": 1
+        }
+      ]
+    }
+  ],
+  "owned_load_stopped": true,
+  "load_end_monotonic": 42398.3902834
+}

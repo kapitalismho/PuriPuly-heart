@@ -1,0 +1,132 @@
+{
+  "compatibility_arms": [
+    "new-cpu-quality",
+    "new-vulkan-quality",
+    "old-cpu-quality",
+    "old-vulkan-quality"
+  ],
+  "cases": {
+    "en-ja-fragment": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "たぶん、お昼過ぎかな。"
+      ]
+    },
+    "en-ja-name": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "カイに7分待ってって言って、17分じゃなくてさ。"
+      ]
+    },
+    "en-ko-context": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "파란색 말하는 거였어요, 빨간색 아니고요."
+      ]
+    },
+    "en-ko-decimal": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "빨간 상자는 4.50달러예요, 45달러가 아니고요."
+      ]
+    },
+    "en-ko-negation": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "미나는 12장 표를 안 샀어요."
+      ]
+    },
+    "ja-en-negation": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "Yuna doesn't have the blue key."
+      ]
+    },
+    "ja-ko-time": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "내일 아침 9시에 역에서 만나요."
+      ]
+    },
+    "ko-en-mixed": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "Alex, it's room B-21, not B-12."
+      ]
+    },
+    "ko-en-time": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "Jisu is coming at 3:15 PM. Don't be late."
+      ]
+    },
+    "ko-en-tone": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "It's okay. You don't have to help right now."
+      ]
+    },
+    "zh-en-number": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "Lin hasn't canceled the two tickets for Friday."
+      ]
+    },
+    "zh-en-quote": {
+      "arm_count": 4,
+      "unique_outputs": [
+        "Please tell Anna, \"I won't be late.\""
+      ]
+    }
+  },
+  "deterministic_mtp_on_off": {
+    "en-ja-fragment": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "en-ja-name": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "en-ko-context": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "en-ko-decimal": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "en-ko-negation": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "ja-en-negation": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "ja-ko-time": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "ko-en-mixed": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "ko-en-time": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "ko-en-tone": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "zh-en-number": {
+      "both_completed": true,
+      "output_equal": true
+    },
+    "zh-en-quote": {
+      "both_completed": true,
+      "output_equal": true
+    }
+  }
+}

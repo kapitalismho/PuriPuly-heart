@@ -1,0 +1,37 @@
+{
+  "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "current_request_policy": {
+    "owner": "ContextResolver.resolve_selected_for_request",
+    "mode": "integrated",
+    "maximum_entries": 5,
+    "time_window_seconds": 60,
+    "order": "both channel histories filtered to each channel's requested language pair, sorted oldest first, keep newest five",
+    "validity": "age strictly less than60s, source/target language match or empty, text length at least2",
+    "format": "- [self] \"text\" or - [peer] \"text\" separated by newlines",
+    "legacy_channel_query_defaults": {"maximum_entries": 3, "time_window_seconds": 30},
+    "legacy_query_scope": "These are not the current request resolver's integrated60s/five-entry path. The resolver inspected here calls integrated selection directly; the integrated_context_enabled boolean is not a branch in that method."
+  },
+  "frozen_primary_workload": {
+    "representation": "five fixed synthetic labelled history contents, oldest first, with current public prompt and current build_translation_user_message wrapper; label-only context lines omit the real resolver's bullet/quote punctuation",
+    "performance_turn_variation": "Step <request_index>: inserted in first self history line to avoid full-user-prompt exact cache hits",
+    "sampling": {"temperature": 0.6, "seed": 42, "safety_output_limit": 128},
+    "scope": "Controlled representative history, not claimed byte-identical application history. All old/new primary arms share exactly this frozen representation."
+  },
+  "literal_confirmation": {
+    "representation": "same five contents and Step marker passed through real ContextResolver/ChannelRuntime, correct self/opposite-peer pair identities, real bullets/quotes",
+    "filter_sanity": "Synthetic wrong-pair and61s-old entries included before valid history; real resolver must exclude both and retain exactly five valid entries",
+    "scope": "No tuning; paired old/new default/cache0 confirmations on each backend. Separate data phase literal; never pooled into earlier controlled-history timings."
+  },
+  "actual_app": {
+    "history": "Unmodified real pipeline/resolver;30 same-pair synthetic warm turns fill the real five-entry context, followed by fresh-process restarts",
+    "scene": "synthetic empty process discovery; no scene participant metadata",
+    "sampling": "Current app temperature0.6, no caller seed override; native default random seed. App and seed42 standalone measurements are not pooled."
+  },
+  "sources": [
+    "src/puripuly_heart/core/orchestrator/context.py:79-153",
+    "src/puripuly_heart/core/orchestrator/channel_runtime.py:140-187",
+    "src/puripuly_heart/core/orchestrator/configuration.py:66-69",
+    "src/puripuly_heart/core/orchestrator/translation_request.py:419-444",
+    "src/puripuly_heart/providers/llm/messages.py:4-16"
+  ]
+}

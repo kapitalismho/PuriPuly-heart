@@ -1,0 +1,541 @@
+{
+  "contend-new-cpu-cache0-accounted-producer.txt": {
+    "normalized_sanitized_original_sha256": "00cfa3a7f3b4232d51edbac97c2c51c72cbf86866143174e192b08abf6452c31",
+    "normalized_original_bytes": 106180,
+    "nonempty_lines": 1035,
+    "retained_lines": 543,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-new-cpu-cache0-producer.txt": {
+    "normalized_sanitized_original_sha256": "39c100969bd7a9e5a4725652ee2e244a04ff115b6dbec27df6e8fe12210da7bc",
+    "normalized_original_bytes": 106180,
+    "nonempty_lines": 1035,
+    "retained_lines": 543,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-new-vulkan-cache0-background-producer.txt": {
+    "normalized_sanitized_original_sha256": "042fea9b5beb206b82d091cdbb34c15a5916143b4e952df720af1e0cf2644aaf",
+    "normalized_original_bytes": 108319,
+    "nonempty_lines": 1023,
+    "retained_lines": 546,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-new-vulkan-cache0-producer.txt": {
+    "normalized_sanitized_original_sha256": "5ae5c79e45d642679b9c19f7f68807a63ece83c53f4a6dc32b2d1e13d7458395",
+    "normalized_original_bytes": 79905,
+    "nonempty_lines": 786,
+    "retained_lines": 502,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-old-cpu-default-accounted-producer.txt": {
+    "normalized_sanitized_original_sha256": "28798aa29dbf2d829544dc87271001af1e5c8f903019c31214880d34bf162bc5",
+    "normalized_original_bytes": 153582,
+    "nonempty_lines": 1468,
+    "retained_lines": 831,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-old-cpu-default-producer.txt": {
+    "normalized_sanitized_original_sha256": "d6948355d10f11061506723dc1a813fe123007727ccb979e5521cde9137904b5",
+    "normalized_original_bytes": 153582,
+    "nonempty_lines": 1468,
+    "retained_lines": 831,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-old-vulkan-default-background-producer.txt": {
+    "normalized_sanitized_original_sha256": "664df2ce0411100d58777e218e77aa7181be6da547a017ec704f933c2ece8334",
+    "normalized_original_bytes": 111048,
+    "nonempty_lines": 1047,
+    "retained_lines": 550,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "contend-old-vulkan-default-producer.txt": {
+    "normalized_sanitized_original_sha256": "4aafd25b78ec25d89170d66d70991b2f14dab6958a4a1f07fa57c63481cead01",
+    "normalized_original_bytes": 127372,
+    "nonempty_lines": 1218,
+    "retained_lines": 779,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "followon-cpu-on-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "b7833a549a08fd27b8ff6ee29c5c4ced806adae8b3bcd87092cd00d0c0645afa",
+    "normalized_original_bytes": 97145,
+    "nonempty_lines": 1050,
+    "retained_lines": 566,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "followon-vulkan-on-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "747490185c4dd3956257af67d84bd674bd61ca655e05eae631b65b90ec11a3fa",
+    "normalized_original_bytes": 60064,
+    "nonempty_lines": 613,
+    "retained_lines": 496,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-new-cpu-cache0-producer.txt": {
+    "normalized_sanitized_original_sha256": "860e333729fa76a48805d91addaa3e0871cf951b511becf4f198635b187c3082",
+    "normalized_original_bytes": 78111,
+    "nonempty_lines": 795,
+    "retained_lines": 501,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-new-cpu-default-producer.txt": {
+    "normalized_sanitized_original_sha256": "26b2c49ef3843d7e258497fa9da40f103d768b22b4218a2d9d4cd8d575556ca8",
+    "normalized_original_bytes": 93217,
+    "nonempty_lines": 940,
+    "retained_lines": 570,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-new-vulkan-cache0-producer.txt": {
+    "normalized_sanitized_original_sha256": "336f9263af2318bbe26a88cbff7bc94762ac6c76be8054290f58d45b65c541f6",
+    "normalized_original_bytes": 56308,
+    "nonempty_lines": 573,
+    "retained_lines": 469,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-new-vulkan-default-producer.txt": {
+    "normalized_sanitized_original_sha256": "02ca793554209270b3c16b79391d3ea703b3421b996d7826352eaa8f29fe46de",
+    "normalized_original_bytes": 71414,
+    "nonempty_lines": 718,
+    "retained_lines": 538,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-old-cpu-cache0-producer.txt": {
+    "normalized_sanitized_original_sha256": "87bf7ad42da241c349c003fa0bbfbacf553368bb69ef70a44f70cd5c2ac45661",
+    "normalized_original_bytes": 80009,
+    "nonempty_lines": 810,
+    "retained_lines": 506,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-old-cpu-default-producer.txt": {
+    "normalized_sanitized_original_sha256": "54e500196b773936751de7b1ea66d7900d80546c456b000e915041ea221e8cfd",
+    "normalized_original_bytes": 95111,
+    "nonempty_lines": 955,
+    "retained_lines": 575,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-old-vulkan-cache0-producer.txt": {
+    "normalized_sanitized_original_sha256": "b29db335353702d9b246b901d74381231915df0fcb17df0a214097df5228aea4",
+    "normalized_original_bytes": 58271,
+    "nonempty_lines": 587,
+    "retained_lines": 474,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "literal-old-vulkan-default-producer.txt": {
+    "normalized_sanitized_original_sha256": "f954ce5bdd85e12dce45db49e08383e25c8976def9a422f4493ed8f7f8de0c65",
+    "normalized_original_bytes": 73373,
+    "nonempty_lines": 732,
+    "retained_lines": 541,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-auto-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "2f4bc69b1d04f237b461567d3921f7d66a45658120f7519edcc27294cf7d63fd",
+    "normalized_original_bytes": 125133,
+    "nonempty_lines": 1222,
+    "retained_lines": 685,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache0-fa-on-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "f8b869c2c17df4d19bb745e97be153b4b763937cde2423a1ba051b06fb583ee0",
+    "normalized_original_bytes": 96380,
+    "nonempty_lines": 951,
+    "retained_lines": 528,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache0-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "9fa505dec22bcb0cb1372314ab1a8a1f79194af59f28fe113fd479595e2e7626",
+    "normalized_original_bytes": 144368,
+    "nonempty_lines": 1359,
+    "retained_lines": 603,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache0-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "bde644046c542d06492d6c39f37cdde2f8b65a32ca2216bd421f38c2ed26c2a0",
+    "normalized_original_bytes": 144370,
+    "nonempty_lines": 1359,
+    "retained_lines": 603,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache0-norepack-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "46569e3a464047b2fe2d231dda60890fdccfd9a0d1bc5a62b36d1e44dc2ab59b",
+    "normalized_original_bytes": 58838,
+    "nonempty_lines": 630,
+    "retained_lines": 473,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache0-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "5c406da891e731e3b36616f2ba65ecf72ef185e759df137cda0112d6b8a6b382",
+    "normalized_original_bytes": 674836,
+    "nonempty_lines": 5865,
+    "retained_lines": 1435,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache0-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "989cdf10948641af30a43f5afb65539e1c32161f3e806408286f30fafd6af8a0",
+    "normalized_original_bytes": 96747,
+    "nonempty_lines": 954,
+    "retained_lines": 528,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-cache512-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "65d1ef040233ced3dd7d3fe503c87ea6188913d98943e8da57b80a0e150edaac",
+    "normalized_original_bytes": 377857,
+    "nonempty_lines": 3435,
+    "retained_lines": 1235,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-default-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "aedf25424c55737d3de6f58654984e99d5113fa73167e00b4d0d2791a39fd3bd",
+    "normalized_original_bytes": 230877,
+    "nonempty_lines": 2158,
+    "retained_lines": 1175,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "89a70459405d8cc12fd53b6a59e8d53cce5d211a3af788a78a6427e3993d4727",
+    "normalized_original_bytes": 223591,
+    "nonempty_lines": 2093,
+    "retained_lines": 1136,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "74b436ce73ad50f8fa606537478a408a76ef03116248ed79572452786a295e96",
+    "normalized_original_bytes": 223442,
+    "nonempty_lines": 2092,
+    "retained_lines": 1136,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-greedy-off-clean-producer.txt": {
+    "normalized_sanitized_original_sha256": "696bb80b7c4a4a53737dd0b7576e235ac54292ff1334e5a0e7df943535143653",
+    "normalized_original_bytes": 78638,
+    "nonempty_lines": 766,
+    "retained_lines": 500,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-greedy-off-producer.txt": {
+    "normalized_sanitized_original_sha256": "47bcbd544bd219d50e2e617a91225162b89b1623ea7acbb282a12557ee63bf77",
+    "normalized_original_bytes": 17740,
+    "nonempty_lines": 207,
+    "retained_lines": 207,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-greedy-on-producer.txt": {
+    "normalized_sanitized_original_sha256": "2cc71ebe54cf7e781e7ca09b5662b73d6796bdb5cafb76cf1756dacc80dc546e",
+    "normalized_original_bytes": 102379,
+    "nonempty_lines": 995,
+    "retained_lines": 540,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-lazy-off-sanity-producer.txt": {
+    "normalized_sanitized_original_sha256": "4ab65ae9f1e2593b3de1f0c4b68d5836f367a0d65c7fff9dd1e666d1374c6da0",
+    "normalized_original_bytes": 52655,
+    "nonempty_lines": 583,
+    "retained_lines": 465,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-lazy-on-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "f944cdf6c35f84aba8293879cdeba7e7a269d935f9d06a7c8014461672c8fb18",
+    "normalized_original_bytes": 125380,
+    "nonempty_lines": 1225,
+    "retained_lines": 685,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-cpu-quality-producer.txt": {
+    "normalized_sanitized_original_sha256": "71a2f0b009afb7266042c8f1fb24871b4dd89f7af1ee0babe462f20bdb3dc184",
+    "normalized_original_bytes": 121925,
+    "nonempty_lines": 1188,
+    "retained_lines": 617,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-auto-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "c0620943942933ca28f9e4e1654e3ae69d50322443fc44058bdab7279998be1c",
+    "normalized_original_bytes": 100315,
+    "nonempty_lines": 982,
+    "retained_lines": 647,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-cache0-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "0ea175d685df299c5c777fa90b7b1f0ce4b5ba4ef9e174637a4feff9c5c1afe4",
+    "normalized_original_bytes": 111828,
+    "nonempty_lines": 1074,
+    "retained_lines": 550,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-cache0-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "caa208c1c2512a33cfc30eee357443624ff6cc18390fb08d8f2d2a87ddb46ae9",
+    "normalized_original_bytes": 111828,
+    "nonempty_lines": 1074,
+    "retained_lines": 550,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-cache0-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "69b5dc9243f0544b2a881ec9fdcd37a6b42027f512eb9ef1a465b732203e8c5e",
+    "normalized_original_bytes": 557532,
+    "nonempty_lines": 5079,
+    "retained_lines": 1215,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-cache0-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "c84d7194dce89e06bf05815877e92652234ea11293c27c317805aaa533a3c0d7",
+    "normalized_original_bytes": 71929,
+    "nonempty_lines": 714,
+    "retained_lines": 490,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-cache512-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "51af0db30b7031fa082a757a4682f83406203a8752aa95f0e9c42a5058e6e27e",
+    "normalized_original_bytes": 321533,
+    "nonempty_lines": 3009,
+    "retained_lines": 1132,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-default-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "5e01126e724ca5c5bea522038718a6da904e954e2587d9017a97a0bb2e33cca9",
+    "normalized_original_bytes": 306445,
+    "nonempty_lines": 2857,
+    "retained_lines": 1755,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "dd893fae4d1a1101e8c8e9c69b7c6d9a17f2cd548ee382d5dc04ea09ff4001d0",
+    "normalized_original_bytes": 190900,
+    "nonempty_lines": 1807,
+    "retained_lines": 1082,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "a812cb39a5de9747843eadc16aad17d7038527c3347d34b699b08471d7884a78",
+    "normalized_original_bytes": 190900,
+    "nonempty_lines": 1807,
+    "retained_lines": 1082,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-lazy-off-sanity-producer.txt": {
+    "normalized_sanitized_original_sha256": "5eec7d8227f03849d208a0c5140f2135cb74594d8a72b98f472fb310eb3a86d3",
+    "normalized_original_bytes": 35398,
+    "nonempty_lines": 388,
+    "retained_lines": 388,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-lazy-on-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "1199a246bad16b584348196134a406296eaf6c26f243bb87859fb24ca073b602",
+    "normalized_original_bytes": 100562,
+    "nonempty_lines": 985,
+    "retained_lines": 647,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "new-vulkan-quality-producer.txt": {
+    "normalized_sanitized_original_sha256": "3b605bfe1f00875fb8f93f50d2866e03b9bdfd4059c1ad6eeafd3e1a71260397",
+    "normalized_original_bytes": 97875,
+    "nonempty_lines": 958,
+    "retained_lines": 574,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-cache0-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "93f7b2ff37a26f7dcfabadeb8bc813ab0a53561d97551a9f407f5e9e596cf20a",
+    "normalized_original_bytes": 148040,
+    "nonempty_lines": 1377,
+    "retained_lines": 611,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-cache0-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "2e88f913d77cf0a0913c5d089c4973d1de8cdf47940f3aec44ecbabcede43a56",
+    "normalized_original_bytes": 148044,
+    "nonempty_lines": 1377,
+    "retained_lines": 611,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-cache0-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "b21e8f740896a12e345b4198025205e7864f236b8c47d04b36bc2da8166d96b3",
+    "normalized_original_bytes": 690507,
+    "nonempty_lines": 5886,
+    "retained_lines": 1446,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-cache0-tune-producer.txt": {
+    "normalized_sanitized_original_sha256": "39f3c23f9f1613d74415d4a16df4e586a8455aafa2c24013123b140066e6753b",
+    "normalized_original_bytes": 99399,
+    "nonempty_lines": 972,
+    "retained_lines": 536,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-default-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "e67aba46e57d540b54fb78642b67bd86c0ba83f9f689e22157c50c31ffb16a31",
+    "normalized_original_bytes": 417929,
+    "nonempty_lines": 3793,
+    "retained_lines": 2233,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "5bbbb5a2ce42e32cc4131845be60ce2f9e4385fb5e736fe205b38f81a6306d6d",
+    "normalized_original_bytes": 227114,
+    "nonempty_lines": 2110,
+    "retained_lines": 1144,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "4ce94069ce18765d1eef9c8042b49742866bee4a0ae9df97443dd40f7d1852cf",
+    "normalized_original_bytes": 227112,
+    "nonempty_lines": 2110,
+    "retained_lines": 1144,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-cpu-quality-producer.txt": {
+    "normalized_sanitized_original_sha256": "fde2673c6925281d474bee73819740006aa06b63d0b8289f96518b03f0b497f9",
+    "normalized_original_bytes": 123640,
+    "nonempty_lines": 1203,
+    "retained_lines": 622,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-cache0-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "7182cb46bfedddfebc3ba14d57e241e5bc19ca7bbfde423c985eeb16a8f14dd4",
+    "normalized_original_bytes": 115566,
+    "nonempty_lines": 1091,
+    "retained_lines": 558,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-cache0-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "71ef7d5cdb13702c6f2b8294b973f9cf1cbfcb4df28db3ba523cabcec2d76b7b",
+    "normalized_original_bytes": 115566,
+    "nonempty_lines": 1091,
+    "retained_lines": 558,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-cache0-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "7eb269bec5c3b1015d6dca307ebb502e72f32eb9eceb7dbac04d2412e1d23b2b",
+    "normalized_original_bytes": 573269,
+    "nonempty_lines": 5099,
+    "retained_lines": 1226,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-default-soak-producer.txt": {
+    "normalized_sanitized_original_sha256": "5349fd781ac5c41dc5c89543b55bcd4a2e6eb372067aa8a8023f20cf572afee3",
+    "normalized_original_bytes": 655944,
+    "nonempty_lines": 5976,
+    "retained_lines": 4038,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-final-a-producer.txt": {
+    "normalized_sanitized_original_sha256": "61359e7cfcb99dfee6f78d99fdecaa04d846e9af10094faa04b0f86112f62b1b",
+    "normalized_original_bytes": 194634,
+    "nonempty_lines": 1824,
+    "retained_lines": 1088,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-final-b-producer.txt": {
+    "normalized_sanitized_original_sha256": "fd5abdbc74267f0508a97c09a30697d4ca2c59eac410a8fafdcca267ea8feab6",
+    "normalized_original_bytes": 194634,
+    "nonempty_lines": 1824,
+    "retained_lines": 1088,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "old-vulkan-quality-producer.txt": {
+    "normalized_sanitized_original_sha256": "a7d42503285ff27ca903ae0163471e2c6178fd915590a37144338fea27d31dc8",
+    "normalized_original_bytes": 99656,
+    "nonempty_lines": 972,
+    "retained_lines": 577,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-cpu-cache0-cycle0-native-0.txt": {
+    "normalized_sanitized_original_sha256": "28efa72c2280549e91bc04002c8213dbf5818561b22b76a4d8a9caf845d4ee50",
+    "normalized_original_bytes": 166781,
+    "nonempty_lines": 1530,
+    "retained_lines": 640,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-cpu-cache0-cycle1-native-0.txt": {
+    "normalized_sanitized_original_sha256": "086548b57bc913d18c9bb0595d1c0abb5f8787d8f78c8bd6aff48a62cae463a4",
+    "normalized_original_bytes": 36891,
+    "nonempty_lines": 433,
+    "retained_lines": 433,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-cpu-cache0-cycle2-native-0.txt": {
+    "normalized_sanitized_original_sha256": "8a9275686708be82c1064b31bf943d32f763e15d0cf47612a66e0e34725c46a4",
+    "normalized_original_bytes": 36891,
+    "nonempty_lines": 433,
+    "retained_lines": 433,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-cpu-guarded-cycle0-native-0.txt": {
+    "normalized_sanitized_original_sha256": "2ddd6bf127ad1dc036a94aaddd6c2a45dde79e1f3a28f60856a1bbaae731d8f9",
+    "normalized_original_bytes": 79691,
+    "nonempty_lines": 809,
+    "retained_lines": 522,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-cpu-guarded-cycle1-native-0.txt": {
+    "normalized_sanitized_original_sha256": "2e1d059bb6ac5e380a52c81700e88eaf95f98c4551eb5ff3fb0057e761da6a0a",
+    "normalized_original_bytes": 37147,
+    "nonempty_lines": 436,
+    "retained_lines": 436,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-vulkan-cache0-cycle0-native-0.txt": {
+    "normalized_sanitized_original_sha256": "5b46f64c38c5272fab2631e5f9d1d7d8778c3adf9f19585d7beeb7d865d6e270",
+    "normalized_original_bytes": 130979,
+    "nonempty_lines": 1229,
+    "retained_lines": 580,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-vulkan-cache0-cycle1-native-0.txt": {
+    "normalized_sanitized_original_sha256": "c096fbb6de1842940db60d6571e9fe9aa4a5748bc89c1c8c0732111b26a79d88",
+    "normalized_original_bytes": 21544,
+    "nonempty_lines": 250,
+    "retained_lines": 250,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-vulkan-cache0-cycle2-native-0.txt": {
+    "normalized_sanitized_original_sha256": "a397be243c9c194aaebc5bf1761b69a09549732fcd8e3d8510494a87f6d25640",
+    "normalized_original_bytes": 21544,
+    "nonempty_lines": 250,
+    "retained_lines": 250,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-vulkan-guarded-cycle0-native-0.txt": {
+    "normalized_sanitized_original_sha256": "cd91fe48550f3703710507ce3b05ed3aa88d691b4ebc4806e1d50f23b1f546e5",
+    "normalized_original_bytes": 59294,
+    "nonempty_lines": 598,
+    "retained_lines": 482,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-new-vulkan-guarded-cycle1-native-0.txt": {
+    "normalized_sanitized_original_sha256": "27a01ec833d96ea8c0931daf11bc71225b69f727c8dbfc196d1c0a4d48d5d94d",
+    "normalized_original_bytes": 21800,
+    "nonempty_lines": 253,
+    "retained_lines": 253,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-old-cpu-failed-native-0.txt": {
+    "normalized_sanitized_original_sha256": "15af2323697061b06f7d17bb65f1b91e1e5cb73355aad63abb1cf5b45d57fd79",
+    "normalized_original_bytes": 37119,
+    "nonempty_lines": 442,
+    "retained_lines": 442,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-old-cpu-guarded-cycle0-native-0.txt": {
+    "normalized_sanitized_original_sha256": "2f11c1f94a9a6eac143f8cf77e972e2c4568b86cf05a5f19b6bfdb6a5400ff35",
+    "normalized_original_bytes": 80402,
+    "nonempty_lines": 819,
+    "retained_lines": 519,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-old-cpu-guarded-cycle1-native-0.txt": {
+    "normalized_sanitized_original_sha256": "237ee6b6aa3109710e82f4a0f03b0cb95d40e5d86c3587f5402c5df17d0a6d76",
+    "normalized_original_bytes": 37658,
+    "nonempty_lines": 445,
+    "retained_lines": 445,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-old-vulkan-guarded-cycle0-native-0.txt": {
+    "normalized_sanitized_original_sha256": "83c47d266b87fff06303f47c20512b33b89acb10fe4c17d8b620f0a5c308cca5",
+    "normalized_original_bytes": 59907,
+    "nonempty_lines": 606,
+    "retained_lines": 483,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  },
+  "app-old-vulkan-guarded-cycle1-native-0.txt": {
+    "normalized_sanitized_original_sha256": "36054407de1acdb38f67448beaf1012043388794a843256323333827fe9ee3a0",
+    "normalized_original_bytes": 22224,
+    "nonempty_lines": 260,
+    "retained_lines": 260,
+    "policy": "first400 + last50 nonempty lines; all failure/warning/cache-state/checkpoint-state/PLE/offload/buffer/MTP evidence. Complete per-request outcomes remain in requests.jsonl or actual-app JSON. Full producer original is retained only in owned external run/app storage; its original line endings/private paths are not the normalized sanitized hash here."
+  }
+}

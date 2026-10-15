@@ -1,0 +1,3733 @@
+{
+  "label": "app-new-vulkan-guarded",
+  "release": "b11537",
+  "backend": "vulkan",
+  "runtime_identity": "process-local exact build/commit injection; maintained constants unchanged",
+  "discovery_boundary": "PsutilCurrentUserProcessSnapshots.snapshots replaced with synthetic empty tuple; no scene/process inventory reads",
+  "gui": "not_run",
+  "commands": [
+    {
+      "arguments": [
+        "app",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 139.13060000049882,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "port": 64270,
+        "revision": 1,
+        "host_pid": 31804,
+        "channels": {
+          "self": {
+            "selected_provider": "soniox",
+            "runtime_provider": "soniox",
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "ready",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "ready",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 1,
+              "provider_id": "soniox",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "soniox",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "stt-rt-v5",
+                "wss://stt-rt.soniox.com/transcribe-websocket",
+                10.0,
+                100,
+                true,
+                null,
+                null,
+                null,
+                null,
+                true,
+                []
+              ],
+              "failure_reason": null,
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": "soniox",
+              "model_id": "stt-rt-v5",
+              "phase": "running",
+              "generation": 1,
+              "pending_handoff": false,
+              "has_resources": true,
+              "provider_live": true
+            }
+          },
+          "peer": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        },
+        "microphone_test": {
+          "state": "off",
+          "desired_active": false,
+          "effective_active": false,
+          "meter_level": 0.0,
+          "failure_reason": null,
+          "failure_type": null
+        },
+        "translation_enabled": false,
+        "translation_runtime_ready": true,
+        "overlay_target": "steamvr",
+        "stopping": false,
+        "scene_observation": {
+          "observation_succeeded": true,
+          "process_present": false,
+          "observation_diagnostic_id": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "capabilities"
+      ],
+      "exit_code": 0,
+      "wall_ms": 137.26199999655364,
+      "output": {
+        "output_version": 1,
+        "version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "commands": {
+          "app.stop": {
+            "description": "Request ordered host shutdown",
+            "arguments": {},
+            "cancellable": false
+          },
+          "capture.set": {
+            "description": "Set self or peer capture explicitly",
+            "arguments": {
+              "channel": [
+                "self",
+                "peer"
+              ],
+              "enabled": "boolean",
+              "accept_terms": "optional boolean (true only for peer enabled; defaults false)"
+            },
+            "cancellable": false
+          },
+          "translation.set": {
+            "description": "Set translation explicitly",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "text.submit": {
+            "description": "Submit manual text through the self pipeline",
+            "arguments": {
+              "text": "non-empty string (protected content)"
+            },
+            "cancellable": false
+          },
+          "microphone.test": {
+            "description": "Start or stop microphone test",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "audio.target.set": {
+            "description": "Set peer loopback target",
+            "arguments": {
+              "value": "available audio.target option value"
+            },
+            "cancellable": false
+          },
+          "audio.retry": {
+            "description": "Retry lost peer process target",
+            "arguments": {},
+            "cancellable": false
+          },
+          "settings.apply": {
+            "description": "Apply focused typed settings changes",
+            "arguments": {
+              "changes": "object of settings_fields to typed values (or direct typed fields)"
+            },
+            "cancellable": false
+          },
+          "provider.apply": {
+            "description": "Apply self and peer STT changes together",
+            "arguments": {
+              "channel": [
+                "self",
+                "peer",
+                "both"
+              ],
+              "provider": "settings.choices stt_providers",
+              "self": "optional settings.choices stt_providers",
+              "peer": "optional settings.choices stt_providers"
+            },
+            "cancellable": false
+          },
+          "models.install": {
+            "description": "Install or repair selected CPU/GPU ASR assets",
+            "arguments": {
+              "backend": "cpu or gpu (default gpu)",
+              "model_ids": "optional list of backend-compatible models.status IDs; empty means backend default"
+            },
+            "cancellable": true
+          },
+          "models.prepare": {
+            "description": "Inspect CPU or GPU model readiness and integrity",
+            "arguments": {
+              "backend": "cpu or gpu (default cpu)",
+              "verify_checksums": "optional boolean (default false)"
+            },
+            "cancellable": false
+          },
+          "models.cancel": {
+            "description": "Cancel an active CPU/GPU model installation",
+            "arguments": {
+              "backend": "cpu or gpu (optional; default gpu)"
+            },
+            "cancellable": false
+          },
+          "gemma.prepare": {
+            "description": "Prepare managed local Gemma model assets",
+            "arguments": {},
+            "cancellable": true
+          },
+          "gemma.cancel": {
+            "description": "Cancel managed local Gemma preparation",
+            "arguments": {},
+            "cancellable": false
+          },
+          "models.retry": {
+            "description": "Retry GPU activation after installation",
+            "arguments": {
+              "backend": "gpu (optional; default gpu)"
+            },
+            "cancellable": false
+          },
+          "gpu.discover": {
+            "description": "Discover available GPU devices",
+            "arguments": {},
+            "cancellable": false
+          },
+          "secrets.set": {
+            "description": "Store provider credential (value never returned)",
+            "arguments": {
+              "name": "declared secrets.presence key",
+              "value": "non-empty secret (stdin/hidden input only)"
+            },
+            "cancellable": false
+          },
+          "secrets.delete": {
+            "description": "Delete provider credential",
+            "arguments": {
+              "name": "declared secrets.presence key"
+            },
+            "cancellable": false
+          },
+          "secrets.verify": {
+            "description": "Verify provider credential separately from storage",
+            "arguments": {
+              "name": "secret key",
+              "value": "non-empty secret (stdin/hidden input only)"
+            },
+            "cancellable": false
+          },
+          "auth.login": {
+            "description": "Authorize a QQ, Discord, OpenRouter, or ChatGPT account with explicit browser consent",
+            "arguments": {
+              "provider": [
+                "qq",
+                "discord",
+                "openrouter",
+                "chatgpt"
+              ],
+              "qq_identity": "required non-empty string for QQ",
+              "credential": "required non-empty secret for QQ (stdin/hidden input only)",
+              "referral_id": "optional referral string for QQ or Discord",
+              "open_browser": "optional boolean, default false (OAuth only)"
+            },
+            "cancellable": false
+          },
+          "auth.logout": {
+            "description": "Remove locally stored account authorization (ChatGPT also requests remote revocation)",
+            "arguments": {
+              "provider": [
+                "qq",
+                "discord",
+                "openrouter",
+                "chatgpt"
+              ]
+            },
+            "cancellable": false
+          },
+          "overlay.set": {
+            "description": "Set overlay enabled state",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "overlay.lock": {
+            "description": "Lock/unlock desktop caption positioning",
+            "arguments": {
+              "locked": "boolean"
+            },
+            "cancellable": false
+          },
+          "overlay.size": {
+            "description": "Select desktop overlay size",
+            "arguments": {
+              "preset": "settings.choices overlay size"
+            },
+            "cancellable": false
+          },
+          "overlay.position.reset": {
+            "description": "Reset desktop overlay position",
+            "arguments": {},
+            "cancellable": false
+          },
+          "overlay.calibrate": {
+            "description": "Begin, change, apply or cancel overlay calibration",
+            "arguments": {
+              "action": [
+                "begin",
+                "change",
+                "apply",
+                "cancel"
+              ],
+              "field": "required for change: anchor, offset_x, offset_y, distance, text_scale, background_alpha",
+              "value": "required for change; type/range depends on field"
+            },
+            "cancellable": false
+          }
+        },
+        "queries": [
+          "app.status",
+          "audio.devices",
+          "audio.processes",
+          "audio.target",
+          "auth.status",
+          "capture.channels",
+          "consent.peer_translation",
+          "diagnostics.health",
+          "diagnostics.history",
+          "gpu.status",
+          "models.status",
+          "osc.status",
+          "overlay.status",
+          "providers.status",
+          "secrets.presence",
+          "settings.choices",
+          "settings.current"
+        ],
+        "query_arguments": {
+          "diagnostics.history": {
+            "operation_id": "optional operation identity",
+            "diagnostic_id": "optional failure identity",
+            "instance_id": "optional originating host identity",
+            "after": "optional nonnegative diagnostic sequence",
+            "limit": "integer 1..100, default 50"
+          },
+          "diagnostics.health": {}
+        },
+        "settings_fields": [
+          "audio.input_device",
+          "audio.input_host_api",
+          "audio.output_device",
+          "chatbox.activation_notice.enabled",
+          "chatbox.source.enabled",
+          "clipboard.enabled",
+          "custom_vocabulary",
+          "languages",
+          "local_llm.base_url",
+          "local_llm.extra_body_json",
+          "local_llm.model",
+          "locale",
+          "managed.referral_id",
+          "osc.connection",
+          "overlay.background_alpha",
+          "overlay.desktop_size",
+          "overlay.peer_original.enabled",
+          "overlay.swap_caption_languages",
+          "overlay.target",
+          "overlay.translation.enabled",
+          "peer_expected_languages",
+          "peer_stt.provider",
+          "peer_vad.hangover_ms",
+          "peer_vad.pre_roll_ms",
+          "peer_vad.speech_threshold",
+          "prompts.system_prompt_override",
+          "prompts.value",
+          "self_vad.speech_threshold",
+          "stt.cloud_free_tier_providers",
+          "stt.custom.endpoint",
+          "stt.custom.extra_json",
+          "stt.custom.model",
+          "stt.gpu_device_id",
+          "stt.provider",
+          "stt.soniox.enable_speaker_diarization",
+          "telemetry.enabled",
+          "translation.connection",
+          "translation.connection_history",
+          "translation.gpu_device_id",
+          "translation.http_extension_id",
+          "translation.model",
+          "translation.previous_llm_model",
+          "translation.qwen.beijing.api_host",
+          "translation.qwen.region",
+          "translation.qwen.singapore.api_host",
+          "vrc_mic_intercept.enabled"
+        ],
+        "secret_keys": [
+          "google_api_key",
+          "openrouter_api_key",
+          "openai_api_key",
+          "deepseek_api_key",
+          "deepgram_api_key",
+          "gemini_transcribe_api_key",
+          "elevenlabs_scribe_api_key",
+          "soniox_api_key",
+          "local_llm_api_key",
+          "custom_stt_api_key",
+          "alibaba_api_key_beijing",
+          "alibaba_api_key_singapore"
+        ],
+        "topics": [
+          "operation",
+          "settings",
+          "auth",
+          "capture",
+          "transcript",
+          "translation",
+          "session_state_changed",
+          "error",
+          "logs",
+          "gap"
+        ]
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "choices"
+      ],
+      "exit_code": 0,
+      "wall_ms": 299.49540000234265,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 1,
+        "extensions": {
+          "translation_http_ids": [],
+          "load_error_count": 0
+        },
+        "choices": {
+          "languages": {
+            "codes": [
+              "ar",
+              "bg",
+              "ca",
+              "zh-CN",
+              "zh-TW",
+              "cs",
+              "da",
+              "nl",
+              "en",
+              "et",
+              "fi",
+              "fr",
+              "de",
+              "el",
+              "hi",
+              "hu",
+              "id",
+              "it",
+              "ja",
+              "ko",
+              "lv",
+              "lt",
+              "ms",
+              "no",
+              "pl",
+              "pt",
+              "ro",
+              "ru",
+              "sk",
+              "es",
+              "sv",
+              "th",
+              "tr",
+              "uk",
+              "vi"
+            ],
+            "secondary_target_unset": "",
+            "peer_source_modes": [
+              "manual",
+              "auto"
+            ]
+          },
+          "stt.provider": [
+            "local_cpu_auto",
+            "local_parakeet_v3",
+            "local_parakeet_ja",
+            "local_qwen",
+            "local_qwen_gpu",
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "qwen_audio",
+            "soniox",
+            "rolling_free",
+            "custom",
+            "custom_offline",
+            "custom_realtime"
+          ],
+          "peer_stt.provider": [
+            "local_cpu_auto",
+            "local_parakeet_v3",
+            "local_parakeet_ja",
+            "local_qwen",
+            "local_qwen_gpu",
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "qwen_audio",
+            "soniox",
+            "rolling_free",
+            "custom",
+            "custom_offline",
+            "custom_realtime"
+          ],
+          "translation.model": [
+            "gemma4_26b_31b",
+            "deepseek_v4_flash",
+            "deepseek_v4_flash_41",
+            "gemini_flash",
+            "gpt_6_luna",
+            "qwen38_flash",
+            "managed_gemma",
+            "local_llm",
+            "custom_http"
+          ],
+          "translation.connection": {
+            "gemma4_26b_31b": [
+              "managed",
+              "openrouter"
+            ],
+            "deepseek_v4_flash": [
+              "openrouter"
+            ],
+            "deepseek_v4_flash_41": [
+              "managed",
+              "managed_china",
+              "openrouter",
+              "official_byok"
+            ],
+            "gemini_flash": [
+              "official_byok",
+              "openrouter"
+            ],
+            "gpt_6_luna": [
+              "chatgpt",
+              "openrouter",
+              "official_byok"
+            ],
+            "qwen38_flash": [
+              "official_byok"
+            ],
+            "managed_gemma": [
+              "cpu",
+              "gpu"
+            ],
+            "local_llm": [
+              "ollama"
+            ],
+            "custom_http": [
+              "custom_http"
+            ]
+          },
+          "translation.gpu_device_id": [
+            {
+              "value": "auto",
+              "available": true
+            }
+          ]
+        },
+        "field_types": {
+          "chatbox.activation_notice.enabled": "boolean",
+          "clipboard.enabled": "boolean",
+          "languages": "object",
+          "peer_stt.provider": "string",
+          "stt.provider": "string",
+          "telemetry.enabled": "boolean",
+          "translation.connection": "string",
+          "translation.gpu_device_id": "string",
+          "translation.model": "string"
+        },
+        "field_schemas": {
+          "chatbox.activation_notice.enabled": {
+            "type": "boolean",
+            "free_form": false
+          },
+          "clipboard.enabled": {
+            "type": "boolean",
+            "free_form": false
+          },
+          "languages": {
+            "type": "object",
+            "required": [],
+            "properties": {
+              "source": {
+                "type": "string",
+                "choices": "/choices/languages/codes"
+              },
+              "target": {
+                "type": "string",
+                "choices": "/choices/languages/codes"
+              },
+              "secondary_target": {
+                "type": "string",
+                "choices": "/choices/languages/codes",
+                "empty_allowed": true
+              },
+              "peer_source": {
+                "type": "string",
+                "choices": "/choices/languages/codes",
+                "empty_allowed": true
+              },
+              "peer_target": {
+                "type": "string",
+                "choices": "/choices/languages/codes",
+                "empty_allowed": true
+              },
+              "peer_source_mode": {
+                "type": "string",
+                "choices": "/choices/languages/peer_source_modes"
+              }
+            }
+          },
+          "peer_stt.provider": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/peer_stt.provider"
+          },
+          "stt.provider": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/stt.provider"
+          },
+          "telemetry.enabled": {
+            "type": "boolean",
+            "free_form": false
+          },
+          "translation.connection": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/translation.connection"
+          },
+          "translation.gpu_device_id": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/translation.gpu_device_id"
+          },
+          "translation.model": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/translation.model"
+          }
+        }
+      },
+      "stderr": "",
+      "projection": "Focused control choices; unrelated real audio/device/process inventory omitted."
+    },
+    {
+      "arguments": [
+        "settings",
+        "current"
+      ],
+      "exit_code": 0,
+      "wall_ms": 138.79430000088178,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 1,
+        "observed_intent": {
+          "languages": {
+            "source_language": "en",
+            "target_language": "ko",
+            "secondary_target_language": "",
+            "peer_source_language": "en",
+            "peer_target_language": "ko",
+            "peer_source_mode": "manual",
+            "peer_expected_languages": [],
+            "recent_source_languages": [
+              "en",
+              "zh-CN",
+              "ja"
+            ],
+            "recent_target_languages": [
+              "en",
+              "zh-CN",
+              "ja"
+            ]
+          },
+          "telemetry": {
+            "enabled": false
+          },
+          "clipboard": {
+            "auto_translate_enabled": false
+          },
+          "osc": {
+            "connection_mode": "off",
+            "host": "127.0.0.1",
+            "port": 49968,
+            "send_port": 49968,
+            "receive_port": 9001,
+            "chatbox_address": "/chatbox/input",
+            "chatbox_send": true,
+            "chatbox_clear": false,
+            "chatbox_max_chars": 144,
+            "vrc_mic_intercept": false,
+            "chatbox_include_source": false,
+            "activation_notice_enabled": false
+          },
+          "integrated_context": {
+            "enabled": true
+          },
+          "translation": {
+            "model": "managed_gemma",
+            "connection": "gpu",
+            "gpu_device_id": "auto",
+            "concurrency_limit": 10
+          },
+          "stt_provider": "soniox",
+          "peer_stt_provider": "soniox"
+        }
+      },
+      "stderr": "",
+      "projection": "Focused observed intent only; full synthetic canonical configuration and redacted secret/prompt fields not published."
+    },
+    {
+      "arguments": [
+        "capture",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 135.89890000002924,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 1,
+        "channels": {
+          "self": {
+            "selected_provider": "soniox",
+            "runtime_provider": "soniox",
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "ready",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "ready",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 1,
+              "provider_id": "soniox",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "soniox",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "stt-rt-v5",
+                "wss://stt-rt.soniox.com/transcribe-websocket",
+                10.0,
+                100,
+                true,
+                null,
+                null,
+                null,
+                null,
+                true,
+                []
+              ],
+              "failure_reason": null,
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": "soniox",
+              "model_id": "stt-rt-v5",
+              "phase": "running",
+              "generation": 1,
+              "pending_handoff": false,
+              "has_resources": true,
+              "provider_live": true
+            }
+          },
+          "peer": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "osc",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 139.25519999611424,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 1,
+        "ports": [
+          null,
+          null
+        ],
+        "output": {
+          "configured_mode": "off",
+          "configured_host": "127.0.0.1",
+          "configured_send_port": 49968,
+          "configured_receive_port": 9001,
+          "effective_mode": "off",
+          "effective_send_port": null,
+          "effective_receive_port": null,
+          "receiver_available": false,
+          "sender_available": false,
+          "query_service_started": false,
+          "query_advertised_port": null,
+          "discovered_remote": null,
+          "query_failure": null,
+          "state_publication": null,
+          "local_availability": "off",
+          "remote_delivery": "unacknowledged"
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "overlay",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 137.06200000160607,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 1,
+        "target": "steamvr",
+        "locked": false,
+        "settings": {
+          "target": "steamvr",
+          "show_translation": true,
+          "show_peer_original": true,
+          "desktop_size_preset": "medium",
+          "desktop_background_alpha": 0.6,
+          "desktop_swap_caption_languages": false,
+          "calibration": {
+            "anchor": "head_locked",
+            "distance": 1.1,
+            "offset_x": 0.0,
+            "offset_y": -0.45,
+            "text_scale": 1.0
+          }
+        },
+        "output": {
+          "settings_available": true,
+          "desired_enabled": false,
+          "configured_target": "steamvr",
+          "effective_target": null,
+          "attempting_target": null,
+          "lifecycle": "off",
+          "runtime_active": false,
+          "process_state": null,
+          "presentation_ready": false,
+          "desktop_visible": null,
+          "generation": null,
+          "failure_reason": null,
+          "auto_restart_scheduled": false,
+          "fallback_active": false,
+          "recovery_active": false,
+          "recovery_reason": null,
+          "ingress_stopped": false,
+          "calibration_draft_active": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "secrets",
+        "presence"
+      ],
+      "exit_code": 0,
+      "wall_ms": 174.477399996249,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 1,
+        "status": "applied",
+        "presence": {
+          "google_api_key": false,
+          "openrouter_api_key": false,
+          "openai_api_key": false,
+          "deepseek_api_key": false,
+          "deepgram_api_key": false,
+          "gemini_transcribe_api_key": false,
+          "elevenlabs_scribe_api_key": false,
+          "soniox_api_key": true,
+          "local_llm_api_key": false,
+          "custom_stt_api_key": false,
+          "alibaba_api_key_beijing": false,
+          "alibaba_api_key_singapore": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "translation",
+        "set",
+        "on"
+      ],
+      "exit_code": 0,
+      "wall_ms": 9031.920499997796,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "559a5dc2ad274a1abb2f173f488a103f",
+        "request_id": "11cd35723beb8c51fbdf4b75609d9ed8",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "translation_enabled": true
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 197.90459999785526,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "c93e9f825d524b299c8b347859294f50",
+        "request_id": "31949e111146165c7026442f83b10044",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 1011.1371000020881,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "c022facc484a49509b7e50003cc7c830",
+        "request_id": "c5625e72ae4ff12f9f307f8f99cf0164",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "admission": "admitted",
+        "turn_id": "cc2537ae-a56a-4909-b900-6261e86eb44e",
+        "child_turn_ids": [
+          "cc2537ae-a56a-4909-b900-6261e86eb44e"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"ko\", \"target\": \"en\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 1116.498399998818,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "d9816188d24f46d2838388d8648818ed",
+        "request_id": "5d828363e169572416f270c820536c4e",
+        "status": "applied",
+        "terminal": true,
+        "revision": 2,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 481.2692999985302,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "813c43bd9fad420c9a98506627c2b2e2",
+        "request_id": "b9335638101b48c84411ee28d980c11f",
+        "status": "applied",
+        "terminal": true,
+        "revision": 2,
+        "admission": "admitted",
+        "turn_id": "28642737-c229-4727-bc7b-bb183a4b974a",
+        "child_turn_ids": [
+          "28642737-c229-4727-bc7b-bb183a4b974a"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 240.60350000218023,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "8c179e61f7b44b91a511d002646fdaa1",
+        "request_id": "8fd8e20e50929d74851ad152380f3370",
+        "status": "applied",
+        "terminal": true,
+        "revision": 3,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 406.54129999893485,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "cad9c44da03b4cf39f1bb774f0eaa972",
+        "request_id": "c4f22533961acc849288ad040bd13f1a",
+        "status": "applied",
+        "terminal": true,
+        "revision": 3,
+        "admission": "admitted",
+        "turn_id": "6051d256-d1eb-455a-b721-56cb6089f393",
+        "child_turn_ids": [
+          "6051d256-d1eb-455a-b721-56cb6089f393"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"ja\", \"target\": \"en\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 1110.5356000043685,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "2524f1cdaa944dc1ac0cb2a2ba7d6d1c",
+        "request_id": "d746da61b23f04ea605618542d0c61c2",
+        "status": "applied",
+        "terminal": true,
+        "revision": 4,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 361.67379999824334,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "f728ab6600d144bbb995115af466b893",
+        "request_id": "72538afa75d5b49dccfe256abb9cae86",
+        "status": "applied",
+        "terminal": true,
+        "revision": 4,
+        "admission": "admitted",
+        "turn_id": "bb9a4aee-e5d2-4796-8b04-cf2a26e7351c",
+        "child_turn_ids": [
+          "bb9a4aee-e5d2-4796-8b04-cf2a26e7351c"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"de\", \"target\": \"en\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 529.0539999987232,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "f810521e16bc440c985ac108102bdf9f",
+        "request_id": "c729af21bb966d85a66aaf383806a699",
+        "status": "applied",
+        "terminal": true,
+        "revision": 5,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 434.62649999855785,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "a91d03d679ad407bb1fca8e29166fae4",
+        "request_id": "b4f493707c5231466af8c5c4ff3a9d2d",
+        "status": "applied",
+        "terminal": true,
+        "revision": 5,
+        "admission": "admitted",
+        "turn_id": "a6b8871c-5e98-4e32-bd9a-f91e478ce19e",
+        "child_turn_ids": [
+          "a6b8871c-5e98-4e32-bd9a-f91e478ce19e"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 244.44840000069235,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "bbf948737d3046ddb74a2ec36b8edf47",
+        "request_id": "6d851531615a98adea4ea105b7d73d18",
+        "status": "applied",
+        "terminal": true,
+        "revision": 6,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 478.2956999988528,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "ad58e9ec4f0643a4bd2d19df7a29dfc2",
+        "request_id": "083acd329a7d4b64d2cf19e7b6f515e8",
+        "status": "applied",
+        "terminal": true,
+        "revision": 6,
+        "admission": "admitted",
+        "turn_id": "8488c839-37f7-4f78-9354-d94ee87428ca",
+        "child_turn_ids": [
+          "8488c839-37f7-4f78-9354-d94ee87428ca"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"ko\", \"target\": \"en\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 282.41439999692375,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "c6f2e1d956ab4fa9a85e1ca03f2f180f",
+        "request_id": "91ca06ac7754315f1fceba15e1e10243",
+        "status": "applied",
+        "terminal": true,
+        "revision": 7,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 529.7913999966113,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "cf7738bad27f4a03a7c5b8029f9931e5",
+        "request_id": "4da72e7680a20066d12f8b55454e8a4c",
+        "status": "applied",
+        "terminal": true,
+        "revision": 7,
+        "admission": "admitted",
+        "turn_id": "0709f775-0be0-4da4-9101-ef700030af9a",
+        "child_turn_ids": [
+          "0709f775-0be0-4da4-9101-ef700030af9a"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 246.1509999993723,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "dd8d54f8a1904b0593980d725cd389cb",
+        "request_id": "0b2bef6230f428cc8ec7f8e6d12b26dc",
+        "status": "applied",
+        "terminal": true,
+        "revision": 8,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 473.0314999978873,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "96afa6479cb54f1e849af64ab6119740",
+        "request_id": "815084c4e46f1775cd9294a205028108",
+        "status": "applied",
+        "terminal": true,
+        "revision": 8,
+        "admission": "admitted",
+        "turn_id": "8a768bbd-11f6-4c59-b4f7-cb07d3f9ad83",
+        "child_turn_ids": [
+          "8a768bbd-11f6-4c59-b4f7-cb07d3f9ad83"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "query",
+        "diagnostics.history"
+      ],
+      "exit_code": 0,
+      "wall_ms": 136.41240000288235,
+      "output": {
+        "output_version": 1,
+        "schema_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "availability": "retained_current_run",
+        "lookup": "not_retained",
+        "records": [],
+        "oldest_sequence": 1,
+        "latest_sequence": 0,
+        "next_after": 0,
+        "gap": false,
+        "evicted_records": 0,
+        "truncated": false,
+        "retention": {
+          "max_records": 256,
+          "max_bytes": 524288,
+          "record_max_bytes": 4096,
+          "query_max_records": 100,
+          "durable": false,
+          "restart_resets_history": true
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "query",
+        "diagnostics.health"
+      ],
+      "exit_code": 0,
+      "wall_ms": 136.73890000063693,
+      "output": {
+        "output_version": 1,
+        "schema_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "history": {
+          "availability": "retained_current_run",
+          "retained_records": 0,
+          "retained_bytes": 0,
+          "evicted_records": 0,
+          "rejected_fields": 0,
+          "rejected_records": 0,
+          "duplicate_projections": 0,
+          "subscriber_delivery_failures": 0,
+          "file_projection_failures": 0,
+          "durable": false,
+          "restart_resets_history": true,
+          "subscriber_dispatch_pending": 0,
+          "subscriber_dispatch_capacity": 256
+        },
+        "basic": {
+          "ui_attached": false,
+          "delivery_failures": null
+        },
+        "file": {
+          "availability": "pending",
+          "queue_capacity": 2048,
+          "queue_pending": 20,
+          "enqueued_records": 162,
+          "written_records": 142,
+          "delivery_failures": 0,
+          "dropped_records": 0,
+          "oversized_rejected": 0,
+          "writer_alive": true,
+          "shutdown_complete": false,
+          "shutdown_attempt_complete": false,
+          "cleanup_failures": 0,
+          "last_progress_age_ms": 787,
+          "pending_episode_age_ms": 785,
+          "delivery_diagnostic_id": null,
+          "loss_diagnostic_id": null,
+          "failure_notification_failures": 0,
+          "persistence": "pending",
+          "durable": false
+        },
+        "events": {
+          "active_subscribers": 1,
+          "retained_events": 71,
+          "history_capacity": 256,
+          "latest_sequence": 71,
+          "oldest_sequence": 1,
+          "evicted_events": 0,
+          "subscriber_gaps": 0,
+          "disconnected_consumers": 0,
+          "restart_resets_history": true
+        },
+        "output": {
+          "availability": "observed",
+          "owner_history": "retained",
+          "owner_history_capacity": 4096,
+          "owner_history_evictions": 0,
+          "observer": "available",
+          "observer_failure_count": 0,
+          "observer_failure_diagnostic_id": null,
+          "last_observer_failure_type": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "models",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 137.6724000001559,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "revision": 8,
+        "state": {
+          "models": [
+            {
+              "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "qwen3-asr-0.6b-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+              "backend": "gpu",
+              "integrity": "not_requested",
+              "operation": "idle"
+            }
+          ],
+          "required_cpu_model_ids": [
+            "parakeet-tdt-0.6b-v3-int8-sherpa",
+            "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+            "qwen3-asr-0.6b-int8-sherpa"
+          ],
+          "gpu_model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+          "activities": [],
+          "revision": 18,
+          "closed": false
+        },
+        "gemma": {
+          "state": "ready",
+          "backend": "gpu",
+          "progress_percent": 100,
+          "error_type": null,
+          "failure_phase": null,
+          "failure_code": null,
+          "cause_type": null,
+          "worker_exit_code": null,
+          "status_code": null,
+          "os_error_code": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "translation",
+        "set",
+        "off"
+      ],
+      "exit_code": 0,
+      "wall_ms": 138.48439999856055,
+      "output": {
+        "output_version": 1,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "b1da1a2da9a14469aa726c2b3022ba90",
+        "request_id": "df71482a2eed87dce6dd8ab03bcf4e13",
+        "status": "applied",
+        "terminal": true,
+        "revision": 8,
+        "translation_enabled": false
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "stop"
+      ],
+      "exit_code": 0,
+      "wall_ms": 1114.523399999598,
+      "output": {
+        "output_version": 1,
+        "status": "stopped",
+        "terminal": true,
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+        "operation_id": "8c954f3896e24d0dbc9c76b897ad1956",
+        "cleanup_outcome": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 135.16420000087237,
+      "output": {
+        "output_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "port": 49180,
+        "revision": 1,
+        "host_pid": 49068,
+        "channels": {
+          "self": {
+            "selected_provider": "soniox",
+            "runtime_provider": "soniox",
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "ready",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "ready",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 1,
+              "provider_id": "soniox",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "soniox",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "stt-rt-v5",
+                "wss://stt-rt.soniox.com/transcribe-websocket",
+                10.0,
+                100,
+                true,
+                null,
+                null,
+                null,
+                null,
+                true,
+                []
+              ],
+              "failure_reason": null,
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": "soniox",
+              "model_id": "stt-rt-v5",
+              "phase": "running",
+              "generation": 1,
+              "pending_handoff": false,
+              "has_resources": true,
+              "provider_live": true
+            }
+          },
+          "peer": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        },
+        "microphone_test": {
+          "state": "off",
+          "desired_active": false,
+          "effective_active": false,
+          "meter_level": 0.0,
+          "failure_reason": null,
+          "failure_type": null
+        },
+        "translation_enabled": false,
+        "translation_runtime_ready": true,
+        "overlay_target": "steamvr",
+        "stopping": false,
+        "scene_observation": {
+          "observation_succeeded": true,
+          "process_present": false,
+          "observation_diagnostic_id": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "translation",
+        "set",
+        "on"
+      ],
+      "exit_code": 0,
+      "wall_ms": 2764.2659999983152,
+      "output": {
+        "output_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "operation_id": "69f77ee1fdeb49fd9f7c173f795c27ba",
+        "request_id": "93f33087a500503f547e816509406cf1",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "translation_enabled": true
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 0,
+      "wall_ms": 206.27429999876767,
+      "output": {
+        "output_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "operation_id": "87f37167d2024e72b29d2e1e0cc0ea09",
+        "request_id": "c513ce7240762113f4f77087a2634239",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "transaction": {
+          "status": "settings_commit_success_runtime_applied",
+          "message": null,
+          "diagnostics": null,
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "wall_ms": 418.2256999993115,
+      "output": {
+        "output_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "operation_id": "0287380acfd2440bb59b13030101c553",
+        "request_id": "c705b8b6329a2cb2422e16a67945d575",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "admission": "admitted",
+        "turn_id": "8d63e7f0-0080-4a88-ac56-be2dcb6b6ccf",
+        "child_turn_ids": [
+          "8d63e7f0-0080-4a88-ac56-be2dcb6b6ccf"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "query",
+        "diagnostics.history"
+      ],
+      "exit_code": 0,
+      "wall_ms": 142.76149999932386,
+      "output": {
+        "output_version": 1,
+        "schema_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "availability": "retained_current_run",
+        "lookup": "not_retained",
+        "records": [],
+        "oldest_sequence": 1,
+        "latest_sequence": 0,
+        "next_after": 0,
+        "gap": false,
+        "evicted_records": 0,
+        "truncated": false,
+        "retention": {
+          "max_records": 256,
+          "max_bytes": 524288,
+          "record_max_bytes": 4096,
+          "query_max_records": 100,
+          "durable": false,
+          "restart_resets_history": true
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "query",
+        "diagnostics.health"
+      ],
+      "exit_code": 0,
+      "wall_ms": 144.1491000005044,
+      "output": {
+        "output_version": 1,
+        "schema_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "history": {
+          "availability": "retained_current_run",
+          "retained_records": 0,
+          "retained_bytes": 0,
+          "evicted_records": 0,
+          "rejected_fields": 0,
+          "rejected_records": 0,
+          "duplicate_projections": 0,
+          "subscriber_delivery_failures": 0,
+          "file_projection_failures": 0,
+          "durable": false,
+          "restart_resets_history": true,
+          "subscriber_dispatch_pending": 0,
+          "subscriber_dispatch_capacity": 256
+        },
+        "basic": {
+          "ui_attached": false,
+          "delivery_failures": null
+        },
+        "file": {
+          "availability": "pending",
+          "queue_capacity": 2048,
+          "queue_pending": 16,
+          "enqueued_records": 22,
+          "written_records": 6,
+          "delivery_failures": 0,
+          "dropped_records": 0,
+          "oversized_rejected": 0,
+          "writer_alive": true,
+          "shutdown_complete": false,
+          "shutdown_attempt_complete": false,
+          "cleanup_failures": 0,
+          "last_progress_age_ms": 3482,
+          "pending_episode_age_ms": 915,
+          "delivery_diagnostic_id": null,
+          "loss_diagnostic_id": null,
+          "failure_notification_failures": 0,
+          "persistence": "pending",
+          "durable": false
+        },
+        "events": {
+          "active_subscribers": 1,
+          "retained_events": 8,
+          "history_capacity": 256,
+          "latest_sequence": 8,
+          "oldest_sequence": 1,
+          "evicted_events": 0,
+          "subscriber_gaps": 0,
+          "disconnected_consumers": 0,
+          "restart_resets_history": true
+        },
+        "output": {
+          "availability": "observed",
+          "owner_history": "retained",
+          "owner_history_capacity": 4096,
+          "owner_history_evictions": 0,
+          "observer": "available",
+          "observer_failure_count": 0,
+          "observer_failure_diagnostic_id": null,
+          "last_observer_failure_type": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "models",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 142.60690000082832,
+      "output": {
+        "output_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "revision": 1,
+        "state": {
+          "models": [
+            {
+              "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "qwen3-asr-0.6b-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+              "backend": "gpu",
+              "integrity": "not_requested",
+              "operation": "idle"
+            }
+          ],
+          "required_cpu_model_ids": [
+            "parakeet-tdt-0.6b-v3-int8-sherpa",
+            "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+            "qwen3-asr-0.6b-int8-sherpa"
+          ],
+          "gpu_model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+          "activities": [],
+          "revision": 4,
+          "closed": false
+        },
+        "gemma": {
+          "state": "ready",
+          "backend": "gpu",
+          "progress_percent": 100,
+          "error_type": null,
+          "failure_phase": null,
+          "failure_code": null,
+          "cause_type": null,
+          "worker_exit_code": null,
+          "status_code": null,
+          "os_error_code": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "translation",
+        "set",
+        "off"
+      ],
+      "exit_code": 0,
+      "wall_ms": 134.91769999382086,
+      "output": {
+        "output_version": 1,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "operation_id": "696862396fa94112aee9b047ba0f1018",
+        "request_id": "810a5f91da5cedb9eb329719d2920d4b",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "translation_enabled": false
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "stop"
+      ],
+      "exit_code": 0,
+      "wall_ms": 1111.3968999998178,
+      "output": {
+        "output_version": 1,
+        "status": "stopped",
+        "terminal": true,
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+        "operation_id": "44c15e64981b4bf2a7b3eead40662416",
+        "cleanup_outcome": "unobserved"
+      },
+      "stderr": ""
+    }
+  ],
+  "cycles": [
+    {
+      "cycle": 0,
+      "ready": {
+        "state": "ready",
+        "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+      },
+      "host_pid": 10368,
+      "translations": [
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "c022facc484a49509b7e50003cc7c830",
+            "request_id": "c5625e72ae4ff12f9f307f8f99cf0164",
+            "status": "applied",
+            "terminal": true,
+            "revision": 1,
+            "admission": "admitted",
+            "turn_id": "cc2537ae-a56a-4909-b900-6261e86eb44e",
+            "child_turn_ids": [
+              "cc2537ae-a56a-4909-b900-6261e86eb44e"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "미나는 12장의 티켓을 사지 않았어.",
+              "utterance_id": "cc2537ae-a56a-4909-b900-6261e86eb44e",
+              "sequence": 6,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "Mina did not buy 12 tickets."
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "813c43bd9fad420c9a98506627c2b2e2",
+            "request_id": "b9335638101b48c84411ee28d980c11f",
+            "status": "applied",
+            "terminal": true,
+            "revision": 2,
+            "admission": "admitted",
+            "turn_id": "28642737-c229-4727-bc7b-bb183a4b974a",
+            "child_turn_ids": [
+              "28642737-c229-4727-bc7b-bb183a4b974a"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "Jisu is coming at 3:15 PM. Don't be late.",
+              "utterance_id": "28642737-c229-4727-bc7b-bb183a4b974a",
+              "sequence": 15,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "지수는 오후 3시 15분에 와요. 늦지 마세요."
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "cad9c44da03b4cf39f1bb774f0eaa972",
+            "request_id": "c4f22533961acc849288ad040bd13f1a",
+            "status": "applied",
+            "terminal": true,
+            "revision": 3,
+            "admission": "admitted",
+            "turn_id": "6051d256-d1eb-455a-b721-56cb6089f393",
+            "child_turn_ids": [
+              "6051d256-d1eb-455a-b721-56cb6089f393"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "파란 열쇠는 제 게 아니에요.",
+              "utterance_id": "6051d256-d1eb-455a-b721-56cb6089f393",
+              "sequence": 24,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "The blue key is not mine."
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "f728ab6600d144bbb995115af466b893",
+            "request_id": "72538afa75d5b49dccfe256abb9cae86",
+            "status": "applied",
+            "terminal": true,
+            "revision": 4,
+            "admission": "admitted",
+            "turn_id": "bb9a4aee-e5d2-4796-8b04-cf2a26e7351c",
+            "child_turn_ids": [
+              "bb9a4aee-e5d2-4796-8b04-cf2a26e7351c"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "Yuna doesn't have the blue key.",
+              "utterance_id": "bb9a4aee-e5d2-4796-8b04-cf2a26e7351c",
+              "sequence": 33,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "ユナは青い鍵を持っていません。"
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "a91d03d679ad407bb1fca8e29166fae4",
+            "request_id": "b4f493707c5231466af8c5c4ff3a9d2d",
+            "status": "applied",
+            "terminal": true,
+            "revision": 5,
+            "admission": "admitted",
+            "turn_id": "a6b8871c-5e98-4e32-bd9a-f91e478ce19e",
+            "child_turn_ids": [
+              "a6b8871c-5e98-4e32-bd9a-f91e478ce19e"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "Anna doesn't have 17, she has 7 cards.",
+              "utterance_id": "a6b8871c-5e98-4e32-bd9a-f91e478ce19e",
+              "sequence": 42,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "Anna hat nicht 17, sondern 7 Karten."
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "ad58e9ec4f0643a4bd2d19df7a29dfc2",
+            "request_id": "083acd329a7d4b64d2cf19e7b6f515e8",
+            "status": "applied",
+            "terminal": true,
+            "revision": 6,
+            "admission": "admitted",
+            "turn_id": "8488c839-37f7-4f78-9354-d94ee87428ca",
+            "child_turn_ids": [
+              "8488c839-37f7-4f78-9354-d94ee87428ca"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "알렉스는 17분이 아니라 7분 동안 기다릴 거예요.",
+              "utterance_id": "8488c839-37f7-4f78-9354-d94ee87428ca",
+              "sequence": 51,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "Alex will wait for 7 minutes, not 17."
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "cf7738bad27f4a03a7c5b8029f9931e5",
+            "request_id": "4da72e7680a20066d12f8b55454e8a4c",
+            "status": "applied",
+            "terminal": true,
+            "revision": 7,
+            "admission": "admitted",
+            "turn_id": "0709f775-0be0-4da4-9101-ef700030af9a",
+            "child_turn_ids": [
+              "0709f775-0be0-4da4-9101-ef700030af9a"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "Alex, it's room B-21, not B-12.",
+              "utterance_id": "0709f775-0be0-4da4-9101-ef700030af9a",
+              "sequence": 60,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "Alex, B-12 방이 아니라 B-21 방이에요."
+        },
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70",
+            "operation_id": "96afa6479cb54f1e849af64ab6119740",
+            "request_id": "815084c4e46f1775cd9294a205028108",
+            "status": "applied",
+            "terminal": true,
+            "revision": 8,
+            "admission": "admitted",
+            "turn_id": "8a768bbd-11f6-4c59-b4f7-cb07d3f9ad83",
+            "child_turn_ids": [
+              "8a768bbd-11f6-4c59-b4f7-cb07d3f9ad83"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "미나는 티켓 12개를 사지 않았어요.",
+              "utterance_id": "8a768bbd-11f6-4c59-b4f7-cb07d3f9ad83",
+              "sequence": 69,
+              "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+            }
+          ],
+          "source": "Mina did not buy 12 tickets."
+        }
+      ],
+      "host_exit_code": 0,
+      "trace": [
+        {
+          "kind": "host_identity",
+          "monotonic": 39778.5635034,
+          "python": "<PYTHON>",
+          "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+          "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+          "pid": 31804,
+          "runtime_build": "b11537",
+          "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+          "process_discovery": "synthetic_empty",
+          "gui": "not_run"
+        },
+        {
+          "kind": "native_started",
+          "monotonic": 39780.7007083,
+          "command": [
+            "<EXTERNAL>\\b11537\\vulkan\\llama-server.exe",
+            "--model",
+            "<ARM>\\localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+            "--alias",
+            "puripuly-gemma-4-e4b-q4",
+            "--load-mode",
+            "mmap",
+            "--ctx-size",
+            "4608",
+            "--parallel",
+            "3",
+            "--batch-size",
+            "512",
+            "--ubatch-size",
+            "512",
+            "--cache-type-k",
+            "f16",
+            "--cache-type-v",
+            "f16",
+            "--cache-prompt",
+            "--reasoning",
+            "off",
+            "--reasoning-budget",
+            "0",
+            "--warmup",
+            "--perf",
+            "--metrics",
+            "--no-webui",
+            "--threads-http",
+            "1",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "64302",
+            "--prio",
+            "-1",
+            "--slot-save-path",
+            ".",
+            "--threads",
+            "4",
+            "--threads-batch",
+            "4",
+            "--device",
+            "Vulkan0",
+            "--n-gpu-layers",
+            "99",
+            "--flash-attn",
+            "on",
+            "--verbosity",
+            "4"
+          ],
+          "pid": 32376
+        },
+        {
+          "kind": "cache_lookup",
+          "monotonic": 39787.3377874,
+          "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+          "backend": "vulkan",
+          "eligible": false,
+          "existing_files": [
+            "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+            "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+            "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+            "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin"
+          ]
+        },
+        {
+          "kind": "prepare_prefix",
+          "monotonic": 39789.5503447,
+          "slot": 0,
+          "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+          "wall_ms": 2212.2721999985515
+        },
+        {
+          "kind": "slot_http",
+          "monotonic": 39789.5824245,
+          "path": "/slots/0",
+          "action": "save",
+          "status_code": 200,
+          "payload": {
+            "id_slot": 0,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "n_saved": 825,
+            "n_written": 68311364,
+            "timings": {
+              "save_ms": 30.01
+            }
+          }
+        },
+        {
+          "kind": "save_prefix",
+          "monotonic": 39789.582702,
+          "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+          "slot_id": 0
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39789.5854614,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            null,
+            null
+          ],
+          "slot_lru": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39789.9229337,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            null,
+            null
+          ],
+          "slot_lru": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39790.7904187,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 15,
+            "prompt_ms": 672.833,
+            "generation_ms": 189.045,
+            "generation_tps": 74.05644158798171,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 12장의 티켓을 사지 않았어.",
+          "wall_ms": 867.2529000032227
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39790.7907739,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=23 cached_prompt_tokens=820 completion_tokens=15 prompt_ms=672.833 generation_ms=189.045 generation_tps=74.056",
+          "level": 20
+        },
+        {
+          "kind": "cache_lookup",
+          "monotonic": 39791.0459493,
+          "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+          "backend": "vulkan",
+          "eligible": false,
+          "existing_files": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+            "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+            "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+          ]
+        },
+        {
+          "kind": "prepare_prefix",
+          "monotonic": 39791.8743002,
+          "slot": 1,
+          "prompt_sha256": "74f79cccc80b818915709fe48c6dcf1c9e2396195e8b52f7395c71e15c1fe1c3",
+          "wall_ms": 828.1102000037208
+        },
+        {
+          "kind": "slot_http",
+          "monotonic": 39791.9036022,
+          "path": "/slots/1",
+          "action": "save",
+          "status_code": 200,
+          "payload": {
+            "id_slot": 1,
+            "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "n_saved": 823,
+            "n_written": 68196620,
+            "timings": {
+              "save_ms": 28.052
+            }
+          }
+        },
+        {
+          "kind": "save_prefix",
+          "monotonic": 39791.9038663,
+          "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+          "slot_id": 1
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39791.9068737,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "ko",
+            "target_language": "en",
+            "prefix_identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          },
+          "active_slot": 1,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            null
+          ],
+          "slot_lru": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39792.0516519,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "ko",
+            "target_language": "en",
+            "prefix_identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          },
+          "active_slot": 1,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            null
+          ],
+          "slot_lru": [
+            2,
+            0,
+            1
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39792.3889591,
+          "slot": 1,
+          "metrics": {
+            "prompt_tokens": 32,
+            "cached_prompt_tokens": 818,
+            "completion_tokens": 19,
+            "prompt_ms": 102.36,
+            "generation_ms": 228.645,
+            "generation_tps": 78.72466049990159,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "Jisu is coming at 3:15 PM. Don't be late.",
+          "wall_ms": 337.0712000032654
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39792.3892918,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=ko->en prompt_tokens=32 cached_prompt_tokens=818 completion_tokens=19 prompt_ms=102.360 generation_ms=228.645 generation_tps=78.725",
+          "level": 20
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39792.6297612,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            null
+          ],
+          "slot_lru": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39792.7709679,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            null
+          ],
+          "slot_lru": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39793.0361224,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 43,
+            "cached_prompt_tokens": 821,
+            "completion_tokens": 11,
+            "prompt_ms": 115.28,
+            "generation_ms": 127.604,
+            "generation_tps": 78.3674492962603,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "파란 열쇠는 제 게 아니에요.",
+          "wall_ms": 264.9124999952619
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39793.0364414,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=43 cached_prompt_tokens=821 completion_tokens=11 prompt_ms=115.280 generation_ms=127.604 generation_tps=78.367",
+          "level": 20
+        },
+        {
+          "kind": "cache_lookup",
+          "monotonic": 39793.2853379,
+          "identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398",
+          "backend": "vulkan",
+          "eligible": false,
+          "existing_files": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+          ]
+        },
+        {
+          "kind": "prepare_prefix",
+          "monotonic": 39794.1132657,
+          "slot": 2,
+          "prompt_sha256": "70a451626be43f726b67676e1a8497ebb6d0ea6b724d630ccdb14096688f47e7",
+          "wall_ms": 827.6970000006258
+        },
+        {
+          "kind": "slot_http",
+          "monotonic": 39794.1430412,
+          "path": "/slots/2",
+          "action": "save",
+          "status_code": 200,
+          "payload": {
+            "id_slot": 2,
+            "filename": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+            "n_saved": 819,
+            "n_written": 67967132,
+            "timings": {
+              "save_ms": 28.408
+            }
+          }
+        },
+        {
+          "kind": "save_prefix",
+          "monotonic": 39794.1433026,
+          "filename": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+          "slot_id": 2
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39794.1462923,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "ja",
+            "target_language": "en",
+            "prefix_identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          },
+          "active_slot": 2,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          ],
+          "slot_lru": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39794.2890539,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "ja",
+            "target_language": "en",
+            "prefix_identity": "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          },
+          "active_slot": 2,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          ],
+          "slot_lru": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39794.5086919,
+          "slot": 2,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 814,
+            "completion_tokens": 11,
+            "prompt_ms": 86.021,
+            "generation_ms": 127.974,
+            "generation_tps": 78.14087236469908,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "Yuna doesn't have the blue key.",
+          "wall_ms": 219.40770000219345
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39794.5090175,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=ja->en prompt_tokens=23 cached_prompt_tokens=814 completion_tokens=11 prompt_ms=86.021 generation_ms=127.974 generation_tps=78.141",
+          "level": 20
+        },
+        {
+          "kind": "cache_lookup",
+          "monotonic": 39794.7584037,
+          "identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+          "backend": "vulkan",
+          "eligible": false,
+          "existing_files": [
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin"
+          ]
+        },
+        {
+          "kind": "prepare_prefix",
+          "monotonic": 39794.9970235,
+          "slot": 1,
+          "prompt_sha256": "53ed5ead9284e79b4292e82dcc39c2f8b91bdcb4ffd6288d43cadb45534079dc",
+          "wall_ms": 238.2041000018944
+        },
+        {
+          "kind": "slot_http",
+          "monotonic": 39795.0342883,
+          "path": "/slots/1",
+          "action": "save",
+          "status_code": 200,
+          "payload": {
+            "id_slot": 1,
+            "filename": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin",
+            "n_saved": 807,
+            "n_written": 88912444,
+            "timings": {
+              "save_ms": 35.854
+            }
+          }
+        },
+        {
+          "kind": "save_prefix",
+          "monotonic": 39795.0345815,
+          "filename": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin",
+          "slot_id": 1
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39795.0373709,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "de",
+            "target_language": "en",
+            "prefix_identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc"
+          },
+          "active_slot": 1,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          ],
+          "slot_lru": [
+            0,
+            2,
+            1
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39795.1819423,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "de",
+            "target_language": "en",
+            "prefix_identity": "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc"
+          },
+          "active_slot": 1,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          ],
+          "slot_lru": [
+            0,
+            2,
+            1
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39795.471779,
+          "slot": 1,
+          "metrics": {
+            "prompt_tokens": 25,
+            "cached_prompt_tokens": 802,
+            "completion_tokens": 16,
+            "prompt_ms": 93.49,
+            "generation_ms": 190.744,
+            "generation_tps": 78.63943295726209,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "Anna doesn't have 17, she has 7 cards.",
+          "wall_ms": 289.6083000014187
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39795.4721255,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=de->en prompt_tokens=25 cached_prompt_tokens=802 completion_tokens=16 prompt_ms=93.490 generation_ms=190.744 generation_tps=78.639",
+          "level": 20
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39795.717019,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          ],
+          "slot_lru": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39795.8591183,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398"
+          ],
+          "slot_lru": [
+            2,
+            1,
+            0
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39796.1947201,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 43,
+            "cached_prompt_tokens": 840,
+            "completion_tokens": 17,
+            "prompt_ms": 108.491,
+            "generation_ms": 203.163,
+            "generation_tps": 78.75449762013753,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "알렉스는 17분이 아니라 7분 동안 기다릴 거예요.",
+          "wall_ms": 335.36610000010114
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39796.1951135,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=43 cached_prompt_tokens=840 completion_tokens=17 prompt_ms=108.491 generation_ms=203.163 generation_tps=78.754",
+          "level": 20
+        },
+        {
+          "kind": "cache_lookup",
+          "monotonic": 39796.4416395,
+          "identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c",
+          "backend": "vulkan",
+          "eligible": true,
+          "existing_files": [
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+          ]
+        },
+        {
+          "kind": "slot_http",
+          "monotonic": 39796.4733757,
+          "path": "/slots/2",
+          "action": "restore",
+          "status_code": 200,
+          "payload": {
+            "id_slot": 2,
+            "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "n_restored": 823,
+            "n_read": 68196620,
+            "timings": {
+              "restore_ms": 30.129
+            }
+          }
+        },
+        {
+          "kind": "restore_prefix",
+          "monotonic": 39796.4736926,
+          "result": true,
+          "wall_ms": 31.798000003618654,
+          "filename": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+          "slot_id": 2
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39796.4742402,
+          "message": "[ManagedGemma] prefix_cache restored backend=vulkan identity=903b138140f9 slot=2",
+          "level": 20
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39796.474696,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "ko",
+            "target_language": "en",
+            "prefix_identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          },
+          "active_slot": 2,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          ],
+          "slot_lru": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39796.6200048,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "ko",
+            "target_language": "en",
+            "prefix_identity": "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          },
+          "active_slot": 2,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          ],
+          "slot_lru": [
+            1,
+            0,
+            2
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39797.0060102,
+          "slot": 2,
+          "metrics": {
+            "prompt_tokens": 62,
+            "cached_prompt_tokens": 818,
+            "completion_tokens": 18,
+            "prompt_ms": 133.672,
+            "generation_ms": 227.767,
+            "generation_tps": 74.63767797793359,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "Alex, it's room B-21, not B-12.",
+          "wall_ms": 385.77429999713786
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39797.0063464,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=ko->en prompt_tokens=62 cached_prompt_tokens=818 completion_tokens=18 prompt_ms=133.672 generation_ms=227.767 generation_tps=74.638",
+          "level": 20
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39797.2528649,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          ],
+          "slot_lru": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39797.3997961,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c"
+          ],
+          "slot_lru": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39797.726388,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 54,
+            "cached_prompt_tokens": 829,
+            "completion_tokens": 14,
+            "prompt_ms": 128.442,
+            "generation_ms": 176.155,
+            "generation_tps": 73.79864324032812,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 티켓 12개를 사지 않았어요.",
+          "wall_ms": 326.35900000605034
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39797.7267477,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=54 cached_prompt_tokens=829 completion_tokens=14 prompt_ms=128.442 generation_ms=176.155 generation_tps=73.799",
+          "level": 20
+        },
+        {
+          "kind": "transport_closed",
+          "monotonic": 39798.4283097,
+          "client_cleared": true
+        },
+        {
+          "kind": "native_exit",
+          "monotonic": 39798.7259828,
+          "pid": 32376,
+          "returncode": 1
+        },
+        {
+          "kind": "owner_close_observed",
+          "monotonic": 39798.7261771,
+          "process_cleared": true,
+          "transport_cleared": true
+        }
+      ]
+    },
+    {
+      "cycle": 1,
+      "ready": {
+        "state": "ready",
+        "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14"
+      },
+      "host_pid": 44676,
+      "translations": [
+        {
+          "receipt": {
+            "output_version": 1,
+            "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14",
+            "operation_id": "0287380acfd2440bb59b13030101c553",
+            "request_id": "c705b8b6329a2cb2422e16a67945d575",
+            "status": "applied",
+            "terminal": true,
+            "revision": 1,
+            "admission": "admitted",
+            "turn_id": "8d63e7f0-0080-4a88-ac56-be2dcb6b6ccf",
+            "child_turn_ids": [
+              "8d63e7f0-0080-4a88-ac56-be2dcb6b6ccf"
+            ],
+            "output_delivery": "unobserved"
+          },
+          "events": [
+            {
+              "output_version": 1,
+              "topic": "translation",
+              "channel": "self",
+              "source": "unknown",
+              "text": "미나는 티켓 12장을 사지 않았어.",
+              "utterance_id": "8d63e7f0-0080-4a88-ac56-be2dcb6b6ccf",
+              "sequence": 6,
+              "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14"
+            }
+          ],
+          "source": "Mina did not buy 12 tickets."
+        }
+      ],
+      "host_exit_code": 0,
+      "trace": [
+        {
+          "kind": "host_identity",
+          "monotonic": 39800.3152078,
+          "python": "<PYTHON>",
+          "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+          "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+          "pid": 49068,
+          "runtime_build": "b11537",
+          "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+          "process_discovery": "synthetic_empty",
+          "gui": "not_run"
+        },
+        {
+          "kind": "native_started",
+          "monotonic": 39801.3004603,
+          "command": [
+            "<EXTERNAL>\\b11537\\vulkan\\llama-server.exe",
+            "--model",
+            "<ARM>\\localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+            "--alias",
+            "puripuly-gemma-4-e4b-q4",
+            "--load-mode",
+            "mmap",
+            "--ctx-size",
+            "4608",
+            "--parallel",
+            "3",
+            "--batch-size",
+            "512",
+            "--ubatch-size",
+            "512",
+            "--cache-type-k",
+            "f16",
+            "--cache-type-v",
+            "f16",
+            "--cache-prompt",
+            "--reasoning",
+            "off",
+            "--reasoning-budget",
+            "0",
+            "--warmup",
+            "--perf",
+            "--metrics",
+            "--no-webui",
+            "--threads-http",
+            "1",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "49191",
+            "--prio",
+            "-1",
+            "--slot-save-path",
+            ".",
+            "--threads",
+            "4",
+            "--threads-batch",
+            "4",
+            "--device",
+            "Vulkan0",
+            "--n-gpu-layers",
+            "99",
+            "--flash-attn",
+            "on",
+            "--verbosity",
+            "4"
+          ],
+          "pid": 45476
+        },
+        {
+          "kind": "cache_lookup",
+          "monotonic": 39803.8866619,
+          "identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+          "backend": "vulkan",
+          "eligible": true,
+          "existing_files": [
+            "28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+            "f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin"
+          ]
+        },
+        {
+          "kind": "slot_http",
+          "monotonic": 39803.9159008,
+          "path": "/slots/0",
+          "action": "restore",
+          "status_code": 200,
+          "payload": {
+            "id_slot": 0,
+            "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+            "n_restored": 825,
+            "n_read": 68311364,
+            "timings": {
+              "restore_ms": 27.92
+            }
+          }
+        },
+        {
+          "kind": "restore_prefix",
+          "monotonic": 39803.9162038,
+          "result": true,
+          "wall_ms": 29.27340000314871,
+          "filename": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+          "slot_id": 0
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39803.9168161,
+          "message": "[ManagedGemma] prefix_cache restored backend=vulkan identity=4691068f6f7c slot=0",
+          "level": 20
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39803.9172272,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            null,
+            null
+          ],
+          "slot_lru": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "kind": "owner_ready",
+          "monotonic": 39804.2725688,
+          "readiness": {
+            "requested_backend": "gpu",
+            "effective_backend": "vulkan",
+            "source_language": "en",
+            "target_language": "ko",
+            "prefix_identity": "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7"
+          },
+          "active_slot": 0,
+          "slot_identities": [
+            "4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7",
+            null,
+            null
+          ],
+          "slot_lru": [
+            1,
+            2,
+            0
+          ]
+        },
+        {
+          "kind": "translate_completed",
+          "monotonic": 39804.5389228,
+          "slot": 0,
+          "metrics": {
+            "prompt_tokens": 23,
+            "cached_prompt_tokens": 820,
+            "completion_tokens": 14,
+            "prompt_ms": 95.307,
+            "generation_ms": 165.317,
+            "generation_tps": 78.63680081298354,
+            "drafted_tokens": null,
+            "accepted_tokens": null
+          },
+          "text": "미나는 티켓 12장을 사지 않았어.",
+          "wall_ms": 266.11390000471147
+        },
+        {
+          "kind": "runtime_log",
+          "monotonic": 39804.5392271,
+          "message": "[ManagedGemma][Performance] backend=vulkan language_pair=en->ko prompt_tokens=23 cached_prompt_tokens=820 completion_tokens=14 prompt_ms=95.307 generation_ms=165.317 generation_tps=78.637",
+          "level": 20
+        },
+        {
+          "kind": "transport_closed",
+          "monotonic": 39805.253726,
+          "client_cleared": true
+        },
+        {
+          "kind": "native_exit",
+          "monotonic": 39805.5032115,
+          "pid": 45476,
+          "returncode": 1
+        },
+        {
+          "kind": "owner_close_observed",
+          "monotonic": 39805.5034255,
+          "process_cleared": true,
+          "transport_cleared": true
+        }
+      ]
+    }
+  ],
+  "isolation": {
+    "settings_seeded_before_first_start": true,
+    "secrets": "isolated encrypted_file, throwaway passphrase; synthetic nonworking Soniox construction token only; no keyring, verification or capture",
+    "credential_environment_names_removed": [],
+    "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+    "hf_offline": true,
+    "telemetry": false,
+    "network": "fail-closed non-loopback Python DNS/connect/connect_ex guard",
+    "osc": "mode off plus owned bound loopback UDP sink; no external output",
+    "capture": "never enabled",
+    "overlay_clipboard": "off",
+    "threads_persisted": {
+      "threads": 4,
+      "threads_batch": 12,
+      "draft_threads": 1
+    }
+  },
+  "foreign_cache_control": {
+    "source_label": "app-old-vulkan-guarded",
+    "copied_filenames": [
+      "577d15a279e55fd01ab5784aa73487cdad9abc11e7890e65841027f1bed3c431.vulkan.bin",
+      "62d9134992cf9eaf40e948a9bfee1543a3c2c28d330185ffaf4ab1df4a30dfae.vulkan.bin",
+      "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.vulkan.bin",
+      "bd863336ca32cf3cd2be6c3449a325bb1a210634b0c9529bfb0068516cbe71c6.vulkan.bin",
+      "index.json"
+    ],
+    "policy": "exact process-local runtime identity must make foreign files ineligible; never restore cross-revision KV"
+  },
+  "udp_datagrams": [
+    {
+      "monotonic": 39789.9218633,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39790.7932608,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000ebafb8eb8298eb8a94203132ec9ea5ec9d9820ed8bb0ecbc93ec9d8420ec82aceca78020ec958aec9598ec96b42e0000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39790.7944319,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39792.0505063,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39792.3915231,
+      "hex": "2f63686174626f782f696e70757400002c735446000000004a69737520697320636f6d696e6720617420333a313520504d2e20446f6e2774206265206c6174652e000000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39792.3926358,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39792.7700156,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39793.0386579,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000ed8c8ceb9e8020ec97b4ec87a0eb8a9420eca09c20eab28c20ec9584eb8b88ec9790ec9a942e0000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39793.0397727,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39794.2881788,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39794.5112111,
+      "hex": "2f63686174626f782f696e70757400002c7354460000000059756e6120646f65736e277420686176652074686520626c7565206b65792e00",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39794.5122989,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39795.1810644,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39795.4743236,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000416e6e6120646f65736e277420686176652031372c207368652068617320372063617264732e0000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39795.4753951,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39795.85822,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39796.1972849,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000ec958ceba089ec8aa4eb8a94203137ebb684ec9db420ec9584eb8b88eb9dbc2037ebb68420eb8f99ec958820eab8b0eb8ba4eba6b420eab1b0ec9888ec9a942e00000000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39796.1983608,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39796.6190654,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39797.0085417,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000416c65782c206974277320726f6f6d20422d32312c206e6f7420422d31322e00",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39797.0099229,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39797.3986998,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39797.7289663,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000ebafb8eb8298eb8a9420ed8bb0ecbc93203132eab09ceba5bc20ec82aceca78020ec958aec9598ec96b4ec9a942e0000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39797.7300398,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39804.2714856,
+      "hex": "2f63686174626f782f747970696e67002c540000",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39804.5423484,
+      "hex": "2f63686174626f782f696e70757400002c73544600000000ebafb8eb8298eb8a9420ed8bb0ecbc93203132ec9ea5ec9d8420ec82aceca78020ec958aec9598ec96b42e00",
+      "sender_loopback": true
+    },
+    {
+      "monotonic": 39804.5435234,
+      "hex": "2f63686174626f782f747970696e67002c460000",
+      "sender_loopback": true
+    }
+  ],
+  "events": [
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "미나는 12장의 티켓을 사지 않았어.",
+      "utterance_id": "cc2537ae-a56a-4909-b900-6261e86eb44e",
+      "sequence": 6,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "Jisu is coming at 3:15 PM. Don't be late.",
+      "utterance_id": "28642737-c229-4727-bc7b-bb183a4b974a",
+      "sequence": 15,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "파란 열쇠는 제 게 아니에요.",
+      "utterance_id": "6051d256-d1eb-455a-b721-56cb6089f393",
+      "sequence": 24,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "Yuna doesn't have the blue key.",
+      "utterance_id": "bb9a4aee-e5d2-4796-8b04-cf2a26e7351c",
+      "sequence": 33,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "Anna doesn't have 17, she has 7 cards.",
+      "utterance_id": "a6b8871c-5e98-4e32-bd9a-f91e478ce19e",
+      "sequence": 42,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "알렉스는 17분이 아니라 7분 동안 기다릴 거예요.",
+      "utterance_id": "8488c839-37f7-4f78-9354-d94ee87428ca",
+      "sequence": 51,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "Alex, it's room B-21, not B-12.",
+      "utterance_id": "0709f775-0be0-4da4-9101-ef700030af9a",
+      "sequence": 60,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "미나는 티켓 12개를 사지 않았어요.",
+      "utterance_id": "8a768bbd-11f6-4c59-b4f7-cb07d3f9ad83",
+      "sequence": 69,
+      "instance_id": "02e889dc-7726-4dbe-9a3f-959a6b9a3b70"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "미나는 티켓 12장을 사지 않았어.",
+      "utterance_id": "8d63e7f0-0080-4a88-ac56-be2dcb6b6ccf",
+      "sequence": 6,
+      "instance_id": "ff08ada1-1588-4dcf-9794-2fdfd7f2be14"
+    }
+  ],
+  "owned_tree_files": [
+    "host-0.txt",
+    "host-1.txt",
+    "isolated-secrets.json",
+    "native-0.txt",
+    "ready.json",
+    "settings.json",
+    "trace-cycle-0.jsonl",
+    "trace.jsonl",
+    "localappdata\\puripuly-heart\\llama_cpp_threads.json",
+    "localappdata\\puripuly-heart\\puripuly_heart.log",
+    "localappdata\\puripuly-heart\\control\\37597a89d2d8c5f34873bb473b5eb52ee49cfafe028a208800766c7c6a2a9b0e.lock",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\28b2b61c792a63e93927cbcb72be6493b90d093e1db57be03253315725d87398.vulkan.bin",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\4691068f6f7c2cc4bec182191c3a0b7b4fd6dd9c0a8738f638a3f4cf6994adf7.vulkan.bin",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\903b138140f9c8fe337b0e00fa83b69991a8f060d44cc626c7a5567e62e9809c.vulkan.bin",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\f0d24d930d6f284965bbf721385dcb60c90c74566df8b7f7099c204f1b52d2bc.vulkan.bin",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\index.json",
+    "localappdata\\puripuly-heart\\models\\.local-asr-provisioning.lock",
+    "localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+    "localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\installed-manifest.json",
+    "localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\mtp-gemma-4-E4B-it.gguf"
+  ]
+}

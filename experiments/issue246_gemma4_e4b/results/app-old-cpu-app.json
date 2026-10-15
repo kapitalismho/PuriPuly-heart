@@ -1,0 +1,1419 @@
+{
+  "label": "app-old-cpu",
+  "release": "b10423",
+  "backend": "cpu",
+  "runtime_identity": "process-local exact build/commit injection; maintained constants unchanged",
+  "discovery_boundary": "PsutilCurrentUserProcessSnapshots.snapshots replaced with synthetic empty tuple; no scene/process inventory reads",
+  "gui": "not_run",
+  "commands": [
+    {
+      "arguments": [
+        "app",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 154.31180000450695,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "port": 52187,
+        "revision": 1,
+        "host_pid": 4344,
+        "channels": {
+          "self": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": "provider_failed",
+            "provider_status": "failed",
+            "capture": {
+              "state": "faulted",
+              "provider_status": "failed",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 1,
+              "provider_id": "soniox",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "soniox",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "stt-rt-v5",
+                "wss://stt-rt.soniox.com/transcribe-websocket",
+                10.0,
+                100,
+                true,
+                null,
+                null,
+                null,
+                null,
+                true,
+                []
+              ],
+              "failure_reason": "provider_failed",
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": {
+                "schema_version": 1,
+                "diagnostic_id": "379f85100c3044e79dfbd2222d9168f9",
+                "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+                "occurred_at": "2026-10-15T01:54:43.299+00:00",
+                "component": "provider.stt",
+                "operation": "provider_build",
+                "stage": "provider_build",
+                "severity": "error",
+                "disposition": "failed",
+                "code": "stt.provider_not_ready",
+                "category": "unknown",
+                "cause_id": null,
+                "operation_id": null,
+                "request_id": null,
+                "channel": "self",
+                "turn_id": null,
+                "generation": 0,
+                "status_code": null,
+                "retry_after_ms": null,
+                "fields": {
+                  "exception_class": "ValueError",
+                  "provider": "soniox",
+                  "transport": "unknown",
+                  "tls_source": "unknown",
+                  "proxy_source": "unknown",
+                  "tls_backend": "unknown",
+                  "recognition_cause": "provider_not_ready"
+                },
+                "file_evidence": "unknown",
+                "detail": {
+                  "state": "available",
+                  "rejected_fields": 0,
+                  "truncated": false
+                },
+                "diagnostic_sequence": 1
+              }
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "failed",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          },
+          "peer": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        },
+        "microphone_test": {
+          "state": "off",
+          "desired_active": false,
+          "effective_active": false,
+          "meter_level": 0.0,
+          "failure_reason": null,
+          "failure_type": null
+        },
+        "translation_enabled": false,
+        "translation_runtime_ready": true,
+        "overlay_target": "steamvr",
+        "stopping": false,
+        "scene_observation": {
+          "observation_succeeded": true,
+          "process_present": false,
+          "observation_diagnostic_id": null
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "capabilities"
+      ],
+      "exit_code": 0,
+      "wall_ms": 141.12330000352813,
+      "output": {
+        "output_version": 1,
+        "version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "commands": {
+          "app.stop": {
+            "description": "Request ordered host shutdown",
+            "arguments": {},
+            "cancellable": false
+          },
+          "capture.set": {
+            "description": "Set self or peer capture explicitly",
+            "arguments": {
+              "channel": [
+                "self",
+                "peer"
+              ],
+              "enabled": "boolean",
+              "accept_terms": "optional boolean (true only for peer enabled; defaults false)"
+            },
+            "cancellable": false
+          },
+          "translation.set": {
+            "description": "Set translation explicitly",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "text.submit": {
+            "description": "Submit manual text through the self pipeline",
+            "arguments": {
+              "text": "non-empty string (protected content)"
+            },
+            "cancellable": false
+          },
+          "microphone.test": {
+            "description": "Start or stop microphone test",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "audio.target.set": {
+            "description": "Set peer loopback target",
+            "arguments": {
+              "value": "available audio.target option value"
+            },
+            "cancellable": false
+          },
+          "audio.retry": {
+            "description": "Retry lost peer process target",
+            "arguments": {},
+            "cancellable": false
+          },
+          "settings.apply": {
+            "description": "Apply focused typed settings changes",
+            "arguments": {
+              "changes": "object of settings_fields to typed values (or direct typed fields)"
+            },
+            "cancellable": false
+          },
+          "provider.apply": {
+            "description": "Apply self and peer STT changes together",
+            "arguments": {
+              "channel": [
+                "self",
+                "peer",
+                "both"
+              ],
+              "provider": "settings.choices stt_providers",
+              "self": "optional settings.choices stt_providers",
+              "peer": "optional settings.choices stt_providers"
+            },
+            "cancellable": false
+          },
+          "models.install": {
+            "description": "Install or repair selected CPU/GPU ASR assets",
+            "arguments": {
+              "backend": "cpu or gpu (default gpu)",
+              "model_ids": "optional list of backend-compatible models.status IDs; empty means backend default"
+            },
+            "cancellable": true
+          },
+          "models.prepare": {
+            "description": "Inspect CPU or GPU model readiness and integrity",
+            "arguments": {
+              "backend": "cpu or gpu (default cpu)",
+              "verify_checksums": "optional boolean (default false)"
+            },
+            "cancellable": false
+          },
+          "models.cancel": {
+            "description": "Cancel an active CPU/GPU model installation",
+            "arguments": {
+              "backend": "cpu or gpu (optional; default gpu)"
+            },
+            "cancellable": false
+          },
+          "gemma.prepare": {
+            "description": "Prepare managed local Gemma model assets",
+            "arguments": {},
+            "cancellable": true
+          },
+          "gemma.cancel": {
+            "description": "Cancel managed local Gemma preparation",
+            "arguments": {},
+            "cancellable": false
+          },
+          "models.retry": {
+            "description": "Retry GPU activation after installation",
+            "arguments": {
+              "backend": "gpu (optional; default gpu)"
+            },
+            "cancellable": false
+          },
+          "gpu.discover": {
+            "description": "Discover available GPU devices",
+            "arguments": {},
+            "cancellable": false
+          },
+          "secrets.set": {
+            "description": "Store provider credential (value never returned)",
+            "arguments": {
+              "name": "declared secrets.presence key",
+              "value": "non-empty secret (stdin/hidden input only)"
+            },
+            "cancellable": false
+          },
+          "secrets.delete": {
+            "description": "Delete provider credential",
+            "arguments": {
+              "name": "declared secrets.presence key"
+            },
+            "cancellable": false
+          },
+          "secrets.verify": {
+            "description": "Verify provider credential separately from storage",
+            "arguments": {
+              "name": "secret key",
+              "value": "non-empty secret (stdin/hidden input only)"
+            },
+            "cancellable": false
+          },
+          "auth.login": {
+            "description": "Authorize a QQ, Discord, OpenRouter, or ChatGPT account with explicit browser consent",
+            "arguments": {
+              "provider": [
+                "qq",
+                "discord",
+                "openrouter",
+                "chatgpt"
+              ],
+              "qq_identity": "required non-empty string for QQ",
+              "credential": "required non-empty secret for QQ (stdin/hidden input only)",
+              "referral_id": "optional referral string for QQ or Discord",
+              "open_browser": "optional boolean, default false (OAuth only)"
+            },
+            "cancellable": false
+          },
+          "auth.logout": {
+            "description": "Remove locally stored account authorization (ChatGPT also requests remote revocation)",
+            "arguments": {
+              "provider": [
+                "qq",
+                "discord",
+                "openrouter",
+                "chatgpt"
+              ]
+            },
+            "cancellable": false
+          },
+          "overlay.set": {
+            "description": "Set overlay enabled state",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "overlay.lock": {
+            "description": "Lock/unlock desktop caption positioning",
+            "arguments": {
+              "locked": "boolean"
+            },
+            "cancellable": false
+          },
+          "overlay.size": {
+            "description": "Select desktop overlay size",
+            "arguments": {
+              "preset": "settings.choices overlay size"
+            },
+            "cancellable": false
+          },
+          "overlay.position.reset": {
+            "description": "Reset desktop overlay position",
+            "arguments": {},
+            "cancellable": false
+          },
+          "overlay.calibrate": {
+            "description": "Begin, change, apply or cancel overlay calibration",
+            "arguments": {
+              "action": [
+                "begin",
+                "change",
+                "apply",
+                "cancel"
+              ],
+              "field": "required for change: anchor, offset_x, offset_y, distance, text_scale, background_alpha",
+              "value": "required for change; type/range depends on field"
+            },
+            "cancellable": false
+          }
+        },
+        "queries": [
+          "app.status",
+          "audio.devices",
+          "audio.processes",
+          "audio.target",
+          "auth.status",
+          "capture.channels",
+          "consent.peer_translation",
+          "diagnostics.health",
+          "diagnostics.history",
+          "gpu.status",
+          "models.status",
+          "osc.status",
+          "overlay.status",
+          "providers.status",
+          "secrets.presence",
+          "settings.choices",
+          "settings.current"
+        ],
+        "query_arguments": {
+          "diagnostics.history": {
+            "operation_id": "optional operation identity",
+            "diagnostic_id": "optional failure identity",
+            "instance_id": "optional originating host identity",
+            "after": "optional nonnegative diagnostic sequence",
+            "limit": "integer 1..100, default 50"
+          },
+          "diagnostics.health": {}
+        },
+        "settings_fields": [
+          "audio.input_device",
+          "audio.input_host_api",
+          "audio.output_device",
+          "chatbox.activation_notice.enabled",
+          "chatbox.source.enabled",
+          "clipboard.enabled",
+          "custom_vocabulary",
+          "languages",
+          "local_llm.base_url",
+          "local_llm.extra_body_json",
+          "local_llm.model",
+          "locale",
+          "managed.referral_id",
+          "osc.connection",
+          "overlay.background_alpha",
+          "overlay.desktop_size",
+          "overlay.peer_original.enabled",
+          "overlay.swap_caption_languages",
+          "overlay.target",
+          "overlay.translation.enabled",
+          "peer_expected_languages",
+          "peer_stt.provider",
+          "peer_vad.hangover_ms",
+          "peer_vad.pre_roll_ms",
+          "peer_vad.speech_threshold",
+          "prompts.system_prompt_override",
+          "prompts.value",
+          "self_vad.speech_threshold",
+          "stt.cloud_free_tier_providers",
+          "stt.custom.endpoint",
+          "stt.custom.extra_json",
+          "stt.custom.model",
+          "stt.gpu_device_id",
+          "stt.provider",
+          "stt.soniox.enable_speaker_diarization",
+          "telemetry.enabled",
+          "translation.connection",
+          "translation.connection_history",
+          "translation.gpu_device_id",
+          "translation.http_extension_id",
+          "translation.model",
+          "translation.previous_llm_model",
+          "translation.qwen.beijing.api_host",
+          "translation.qwen.region",
+          "translation.qwen.singapore.api_host",
+          "vrc_mic_intercept.enabled"
+        ],
+        "secret_keys": [
+          "google_api_key",
+          "openrouter_api_key",
+          "openai_api_key",
+          "deepseek_api_key",
+          "deepgram_api_key",
+          "gemini_transcribe_api_key",
+          "elevenlabs_scribe_api_key",
+          "soniox_api_key",
+          "local_llm_api_key",
+          "custom_stt_api_key",
+          "alibaba_api_key_beijing",
+          "alibaba_api_key_singapore"
+        ],
+        "topics": [
+          "operation",
+          "settings",
+          "auth",
+          "capture",
+          "transcript",
+          "translation",
+          "session_state_changed",
+          "error",
+          "logs",
+          "gap"
+        ]
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "choices"
+      ],
+      "exit_code": 0,
+      "wall_ms": 348.13969999959227,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "revision": 1,
+        "extensions": {
+          "translation_http_ids": [],
+          "load_error_count": 0
+        },
+        "choices": {
+          "languages": {
+            "codes": [
+              "ar",
+              "bg",
+              "ca",
+              "zh-CN",
+              "zh-TW",
+              "cs",
+              "da",
+              "nl",
+              "en",
+              "et",
+              "fi",
+              "fr",
+              "de",
+              "el",
+              "hi",
+              "hu",
+              "id",
+              "it",
+              "ja",
+              "ko",
+              "lv",
+              "lt",
+              "ms",
+              "no",
+              "pl",
+              "pt",
+              "ro",
+              "ru",
+              "sk",
+              "es",
+              "sv",
+              "th",
+              "tr",
+              "uk",
+              "vi"
+            ],
+            "secondary_target_unset": "",
+            "peer_source_modes": [
+              "manual",
+              "auto"
+            ]
+          },
+          "stt.provider": [
+            "local_cpu_auto",
+            "local_parakeet_v3",
+            "local_parakeet_ja",
+            "local_qwen",
+            "local_qwen_gpu",
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "qwen_audio",
+            "soniox",
+            "rolling_free",
+            "custom",
+            "custom_offline",
+            "custom_realtime"
+          ],
+          "peer_stt.provider": [
+            "local_cpu_auto",
+            "local_parakeet_v3",
+            "local_parakeet_ja",
+            "local_qwen",
+            "local_qwen_gpu",
+            "deepgram",
+            "gemini_transcribe",
+            "elevenlabs_scribe",
+            "qwen_audio",
+            "soniox",
+            "rolling_free",
+            "custom",
+            "custom_offline",
+            "custom_realtime"
+          ],
+          "translation.model": [
+            "gemma4_26b_31b",
+            "deepseek_v4_flash",
+            "deepseek_v4_flash_41",
+            "gemini_flash",
+            "gpt_6_luna",
+            "qwen38_flash",
+            "managed_gemma",
+            "local_llm",
+            "custom_http"
+          ],
+          "translation.connection": {
+            "gemma4_26b_31b": [
+              "managed",
+              "openrouter"
+            ],
+            "deepseek_v4_flash": [
+              "openrouter"
+            ],
+            "deepseek_v4_flash_41": [
+              "managed",
+              "managed_china",
+              "openrouter",
+              "official_byok"
+            ],
+            "gemini_flash": [
+              "official_byok",
+              "openrouter"
+            ],
+            "gpt_6_luna": [
+              "chatgpt",
+              "openrouter",
+              "official_byok"
+            ],
+            "qwen38_flash": [
+              "official_byok"
+            ],
+            "managed_gemma": [
+              "cpu",
+              "gpu"
+            ],
+            "local_llm": [
+              "ollama"
+            ],
+            "custom_http": [
+              "custom_http"
+            ]
+          },
+          "translation.gpu_device_id": [
+            {
+              "value": "auto",
+              "available": true
+            }
+          ]
+        },
+        "field_types": {
+          "chatbox.activation_notice.enabled": "boolean",
+          "clipboard.enabled": "boolean",
+          "languages": "object",
+          "peer_stt.provider": "string",
+          "stt.provider": "string",
+          "telemetry.enabled": "boolean",
+          "translation.connection": "string",
+          "translation.gpu_device_id": "string",
+          "translation.model": "string"
+        },
+        "field_schemas": {
+          "chatbox.activation_notice.enabled": {
+            "type": "boolean",
+            "free_form": false
+          },
+          "clipboard.enabled": {
+            "type": "boolean",
+            "free_form": false
+          },
+          "languages": {
+            "type": "object",
+            "required": [],
+            "properties": {
+              "source": {
+                "type": "string",
+                "choices": "/choices/languages/codes"
+              },
+              "target": {
+                "type": "string",
+                "choices": "/choices/languages/codes"
+              },
+              "secondary_target": {
+                "type": "string",
+                "choices": "/choices/languages/codes",
+                "empty_allowed": true
+              },
+              "peer_source": {
+                "type": "string",
+                "choices": "/choices/languages/codes",
+                "empty_allowed": true
+              },
+              "peer_target": {
+                "type": "string",
+                "choices": "/choices/languages/codes",
+                "empty_allowed": true
+              },
+              "peer_source_mode": {
+                "type": "string",
+                "choices": "/choices/languages/peer_source_modes"
+              }
+            }
+          },
+          "peer_stt.provider": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/peer_stt.provider"
+          },
+          "stt.provider": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/stt.provider"
+          },
+          "telemetry.enabled": {
+            "type": "boolean",
+            "free_form": false
+          },
+          "translation.connection": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/translation.connection"
+          },
+          "translation.gpu_device_id": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/translation.gpu_device_id"
+          },
+          "translation.model": {
+            "type": "string",
+            "free_form": false,
+            "choices": "/choices/translation.model"
+          }
+        }
+      },
+      "stderr": "",
+      "projection": "Focused control choices; unrelated real audio/device/process inventory omitted."
+    },
+    {
+      "arguments": [
+        "settings",
+        "current"
+      ],
+      "exit_code": 0,
+      "wall_ms": 146.2247000017669,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "revision": 1,
+        "observed_intent": {
+          "languages": {
+            "source_language": "en",
+            "target_language": "ko",
+            "secondary_target_language": "",
+            "peer_source_language": "en",
+            "peer_target_language": "ko",
+            "peer_source_mode": "manual",
+            "peer_expected_languages": [],
+            "recent_source_languages": [
+              "en",
+              "zh-CN",
+              "ja"
+            ],
+            "recent_target_languages": [
+              "en",
+              "zh-CN",
+              "ja"
+            ]
+          },
+          "telemetry": {
+            "enabled": false
+          },
+          "clipboard": {
+            "auto_translate_enabled": false
+          },
+          "osc": {
+            "connection_mode": "off",
+            "host": "127.0.0.1",
+            "port": 51643,
+            "send_port": 51643,
+            "receive_port": 9001,
+            "chatbox_address": "/chatbox/input",
+            "chatbox_send": true,
+            "chatbox_clear": false,
+            "chatbox_max_chars": 144,
+            "vrc_mic_intercept": false,
+            "chatbox_include_source": false,
+            "activation_notice_enabled": false
+          },
+          "integrated_context": {
+            "enabled": true
+          },
+          "translation": {
+            "model": "managed_gemma",
+            "connection": "cpu",
+            "gpu_device_id": "auto",
+            "concurrency_limit": 10
+          },
+          "stt_provider": "soniox",
+          "peer_stt_provider": "soniox"
+        }
+      },
+      "stderr": "",
+      "projection": "Focused observed intent only; full synthetic canonical configuration and redacted secret/prompt fields not published."
+    },
+    {
+      "arguments": [
+        "capture",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 138.7343000023975,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "revision": 1,
+        "channels": {
+          "self": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": "provider_failed",
+            "provider_status": "failed",
+            "capture": {
+              "state": "faulted",
+              "provider_status": "failed",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 1,
+              "provider_id": "soniox",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "soniox",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "stt-rt-v5",
+                "wss://stt-rt.soniox.com/transcribe-websocket",
+                10.0,
+                100,
+                true,
+                null,
+                null,
+                null,
+                null,
+                true,
+                []
+              ],
+              "failure_reason": "provider_failed",
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": {
+                "schema_version": 1,
+                "diagnostic_id": "379f85100c3044e79dfbd2222d9168f9",
+                "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+                "occurred_at": "2026-10-15T01:54:43.299+00:00",
+                "component": "provider.stt",
+                "operation": "provider_build",
+                "stage": "provider_build",
+                "severity": "error",
+                "disposition": "failed",
+                "code": "stt.provider_not_ready",
+                "category": "unknown",
+                "cause_id": null,
+                "operation_id": null,
+                "request_id": null,
+                "channel": "self",
+                "turn_id": null,
+                "generation": 0,
+                "status_code": null,
+                "retry_after_ms": null,
+                "fields": {
+                  "exception_class": "ValueError",
+                  "provider": "soniox",
+                  "transport": "unknown",
+                  "tls_source": "unknown",
+                  "proxy_source": "unknown",
+                  "tls_backend": "unknown",
+                  "recognition_cause": "provider_not_ready"
+                },
+                "file_evidence": "unknown",
+                "detail": {
+                  "state": "available",
+                  "rejected_fields": 0,
+                  "truncated": false
+                },
+                "diagnostic_sequence": 1
+              }
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "failed",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          },
+          "peer": {
+            "selected_provider": "soniox",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "osc",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 137.47789999615634,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "revision": 1,
+        "ports": [
+          null,
+          null
+        ],
+        "output": {
+          "configured_mode": "off",
+          "configured_host": "127.0.0.1",
+          "configured_send_port": 51643,
+          "configured_receive_port": 9001,
+          "effective_mode": "off",
+          "effective_send_port": null,
+          "effective_receive_port": null,
+          "receiver_available": false,
+          "sender_available": false,
+          "query_service_started": false,
+          "query_advertised_port": null,
+          "discovered_remote": null,
+          "query_failure": null,
+          "state_publication": null,
+          "local_availability": "off",
+          "remote_delivery": "unacknowledged"
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "overlay",
+        "status"
+      ],
+      "exit_code": 0,
+      "wall_ms": 139.78189999761526,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "revision": 1,
+        "target": "steamvr",
+        "locked": false,
+        "settings": {
+          "target": "steamvr",
+          "show_translation": true,
+          "show_peer_original": true,
+          "desktop_size_preset": "medium",
+          "desktop_background_alpha": 0.6,
+          "desktop_swap_caption_languages": false,
+          "calibration": {
+            "anchor": "head_locked",
+            "distance": 1.1,
+            "offset_x": 0.0,
+            "offset_y": -0.45,
+            "text_scale": 1.0
+          }
+        },
+        "output": {
+          "settings_available": true,
+          "desired_enabled": false,
+          "configured_target": "steamvr",
+          "effective_target": null,
+          "attempting_target": null,
+          "lifecycle": "off",
+          "runtime_active": false,
+          "process_state": null,
+          "presentation_ready": false,
+          "desktop_visible": null,
+          "generation": null,
+          "failure_reason": null,
+          "auto_restart_scheduled": false,
+          "fallback_active": false,
+          "recovery_active": false,
+          "recovery_reason": null,
+          "ingress_stopped": false,
+          "calibration_draft_active": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "secrets",
+        "presence"
+      ],
+      "exit_code": 0,
+      "wall_ms": 180.85489999793936,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "revision": 1,
+        "status": "applied",
+        "presence": {
+          "google_api_key": false,
+          "openrouter_api_key": false,
+          "openai_api_key": false,
+          "deepseek_api_key": false,
+          "deepgram_api_key": false,
+          "gemini_transcribe_api_key": false,
+          "elevenlabs_scribe_api_key": false,
+          "soniox_api_key": false,
+          "local_llm_api_key": false,
+          "custom_stt_api_key": false,
+          "alibaba_api_key_beijing": false,
+          "alibaba_api_key_singapore": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "translation",
+        "set",
+        "on"
+      ],
+      "exit_code": 0,
+      "wall_ms": 7671.722799997951,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "operation_id": "190d6f052c71488caa0ffc47e7378908",
+        "request_id": "4f506c73b0912063f38dab3cdb3afc78",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "translation_enabled": true
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}"
+      ],
+      "exit_code": 4,
+      "wall_ms": 222.34060000482714,
+      "output": {
+        "output_version": 1,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "operation_id": "3e7c1eb8927c4099904a46c55b8387dd",
+        "request_id": "4fef9ee78a33562e787ca1a3d67e40d8",
+        "status": "degraded",
+        "terminal": true,
+        "revision": 1,
+        "transaction": {
+          "status": "settings_commit_success_runtime_degraded",
+          "message": "settings.mutation.runtime_apply_failed",
+          "diagnostics": {
+            "schema_version": 1,
+            "diagnostic_id": "1dccabe9c876428a9a83a3421fd56f3d",
+            "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+            "occurred_at": "2026-10-15T01:54:53.114+00:00",
+            "component": "provider.stt",
+            "operation": "provider_build",
+            "stage": "provider_build",
+            "severity": "error",
+            "disposition": "failed",
+            "code": "stt.provider_not_ready",
+            "category": "unknown",
+            "cause_id": null,
+            "operation_id": "3e7c1eb8927c4099904a46c55b8387dd",
+            "request_id": "4fef9ee78a33562e787ca1a3d67e40d8",
+            "channel": "self",
+            "turn_id": null,
+            "generation": 0,
+            "status_code": null,
+            "retry_after_ms": null,
+            "fields": {
+              "exception_class": "ValueError",
+              "provider": "soniox",
+              "transport": "unknown",
+              "tls_source": "unknown",
+              "proxy_source": "unknown",
+              "tls_backend": "unknown",
+              "recognition_cause": "provider_not_ready"
+            },
+            "file_evidence": "unknown",
+            "detail": {
+              "state": "available",
+              "rejected_fields": 0,
+              "truncated": false
+            },
+            "diagnostic_sequence": 2
+          },
+          "secondary_diagnostics": [],
+          "secondary_omitted_count": 0,
+          "secondary_truncated": false
+        }
+      },
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "stop"
+      ],
+      "exit_code": 0,
+      "wall_ms": 1137.3538999978337,
+      "output": {
+        "output_version": 1,
+        "status": "stopped",
+        "terminal": true,
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f",
+        "operation_id": "3ce7e82138d64606bee3d4283f3ffbbf",
+        "cleanup_outcome": "unobserved"
+      },
+      "stderr": ""
+    }
+  ],
+  "cycles": [
+    {
+      "cycle": 0,
+      "ready": {
+        "state": "ready",
+        "instance_id": "bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f"
+      },
+      "host_pid": 45760,
+      "translations": []
+    }
+  ],
+  "isolation": {
+    "settings_seeded_before_first_start": true,
+    "secrets": "empty encrypted_file with throwaway process environment passphrase, no keyring",
+    "credential_environment_names_removed": [],
+    "models": "verified Q4/drafter hardlinks into isolated model installation; no automatic downloads",
+    "hf_offline": true,
+    "telemetry": false,
+    "osc": "mode off plus owned bound loopback UDP sink; no external output",
+    "capture": "never enabled",
+    "overlay_clipboard": "off",
+    "threads_persisted": {
+      "threads": 4,
+      "threads_batch": 12,
+      "draft_threads": 1
+    }
+  },
+  "failure": {
+    "type": "RuntimeError",
+    "message": "CLI command failed: ('settings', 'apply', '--arguments', '{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\", \"secondary_target\": \"\"}}}'): {'output_version': 1, 'instance_id': 'bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f', 'operation_id': '3e7c1eb8927c4099904a46c55b8387dd', 'request_id': '4fef9ee78a33562e787ca1a3d67e40d8', 'status': 'degraded', 'terminal': True, 'revision': 1, 'transaction': {'status': 'settings_commit_success_runtime_degraded', 'message': 'settings.mutation.runtime_apply_failed', 'diagnostics': {'schema_version': 1, 'diagnostic_id': '1dccabe9c876428a9a83a3421fd56f3d', 'instance_id': 'bfdd1cd8-e7a5-4dd6-bdb9-99465c51d44f', 'occurred_at': '2026-10-15T01:54:53.114+00:00', 'component': 'provider.stt', 'operation': 'provider_build', 'stage': 'provider_build', 'severity': 'error', 'disposition': 'failed', 'code': 'stt.provider_not_ready', 'category': 'unknown', 'cause_id': None, 'operation_id': '3e7c1eb8927c4099904a46c55b8387dd', 'request_id': '4fef9ee78a33562e787ca1a3d67e40d8', 'channel': 'self', 'turn_id': None, 'generation': 0, 'status_code': None, 'retry_after_ms': None, 'fields': {'exception_class': 'ValueError', 'provider': 'soniox', 'transport': 'unknown', 'tls_source': 'unknown', 'proxy_source': 'unknown', 'tls_backend': 'unknown', 'recognition_cause': 'provider_not_ready'}, 'file_evidence': 'unknown', 'detail': {'state': 'available', 'rejected_fields': 0, 'truncated': False}, 'diagnostic_sequence': 2}, 'secondary_diagnostics': [], 'secondary_omitted_count': 0, 'secondary_truncated': False}}: "
+  },
+  "udp_datagrams": [],
+  "events": [],
+  "owned_tree_files": [
+    "host-0.txt",
+    "isolated-secrets.json",
+    "native-0.txt",
+    "ready.json",
+    "settings.json",
+    "trace.jsonl",
+    "localappdata\\puripuly-heart\\llama_cpp_threads.json",
+    "localappdata\\puripuly-heart\\puripuly_heart.log",
+    "localappdata\\puripuly-heart\\control\\c094c31a70ae90e1f813711cf6b62f31b5f4dc0f6cd23c2c54cb6e07f57ffac2.lock",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+    "localappdata\\puripuly-heart\\gemma-prefix-cache\\index.json",
+    "localappdata\\puripuly-heart\\models\\.local-asr-provisioning.lock",
+    "localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+    "localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\installed-manifest.json",
+    "localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\mtp-gemma-4-E4B-it.gguf"
+  ],
+  "failure_trace": [
+    {
+      "kind": "host_identity",
+      "monotonic": 39224.7134227,
+      "python": "<PYTHON>",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "checkout": "7a8151be6114a950f062e2430bd36f899d57e4de",
+      "pid": 4344,
+      "runtime_build": "b10423",
+      "runtime_commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+      "process_discovery": "synthetic_empty",
+      "gui": "not_run"
+    },
+    {
+      "kind": "native_started",
+      "monotonic": 39227.0505124,
+      "command": [
+        "<EXTERNAL>\\b10423\\cpu\\llama-server.exe",
+        "--model",
+        "<ARM>\\localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+        "--alias",
+        "puripuly-gemma-4-e4b-q4",
+        "--load-mode",
+        "mmap",
+        "--ctx-size",
+        "4608",
+        "--parallel",
+        "3",
+        "--batch-size",
+        "512",
+        "--ubatch-size",
+        "512",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--cache-prompt",
+        "--reasoning",
+        "off",
+        "--reasoning-budget",
+        "0",
+        "--warmup",
+        "--perf",
+        "--metrics",
+        "--no-webui",
+        "--threads-http",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "60973",
+        "--prio",
+        "-1",
+        "--slot-save-path",
+        ".",
+        "--threads",
+        "4",
+        "--threads-batch",
+        "12",
+        "--device",
+        "none",
+        "--n-gpu-layers",
+        "0",
+        "--flash-attn",
+        "off",
+        "--spec-draft-model",
+        "<ARM>\\localappdata\\puripuly-heart\\models\\gemma-4-e4b-it-qat-ud-q4-k-xl\\mtp-gemma-4-E4B-it.gguf",
+        "--spec-type",
+        "draft-mtp",
+        "--spec-draft-n-max",
+        "3",
+        "--spec-draft-n-min",
+        "2",
+        "--spec-draft-p-min",
+        "0.0",
+        "--spec-draft-device",
+        "none",
+        "--spec-draft-ngl",
+        "0",
+        "--spec-draft-threads",
+        "1",
+        "--spec-draft-threads-batch",
+        "1",
+        "--spec-draft-type-k",
+        "f16",
+        "--spec-draft-type-v",
+        "f16",
+        "--verbosity",
+        "4"
+      ],
+      "pid": 24524
+    },
+    {
+      "kind": "cache_lookup",
+      "monotonic": 39231.1633677,
+      "identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370",
+      "backend": "cpu",
+      "eligible": false,
+      "existing_files": []
+    },
+    {
+      "kind": "prepare_prefix",
+      "monotonic": 39234.5136682,
+      "slot": 0,
+      "prompt_sha256": "4ffb791e10dbe6bffd9ef2e2a68ebb019f541799b2478a2cb7587158ede61d77",
+      "wall_ms": 3349.9951000048895
+    },
+    {
+      "kind": "save_prefix",
+      "monotonic": 39234.567607,
+      "filename": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370.cpu.bin",
+      "slot_id": 0
+    },
+    {
+      "kind": "owner_ready",
+      "monotonic": 39234.5685699,
+      "readiness": {
+        "requested_backend": "cpu",
+        "effective_backend": "cpu",
+        "source_language": "en",
+        "target_language": "ko",
+        "prefix_identity": "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370"
+      },
+      "active_slot": 0,
+      "slot_identities": [
+        "91c0e8283e668fcef62f6f5d060303721afad6f439910244dc374aaedfec7370",
+        null,
+        null
+      ],
+      "slot_lru": [
+        1,
+        2,
+        0
+      ]
+    },
+    {
+      "kind": "transport_closed",
+      "monotonic": 39234.9478715,
+      "client_cleared": true
+    },
+    {
+      "kind": "native_exit",
+      "monotonic": 39235.2267262,
+      "pid": 24524,
+      "returncode": 1
+    },
+    {
+      "kind": "owner_close_observed",
+      "monotonic": 39235.2269236,
+      "process_cleared": true,
+      "transport_cleared": true
+    }
+  ]
+}

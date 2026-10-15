@@ -1,0 +1,1420 @@
+{
+  "entries": [
+    {
+      "path": "app-new-cpu-cache0-app.json",
+      "bytes": 302442,
+      "sha256": "e02f1ab0651d3fee2f4ff430c146650159b7cc5c3ea8d03b7ca308d0da2b8ce6"
+    },
+    {
+      "path": "app-new-cpu-cache0-cycle0-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-cache0-cycle0-native-0.txt",
+      "bytes": 74163,
+      "sha256": "a86012ec45203edd5b942b7aa78798ece284ea7690633f8ba2c93ba6271ecce6"
+    },
+    {
+      "path": "app-new-cpu-cache0-cycle1-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-cache0-cycle1-native-0.txt",
+      "bytes": 37475,
+      "sha256": "d6ccb9eb5acd1a81d0f4fff1d2ac7e1bee9d381ad130f43b8a4935a4b4378714"
+    },
+    {
+      "path": "app-new-cpu-cache0-cycle2-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-cache0-cycle2-native-0.txt",
+      "bytes": 37475,
+      "sha256": "fa9295edf62da5bc3e10861afed10053719abe21dc8337345481427a8e1b926f"
+    },
+    {
+      "path": "app-new-cpu-cache0-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-cache0-host-1.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-cache0-host-2.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-guarded-app.json",
+      "bytes": 122802,
+      "sha256": "dbd2ce154199468031d580219be30b8c8fe61ce119fd151cf9802349f10faad5"
+    },
+    {
+      "path": "app-new-cpu-guarded-cycle0-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-guarded-cycle0-native-0.txt",
+      "bytes": 51108,
+      "sha256": "fd9f16be26c2077b046eedbbbf82aa4d18fe4fd1c75aea34ee3a10540fee0c90"
+    },
+    {
+      "path": "app-new-cpu-guarded-cycle1-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-guarded-cycle1-native-0.txt",
+      "bytes": 37731,
+      "sha256": "1ed388f590b92e3c79301657c2f3a2b34a4d8d7293152c693c832e2d006f38ef"
+    },
+    {
+      "path": "app-new-cpu-guarded-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-cpu-guarded-host-1.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-cache0-app.json",
+      "bytes": 299527,
+      "sha256": "52fa9cb688f26f093500408af79fcdab31ed18f03fc5701ea38928145dc81e22"
+    },
+    {
+      "path": "app-new-vulkan-cache0-cycle0-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-cache0-cycle0-native-0.txt",
+      "bytes": 63815,
+      "sha256": "370a2527653822be8eabbdd31d56c38e38043a43666c83bf58b8eac83013fdf1"
+    },
+    {
+      "path": "app-new-vulkan-cache0-cycle1-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-cache0-cycle1-native-0.txt",
+      "bytes": 22128,
+      "sha256": "64202ac9ef3f80b222fa89530268767c2e848a3e4c41590c55e57625dfb00afd"
+    },
+    {
+      "path": "app-new-vulkan-cache0-cycle2-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-cache0-cycle2-native-0.txt",
+      "bytes": 22128,
+      "sha256": "81eb17f71573993af37247daed97421480d53894ad299bc86d75d4ecf0f8fa44"
+    },
+    {
+      "path": "app-new-vulkan-cache0-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-cache0-host-1.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-cache0-host-2.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-guarded-app.json",
+      "bytes": 124416,
+      "sha256": "7924ecf809c7730a8bc360fbd88abfef2f7beea38e91d1a10eeb5edefb8465ab"
+    },
+    {
+      "path": "app-new-vulkan-guarded-cycle0-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-guarded-cycle0-native-0.txt",
+      "bytes": 48136,
+      "sha256": "293c499f17b7b9fed20e6ad4fc336dbf883b7b51f6cd1e1135f730b1fbf2d89f"
+    },
+    {
+      "path": "app-new-vulkan-guarded-cycle1-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-guarded-cycle1-native-0.txt",
+      "bytes": 22384,
+      "sha256": "5bb7d1c90ef4ba976a373cb580e353a341193d7401dc0fb93a7614739737681d"
+    },
+    {
+      "path": "app-new-vulkan-guarded-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-new-vulkan-guarded-host-1.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-cpu-app.json",
+      "bytes": 47112,
+      "sha256": "5c03a9fda7c1b3c6ffc297a891fbf9edc3f4b0e43c4facb3232391c14bf416fd"
+    },
+    {
+      "path": "app-old-cpu-failed-native-0.txt",
+      "bytes": 37703,
+      "sha256": "ecae0f210604cc669113ad5c6442defd6f3faa889f275e899fead55a3f1598f0"
+    },
+    {
+      "path": "app-old-cpu-guarded-app.json",
+      "bytes": 121400,
+      "sha256": "e36e863ee21cdf1dcbbc0e5574d64dad14cd09ba6538c9ad7fb89f695d133643"
+    },
+    {
+      "path": "app-old-cpu-guarded-cycle0-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-cpu-guarded-cycle0-native-0.txt",
+      "bytes": 51133,
+      "sha256": "32d56f2c2ac6cd35b5737151c25e4aa608704af1016e90c61f75b16dd3b8f4c4"
+    },
+    {
+      "path": "app-old-cpu-guarded-cycle1-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-cpu-guarded-cycle1-native-0.txt",
+      "bytes": 38242,
+      "sha256": "e39f9c07ab80f2a280f120c05f6ca516897d77ff206b34a7bf8da2fa2f446306"
+    },
+    {
+      "path": "app-old-cpu-guarded-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-cpu-guarded-host-1.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-cpu-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-vulkan-guarded-app.json",
+      "bytes": 122701,
+      "sha256": "cdeeb59c8cc3a43599019e29cb5250b4c7a33e2cd1ae6a99bd7ed508b689fb36"
+    },
+    {
+      "path": "app-old-vulkan-guarded-cycle0-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-vulkan-guarded-cycle0-native-0.txt",
+      "bytes": 48134,
+      "sha256": "1cf201687a26e81c107b8caf133d5c7761652c3fe0ed6017a46278c7786fb4e5"
+    },
+    {
+      "path": "app-old-vulkan-guarded-cycle1-host.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-vulkan-guarded-cycle1-native-0.txt",
+      "bytes": 22808,
+      "sha256": "f232f642dd224db663b7006d5ada4dced02b783fee6cb3b305a30ff83af95edf"
+    },
+    {
+      "path": "app-old-vulkan-guarded-host-0.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-old-vulkan-guarded-host-1.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app-summary.json",
+      "bytes": 162467,
+      "sha256": "d01c4e22eb2a3276c7705f472fe338f2001eeb5f6cdcdd95d86e706edde5b8c7"
+    },
+    {
+      "path": "b10423-cpu-devices.txt",
+      "bytes": 30,
+      "sha256": "b58762ecbfe35101c05a4fb3669aabcf292f2eec094fc8188d20f67780510035"
+    },
+    {
+      "path": "b10423-cpu-help.txt",
+      "bytes": 56741,
+      "sha256": "c18d6a3d901a9af9e1ff9c85e2a4776fcd607f9af4c6644f0e430ba33845ed07"
+    },
+    {
+      "path": "b10423-cpu-version.txt",
+      "bytes": 96,
+      "sha256": "279a7f8176478e29976487fa8e579e13f2f9ab540aeb2e42d924e144d20a18e8"
+    },
+    {
+      "path": "b10423-vulkan-devices.txt",
+      "bytes": 83,
+      "sha256": "ea08025a125748a303ee7edf50b4b1412d06cc367add345a9ff4a5bc44080e2c"
+    },
+    {
+      "path": "b10423-vulkan-help.txt",
+      "bytes": 56741,
+      "sha256": "c18d6a3d901a9af9e1ff9c85e2a4776fcd607f9af4c6644f0e430ba33845ed07"
+    },
+    {
+      "path": "b10423-vulkan-version.txt",
+      "bytes": 96,
+      "sha256": "279a7f8176478e29976487fa8e579e13f2f9ab540aeb2e42d924e144d20a18e8"
+    },
+    {
+      "path": "b11537-cpu-devices.txt",
+      "bytes": 30,
+      "sha256": "b58762ecbfe35101c05a4fb3669aabcf292f2eec094fc8188d20f67780510035"
+    },
+    {
+      "path": "b11537-cpu-help.txt",
+      "bytes": 60357,
+      "sha256": "1f7d01bd69fb9735aba2dbf23b788210de6469eb8f66ecc2cdf75a50645e5210"
+    },
+    {
+      "path": "b11537-cpu-version.txt",
+      "bytes": 96,
+      "sha256": "f21a21b584ad3b174ac656517783e992636972281b9589ae2488e8ba8c830529"
+    },
+    {
+      "path": "b11537-vulkan-devices.txt",
+      "bytes": 83,
+      "sha256": "ea08025a125748a303ee7edf50b4b1412d06cc367add345a9ff4a5bc44080e2c"
+    },
+    {
+      "path": "b11537-vulkan-help.txt",
+      "bytes": 60357,
+      "sha256": "1f7d01bd69fb9735aba2dbf23b788210de6469eb8f66ecc2cdf75a50645e5210"
+    },
+    {
+      "path": "b11537-vulkan-version.txt",
+      "bytes": 96,
+      "sha256": "f21a21b584ad3b174ac656517783e992636972281b9589ae2488e8ba8c830529"
+    },
+    {
+      "path": "b11630-cpu-devices.txt",
+      "bytes": 30,
+      "sha256": "b58762ecbfe35101c05a4fb3669aabcf292f2eec094fc8188d20f67780510035"
+    },
+    {
+      "path": "b11630-cpu-help.txt",
+      "bytes": 60708,
+      "sha256": "a52e4860e6d7a47892840f9df159cfe7dd6729127998279cf4143db685ef254d"
+    },
+    {
+      "path": "b11630-cpu-version.txt",
+      "bytes": 96,
+      "sha256": "71e5ab1850874dd252e7e9819c5fd890518d2a8852513841a59f5a8af3e20a15"
+    },
+    {
+      "path": "b11630-vulkan-devices.txt",
+      "bytes": 83,
+      "sha256": "ea08025a125748a303ee7edf50b4b1412d06cc367add345a9ff4a5bc44080e2c"
+    },
+    {
+      "path": "b11630-vulkan-help.txt",
+      "bytes": 60708,
+      "sha256": "a52e4860e6d7a47892840f9df159cfe7dd6729127998279cf4143db685ef254d"
+    },
+    {
+      "path": "b11630-vulkan-version.txt",
+      "bytes": 96,
+      "sha256": "71e5ab1850874dd252e7e9819c5fd890518d2a8852513841a59f5a8af3e20a15"
+    },
+    {
+      "path": "build-provenance.json",
+      "bytes": 5673,
+      "sha256": "ef31b9243f37e86543b0e6d756a075dacbe21313f7cabf82b7a82de701a6e664"
+    },
+    {
+      "path": "comparisons.json",
+      "bytes": 51310,
+      "sha256": "94105c0430f2e9828c9ab869e91e179be8083bf055d7728914378352e06b5f4d"
+    },
+    {
+      "path": "contend-new-cpu-cache0-accounted-contention.json",
+      "bytes": 73059,
+      "sha256": "22b57611f9ee26cba8759a40bf684ed94d89af0f2dad2e129ceaa074ccbdb34b"
+    },
+    {
+      "path": "contend-new-cpu-cache0-accounted-producer.txt",
+      "bytes": 56306,
+      "sha256": "2d89e1533310d290e007df41a2d4f6f7b415f5eb6db3d50619f8663f40e79e10"
+    },
+    {
+      "path": "contend-new-cpu-cache0-accounted-props.json",
+      "bytes": 21734,
+      "sha256": "5718e32f752a72449f62fab5492581998dca7b2b7bdfa674030583d228cfb021"
+    },
+    {
+      "path": "contend-new-cpu-cache0-accounted-run.json",
+      "bytes": 13565,
+      "sha256": "f9cfb998af7e8ce55b1d46ad877415cda9e20f44dbb6cbfe665b64c922852db8"
+    },
+    {
+      "path": "contend-new-cpu-cache0-contention.json",
+      "bytes": 43419,
+      "sha256": "312dac5dc59291e0585616cb252f1b89a18dd2ef158e22526b97618c303f0491"
+    },
+    {
+      "path": "contend-new-cpu-cache0-producer.txt",
+      "bytes": 56306,
+      "sha256": "e1130afb3002231afa355541881f06b3435e3e2d31484338dbc912312bf9346f"
+    },
+    {
+      "path": "contend-new-cpu-cache0-props.json",
+      "bytes": 2657,
+      "sha256": "46ead44158ff4b97fdebfd8feff037cc7362b35ac8bb2ef16aa8f32bdb91bc63"
+    },
+    {
+      "path": "contend-new-cpu-cache0-run.json",
+      "bytes": 13521,
+      "sha256": "98a9847268a4e30b5abb5186d9739f37627865badc3489b63ca0a7d34c7375cf"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-background-producer.txt",
+      "bytes": 59977,
+      "sha256": "d4544c28a78179527a426a26cdbcb2f53f9364c6e6fb67a1e68df9b8e8848eb9"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-background-props.json",
+      "bytes": 2617,
+      "sha256": "962f95bd457aa0151c9cdea36fc7a140b4491ad1baf26e12af0e4eb799bac879"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-background-run.json",
+      "bytes": 7178,
+      "sha256": "063bcaf9b923c7d7882fc8de2ee8a0dcae3bf48f53da8365dbc7f1a93331c690"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-contention.json",
+      "bytes": 41048,
+      "sha256": "7ad5b67e546ac32ddf4acdeca5fcde0a8bd799660e751d1b6ae6eb5f1b86405f"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-producer.txt",
+      "bytes": 51602,
+      "sha256": "b36bef9d448d4cff03c06fee2bcdec44343acbd666944983dcadf3e1841e571e"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-props.json",
+      "bytes": 2657,
+      "sha256": "6fc01be63093630485f4bea2938b0ec0ca0070d21f27c20384e6ce3048d50315"
+    },
+    {
+      "path": "contend-new-vulkan-cache0-run.json",
+      "bytes": 12846,
+      "sha256": "2276a2df9196a4c5d96637512055f032190f9c7a2236f6ae040e4814ca67c858"
+    },
+    {
+      "path": "contend-old-cpu-default-accounted-contention.json",
+      "bytes": 73029,
+      "sha256": "d667d2d19834f7d3fb0f862e66d05f7de84cdc9abeda77c1ac6088ae76f0aa3a"
+    },
+    {
+      "path": "contend-old-cpu-default-accounted-producer.txt",
+      "bytes": 90687,
+      "sha256": "83cec82d5af3fcce5cf33590d4a4e2d84ccc083e66941604a2e5214e9b76075e"
+    },
+    {
+      "path": "contend-old-cpu-default-accounted-props.json",
+      "bytes": 2617,
+      "sha256": "2611e43a57343ec6c1480dee50f44566589cfb1f550d1efe168151c03a7cd35d"
+    },
+    {
+      "path": "contend-old-cpu-default-accounted-run.json",
+      "bytes": 13511,
+      "sha256": "242e1356d4519920c7fca0af6a357299d8df467303673046c6d384d18002537a"
+    },
+    {
+      "path": "contend-old-cpu-default-contention.json",
+      "bytes": 43440,
+      "sha256": "3bdc543b89ce78b1873638176c4c71a792a5191595140c2279b46d4c7f7c699a"
+    },
+    {
+      "path": "contend-old-cpu-default-producer.txt",
+      "bytes": 90687,
+      "sha256": "a9775c3cfa1031d6097758c0b733849ebd638aa17e02600db398da3b71fe789a"
+    },
+    {
+      "path": "contend-old-cpu-default-props.json",
+      "bytes": 2617,
+      "sha256": "c303450b5feab67aa55d121532a07ac98238c0e4701eb7a8ca1857c20c0b0b28"
+    },
+    {
+      "path": "contend-old-cpu-default-run.json",
+      "bytes": 13492,
+      "sha256": "42e19b021e461456a4c9a7e44ab2a50091363031216fa721391468875d3f3ff3"
+    },
+    {
+      "path": "contend-old-vulkan-default-background-producer.txt",
+      "bytes": 60641,
+      "sha256": "f3cea9e37d1ae570521e7969d486f0cb52822edb7f5d8c2e1f88a8692a4116ea"
+    },
+    {
+      "path": "contend-old-vulkan-default-background-props.json",
+      "bytes": 2617,
+      "sha256": "3f8e0889ef5c7309a6580fedc0b4b7821c33e3b0a2e8bc810473eeca62496854"
+    },
+    {
+      "path": "contend-old-vulkan-default-background-run.json",
+      "bytes": 7179,
+      "sha256": "e72f93de8c46f7fee88e8e8ceff317b096b146c09a70a46f3a9622ff6501c1df"
+    },
+    {
+      "path": "contend-old-vulkan-default-contention.json",
+      "bytes": 41089,
+      "sha256": "1b637c6ece85110624a9866bf907c6596656028c1009993bb4cb857a002fea5e"
+    },
+    {
+      "path": "contend-old-vulkan-default-producer.txt",
+      "bytes": 83932,
+      "sha256": "4210835cc9a4fc2c626adaac984daa8469efa13e6b6cbbefa2b7b3c26369238b"
+    },
+    {
+      "path": "contend-old-vulkan-default-props.json",
+      "bytes": 2617,
+      "sha256": "a77a780668dd184e7e1df1e0a87762cfe928b8c3155668605db394ca117ee163"
+    },
+    {
+      "path": "contend-old-vulkan-default-run.json",
+      "bytes": 12825,
+      "sha256": "5c4f75e59a5f18b485011adffdbab21c76194dd948e6bfbaffbcf0b16d18f6e9"
+    },
+    {
+      "path": "environment.json",
+      "bytes": 6281,
+      "sha256": "15b3c6fd95026b87f6d60a0a95a1ee47e5067038c123ebdcbe916b58b9108252"
+    },
+    {
+      "path": "execution-counts.json",
+      "bytes": 347,
+      "sha256": "c46db2a0ca10cef3d43e547c090125ec6d957f9827320c2a1981a1103d37dccf"
+    },
+    {
+      "path": "followon-cpu-on-tune-producer.txt",
+      "bytes": 53646,
+      "sha256": "df22b1a182319c91560ee71b826646a99f699730e89738eaa683b841958a8c82"
+    },
+    {
+      "path": "followon-cpu-on-tune-props.json",
+      "bytes": 2657,
+      "sha256": "0199f3923c859654b25c4334fd03808225968044ccc6b429354a19e890a2cec1"
+    },
+    {
+      "path": "followon-cpu-on-tune-run.json",
+      "bytes": 13344,
+      "sha256": "8b820a2ed13b28b1d3a4b0168ba6391ad1d157658e50100d2740dd654f989884"
+    },
+    {
+      "path": "followon-identity.json",
+      "bytes": 19459,
+      "sha256": "8986dbbd7e6b991034a86a9aa99d0d99da31e2a2bcc48a05dfbd6ac4b8c34b24"
+    },
+    {
+      "path": "followon-vulkan-on-tune-producer.txt",
+      "bytes": 49173,
+      "sha256": "e53a80b895ad016a7689bd6985b31015d7a155ad5d1a05937223321f9797f1ff"
+    },
+    {
+      "path": "followon-vulkan-on-tune-props.json",
+      "bytes": 2657,
+      "sha256": "052410daf9e879035ed6b02919b94ccd9c1a70b392792c3a6dec96a64ad08812"
+    },
+    {
+      "path": "followon-vulkan-on-tune-run.json",
+      "bytes": 12843,
+      "sha256": "6139dca03a757adbccbd8209ab623b25f7aff7c44e2e978675730d0d274de3c0"
+    },
+    {
+      "path": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf.json",
+      "bytes": 164814,
+      "sha256": "24e510512a7aa8aa46ffcc0263c0e8cf6853b864f131f5bab357808e25b6a203"
+    },
+    {
+      "path": "identity.json",
+      "bytes": 39673,
+      "sha256": "1d3238b8fd4f116a01041ae982ecc1aec7fb949b217b24d978370317d34e8226"
+    },
+    {
+      "path": "literal-new-cpu-cache0-producer.txt",
+      "bytes": 48833,
+      "sha256": "73934e298f17e9013cb8ec52869e3b1620f8e03771b8e49078c12b2480827d41"
+    },
+    {
+      "path": "literal-new-cpu-cache0-props.json",
+      "bytes": 2657,
+      "sha256": "9267ab2192ae61ef70e7088f0460041b5204b265904ada53c3f82e4d2e61b960"
+    },
+    {
+      "path": "literal-new-cpu-cache0-run.json",
+      "bytes": 13515,
+      "sha256": "5b262d2093e5e9d42c84288607ee9aa88fea13967cc318ce8f5aa4ffe6fc48df"
+    },
+    {
+      "path": "literal-new-cpu-default-producer.txt",
+      "bytes": 56621,
+      "sha256": "b7e09937e0b9135350208de577a888105bddeacf029b023ec3e615f017dbb891"
+    },
+    {
+      "path": "literal-new-cpu-default-props.json",
+      "bytes": 2657,
+      "sha256": "87f3b95d58d1f58501e9c4d6a9989f8c419cc091ff15e390a640d97312957fd4"
+    },
+    {
+      "path": "literal-new-cpu-default-run.json",
+      "bytes": 13492,
+      "sha256": "8aec47573dac0da2657ce2a9a490e551638204e81d4be3cb2a1c2aa4ee979d06"
+    },
+    {
+      "path": "literal-new-vulkan-cache0-producer.txt",
+      "bytes": 46583,
+      "sha256": "48ff07cce11fa61db6d9df58edd1be6d21098bb03f9ad1d359ccd8c908275dd3"
+    },
+    {
+      "path": "literal-new-vulkan-cache0-props.json",
+      "bytes": 2657,
+      "sha256": "29cdef3961f63e369febcb5ed9e570323bbd80c6d131082285fed3e26cf0c303"
+    },
+    {
+      "path": "literal-new-vulkan-cache0-run.json",
+      "bytes": 12847,
+      "sha256": "3284d05e4c75f6be51159e6f7126b0d78b63032e1aec4ca3b7b6390d5bed7acc"
+    },
+    {
+      "path": "literal-new-vulkan-default-producer.txt",
+      "bytes": 54178,
+      "sha256": "db355ea2ea8e7ff4a38630a8015a978c78cbe7100ff1239cbf2e1ae91b459e47"
+    },
+    {
+      "path": "literal-new-vulkan-default-props.json",
+      "bytes": 2657,
+      "sha256": "09c9d680aff68fd7abced7fd97a21b40392343bc922eb76e8b2e2e31c15f20e8"
+    },
+    {
+      "path": "literal-new-vulkan-default-run.json",
+      "bytes": 12817,
+      "sha256": "95ace0fc68c1cbba71e6fb2c6d4a7dd44733fbf1d14908728e618d3346879eaf"
+    },
+    {
+      "path": "literal-old-cpu-cache0-producer.txt",
+      "bytes": 50576,
+      "sha256": "60e23976373f3f9243f69bc162a139edc132169c481ed743d2663406f6d60fa1"
+    },
+    {
+      "path": "literal-old-cpu-cache0-props.json",
+      "bytes": 2617,
+      "sha256": "58968a8c1be0f8f9c43e98269f750c9e524135ea01bc05fc17581b185c1f7c8e"
+    },
+    {
+      "path": "literal-old-cpu-cache0-run.json",
+      "bytes": 13508,
+      "sha256": "fc380f7f9ae2a6a84b6329a7ccae54bb52a982ffec644b0aa035ed8b5c731335"
+    },
+    {
+      "path": "literal-old-cpu-default-producer.txt",
+      "bytes": 58327,
+      "sha256": "265a8e0c6ab73dde287ba1671c8909707b3503968ba84332946dc84f6d2a3cf3"
+    },
+    {
+      "path": "literal-old-cpu-default-props.json",
+      "bytes": 2617,
+      "sha256": "054380e649e794550c365ba0ff39e53ffc8a9c9295cf70f6eb29a061b06c3d4d"
+    },
+    {
+      "path": "literal-old-cpu-default-run.json",
+      "bytes": 13486,
+      "sha256": "7382d7302ee0af2108291e02df57b78a5166378a58a480c053023e2bd8cad6da"
+    },
+    {
+      "path": "literal-old-vulkan-cache0-producer.txt",
+      "bytes": 47547,
+      "sha256": "29148691c54a8b79c3b8d88397e26b61cc903c1f5ae6356dbd1629df07b991a0"
+    },
+    {
+      "path": "literal-old-vulkan-cache0-props.json",
+      "bytes": 2617,
+      "sha256": "274bb128a32ac8a8760fe546251d675531315c9df61a1b22ddedaeb024c2edfa"
+    },
+    {
+      "path": "literal-old-vulkan-cache0-run.json",
+      "bytes": 12849,
+      "sha256": "bf3004ec5220fa6404e2a11d5797552c1c5a06047726066f48a20381024bdfe3"
+    },
+    {
+      "path": "literal-old-vulkan-default-producer.txt",
+      "bytes": 54995,
+      "sha256": "8d794b098c09ed166e9578004024dea2efe2a74589a6c6ef3e6f0bbd2f93199b"
+    },
+    {
+      "path": "literal-old-vulkan-default-props.json",
+      "bytes": 2617,
+      "sha256": "c1ea749a85dd3c441011af32d1360b1405f77e3dbe2cad85b646a1baae48d5f8"
+    },
+    {
+      "path": "literal-old-vulkan-default-run.json",
+      "bytes": 12820,
+      "sha256": "ee87d673ac89fd492efcba2609d1e794d01afb17dc4ca250bd48db3263543a51"
+    },
+    {
+      "path": "memory-soak-bins.json",
+      "bytes": 187408,
+      "sha256": "73bbb1ade7129d780154543ad577e301108e10145e2aab398dedf892b4e6028b"
+    },
+    {
+      "path": "mtp-gemma-4-E4B-it.gguf.json",
+      "bytes": 31439,
+      "sha256": "1e935dc11934ddabe0b7c72dbe3c44e3ff3fbaa8d67675d9805922f7517e50b5"
+    },
+    {
+      "path": "new-cpu-auto-tune-producer.txt",
+      "bytes": 71589,
+      "sha256": "0a8377cfc5af2e6b76fe1ef83e2a63c0a5ba6b644d2dd1c6dc08103e699149fe"
+    },
+    {
+      "path": "new-cpu-auto-tune-props.json",
+      "bytes": 2657,
+      "sha256": "e71a454efb5d9b26278d3441da3bc780e1959e1d4da1ae911b77c0fbbd2da333"
+    },
+    {
+      "path": "new-cpu-auto-tune-run.json",
+      "bytes": 13305,
+      "sha256": "9825c91e41e64b0afc6b96524412a0ffcd48dae8fec33dca41c61e9e104b9910"
+    },
+    {
+      "path": "new-cpu-cache0-fa-on-tune-producer.txt",
+      "bytes": 53585,
+      "sha256": "2a3bd4063a324a2d0302b41fa754162eceb5b90ec67f597b62ca88d34c26f6ea"
+    },
+    {
+      "path": "new-cpu-cache0-fa-on-tune-props.json",
+      "bytes": 2657,
+      "sha256": "4cdd1d287db359ee6c9a7d7538244c0293714a113a241bb88006cc10795ab9f7"
+    },
+    {
+      "path": "new-cpu-cache0-fa-on-tune-run.json",
+      "bytes": 13382,
+      "sha256": "20fbd0f4faea1133f5694d5764ab799404fc696e08e9e227f2c4914ef064a155"
+    },
+    {
+      "path": "new-cpu-cache0-final-a-producer.txt",
+      "bytes": 66990,
+      "sha256": "f36955d430caefb98dc5d0bb6bb128dee629567d132fe7444c624950410f523f"
+    },
+    {
+      "path": "new-cpu-cache0-final-a-props.json",
+      "bytes": 2657,
+      "sha256": "ff138e3488b1ffbc0a9a49e6f6027b05f32aa4d8146669f4adf487467f3b6c3a"
+    },
+    {
+      "path": "new-cpu-cache0-final-a-run.json",
+      "bytes": 13343,
+      "sha256": "cd3ead072a64d09e3d65450b0b69eb2c2f1b3be501ed038b933cf100c0532b7e"
+    },
+    {
+      "path": "new-cpu-cache0-final-b-producer.txt",
+      "bytes": 66992,
+      "sha256": "75bcd00c529e70945ef9382265c5ee4c99e3a996cbe90ac2741015cff54615fa"
+    },
+    {
+      "path": "new-cpu-cache0-final-b-props.json",
+      "bytes": 2657,
+      "sha256": "33ad0f4030b37d04b9d2eca4d53d533379b6f52bbb1df9d60534b54ce6b6c855"
+    },
+    {
+      "path": "new-cpu-cache0-final-b-run.json",
+      "bytes": 13344,
+      "sha256": "0b88a72f6e71103e4e6af09634d37d8337d1680aa2cd8ea0de50cdcb65df49aa"
+    },
+    {
+      "path": "new-cpu-cache0-norepack-tune-producer.txt",
+      "bytes": 43693,
+      "sha256": "0c9e288493d4416c20d5fd300c0d8beadc795a938d52bdf4aeda8fb05b6f1045"
+    },
+    {
+      "path": "new-cpu-cache0-norepack-tune-props.json",
+      "bytes": 2657,
+      "sha256": "159cd57bae910e193e79cb177a17adb72fa18a967184a48c599cf9eae7a3993d"
+    },
+    {
+      "path": "new-cpu-cache0-norepack-tune-run.json",
+      "bytes": 13367,
+      "sha256": "ce3a71a36d77bf4e227a964d9be12d185bc4e22568851f04187190d464d503cc"
+    },
+    {
+      "path": "new-cpu-cache0-soak-producer.txt",
+      "bytes": 213971,
+      "sha256": "c5efbffbcc8be767b2b10bcb5137c95c496d0dc1002016c1727ef0c2b3ff0208"
+    },
+    {
+      "path": "new-cpu-cache0-soak-props.json",
+      "bytes": 2657,
+      "sha256": "6795d1b7de95402a3a66a514c6b23f364fc5b17c378db11e6959ff99dab68aec"
+    },
+    {
+      "path": "new-cpu-cache0-soak-run.json",
+      "bytes": 13512,
+      "sha256": "a44e9e780ed7352042dc8fd8bd06b4fd60b6e17a1d74f3a6de57dd643b661099"
+    },
+    {
+      "path": "new-cpu-cache0-tune-producer.txt",
+      "bytes": 53756,
+      "sha256": "44afcd99c4321c354fddb3ab0fce3d587f34e3065359d0da174ca2f606220ca2"
+    },
+    {
+      "path": "new-cpu-cache0-tune-props.json",
+      "bytes": 2657,
+      "sha256": "fd5c132a211fc82e0b303c12583389b1a605e3b66906b3e84dca50e7bc956471"
+    },
+    {
+      "path": "new-cpu-cache0-tune-run.json",
+      "bytes": 13337,
+      "sha256": "5e00941a7a88b5b543e534383e60c613b7fb4b21c06c864604a3b45f02d663ed"
+    },
+    {
+      "path": "new-cpu-cache512-soak-producer.txt",
+      "bytes": 153741,
+      "sha256": "db90e36d6766e0ac4ed1c74923ea085523c3cb5bc1122249011b4fdc8c91528e"
+    },
+    {
+      "path": "new-cpu-cache512-soak-props.json",
+      "bytes": 2657,
+      "sha256": "2b57e5c6a42451e9ce64103b97d6f828f3907aaabed611bd23a12a8de63bb85e"
+    },
+    {
+      "path": "new-cpu-cache512-soak-run.json",
+      "bytes": 13517,
+      "sha256": "7d11ef9b08d585b36c0e23837cc237eae5c486703d0ea8bedfd1c1ba55d450c1"
+    },
+    {
+      "path": "new-cpu-default-soak-producer.txt",
+      "bytes": 131928,
+      "sha256": "123af01f55f341f528387916499df1f1bb1a60c9f841f2fce29f5ea83b685f98"
+    },
+    {
+      "path": "new-cpu-default-soak-props.json",
+      "bytes": 2657,
+      "sha256": "a7ac5db9b04677be595a4ec6c5ab53b1e828a977e3f6610ff696c2ecb7f62c4d"
+    },
+    {
+      "path": "new-cpu-default-soak-run.json",
+      "bytes": 13528,
+      "sha256": "2ebc11b3ebbce03fe479e5f6f97f20066a65569807c031acdb363fcd59053c4d"
+    },
+    {
+      "path": "new-cpu-final-a-producer.txt",
+      "bytes": 127234,
+      "sha256": "ddcff8c43a6cb26550790c4f7ac0081ffa8b65d159c5c5c1c94aa738918fe660"
+    },
+    {
+      "path": "new-cpu-final-a-props.json",
+      "bytes": 2657,
+      "sha256": "6da9feb5f01e76da3977b41a5bf10a435ae932a64d6d384b848b5818bb6ce512"
+    },
+    {
+      "path": "new-cpu-final-a-run.json",
+      "bytes": 13304,
+      "sha256": "cba80e4e79ed049ec5fa73d7f2e1cfd7d66bb472d7c383c92e063b4658563aca"
+    },
+    {
+      "path": "new-cpu-final-b-producer.txt",
+      "bytes": 127232,
+      "sha256": "49bd21af7b34fda57bc1cf117bbcdc88164892a315065bf07867ed7710d0215f"
+    },
+    {
+      "path": "new-cpu-final-b-props.json",
+      "bytes": 2657,
+      "sha256": "fe04b5dce9908a860ca2750cf4d7182f9f74c246bea540ef46cbeb02e5bfe420"
+    },
+    {
+      "path": "new-cpu-final-b-run.json",
+      "bytes": 13303,
+      "sha256": "0868e26af0f1dabc509f8f587b0632260b77b5db3ed3dde8c523200d07ac680f"
+    },
+    {
+      "path": "new-cpu-greedy-off-clean-producer.txt",
+      "bytes": 52193,
+      "sha256": "da172cac8396b02c940ebb9480d956919f943df5b3ff9e7acc99396693ed4189"
+    },
+    {
+      "path": "new-cpu-greedy-off-clean-props.json",
+      "bytes": 2657,
+      "sha256": "495847086440de0647f346136742427a813a20fadd18bbfa61d8618b9a6183e9"
+    },
+    {
+      "path": "new-cpu-greedy-off-clean-run.json",
+      "bytes": 20338,
+      "sha256": "64bebd2a59836ba606a1bd59a29cc4a3b4412ca6321c7e0295a24c5d2d8eece4"
+    },
+    {
+      "path": "new-cpu-greedy-off-failure.json",
+      "bytes": 73,
+      "sha256": "739830a7c7325d9d01ba8b6a6ba83e9912fc128cf9063c1142d4426ffd4b92de"
+    },
+    {
+      "path": "new-cpu-greedy-off-producer.txt",
+      "bytes": 18531,
+      "sha256": "2a523d833db83a7ae565f45009e057600af5e1aa2cf1e43af74be13129405540"
+    },
+    {
+      "path": "new-cpu-greedy-off-run.json",
+      "bytes": 1959,
+      "sha256": "37d4e92ad9f9643d4119797510e9757e1dbae0ba5c4649bcde6c18199aab37d7"
+    },
+    {
+      "path": "new-cpu-greedy-on-producer.txt",
+      "bytes": 56435,
+      "sha256": "c5e85ea142c855ae900625917445f12317dbc6debb3d66675c671a3a796d30b3"
+    },
+    {
+      "path": "new-cpu-greedy-on-props.json",
+      "bytes": 2657,
+      "sha256": "7528eddeef7dd2ebd565deeaa3fb9ee9826baad43fc36e296a50a6744ca30aa9"
+    },
+    {
+      "path": "new-cpu-greedy-on-run.json",
+      "bytes": 20965,
+      "sha256": "1ec726411ba1c941d5aa636fc83852ce2ba14ea1e0e8e6256f50f25e626dfbbb"
+    },
+    {
+      "path": "new-cpu-lazy-off-sanity-producer.txt",
+      "bytes": 41866,
+      "sha256": "56003594e6ea3acb147d13bc1d158aaa16bdd2930100f3533a51eb38cd83d8d6"
+    },
+    {
+      "path": "new-cpu-lazy-off-sanity-props.json",
+      "bytes": 2657,
+      "sha256": "11df702c30feb5fb49f40d7dc980938d8edfead3d4350597d4f43e68ad46f3eb"
+    },
+    {
+      "path": "new-cpu-lazy-off-sanity-run.json",
+      "bytes": 13344,
+      "sha256": "e41775d254dccdb0919e0f206f13a3a0f561826d0efd892aee7eb1c7897a10d4"
+    },
+    {
+      "path": "new-cpu-lazy-on-tune-producer.txt",
+      "bytes": 71633,
+      "sha256": "ced8e7a58113e1e2af38ff75f9e1a325b869f2e4b7d71d12e6d7d10df0a13d37"
+    },
+    {
+      "path": "new-cpu-lazy-on-tune-props.json",
+      "bytes": 2657,
+      "sha256": "5a007cd8d2eb2ae06348207040357b7aefebc4380ae15d615d91440273e7378b"
+    },
+    {
+      "path": "new-cpu-lazy-on-tune-run.json",
+      "bytes": 13347,
+      "sha256": "f4a001218900476b7701b6cdb260b8218d128fb63d2cc35dc24bd4b05402b8b5"
+    },
+    {
+      "path": "new-cpu-quality-producer.txt",
+      "bytes": 65156,
+      "sha256": "e018037f28f2546903d70db9bee0999608940c29180a07f00a6b12c9494939ee"
+    },
+    {
+      "path": "new-cpu-quality-props.json",
+      "bytes": 2657,
+      "sha256": "57972726d27ab00e2c83d708840f4aaf14ffd8b484f235b9042959660a41ff50"
+    },
+    {
+      "path": "new-cpu-quality-run.json",
+      "bytes": 20970,
+      "sha256": "f4eb0798194e948a54f9201d2ba2d6f441cb81677c51e6a10c870dc613e32d31"
+    },
+    {
+      "path": "new-vulkan-auto-tune-producer.txt",
+      "bytes": 67300,
+      "sha256": "08ef9029727e4ee6c934ccea4c35191c45450548666d2841ccf85d8e332371d8"
+    },
+    {
+      "path": "new-vulkan-auto-tune-props.json",
+      "bytes": 2657,
+      "sha256": "7cad65b2cf97b6695254cf741be1eeffbbc6b0cb5604871259172cea9b361ab0"
+    },
+    {
+      "path": "new-vulkan-auto-tune-run.json",
+      "bytes": 12806,
+      "sha256": "0b49a6907aa428300c3ba5e4d751349e5c0bcf710ad4dc84ed99c31686d1b152"
+    },
+    {
+      "path": "new-vulkan-cache0-final-a-producer.txt",
+      "bytes": 58747,
+      "sha256": "2d357cf7a0e32ec6fc3c8b0590d31c23c053a9b877962a9beac934bfaa77a073"
+    },
+    {
+      "path": "new-vulkan-cache0-final-a-props.json",
+      "bytes": 2657,
+      "sha256": "e475c21ba0a59cee4f749a9b977afd1f7754ad14d625cedd8df50ccf5e33599b"
+    },
+    {
+      "path": "new-vulkan-cache0-final-a-run.json",
+      "bytes": 12844,
+      "sha256": "10603f9e37ad318934b4df698e67f9a2660afc6ed1f51da97caf2e425165a4f1"
+    },
+    {
+      "path": "new-vulkan-cache0-final-b-producer.txt",
+      "bytes": 58747,
+      "sha256": "8a1a4881f770dc1a004bdadb0be79c21681e2ca2834e893e1b61036e13acc968"
+    },
+    {
+      "path": "new-vulkan-cache0-final-b-props.json",
+      "bytes": 2657,
+      "sha256": "c7a624657a98567a8f0c6bd0ab00305822b081e82fd4f1d8d3830f5aafa846e8"
+    },
+    {
+      "path": "new-vulkan-cache0-final-b-run.json",
+      "bytes": 12843,
+      "sha256": "456996678abf1e0ce7036bd974d977594089d3cbd4f7806e7d8dbebc0f1f4797"
+    },
+    {
+      "path": "new-vulkan-cache0-soak-producer.txt",
+      "bytes": 158214,
+      "sha256": "f6789d75167a4418263e9ad0ad0419681037deaaf25154fdfcb231202d19758a"
+    },
+    {
+      "path": "new-vulkan-cache0-soak-props.json",
+      "bytes": 2657,
+      "sha256": "8c92c293713de700e5258b107c12d96f0f6bda96b7c08f8db4ecdcf89766bbe8"
+    },
+    {
+      "path": "new-vulkan-cache0-soak-run.json",
+      "bytes": 12839,
+      "sha256": "ba85e91a66fe6c7fda79b9d054e5dbab1382c965913368bc8f7837b2b2d6fc52"
+    },
+    {
+      "path": "new-vulkan-cache0-tune-producer.txt",
+      "bytes": 49831,
+      "sha256": "11bf5bd8dc50d96ae4735f53b489f4db9658fd0fddcc6c5d13238c015f33062f"
+    },
+    {
+      "path": "new-vulkan-cache0-tune-props.json",
+      "bytes": 2657,
+      "sha256": "2bb78ae27ba92fbd07e978d2a139f13645fa3e30a3ef492e1ac8633980bd452a"
+    },
+    {
+      "path": "new-vulkan-cache0-tune-run.json",
+      "bytes": 12842,
+      "sha256": "4d3007da727e0727ac7b9e5546b55769552848a0cb5d6048e4caefab9d140016"
+    },
+    {
+      "path": "new-vulkan-cache512-soak-producer.txt",
+      "bytes": 131573,
+      "sha256": "97560dd7a13c75b4f00ee0e1b0092e84290823bc738e11712b6a341d972323ca"
+    },
+    {
+      "path": "new-vulkan-cache512-soak-props.json",
+      "bytes": 2657,
+      "sha256": "39a244b10d8276818d802ce0c404b61efa0ce874d3c8a835c14e115f8f3f8f73"
+    },
+    {
+      "path": "new-vulkan-cache512-soak-run.json",
+      "bytes": 12852,
+      "sha256": "e39b589a32f8029bdb8cae99ee0ed53171aef493ddff128313d8a37c46869169"
+    },
+    {
+      "path": "new-vulkan-default-soak-producer.txt",
+      "bytes": 196370,
+      "sha256": "0a6bf2d0476d7c176a5d4b85f1c5c33fbc90a6cd631e2220c766e3c924c87c9b"
+    },
+    {
+      "path": "new-vulkan-default-soak-props.json",
+      "bytes": 2657,
+      "sha256": "05ea1736fdf9a6dc1e0e1662131da379de39aec8050113111512a9a5791a90e6"
+    },
+    {
+      "path": "new-vulkan-default-soak-run.json",
+      "bytes": 13036,
+      "sha256": "3bda9e864b27725e5f08cb32fac53455587ce738c63c15eefc9debd150c819a2"
+    },
+    {
+      "path": "new-vulkan-final-a-producer.txt",
+      "bytes": 118619,
+      "sha256": "409ac72e206663d35850e32d0d0769bdef52adb3da23e5aaedeeabb2f2787631"
+    },
+    {
+      "path": "new-vulkan-final-a-props.json",
+      "bytes": 2657,
+      "sha256": "ce9a33d55a7f3d5244ceb9da2fb5a9218850a8b74d98ff5036c28dc3c3dac86b"
+    },
+    {
+      "path": "new-vulkan-final-a-run.json",
+      "bytes": 12801,
+      "sha256": "9a58564a3b048402757553f73de07068b96963759eb49422ac9969e493b9e651"
+    },
+    {
+      "path": "new-vulkan-final-b-producer.txt",
+      "bytes": 118619,
+      "sha256": "980103f237e7336496827b988c35f1de91b5350d72cc96e944a11a26678dcdce"
+    },
+    {
+      "path": "new-vulkan-final-b-props.json",
+      "bytes": 2657,
+      "sha256": "ec4a71da572c9ab6f3935faccd7f5fa620ef3f88e1eb80a96df5ec51a1510460"
+    },
+    {
+      "path": "new-vulkan-final-b-run.json",
+      "bytes": 12802,
+      "sha256": "e1e29e533317523ff69e39764520175eb53e3e6272f8d1747650dff37b78d7e4"
+    },
+    {
+      "path": "new-vulkan-lazy-off-sanity-producer.txt",
+      "bytes": 36370,
+      "sha256": "75f141d2396fd3f3fdcfb7a37fab7c29cb1a197220116b3d32ff64f2a7180153"
+    },
+    {
+      "path": "new-vulkan-lazy-off-sanity-props.json",
+      "bytes": 2657,
+      "sha256": "58fae50dcfc3d2ed8313fe76748dea74a8ce98a17a74bc29dff06e81ae3cad61"
+    },
+    {
+      "path": "new-vulkan-lazy-off-sanity-run.json",
+      "bytes": 12849,
+      "sha256": "330f144cc5510e12a87b303bb20d1225c300eb129ba7ffa6afe0d9f22510c6a7"
+    },
+    {
+      "path": "new-vulkan-lazy-on-tune-producer.txt",
+      "bytes": 67267,
+      "sha256": "acb88258f89ec17b709704e65301d52cceb6aaf89eba3115c37a50d4a60f5e62"
+    },
+    {
+      "path": "new-vulkan-lazy-on-tune-props.json",
+      "bytes": 2657,
+      "sha256": "ef2a19ef2b4970c1e967f4d12e044d8047dd76262df0b282703d305d3b6fe910"
+    },
+    {
+      "path": "new-vulkan-lazy-on-tune-run.json",
+      "bytes": 12842,
+      "sha256": "3354900d7f763d436e2dbf657072fbd3a92ef4f8fbaf68f90a1fc8b2d73dba83"
+    },
+    {
+      "path": "new-vulkan-quality-producer.txt",
+      "bytes": 60059,
+      "sha256": "774368bb3189004e457c85fe7e875a1aa0a1c8214804141b993aeb8d0716cc57"
+    },
+    {
+      "path": "new-vulkan-quality-props.json",
+      "bytes": 2657,
+      "sha256": "05fedc43edf06490eb32ca0e1959e0acc668b59c0b0d1811f68c207ee9963a72"
+    },
+    {
+      "path": "new-vulkan-quality-run.json",
+      "bytes": 20441,
+      "sha256": "90e93dbf9d794cc9c515af1a3b3078fd622ce3fb2e1959555ab15cf3e10198ab"
+    },
+    {
+      "path": "old-cpu-cache0-final-a-producer.txt",
+      "bytes": 70510,
+      "sha256": "fb219771963efeaaf187d5d415f0910dd9c75987671a989d91f24dfc320f3ae4"
+    },
+    {
+      "path": "old-cpu-cache0-final-a-props.json",
+      "bytes": 2617,
+      "sha256": "b7a34c42723855058cbe5c49cc9f1007fbe86497db1f714b472ca502f4dd48b9"
+    },
+    {
+      "path": "old-cpu-cache0-final-a-run.json",
+      "bytes": 13342,
+      "sha256": "03aca82735f1f5b62a19afeaf0dd89a3f755f6f46f0581cf9864f78a318fb596"
+    },
+    {
+      "path": "old-cpu-cache0-final-b-producer.txt",
+      "bytes": 70514,
+      "sha256": "767f1cf4c6a72cddfef8e7e80e0757366ef8251b54f6a2d0bbefa86fb085e3a8"
+    },
+    {
+      "path": "old-cpu-cache0-final-b-props.json",
+      "bytes": 2617,
+      "sha256": "1ba84ae129e1cf9cd77e5480dc501b350e9a849f70e4edea6d0181f6a0987adf"
+    },
+    {
+      "path": "old-cpu-cache0-final-b-run.json",
+      "bytes": 13346,
+      "sha256": "266362303f59c9bedffaee410eb92b2ef0e1c607a3893daf54b0201eb6eb15e0"
+    },
+    {
+      "path": "old-cpu-cache0-soak-producer.txt",
+      "bytes": 229493,
+      "sha256": "f55487336706d57493bdb7245715856d992cdc5bce9a4e1f596ff09040971887"
+    },
+    {
+      "path": "old-cpu-cache0-soak-props.json",
+      "bytes": 2617,
+      "sha256": "3b19014196d40b23ed6a2e2ed55618404d06183e381d4da0f4a27ba8961986b9"
+    },
+    {
+      "path": "old-cpu-cache0-soak-run.json",
+      "bytes": 13514,
+      "sha256": "5d7186d718f8897e480cbed8c2f2f23d3d119a81dcabf8f41388e81ed37a2709"
+    },
+    {
+      "path": "old-cpu-cache0-tune-producer.txt",
+      "bytes": 56256,
+      "sha256": "2d82dcd22f4795cedd2e93e021108298e4ecf232434c841491f528c3e9d3a2ca"
+    },
+    {
+      "path": "old-cpu-cache0-tune-props.json",
+      "bytes": 2617,
+      "sha256": "927f027599bd9e8e7770717dd8c6f8f581676c22dfafff0c3ce91269109d0c49"
+    },
+    {
+      "path": "old-cpu-cache0-tune-run.json",
+      "bytes": 13335,
+      "sha256": "65ea51f9b63e51e77579d8829d29ab78c76a6e2eeecc754da43535797bc4dc8a"
+    },
+    {
+      "path": "old-cpu-default-soak-producer.txt",
+      "bytes": 261507,
+      "sha256": "0471280955b1f37b614696104a4de67b8702fd6818c43400d93719f4e9e5ead1"
+    },
+    {
+      "path": "old-cpu-default-soak-props.json",
+      "bytes": 2617,
+      "sha256": "3fa4198b0ee52054519ca024d376a6ef049e141a6282179c52668b1da9bd87f4"
+    },
+    {
+      "path": "old-cpu-default-soak-run.json",
+      "bytes": 13523,
+      "sha256": "d9f4ee48f7cede0ecb97353695789445ffd8e76b568bd5eb83cb6fd4dd32f328"
+    },
+    {
+      "path": "old-cpu-final-a-producer.txt",
+      "bytes": 130719,
+      "sha256": "e3e1caf8eb7f4f1cdd3aa3c6d89d080e212a1d3d3ef6047d8ec482357a86a0c8"
+    },
+    {
+      "path": "old-cpu-final-a-props.json",
+      "bytes": 2617,
+      "sha256": "8f3e1fe4bd6de4450b918ac51b62711d41610781ef4befe3ad0477d7e0064f80"
+    },
+    {
+      "path": "old-cpu-final-a-run.json",
+      "bytes": 13297,
+      "sha256": "1e598c9413c6c00fef866a031d875f4908f0563684922b810a1034c83e1c55b5"
+    },
+    {
+      "path": "old-cpu-final-b-producer.txt",
+      "bytes": 130718,
+      "sha256": "e125cfc43f4d163f7c5cc6665ef792e11f4aaadd94c65e98a590060c94235bbe"
+    },
+    {
+      "path": "old-cpu-final-b-props.json",
+      "bytes": 2617,
+      "sha256": "1fcf3e012d8949535e86b65e688f3395a9bff268d02df54a3e67cd25ffaf2d50"
+    },
+    {
+      "path": "old-cpu-final-b-run.json",
+      "bytes": 13308,
+      "sha256": "ea5d334f24fa10ade9602eb48f739c0ccd59c329b2a215b496c5b0634915c135"
+    },
+    {
+      "path": "old-cpu-quality-producer.txt",
+      "bytes": 66683,
+      "sha256": "fc52b4c8f2de8367a4efe4c171e696392e95e6bd597d43cb4ba13f16329e6ce0"
+    },
+    {
+      "path": "old-cpu-quality-props.json",
+      "bytes": 2617,
+      "sha256": "8fc162c35324e15a704fc4c9ab4c63714a06c1f33750c23bc680bfb32e2c4dbb"
+    },
+    {
+      "path": "old-cpu-quality-run.json",
+      "bytes": 20960,
+      "sha256": "fdc446991165dc8eb5055ea585ddffb6baa88c71e4c8e477a75e7737188c8896"
+    },
+    {
+      "path": "old-vulkan-cache0-final-a-producer.txt",
+      "bytes": 61489,
+      "sha256": "63593f59c6dd918d814d35027a6f8280283963c25a0d11f7d68abf712b2f3126"
+    },
+    {
+      "path": "old-vulkan-cache0-final-a-props.json",
+      "bytes": 2617,
+      "sha256": "83c125afddbc9d08b5d7b89f8c522c46c6de34c3b4efdffd613e3a2716908854"
+    },
+    {
+      "path": "old-vulkan-cache0-final-a-run.json",
+      "bytes": 12849,
+      "sha256": "eeca6ed4871c0e88e02749c2a7bdbfc7bc34c1a047b3587b2606c7a9e95f0864"
+    },
+    {
+      "path": "old-vulkan-cache0-final-b-producer.txt",
+      "bytes": 61489,
+      "sha256": "4d2d3005e5e6c8c60350cf21167c55fe2b656f3218ab03235c3587b4624f1fe2"
+    },
+    {
+      "path": "old-vulkan-cache0-final-b-props.json",
+      "bytes": 2617,
+      "sha256": "ac2109fe45613fd20d27f87278442d839545e7f4bb03b78d5a0c06a6b40b3e44"
+    },
+    {
+      "path": "old-vulkan-cache0-final-b-run.json",
+      "bytes": 12854,
+      "sha256": "04ddb96af8ea7ecc5f471f987a73db83a64a73035c95c6417a0e18f0d6d44d89"
+    },
+    {
+      "path": "old-vulkan-cache0-soak-producer.txt",
+      "bytes": 172958,
+      "sha256": "e798dbe8cff5e8be0775c93c17449ea1262908ac753b118f963a8683d4ff9c38"
+    },
+    {
+      "path": "old-vulkan-cache0-soak-props.json",
+      "bytes": 2617,
+      "sha256": "80d4c8962f9953ccded5fb7c50778a2007c7263e0bf3ba5c754f1a39270b9c96"
+    },
+    {
+      "path": "old-vulkan-cache0-soak-run.json",
+      "bytes": 12843,
+      "sha256": "6bb29b17eb48bd0f96ffe96e28b0642ed6dee29657938e0e2968e6e8b2ba3f88"
+    },
+    {
+      "path": "old-vulkan-default-soak-producer.txt",
+      "bytes": 462623,
+      "sha256": "da2d838d6e7dcda3919b02b0e7a344ba91bd655dbad0b5d5dec6ed52984d28a3"
+    },
+    {
+      "path": "old-vulkan-default-soak-props.json",
+      "bytes": 2617,
+      "sha256": "cc76b33455a2e17bb27f0be7a939e68952baebcf86656284b32fc6c6338515c2"
+    },
+    {
+      "path": "old-vulkan-default-soak-run.json",
+      "bytes": 13038,
+      "sha256": "253fbdb581a0609a350ada59c10cb92064f32c9a54f848b6aea96dcc2830b1f8"
+    },
+    {
+      "path": "old-vulkan-final-a-producer.txt",
+      "bytes": 121214,
+      "sha256": "6bcd538956200b1e79894c19db44f6943dd09c1faafed71d656956aada9080ca"
+    },
+    {
+      "path": "old-vulkan-final-a-props.json",
+      "bytes": 2617,
+      "sha256": "0d3c9d8f180871105165fd145b39eda937ecca15fff3b14a8807ebefe70f8e78"
+    },
+    {
+      "path": "old-vulkan-final-a-run.json",
+      "bytes": 12809,
+      "sha256": "d2632b152a882647c5e5e1ec39fd385b7246bdc3831ae35f0d079f9d7cb638d3"
+    },
+    {
+      "path": "old-vulkan-final-b-producer.txt",
+      "bytes": 121214,
+      "sha256": "3430bc0cad8a009a7d2db32e64a34f0b359b308bcdbfa144df7aa98f526ea24c"
+    },
+    {
+      "path": "old-vulkan-final-b-props.json",
+      "bytes": 2617,
+      "sha256": "c7fb47752d57a40dc548fadaeeceb5a3b28741697f2516390b21b17955c9a1f3"
+    },
+    {
+      "path": "old-vulkan-final-b-run.json",
+      "bytes": 12808,
+      "sha256": "2f5f2d2d0f9bb7894de4efb5fa69e3f41e135b8ae7855b0c34755a5a2bcaffb9"
+    },
+    {
+      "path": "old-vulkan-quality-producer.txt",
+      "bytes": 60698,
+      "sha256": "5c3a5bb9733a9ec510f940de5b734a34e6c4ee2e7a95ff8c7bd6317405d2be3e"
+    },
+    {
+      "path": "old-vulkan-quality-props.json",
+      "bytes": 2617,
+      "sha256": "db8f260c425a4b63646d646dbada5a372daae0a0c42d32df69b7b2ca5c403575"
+    },
+    {
+      "path": "old-vulkan-quality-run.json",
+      "bytes": 20446,
+      "sha256": "6258d90bba6ef755803b71c74385c7489429db06b20a90603a645242765ad1bb"
+    },
+    {
+      "path": "producer-compaction.json",
+      "bytes": 48456,
+      "sha256": "7066e979f98ae548a8ac48c9dcb46fb6d18312c26d622af57b8c4e1bb99cdc94"
+    },
+    {
+      "path": "prompt-Chinese (Simplified)-English.txt",
+      "bytes": 3618,
+      "sha256": "15e4fca316cdc2207fc96d5c6a4606228958b76a724686b5320a29d659abab03"
+    },
+    {
+      "path": "prompt-English-Japanese.txt",
+      "bytes": 3599,
+      "sha256": "36ee1f75f67489aa743bf79257c54d9346c1369e2d8c955d16c09ae5b145d95d"
+    },
+    {
+      "path": "prompt-English-Korean.txt",
+      "bytes": 3582,
+      "sha256": "faf1461215a7cfd9b36683e46952c5c9ac8120c2e28fbace58f67e11484de079"
+    },
+    {
+      "path": "prompt-Japanese-English.txt",
+      "bytes": 3615,
+      "sha256": "a62f3a6a5015a84812f15359166d1f60eb938221a3926fdb58c52d70da80c861"
+    },
+    {
+      "path": "prompt-Japanese-Korean.txt",
+      "bytes": 3709,
+      "sha256": "11fee0e96c3b90df0bd525f07c42e7b8ee50b08b9465754e5b44dc113169aa0c"
+    },
+    {
+      "path": "prompt-Korean-English.txt",
+      "bytes": 3590,
+      "sha256": "f29ea9c8a15b847c914c6ed3e68de8a78b7448c75e3f66fb5299ce591ef30aad"
+    },
+    {
+      "path": "quality-comparisons.json",
+      "bytes": 3023,
+      "sha256": "ebe7141520879f37cd3946b28c53c43a3515883d96dd5dfb076e06350ab04a74"
+    },
+    {
+      "path": "requests.jsonl",
+      "bytes": 2893850,
+      "sha256": "9f9b4b4a9fbc86f4e1a4ae21f6e98c8799d5dba1108d6666b1a6d45536487034"
+    },
+    {
+      "path": "sampling-template-summary.json",
+      "bytes": 118659,
+      "sha256": "ea053460d04445d55a444f5b357000b0050e2ea57cb96ccad61cd06e02f6a143"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 602388,
+      "sha256": "b91b8fd04519cb25cd92f9fe3088e5dc06e4cc91897844bf0d7545e997b4a6e4"
+    },
+    {
+      "path": "workload-policy.json",
+      "bytes": 2848,
+      "sha256": "d3ccc8755688a129523cb4cc3caf8f3379eccff8feed1c99198602be2bd027b8"
+    }
+  ],
+  "total_bytes": 13491464
+}
