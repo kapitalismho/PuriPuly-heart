@@ -318,11 +318,7 @@ async def test_all_sources_failed_repair_preserves_install_and_unowned_staging(
         modelscope_server.responses["draft.gguf"] = (503, b"unavailable")
         downloader = FailedDownloader(contents, LocalSTTDownloadPortError("unavailable"))
     else:
-        corrupt = (
-            b"wrong-size"
-            if failure_kind == "size"
-            else b"x" * len(contents["draft.gguf"])
-        )
+        corrupt = b"wrong-size" if failure_kind == "size" else b"x" * len(contents["draft.gguf"])
         modelscope_server.responses["draft.gguf"] = (200, corrupt)
         downloader = FakeDownloader({**contents, "draft.gguf": corrupt})
     install_dir = tmp_path / "gemma"
@@ -817,9 +813,7 @@ async def test_programmer_and_status_failures_do_not_trigger_source_fallback(
     elif failure_kind == "worker_protocol":
         downloader = FailedDownloader(
             contents,
-            LocalSTTDownloadPortError(
-                "protocol failure", failure_code="worker_protocol_failed"
-            ),
+            LocalSTTDownloadPortError("protocol failure", failure_code="worker_protocol_failed"),
         )
     else:
         downloader = FakeDownloader(contents)

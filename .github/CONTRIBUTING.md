@@ -20,6 +20,22 @@ Thanks for taking an interest in this project.
 3. Make sure the CI tests pass.
 4. Open a pull request against `dev`.
 
+## PR verification
+
+The [PR workflow](workflows/pr-ci.yml) owns the Python test selections and the nine existing check responsibilities. Use its pinned Python and uv versions. PR setup and commands use `--locked`: stale dependency metadata must fail, not update `uv.lock` during verification. The shared setup action keeps its frozen default for release callers.
+
+```powershell
+uv sync --locked --extra dev
+uv run --locked python scripts/ci/check_test_selection.py
+uv run --locked pytest -ra --junitxml=tooling-results.xml tests/scripts tests/cli tests/release_evidence
+```
+
+The selection checker reads the workflow rather than a second partition manifest. New ordinary test files must belong to a declared selection; missing targets, empty protected roots, and source/configuration parsing failures are errors. The remaining `tests/integration` suites are explicitly excluded because they need external providers, servers, credentials, or models. Deterministic helper, scoped-session, and speaker-pipeline contracts belong to ordinary test partitions instead.
+
+The dev extra includes the PE parser required by native-distribution tests. A missing mandatory parser is not a legitimate skip. Pytest summaries include skip reasons, and Python jobs retain JUnit results even after a failing step. The Overlay job separately requires its five selected process cases to execute without skips; this is not a zero-skip claim for every native or device scenario.
+
+Keep tests organized around consumer guarantees. Synthetic PE/GPU payloads and evidence-runner reports do not prove real GPU execution, model decoding, audio capture, or installed-product behavior. Preserve the distinct producer-to-fresh-process bundle checks, adversarial loader cases, safe cleanup tests, and runner failure classification when consolidating fixtures or moving tests.
+
 ## Releases
 
 Pushing a `vMAJOR.MINOR.PATCH` tag, such as `v2.8.2`, runs the [native release workflow](workflows/release-native.yml). It builds and verifies the native Windows installer, uploads only `PuriPulyHeart-Setup-MAJOR.MINOR.PATCH.exe` as the Actions artifact, and creates a GitHub draft release containing that installer alone. The legacy release workflow has been removed; `native-v*` tags no longer trigger a release.

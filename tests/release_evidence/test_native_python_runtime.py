@@ -17,7 +17,9 @@ from pathlib import Path
 
 import pytest
 
-_HOST_ROOT = Path(__file__).resolve().parents[1] / "native" / "windows_host"
+from tests.helpers.paths import REPO_ROOT
+
+_HOST_ROOT = REPO_ROOT / "native" / "windows_host"
 _PREFIX = "_native_test_"
 
 

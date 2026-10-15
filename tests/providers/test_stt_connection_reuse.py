@@ -28,7 +28,7 @@ from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRe
 from puripuly_heart.providers.stt.deepgram import _CLOSE_STREAM, _DeepgramSDKSession
 from tests.core.runtime.test_peer_capture_session import make_config, make_owner
 from tests.core.test_stt_scoped_engine import ControlledMonotonicClock, ControlledScopedSession
-from tests.providers.test_protocol_a_scoped_sessions import (
+from tests.helpers.scoped_provider_sessions import (
     _deepgram_result,
     _deepgram_session,
     _gemini_message,

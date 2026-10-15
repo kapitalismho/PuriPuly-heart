@@ -10,8 +10,6 @@ import pytest
 from puripuly_heart.domain.models import Translation
 from tests.integration import helpers
 
-pytestmark = helpers.integration_mark()
-
 
 def _write_silent_wav(path: Path, *, sample_rate_hz: int) -> None:
     with wave.open(str(path), "wb") as audio:

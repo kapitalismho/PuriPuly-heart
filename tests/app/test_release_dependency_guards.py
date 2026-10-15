@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import shlex
 import shutil
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
 import pytest
+import yaml
 
 from puripuly_heart.core.overlay.openvr_vendor import (
     OPENVR_VENDOR_DLL_URL,
@@ -285,15 +289,129 @@ def test_third_party_notices_cover_vendored_openvr_bundle_and_bsd_terms() -> Non
     assert "{app}" not in openvr_notice_section
 
 
-def test_shared_setup_action_installs_pinned_uv_and_uses_frozen_sync() -> None:
-    action = (ROOT / ".github" / "actions" / "setup-uv-environment" / "action.yml").read_text(
-        encoding="utf-8"
+@pytest.mark.parametrize(
+    ("use_pr_mode", "stale"),
+    [(False, False), (False, True), (True, False), (True, True)],
+    ids=["release-valid", "release-stale", "pr-valid", "pr-stale"],
+)
+def test_shared_setup_action_preserves_release_default_and_rejects_stale_pr_lock(
+    tmp_path: Path, use_pr_mode: bool, stale: bool
+) -> None:
+    action = yaml.safe_load(
+        (ROOT / ".github/actions/setup-uv-environment/action.yml").read_text(encoding="utf-8")
+    )
+    workflow = yaml.safe_load((ROOT / ".github/workflows/pr-ci.yml").read_text(encoding="utf-8"))
+    setup_python = next(step for step in action["runs"]["steps"] if "uses" in step)
+    assert setup_python["uses"] == "actions/setup-python@v7"
+    assert setup_python["with"]["cache-dependency-path"] == "uv.lock"
+    inputs = {
+        "sync-args": "--extra dev",
+        "uv-version": workflow["env"]["UV_VERSION"],
+        "lock-mode": action["inputs"]["lock-mode"]["default"],
+    }
+    if use_pr_mode:
+        pr_setup = next(
+            step
+            for step in workflow["jobs"]["python-style"]["steps"]
+            if step.get("uses") == "./.github/actions/setup-uv-environment"
+        )
+        inputs["lock-mode"] = pr_setup["with"]["lock-mode"]
+        inputs["sync-args"] = pr_setup["with"]["sync-args"]
+    commands = [
+        shlex.split(
+            re.sub(
+                r"\$\{\{\s*inputs\.([a-z-]+)\s*\}\}",
+                lambda match: inputs[match[1]],
+                line,
+            )
+        )
+        for step in action["runs"]["steps"]
+        for line in step.get("run", "").splitlines()
+        if line.strip()
+    ]
+    installer = next(command for command in commands if command[:3] == ["python", "-m", "pip"])
+    assert "install" in installer
+    assert f"uv=={inputs['uv-version']}" in installer
+    sync_commands = [command for command in commands if command[:2] == ["uv", "sync"]]
+    assert len(sync_commands) == 1
+    uv = shutil.which("uv")
+    assert uv is not None, "The pinned uv tool is required for the setup invocation contract"
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith("UV_") and key.upper() != "VIRTUAL_ENV"
+    }
+    environment.update(
+        UV_PROJECT_ENVIRONMENT=str(tmp_path / ".venv"),
+        UV_CACHE_DIR=str(tmp_path / "cache"),
+        UV_NO_CONFIG="1",
+        UV_OFFLINE="1",
+        UV_PYTHON_DOWNLOADS="never",
+        UV_PYTHON=sys.executable,
     )
 
-    assert "uses: actions/setup-python@v7" in action
-    assert "cache-dependency-path: uv.lock" in action
-    assert '"uv==${{ inputs.uv-version }}"' in action
-    assert "uv sync ${{ inputs.sync-args }} --frozen" in action
+    def invoke(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+        completed = subprocess.run(
+            [uv, *arguments],
+            cwd=tmp_path,
+            env=environment,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=60,
+            check=False,
+        )
+        print(
+            json.dumps(
+                {
+                    "arguments": arguments,
+                    "exit_code": completed.returncode,
+                    "stdout": completed.stdout,
+                    "stderr": completed.stderr,
+                }
+            )
+        )
+        return completed
+
+    version = invoke(["--version"])
+    assert version.returncode == 0
+    assert version.stdout.split()[1] == inputs["uv-version"]
+    project = tmp_path / "pyproject.toml"
+    metadata = (
+        '[project]\nname = "ci-lock-contract"\nversion = "0.0.0"\n'
+        'requires-python = ">=3.14,<3.15"\n[project.optional-dependencies]\ndev = []\n'
+    )
+    project.write_text(metadata, encoding="utf-8")
+    locked = invoke(["lock"])
+    assert locked.returncode == 0, locked.stderr
+    lock = tmp_path / "uv.lock"
+    original_lock = lock.read_bytes()
+    if stale:
+        project.write_text(
+            metadata.replace('version = "0.0.0"', 'version = "0.0.1"'), encoding="utf-8"
+        )
+    synced = invoke(sync_commands[0][1:])
+    assert (synced.returncode == 0) is (not use_pr_mode or not stale), synced.stderr
+    assert lock.read_bytes() == original_lock
+    pr_run = next(
+        step["run"]
+        for step in workflow["jobs"]["python-style"]["steps"]
+        if step.get("run", "").startswith("uv run ")
+    )
+    run_prefix = shlex.split(pr_run)[:3]
+    invoked = invoke(
+        [
+            *run_prefix[1:],
+            "python",
+            "-c",
+            "from pathlib import Path; Path('command-executed').write_text('yes')",
+        ]
+    )
+    assert (invoked.returncode == 0) is (not stale), invoked.stderr
+    assert (tmp_path / "command-executed").exists() is (not stale)
+    assert lock.read_bytes() == original_lock
+    if stale:
+        assert "lockfile" in invoked.stderr and "--locked" in invoked.stderr
 
 
 def test_installer_script_embeds_local_stt_manifest_assets_for_inno_download() -> None:

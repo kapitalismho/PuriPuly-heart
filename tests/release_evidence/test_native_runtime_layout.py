@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import py_compile
 import shutil
 import subprocess
 import sys
-import zipfile
 from pathlib import Path
 
 from puripuly_heart.config.prompts import get_prompts_dir
@@ -14,7 +13,8 @@ from puripuly_heart.core.local_translation.runtime_profile import (
     LLAMA_CPP_RUNTIME_DIRNAME,
     default_llama_runtime_root,
 )
-from puripuly_heart.runtime_layout import RuntimeLayout, current_runtime_layout
+from puripuly_heart.release_evidence.native_distribution import bundle_runtime, compile_runtime
+from puripuly_heart.runtime_layout import current_runtime_layout
 from tests.helpers.paths import SOURCE_ROOT
 
 
@@ -147,93 +147,94 @@ def test_frozen_package_resources_and_child_environment_preserve_runtime_boundar
     assert layout.python_child_environment(environment) == environment
 
 
-def test_native_child_imports_archived_bytecode_and_filesystem_package_resources(
+def test_native_child_consumes_production_bundle_resources_without_installed_writes(
     tmp_path: Path,
+    staged_archive_runtime: tuple[Path, Path, dict[str, object]],
 ) -> None:
-    app_root = tmp_path / "relocated app 한글"
-    app_root.mkdir()
-    archive_path = app_root / "python.zip"
-    bytecode_root = tmp_path / "bytecode"
-    directories: set[str] = set()
-    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for source in sorted(SOURCE_ROOT.rglob("*.py")):
-            relative = source.relative_to(SOURCE_ROOT.parent)
-            for parent in relative.parents:
-                if parent != Path("."):
-                    directory = parent.as_posix() + "/"
-                    if directory not in directories:
-                        archive.writestr(directory, b"")
-                        directories.add(directory)
-            bytecode = bytecode_root / relative.with_suffix(".pyc")
-            bytecode.parent.mkdir(parents=True, exist_ok=True)
-            py_compile.compile(
-                str(source),
-                cfile=str(bytecode),
-                dfile=relative.as_posix(),
-                doraise=True,
-                optimize=0,
-            )
-            archive.write(bytecode, relative.with_suffix(".pyc").as_posix())
-            archive.write(source, relative.as_posix())
+    layout_path, bytecode, _ = staged_archive_runtime
+    package = tmp_path / "app" / "puripuly_heart"
+    shutil.copytree(
+        SOURCE_ROOT,
+        package,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "data"),
+    )
     resource_paths = (
         "data/vad/silero_vad.onnx",
         "data/fonts/NotoSansCJK-Medium.ttc",
         "data/THIRD_PARTY_NOTICES.txt",
         "data/licenses/PYTHON-3.14.7-LICENSE.txt",
         "data/models/qwen3-asr-0.6b-int8-sherpa.manifest.json",
-        "data/i18n/en.json",
-        "data/i18n/ko.json",
     )
-    for relative_path in resource_paths:
-        destination = app_root / "puripuly_heart" / relative_path
+    for relative in resource_paths:
+        destination = package / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(SOURCE_ROOT / relative_path, destination)
-    layout = RuntimeLayout(
-        host_kind="native",
-        app_resource_root=app_root,
-        native_runtime_root=Path(sys.base_prefix),
-        host_executable=tmp_path / "PuriPulyHeart.exe",
-        python_executable=Path(sys.executable),
-        user_data_root=tmp_path / "profile",
-        model_cache_root=tmp_path / "profile" / "models",
-        log_root=tmp_path / "profile" / "logs",
+        shutil.copy2(SOURCE_ROOT / relative, destination)
+    shutil.copytree(SOURCE_ROOT / "data/i18n", package / "data/i18n")
+    bytecode.write_text(json.dumps(compile_runtime(tmp_path, layout_path)), encoding="utf-8")
+    bundle_runtime(tmp_path, layout_path, bytecode)
+    app_root = tmp_path / "relocated app 한글"
+    (tmp_path / "app").rename(app_root)
+    archive_path = app_root / "python.zip"
+    (app_root / "puripuly_heart/__init__.py").write_text(
+        "raise AssertionError('loose application fallback')\n", encoding="utf-8"
     )
-    script = """
-import hashlib
-import json
+    installed_roots = (app_root, tmp_path / "site-packages", tmp_path / "Lib")
+    before = {
+        path: hashlib.sha256(path.read_bytes()).hexdigest()
+        for root in installed_roots
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+    script = (
+        "import hashlib, json, os, sys, zipimport\n"
+        f"sys.path[:0] = {[str(archive_path), str(app_root), str(tmp_path / 'site-packages')]!r}\n"
+        f"os.environ['PURIPULY_HEART_NATIVE_RESOURCE_ROOT'] = {str(app_root)!r}\n"
+        f"os.environ['PURIPULY_HEART_NATIVE_RUNTIME_ROOT'] = {str(tmp_path)!r}\n"
+        "from _puripuly_native_runtime import install\n"
+        f"install({str(tmp_path)!r})\n"
+        "def reject_compilation(*args, **kwargs):\n"
+        "    raise AssertionError('archive source compilation')\n"
+        "zipimport._compile_source = reject_compilation\n"
+        """
 from puripuly_heart import runtime_layout
 from puripuly_heart.core.vad import bundled
 from puripuly_heart.core.local_asr import local_stt_assets
 from puripuly_heart.ui import fonts, i18n
 
 layout = runtime_layout.current_runtime_layout()
-notices = layout.package_resource("data", "THIRD_PARTY_NOTICES.txt")
-license_path = layout.package_resource("data", "licenses", "PYTHON-3.14.7-LICENSE.txt")
 model = bundled.bundled_silero_vad_onnx_path()
-with model.open("rb") as handle:
-    model_hash = hashlib.file_digest(handle, "sha256").hexdigest()
 font = fonts.fonts_dir() / "NotoSansCJK-Medium.ttc"
+resources = [
+    model,
+    font,
+    layout.package_resource("data", "THIRD_PARTY_NOTICES.txt"),
+    layout.package_resource("data", "licenses", "PYTHON-3.14.7-LICENSE.txt"),
+]
 manifest = local_stt_assets.load_local_stt_asset_manifest()
 print(json.dumps({
     "host_kind": layout.host_kind,
     "origins": [runtime_layout.__file__, bundled.__file__, fonts.__file__, i18n.__file__,
                 local_stt_assets.__file__],
-    "model": str(model),
-    "model_hash": model_hash,
-    "font": str(font),
-    "font_exists": font.is_file(),
+    "resources": [
+        {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        for path in resources
+    ],
     "font_url": fonts.font_asset_path(fonts.FONT_FAMILY_NOTO_SANS_CJK_JP),
-    "notices": notices.read_text(encoding="utf-8"),
-    "license": license_path.read_text(encoding="utf-8"),
     "manifest_id": manifest.model_id,
     "locales": i18n.available_locales(),
     "title": i18n.t("app.title"),
 }))
 """
+    )
+    environment = dict(os.environ)
+    environment["LOCALAPPDATA"] = str(tmp_path / "profile")
+    unrelated = tmp_path / "unrelated working directory"
+    unrelated.mkdir()
     completed = subprocess.run(
-        [str(layout.python_executable), "-c", script],
-        cwd=tmp_path,
-        env=layout.python_child_environment(),
+        [sys.executable, "-I", "-B", "-c", script],
+        cwd=unrelated,
+        env=environment,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -247,20 +248,28 @@ print(json.dumps({
     for origin in result["origins"]:
         assert origin.replace("\\", "/").startswith(archive_path.as_posix() + "/")
         assert origin.endswith(".pyc")
-    assert result["model"] == str(app_root / "puripuly_heart" / resource_paths[0])
-    assert result["model_hash"] == (
-        "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3"
-    )
-    assert result["font"] == str(app_root / "puripuly_heart" / resource_paths[1])
-    assert result["font_exists"] is True
+    assert result["resources"] == [
+        {
+            "path": str(app_root / "puripuly_heart" / relative),
+            "sha256": hashlib.sha256((SOURCE_ROOT / relative).read_bytes()).hexdigest(),
+        }
+        for relative in resource_paths[:4]
+    ]
     assert result["font_url"] == "/fonts/NotoSansCJK-Medium.ttc"
-    assert result["notices"] == (SOURCE_ROOT / resource_paths[2]).read_text(encoding="utf-8")
-    assert result["license"] == (SOURCE_ROOT / resource_paths[3]).read_text(encoding="utf-8")
-    assert result["manifest_id"] == "qwen3-asr-0.6b-int8-sherpa"
-    assert result["locales"] == ["en", "ko"]
+    assert (
+        result["manifest_id"]
+        == json.loads((SOURCE_ROOT / resource_paths[4]).read_text(encoding="utf-8"))["model_id"]
+    )
+    assert sorted(result["locales"]) == sorted(
+        path.stem for path in (SOURCE_ROOT / "data/i18n").glob("*.json")
+    )
     assert (
         result["title"]
-        == json.loads((SOURCE_ROOT / "data" / "i18n" / "en.json").read_text(encoding="utf-8"))[
-            "app.title"
-        ]
+        == json.loads((SOURCE_ROOT / "data/i18n/en.json").read_text(encoding="utf-8"))["app.title"]
     )
+    assert {
+        path: hashlib.sha256(path.read_bytes()).hexdigest()
+        for root in installed_roots
+        for path in root.rglob("*")
+        if path.is_file()
+    } == before

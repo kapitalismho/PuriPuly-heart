@@ -288,16 +288,12 @@ def mirror_install_case(windows_temp_dir: Path, file_server):
     model_id = "parakeet-tdt-ctc-0.6b-ja-int8-sherpa"
     manifest["model_id"] = model_id
     manifest["install_dirname"] = model_id
-    manifest["files"][0]["source_path_overrides"] = {
-        "hf_mirror": "nested/mirrored-model.onnx"
-    }
+    manifest["files"][0]["source_path_overrides"] = {"hf_mirror": "nested/mirrored-model.onnx"}
     for source_name in ("huggingface", "hf_mirror"):
         source_root = source_dir / source_name
         source_root.mkdir()
         remote_path = (
-            "nested/mirrored-model.onnx"
-            if source_name == "hf_mirror"
-            else "model.int8.onnx"
+            "nested/mirrored-model.onnx" if source_name == "hf_mirror" else "model.int8.onnx"
         )
         model_path = source_root / remote_path
         model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -331,9 +327,7 @@ def test_installer_script_installs_preferred_http_source(
     assert installed["selected_source"] == selected_source
     assert installed["selected_revision"] == "hf-rev-1"
     remote_model = (
-        "nested/mirrored-model.onnx"
-        if selected_source == "hf_mirror"
-        else "model.int8.onnx"
+        "nested/mirrored-model.onnx" if selected_source == "hf_mirror" else "model.int8.onnx"
     )
     assert requests == [
         f"/{selected_source}/{remote_model}",

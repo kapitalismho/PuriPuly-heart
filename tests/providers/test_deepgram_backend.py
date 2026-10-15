@@ -27,8 +27,8 @@ from tests.core.test_external_network import certificates as certificates
 from tests.core.test_external_network import (
     isolated_network_environment as isolated_network_environment,
 )
+from tests.helpers.scoped_provider_sessions import _deepgram_result
 from tests.providers.test_deepgram_reuse import _next, _request, _seal
-from tests.providers.test_protocol_a_scoped_sessions import _deepgram_result
 
 
 @pytest.fixture

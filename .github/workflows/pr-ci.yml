@@ -17,7 +17,7 @@ env:
   NODE_VERSION: "22"
 
 concurrency:
-  group: pr-ci-${{ github.event.pull_request.number }}
+  group: pr-ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -34,12 +34,16 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
+          lock-mode: locked
 
       - name: Ruff check
-        run: uv run ruff check .
+        run: uv run --locked ruff check .
 
       - name: Black check
-        run: uv run black --check .
+        run: uv run --locked black --check .
+
+      - name: Check Python test selection
+        run: uv run --locked python scripts/ci/check_test_selection.py
 
   python-contracts:
     name: Contracts
@@ -54,9 +58,17 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
+          lock-mode: locked
 
       - name: Run contract tests
-        run: uv run pytest tests/domain tests/config tests/core
+        run: uv run --locked pytest -ra --junitxml=contract-results.xml tests/domain tests/config tests/core
+
+      - name: Upload contract results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: contracts-results
+          path: contract-results.xml
 
   python-suite:
     name: ${{ matrix.name }}
@@ -74,7 +86,7 @@ jobs:
           - name: UI
             pytest-args: tests/ui
           - name: Tooling
-            pytest-args: tests/scripts
+            pytest-args: tests/scripts tests/cli tests/release_evidence
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -87,9 +99,17 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
+          lock-mode: locked
 
       - name: Run tests
-        run: uv run pytest ${{ matrix.pytest-args }}
+        run: uv run --locked pytest -ra --junitxml=python-results.xml ${{ matrix.pytest-args }}
+
+      - name: Upload Python results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-${{ matrix.name }}-results
+          path: python-results.xml
 
   broker-ci:
     name: Broker
@@ -131,6 +151,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           uv-version: ${{ env.UV_VERSION }}
           sync-args: --extra dev
+          lock-mode: locked
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -161,7 +182,7 @@ jobs:
           INTEGRATION: "1"
           PYTHONIOENCODING: utf-8
         run: >
-          uv run --frozen pytest
+          uv run --locked pytest -ra
           tests/app/test_desktop_overlay_runner.py::test_import_run_desktop_overlay_dispatch_is_provider_secret_and_stt_free
           tests/app/test_desktop_overlay_runner.py::test_import_preview_dispatch_is_provider_secret_and_stt_free
           tests/core/runtime/test_overlay_runtime.py::test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_reader_cleanup
@@ -170,6 +191,14 @@ jobs:
           --junitxml=overlay-integration-results.xml
 
       - name: Require five integration results with no skips
+        if: always()
         shell: bash
         run: |
-          uv run --frozen python -c "import xml.etree.ElementTree as ET; s=ET.parse('overlay-integration-results.xml').getroot().find('testsuite'); c={k: int(s.get(k, '0')) for k in ('tests', 'skipped', 'failures', 'errors')}; print(c); assert c == {'tests': 5, 'skipped': 0, 'failures': 0, 'errors': 0}, c"
+          uv run --locked python -c "import xml.etree.ElementTree as ET; s=ET.parse('overlay-integration-results.xml').getroot().find('testsuite'); c={k: int(s.get(k, '0')) for k in ('tests', 'skipped', 'failures', 'errors')}; print(c); assert c == {'tests': 5, 'skipped': 0, 'failures': 0, 'errors': 0}, c"
+
+      - name: Upload overlay integration results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: overlay-integration-results
+          path: overlay-integration-results.xml

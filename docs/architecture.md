@@ -19,6 +19,8 @@ Python paths are relative to `src/puripuly_heart/`; `src/`, `native/`, `tests/`,
 - Composition selects adapters and connects owners.
 - Core code must not depend on UI or composition code.
 
+`tests/architecture/test_dependency_boundaries.py` enforces this boundary across all core modules, independently of the generic layer taxonomy, including nested and type-only imports. The exact existing `core.discord.oauth_callback_page` → `ui.i18n` edge is transitional localization debt; no other core-to-UI/composition edge is allowed. Dynamic imports and module names in process-launch strings are outside this import rule.
+
 Dependency direction:
 
 ```text
@@ -363,7 +365,7 @@ References:
   - Native libraries and filesystem-backed resources remain accessible through their runtime layout.
 - Installer cleanup owns only verified distribution files. It does not own modified or unlisted files or writable user data.
 
-Build policy and validation: `scripts/ci/build-native-experimental.ps1`, `release_evidence/native_distribution.py`. Runtime behavior: `tests/test_runtime_layout.py`, `tests/test_native_python_runtime.py`.
+Build policy and validation: `scripts/ci/build-native-experimental.ps1`, `release_evidence/native_distribution.py`. Runtime behavior: `tests/release_evidence/test_native_runtime_layout.py`, `tests/release_evidence/test_native_python_runtime.py`, `tests/release_evidence/test_native_bootstrap.py`.
 
 ### Model assets
 
@@ -436,3 +438,20 @@ Exact handoff and teardown ordering belongs to owner implementations and lifecyc
 - Callbacks delegate to the receiving owner. They must not mutate another owner's private runtime state.
 - Ordering is local to the owning channel or queue. There is no assumed global ordering across self, peer, UI, and provider events.
 - Run blocking model, device, or native work through the established worker, executor, or child-process boundary. Keep it off the application event loop.
+
+### Bounded task-creation enforcement
+
+`tests/architecture/test_lifecycle_task_guard.py` scans all Python files under `src/puripuly_heart`, including evidence runners, using `tests/helpers/task_creation.py`. It recognizes direct asyncio task creation (`create_task`, `Task`, `ensure_future`), ordinary imported/assigned aliases, resolvable loop `create_task`, and identifiable Flet page or injected `run_task` bindings. A method name alone does not establish task creation.
+
+Each reviewed identity names its module, enclosing qualified function, callee family, maximum multiplicity, and lifetime rationale. Owning primitives, named owners, and legacy exceptions are separate dispositions. Removal is allowed; a new identity or increased multiplicity requires explicit review. Missing/empty protected roots and source discovery, decoding, or parsing failures fail the check.
+
+This is bounded lexical analysis, not dynamic task-factory or whole-program alias resolution. Arbitrary untyped receivers, interprocedural aliases, star imports, indirect inheritance, global/nonlocal rebinding, pattern bindings, and conditional-flow joins are not resolved. Structural acceptance does not prove cancellation, draining, cleanup, or generation progress; owner behavior tests retain those responsibilities.
+
+Existing narrow lifetime debt is recorded at the exact creation identities, without changing runtime behavior:
+
+- `ScopedRecognitionEngine._normalization_diagnostic` does not retain its notification task; `_notify_terminal_failure` retains notifications, but `close()` does not drain either notification path.
+- `GuiControlBoundary.start` retains its stop watcher, which `stop()` cancels without joining.
+- `_AsyncioOverlayProcess.terminate` shields an exit-confirmation waiter without retaining, cancelling, or joining it after termination timeout.
+- The evidence runner's `local_asr_production_composition._run_stage` cancels/gathers on timeout, but not on caller cancellation.
+
+These exceptions permit only their reviewed existing identities and caps. The Flet application shutdown driver is separately retained and excluded from cancelling itself; that is not a claim that ordinary page callback cleanup drains the driver.
