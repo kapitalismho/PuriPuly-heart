@@ -121,7 +121,7 @@ Rendered content hashes are in `prefix_metadata`; full real request token counts
 
 ### Memory and CPU accounting
 
-The collector starts immediately after owned server creation and remains through load, prefix, repeated serving and shutdown. Nominal interval is 250 ms; actual cadence is retained. For the recommended standalone profile: **113 samples, median interval .257 s, p95 .259 s, maximum gap .335 s**. These are **observed sampled GPU peaks/lower bounds on a true transient peak**, not a lifetime GPU high-water guarantee.
+The collector starts immediately after owned server creation and remains through load, prefix, repeated serving and shutdown. Nominal interval is 250 ms; actual cadence is retained. For the original 2048-MiB standalone profile: **113 samples, median interval .257 s, p95 .259 s, maximum gap .335 s**. These are **observed sampled GPU peaks/lower bounds on a true transient peak**, not a lifetime GPU high-water guarantee.
 
 PDH rows are restricted to the owned PID and exact observed RX adapter **`luid_0x00000000_0x0000F60B_phys_0`**, separately from the other virtual-adapter LUID. The owned Vulkan process registers on that adapter. Whole-adapter memory is measured independently, not reconstructed by summing processes. GPU utilization is the **busiest owned process engine**, not the invalid sum of engine percentages. Missing process GPU rows, including the headless app's absent GPU row, are unavailable rather than fabricated zeroes. The server is the only owned model/GPU runtime; whole-device sampling encloses all allocations and background use.
 
