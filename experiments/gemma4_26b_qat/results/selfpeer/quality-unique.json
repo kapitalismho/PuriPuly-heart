@@ -1,0 +1,1166 @@
+[
+  {
+    "input": "유나는 3시가 아니라 4시에 도착해요.",
+    "output": "Yuna is arriving at 4, not 3.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나가 티켓을 12장 산 게 아니라, 2장 샀어요.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "유나는 3시가 아니라 4시에 도착해요.",
+    "output": "Yuna arrives at 4, not 3.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 안에 돌아올게요.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "그 열쇠는 제 것이 아니라 민수 것이에요.",
+    "output": "That key isn't mine, it's Minsu's.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "아까 말한 파란 문 말고 빨간 문으로 와 주세요.",
+    "output": "Please come to the red door, not the blue one I mentioned earlier.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "I thought you were joking, but I was wrong.",
+    "output": "농담인 줄 알았는데, 아니었네요.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 뒤에 올게요.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나가 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+    "occurrences": [
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache2048-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache2048-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache3072-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9
+      },
+      {
+        "run": "selfpeer-cache3072-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12
+      }
+    ],
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    }
+  }
+]

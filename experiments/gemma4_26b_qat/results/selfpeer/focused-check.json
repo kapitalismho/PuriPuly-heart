@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "completed": 176,
+  "run_count": 4,
+  "assertions": [
+    "44requests/run;2first-prefix,12serial,30simultaneous",
+    "Exact prompts/workload match across four runs",
+    "All176EOS/nonempty/no-reasoning/not-truncated",
+    "Pinned Self0/Peer1,slot2unused",
+    "All15simultaneous rounds/run have positive native-server active overlap",
+    "All effective GGML allowlist absent",
+    "Actual Vulkan_Host model buffers",
+    "Four graceful0 exits,no safety cutoff"
+  ],
+  "token_differences_disclosed": 1
+}

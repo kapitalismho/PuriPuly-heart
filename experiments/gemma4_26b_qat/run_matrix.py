@@ -132,7 +132,7 @@ def classify_owned_safety_stop(result):
     return result
 
 
-def run(args, profile: str, *, load_mode="mmap", output_dir=None, environment_overrides=None, safety_policy=None):
+def run(args, profile: str, *, load_mode="mmap", output_dir=None, environment_overrides=None, safety_policy=None, workload=None):
     build, placement = PROFILES[profile]
     model = args.e4b if profile == "e4b-product" else args.root / "models" / "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
     executable = args.root / "runtimes" / build / "llama-server.exe"
@@ -217,22 +217,25 @@ def run(args, profile: str, *, load_mode="mmap", output_dir=None, environment_ov
                 system = render_translation_prompt_template(get_default_prompt(), source_name=source, target_name=target)
                 wrapped = post(base, "/apply-template", {"messages": [{"role": "system", "content": system}, {"role": "user", "content": " "}], "add_generation_prompt": True})["prompt"]
                 result["prefix_metadata"].append({"pair": source + "->" + target, "system_sha256": hashlib.sha256(system.encode()).hexdigest(), "raw_system_tokens": len(post(base, "/tokenize", {"content": system, "add_special": False, "parse_special": True})["tokens"]), "wrapped_system_blank_user_tokens": len(post(base, "/tokenize", {"content": wrapped, "add_special": False, "parse_special": True})["tokens"])})
-            phase[0] = "first_prefix"
-            for i in range(3):
-                result["requests"].append(request_translation(base, CASES[i], i, "first_prefix", i, 0.0))
-            phase[0] = "hot_same_pair"
-            for rep in range(args.repetitions):
-                result["requests"].append(request_translation(base, CASES[rep % 3 * 4], 0, "hot_same_pair", rep, 0.6))
-            phase[0] = "pair_alternation"
-            for rep in range(args.repetitions):
-                for i in range(4):
-                    result["requests"].append(request_translation(base, CASES[(rep % 3)*4+i], i % 3, "pair_alternation", rep*4+i, 0.6))
-            phase[0] = "three_slots"
-            for rep in range(args.repetitions):
-                with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                    futures = [executor.submit(request_translation, base, CASES[(rep % 3)*4+i], i, "three_slots", rep*3+i, 0.6) for i in range(3)]
-                    for future in futures:
-                        result["requests"].append(future.result())
+            if workload is not None:
+                workload(base, result, phase, started)
+            else:
+                phase[0] = "first_prefix"
+                for i in range(3):
+                    result["requests"].append(request_translation(base, CASES[i], i, "first_prefix", i, 0.0))
+                phase[0] = "hot_same_pair"
+                for rep in range(args.repetitions):
+                    result["requests"].append(request_translation(base, CASES[rep % 3 * 4], 0, "hot_same_pair", rep, 0.6))
+                phase[0] = "pair_alternation"
+                for rep in range(args.repetitions):
+                    for i in range(4):
+                        result["requests"].append(request_translation(base, CASES[(rep % 3)*4+i], i % 3, "pair_alternation", rep*4+i, 0.6))
+                phase[0] = "three_slots"
+                for rep in range(args.repetitions):
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+                        futures = [executor.submit(request_translation, base, CASES[(rep % 3)*4+i], i, "three_slots", rep*3+i, 0.6) for i in range(3)]
+                        for future in futures:
+                            result["requests"].append(future.result())
             result["mapped_file_after_repeated"] = mapped_gguf_observation(process.pid)
             result["status"] = "completed"
         except Exception as error:

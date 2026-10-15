@@ -1,0 +1,38 @@
+{
+  "observed_utc": "2026-10-15T15:07:30.151124+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 15901532160,
+    "system_committed_bytes": 51647442944,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 25235644416,
+    "device_gpu_dedicated_bytes": 4119973888.0,
+    "device_gpu_shared_bytes": 399712256.0,
+    "device_gpu_committed_bytes": 4706639872.0,
+    "system_pages_input_per_second": 0.0,
+    "system_page_reads_per_second": 0.0
+  },
+  "counter_errors": {},
+  "owned_exits": [
+    {
+      "run": "selfpeer-cache2048-a1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "selfpeer-cache2048-a2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "selfpeer-cache3072-b1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "selfpeer-cache3072-b2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    }
+  ]
+}

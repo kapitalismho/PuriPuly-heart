@@ -1,0 +1,7 @@
+{
+  "review_scope": "All176 completed requests covered by9 unique input-output pairs across6fixed sources; manual assistant self-review, not independent quality ranking",
+  "result": "No observed cache-specific material semantic collapse, reasoning, repetition or truncation; all176EOS",
+  "preserved_meanings": ["Yuna arrives/is arriving at4,not3", "Mina bought2tickets,not12", "Minsu owns key,not speaker", "Red door,not previously mentioned blue", "Speaker was wrong about joking", "Wait here and speaker returns"],
+  "caveats": [{"source": "I will be back in5minutes", "observation": "15outputs use within5minutes;13use5minutes later. Preserve nuance caveat, not exact temporal-equivalence pass"}, {"source": "Mina bought2", "observation": "15outputs add only/emphasis via2장만, with core12-vs2contrast retained"}],
+  "limits": "Six-source bounded fixture, not model superiority, full multilingual coverage or product adoption evidence. No quality-check predicate was weakened. Original automated checks retained."
+}
