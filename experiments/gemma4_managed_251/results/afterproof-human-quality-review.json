@@ -1146,7 +1146,7 @@
       ]
     }
   ],
-  "source_audit_sha256": {
+  "source_raw_journal_sha256": {
     "26b": "fdb701811c69e040d97694d64cad8d67aa75764e28845b32c46db5f51c07cd58",
     "e4b": "c76121a6d21bbc8c9c947d3fd5cfeae0c41679f84a6aa02806ee4edba6c98396"
   }

@@ -1,0 +1,58 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-evidence-repair/v1",
+  "original_checkpoint": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5..7d057f3954b734a656e6c6d54c84cdb39b2344b8",
+  "product_candidate_unchanged": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+  "adjudication": {
+    "reviewer": "experiment-checkpoint-review",
+    "coverage": "Complete56-file experiment/evidence checkpoint; seven modules, four reports, one ZIP and44 JSON records.",
+    "finding": "AcceptedP3 F1: afterproof quality source_audit_sha256 contained genuine original-journal digests, not audit-file digests.",
+    "repair": "Renamed only that field to source_raw_journal_sha256, preserving both digest values. Repository search found no code or other record consumer of the old field.",
+    "verification": "Actual JSON parsing joined each new-field value to the corresponding audit raw_journal_sha256. The originating reviewer had independently streamed/authenticated the original journals.",
+    "other_checkpoint_outcome": "No additional product/runtime defect established. Packaging was traced through explicit src/bootstrap staging; tracking experiments does not package its fixtures/data or invalidate the prior product build."
+  },
+  "ci_scope_gap": {
+    "initial_command": "python -m ruff check . && python -m black --check .",
+    "initial_result": "Ruff passed; Black exited1 with audit.py, pressure.py, summarize.py and session.py requiring formatting;1072 files unchanged.",
+    "repair_command": "python -m black experiments/gemma4_managed_251/audit.py experiments/gemma4_managed_251/pressure.py experiments/gemma4_managed_251/summarize.py experiments/gemma4_managed_251/session.py",
+    "repair_result": "Exactly4 files reformatted.",
+    "final_commands": "python -m ruff check . && python -m black --check .",
+    "final_result": "Ruff passed; Black passed with1076 files unchanged.",
+    "policy": "Existing repository CI uses Black, not Ruff-format. Earlier successful Ruff-format observations remain historical, not the final formatter verdict."
+  },
+  "formatting_semantics": {
+    "method": "Parsed each of the seven modules before and after Black, then compared ast.dump(include_attributes=False), with no AST normalizations or exclusions.",
+    "identical_by_module": {
+      "audit.py": true,
+      "compare.py": true,
+      "pressure.py": true,
+      "run.py": true,
+      "session.py": true,
+      "summarize.py": true,
+      "windows_metrics.py": true
+    },
+    "limit": "AST identity supports reuse of the earlier exercised native mechanism; no new native/model execution or new performance result is claimed."
+  },
+  "observed_harness_snapshot": {
+    "path": "afterproof-harness-671.zip",
+    "sha256": "6412fa95e7b99276cbc6280d14d6cd2e527c3dbf8aff412f2ab76ceb8df49307",
+    "members": 7,
+    "archive_creation": "Created before Black from the unchanged working modules; each source digest was checked against actual671 afterproof-evidence.json. ZIP member bytes were then independently read and hashed.",
+    "matches_observed_digests_by_module": {
+      "audit.py": true,
+      "compare.py": true,
+      "pressure.py": true,
+      "run.py": true,
+      "session.py": true,
+      "summarize.py": true,
+      "windows_metrics.py": true
+    },
+    "original_source_code_checkpoint": "7d057f3954b734a656e6c6d54c84cdb39b2344b8",
+    "purpose": "Retains the exact executed afterproof fixture despite subsequent CI-only formatting. Original ABBA snapshot and all observed source/model/runtime/raw identities remain separate and unchanged."
+  },
+  "limits": [
+    "No product source, runtime profile, default, native outcome, sampling control or actual measurement was changed.",
+    "No build/model/test-matrix rerun followed this metadata/formatting repair.",
+    "Originating bounded repair review and final terminal audit are separate from these Director observations.",
+    "Latest installed actual inference remains user-skipped and unverified."
+  ]
+}

@@ -77,9 +77,9 @@ def audit(path: Path):
                     "actual_translation_events": matches,
                 }
             )
-            assert matches, (
-                "Manual admission was not independently followed by translation completion"
-            )
+            assert (
+                matches
+            ), "Manual admission was not independently followed by translation completion"
     cpu_pids = {
         row["pid"]
         for row in rows
@@ -120,9 +120,9 @@ def audit(path: Path):
             if pair["label"] in {"after-return-to-gpu", "after-return-to-gpu-repeat"}
         ]
         assert len(return_pairs) == 2
-        assert all((pair["server_active_overlap_s"] or 0) > 0 for pair in return_pairs), (
-            "Repeated GPU-return requests did not overlap at the native server"
-        )
+        assert all(
+            (pair["server_active_overlap_s"] or 0) > 0 for pair in return_pairs
+        ), "Repeated GPU-return requests did not overlap at the native server"
         shutdown = [row for row in rows if row["kind"] == "shutdown_waiting_manual_admission"]
         assert len(shutdown) == 1
         assert shutdown[0]["admission"]["status"] == "admitted"
@@ -155,9 +155,9 @@ def audit(path: Path):
                 "phase": row.get("phase"),
                 "boundary": row.get("failure_boundary"),
                 "original_command": safe_command(row["original_command"]),
-                "effective_command": safe_command(row["effective_command"])
-                if "effective_command" in row
-                else None,
+                "effective_command": (
+                    safe_command(row["effective_command"]) if "effective_command" in row else None
+                ),
             }
             for row in rows
             if row["kind"] in {"managed_spawn_attempt", "injected_spawn_failure"}

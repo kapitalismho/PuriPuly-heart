@@ -1,0 +1,627 @@
+{
+  "schema": "puripuly-heart/issue-251-distribution-final-evidence/v1",
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/251",
+  "status": "BUILD_INSTALL_STAGING_OBSERVED_CURRENT_INSTALLED_MODEL_PROOF_USER_SKIPPED_UNVERIFIED",
+  "completion_boundary": {
+    "built_product_commit": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+    "nonproduct_evidence_checkpoint": "7d057f3954b734a656e6c6d54c84cdb39b2344b8",
+    "baseline": "766e25a39ac6cec6800bf15e994409cf76a0ffe5",
+    "identity_note": "Product/build remains671; later7d057 checkpoint pins nonproduct experiments/evidence only. No rebuild or new product-source claim is inferred from HEAD movement.",
+    "issue_completion": "Not established. Current-candidate installed model/host criterion remains UNVERIFIED; skip is not issue-wide acceptance or closure."
+  },
+  "user_decision": {
+    "reply_verbatim": "스킵",
+    "meaning": "Director conservatively interprets as skip this current-candidate installed model/host proof, not bypass the resource guard.",
+    "scope_exception": "Only the final native installed check was authorized to be skipped. Original issue requirement remains unverified.",
+    "no_model_or_host_go": true,
+    "probe_executed": false,
+    "watchdog_executed": false,
+    "current_candidate_installed_inference_completions": 0,
+    "current_candidate_owned_model_children": 0,
+    "boundary": "Mandatory build standalone CPU/Vulkan --version checks and installer telemetry-preference commands are not an application-control host or managed model inference proof."
+  },
+  "owned_root_labels": {
+    "<BUILD_ROOT>": "Fresh final task-owned root issue251-2da155b006.",
+    "<CHECKOUT>": "Integrated source checkout; product source frozen at671.",
+    "<INSTALLED_STATE>": "Fresh normal user-Temp synthetic settings/model staging root.",
+    "<INSTALLER_STATE>": "Separate normal user-Temp isolated smoke-installer settings root.",
+    "<TOOL_RECOVERY_ROOT>": "Owned earlier tool-dependency recovery root; shared environments not modified.",
+    "<ORIGINAL_8786_ROOT>": "Earlier accepted8786 installed proof root; original records remain separate and unchanged.",
+    "<CANCELLED_7CFF_ROOT>": "Obsolete7cff build root cancelled by Director before install/probe.",
+    "<VERIFIED_DISTRIBUTION_INPUTS>": "Prior independently verified native inputs/archive cache.",
+    "<VERIFIED_MODEL_ASSETS>": "Original read-only verified model asset root; preserved, not a cleanup target.",
+    "<CHECK_TOOLS_ENV>": "Existing check-tools Python environment.",
+    "<SOXR_BUILD_ENV>": "Existing system-linked Soxr environment.",
+    "<INNO_7_1_ROOT>": "Verified Inno7.1 compiler.",
+    "<USER_HOME>": "Personal home/cache prefix redacted."
+  },
+  "build": {
+    "candidate": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+    "source": "<CHECKOUT>",
+    "command": [
+      "pwsh",
+      "-NoProfile",
+      "-File",
+      "<CHECKOUT>/scripts/ci/build-native-release-artifacts.ps1",
+      "-ToolPython",
+      "<TOOL_RECOVERY_ROOT>/tool-env/Scripts/python.exe",
+      "-PinnedInputRoot",
+      "<VERIFIED_DISTRIBUTION_INPUTS>/native-pinned-inputs",
+      "-PythonEmbedArchive",
+      "<VERIFIED_DISTRIBUTION_INPUTS>/native-pinned-inputs/python-3.14.7-embed-amd64.zip",
+      "-InnoSetupVersion",
+      "7.1.0",
+      "-InnoSetupCompiler",
+      "<INNO_7_1_ROOT>/ISCC.exe",
+      "-SoxrBuildEnvironment",
+      "<SOXR_BUILD_ENV>",
+      "-BuildRoot",
+      "<BUILD_ROOT>/build",
+      "-OutputDir",
+      "<BUILD_ROOT>/dist",
+      "-InstallerOutputDir",
+      "<BUILD_ROOT>/installer"
+    ],
+    "start_utc": "2026-10-15T18:59:45.075908+00:00",
+    "start_unix_s": 1792090785.0759192,
+    "cache_boundary": "Retained verified pinned inputs and llama archives; copied already-extracted pinned Flutter SDK; shared existing Cargo/Rustup/Pub/uv dependency caches. Own Python3.14.7 tool environment adds hash-verified runtime dependencies read-only to prior Flet1.0 build dependencies. App state, home, temp isolated. No production installer execution.",
+    "exit_code": 0,
+    "end_unix_s": 1792091701.404887,
+    "end_utc": "2026-10-15T19:15:01.404892+00:00",
+    "product_provenance": {
+      "matched": true,
+      "product_source_files": 552,
+      "packaged_product_source_files": 552,
+      "source_unchanged_during_build": true
+    },
+    "elapsed_seconds": 916.3289678096771,
+    "pipeline": "Full scripts/ci/build-native-release-artifacts.ps1 -> build-native-experimental.ps1. No SkipNativeBuild, obsolete-root resume, or manual packaged Python/zip editing.",
+    "completed_stages": [
+      "verify-inputs",
+      "render-template",
+      "Flet/Flutter Windows native host build",
+      "locked hashed dependency staging",
+      "system-linked Soxr wheel/compliance sources",
+      "product source staging/metadata",
+      "overlay/GPU worker/console native compilation",
+      "managed Gemma runtime prepare/stage",
+      "VC runtime staging",
+      "compile-runtime",
+      "bundle-runtime",
+      "validate-target",
+      "validate-compliance",
+      "managed verify-package --launch",
+      "artifact manifest/cleanup include",
+      "release smoke commands and package validation",
+      "normal installer compilation/product metadata verification"
+    ],
+    "source_identity": "All552 packaged product Python source hashes matched initial frozen671 snapshot; source snapshot unchanged during full pipeline.",
+    "artifact_inventory_subset": [
+      {
+        "bytes": 9216,
+        "path": "_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+        "sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+      },
+      {
+        "bytes": 43638529,
+        "path": "app/python.zip",
+        "sha256": "9ae97c6ce3fc9e61523cee4e1cd533688aecd1869db1563ec40fb1ea2e0de15c"
+      },
+      {
+        "bytes": 154624,
+        "path": "puripuly.exe",
+        "sha256": "fd9f2221292c620bcd88468e22af79d60b0fa5ec38be8985dab84c482f67ef7f"
+      },
+      {
+        "bytes": 196096,
+        "path": "PuriPulyHeart.exe",
+        "sha256": "d4fb897a3002c5f2f0543974705f7a460005a3a1121550281773e67dd4a2341e"
+      }
+    ],
+    "normal_installer": {
+      "filename": "installer/PuriPulyHeart-Setup-2.8.2.exe",
+      "sha256": "da39e9db4930ba928b117707e23050300d620baef0e9966ce83cd0fdda686a9b",
+      "compiled": true,
+      "executed": false,
+      "hash_observation": "build.stdout.txt final installer SHA256 output"
+    }
+  },
+  "isolated_installer": {
+    "identity": "PuriPulyHeart-Issue251-2da155b006",
+    "install": "<BUILD_ROOT>/installed",
+    "state": "<INSTALLER_STATE>/Temp/installer-appdata",
+    "boundary": "Genuine newly built671 candidate; alternate AppId/app-data/group and InstallerSmokeAppDataRoot, no production-identity execution. SkipLocalSttProvisioning excludes unrelated ASR only; normal Gemma runtime packaging retained.",
+    "records": [
+      {
+        "label": "smoke-telemetry-seed",
+        "command": [
+          "<BUILD_ROOT>/dist/PuriPulyHeart.exe",
+          "--headless",
+          "--config",
+          "<INSTALLER_STATE>/Temp/installer-appdata/settings.json",
+          "installer-telemetry-preference",
+          "disable"
+        ],
+        "start_unix_s": 1792091707.1679513,
+        "end_unix_s": 1792091707.9601955,
+        "exit_code": 0
+      },
+      {
+        "label": "smoke-compile",
+        "command": [
+          "<INNO_7_1_ROOT>/ISCC.exe",
+          "/DNativeExperimental=1",
+          "/DMyPackagedAppDir=<BUILD_ROOT>/dist",
+          "/DMyStagedOverlayDir=<BUILD_ROOT>/dist",
+          "/DNativeCleanupInclude=<BUILD_ROOT>/native-installer-cleanup.iss",
+          "/DMyAppId=PuriPulyHeart-Issue251-2da155b006",
+          "/DMyAppDirName=PuriPulyHeart-Issue251-2da155b006",
+          "/DMyAppDataDirName=PuriPulyHeart-Issue251-2da155b006",
+          "/DMyAppGroupName=PuriPulyHeart-Issue251-2da155b006",
+          "/DInstallerSmokeAppDataRoot=<INSTALLER_STATE>/Temp/installer-appdata",
+          "/DSkipLocalSttProvisioning=1",
+          "/O<BUILD_ROOT>/installer-smoke",
+          "<CHECKOUT>/installer.iss"
+        ],
+        "start_unix_s": 1792091707.961212,
+        "end_unix_s": 1792091808.9689426,
+        "exit_code": 0
+      },
+      {
+        "label": "smoke-install",
+        "command": [
+          "<BUILD_ROOT>/installer-smoke/PuriPulyHeart-Setup-2.8.2.exe",
+          "/VERYSILENT",
+          "/SUPPRESSMSGBOXES",
+          "/SP-",
+          "/NORESTART",
+          "/NOCLOSEAPPLICATIONS",
+          "/NORESTARTAPPLICATIONS",
+          "/DIR=<BUILD_ROOT>/installed",
+          "/TASKS=",
+          "/LOG=<BUILD_ROOT>/smoke-install.log"
+        ],
+        "start_unix_s": 1792091809.1369941,
+        "end_unix_s": 1792091839.1864622,
+        "exit_code": 0
+      }
+    ],
+    "filename": "installer-smoke/PuriPulyHeart-Setup-2.8.2.exe",
+    "sha256": "c1d0c829d250299b9eac03c64a304a6440e07e61bb34611caeb7fbf794246a7d",
+    "compile_exit_code": 0,
+    "install_exit_code": 0,
+    "hash_observation": "install_smoke.py successful terminal result, computed before install."
+  },
+  "nonmodel_installed_staging": {
+    "candidate": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+    "utc": "2026-10-15T19:17:35.180921+00:00",
+    "command": [
+      "<BUILD_ROOT>/installed/python.exe",
+      "<BUILD_ROOT>/seed_installed_state.py",
+      "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+      "<VERIFIED_MODEL_ASSETS>",
+      "53659"
+    ],
+    "started_unix_s": 1792091844.1766331,
+    "ended_unix_s": 1792091855.180944,
+    "exit_code": 0,
+    "config": "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+    "osc_port": 53659,
+    "seed_stderr": "",
+    "boundary": "Nonmodel staging only: verified model hardlinks, installed checksum validation and initial isolated settings. No application host, translation owner or native model child started. UDP reservation socket closed; later proof must bind this exact owned sink port or fail explicitly.",
+    "model_launch": "HOLD pending post-staging physical/commit baseline and Director GO.",
+    "installed_seed_result": {
+      "imported_product": "<BUILD_ROOT>/installed/app/python.zip/puripuly_heart/__init__.pyc",
+      "config": "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+      "model_root": "<INSTALLED_STATE>/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+      "model_manifest": {
+        "manifest_version": 1,
+        "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+        "repo_id": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+        "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+        "upstream_repo_id": "google/gemma-4-26B-A4B-it",
+        "license": "Apache-2.0",
+        "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+        "files": [
+          "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
+        ]
+      },
+      "model_files": [
+        "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+        "installed-manifest.json"
+      ],
+      "runtime_override": null
+    },
+    "integrity": "Installed validate_gemma_install(..., verify_checksums=True, spec=gemma_26b_spec()) exited0. Hardlinks and initial isolated settings only; no application host or model load.",
+    "exact_model_artifact": {
+      "repository": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "bytes": 14249047104,
+      "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891"
+    },
+    "settings_boundary": "Initial synthetic canonical state selects managed_gemma_26b/gpu, en->ko; telemetry/clipboard off; Soniox keyless/inactive, encrypted-file secrets with ephemeral passphrase; no account credentials. OSC reservation socket closed after stage. Current-instance effective settings were not observed because host was not launched.",
+    "runtime_override": null
+  },
+  "runtime_distribution": {
+    "build": "b11537",
+    "commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "official_release": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11537",
+    "archives": {
+      "cpu": {
+        "filename": "llama-b11537-bin-win-cpu-x64.zip",
+        "bytes": 19513247,
+        "sha256": "a05c2d35ebe9787489277d6e039b391fd006384a6c49d069395f3a7b47186fd2"
+      },
+      "vulkan": {
+        "filename": "llama-b11537-bin-win-vulkan-x64.zip",
+        "bytes": 33458882,
+        "sha256": "ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe"
+      }
+    },
+    "launcher_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+    "expected_installed_path": "<BUILD_ROOT>/installed/_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+    "current_installed_actual_owned_child_observation": null,
+    "boundary": "Final artifact inventory/package launch checks are real distribution evidence, but do not establish an actual managed child launched by the final installed application.",
+    "profile": "Accepted26B Vulkan n24/non-mmap/cache2048 unchanged. E4B GPU mmap retained per Director ABBA176 decision; no profile retuning/fallback."
+  },
+  "resource_observations": {
+    "post_staging_worker_observation": {
+      "candidate": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+      "boundary": "Read-only system-memory APIs only, three samples over two seconds; no application/model process launch or changes to unrelated applications.",
+      "samples": [
+        {
+          "utc": "2026-10-15T19:17:38.459440+00:00",
+          "unix_s": 1792091858.4595447,
+          "available_physical_bytes": 6895878144,
+          "total_physical_bytes": 33933414400,
+          "memory_load_percent": 79,
+          "commit_total_bytes": 80444436480,
+          "commit_limit_bytes": 94632157184,
+          "commit_headroom_bytes": 14187720704,
+          "system_cache_bytes": 7414059008,
+          "process_count": 518,
+          "page_size_bytes": 4096
+        },
+        {
+          "utc": "2026-10-15T19:17:39.475789+00:00",
+          "unix_s": 1792091859.4758081,
+          "available_physical_bytes": 6952239104,
+          "total_physical_bytes": 33933414400,
+          "memory_load_percent": 79,
+          "commit_total_bytes": 80383004672,
+          "commit_limit_bytes": 94632157184,
+          "commit_headroom_bytes": 14249152512,
+          "system_cache_bytes": 7414099968,
+          "process_count": 518,
+          "page_size_bytes": 4096
+        },
+        {
+          "utc": "2026-10-15T19:17:40.492628+00:00",
+          "unix_s": 1792091860.492644,
+          "available_physical_bytes": 6960619520,
+          "total_physical_bytes": 33933414400,
+          "memory_load_percent": 79,
+          "commit_total_bytes": 80373362688,
+          "commit_limit_bytes": 94632157184,
+          "commit_headroom_bytes": 14258794496,
+          "system_cache_bytes": 7423684608,
+          "process_count": 519,
+          "page_size_bytes": 4096
+        }
+      ],
+      "available_physical_min_bytes": 6895878144,
+      "commit_headroom_min_bytes": 14187720704,
+      "source_pressure_observation_from_director": {
+        "prelaunch_available_physical_bytes": 5045506048,
+        "prelaunch_commit_headroom_bytes": 9941684224,
+        "load_min_available_physical_bytes": 155648,
+        "sampled_below_256_mib_span_s": 5.385,
+        "outer_interval_s": 5.914,
+        "max_sample_gap_s": 0.342,
+        "watchdog_8_second_cutoff_triggered": false,
+        "interpretation": "Not RAM-safe evidence; absence of cutoff does not erase observed material pressure."
+      },
+      "model_launch": "HOLD pending Director safety assessment/authorization; this record does not establish RAM safety."
+    },
+    "later_director_observation": {
+      "source": "Director supplied system counters after stopping8 completed task-owned leaf sessions; worker did not rerun or alter unrelated apps/cache.",
+      "unix_s": 1792092041.4546194,
+      "available_physical_bytes": 4014628864,
+      "commit_headroom_bytes": 14273228800,
+      "commit_limit_bytes": 94632157184,
+      "interpretation": "No improvement or causal claim; lower physical availability does not authorize an unsafe launch."
+    },
+    "assessment": "No RAM-safety claim. Earlier26B source load reached155648B physical availability and remained below256MiB for sampled5.385s despite no8s watchdog cutoff. Current baseline does not erase that material-pressure observation.",
+    "causality": "Not established. No global cache purge, working-set trimming, unrelated-app termination, model/profile change or CPU fallback performed.",
+    "original_source_observation": "Retained unchanged in postbuild-memory-assessment.json; reported by Director, not re-exercised by this worker."
+  },
+  "prepared_external_watchdog": {
+    "executed": false,
+    "script": "memory_watchdog.py",
+    "threshold_bytes": 268435456,
+    "sustained_seconds": 2,
+    "nominal_sample_interval_seconds": 0.1,
+    "scope": "Would capture only exact unique installed native-child/owned-headless-host PID/create-time/executable identities; no unrelated targets.",
+    "cutoff_classification_if_exercised": "Resource gap, not product failure.",
+    "boundary": "Prepared task-only observer, not product/profile code. No watchdog run, owned-model termination, pressure-cutoff or no-cutoff safety claim exists for this final candidate."
+  },
+  "current_candidate_installed_model_proof": {
+    "status": "USER_AUTHORIZED_SKIP_UNVERIFIED",
+    "two_fresh_hosts": [],
+    "terminal_translation_records": [],
+    "owned_osc_receipts": [],
+    "actual_owned_child_profile_hash_version": null,
+    "restart_persistence_observed": false,
+    "owned_model_port_release_observation": null,
+    "reason": "No host/model launched after user skip. No fabricated completion, persistence or child-release evidence. Final installed criterion remains unmet."
+  },
+  "earlier_and_failed_history": {
+    "original_8786_proof": {
+      "file": "experiments/gemma4_managed_251/results/distribution-evidence.json",
+      "product_commit": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+      "completed_fresh_installed_cycles": 2,
+      "boundary": "Accepted earlier separate executed proof; not substituted for missing current671 installed proof. Original file and raw records preserved."
+    },
+    "initial_failures": {
+      "reference": "distribution-evidence.json failed_attempts",
+      "retained": [
+        "Preliminary d0a0 tool environment missing websockets; recovered in fresh owned tool env without modifying shared dependencies.",
+        "Original C-drive sandbox SetFileSecurityW WinError5 and later insecure-DACL rejection; fixed by normal user-Temp probe state without security bypass.",
+        "8786 subscriber timeout despite successful inference; stream validation remains unclaimed.",
+        "Immediate producer-file observation preceded asynchronous logging flush; successful owned OSC output preserved."
+      ],
+      "boundary": "No reruns or reinterpretation as current671 product failure."
+    },
+    "obsolete_build_cancellation": {
+      "candidate": "7cffc6b8bb8f3da2544f42a4f76319ff91759513",
+      "classification": "Director obsolete-candidate cancellation; not a product build failure",
+      "job": "bg_52",
+      "job_cancelled": true,
+      "owned_descendant_pids_terminated": [
+        56628,
+        68924,
+        60644
+      ],
+      "remaining_owned_roots": [],
+      "install_executed": false,
+      "probe_executed": false,
+      "model_executed": false,
+      "source_freeze_release": "Owned build job/process tree ended; Director may lift source freeze for accepted repair.",
+      "preserved": [
+        "build-run.json (start record; driver interrupted before terminal update)",
+        "candidate-product-source.json",
+        "build.stdout.txt",
+        "build.stderr.txt",
+        "completed build/evidence stages and cached inputs"
+      ],
+      "boundary": "Only process commands tied to this unique owned build root and their descendants were terminated; no global/shared tool processes targeted. Original8786 records/installation untouched."
+    }
+  },
+  "verification_gaps": [
+    "Current671 installed app-control host, actual managed26B child, two fresh-host terminal translations/OSC receipts and restart-persistence were explicitly user-skipped and remain UNVERIFIED.",
+    "No RAM-safety or pressure-cutoff guarantee; prepared2s watchdog never executed.",
+    "Earlier8786 completions do not close current671 installed acceptance.",
+    "No GUI interaction/presentation, installed CPU/MTP, two-channel concurrency/safety or E4B loading comparison claim by this distribution worker.",
+    "Standalone packaged runtime --version launches and source hash matching do not replace installed application-owned child observations.",
+    "Full source/runtime/profile pins remain unchanged; current instance behavior is not inferred from constants or seeded settings.",
+    "This authorized final-check scope exception does not authorize issue closure, release, merge or deployment."
+  ],
+  "local_original_evidence": {
+    "boundary": "Raw logs stay local. Original byte hashes identify task-root-relative originals, not sanitized reconstructions. Immutable build/installer artifacts are retained.",
+    "files": [
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build-run.json",
+        "bytes": 2047,
+        "sha256": "0e4ea266d5e330e76ecc5d5d52c264644583d1d2b62ab39d35f34c91312656ad"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "candidate-product-source.json",
+        "bytes": 68413,
+        "sha256": "ebe209b0b0493c8ed44ac45408bba4009bf5a30f361a8db169557e6d95f45adb"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build.stdout.txt",
+        "bytes": 1359877,
+        "sha256": "18539493f8b29c93ab24f71825dd2e4e60cabab8ebb7d6359e79130ab06f1ebb"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build.stderr.txt",
+        "bytes": 33207,
+        "sha256": "39a849a65bf42adaef24a26a90b8e568760302b212ec3b5a2d4b58fc76a4ad46"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "isolated-install-run.json",
+        "bytes": 2808,
+        "sha256": "af97268f8e51ba6a4a11dd6c18688cdeabefb4fa9dc980ad9d37f57e262ed34c"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "smoke-compile.stdout.txt",
+        "bytes": 1256951,
+        "sha256": "553c4ff0fb57b75c0af97c9bb8bd0b6a41b29d6e557ae9d85a238464a3541cfd"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "smoke-install.log",
+        "bytes": 3941769,
+        "sha256": "8331a05ec2385bb34a59cd2d9d5cc176f3339acceebfc09ef3a4704d4f20b4bc"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-staging.json",
+        "bytes": 2202,
+        "sha256": "2df4ee85cda1d0bb75544ebf1e48eeffe89fc50dec8a298e4fcfbb07324e35e1"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "postbuild-memory-assessment.json",
+        "bytes": 2305,
+        "sha256": "f213c4892e4931b523714e1543c822f9e28419ce7222a2c0c227fb8d4bc0be37"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "dist/native-artifact-manifest.json",
+        "bytes": 6762760,
+        "sha256": "cfd434a78ed0f5237f873738f1514dca6343ffdfc5c199a5e2d34c01857017b2"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/bytecode.json",
+        "bytes": 4597437,
+        "sha256": "11571b41975043beed1e183b476235b14ed10767ca26f45087ea041a34fa66b2"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/upstream-inputs.json",
+        "bytes": 2834,
+        "sha256": "95b421db04b0e688fbcd7f83583e319cd44e0c5334785df539f774edbcf84110"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/release-target-validation.json",
+        "bytes": 628871,
+        "sha256": "8cb6bb16920db7e592e4d83cbd9748d65b5d4513408356194e82fb20f2b06396"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/release-compliance-validation.json",
+        "bytes": 5739,
+        "sha256": "03ef3d1a12eeba5af2a3105e14bd6c1703d0b5e42620649965590aecf70c80a6"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "run_native_build.py",
+        "bytes": 4321,
+        "sha256": "d7b12a110c1bd108a0766809f710e0d9ea3306ef55977fd8b20e858e90cb5440"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "install_smoke.py",
+        "bytes": 3778,
+        "sha256": "a76edc30da5acaf29f39a90f4bfae2dfe28fd29d5f8573ac3aae1b9304ec65e8"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "seed_installed_state.py",
+        "bytes": 2369,
+        "sha256": "d457c4a9565c0bd826107e8617412ebddf5786022a20db82fcd004c5ed91cfd6"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "stage_installed.py",
+        "bytes": 3081,
+        "sha256": "5620d73707fdf9451d2529f10b2834c298e8fb88ad9ba1c8687045e725ccca9b"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "assess_memory.py",
+        "bytes": 3576,
+        "sha256": "6ac4f82a431458cd7c637365b4da1cca75e93185828a8e6d7cac9f9d83c03b77"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "probe_installed.py",
+        "bytes": 17441,
+        "sha256": "a4aa20fb9d729b828a00121ddae3cabf4ce9dc9056cc87d18cdd60925586aa42"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "memory_watchdog.py",
+        "bytes": 6087,
+        "sha256": "9009973017a95b0256430c8cf32447b28c6d8c37520ab5158c05bc7e3637c777"
+      }
+    ],
+    "cancelled_build": [
+      {
+        "owned_root": "<CANCELLED_7CFF_ROOT>",
+        "filename": "director-cancellation.json",
+        "bytes": 858,
+        "sha256": "06a4520dd245c62bd4e1c730f95615a01a301602fa05a674fbe445546399f495"
+      }
+    ]
+  },
+  "cleanup": {
+    "status": "SCOPED_UNINSTALL_COMPLETE_MODEL_ALIASES_REMOVED_SMALL_DENIED_REMAINDERS_RETAINED",
+    "inspection": "Before execution, both unique HKCU uninstall registrations matched exact task-owned InstallLocation/unins000.exe paths. No owned installation process was active; inspected trees had no reparse points. Installer source limited uninstall deletion to installed files and compile-time isolated smoke app-data; no production uninstall hooks were found.",
+    "original_8786_uninstall": {
+      "identity": "PuriPulyHeart-Issue251-91b2b3ef64",
+      "command": [
+        "<ORIGINAL_8786_ROOT>/installed/unins000.exe",
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/LOG=<BUILD_ROOT>/cleanup-uninstall-original_8786.log"
+      ],
+      "started_unix_s": 1792092633.4244466,
+      "ended_unix_s": 1792092635.273188,
+      "exit_code": 0,
+      "installed_tree_present_after": false,
+      "unique_uninstall_registration_present_after": false
+    },
+    "final_671_uninstall": {
+      "identity": "PuriPulyHeart-Issue251-2da155b006",
+      "command": [
+        "<BUILD_ROOT>/installed/unins000.exe",
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/LOG=<BUILD_ROOT>/cleanup-uninstall-final_671.log"
+      ],
+      "started_unix_s": 1792092635.2733574,
+      "ended_unix_s": 1792092636.929365,
+      "exit_code": 0,
+      "installed_tree_present_after": false,
+      "unique_uninstall_registration_present_after": false
+    },
+    "environment": "Each uninstaller inherited its original isolated TEMP/APPDATA/LOCALAPPDATA/HOME/USERPROFILE. The old compile-time smoke root remained recognized as task-owned temporary state. No production identity, configuration or unrelated application was targeted.",
+    "state_cleanup": {
+      "preserved_raw_state_files": 14,
+      "preservation_location": "<BUILD_ROOT>/cleanup-preserved-state",
+      "fully_removed": [
+        "Original user-Temp event-observer attempt state",
+        "Original user-Temp producer-flush attempt state",
+        "Original user-Temp completed8786 proof state",
+        "Final671 user-Temp integrity-staging state"
+      ],
+      "all_task_state_model_hardlink_aliases_removed": true,
+      "original_verified_26b_asset_preserved": true,
+      "original_verified_26b_asset_bytes": 14249047104,
+      "original_verified_26b_asset_link_count_after": 8,
+      "original_assets_boundary": "Only hardlink aliases in exact task-created state roots were removed. Original verified/issue245 model inputs were never deletion targets; no model bytes were reread or modified.",
+      "permission_denied_remainders": [
+        {
+          "root": "<ORIGINAL_8786_ROOT>/smoke-sandbox",
+          "retained_files": [
+            {"relative_path": "Temp/is-WIQTXUAYBI-uninstall.tmp/_unins.tmp", "bytes": 4492838},
+            {"relative_path": "Temp/is-WIQTXUAYBI-uninstall.tmp/_unins-done.tmp", "bytes": 0},
+            {"relative_path": "Home/AppData/Roaming/Microsoft/Windows/Start Menu/desktop.ini", "bytes": 174}
+          ]
+        },
+        {
+          "root": "<INSTALLER_STATE>",
+          "retained_files": [
+            {"relative_path": "Temp/is-L7Q7XE43HY-uninstall.tmp/_unins.tmp", "bytes": 4492838},
+            {"relative_path": "Temp/is-L7Q7XE43HY-uninstall.tmp/_unins-done.tmp", "bytes": 0},
+            {"relative_path": "Home/AppData/Roaming/Microsoft/Windows/Start Menu/desktop.ini", "bytes": 174}
+          ]
+        }
+      ],
+      "retained_remainder_bytes": 8986024,
+      "cleanup_limit": "Normal deletion returned WinError5 for Inno-created temporary engines/sentinels and Windows-created desktop.ini metadata. No running owned temporary process was found; engines had one hardlink and were not ReadOnly. No ACL/ownership changes or escalation attempted. All removable settings, logs and model aliases were removed after preservation."
+    },
+    "retained_scaffolds_and_artifacts": "Immutable build/dist/installer artifacts, original8786 and cancelled7cff evidence, verified caches/tools, local reproduction/probe/watchdog helper scripts, original raw verification logs and archived state logs/settings remain. No blanket task-root cleanup was performed.",
+    "raw_cleanup_evidence": [
+      {"owned_root": "<BUILD_ROOT>", "filename": "cleanup-inspection.json", "bytes": 9996, "sha256": "71f4ad74acb6331c4346a1196a8e5a40f23c19b4855fac07bedabdfc4ead5a9c"},
+      {"owned_root": "<BUILD_ROOT>", "filename": "cleanup-result.json", "bytes": 11323, "sha256": "c0552d25548692593bb0fa7bc42a083666ba24420a2bccf70bba6e7cc4782060"},
+      {"owned_root": "<BUILD_ROOT>", "filename": "cleanup-uninstall-original_8786.log", "bytes": 1721421, "sha256": "ca4b8d2314521b3ae2014ed6d7da755954cd13d1c4345aca3030c7d28e691bf4"},
+      {"owned_root": "<BUILD_ROOT>", "filename": "cleanup-uninstall-final_671.log", "bytes": 1721441, "sha256": "923a3b4aad3d39dd39e513a18c270740f9bff4277f2731b76182bbf7d5779c1a"}
+    ],
+    "verification_boundary": "Only bounded nonmodel cleanup inspection, uninstall execution and target/registration checks occurred after the user skip. No application host, model inference, probe or watchdog was executed."
+  }
+}

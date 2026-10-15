@@ -176,9 +176,11 @@ def analyze(path):
                 "prelaunch_baseline": {
                     "captured": prelaunch is not None,
                     "observation": prelaunch,
-                    "reason": None
-                    if prelaunch is not None
-                    else "Monitor starts after native spawn; no prelaunch observation is reconstructed.",
+                    "reason": (
+                        None
+                        if prelaunch is not None
+                        else "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+                    ),
                 },
                 "earliest_postspawn_not_prelaunch": {
                     "time_s": times[0],

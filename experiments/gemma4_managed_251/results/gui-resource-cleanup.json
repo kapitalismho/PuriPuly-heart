@@ -1,0 +1,43 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-gui-resource-cleanup/v1",
+  "observed_unix_s": 1792092911.4393468,
+  "scope": "Only two exact task-created GUI provisioning model paths were unlinked after completed probe release and worker termination. No process was launched or terminated; no live settings or original issue245 model was removed.",
+  "prior_evidence": "selection-evidence.json; original cache-promotion-evidence.json",
+  "removed": [
+    {
+      "path": "<GUI_PROVISIONING_ROOT>/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "size_bytes": 14249047104,
+      "inode": 43347146414120982,
+      "hardlink_count_before": 1,
+      "absent_after": true
+    },
+    {
+      "path": "<GUI_PROVISIONING_ROOT>/HuggingFace/hub-preserved-for-reuse-proof/models--unsloth--gemma-4-26B-A4B-it-qat-GGUF/snapshots/7b92b5b28818151e8669af2e45e88d6086f490dd/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "size_bytes": 14249047104,
+      "inode": 2251799816787092,
+      "hardlink_count_before": 8,
+      "absent_after": true
+    }
+  ],
+  "identity_checks": {
+    "copied_target_matched_original_probe_inode_and_mtime": true,
+    "copied_target_was_distinct_from_retained_original": true,
+    "cache_entry_was_hardlinked_to_retained_original": true,
+    "retained_original_identity_size_mtime_unchanged": true,
+    "retained_original_size_bytes": 14249047104,
+    "retained_original_hardlink_count_before": 8,
+    "retained_original_hardlink_count_after": 7
+  },
+  "preserved": {
+    "product_created_manifest": true,
+    "original_cache_promotion_record": true,
+    "owned_reuse_screenshot": true,
+    "original_issue245_target": true
+  },
+  "limits": [
+    "No fresh model checksum or native inference was performed. Earlier full integrity evidence is unchanged; this cleanup checks file identity, size and mtime preservation, not a new bitwise verification.",
+    "Original app/GUI shutdown observations are retained; this action does not claim a new machine-wide PID inspection.",
+    "The historical GUI sandbox no longer contains runnable installed weights. Its manifest, settings, logs, screenshots and original evidence remain historical records, not current model-readiness claims.",
+    "No disk-space reclamation amount or memory improvement is inferred from unlinking."
+  ]
+}

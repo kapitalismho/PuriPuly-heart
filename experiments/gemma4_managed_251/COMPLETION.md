@@ -1,0 +1,65 @@
+# Issue 251 implementation and verification record
+
+[Issue 251](https://github.com/kapitalismho/PuriPuly-heart/issues/251) owns the integration contract; the [final owner decision](https://github.com/kapitalismho/PuriPuly-heart/issues/245#issuecomment-6196060251) fixes the 26B placement/cache profile.
+
+**Implementation and source-native verification are recorded below. Latest-candidate installed inference was explicitly skipped by the user after a memory-pressure warning. It remains unverified, not passed; this record does not declare the original issue fully complete.** No push, PR, merge, release, deployment, issue closure or Project completion is implied. The authorized remote action is a non-sensitive results comment only.
+
+## Candidate and implementation
+
+- Initial baseline: `766e25a39ac6cec6800bf15e994409cf76a0ffe5`.
+- Final product: `671ca2ac68a184a2d6915e9efd36464b52d5b0f5`, 80 changed product/test/documentation files. Later changes contain experiment evidence, documentation and fixture-only formatting, not product code.
+- Original native comparison/matrix and first installed proof: `8786d1fcd8fcb966f0ae164acee289e535a7c862`.
+- Actual enable-error/cancel/retry GUI proof: `7cffc6b8bb8f3da2544f42a4f76319ff91759513`; later signature-only changes retain its bounded applicability, not a claim of fresh GUI execution.
+- Exact 671 source-native tree SHA256: `cbd004e0bd448c1b6efb20f0836b247a5bb0c116adf3b5d736a878a81eb496c5`.
+
+| Implementation area | Maintained implementation and documentation |
+| --- | --- |
+| Runtime/model pins, isolated assets and profiles | [Assets](../../src/puripuly_heart/core/local_translation/assets.py), [profiles](../../src/puripuly_heart/core/local_translation/runtime_profile.py), [runtime distribution documentation](../../third_party/llama.cpp/README.md), [native artifact layout](../../native/windows_host/artifact-layout.json) |
+| Request-local slots, admission, settlement and lifecycle | [Managed runtime](../../src/puripuly_heart/core/local_translation/runtime.py), [provider](../../src/puripuly_heart/providers/llm/managed_gemma.py), [factory](../../src/puripuly_heart/app/wiring/wiring_llm_factory.py) |
+| Separate selection, persistence and GUI | [Translation values](../../src/puripuly_heart/config/translation_values.py), [settings schema](../../src/puripuly_heart/config/settings_vnext/schema.py), [settings UI](../../src/puripuly_heart/ui/views/settings.py), [user guide](../../README.md) and its four translated editions |
+| Failed-enable rollback and component-owned binding identity | [Enable owner](../../src/puripuly_heart/app/services/translation_enable.py), [provider application](../../src/puripuly_heart/app/services/provider/provider_runtime_apply.py), [signature ownership](../../src/puripuly_heart/app/wiring/wiring_provider_runtime.py), [startup](../../src/puripuly_heart/composition/application_startup.py) |
+| Public behavior and ownership map | [CLI](../../docs/cli.md), [architecture](../../docs/architecture.md), [OSC](../../docs/vrchat-osc.md) |
+
+User-visible changes: 26B is a distinct GPU-only managed choice; model selection persists independently of existing E4B choices. Both GPU models permit overlapping Self/Peer translation while CPU stays serial. Failed current-generation warmup/cancellation returns the effective translation toggle to off; explicit retry remains possible without substituting another model/backend. Independent STT degradation no longer loses the actual LLM binding or suppresses a required retry. OSC provider value 15 is added; existing values 10/11 and retired value 12 retain their intended treatment.
+
+## Effective models and runtime
+
+Runtime is pinned to **b11537 / `8e2d31e0eb658d0382d3106a61369dff81f0c080`**, not `latest`. Official CPU/Vulkan archives, staged files and actual version launches are recorded in [asset identities](results/asset-identities.json) and the distribution evidence. Supported incompatible overrides are rejected rather than accepted as the pinned runtime.
+
+26B is exactly `unsloth/gemma-4-26B-A4B-it-qat-GGUF`, revision `7b92b5b28818151e8669af2e45e88d6086f490dd`, file `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf`, 14,249,047,104 bytes, SHA256 `a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891`. No 26B drafter/projector, bundled weights, CPU profile or silent CPU/E4B/cloud fallback was added.
+
+| Model/backend | Effective contract |
+| --- | --- |
+| 26B Vulkan | Fixed n24 / `--load-mode none` / expert cache 2048 MiB; GPU layers 99, SWA full, host prompt cache 0, target threads 4/4. Context 4608, three 1536-token resident slots, at most two active requests. Batch/ubatch 512, KV f16/f16, flash attention on, fit/reasoning/speculation off. Remaining lifecycle/loopback/priority flags follow the exact issue profile. |
+| E4B Vulkan | Existing full-offload profile, threads 4/4, flash attention on, no MTP; at most two active requests. **Existing mmap retained.** No 26B offload/cache/SWA controls copied into this profile. |
+| E4B CPU, including internal GPU-start fallback | Existing model/drafter, mmap, device none, GPU layers 0, flash attention off, MTP on, one active request. Existing persisted thread policy retained; observed 8C/16T detection was target/batch 4/12 and draft 1/1. Context/prefix capacity stays 4608/3. |
+
+## Observed completion boundaries
+
+| Requirement | Observation and evidence |
+| --- | --- |
+| Runtime distribution and installed launch | [Original 8786 proof](results/distribution-evidence.json): full native pipeline and two genuine fresh installed hosts completed 26B translations, persisted selection and released the installed pinned child. [Final 671 record](results/distribution-final-evidence.json): full build exit 0, 552/552 packaged source hashes matched unchanged input, unique installation and exact model checksum staging passed. **Latest installed inference/fresh-host persistence was user-skipped and remains unverified.** |
+| GUI selection, progress/cancel/error, product installation/reuse and restart | [Selection/provisioning evidence](results/selection-evidence.json): actual owned Flet interaction, distinct choices/backend restrictions, real public download progress/cancel, normal exact-asset cache-to-staging/checksum/atomic promotion, fresh offline reuse and selection persistence. [Enable GUI evidence](results/enable-gui-evidence.json): actual failed enable/off, checking/cancel/off and explicit retry/error/off. Readiness and controlled runtime limits remain explicit. |
+| Managed 26B fixed-profile completion and overlap | [Original workload/safety](results/26b-execution.json), [audit](results/26b-audit.json), and [671 afterproof](results/afterproof-evidence.json). The later rejected-spawn case preserves off/no-fallback/native-not-ready, then explicit same-selection retry completes six actual native/application translations. |
+| Both GPU models: routing, overlap and lifecycle | [Execution ledger](EXECUTION.md), [results](RESULTS.md) and linked native audits cover same/opposite pairs, single-channel progress, per-channel order, cancellation/failure survivors, slot reuse, manual capacity, prefix LRU, transitions and shutdown. Returned E4B GPU completed two overlapping pairs on the retained child before its two-active/waiting-manual shutdown boundary. One server/model is used; no Peer chatbox publication. |
+| CPU/MTP and fallback preservation | [CPU execution](results/cpu-execution.json)/[audit](results/cpu-audit.json) and [injected GPU-start fallback](results/fallback-execution.json)/[audit](results/fallback-audit.json): 44 completions each, native maximum one and 1,566 actual draft tokens each. The injected failure is not described as a physical GPU failure. |
+| E4B loading-mode decision | [Full comparison](RESULTS.md#e4b-loading-mode-decision-retain-mmap), [strict data](results/e4b-loading-comparison.json), [quality review](results/e4b-human-quality-review.json). Four matched ABBA lifecycles completed 176 translations and 48 native-overlapping pairs. Small mixed timing changes do not justify additional shared-GPU accounting/private commitment; retain mmap. |
+| Deterministic behavior, architecture and CI policy | [Portable verification](results/verification-evidence.json): final affected 473 tests and integrated/all-architecture 538 tests passed, with overlap not summed. [Evidence repair verification](results/evidence-repair-verification.json): final `ruff check .` and `black --check .` passed, 1,076 Black files unchanged. Prior failures, review scopes and controlled smoke boundaries remain recorded. |
+
+Synthetic recognition entered real composed channel owners, provider/factory, runtime/transport and output routing. The capture-free Peer projection is disclosed; this is not live audio/ASR/consent/capture or actual VRChat rendering evidence. GUI and installed observations are separate, not inferred from headless events. `translation_runtime_ready` retains its provider-attachment meaning; native model readiness is separately observed.
+
+## Material failures and limits
+
+- **Severe memory pressure:** on the 671 26B loading case, available physical memory reached **155,648 bytes (152 KiB)**. The sampled below-256-MiB span was 5.385011 s, with a 5.914263 s surrounding bracket and 0.342108 s maximum sample gap. No eight-second watchdog cutoff is not a RAM-safety pass. [Pressure report](RESOURCE_PRESSURE.md) distinguishes phase/PID, original missing baselines, new true baselines, paging and process/device counters. Private commitment is not physical RAM; shared GPU accounting is not automatically spill. No 8-GB-card or VRChat frame-time guarantee is made.
+- **User-approved verification exception:** after the final build/install/staging and memory warning, the user requested skipping only latest installed actual inference. The prepared two-second guard was not executed. Earlier installed success is not relabeled as final-candidate execution. The original current-installed completion criterion remains unverified.
+- **Translation quality is not universally correct:** all 44 matched ABBA output positions were identical across modes, but eight correction-direction errors and eight lexical concerns remain. Separate original matrix and afterproof quality records preserve further factual/lexical failures; no sampler/history/input was retuned to hide them. See [original matrix review](results/matrix-human-quality-review.json), [extra native outcomes](results/matrix-extra-native-quality.json) and [afterproof review](results/afterproof-human-quality-review.json).
+- **Original failures remain failures:** failed harness attempts, the original failed 26B enable and E4B recovery attempts, the preliminary missing-build-dependency failure, the cancelled obsolete build and original installed observation limitations remain linked. The corresponding source repairs have actual afterproof; history was not overwritten.
+- **No full-repository green claim:** the original combined run was 7,926 passed / 92 failed / 9 skipped. Three in-scope failures were repaired and verified. The remaining 89 unchanged cross-suite logging-isolation failures were deferred; the separate complete Providers shard passed 869 tests. No baseline execution, remote CI or type-check pass is invented.
+
+## Reproducibility and cleanup
+
+The [fixture instructions](README.md), [execution ledger](EXECUTION.md), exact [ABBA snapshot](results/abba-harness-v3.zip) and exact [671 afterproof snapshot](results/afterproof-harness-671.zip) preserve the actual executed mechanisms. Current fixture formatting follows repository Black policy; all seven module ASTs remained identical. The corrected quality digest field identifies original journal bytes, not normalized audit JSON. Raw artifact hashes retain their explicitly original byte scope despite Git JSON line-ending normalization.
+
+Both unique native test installations and their registrations were removed; model aliases and normal user-Temp probe states were cleaned after raw-state evidence preservation. Six permission-denied Inno/Windows temporary files totaling 8,986,024 bytes remain in two exact task-owned roots, without ACL/ownership escalation. [GUI resource cleanup](results/gui-resource-cleanup.json) separately removed the task-created target copy/cache hardlink. Original issue245 assets, immutable build/installers, manifests, raw logs/screenshots and reproduction evidence remain. No unrelated app, live user state or global cache was targeted.
+
+The evidence record separates local implementation acceptance, the user-authorized verification omission, shared-result publication and original issue completion. None grants merge, release, deployment or closure authority.

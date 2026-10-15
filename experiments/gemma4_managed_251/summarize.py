@@ -150,30 +150,30 @@ def summarize_arm(path: Path):
                 "quality": result["quality"],
                 "native_timings": payload.get("timings"),
                 "native_generation_settings": payload.get("generation_settings"),
-                "effective_completion_parameters": None
-                if http_payload is None
-                else http_payload["effective_parameters"],
-                "original_completion_parameters": None
-                if http_payload is None
-                else http_payload["original_parameters"],
-                "native_request_prompt_sha256": None
-                if http_payload is None
-                else http_payload["native_prompt_sha256"],
-                "native_prompt_echo_matches": None
-                if native is None
-                else native.get("native_prompt_echo_matches"),
-                "native_prompt_echo_representation": None
-                if native is None
-                else native.get("native_prompt_echo_representation"),
+                "effective_completion_parameters": (
+                    None if http_payload is None else http_payload["effective_parameters"]
+                ),
+                "original_completion_parameters": (
+                    None if http_payload is None else http_payload["original_parameters"]
+                ),
+                "native_request_prompt_sha256": (
+                    None if http_payload is None else http_payload["native_prompt_sha256"]
+                ),
+                "native_prompt_echo_matches": (
+                    None if native is None else native.get("native_prompt_echo_matches")
+                ),
+                "native_prompt_echo_representation": (
+                    None if native is None else native.get("native_prompt_echo_representation")
+                ),
                 "actual_model": payload.get("model"),
                 "tokens_evaluated": payload.get("tokens_evaluated"),
                 "tokens_cached": payload.get("tokens_cached"),
                 "tokens_predicted": payload.get("tokens_predicted"),
-                "native_template_prompt_sha256": hashlib.sha256(
-                    payload["prompt"].encode()
-                ).hexdigest()
-                if isinstance(payload.get("prompt"), str)
-                else None,
+                "native_template_prompt_sha256": (
+                    hashlib.sha256(payload["prompt"].encode()).hexdigest()
+                    if isinstance(payload.get("prompt"), str)
+                    else None
+                ),
                 "stop": {
                     key: payload.get(key)
                     for key in (
@@ -186,9 +186,9 @@ def summarize_arm(path: Path):
                         "truncated",
                     )
                 },
-                "rendered_messages_sha256": None
-                if native is None
-                else native["rendered_messages_sha256"],
+                "rendered_messages_sha256": (
+                    None if native is None else native["rendered_messages_sha256"]
+                ),
                 "slot": None if native is None else native["slot_id"],
                 "native_interval": interval,
             }
@@ -398,9 +398,11 @@ def summarize(root: Path, output: Path | None = None):
     report = {
         "schema": "puripuly-heart/managed-gemma-251/v1",
         "arms": [summarize_arm(path) for path in journals],
-        "execution_outcomes": json.loads((root / "outcomes.json").read_text(encoding="utf-8"))
-        if (root / "outcomes.json").is_file()
-        else None,
+        "execution_outcomes": (
+            json.loads((root / "outcomes.json").read_text(encoding="utf-8"))
+            if (root / "outcomes.json").is_file()
+            else None
+        ),
         "limits": [
             "Controlled synthetic recognition ingress; no live audio, capture activation, ASR or consent proof.",
             "Peer effective-state projection is a disclosed capture-admission substitution.",

@@ -92,6 +92,8 @@ Every additional synthetic native/application output was read, including rejecte
 
 Exact candidate: `671ca2ac68a184a2d6915e9efd36464b52d5b0f5`; actual source-tree SHA256 `cbd004e0bd448c1b6efb20f0836b247a5bb0c116adf3b5d736a878a81eb496c5` matched in both fresh source lifecycles. Runtime remained b11537/`8e2d31e0e` with unchanged exact model assets/profile guards and identical fixture hashes between cases. Summary: [afterproof-evidence.json](results/afterproof-evidence.json).
 
+Exact executed fixture: [afterproof-harness-671.zip](results/afterproof-harness-671.zip), SHA256 `6412fa95e7b99276cbc6280d14d6cd2e527c3dbf8aff412f2ab76ceb8df49307`. All seven member digests match the in-run record. Subsequent CI-required Black formatting changed four source representations but no parsed AST; no native evidence was rerun or relabeled. [Bounded evidence repair checks](results/evidence-repair-verification.json).
+
 | Case | Actual outcome | Durable records |
 | --- | --- | --- |
 |26B failure/explicit retry|Exit0. One injected pre-spawn Vulkan rejection; effective enabled=false/provider binding=true, exact26B/GPU failed, native readiness=None and zero native/fallback processes. Explicit same-selection retry produced one exact26B Vulkan child PID69864 and six real native/application translations; native maximum2.|`26b-afterproof.json`, `26b-afterproof-audit.json`|
@@ -104,6 +106,14 @@ Exact candidate: `671ca2ac68a184a2d6915e9efd36464b52d5b0f5`; actual source-tree 
 The eight additional native outputs include two publications: manual-capacity completion and one Peer completion during ordered shutdown. Six remained unpublished, including both explicit cancellations, injected rejected response, retired-backend result, long Self shutdown result and queued manual shutdown result. Legitimate ordered-shutdown progress is preserved rather than asserting zero publication from close request.
 
 Original8786/ABBA evidence and every historical failure remain immutable and separately attributed. Final full native build/installed proof, GUI boundaries, integration and issue acceptance remain with their assigned owners; this worker claims completed source-native after-proof, not whole-issue acceptance.
+
+## Final distribution boundary and authorized skip
+
+The full671 native pipeline completed exit0 with552/552 packaged source hashes matching unchanged input. A genuine unique-identity smoke installer compiled/installed exit0, and exact26B nonmodel hardlink/checksum staging passed. [Final distribution record](results/distribution-final-evidence.json) retains the commands, artifact identities and original records.
+
+Post-staging physical headroom remained about6.9GB; a later Director observation was about4.0GB. After the explicit memory-risk question, the user requested skipping only latest installed actual inference. No final control-host/model probe or prepared2s watchdog ran. Current installed child/profile/completion/fresh-host persistence is therefore unverified; original8786 two-host success is not relabeled. The original issue is not declared complete.
+
+Both unique test installations and registrations were removed; normal user-Temp model aliases/state were cleaned after raw-state evidence preservation. Six permission-denied Inno/Windows temporary files totaling8,986,024bytes remain, without ACL escalation. Separately, [GUI resource cleanup](results/gui-resource-cleanup.json) removed the task-created target copy/cache hardlink while preserving the original model and historical evidence. No further model execution or resource-safety claim follows from cleanup.
 
 ## Explicit limits
 

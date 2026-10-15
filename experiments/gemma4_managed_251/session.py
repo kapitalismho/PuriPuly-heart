@@ -770,9 +770,11 @@ class Fixture:
                             },
                             native_prompt_sha256=prompt_hash,
                             native_prompt_chars=len(body["prompt"]),
-                            seed_control="fixed_comparison_only"
-                            if self.args.case == "abba"
-                            else "unmodified_product",
+                            seed_control=(
+                                "fixed_comparison_only"
+                                if self.args.case == "abba"
+                                else "unmodified_product"
+                            ),
                         )
                     return await original_post(url, *args, **kwargs)
 
