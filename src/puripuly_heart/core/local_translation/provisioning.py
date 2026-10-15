@@ -85,9 +85,7 @@ class _HTTPDownloadAdapter:
         _raise_if_cancelled(cancel_event)
         destination = request.local_dir / request.remote_path
         destination.parent.mkdir(parents=True, exist_ok=True)
-        url = self._source.download_url_template.format(
-            path=quote(request.remote_path, safe="/")
-        )
+        url = self._source.download_url_template.format(path=quote(request.remote_path, safe="/"))
         downloaded_bytes = 0
         reported_percent = -1
         try:
