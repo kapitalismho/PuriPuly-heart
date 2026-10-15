@@ -153,6 +153,7 @@ GUI and headless hosts share application owners and runtime resources. Presentat
 - **Local control host**
   - The host owns authenticated same-user access and instance identity.
   - Event subscriptions are bounded and privacy-filtered. Slow clients cannot block runtime producers.
+  - Readiness waits for endpoint publication. Blocking publication runs through the owned-thread boundary; ingress freeze fences startup, and endpoint cleanup waits for publication before releasing the lease.
 - **GUI settings queues**
   - Queues obtain the current diagnostic instance identity through the data-only `UiApplicationPort.diagnostic_instance_id` property.
   - `UiApplicationBoundary` reads the composed control owner's identity. The GUI does not access operational control directly.
@@ -437,7 +438,7 @@ Exact handoff and teardown ordering belongs to owner implementations and lifecyc
 - Capture, STT, translation, UI, and child-process events cross owner boundaries through ports, callbacks, or owned queues.
 - Callbacks delegate to the receiving owner. They must not mutate another owner's private runtime state.
 - Ordering is local to the owning channel or queue. There is no assumed global ordering across self, peer, UI, and provider events.
-- Run blocking model, device, or native work through the established worker, executor, or child-process boundary. Keep it off the application event loop.
+- Run blocking model, device, native, startup credential, TLS-policy, and endpoint-publication work through the established worker, executor, or child-process boundary. Keep application state, async clients, and presentation on the event loop; cancellation drains owned synchronous work before releasing its resources.
 
 ### Bounded task-creation enforcement
 

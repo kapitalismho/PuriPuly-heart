@@ -45,12 +45,16 @@ from puripuly_heart.core.managed_openrouter_release import (
     UnavailableManagedOpenRouterReleaseClient,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
-from puripuly_heart.core.openrouter_credentials import resolve_openrouter_credentials
+from puripuly_heart.core.openrouter_credentials import (
+    OpenRouterCredentialResolution,
+    resolve_openrouter_credentials,
+)
 from puripuly_heart.core.openrouter_handoff import should_auto_show_founder_letter
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEClient
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 from .wiring_managed_auth_factory import (
     ManagedAuthRuntimeAdapter,
@@ -301,19 +305,25 @@ class ManagedUsageRuntimeAdapter:
         release_settings = self.release.release_settings()
         if current is None or release_settings is None:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
-        try:
+
+        def resolve_credentials() -> OpenRouterCredentialResolution:
             secrets = create_secret_store(
                 release_settings.intent.secrets,
                 config_path=self.config_path,
             )
-            resolution = resolve_openrouter_credentials(
+            return resolve_openrouter_credentials(
                 build_openrouter_credential_runtime_config_from_vnext(release_settings),
                 secrets=secrets,
             )
+
+        try:
+            resolution = await run_owned_thread_call(resolve_credentials)
         except Exception as exc:
             _record_managed_account_failure(
                 "secret_observation", exc, "managed_account_observation_failed"
             )
+            return ManagedUsageMetadataResult(key_available=False, metadata=None)
+        if self.ingress_provider() or self.settings.canonical is not current:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
         if not resolution.api_key:
             return ManagedUsageMetadataResult(key_available=False, metadata=None)
