@@ -466,6 +466,8 @@ Exact handoff and teardown ordering belongs to owner implementations and lifecyc
 
 Each reviewed identity names its module, enclosing qualified function, callee family, maximum multiplicity, and lifetime rationale. Owning primitives, named owners, and legacy exceptions are separate dispositions. Removal is allowed; a new identity or increased multiplicity requires explicit review. Missing/empty protected roots and source discovery, decoding, or parsing failures fail the check.
 
+`ManagedGemmaRuntimeOwner._await_server_work` is a named-owner boundary: `_server_tasks` retains each shielded native operation until its outcome is consumed. Admission limits translation and prefix work together to two live workers on Vulkan or one on CPU; three resident slots do not increase that bound. Caller cancellation waits for settlement, and lifecycle stop bounds remaining work before transport/process teardown. The registry's single creation-site count is lexical, not a one-request runtime policy.
+
 This is bounded lexical analysis, not dynamic task-factory or whole-program alias resolution. Callback invocation timing, arbitrary untyped receivers, interprocedural aliases, star imports, indirect inheritance, global/nonlocal rebinding, pattern bindings, and conditional-flow joins are not resolved. Structural acceptance does not prove cancellation, draining, cleanup, or generation progress; owner behavior tests retain those responsibilities.
 
 Existing narrow lifetime debt is recorded at the exact creation identities, without changing runtime behavior:

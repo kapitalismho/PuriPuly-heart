@@ -176,6 +176,17 @@ TASK_CREATION_REVIEWS = (
         "ManagedGemmaRuntimeOwner races readiness against process exit and cancels plus gathers both local waiters in finally",
     ),
     *_reviews(
+        "core/local_translation/runtime.py",
+        {"ManagedGemmaRuntimeOwner._await_server_work": 1},
+        "ManagedGemmaRuntimeOwner retains server work in _server_tasks: admission permits at most "
+        "two Vulkan workers or one CPU worker, including prefix preparation serialized under the "
+        "same capacity gate; fallback drains active slots before replacement preparation. Each "
+        "call shield-drains and consumes its worker outcome before releasing the slot; lifecycle "
+        "shutdown applies bounded grace, stops the owned server, cancels remaining workers and "
+        "drains their operation owners",
+        family=ASYNCIO_ENSURE_FUTURE,
+    ),
+    *_reviews(
         "core/orchestrator/self_translation_channel.py",
         {
             "SelfTranslationChannelOwner._start_awaiting_vad_timeout": 1,

@@ -36,7 +36,7 @@ class ManagedGemmaDashboardNotice:
     backend: str | None = None
     progress_percent: int | None = None
     action: ManagedGemmaNoticeAction | None = None
-    model_id: str | None = None
+    gpu_only: bool = False
     failure_phase: str | None = None
 
 

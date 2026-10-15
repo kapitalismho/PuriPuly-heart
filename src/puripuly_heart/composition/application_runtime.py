@@ -249,6 +249,7 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationOwner,
@@ -615,7 +616,7 @@ def compose_application_runtime(
                 action=(
                     "cancel" if snapshot.state in {"checking", "downloading", "preparing"} else None
                 ),
-                model_id=snapshot.model_id,
+                gpu_only=snapshot.model_id == GEMMA_26B_MODEL_ID,
                 failure_phase=snapshot.failure_phase,
             )
         )

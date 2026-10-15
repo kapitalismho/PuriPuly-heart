@@ -1858,3 +1858,107 @@ async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
         await owner.close()
         await app.stop()
         sink.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("model", "backend", "gpu_only", "failure_phase", "failure_key"),
+    [
+        ("managed_gemma", "cpu", False, "runtime", "dashboard.managed_gemma_notice.failed"),
+        ("managed_gemma", "gpu", False, "runtime", "dashboard.managed_gemma_notice.failed"),
+        (
+            "managed_gemma_26b",
+            "gpu",
+            True,
+            "runtime",
+            "dashboard.managed_gemma_notice.gpu_only_failed",
+        ),
+        ("managed_gemma_26b", "gpu", True, "download", "dashboard.managed_gemma_notice.failed"),
+    ],
+)
+async def test_composed_gemma_notices_carry_presentation_policy_without_backend_identity(
+    offline, monkeypatch, model, backend, gpu_only, failure_phase, failure_key
+):
+    import socket
+
+    from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
+    from puripuly_heart.composition import headless_application
+    from puripuly_heart.core.local_asr.local_stt_download_port import LocalSTTDownloadPortError
+    from puripuly_heart.core.local_translation.provisioning import GemmaProvisioningUpdate
+    from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeError
+    from puripuly_heart.ui.dashboard.capture_notices import managed_gemma_capture_notice
+    from puripuly_heart.ui.i18n import t
+
+    monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-notice-data"))
+    monkeypatch.setenv("APPDATA", str(offline.parent / "isolated-notice-roaming"))
+    settings = json.loads(offline.read_text(encoding="utf-8"))
+    settings["intent"]["translation"].update(model=model, connection=backend)
+    settings["intent"]["stt"]["provider"] = "soniox"
+    settings["intent"]["peer_stt"]["provider"] = "soniox"
+    settings["intent"]["telemetry"]["enabled"] = False
+    settings["intent"]["integrated_context"]["enabled"] = False
+    sink = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sink.bind(("127.0.0.1", 0))
+    settings["intent"]["osc"].update(
+        host="127.0.0.1",
+        port=sink.getsockname()[1],
+        send_port=sink.getsockname()[1],
+        activation_notice_enabled=False,
+    )
+    offline.write_text(json.dumps(settings), encoding="utf-8")
+    presentation = headless_application.HeadlessApplicationPresentation()
+    monkeypatch.setattr(
+        headless_application, "HeadlessApplicationPresentation", lambda: presentation
+    )
+    progress_notices = []
+    terminal_error = (
+        ManagedGemmaRuntimeError("controlled runtime failure")
+        if failure_phase == "runtime"
+        else LocalSTTDownloadPortError("controlled download failure")
+    )
+
+    class Runtime:
+        async def prepare(self, **kwargs):
+            kwargs["provision_kwargs"]["on_status"](
+                GemmaProvisioningUpdate("downloading", 25, 100, 25)
+            )
+            progress_notices.append(presentation.projections["managed_gemma"])
+            raise terminal_error
+
+        async def release(self):
+            return None
+
+        async def close(self):
+            return None
+
+    monkeypatch.setattr(
+        application_runtime, "create_managed_gemma_runtime", lambda **_kwargs: Runtime()
+    )
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        owner = control.gemma()
+        with pytest.raises(type(terminal_error)):
+            await owner.prepare(control.gemma_selection(app.compatibility_settings()))
+        progress = progress_notices[-1]
+        assert isinstance(progress, ManagedGemmaDashboardNotice)
+        assert progress.gpu_only is gpu_only
+        assert progress.progress_percent == 25
+        assert progress.action == "cancel"
+        assert managed_gemma_capture_notice(progress).text == t(
+            "dashboard.managed_gemma_notice.downloading", percent=25
+        )
+        failure = presentation.projections["managed_gemma"]
+        assert isinstance(failure, ManagedGemmaDashboardNotice)
+        assert failure.gpu_only is gpu_only
+        assert failure.failure_phase == failure_phase
+        assert failure.action is None
+        rendered = managed_gemma_capture_notice(failure)
+        assert rendered.tone == "error"
+        assert rendered.text == t(failure_key)
+        if gpu_only and failure_phase == "runtime":
+            assert "No CPU or cloud fallback" in rendered.text
+    finally:
+        await app.stop()
+        sink.close()
