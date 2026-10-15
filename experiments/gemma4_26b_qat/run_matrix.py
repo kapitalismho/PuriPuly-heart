@@ -58,6 +58,7 @@ PROFILES = {
     "new-ncpu24-cache2048": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "24", "--moe-cache-mib", "2048"]),
     "new-ncpu24-cache2048-swa": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "24", "--moe-cache-mib", "2048", "--swa-full"]),
     "new-ncpu24-cache2048-swa-nocram": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "24", "--moe-cache-mib", "2048", "--swa-full", "--cache-ram", "0"]),
+    **{f"new-ncpu{n}-cache3072-swa-nocram": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", str(n), "--moe-cache-mib", "3072", "--swa-full", "--cache-ram", "0"]) for n in (18, 24)},
     "new-ncpu12-off": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12"]),
     "new-ncpu12-cache2048": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048"]),
     "new-ncpu12-cache2048-swa": ("b11537", ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full"]),

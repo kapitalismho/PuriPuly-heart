@@ -1,0 +1,39 @@
+{
+  "observed_utc": "2026-10-15T14:29:48.301066+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 16967200768,
+    "system_committed_bytes": 48386940928,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 28496146432,
+    "device_gpu_dedicated_bytes": 4008759296.0,
+    "device_gpu_shared_bytes": 373526528.0,
+    "device_gpu_committed_bytes": 4577955840.0,
+    "system_pages_input_per_second": 26.543152530226017,
+    "system_page_reads_per_second": 3.317894066278252
+  },
+  "counter_errors": {},
+  "recorded_utc": "2026-10-15T14:29:48.627983+00:00",
+  "owned_process_exits": [
+    {
+      "run": "followup-placement3072-n18-mmap-a1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "followup-placement3072-n18-read-b1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "followup-placement3072-n24-mmap-a1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "followup-placement3072-n24-read-b1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    }
+  ]
+}

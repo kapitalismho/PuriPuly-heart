@@ -1,0 +1,8 @@
+{
+  "check": "Fresh app-Python offline assertions against four actual retained run records",
+  "exit_code": 0,
+  "outcome": "PASS",
+  "assertions": ["Exactly four run identities", "Each status completed,43 requests,process exit0,no safety cutoff", "All172 stop_type eos", "All43 ordered phase/index/slot/input/prompt_sha256/prompt_n/cache_n identities equal across all four runs", "Every source-known allowlisted backend environment control absent in each effective child"],
+  "aggregation_actual_runs": {"summarize_placement3072": "exit0,four runs,172 completed,18 unique input-output pairs,no remaining model process", "summarize_timings": "exit0,four native identities,172 timed requests,zero app identities"},
+  "limits": "No product build/test/linter. No per-request association inferred from concurrent native log order. Final helper exercised through actual four runs; no later helper changes."
+}

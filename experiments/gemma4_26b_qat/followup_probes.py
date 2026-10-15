@@ -36,6 +36,8 @@ CONTROLS = (
 PLACEMENTS = {
     'allhost3072': 'new-cpu-moe-cache3072-swa-nocram',
     'n24cache2048': 'new-ncpu24-cache2048-swa-nocram',
+    'n18cache3072': 'new-ncpu18-cache3072-swa-nocram',
+    'n24cache3072': 'new-ncpu24-cache3072-swa-nocram',
 }
 MODEL_RUNTIMES = {'llama-server.exe', 'llama-cli.exe', 'llama-bench.exe', 'strata.exe', 'strata-poly.exe'}
 
@@ -110,11 +112,13 @@ def main():
     parser.add_argument('--load-mode', choices=('mmap', 'none'), required=True)
     parser.add_argument('--run-id', required=True)
     parser.add_argument('--minimum-free-bytes', type=int, default=16000000000)
+    parser.add_argument('--results', type=Path)
+    parser.add_argument('--experiment-baseline', default='eff651d517c7fd15ef2f96a019b348cccf662d06')
     parser.add_argument('--allow-pressure', action='store_true', help='Requires explicit Director acceptance; records pressure qualification, never an efficient-offload claim.')
     args = parser.parse_args()
     if not re.fullmatch(r'followup-[a-z0-9-]+', args.run_id):
         parser.error('Use a new followup-prefixed filename-safe run identity')
-    public = matrix.REPO / 'experiments/gemma4_26b_qat/results/followup/firstwave'
+    public = args.results or matrix.REPO / 'experiments/gemma4_26b_qat/results/followup/firstwave'
     public.mkdir(parents=True, exist_ok=True)
     raw = args.root / 'followup/runs' / args.run_id
     paths = [public / f'{args.run_id}{suffix}' for suffix in ('.headroom.json', '.json', '.analysis.json', '.samples.jsonl')]
@@ -137,7 +141,7 @@ def main():
     analysis = project(record, samples, raw / 'server.log')
     analysis.update(
         matched_original_profile=profile,
-        experiment_baseline='eff651d517c7fd15ef2f96a019b348cccf662d06',
+        experiment_baseline=args.experiment_baseline,
         executable_sha256=hashlib.sha256((args.root / 'runtimes/b11537/llama-server.exe').read_bytes()).hexdigest(),
         mode_boundary='none is the supported b11537 read/non-mmap mode, not a pinning guarantee.',
         preflight_headroom=before,
