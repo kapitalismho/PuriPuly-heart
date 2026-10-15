@@ -22,6 +22,8 @@
 - Link existing explanations and share only non-sensitive information.
 - Use clear, direct sentences and structured formats such as bullet points for shared work records and GitHub content.
 - Write all content published to GitHub in English.
+- Carry authorized PR work through current-candidate CI, proportionate repair/review, and its delegated endpoint; distinguish local acceptance, actual merge, issue completion, and Project reconciliation.
+- Local OMP guidance is not installed by a product PR. Report effective loading/use and activation/reversal separately, and preserve successful external effects when only a tracking update remains pending.
 
 ## Experimentation
 
