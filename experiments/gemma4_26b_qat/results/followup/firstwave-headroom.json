@@ -1,0 +1,15 @@
+{
+  "observed_utc": "2026-10-15T13:17:08.007505+00:00",
+  "model_runtime_processes": [],
+  "host_CPU_percent": 0.6,
+  "resources": {
+    "system_available_physical_bytes": 11631935488,
+    "system_committed_bytes": 50750074880,
+    "device_gpu_dedicated_bytes": 4090388480.0,
+    "device_gpu_shared_bytes": 430571520.0,
+    "device_gpu_committed_bytes": 4668325888.0,
+    "system_pages_input_per_second": 23.22720821898081,
+    "system_page_reads_per_second": 9.954517808134634
+  },
+  "counter_errors": {}
+}

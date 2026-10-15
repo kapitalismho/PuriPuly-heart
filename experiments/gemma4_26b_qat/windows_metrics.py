@@ -81,7 +81,7 @@ class Sampler:
         status = MemoryStatus()
         status.length = C.sizeof(status)
         self.kernel.GlobalMemoryStatusEx(C.byref(status))
-        result.update(system_available_physical_bytes=status.available_physical, system_committed_bytes=status.total_pagefile-status.available_pagefile)
+        result.update(system_available_physical_bytes=status.available_physical, system_committed_bytes=status.total_pagefile-status.available_pagefile, system_commit_limit_bytes=status.total_pagefile, system_commit_headroom_bytes=status.available_pagefile)
         self.pdh.PdhCollectQueryData(self.query)
         for name, counter in self.counters.items():
             size, count = W.DWORD(), W.DWORD()

@@ -1,0 +1,301 @@
+{
+  "profile": "followup-allhost3072-mmap-a1",
+  "status": "stopped_safety_cutoff",
+  "source_file": "followup-allhost3072-mmap-a1.json",
+  "error_or_unavailable_reason": "Owned conservative safety termination, NOT a runtime OOM",
+  "phases": {
+    "first_prefix": {
+      "prefill_ms": {
+        "n": 1,
+        "median": 21303.525,
+        "p95": 21303.525,
+        "min": 21303.525,
+        "max": 21303.525
+      },
+      "prefill_tps": {
+        "n": 1,
+        "median": 42.809816685266874,
+        "p95": 42.809816685266874,
+        "min": 42.809816685266874,
+        "max": 42.809816685266874
+      },
+      "decode_ms": {
+        "n": 1,
+        "median": 1394.552,
+        "p95": 1394.552,
+        "min": 1394.552,
+        "max": 1394.552
+      },
+      "decode_tps": {
+        "n": 1,
+        "median": 14.341523299238752,
+        "p95": 14.341523299238752,
+        "min": 14.341523299238752,
+        "max": 14.341523299238752
+      },
+      "prompt_evaluated_tokens": {
+        "n": 1,
+        "median": 912,
+        "p95": 912,
+        "min": 912,
+        "max": 912
+      },
+      "prompt_cached_tokens": {
+        "n": 1,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0
+      },
+      "prompt_total_tokens": {
+        "n": 1,
+        "median": 912,
+        "p95": 912,
+        "min": 912,
+        "max": 912
+      },
+      "predicted_output_tokens": {
+        "n": 1,
+        "median": 21,
+        "p95": 21,
+        "min": 21,
+        "max": 21
+      },
+      "decode_eval_tokens": {
+        "n": 1,
+        "median": 21,
+        "p95": 21,
+        "min": 21,
+        "max": 21
+      },
+      "native_ordered_phase_records": [
+        {
+          "prefill_ms": 21303.53,
+          "prompt_evaluated_tokens": 912,
+          "prefill_tps": 42.81,
+          "decode_ms": 1394.55,
+          "decode_eval_tokens": 21,
+          "decode_tps": 14.34
+        }
+      ],
+      "native_reported_count_matches_api_output_multiset": true
+    },
+    "hot_same_pair": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "native_ordered_phase_records": [],
+      "native_reported_count_matches_api_output_multiset": null
+    },
+    "pair_alternation": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "native_ordered_phase_records": [],
+      "native_reported_count_matches_api_output_multiset": null
+    },
+    "three_slots": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "native_ordered_phase_records": [],
+      "native_reported_count_matches_api_output_multiset": null
+    }
+  },
+  "observations": [
+    {
+      "phase": "first_prefix",
+      "index": 0,
+      "prefill_ms": 21303.525,
+      "prefill_tps": 42.809816685266874,
+      "decode_ms": 1394.552,
+      "decode_tps": 14.341523299238752,
+      "prompt_evaluated_tokens": 912,
+      "prompt_cached_tokens": 0,
+      "prompt_total_tokens": 912,
+      "predicted_output_tokens": 21,
+      "final_KV_tokens_cached_not_prompt_hit_count": 932
+    }
+  ],
+  "association_limit": "API timing fields belong to their original requests. Native log records are assigned only to phase barriers when total counts match; three-slot completion order is NOT joined to request submission order. Native decode-eval counts are phase distributions, not fabricated per-request joins."
+}

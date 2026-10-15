@@ -1,0 +1,65 @@
+{
+  "status":"bounded_primary_source_research_completed_before_local_probes",
+  "scope":"Compare published claims first; no alternate model/backend was installed or executed. Missing public fields remain missing, not filled from our environment.",
+  "cases":[
+    {
+      "id":"PolyStrata-physical8GiB-Gemma",
+      "sources":["https://github.com/VecSzn/PolyStrata/blob/c566ff4787c8ab188ecf33c6f1907a9f90d9f152/docs/BACKENDS.md#on-a-laptop-with-8-gb-of-vram","https://github.com/VecSzn/PolyStrata/tree/1212621baadfb0d1a55a3a1460a8708a55343b40/src/poly"],
+      "attribution":"Author benchmark, not independent replication. README selects higher cells across passes.",
+      "engine":"strata-poly custom CUDA, source1212621baadfb0d1a55a3a1460a8708a55343b40",
+      "model":"Gemma4 26B-A4B non-QAT UD-Q4_K_M,16,947,541,728B; Q4_K/Q5_1 expert types. Not fixed issue245 QAT artifact/q4_0. Its larger file means quantization difference alone does not explain away speed claims.",
+      "hardware":"RTX4070Laptop8GiB;i7-14700HX8P+12E;32GBRAM;Windows10;driver610.74;CUDA13.0;13expert workers",
+      "method":"Context32768;actual31063-token documentation prompt;256-answer allowance;short chat separate;three runs/size with first omitted and lasttwo reported;one model after another;not simultaneous3-slot subtitle traffic.",
+      "reported":{"prefill_tps_range":[2146,2148],"short_chat_decode_tps":85,"after_long_prompt_decode_tps":61,"TTFT_seconds":14.5,"experts_from_VRAM_percent":41,"whole_card_GiB_range":[7.7,7.8],"whole_machine_RAM_GiB":27.9},
+      "later_pass":"Source2ba29a383baf:Q4 prefill2011tok/s,short80–82,after-prompt59;card7.5–7.7GiB. Not a cross-pass median.",
+      "source_proven_mechanisms":"Cached GPU experts and uncached CPU experts overlap via cpu_experts GPU callback; split-window overlap; pinned asynchronous adaptive follower rather than upload-every-miss GPU computation; default1024 prefill/stage>=32; double-buffered layer-major pooled expert reads reused across prefill calls. Gemma uses guessed tokens, but exact acceptance/tokens-per-verify for this pass unavailable; do not borrow Qwen3.23.",
+      "missing":["Exact attached benchmark artifact hash verification","Complete arguments and actual output counts","PCIe/storage/RAM channel speed and power/clocks","Isolated process lifetime GPU peak","Exact per-pass accepted draft count","Raw request distributions"]
+    },
+    {
+      "id":"Original-Strata-headline",
+      "source":"https://github.com/Niko1221/Strata/blob/296b59d2f73c8f04a805df29c2fa97655adace78/docs/DETAILS.md#speed-measured",
+      "model":"Qwen3.8-Flash-Next125B custom Q2/IQ packs;not GemmaQATQ4",
+      "hardware":"RTX5070 12GiB,PCIe5x16,Ryzen7600,64GBDDR5-5200,Windows",
+      "method":"One code-agent prompt per length,256 output,greedy,MTP;4K decode and32K prefill headlines are different cells.",
+      "reported":"Engine0.1.26 Q2 actual3562P:1299.44pp/92.97decode,3.23tokens/verify;actual31566P:2170.85pp/81.75decode. Newer0.1.36 headline~94decode/2650pp is a different version.",
+      "memory_limit":"12GiB card,not measured6–8GB total serving footprint;cache slot counts are not total bytes.",
+      "missing":["Exact model revision/hash per cell","Driver/storage and cold boundaries","Total-runtime memory peaks","Repeats/spread for n1 cells"]
+    },
+    {
+      "id":"Independent-physical8GiB-RX6600",
+      "sources":["https://github.com/Niko1221/Strata/pull/1378","https://github.com/Niko1221/Strata/blob/f6cd7e6df29383f67090a811d49242867fa5733c/bench/results/2026-10-07-community-rx-6600-gfx1032/README.md"],
+      "model":"Qwen125B IQ3_XXS,not Gemma",
+      "hardware":"RX6600 8GiB/HIP;EPYC7232P;128GB8channelDDR4;Ubuntu24.04.5;PCIe4x8",
+      "method":"8.6K fresh prefix/zero KV reuse,512 output,n2,MTP,128K context",
+      "reported":{"prefill_tps":[262.6,265.6],"decode_tps":[24,23.8],"expert_cache_GiB":1.62,"startup_free_VRAM_MiB":620},
+      "limits":"Independent community unmergedPR;startup layout not lifetime peak;exactartifact hash,storage,full actual counts missing. Shows public physical8GiB results are not uniformly~100tok/s."
+    },
+    {
+      "id":"Closest-Gemma-Vulkan-mmap-report",
+      "sources":["https://github.com/ggml-org/llama.cpp/issues/21590#issuecomment-4207665784","https://github.com/ggml-org/llama.cpp/issues/21590#issuecomment-4207678793","https://github.com/ggml-org/llama.cpp/issues/21590#issuecomment-4203766005"],
+      "model":"Gemma4 26BA4B,quantization unspecified,all CPU experts",
+      "hardware":"RX9070XT,PCIe5x16,SAM;OS/CPU/RAM unspecified",
+      "reported":{"mmap_pp128_tps":116,"non_mmap_pp128_tps":291,"mmap_tg128_tps":27,"non_mmap_tg128_tps":26.4},
+      "source_interpretation":"Maintainer says non-mmap allocates device-mapped host weights and avoids pageable staging copy. Direct BAR-write proposal violates set_tensor_async command ordering;single staging reuse requires synchronization. Closed stale/not-planned,not a merged optimization to adopt.",
+      "missing":["Exact artifact/quant/build","OS/CPU/RAM","Complete commands","Resource footprint","Repeats/spread and raw data"],
+      "local_relevance":"Supported b11537 --load-mode none versus mmap is a concrete discriminator; flag alone does not prove actual pinning/import, every miss async, or isolation from RAM pressure."
+    },
+    {
+      "id":"Upstream-cache-introduction",
+      "sources":["https://github.com/ggml-org/llama.cpp/pull/29887","https://github.com/ggml-org/llama.cpp/pull/30112"],
+      "provenance":"PR29887 explicitly says port of qvac-fabric;not established Strata adoption. Merged d6cf9acb25e6c657d6c6a4645ab7b69fce119995;multiGPU c811cb8f0ac91b8ac72a32f970bdd45037f20da7 already in b11537.",
+      "case":"QwenQ4_0/EPYC7742/PCIe4x16,CUDA4090/5090,512 output/noMTP,c32768,b/ub2048. Two4090 followup baselinePP440.7/TG34.78 versuscache15000 PP321.5/TG64.39. Expert allocation is not total VRAM.",
+      "Vulkan_case":"RX7900XTX24GB/56GBRAM,QwenIQ3_S,128K,~35tok/s end-to-end;cachebudget/OS/CPU/PP-TG split/repeats/peaks missing. Author says Vulkan batched upload not fully optimized.",
+      "mechanism":"Upload every selected miss then compute experts on GPU,LRU groups;not simultaneous CPU misses/GPU hits. Router-ID readback+synchronize even on hits;>32 slot-map bypass retains existing-cache read-copy reuse."
+    },
+    {
+      "id":"Actual-Strata-inspired-llama-fork",
+      "sources":["https://github.com/ggml-org/llama.cpp/pull/30594","https://github.com/voidstackloop/extended-strata-moe/blob/2ce49abf5576fa04a70d230f21f07c1f89f36010/docs/ADR-002-cpu-misses-not-uploads.md","https://github.com/voidstackloop/llama.cpp/blob/f6dea514f0219274244880a939f777eb087b3893/ggml/src/ggml-cuda/mailbox.cu"],
+      "status":"Unmerged proposal,not tested upstreamb11537 and not original Strata engine",
+      "mechanism":"CPU misses+GPU hits;NVIDIA CUDA one-token pinned mailbox;ranked warm profiles and bounded adaptive swaps. Vulkan has no mailbox path/benchmark;adaptive swaps still upload/flush/synchronize.",
+      "case":"RTX4060Laptop8GiB/i7-13620H/WSL2/CUDA13.4,gpt-oss120b/Qwen3CoderNext;not GemmaQAT. Different batch/context/cache settings between some headline cells;ADR withdraws earlier overcommitted-memory interpretation.",
+      "limits":"No permission to switch engine/backend/models/semantics. No source-proven newer Vulkan kernel fixes our exact short-context/cache issue;no runtime update planned in this followup."
+    }
+  ],
+  "comparison_rules":["Cache budget,process dedicated bytes,whole-card use and card capacity differ.","Long30K batched prefill cannot be compared directly to1–28 actual evaluated cached-tail tokens.","A fresh KV prefix can still have warm expert/OS caches;native warmup also changes expert state.","Speculative accepted tokens per verify differ from non-speculative one-token decoding.","Quant differences are material,not a sufficient stand-alone explanation for the public speed gap.","Logical uploaded MiB/wall is not hardware PCIe bandwidth or measured physical bytes.","Current pressure-conditioned mmap/read viability is not clean per-transfer causal partition or actual VRChat co-rendering."]
+}

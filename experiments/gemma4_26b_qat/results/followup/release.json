@@ -1,0 +1,53 @@
+{
+  "observed_utc": "2026-10-15T13:45:23.592742+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 16159735808,
+    "system_committed_bytes": 50350620672,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 26532466688,
+    "device_gpu_dedicated_bytes": 3772809216.0,
+    "device_gpu_shared_bytes": 403521536.0,
+    "device_gpu_committed_bytes": 4313890816.0,
+    "system_pages_input_per_second": 0.0,
+    "system_page_reads_per_second": 0.0
+  },
+  "counter_errors": {},
+  "query_exit_code": 0,
+  "owned_native_servers": [
+    {
+      "pid": 44464,
+      "run_id": "followup-allhost3072-mmap-a1",
+      "exit_code": 1,
+      "shutdown": "owned_memory_safety_cutoff"
+    },
+    {
+      "pid": 56452,
+      "run_id": "followup-allhost3072-read-b1",
+      "exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "pid": 58360,
+      "run_id": "followup-n24cache2048-mmap-a1",
+      "exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "pid": 58360,
+      "run_id": "followup-n24cache2048-read-b1",
+      "exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "pid": 53908,
+      "run_id": "followup-n24cache2048-mmap-a2-bracket",
+      "exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    }
+  ],
+  "owned_jobs_remaining": [],
+  "observers": "Per-run sampler threads joined and PDH/process handles closed;release observer also closed. No app/UDP sink launched in followup.",
+  "preserved_artifacts": "Originals plus new raw native logs/samples and property query remain under external owned root;no download/model/runtime replacement.",
+  "other_process_actions": []
+}

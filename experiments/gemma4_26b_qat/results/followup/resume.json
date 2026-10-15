@@ -1,0 +1,121 @@
+{
+  "issue": 245,
+  "status": "bounded_followup_complete_awaiting_Director_review",
+  "experiment_baseline_commit": "eff651d517c7fd15ef2f96a019b348cccf662d06",
+  "product_baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "authority": "No worker Git/GitHub mutation. Director owns authorized experiment-branch commit/push/English issue publication;no PR/merge/deploy. Product/adoption selection not changed.",
+  "execution_counts": {
+    "logical_arms": 4,
+    "run_identities": 5,
+    "complete43_request_runs": 4,
+    "safety_stopped_runs": 1,
+    "completed_translations": 173,
+    "distinct_sources": 12,
+    "unique_input_output_pairs": 16
+  },
+  "run_order": [
+    "followup-allhost3072-mmap-a1",
+    "followup-allhost3072-read-b1",
+    "followup-n24cache2048-mmap-a1",
+    "followup-n24cache2048-read-b1",
+    "followup-n24cache2048-mmap-a2-bracket"
+  ],
+  "owned_jobs_remaining": [],
+  "owned_model_processes_remaining": [],
+  "last_release_observation_utc": "2026-10-15T13:45:23.592742+00:00",
+  "release": "release.json",
+  "completed_requirements": [
+    "Primary published cases first,including actualStrata-inspired CUDA-only extension versus mergedqvac-fabric port.",
+    "Property-only Vulkan capture shows2GiB advertised cap andexactfused-bank explanation;no override/repeat.",
+    "Matched mmap/read allhost3072+n24cache2048 usingunchanged43-request fixture/currentuser-approved RAMpressure;allfailuresand actual hosttype/shared/commit costs retained.",
+    "n24 mmap bracket under recoveredheadroom confirmsmodebenefit persists;43/43request identities and actualeval/cachecounts match.",
+    "Allfive profiles/fourphases prefill/decode ms/TPS/counts,n/median/p95/min/max;partial1response andN/A reasons retained.",
+    "Every unique output inspected;boundedsemanticcaveats retained.",
+    "Final classificationhelper exercised offline onfive real retained records;no native failure reenacted.",
+    "All owned model processes/observers released;raw external records preserved."
+  ],
+  "key_findings": {
+    "n24_hot_prefill_ms_mmap_A2_read": [
+      452.415,
+      164.255
+    ],
+    "n24_hot_decode_ms_mmap_A2_read": [
+      450.137,
+      303.521
+    ],
+    "n24_hot_decode_tps_mmap_A2_read": [
+      31.101642388872722,
+      46.12530928667209
+    ],
+    "n24_sampled_WS_GB_mmap_A2_read": [
+      14.439325696,
+      11.253280768
+    ],
+    "n24_sampled_private_commit_GB_mmap_A2_read": [
+      8.597487616,
+      18.921312256
+    ],
+    "shared_memory_interpretation": "ObservedVulkan_Host allocations support intentional GPU-visible host buffer charge;do notlabelallsharedbytesVRAMspill.",
+    "cold_boundary": "Read moves work before ready;nativefirstprefill21.304→1.030s is not21xtotalcoldspeedup.",
+    "cap": "maxBufferSize=maxMemoryAllocationSize2147483648B;maxStorageBufferRange4294967295B;no4096rerun."
+  },
+  "reports": [
+    "../../FOLLOWUP.md",
+    "../../FOLLOWUP_TIMINGS.md"
+  ],
+  "evidence": [
+    "public-cases.json",
+    "vulkan-capabilities.json",
+    "firstwave/",
+    "summary.json",
+    "request-matching.json",
+    "quality.json",
+    "safety-classification-correction.json",
+    "safety-classification-check.json",
+    "release.json"
+  ],
+  "changed_sources": [
+    "../../followup_probes.py(new)",
+    "../../run_matrix.py(optionalloadmode/output/environment/safetyandpureclassificationhelper)",
+    "../../windows_metrics.py(commitlimit/headroom)",
+    "../../summarize_timings.py(explicitpartialfailureN/Areason)"
+  ],
+  "source_count_for_Director_static_syntax_check": 12,
+  "final_harness_sha256": {
+    "summarize_timings.py": "55cad759cf0051584a3bea98aafc208180d3162c1c76a9f980bb694cd2cf984d",
+    "run_matrix.py": "a7aac94c3a42d6d7708488714fd8ab669989606a8c7d1f8d65911df1c63b03aa",
+    "followup_probes.py": "f7b24f6905ea23f5e2e5c2d6424bb70ca45bbe7bdcbfc8f83a903e8d30004028",
+    "windows_metrics.py": "b0a91d610bbcd5905e68470c538d15106f40991c2539026e44f759a7a08aa775",
+    "managed_e4b_probe.py": "ea3aa3922504b91e5c5050fc87f4ed088e940efff5290abe3e7aa22db816d560",
+    "summarize_apps.py": "e159f04f4e6b77e2f4dac133e696e946893e33c35a7089e5e1bde4ebbbe7c71b",
+    "summarize.py": "05651be4d43d5c5329dec0e0c19c5de9aedd6bad8b3ca0784b3215ca35a41a7d",
+    "windows_memory.py": "4a38ce28fd0fc0238e22b6c1f3e765821d939993d7cd3a315a6d8c73a778e994",
+    "attribute_memory.py": "7f67866124143ff907e67a7a3178cf1303f318ac2439958a973b4c1249727ebe",
+    "app_probe.py": "4e0463030844ff8ddd8457f0026afc72e1e679dc43d7ae02e9598d0a916dee41",
+    "capture_identity.py": "7385d19069c37255e555eb968c22097349db64b8dd978e6caf37c204f65c4a7e",
+    "acquire.py": "9fc48dffa8bd143e5350595e0a9abbf70a5b0dad8e1a221fcd463db328d0b6d9"
+  },
+  "checks_exercised": [
+    "Installedfullvulkaninfo propertyqueryexit0.",
+    "Fiveactualnative model experiments,four43requestgraceful0lifecycles andoneobservedownedsafetycutoff.",
+    "All-optiontimingaggregation:5identities,173native requests,0app.",
+    "Exactrequest/eval/cache-token matching and completeunique-outputassessment.",
+    "Freshinterpreter finalclassificationhelper on5realrecords,exit0,1cutoff+4unchangedpositivecases.",
+    "Finalfreshrelease observation:no modelruntimeprocesses,countererrors{};newpublicprivatepathregexnomatches."
+  ],
+  "not_run": [
+    "Product build/tests/linter/formatter/typechecker.",
+    "32vs33orlongforceddecode/profiler;notdecision-changingforboundeddiagnosis.",
+    "None-mode actualapp/managed26B/ASR/GUI/actualVRChatco-render.",
+    "4096rerun/largeallocationprobe/forcecaps/newruntime/driverorbackendchange."
+  ],
+  "remaining_measurement_limits": [
+    "Uncontrolledbackground/OS/RAMheadroomchanges;current-loadtradeoff,notperfectlyisolatedtransfercausality.",
+    "No per-miss branchtrace,exacthostsyncpercentage/physicalPCIebytes/allocatorflags.",
+    "Publiccaseidentity/workloadmissingfieldsretained;no exactartifactVulkanreplicationclaimed.",
+    "Small12source/16outputqualityset;Chinese namereading and13/24in→withinminutes drift.",
+    "WindowsPID58360reusedbetween sequentialn24runs;usecompositeidentity."
+  ],
+  "technical_blockers_remaining": [],
+  "exact_next_step": "Director pins/reviews new task-only candidate;static syntax12Python andJSON/JSONL/aggregate/immutability/privacy checks,then independent evidence review and authorized experimental publication. Product adoption/none-modeappselection remains a separate owner decision,not blocker to this report. No further model run needed absent concrete new gap."
+}

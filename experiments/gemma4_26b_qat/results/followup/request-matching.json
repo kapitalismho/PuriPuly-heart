@@ -1,0 +1,38 @@
+{
+  "boundary": "Existing completed synthetic request records only;no inference rerun. Match per-request API identity and actual uncached/cache-hit counts,not concurrent native log order.",
+  "comparisons": [
+    {
+      "control": "followup-n24cache2048-mmap-a1",
+      "other": "followup-n24cache2048-read-b1",
+      "request_identity_count": 43,
+      "prompt_and_eval_count_differences": [],
+      "output_token_count_differences": [
+        {
+          "key": [
+            "three_slots",
+            0,
+            0
+          ],
+          "control": 21,
+          "other": 22
+        },
+        {
+          "key": [
+            "three_slots",
+            8,
+            2
+          ],
+          "control": 18,
+          "other": 17
+        }
+      ]
+    },
+    {
+      "control": "followup-n24cache2048-mmap-a1",
+      "other": "followup-n24cache2048-mmap-a2-bracket",
+      "request_identity_count": 43,
+      "prompt_and_eval_count_differences": [],
+      "output_token_count_differences": []
+    }
+  ]
+}

@@ -124,11 +124,18 @@ def sanitize(text: str, root: Path) -> str:
     return text.replace(str(root), "<ARTIFACT_ROOT>").replace(str(root).replace("\\", "/"), "<ARTIFACT_ROOT>").replace(str(REPO), "<CHECKOUT>")
 
 
-def run(args, profile: str):
+def classify_owned_safety_stop(result):
+    if result.get("safety_cutoff"):
+        result["status"] = "stopped_safety_cutoff"
+        result["shutdown"] = "owned_memory_safety_cutoff"
+    return result
+
+
+def run(args, profile: str, *, load_mode="mmap", output_dir=None, environment_overrides=None, safety_policy=None):
     build, placement = PROFILES[profile]
     model = args.e4b if profile == "e4b-product" else args.root / "models" / "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
     executable = args.root / "runtimes" / build / "llama-server.exe"
-    output_dir = args.root / "runs" / profile
+    output_dir = output_dir or args.root / "runs" / profile
     if output_dir.exists() or (args.results / f"{profile}.json").exists():
         raise FileExistsError(f"Preserve existing evidence; use a new profile identity/root: {profile}")
     output_dir.mkdir(parents=True)
@@ -136,7 +143,7 @@ def run(args, profile: str):
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
-    command = [str(executable), "--model", str(model), "--alias", "issue245", "--load-mode", "mmap", "--ctx-size", "4608", "--parallel", "3", "--batch-size", "512", "--ubatch-size", "512", "--threads", "4", "--threads-batch", "4", "--cache-type-k", "f16", "--cache-type-v", "f16", "--cache-prompt", "--reasoning", "off", "--reasoning-budget", "0", "--warmup", "--perf", "--metrics", "--no-webui", "--threads-http", "1", "--host", "127.0.0.1", "--port", str(port), "--prio", "-1", "--device", "Vulkan0", "--flash-attn", "on", "--fit", "off", *placement]
+    command = [str(executable), "--model", str(model), "--alias", "issue245", "--load-mode", load_mode, "--ctx-size", "4608", "--parallel", "3", "--batch-size", "512", "--ubatch-size", "512", "--threads", "4", "--threads-batch", "4", "--cache-type-k", "f16", "--cache-type-v", "f16", "--cache-prompt", "--reasoning", "off", "--reasoning-budget", "0", "--warmup", "--perf", "--metrics", "--no-webui", "--threads-http", "1", "--host", "127.0.0.1", "--port", str(port), "--prio", "-1", "--device", "Vulkan0", "--flash-attn", "on", "--fit", "off", *placement]
     command.extend(["--verbosity", "4"])
     result = {"profile": profile, "build": build, "baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de", "command": [sanitize(x, args.root) if x != str(model) else f"<MODEL>/{model.name}" for x in command], "status": "started", "requests": [], "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     started = time.perf_counter()
@@ -144,6 +151,15 @@ def run(args, profile: str):
     startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     startup.wShowWindow = 0
     environment = {k: v for k, v in os.environ.items() if not k.startswith("LLAMA_") and k not in {"HF_TOKEN", "HUGGING_FACE_HUB_TOKEN"}}
+    result["load_mode"] = load_mode
+    if environment_overrides is not None:
+        result["allowlisted_backend_environment_inherited"] = {key: environment.get(key) for key in sorted(environment_overrides)}
+        for key, value in environment_overrides.items():
+            if value is None:
+                environment.pop(key, None)
+            else:
+                environment[key] = str(value)
+        result["allowlisted_backend_environment_effective"] = {key: environment.get(key) for key in sorted(environment_overrides)}
     stop = threading.Event()
     samples = []
     phase = ["load"]
@@ -154,14 +170,27 @@ def run(args, profile: str):
         try:
             ctypes.WinDLL("kernel32", use_last_error=True).SetConsoleCtrlHandler(None, False)
             process = subprocess.Popen(command, stdout=log, stderr=log, env=environment, creationflags=subprocess.CREATE_NEW_CONSOLE, startupinfo=startup)
+            result["server_pid"] = process.pid
             sampler = Sampler(process.pid)
             result["counter_errors"] = sampler.errors
             result["gpu_adapter_luid"] = sampler.adapter
+            if safety_policy is not None:
+                result["owned_safety_policy"] = safety_policy
             def sampling():
+                low_since = None
                 while not stop.is_set():
                     sample = sampler.sample()
                     sample["phase"] = phase[0]
                     samples.append(sample)
+                    if safety_policy is not None:
+                        low = sample.get("system_available_physical_bytes", float("inf")) < safety_policy["minimum_available_physical_bytes"] or sample.get("system_commit_headroom_bytes", float("inf")) < safety_policy["minimum_commit_headroom_bytes"]
+                        low_since = (low_since if low_since is not None else sample["time"]) if low else None
+                        if low_since is not None and sample["time"] - low_since >= safety_policy["sustained_seconds"] and process.poll() is None:
+                            result["safety_cutoff"] = {"elapsed_seconds": sample["time"]-started, "sustained_seconds": sample["time"]-low_since, "available_physical_bytes": sample.get("system_available_physical_bytes"), "commit_headroom_bytes": sample.get("system_commit_headroom_bytes"), "classification": "Owned conservative safety termination, NOT a runtime OOM"}
+                            result["shutdown"] = "owned_memory_safety_cutoff"
+                            process.kill()
+                            process.wait(timeout=10)
+                            return
                     stop.wait(0.25)
             thread = threading.Thread(target=sampling)
             thread.start()
@@ -228,6 +257,7 @@ def run(args, profile: str):
             if sampler is not None:
                 result["counter_instances"] = sampler.instances
                 sampler.close()
+    result = classify_owned_safety_stop(result)
     result["elapsed_seconds"] = time.perf_counter()-started
     if samples:
         result["sample_count"] = len(samples)
@@ -243,11 +273,13 @@ def run(args, profile: str):
     (output_dir / "samples.json").write_text(json.dumps(samples), encoding="utf-8")
     raw_log = (output_dir / "server.log").read_text(encoding="utf-8", errors="replace")
     result["placement_cache_log"] = [sanitize(line, args.root) for line in raw_log.splitlines() if any(term in line for term in ("MoE cache", "llama_moe_cache:", "offload", "buffer size", "n_ctx", "type  ", "type ", "model params", "model ftype", "Using device", "Vulkan", "CPU_REPACK"))]
+    result["host_allocation_log"] = [sanitize(line, args.root) for line in raw_log.splitlines() if any(term in line for term in ("pinned", "import", "CPU_Mapped", "CPU_REPACK", "Vulkan_Host", "host buffer", "host memory", "host_ptr"))]
     result["server_log_sha256"] = hashlib.sha256(raw_log.encode()).hexdigest()
     (output_dir / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     args.results.mkdir(parents=True, exist_ok=True)
     (args.results / f"{profile}.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({k: result.get(k) for k in ("profile", "status", "error", "cold_readiness_seconds", "shutdown", "process_exit_code", "memory_peaks", "cpu_seconds", "sample_count")}), flush=True)
+    return result
 
 
 def main():

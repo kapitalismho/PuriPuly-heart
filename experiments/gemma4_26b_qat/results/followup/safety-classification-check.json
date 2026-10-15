@@ -1,0 +1,57 @@
+{
+  "retained_records": 5,
+  "observed_cutoff_cases": 1,
+  "checks": [
+    {
+      "run_id": "followup-allhost3072-mmap-a1",
+      "observed_cutoff": true,
+      "original_status": "stopped_safety_cutoff",
+      "classified_status": "stopped_safety_cutoff",
+      "original_shutdown": "graceful_console_ctrl_c",
+      "classified_shutdown": "owned_memory_safety_cutoff",
+      "other_observed_fields_unchanged": true
+    },
+    {
+      "run_id": "followup-allhost3072-read-b1",
+      "observed_cutoff": false,
+      "original_status": "completed",
+      "classified_status": "completed",
+      "original_shutdown": "graceful_console_ctrl_c",
+      "classified_shutdown": "graceful_console_ctrl_c",
+      "other_observed_fields_unchanged": true
+    },
+    {
+      "run_id": "followup-n24cache2048-mmap-a1",
+      "observed_cutoff": false,
+      "original_status": "completed",
+      "classified_status": "completed",
+      "original_shutdown": "graceful_console_ctrl_c",
+      "classified_shutdown": "graceful_console_ctrl_c",
+      "other_observed_fields_unchanged": true
+    },
+    {
+      "run_id": "followup-n24cache2048-read-b1",
+      "observed_cutoff": false,
+      "original_status": "completed",
+      "classified_status": "completed",
+      "original_shutdown": "graceful_console_ctrl_c",
+      "classified_shutdown": "graceful_console_ctrl_c",
+      "other_observed_fields_unchanged": true
+    },
+    {
+      "run_id": "followup-n24cache2048-mmap-a2-bracket",
+      "observed_cutoff": false,
+      "original_status": "completed",
+      "classified_status": "completed",
+      "original_shutdown": "graceful_console_ctrl_c",
+      "classified_shutdown": "graceful_console_ctrl_c",
+      "other_observed_fields_unchanged": true
+    }
+  ],
+  "status": "passed_offline_final_helper_exercise",
+  "process_exit_code": 0,
+  "boundary": "Fresh application interpreter imports final classify_owned_safety_stop; executes it on copies of five retained real run records. No injected cutoff,model/app rerun,original-record overwrite or claim of reenacted native termination.",
+  "limits": "Tests the amended classification helper/control-flow with observed input,not another live watchdog event. Actual threshold/termination observation remains the original first safety stop.",
+  "command": "<APP_PYTHON>/python.exe -c <retained-record classification code>",
+  "executed_code": "import sys,json\nfrom pathlib import Path\nsys.path.insert(0,'experiments/gemma4_26b_qat')\nfrom run_matrix import classify_owned_safety_stop\nids=['followup-allhost3072-mmap-a1','followup-allhost3072-read-b1','followup-n24cache2048-mmap-a1','followup-n24cache2048-read-b1','followup-n24cache2048-mmap-a2-bracket']\nrows=[]\nfor name in ids:\n    original=json.loads((Path('experiments/gemma4_26b_qat/results/followup/firstwave')/(name+'.json')).read_text(encoding='utf-8'))\n    actual=classify_owned_safety_stop(dict(original))\n    expected_status='stopped_safety_cutoff' if original.get('safety_cutoff') else original['status']\n    expected_shutdown='owned_memory_safety_cutoff' if original.get('safety_cutoff') else original.get('shutdown')\n    assert actual['status']==expected_status and actual['shutdown']==expected_shutdown\n    assert all(actual.get(key)==value for key,value in original.items() if key not in {'status','shutdown'})\n    rows.append({'run_id':name,'observed_cutoff':bool(original.get('safety_cutoff')),'original_status':original['status'],'classified_status':actual['status'],'original_shutdown':original.get('shutdown'),'classified_shutdown':actual['shutdown'],'other_observed_fields_unchanged':True})\nprint(json.dumps({'retained_records':len(rows),'observed_cutoff_cases':sum(r['observed_cutoff'] for r in rows),'checks':rows}))\n"
+}

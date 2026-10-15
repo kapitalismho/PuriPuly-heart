@@ -1,0 +1,20 @@
+{
+  "observed_utc": "2026-10-15T13:37:55.211167+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 17219645440,
+    "system_committed_bytes": 49383534592,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 27499552768,
+    "device_gpu_dedicated_bytes": 3742400512.0,
+    "device_gpu_shared_bytes": 412815360.0,
+    "device_gpu_committed_bytes": 4318781440.0,
+    "system_pages_input_per_second": 106.21838965618768,
+    "system_page_reads_per_second": 6.63864935351173
+  },
+  "counter_errors": {},
+  "minimum_free_bytes_for_unqualified_run": 16000000000,
+  "minimum_is_safety_policy_not_exact_model_requirement": true,
+  "pressure_qualified_by_explicit_override": true,
+  "pressure_boundary_authorization": "User requested existing constrained RAM as pragmatic concurrent-load condition; not actual VRChat co-rendering or clean transfer-only causality."
+}

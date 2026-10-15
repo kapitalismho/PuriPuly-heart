@@ -1,0 +1,519 @@
+{
+  "run_id": "followup-allhost3072-mmap-a1",
+  "status": "stopped_safety_cutoff",
+  "load_mode": "mmap",
+  "completed_requests": 1,
+  "phases": {
+    "first_prefix": {
+      "prefill_ms": {
+        "n": 1,
+        "median": 21303.525,
+        "p95": 21303.525,
+        "min": 21303.525,
+        "max": 21303.525
+      },
+      "prefill_tps": {
+        "n": 1,
+        "median": 42.809816685266874,
+        "p95": 42.809816685266874,
+        "min": 42.809816685266874,
+        "max": 42.809816685266874
+      },
+      "decode_ms": {
+        "n": 1,
+        "median": 1394.552,
+        "p95": 1394.552,
+        "min": 1394.552,
+        "max": 1394.552
+      },
+      "decode_tps": {
+        "n": 1,
+        "median": 14.341523299238752,
+        "p95": 14.341523299238752,
+        "min": 14.341523299238752,
+        "max": 14.341523299238752
+      },
+      "prompt_evaluated_tokens": {
+        "n": 1,
+        "median": 912,
+        "p95": 912,
+        "min": 912,
+        "max": 912
+      },
+      "prompt_cached_tokens": {
+        "n": 1,
+        "median": 0,
+        "p95": 0,
+        "min": 0,
+        "max": 0
+      },
+      "prompt_total_tokens": {
+        "n": 1,
+        "median": 912,
+        "p95": 912,
+        "min": 912,
+        "max": 912
+      },
+      "predicted_output_tokens": {
+        "n": 1,
+        "median": 21,
+        "p95": 21,
+        "min": 21,
+        "max": 21
+      },
+      "decode_eval_tokens": {
+        "n": 1,
+        "median": 21,
+        "p95": 21,
+        "min": 21,
+        "max": 21
+      },
+      "native_ordered_phase_records": [
+        {
+          "prefill_ms": 21303.53,
+          "prompt_evaluated_tokens": 912,
+          "prefill_tps": 42.81,
+          "decode_ms": 1394.55,
+          "decode_eval_tokens": 21,
+          "decode_tps": 14.34
+        }
+      ],
+      "wall_seconds": {
+        "n": 1,
+        "median": 22.72510749999492,
+        "p95": 22.72510749999492,
+        "min": 22.72510749999492,
+        "max": 22.72510749999492
+      },
+      "streaming_TTFT_including_apply_template_seconds": {
+        "n": 1,
+        "median": 21.322796899999958,
+        "p95": 21.322796899999958,
+        "min": 21.322796899999958,
+        "max": 21.322796899999958
+      }
+    },
+    "hot_same_pair": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "native_ordered_phase_records": [],
+      "wall_seconds": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "streaming_TTFT_including_apply_template_seconds": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      }
+    },
+    "pair_alternation": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "native_ordered_phase_records": [],
+      "wall_seconds": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "streaming_TTFT_including_apply_template_seconds": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      }
+    },
+    "three_slots": {
+      "prefill_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prefill_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_ms": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_tps": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_evaluated_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_cached_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "prompt_total_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "predicted_output_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "decode_eval_tokens": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "native_ordered_phase_records": [],
+      "wall_seconds": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      },
+      "streaming_TTFT_including_apply_template_seconds": {
+        "n": 0,
+        "median": null,
+        "p95": null,
+        "min": null,
+        "max": null
+      }
+    }
+  },
+  "native_log_count": 1,
+  "native_log_phase_alignment": true,
+  "association_limit": "API timings belong to original requests; concurrent native logs are phase distributions, not per-request joins. Printed decode count is not a traced pure forward-pass count; native TPS is retained.",
+  "resource_distributions": {
+    "PageFaultCount": {
+      "n": 139,
+      "median": 2545008,
+      "p95": 4385122,
+      "min": 564,
+      "max": 4388322
+    },
+    "PeakPagefileUsage": {
+      "n": 139,
+      "median": 6929752064,
+      "p95": 7027609600,
+      "min": 389120,
+      "max": 7027609600
+    },
+    "PeakWorkingSetSize": {
+      "n": 139,
+      "median": 10196992000,
+      "p95": 12203737088,
+      "min": 2224128,
+      "max": 12203737088
+    },
+    "PrivateUsage": {
+      "n": 139,
+      "median": 6919606272,
+      "p95": 6973976576,
+      "min": 389120,
+      "max": 7027609600
+    },
+    "WorkingSetSize": {
+      "n": 139,
+      "median": 10196992000,
+      "p95": 12148518912,
+      "min": 2224128,
+      "max": 12202766336
+    },
+    "cpu_seconds": {
+      "n": 139,
+      "median": 4.203125,
+      "p95": 8.5625,
+      "min": 0.0,
+      "max": 9.421875
+    },
+    "device_gpu_committed_bytes": {
+      "n": 139,
+      "median": 11379281920.0,
+      "p95": 11480154112.0,
+      "min": 4659343360.0,
+      "max": 11485282304.0
+    },
+    "device_gpu_dedicated_bytes": {
+      "n": 139,
+      "median": 10204659712.0,
+      "p95": 10289397760.0,
+      "min": 4078329856.0,
+      "max": 10302287872.0
+    },
+    "device_gpu_shared_bytes": {
+      "n": 139,
+      "median": 1032302592.0,
+      "p95": 1035014144.0,
+      "min": 430313472.0,
+      "max": 1042923520.0
+    },
+    "gpu_engine_percent": {
+      "n": 137,
+      "median": 4.098415520088914,
+      "p95": 20.567048343002348,
+      "min": 0.0,
+      "max": 25.69355651016958
+    },
+    "process_gpu_committed_bytes": {
+      "n": 138,
+      "median": 6677274624.0,
+      "p95": 6729904128.0,
+      "min": 11853824.0,
+      "max": 6729904128.0
+    },
+    "process_gpu_dedicated_bytes": {
+      "n": 138,
+      "median": 6074949632.0,
+      "p95": 6125346816.0,
+      "min": 11517952.0,
+      "max": 6125346816.0
+    },
+    "process_gpu_shared_bytes": {
+      "n": 138,
+      "median": 602324992.0,
+      "p95": 604557312.0,
+      "min": 335872.0,
+      "max": 604557312.0
+    },
+    "system_available_physical_bytes": {
+      "n": 139,
+      "median": 1283452928,
+      "p95": 10601467904,
+      "min": 18579456,
+      "max": 11486044160
+    },
+    "system_commit_headroom_bytes": {
+      "n": 139,
+      "median": 18783019008,
+      "p95": 23865815040,
+      "min": 14759546880,
+      "max": 25976074240
+    },
+    "system_commit_limit_bytes": {
+      "n": 139,
+      "median": 76883087360,
+      "p95": 76883087360,
+      "min": 76883087360,
+      "max": 76883087360
+    },
+    "system_committed_bytes": {
+      "n": 139,
+      "median": 58100068352,
+      "p95": 59530199040,
+      "min": 50907013120,
+      "max": 62123540480
+    },
+    "system_page_reads_per_second": {
+      "n": 139,
+      "median": 8757.566223353153,
+      "p95": 20461.599485122413,
+      "min": 0.0,
+      "max": 117313.95017897898
+    },
+    "system_pages_input_per_second": {
+      "n": 139,
+      "median": 88805.60946295528,
+      "p95": 253958.87251495468,
+      "min": 0.0,
+      "max": 8942412.03960445
+    },
+    "time": {
+      "n": 139,
+      "median": 17.835252199991373,
+      "p95": 34.122621799993794,
+      "min": 0.005433500002254732,
+      "max": 35.67518879999989
+    }
+  },
+  "native_host_model_buffers": [
+    "0.02.367.069 I load_tensors:   CPU_Mapped model buffer size = 13570.59 MiB",
+    "0.02.367.070 I load_tensors:      Vulkan0 model buffer size =  1322.59 MiB"
+  ],
+  "Vulkan_Host_model_buffer_logged": false,
+  "CPU_Mapped_model_buffer_logged": true,
+  "pinned_allocation_failure_warnings": [],
+  "per_miss_async_route_measured": false,
+  "path_evidence_limit": "Actual buffer names and warnings are observed; recognized-pinned transfer behavior is source-backed conditional reasoning, not a per-upload trace. Router-ID readback/synchronization remains even on cache hits/read mode.",
+  "lifetime_cache_counters": [],
+  "counter_limit": "Includes native warmup and the full43-request lifecycle, not per-phase transfer bytes. Logical uploaded bytes are not measured physical PCIe bytes or bandwidth.",
+  "quality_automated_nonempty_no_reasoning_not_truncated": true,
+  "quality_limit": "Automated digits are not a semantic gate; complete unique outputs require the documented bounded semantic review.",
+  "matched_original_profile": "new-cpu-moe-cache3072-swa-nocram",
+  "experiment_baseline": "eff651d517c7fd15ef2f96a019b348cccf662d06",
+  "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+  "mode_boundary": "none is the supported b11537 read/non-mmap mode, not a pinning guarantee.",
+  "preflight_headroom": {
+    "observed_utc": "2026-10-15T13:22:33.935571+00:00",
+    "model_runtime_processes": [],
+    "resources": {
+      "system_available_physical_bytes": 11468107776,
+      "system_committed_bytes": 50916519936,
+      "system_commit_limit_bytes": 76883087360,
+      "system_commit_headroom_bytes": 25966567424,
+      "device_gpu_dedicated_bytes": 4078329856.0,
+      "device_gpu_shared_bytes": 438366208.0,
+      "device_gpu_committed_bytes": 4664528896.0,
+      "system_pages_input_per_second": 6.63199239973671,
+      "system_page_reads_per_second": 6.63199239973671
+    },
+    "counter_errors": {},
+    "minimum_free_bytes_for_unqualified_run": 16000000000,
+    "minimum_is_safety_policy_not_exact_model_requirement": true,
+    "pressure_qualified_by_explicit_override": true,
+    "pressure_boundary_authorization": "User requested existing constrained RAM as pragmatic concurrent-load condition; not actual VRChat co-rendering or clean transfer-only causality."
+  }
+}

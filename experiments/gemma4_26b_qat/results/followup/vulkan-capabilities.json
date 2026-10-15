@@ -1,0 +1,72 @@
+{
+  "status":"completed_property_query",
+  "baseline_experiment_commit":"eff651d517c7fd15ef2f96a019b348cccf662d06",
+  "started_utc":"2026-10-15T13:10:59.191138+00:00",
+  "finished_utc":"2026-10-15T13:10:59.503605+00:00",
+  "command":["<SYSTEM32>/vulkaninfo.exe"],
+  "executable_file_version":"1.4.341.0",
+  "executable_sha256":"3b91a8841c15f7894ef0d1255441c54deb2e8cd0ef426821f33022dd89257016",
+  "exit_code":0,
+  "raw_text":"<ARTIFACT_ROOT>/followup/capability-query-1/vulkaninfo.txt",
+  "raw_utf8_text_sha256":"63307121932e6cc821fbffeec88e39646f6bf03d1af087fe013bd4933768e6f6",
+  "stdout_bytes":93866,
+  "stderr_bytes":165,
+  "warning":"Loader reported OBS_HOOK layer API1.3 older than requested1.4. Query succeeded; layer/environment was not changed and no performance causality is inferred.",
+  "ABI":"Installed VulkanInfo with its own compiled Vulkan headers; no guessed ctypes property structures.",
+  "physical_device":{
+    "enumeration_index":0,
+    "name":"AMD Radeon RX 7900 XTX",
+    "type":"DISCRETE_GPU",
+    "vendor_id":"0x1002",
+    "device_id":"0x744c",
+    "api_version":"1.4.349",
+    "driver_version":"2.0.395",
+    "driver_name":"AMD proprietary driver",
+    "driver_info":"26.8.1 (LLPC)"
+  },
+  "properties":{
+    "maxBufferSize_bytes":2147483648,
+    "maxBufferSize_reported_structure":"VkPhysicalDeviceVulkan13Properties (promoted maintenance4 field)",
+    "maxMemoryAllocationSize_bytes":2147483648,
+    "maxMemoryAllocationSize_reported_structure":"VkPhysicalDeviceVulkan11Properties (promoted maintenance3 field)",
+    "maxStorageBufferRange_bytes":4294967295,
+    "minStorageBufferOffsetAlignment_bytes":4,
+    "VK_KHR_maintenance3_advertised":true,
+    "VK_KHR_maintenance4_advertised":true,
+    "VK_KHR_maintenance4_revision":2,
+    "VK_EXT_shader_64bit_indexing_advertised":false,
+    "shader64BitIndexing_reported_value":null,
+    "shader64BitIndexing_limit":"No extension advertised or feature value emitted; unsupported/unavailable is not fabricated as a queried false feature.",
+    "shaderInt64":true,
+    "bufferDeviceAddress":true
+  },
+  "allowlisted_current_environment":{
+    "GGML_VK_FORCE_MAX_BUFFER_SIZE":null,
+    "GGML_VK_FORCE_MAX_ALLOCATION_SIZE":null,
+    "GGML_VK_SUBALLOCATION_BLOCK_SIZE":null,
+    "GGML_VK_PREFER_HOST_MEMORY":null,
+    "GGML_VK_DISABLE_HOST_VISIBLE_VIDMEM":null,
+    "GGML_VK_ALLOW_SYSMEM_FALLBACK":null,
+    "GGML_VK_DISABLE_ASYNC":null,
+    "GGML_VK_ASYNC_USE_TRANSFER_QUEUE":null,
+    "GGML_OP_OFFLOAD_MIN_BATCH":null,
+    "GGML_VK_PERF_LOGGER":null,
+    "GGML_VK_PERF_LOGGER_CONCURRENT":null,
+    "GGML_VK_PERF_LOGGER_FREQUENCY":null,
+    "GGML_VK_SYNC_LOGGER":null,
+    "GGML_VK_DISABLE_FUSION":null
+  },
+  "environment_semantics":"null means absent. Presence-based flags are not disabled by a literal0. This current query cannot reconstruct exited historical server environments. build-provenance.json18 separately records GGML* empty before historical refinement; per-run historical absence is not proved and overrides are not alleged.",
+  "derived_pinned_backend_default_limits":{"max_buffer_size_bytes":2147483648,"max_memory_allocation_size_bytes":2147483648},
+  "derived_fixed_GGUF_banks":[
+    {"budget_MiB":3072,"usable_slots":961,"planes_including_padding":962,"fused_gate_up_bank_bytes":2145521664,"down_bank_bytes":1072760832,"result":"Observed prior successful allocation; both banks within current limits."},
+    {"budget_MiB":4096,"usable_slots":1282,"planes_including_padding":1283,"fused_gate_up_bank_bytes":2861438976,"down_bank_bytes":1430719488,"result":"Exact retained failed bank exceeds current driver-advertised maxBufferSize and maxMemoryAllocationSize. Stop; no repeat or override."}
+  ],
+  "conclusion":"The retained software size guard matches the current stack's advertised per-buffer/per-allocation2GiB limits, not total24GiB VRAM. maxStorageBufferRange is distinct and larger. No hardcoded universal AMD/Windows physical limit is claimed. Existing CLI/suballocation/layer-count changes do not shard this same-layout fused bank.",
+  "resources":"Query process exited0; no llama-server/app, large-buffer allocation, device-memory allocation experiment, inference, force override, system/driver change or original-record overwrite.",
+  "sources":[
+    "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-moe-cache.cpp#L236-L385",
+    "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan.cpp#L4193-L4210",
+    "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp#L28-L66"
+  ]
+}

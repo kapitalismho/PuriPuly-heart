@@ -1,0 +1,14 @@
+{
+  "affected_record":"firstwave/followup-allhost3072-mmap-a1.json",
+  "original_record_preserved":true,
+  "observed_status":"stopped_safety_cutoff",
+  "observed_exit_code":1,
+  "completed_requests":1,
+  "cutoff":{"elapsed_seconds":35.67518879999989,"sustained_seconds":8.005524100008188,"available_physical_bytes":93351936,"system_commit_headroom_bytes":17150668800},
+  "minimum_sampled_available_physical_bytes":18579456,
+  "original_shutdown_field":"graceful_console_ctrl_c",
+  "original_graceful_signal_helper_exit_code":1,
+  "correct_interpretation":"Owned conservative memory watchdog requested termination and called process.kill after sustained low physical RAM. The failed graceful-helper receipt and process.wait returning were incorrectly labeled graceful by finally. Treat shutdown as owned_memory_safety_cutoff, NOT graceful, runtime OOM, server success, or destructor-counter proof.",
+  "future_harness_correction":"Final safety-cutoff classification now also overrides shutdown to owned_memory_safety_cutoff after the sampler thread is joined. This does not change the cutoff threshold or rewrite the failed record.",
+  "authorization":"User explicitly requested existing constrained RAM as pragmatic concurrent-load condition. Only owned model process was terminated; no unrelated processes/state were changed. This is not an actual VRChat co-render benchmark."
+}
