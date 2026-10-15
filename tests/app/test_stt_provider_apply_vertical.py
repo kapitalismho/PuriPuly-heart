@@ -708,12 +708,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
             ),
         ),
     )
-    unrelated_plan = components.runtime.build_plan(
-        unrelated_settings,
-        force_rebuild_llm=False,
-    )
-    assert unrelated_plan.should_refresh_self_stt is False
-    await components.runtime.apply(unrelated_settings, unrelated_plan)
+    await provider_application.apply(unrelated_settings, persist_settings=False)
     assert len(harness_factory.provider_factory.providers) == provider_count_before_disable
     assert runtime.snapshot.channel_for("self").provider_id == detached_channel.provider_id
     assert capture_owner.snapshot.desired_active is False

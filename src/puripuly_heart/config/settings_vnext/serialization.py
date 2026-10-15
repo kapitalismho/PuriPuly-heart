@@ -6,6 +6,8 @@ import math
 import types
 from collections.abc import Mapping
 from dataclasses import asdict, fields, is_dataclass, replace
+from functools import cache
+from types import MappingProxyType
 from typing import Any, Final, Literal, Union, get_args, get_origin, get_type_hints
 
 from puripuly_heart.config.llm_profiles import normalize_legacy_openrouter_model
@@ -311,6 +313,11 @@ def _is_non_empty_string(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
+@cache
+def _schema_type_hints(schema_type: type) -> Mapping[str, Any]:
+    return MappingProxyType(get_type_hints(schema_type))
+
+
 def _merge_dataclass(default: object, raw: object, *, path: str) -> object:
     if not is_dataclass(default) or isinstance(default, type):
         return copy.deepcopy(raw)
@@ -318,7 +325,7 @@ def _merge_dataclass(default: object, raw: object, *, path: str) -> object:
         raise ValueError(f"{path} must be a JSON object")
 
     kwargs: dict[str, object] = {}
-    type_hints = get_type_hints(type(default))
+    type_hints = _schema_type_hints(type(default))
     for field in fields(default):
         default_value = getattr(default, field.name)
         child_path = f"{path}.{field.name}"
@@ -395,7 +402,7 @@ def _validate_raw_value_type(value: object, expected: object, *, path: str) -> N
     if isinstance(expected, type) and is_dataclass(expected):
         if not isinstance(value, Mapping):
             raise ValueError(f"{path} must be a JSON object")
-        type_hints = get_type_hints(expected)
+        type_hints = _schema_type_hints(expected)
         for field in fields(expected):
             if field.name in value:
                 _validate_raw_value_type(

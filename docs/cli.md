@@ -528,11 +528,15 @@ puripuly.exe secrets presence
 puripuly.exe secrets verify soniox_api_key
 ```
 
-- Verification reads a secret through hidden input or stdin. It is separate from storage.
+Saving the active DeepSeek, OpenAI, Gemini, or OpenRouter BYOK translation key applies it to subsequent translations without restarting, including first registration. This does not enable translation or capture. Saving an inactive key does not rebuild the active translation provider, and managed-account routes do not switch to BYOK.
+
+- Verification reads a secret through hidden input or stdin. It is separate from storage; saving a key resets its verification status to `unknown` and does not establish service health.
 - `capabilities` and `secrets presence` list the declared secret identifiers, including loaded HTTP-extension declarations.
 - A key without a supported verification protocol returns terminal `action_required` with `verification: unavailable`. It does not report verification success.
 - Secret values are never returned in settings, query results, operation receipts, or logs.
 - Delete removes the secret from local storage.
+- If a key is persisted but runtime application fails, the operation reports `degraded` with the retained failure cause. The stored key remains saved and can still be verified separately; neither a successful save nor a successful key probe claims that the live provider adopted it.
+- If independent STT/GPU application also fails, its cause is retained as a linked secondary diagnostic. The missing translation backend remains eligible for recovery through an ordinary provider apply.
 
 Verification is a limited key/protocol probe, not proof of healthy live recognition:
 
@@ -743,6 +747,7 @@ Disposition is one of `failed`, `degraded`, `recovered`, `cancelled`, `supersede
 - `secondary_omitted_count` adds known omissions from the owning result and any later receipt or notification projection.
 - `secondary_truncated` is true when that count is nonzero.
 - The primary diagnostic remains separate. A secondary failure or truncation does not replace it.
+- Transaction receipts preserve the transaction's validated cause linkage even when a diagnostic was emitted earlier; diagnostic history and failure events retain the immutable first record and identity.
 - Unobserved or unavailable detail is not counted as a known omitted cause.
 - These cause-list bounds are distinct from an individual diagnostic's `detail.truncated` field.
 

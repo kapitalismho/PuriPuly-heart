@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import errno
+import logging
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -12,6 +14,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
     SettingsVNextCanonicalPersistenceAdapter,
 )
 from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
+from puripuly_heart.app.services.application_control import ApplicationControlOwner
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownCoordinator,
     application_shutdown_callback,
@@ -42,7 +45,9 @@ from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_ADAPTERS,
     SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
 from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService, configure_main_logging
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
 from puripuly_heart.ui.app import TranslatorApp
@@ -118,6 +123,154 @@ async def test_internal_runtime_defect_keeps_durable_intent_and_diagnosable_phas
     assert persistence.load_active(owner.path).canonical_settings.intent.ui.locale == "ja"
     assert FORBIDDEN not in repr(result)
     owner.complete()
+
+
+@pytest.fixture
+def diagnostic_receipt_control(tmp_path):
+    root = logging.getLogger(f"test.transaction-diagnostic-causes.{uuid4().hex}")
+    root.propagate = False
+    sinks = configure_main_logging(root_logger=root, log_dir=tmp_path)
+    service = SessionRuntimeLoggingService(root_logger=root, sinks=sinks)
+    instance_id = uuid4().hex
+    service.configure_diagnostics(instance_id=instance_id)
+    control = ApplicationControlOwner.__new__(ApplicationControlOwner)
+    control.application = SimpleNamespace(_runtime_logging=service)
+    control.instance_id = instance_id
+    try:
+        yield control, service
+    finally:
+        service.close()
+        sinks.close(force=True)
+        root.handlers.clear()
+
+
+@pytest.mark.parametrize(
+    ("existing_link", "transaction_link"),
+    [
+        (False, "updated"),
+        (True, "updated"),
+        (True, "unchanged"),
+        (True, None),
+        (True, f"Bearer {FORBIDDEN}"),
+        (False, f"C:/{FORBIDDEN}"),
+    ],
+)
+def test_transaction_receipt_links_preemitted_causes_without_rewriting_journal(
+    diagnostic_receipt_control, existing_link, transaction_link
+):
+    control, service = diagnostic_receipt_control
+    events = []
+    service.configure_diagnostics(event_sink=events.append)
+    primary = ErrorDiagnostics(
+        component="settings_application",
+        operation="runtime_apply",
+        code="provider_runtime_apply_unavailable",
+        category="lifecycle",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={"phase": "runtime_apply"},
+        cause_id=uuid4().hex if existing_link else None,
+    )
+    secondary = replace(
+        primary,
+        diagnostic_id=uuid4().hex,
+        code="stt_runtime_apply_unavailable",
+        cause_id=uuid4().hex if existing_link else None,
+    )
+    original_primary = service.emit_failure(primary, stage="runtime_apply", disposition="failed")
+    original_secondary = service.emit_failure(
+        secondary, stage="warmup", severity="warning", disposition="failed"
+    )
+    if transaction_link == "updated":
+        primary_cause, secondary_cause = uuid4().hex, primary.diagnostic_id
+    elif transaction_link == "unchanged":
+        primary_cause, secondary_cause = primary.cause_id, secondary.cause_id
+    else:
+        primary_cause = secondary_cause = transaction_link
+    transaction = TransactionResult(
+        "settings_commit_success_runtime_degraded",
+        None,
+        replace(
+            primary,
+            cause_id=primary_cause,
+            fields={"message": FORBIDDEN, "phase": "settings_save"},
+        ),
+        secondary_diagnostics=(
+            replace(
+                secondary,
+                cause_id=secondary_cause,
+                fields={"message": FORBIDDEN, "phase": "settings_save"},
+            ),
+        ),
+    )
+
+    receipt = control._transaction_receipt(transaction, "degraded")
+
+    expected_primary = dict(original_primary)
+    expected_secondary = dict(original_secondary)
+    if transaction_link in {"updated", "unchanged"}:
+        expected_primary["cause_id"] = primary_cause
+        expected_secondary["cause_id"] = secondary_cause
+    assert receipt["diagnostics"] == expected_primary
+    assert receipt["secondary_diagnostics"] == [expected_secondary]
+    assert receipt["diagnostics"]["diagnostic_id"] == primary.diagnostic_id
+    assert receipt["diagnostics"]["code"] == "provider_runtime_apply_unavailable"
+    assert receipt["secondary_diagnostics"][0]["diagnostic_id"] == secondary.diagnostic_id
+    assert receipt["secondary_diagnostics"][0]["code"] == "stt_runtime_apply_unavailable"
+    if transaction_link == "updated":
+        assert (
+            receipt["secondary_diagnostics"][0]["cause_id"]
+            == receipt["diagnostics"]["diagnostic_id"]
+        )
+    assert receipt["secondary_omitted_count"] == 0
+    assert receipt["secondary_truncated"] is False
+    assert control._transaction_receipt(transaction, "degraded") == receipt
+    assert service.diagnostic_history({})["records"] == [original_primary, original_secondary]
+    assert [event["diagnostic"] for event in events] == [original_primary, original_secondary]
+    assert FORBIDDEN not in repr(receipt) + repr(service.diagnostic_history({})) + repr(events)
+
+
+def test_transaction_receipt_keeps_secondary_bound_and_links_without_primary(
+    diagnostic_receipt_control,
+):
+    control, service = diagnostic_receipt_control
+    cause_id = uuid4().hex
+    diagnostics = tuple(
+        ErrorDiagnostics(
+            component="settings_application",
+            operation="runtime_apply",
+            code="stt_runtime_apply_unavailable",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={"phase": "runtime_apply"},
+        )
+        for _ in range(6)
+    )
+    originals = [service.emit_failure(diagnostic) for diagnostic in diagnostics]
+    transaction = TransactionResult(
+        "settings_commit_success_runtime_degraded",
+        None,
+        None,
+        secondary_diagnostics=tuple(
+            replace(diagnostic, cause_id=cause_id) for diagnostic in diagnostics
+        ),
+        secondary_omitted_count=3,
+    )
+
+    receipt = control._transaction_receipt(transaction, "degraded")
+
+    assert receipt["diagnostics"] is None
+    assert receipt["secondary_diagnostics"] == [
+        {**record, "cause_id": cause_id} for record in originals[:4]
+    ]
+    assert receipt["secondary_omitted_count"] == 5
+    assert receipt["secondary_truncated"] is True
+    assert service.diagnostic_history({})["records"] == originals
 
 
 @pytest.mark.asyncio

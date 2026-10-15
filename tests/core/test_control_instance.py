@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import ctypes
+import errno
 import json
 import os
 import subprocess
 import sys
 import threading
 import uuid
+from contextlib import contextmanager
+from ctypes import wintypes
 from pathlib import Path
 
 import pytest
 
+from puripuly_heart.core import control_instance
 from puripuly_heart.core.control_instance import (
     InstanceAlreadyRunning,
     InstanceSecurityError,
@@ -221,3 +226,187 @@ def test_anonymous_windows_token_cannot_open_endpoint(
             [sys.executable, "-c", script, str(lease._path)], capture_output=True, text=True
         )
         assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("action", ["close", "replace"])
+def test_record_reader_preserves_owner_cleanup_and_failed_republication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    settings = tmp_path / "settings.json"
+    first = str(uuid.uuid4())
+    second = str(uuid.uuid4())
+    with acquire(settings) as lease:
+        lease.publish(port=23456, token="a" * 43, instance_id=first)
+        with lease._security.open_record(lease._path) as reader:
+            assert not os.get_inheritable(reader.fileno())
+            if action == "close":
+                lease.close()
+                assert discover(settings) is None
+            else:
+                with lease._path.open("r", encoding="utf-8") as conflicting_reader:
+                    with pytest.raises(PermissionError):
+                        lease.publish(port=23457, token="b" * 43, instance_id=second)
+                    assert json.load(conflicting_reader)["instance_id"] == first
+                assert discover(settings).instance_id == first
+                assert not list(lease._path.parent.glob("*.tmp"))
+            assert json.load(reader)["instance_id"] == first
+        assert reader.closed
+        if action == "replace":
+            lease.publish(port=23457, token="b" * 43, instance_id=second)
+            assert discover(settings).instance_id == second
+    assert discover(settings) is None
+    with acquire(settings) as successor:
+        successor.publish(port=23458, token="c" * 43, instance_id=str(uuid.uuid4()))
+        assert discover(settings).port == 23458
+
+
+@pytest.mark.parametrize(
+    ("query", "pause_on_read"),
+    [(discover, 1), (discover_instances, 1), (discover_instances, 2)],
+)
+def test_inflight_discovery_read_cannot_fail_owner_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, query, pause_on_read: int
+) -> None:
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    settings = tmp_path / "settings.json"
+    lease = acquire(settings)
+    lease.publish(port=23456, token="a" * 43, instance_id=str(uuid.uuid4()))
+    original_open = control_instance._WindowsSecurity.open_record
+    entered = threading.Event()
+    release = threading.Event()
+    results = []
+    failures = []
+    reads = 0
+
+    @contextmanager
+    def gated_open(security, path):
+        nonlocal reads
+        with original_open(security, path) as reader:
+            if threading.current_thread() is worker:
+                reads += 1
+                if reads == pause_on_read:
+                    entered.set()
+                    assert release.wait(5)
+            yield reader
+
+    def observe():
+        try:
+            results.append(query(settings) if query is discover else query())
+        except BaseException as error:
+            failures.append(error)
+
+    monkeypatch.setattr(control_instance._WindowsSecurity, "open_record", gated_open)
+    worker = threading.Thread(target=observe)
+    worker.start()
+    try:
+        assert entered.wait(3)
+        assert discover(settings).port == 23456
+        lease.close()
+        release.set()
+        worker.join(timeout=5)
+        assert not worker.is_alive()
+        assert not failures
+        assert results == ([None] if query is discover else [[]])
+        assert discover(settings) is None
+    finally:
+        release.set()
+        worker.join(timeout=5)
+        lease.close()
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        b"\xff",
+        b"{",
+        b"x" * 4097,
+        b"[]",
+        {"port": True},
+        {"token": "short"},
+        {"instance_id": "invalid"},
+        {"settings_path": "relative.json"},
+        {"extra": True},
+        "different_settings_identity",
+    ],
+)
+def test_shared_record_reads_preserve_validation_and_release_failed_readers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, invalid
+) -> None:
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    settings = tmp_path / "settings.json"
+    with acquire(settings) as lease:
+        lease.publish(port=23456, token="a" * 43, instance_id=str(uuid.uuid4()))
+        original = lease._path.read_bytes()
+        payload = json.loads(original)
+        if isinstance(invalid, bytes):
+            malformed = invalid
+        else:
+            if isinstance(invalid, dict):
+                payload.update(invalid)
+            else:
+                payload["settings_path"] = os.path.normcase(
+                    str((tmp_path / "different.json").resolve())
+                )
+            malformed = json.dumps(payload).encode()
+        try:
+            lease._path.write_bytes(malformed)
+            with pytest.raises(InstanceSecurityError):
+                discover(settings)
+            assert discover_instances() == []
+        finally:
+            lease._path.write_bytes(original)
+        assert discover(settings).port == 23456
+    assert discover(settings) is None
+
+
+def test_missing_record_read_preserves_file_not_found_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    settings = tmp_path / "settings.json"
+    with acquire(settings) as lease:
+        with pytest.raises(FileNotFoundError):
+            lease._security.open_record(lease._path)
+        lease.publish(port=23456, token="a" * 43, instance_id=str(uuid.uuid4()))
+        lease._path.unlink()
+        assert discover(settings) is None
+
+
+@pytest.mark.parametrize("stage", ["descriptor", "stream"])
+def test_record_reader_construction_failure_releases_native_resource(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stage: str
+) -> None:
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    settings = tmp_path / "settings.json"
+    resources = []
+
+    def fail(resource, *_args, **_kwargs):
+        resources.append(resource)
+        raise OSError(errno.EMFILE, "synthetic reader construction failure")
+
+    with acquire(settings) as lease:
+        lease.publish(port=23456, token="a" * 43, instance_id=str(uuid.uuid4()))
+        with monkeypatch.context() as scoped:
+            if stage == "descriptor":
+                scoped.setattr(control_instance.msvcrt, "open_osfhandle", fail)
+            else:
+                scoped.setattr(control_instance.os, "fdopen", fail)
+            with pytest.raises(OSError) as failure:
+                lease._security.open_record(lease._path)
+            assert failure.value.errno == errno.EMFILE
+        assert len(resources) == 1
+        if stage == "descriptor":
+            kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+            kernel.GetHandleInformation.argtypes = [
+                ctypes.c_void_p,
+                ctypes.POINTER(wintypes.DWORD),
+            ]
+            flags = wintypes.DWORD()
+            assert not kernel.GetHandleInformation(resources[0], ctypes.byref(flags))
+            assert ctypes.get_last_error() == 6
+        else:
+            with pytest.raises(OSError) as closed:
+                os.fstat(resources[0])
+            assert closed.value.errno == errno.EBADF
+        assert discover(settings).port == 23456

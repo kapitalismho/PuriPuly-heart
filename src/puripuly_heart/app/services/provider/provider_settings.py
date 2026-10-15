@@ -53,6 +53,7 @@ from .provider_runtime_apply import (
     _runtime_apply_failed_result,
     _runtime_apply_result_as_degraded_transaction,
     _settings_mutation_diagnostics,
+    _settings_mutation_secondary_diagnostics,
     _stt_language_audio_save_failed_transaction_result,
     _translation_provider_save_failed_transaction_result,
 )
@@ -703,7 +704,15 @@ class ProviderApplicationOwner:
                 code="settings_runtime_resync_failed",
                 exception=exc,
             )
+            additional_diagnostics = _settings_mutation_secondary_diagnostics(
+                primary=secondary,
+                component="provider_application",
+                operation=phase,
+                code="settings_runtime_resync_failed",
+                exception=exc,
+            )
             restoration_failure = None
+            preserve_retry = self.llm_retry_pending()
             try:
                 self.sync_memory(committed_settings)
             except Exception as restore_exc:
@@ -716,6 +725,9 @@ class ProviderApplicationOwner:
                     ),
                     cause_id=secondary.diagnostic_id,
                 )
+            finally:
+                if preserve_retry:
+                    self.mark_llm_retry()
             failure_result = replace(
                 failure_result,
                 secondary_diagnostics=(
@@ -728,6 +740,7 @@ class ProviderApplicationOwner:
                             else None
                         ),
                     ),
+                    *additional_diagnostics,
                     *((restoration_failure,) if restoration_failure is not None else ()),
                 ),
             )

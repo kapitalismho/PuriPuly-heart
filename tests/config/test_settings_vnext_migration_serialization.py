@@ -2353,3 +2353,47 @@ def test_managed_operation_identity_normalizes_all_or_nothing() -> None:
     assert partial.pending_managed_operation_state is None
     fresh = ManagedConnectionState(installation_id="install-1")
     assert fresh.pending_managed_operation_id is None
+
+
+@pytest.mark.parametrize(
+    ("path", "invalid"),
+    [
+        (("intent", "osc", "send_port"), "9000"),
+        (("intent", "audio"), []),
+        (("intent", "translation", "connection_history"), {"model": 3}),
+        (("intent", "stt", "custom_terms"), {"en": [1]}),
+        (("state", "telemetry", "anonymous_id"), 42),
+    ],
+)
+def test_repeated_schema_loading_revalidates_wrong_and_nested_types(
+    path: tuple[str, ...], invalid: object
+) -> None:
+    serialization = _serialization()
+    for locale in ("en", "ko"):
+        valid = serialization.to_dict(AppSettingsVNext())
+        valid["intent"]["ui"]["locale"] = locale
+        assert serialization.from_dict(valid).intent.ui.locale == locale
+        malformed = serialization.to_dict(serialization.from_dict(valid))
+        target = malformed
+        for member in path[:-1]:
+            target = target[member]
+        target[path[-1]] = invalid
+        with pytest.raises(ValueError, match=r"settings\."):
+            serialization.from_dict(malformed)
+        assert serialization.from_dict(valid).intent.ui.locale == locale
+
+
+def test_repeated_schema_loading_preserves_independent_mutable_settings() -> None:
+    serialization = _serialization()
+    raw = serialization.to_dict(AppSettingsVNext())
+    raw["intent"]["local_llm"]["extra_body"] = {"options": {"labels": ["alpha"]}}
+    first = serialization.from_dict(raw)
+    second = serialization.from_dict(raw)
+
+    first.intent.local_llm.extra_body["options"]["labels"].append("beta")
+    first.intent.translation.connection_history["synthetic-model"] = "byok"
+
+    assert second.intent.local_llm.extra_body == {"options": {"labels": ["alpha"]}}
+    assert raw["intent"]["local_llm"]["extra_body"] == {"options": {"labels": ["alpha"]}}
+    assert "synthetic-model" not in second.intent.translation.connection_history
+    assert "synthetic-model" not in raw["intent"]["translation"]["connection_history"]

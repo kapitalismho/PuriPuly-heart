@@ -485,7 +485,7 @@ async def test_failed_llm_replacement_is_retryable_without_committing_failed_pro
             RuntimeApplyRequest({}, "controlled-failed-replacement", None)
         )
         assert result.status == "failed"
-        assert result.diagnostics.code == "provider_runtime_apply_unavailable"
+        assert result.diagnostics.code == "provider_runtime_apply_exception"
         assert handle.provider is None
         assert components.signatures.last_llm_provider == ()
         assert (
@@ -757,7 +757,7 @@ async def test_composed_failed_replacement_survives_successful_locale_and_retrie
         )
         assert failed["status"] == "degraded"
         assert failed["transaction"]["status"] == "settings_commit_success_runtime_degraded"
-        assert failed["transaction"]["diagnostics"]["code"] == "provider_runtime_apply_unavailable"
+        assert failed["transaction"]["diagnostics"]["code"] == "provider_runtime_apply_exception"
         assert control.pipeline.llm_runtime.provider is None
         assert fixture.signature() == ()
         calls = tuple(fixture.construction.calls)
