@@ -154,6 +154,7 @@ GUI and headless hosts share application owners and runtime resources. Presentat
   - The host owns authenticated same-user access and instance identity.
   - Event subscriptions are bounded and privacy-filtered. Slow clients cannot block runtime producers.
   - Readiness waits for endpoint publication. Blocking publication runs through the owned-thread boundary; ingress freeze fences startup, and endpoint cleanup waits for publication before releasing the lease.
+  - Windows discovery readers permit deletion of the advisory record while finishing their existing snapshots. The separate ownership lock and ACL/authentication checks remain authoritative; ordinary publication and cleanup failures still propagate.
 - **GUI settings queues**
   - Queues obtain the current diagnostic instance identity through the data-only `UiApplicationPort.diagnostic_instance_id` property.
   - `UiApplicationBoundary` reads the composed control owner's identity. The GUI does not access operational control directly.
