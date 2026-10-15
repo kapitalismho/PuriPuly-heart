@@ -17,11 +17,19 @@ The current native default prompt-cache policy also creates substantial **intent
 - [Quality review and limits](QUALITY.md), [workload-policy provenance](results/workload-policy.json), [protocol](PROTOCOL.md), [upstream findings and immutable citations](UPSTREAM.md), [reproduction](REPRODUCE.md).
 - [Producer compaction policy and normalized-source digests](results/producer-compaction.json), [effective sampling/template summary](results/sampling-template-summary.json).
 
-All inputs are synthetic. Published paths are placeholders. Runtime/model binaries, isolated configurations, encrypted secret stores, control credentials and bulk original producer logs are outside this directory. The index gives SHA-256/size for each published result file; it deliberately excludes its own hash.
+All inputs are synthetic. Published paths are placeholders. Runtime/model binaries, isolated configurations, encrypted secret stores, control credentials and bulk original producer logs are outside this directory. The index gives SHA-256/size for each result's **canonical UTF-8 LF publication/Git blob bytes**, not Windows-native CRLF bytes; it deliberately excludes its own hash.
+
+### Publication-byte repair
+
+The publishing checkpoint `8e6c015b2f5afc41316aa011ead1e936de7bb149` exposed Windows CRLF→Git LF normalization warnings. The original index had counted Windows worktree bytes. `finish_evidence.py` now writes every indexed text result as canonical UTF-8 LF before hashing; the shared JSON writer explicitly emits LF, including the index. Canonical indexed total is **13300418 bytes across283 result files**, replacing13491464 Windows bytes (191046 newline bytes removed). No inference or scientific record was rerun or semantically changed.
+
+[Read-only publication audit](PUBLICATION_AUDIT.json) compares the repaired index and actual LF working bytes against all283 stored result blobs in that checkpoint: **283/283 match, zero failures**. The repaired index/helper/docs themselves are proposed local changes, not claimed present in that old checkpoint. [Audit helper](verify_publication.py) permits the publishing owner to repeat the comparison at the final candidate. Original normalized-sanitized pre-compaction digests retain their original meaning; the complete `producer-compaction.json` matches the checkpoint blob unchanged. These digests are distinct from the index hashes of compact published files.
 
 ## 1. Frozen baseline and artifacts
 
 Execution checkout: `7a8151be6114a950f062e2430bd36f899d57e4de`, initially clean, branch `experiment-optimize-gemma-4-e4b-on-cpu-vulkan-wi`, initially equal to origin/dev. The current code supersedes old #75 two-slot amendments: **three slots, total context4608, 1536 per slot**. #64's Q4 selection and later CPU T4/B12, draft1/1, max/min3/2 decisions were preserved; rejected whole-model Q2 and other runtimes were not revisited. [Issue and criteria](https://github.com/kapitalismho/PuriPuly-heart/issues/246), [prior selection](https://github.com/kapitalismho/PuriPuly-heart/issues/64), [integration history](https://github.com/kapitalismho/PuriPuly-heart/issues/75).
+
+Scientific baseline remains `7a8151be6114a950f062e2430bd36f899d57e4de`. Later origin/dev `29a77232` and #247/#248 are not incorporated into this experiment; the publication repair does not rebase or reinterpret the frozen measurements.
 
 ### Measured host
 

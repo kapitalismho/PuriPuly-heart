@@ -118,8 +118,13 @@ def main():
     for path in sorted(results.iterdir()):
         if path.is_file() and path.name != "evidence-index.json":
             raw = path.read_bytes()
+            if path.suffix in {".txt", ".json", ".jsonl"}:
+                canonical = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n").encode("utf-8")
+                if canonical != raw:
+                    path.write_bytes(canonical)
+                raw = canonical
             index.append({"path": path.name, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()})
-    save("evidence-index.json", {"entries": index, "total_bytes": sum(row["bytes"] for row in index)})
+    save("evidence-index.json", {"encoding": "UTF-8", "line_endings": "LF", "hash_semantics": "SHA-256 and byte counts describe canonical UTF-8 LF publication/Git blob bytes, not platform-native CRLF worktree bytes; the index excludes itself.", "entries": index, "total_bytes": sum(row["bytes"] for row in index)})
     print(json.dumps({"evidence_files": len(index), "total_bytes": sum(row["bytes"] for row in index), "app_reports": len(apps), "compacted_producers": len(compact_records)}))
 
 

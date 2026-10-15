@@ -1,0 +1,12 @@
+{
+  "reference_candidate": "8e6c015b2f5afc41316aa011ead1e936de7bb149",
+  "scientific_product_baseline": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "scope": "Compare the repaired working publication index and actual UTF-8 LF result bytes against read-only Git result blobs at the reference candidate. The repaired index/helper/docs are not claimed committed there; the index excludes itself. No Git mutations or inference.",
+  "indexed_files": 283,
+  "matching_candidate_result_blobs": 283,
+  "total_publication_bytes": 13300418,
+  "publication_index_sha256": "36cd5367b3942f0140dc1f6687e28011467144d13f442aaa85fe1d3e00ed430f",
+  "producer_compaction_metadata_matches_candidate": true,
+  "failures": [],
+  "outcome": "pass"
+}

@@ -91,6 +91,14 @@ CPU load is six180s-bounded integer-loop workers, actual logical affinities0…5
 & $Python "$E/finish_evidence.py"
 ```
 
-`summarize.py` computes counts/distributions, paired results,20-request memory bins and quality parity from actual ledger rows; it does not rerun inference. `finish_evidence.py` sanitizes paths, projects unrelated audio/device/config details out of app evidence, retains one canonical template with hash references, compacts producer logs while keeping errors/warnings/checkpoints/cache state/placement, and indexes published result sizes/hashes. It preserves prior compaction metadata on repeated reduction. Full original producer text stays only in the owned external storage; normalized sanitized pre-compaction hashes are explicitly not hashes of raw private-path/original-line-ending files.
+`summarize.py` computes counts/distributions, paired results,20-request memory bins and quality parity from actual ledger rows; it does not rerun inference. `finish_evidence.py` sanitizes paths, projects unrelated audio/device/config details out of app evidence, retains one canonical template with hash references, compacts producer logs while keeping errors/warnings/checkpoints/cache state/placement, and indexes published result sizes/hashes. It canonicalizes every indexed text result to UTF-8 LF **before hashing**, and the JSON writer emits LF for the index too. Thus hashes/byte counts describe stored publication/Git blob bytes, not Windows CRLF worktree sizes. It preserves prior compaction metadata on repeated reduction. Full original producer text stays only in the owned external storage; normalized sanitized pre-compaction hashes retain their original meaning and are not hashes of raw private-path/original-line-ending files or the compact final file.
+
+For a candidate that already contains the particular results set being checked, the publishing owner can perform the explicit read-only blob audit:
+
+```powershell
+& $Python "$E/verify_publication.py" --candidate "<commit-containing-this-results-set>"
+```
+
+It checks every indexed working file's UTF-8 LF bytes/hash/size and every corresponding actual Git blob, verifies the index total/LF declaration, and writes `PUBLICATION_AUDIT.json` outside the indexed set to avoid a self-referential checksum. It only invokes read-only `git rev-parse`/`git cat-file --batch`; it does not commit or alter the index. The original repair audit against `8e6c015b` matched all283 stored result blobs at13300418 bytes; no new inference occurred. A fresh reproduction has new timing records and must be compared with its own published candidate, not expected to match the historical data byte-for-byte.
 
 Perform a privacy/evidence review before publishing. Do not commit external archives/DLLs/GGUF/KV files, encrypted secret/config stores, auth/lease records or whole device/process inventories. Keep failed/degraded/censored arms and absent counters explicit. The report recommends no product change; Git/GitHub publication and any later integration/acceptance belong to their authorized owner.
