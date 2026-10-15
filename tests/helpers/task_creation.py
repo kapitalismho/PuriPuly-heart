@@ -105,6 +105,8 @@ class _TaskScanner(ast.NodeVisitor):
         self.module = module
         self.module_name = module.removeprefix("src/").removesuffix(".py").replace("/", ".")
         self.bindings: dict[str, str | None] = {}
+        self.lexical_bindings = self.bindings
+        self.instance_bindings: list[dict[str, str]] = []
         self.owners: list[str] = []
         self.classes: list[str] = []
         self.sites: list[TaskCreationSite] = []
@@ -118,6 +120,8 @@ class _TaskScanner(ast.NodeVisitor):
                 return _PAGE
             if expression in self.bindings:
                 return self.bindings[expression]
+            if self.instance_bindings and expression in self.instance_bindings[-1]:
+                return self.instance_bindings[-1][expression]
             value = self.resolve(node.value)
             if value == _PAGE and node.attr == "run_task":
                 return _RUNNER
@@ -198,28 +202,34 @@ class _TaskScanner(ast.NodeVisitor):
         self.visit(node.value)
         binding = self.resolve(node.value)
         for target in node.targets:
-            if isinstance(target, (ast.Name, ast.Attribute)):
-                self.bindings[ast.unparse(target)] = binding
+            self.bind_target(target, binding)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if node.value is not None:
             self.visit(node.value)
-        self.bindings[ast.unparse(node.target)] = self.annotation_binding(
-            node.annotation
-        ) or self.resolve(node.value)
+        self.bind_target(
+            node.target, self.annotation_binding(node.annotation) or self.resolve(node.value)
+        )
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         previous = self.bindings
-        self.bindings = previous.copy()
         self.owners.append(node.name)
+        for expression in (*node.decorator_list, *node.bases):
+            self.visit(expression)
+        for keyword in node.keywords:
+            self.visit(keyword.value)
+        flet_control = any((self.resolve(base) or "").startswith("flet.") for base in node.bases)
+        self.bindings = self.lexical_bindings.copy()
         self.classes.append(node.name)
-        if any((self.resolve(base) or "").startswith("flet.") for base in node.bases):
-            self.bindings["self.page"] = _PAGE
+        inferred_attributes: dict[str, str] = {}
+        self.instance_bindings.append(inferred_attributes)
+        if flet_control:
+            inferred_attributes["self.page"] = _PAGE
         for statement in node.body:
             if isinstance(statement, ast.AnnAssign):
                 binding = self.annotation_binding(statement.annotation)
                 if binding and isinstance(statement.target, ast.Name):
-                    self.bindings[f"self.{statement.target.id}"] = binding
+                    inferred_attributes[f"self.{statement.target.id}"] = binding
             if (
                 isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef))
                 and statement.name == "__init__"
@@ -240,12 +250,13 @@ class _TaskScanner(ast.NodeVisitor):
                             if isinstance(target, ast.Attribute) and parameter_bindings.get(
                                 assignment.value.id
                             ):
-                                self.bindings[ast.unparse(target)] = parameter_bindings[
+                                inferred_attributes[ast.unparse(target)] = parameter_bindings[
                                     assignment.value.id
                                 ]
         for statement in node.body:
             self.visit(statement)
         self.classes.pop()
+        self.instance_bindings.pop()
         self.owners.pop()
         self.bindings = previous
         self.bindings[node.name] = f"{self.module_name}.{node.name}"
@@ -258,19 +269,25 @@ class _TaskScanner(ast.NodeVisitor):
         for expression in node.args.kw_defaults:
             if expression is not None:
                 self.visit(expression)
-        self.bindings = previous.copy()
-        local_bindings = _LocalBindings()
-        for statement in node.body:
-            local_bindings.visit(statement)
-        self.bindings.update(dict.fromkeys(local_bindings.names))
+        parameter_bindings = {
+            argument.arg: self.annotation_binding(argument.annotation)
+            for argument in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs)
+        }
         for argument in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
-            self.bindings[argument.arg] = self.annotation_binding(argument.annotation)
             if argument.arg == "run_task":
                 annotation = self.annotation_expression(argument.annotation)
                 if isinstance(annotation, ast.Subscript):
                     annotation = annotation.value
                 if self.resolve(annotation) in {"typing.Callable", "collections.abc.Callable"}:
-                    self.bindings[argument.arg] = _RUNNER
+                    parameter_bindings[argument.arg] = _RUNNER
+        previous_lexical = self.lexical_bindings
+        self.bindings = previous_lexical.copy()
+        self.lexical_bindings = self.bindings
+        local_bindings = _LocalBindings()
+        for statement in node.body:
+            local_bindings.visit(statement)
+        self.bindings.update(dict.fromkeys(local_bindings.names))
+        self.bindings.update(parameter_bindings)
         for argument in (node.args.vararg, node.args.kwarg):
             if argument is not None:
                 self.bindings[argument.arg] = None
@@ -278,13 +295,21 @@ class _TaskScanner(ast.NodeVisitor):
             self.visit(statement)
         self.owners.pop()
         self.bindings = previous
+        self.lexical_bindings = previous_lexical
         self.bindings[node.name] = f"{self.module_name}.{node.name}"
 
     visit_AsyncFunctionDef = visit_FunctionDef
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
         previous = self.bindings
-        self.bindings = previous.copy()
+        for expression in node.args.defaults:
+            self.visit(expression)
+        for expression in node.args.kw_defaults:
+            if expression is not None:
+                self.visit(expression)
+        previous_lexical = self.lexical_bindings
+        self.bindings = previous_lexical.copy()
+        self.lexical_bindings = self.bindings
         for argument in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
             self.bindings[argument.arg] = None
         for argument in (node.args.vararg, node.args.kwarg):
@@ -292,6 +317,7 @@ class _TaskScanner(ast.NodeVisitor):
                 self.bindings[argument.arg] = None
         self.visit(node.body)
         self.bindings = previous
+        self.lexical_bindings = previous_lexical
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
         if node.type is not None:
@@ -303,22 +329,32 @@ class _TaskScanner(ast.NodeVisitor):
 
     def visit_For(self, node: ast.For | ast.AsyncFor) -> None:
         self.visit(node.iter)
-        self.invalidate(node.target)
+        self.bind_target(node.target)
         for statement in (*node.body, *node.orelse):
             self.visit(statement)
 
     visit_AsyncFor = visit_For
 
-    def invalidate(self, target: ast.AST) -> None:
-        for node in ast.walk(target):
-            if isinstance(node, ast.Name):
-                self.bindings[node.id] = None
+    def bind_target(self, target: ast.AST, binding: str | None = None) -> None:
+        if isinstance(target, ast.Name):
+            self.bindings[target.id] = binding
+        elif isinstance(target, ast.Attribute):
+            self.visit(target.value)
+            self.bindings[ast.unparse(target)] = binding
+        elif isinstance(target, ast.Subscript):
+            self.visit(target.value)
+            self.visit(target.slice)
+        elif isinstance(target, ast.Starred):
+            self.bind_target(target.value)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for item in target.elts:
+                self.bind_target(item)
 
     def visit_With(self, node: ast.With | ast.AsyncWith) -> None:
         for item in node.items:
             self.visit(item.context_expr)
             if item.optional_vars is not None:
-                self.invalidate(item.optional_vars)
+                self.bind_target(item.optional_vars)
         for statement in node.body:
             self.visit(statement)
 
@@ -328,10 +364,14 @@ class _TaskScanner(ast.NodeVisitor):
         self, node: ast.ListComp | ast.SetComp | ast.GeneratorExp | ast.DictComp
     ) -> None:
         previous = self.bindings
-        self.bindings = previous.copy()
-        for generator in node.generators:
-            self.visit(generator.iter)
-            self.invalidate(generator.target)
+        self.visit(node.generators[0].iter)
+        previous_lexical = self.lexical_bindings
+        self.bindings = previous_lexical.copy()
+        self.lexical_bindings = self.bindings
+        for index, generator in enumerate(node.generators):
+            if index:
+                self.visit(generator.iter)
+            self.bind_target(generator.target)
             for condition in generator.ifs:
                 self.visit(condition)
         if isinstance(node, ast.DictComp):
@@ -340,6 +380,7 @@ class _TaskScanner(ast.NodeVisitor):
         else:
             self.visit(node.elt)
         self.bindings = previous
+        self.lexical_bindings = previous_lexical
 
     visit_SetComp = visit_ListComp
     visit_GeneratorExp = visit_ListComp

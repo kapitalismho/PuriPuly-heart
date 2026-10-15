@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -439,7 +440,20 @@ def _absolute_import_from_module(
 def _dependency_source_paths() -> tuple[Path, ...]:
     if not SOURCE_PACKAGE_ROOT.is_dir():
         raise AssertionError(f"missing dependency source root: {SOURCE_PACKAGE_ROOT}")
-    paths = tuple(sorted(SOURCE_PACKAGE_ROOT.rglob("*.py")))
+
+    def discovery_error(error: OSError) -> None:
+        raise error
+
+    paths = tuple(
+        sorted(
+            Path(directory) / filename
+            for directory, _directories, filenames in os.walk(
+                SOURCE_PACKAGE_ROOT, onerror=discovery_error
+            )
+            for filename in filenames
+            if filename.endswith(".py")
+        )
+    )
     core_root = SOURCE_PACKAGE_ROOT / "core"
     if not any(path.is_relative_to(core_root) for path in paths):
         raise AssertionError(f"empty or missing protected core root: {core_root}")
@@ -1876,3 +1890,38 @@ def test_dependency_scan_propagates_source_read_failures(
 
     with pytest.raises(PermissionError, match="protected source unreadable"):
         _dependency_violations()
+
+
+def test_dependency_rule_rejects_partially_unreadable_source_tree(
+    dependency_source_tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hidden = dependency_source_tree / "core" / "hidden"
+    hidden.mkdir()
+    (hidden / "bad.py").write_text("import puripuly_heart.ui.i18n\n", encoding="utf-8")
+    assert (dependency_source_tree / "core" / "seed.py").is_file()
+
+    violations = _dependency_violations()
+
+    assert {
+        (violation.rule_id, violation.importer, violation.imported) for violation in violations
+    } == {
+        (
+            "whole-core-avoids-ui-and-composition",
+            "src/puripuly_heart/core/hidden/bad.py",
+            "puripuly_heart.ui.i18n",
+        )
+    }
+    original_scandir = os.scandir
+    denied: list[Path] = []
+
+    def scandir(path: str | Path):
+        if Path(path) == hidden:
+            denied.append(hidden)
+            raise PermissionError(f"protected subtree unreadable: {hidden}")
+        return original_scandir(path)
+
+    monkeypatch.setattr(os, "scandir", scandir)
+
+    with pytest.raises(PermissionError, match="protected subtree unreadable"):
+        _dependency_violations()
+    assert denied == [hidden]
