@@ -441,11 +441,11 @@ Exact handoff and teardown ordering belongs to owner implementations and lifecyc
 
 ### Bounded task-creation enforcement
 
-`tests/architecture/test_lifecycle_task_guard.py` scans all Python files under `src/puripuly_heart`, including evidence runners, using `tests/helpers/task_creation.py`. It recognizes direct asyncio task creation (`create_task`, `Task`, `ensure_future`), ordinary imported/assigned aliases, resolvable loop `create_task`, and identifiable Flet page or injected `run_task` bindings. A method name alone does not establish task creation.
+`tests/architecture/test_lifecycle_task_guard.py` scans all Python files under `src/puripuly_heart`, including evidence runners, using `tests/helpers/task_creation.py`. It recognizes direct asyncio task creation (`create_task`, `Task`, `ensure_future`), ordinary imported/assigned aliases, resolvable loop `create_task`, and identifiable Flet page or injected `run_task` bindings. Nested function and lambda bodies use completed enclosing lexical bindings, including aliases assigned after the callback definition; defaults and decorators retain definition-order analysis. A method name alone does not establish task creation.
 
 Each reviewed identity names its module, enclosing qualified function, callee family, maximum multiplicity, and lifetime rationale. Owning primitives, named owners, and legacy exceptions are separate dispositions. Removal is allowed; a new identity or increased multiplicity requires explicit review. Missing/empty protected roots and source discovery, decoding, or parsing failures fail the check.
 
-This is bounded lexical analysis, not dynamic task-factory or whole-program alias resolution. Arbitrary untyped receivers, interprocedural aliases, star imports, indirect inheritance, global/nonlocal rebinding, pattern bindings, and conditional-flow joins are not resolved. Structural acceptance does not prove cancellation, draining, cleanup, or generation progress; owner behavior tests retain those responsibilities.
+This is bounded lexical analysis, not dynamic task-factory or whole-program alias resolution. Callback invocation timing, arbitrary untyped receivers, interprocedural aliases, star imports, indirect inheritance, global/nonlocal rebinding, pattern bindings, and conditional-flow joins are not resolved. Structural acceptance does not prove cancellation, draining, cleanup, or generation progress; owner behavior tests retain those responsibilities.
 
 Existing narrow lifetime debt is recorded at the exact creation identities, without changing runtime behavior:
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import ast
-from collections import Counter
-from collections.abc import Mapping
+from collections import ChainMap, Counter
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -100,16 +100,85 @@ class _LocalBindings(ast.NodeVisitor):
     visit_DictComp = visit_ListComp
 
 
+@dataclass(frozen=True)
+class _DeferredCallable:
+    node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda
+    parameters: dict[str, str | None]
+    lexical_bindings: ChainMap[str, str | None]
+    owners: tuple[str, ...]
+    classes: tuple[str, ...]
+    instance_bindings: tuple[dict[str, str], ...]
+
+
 class _TaskScanner(ast.NodeVisitor):
     def __init__(self, module: str) -> None:
         self.module = module
         self.module_name = module.removeprefix("src/").removesuffix(".py").replace("/", ".")
-        self.bindings: dict[str, str | None] = {}
+        self.bindings: ChainMap[str, str | None] = ChainMap()
         self.lexical_bindings = self.bindings
         self.instance_bindings: list[dict[str, str]] = []
         self.owners: list[str] = []
         self.classes: list[str] = []
         self.sites: list[TaskCreationSite] = []
+        self.pending_callables: list[_DeferredCallable] = []
+
+    def visit_Module(self, node: ast.Module) -> None:
+        self.scan_body(node.body)
+
+    def scan_body(self, body: Iterable[ast.AST]) -> None:
+        previous_pending = self.pending_callables
+        self.pending_callables = []
+        for node in body:
+            self.visit(node)
+        completed = self.pending_callables
+        self.pending_callables = previous_pending
+        for pending in completed:
+            self.scan_callable(pending)
+
+    def defer_callable(
+        self,
+        node: ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda,
+        parameters: dict[str, str | None],
+    ) -> None:
+        self.pending_callables.append(
+            _DeferredCallable(
+                node,
+                parameters,
+                self.lexical_bindings,
+                tuple(self.owners),
+                tuple(self.classes),
+                tuple(self.instance_bindings),
+            )
+        )
+
+    def scan_callable(self, pending: _DeferredCallable) -> None:
+        previous = (
+            self.bindings,
+            self.lexical_bindings,
+            self.owners,
+            self.classes,
+            self.instance_bindings,
+        )
+        self.bindings = pending.lexical_bindings.new_child()
+        self.lexical_bindings = self.bindings
+        self.owners = list(pending.owners)
+        self.classes = list(pending.classes)
+        self.instance_bindings = list(pending.instance_bindings)
+        node = pending.node
+        body = [node.body] if isinstance(node, ast.Lambda) else node.body
+        local_bindings = _LocalBindings()
+        for statement in body:
+            local_bindings.visit(statement)
+        self.bindings.update(dict.fromkeys(local_bindings.names))
+        self.bindings.update(pending.parameters)
+        self.scan_body(body)
+        (
+            self.bindings,
+            self.lexical_bindings,
+            self.owners,
+            self.classes,
+            self.instance_bindings,
+        ) = previous
 
     def resolve(self, node: ast.AST | None) -> str | None:
         if isinstance(node, ast.Name):
@@ -219,7 +288,7 @@ class _TaskScanner(ast.NodeVisitor):
         for keyword in node.keywords:
             self.visit(keyword.value)
         flet_control = any((self.resolve(base) or "").startswith("flet.") for base in node.bases)
-        self.bindings = self.lexical_bindings.copy()
+        self.bindings = self.lexical_bindings.new_child()
         self.classes.append(node.name)
         inferred_attributes: dict[str, str] = {}
         self.instance_bindings.append(inferred_attributes)
@@ -262,7 +331,6 @@ class _TaskScanner(ast.NodeVisitor):
         self.bindings[node.name] = f"{self.module_name}.{node.name}"
 
     def visit_FunctionDef(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        previous = self.bindings
         self.owners.append(node.name)
         for expression in (*node.decorator_list, *node.args.defaults):
             self.visit(expression)
@@ -280,44 +348,29 @@ class _TaskScanner(ast.NodeVisitor):
                     annotation = annotation.value
                 if self.resolve(annotation) in {"typing.Callable", "collections.abc.Callable"}:
                     parameter_bindings[argument.arg] = _RUNNER
-        previous_lexical = self.lexical_bindings
-        self.bindings = previous_lexical.copy()
-        self.lexical_bindings = self.bindings
-        local_bindings = _LocalBindings()
-        for statement in node.body:
-            local_bindings.visit(statement)
-        self.bindings.update(dict.fromkeys(local_bindings.names))
-        self.bindings.update(parameter_bindings)
         for argument in (node.args.vararg, node.args.kwarg):
             if argument is not None:
-                self.bindings[argument.arg] = None
-        for statement in node.body:
-            self.visit(statement)
+                parameter_bindings[argument.arg] = None
+        self.defer_callable(node, parameter_bindings)
         self.owners.pop()
-        self.bindings = previous
-        self.lexical_bindings = previous_lexical
         self.bindings[node.name] = f"{self.module_name}.{node.name}"
 
     visit_AsyncFunctionDef = visit_FunctionDef
 
     def visit_Lambda(self, node: ast.Lambda) -> None:
-        previous = self.bindings
         for expression in node.args.defaults:
             self.visit(expression)
         for expression in node.args.kw_defaults:
             if expression is not None:
                 self.visit(expression)
-        previous_lexical = self.lexical_bindings
-        self.bindings = previous_lexical.copy()
-        self.lexical_bindings = self.bindings
-        for argument in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs):
-            self.bindings[argument.arg] = None
+        parameter_bindings = {
+            argument.arg: None
+            for argument in (*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs)
+        }
         for argument in (node.args.vararg, node.args.kwarg):
             if argument is not None:
-                self.bindings[argument.arg] = None
-        self.visit(node.body)
-        self.bindings = previous
-        self.lexical_bindings = previous_lexical
+                parameter_bindings[argument.arg] = None
+        self.defer_callable(node, parameter_bindings)
 
     def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
         if node.type is not None:
@@ -366,7 +419,7 @@ class _TaskScanner(ast.NodeVisitor):
         previous = self.bindings
         self.visit(node.generators[0].iter)
         previous_lexical = self.lexical_bindings
-        self.bindings = previous_lexical.copy()
+        self.bindings = previous_lexical.new_child()
         self.lexical_bindings = self.bindings
         for index, generator in enumerate(node.generators):
             if index:
