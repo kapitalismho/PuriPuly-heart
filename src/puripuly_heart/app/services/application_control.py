@@ -75,6 +75,7 @@ from puripuly_heart.core.diagnostics import (
     normalize_diagnostic,
     sanitize_diagnostic_fields,
 )
+from puripuly_heart.core.local_translation.provisioning import GemmaProvisioningCancelled
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_VISIBILITY_BASIC,
@@ -1582,7 +1583,7 @@ class ApplicationControlOwner:
                             (operation.receipt.get("transaction") or {}).get("diagnostics"),
                         )
                     completed = True
-        except asyncio.CancelledError:
+        except asyncio.CancelledError, GemmaProvisioningCancelled:
             operation.receipt["status"] = "interrupted" if not self._open else "cancelled"
         except PeerCaptureTargetUnavailable:
             operation.receipt.update(
@@ -1593,7 +1594,7 @@ class ApplicationControlOwner:
                 status="rejected",
                 error={"code": "invalid_arguments", "type": "InvalidArgumentsError"},
             )
-        except Exception as exc:
+        except (Exception, BaseExceptionGroup) as exc:
             source = vars(exc).get("failure_diagnostics")
             if not isinstance(source, ErrorDiagnostics):
                 source = vars(exc).get("diagnostics")

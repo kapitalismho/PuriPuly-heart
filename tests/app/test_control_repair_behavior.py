@@ -1738,3 +1738,123 @@ async def test_execution_receipt_preserves_approved_native_failure_carrier(
         assert receipt["cause_diagnostics"] in records and receipt["diagnostics"] in records
     finally:
         await app.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["cancelled", "failed", "interrupted"])
+async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
+    offline, monkeypatch, outcome
+):
+    import socket
+
+    from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
+    from puripuly_heart.core.local_asr.local_stt_download_port import (
+        HuggingFaceDownloadProgress,
+        LocalSTTDownloadPortCancelled,
+    )
+    from puripuly_heart.core.local_translation import assets
+    from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
+
+    monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-gemma-data"))
+    monkeypatch.setenv("APPDATA", str(offline.parent / "isolated-gemma-roaming"))
+    settings = json.loads(offline.read_text(encoding="utf-8"))
+    settings["intent"]["translation"].update(model="managed_gemma_26b", connection="gpu")
+    settings["intent"]["stt"]["provider"] = "soniox"
+    settings["intent"]["peer_stt"]["provider"] = "soniox"
+    settings["intent"]["telemetry"]["enabled"] = False
+    settings["intent"]["integrated_context"]["enabled"] = False
+    sink = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sink.bind(("127.0.0.1", 0))
+    settings["intent"]["osc"].update(
+        host="127.0.0.1",
+        port=sink.getsockname()[1],
+        send_port=sink.getsockname()[1],
+        activation_notice_enabled=False,
+    )
+    offline.write_text(json.dumps(settings), encoding="utf-8")
+    spec = assets.resolve_gemma_spec(assets.GEMMA_26B_MODEL_ID)
+    spec = replace(
+        spec,
+        assets=(replace(spec.assets[0], size_bytes=100, sha256="0" * 64),),
+    )
+    monkeypatch.setattr(assets, "gemma_26b_spec", lambda: spec)
+    entered = asyncio.Event()
+    settled = asyncio.Event()
+    staging_paths = []
+
+    class Downloader:
+        async def download(self, request, *, cancel_event, on_progress):
+            staging_paths.append(request.local_dir)
+            (request.local_dir / request.remote_path).write_bytes(b"partial synthetic target")
+            on_progress(HuggingFaceDownloadProgress(24, 100))
+            entered.set()
+            await asyncio.to_thread(cancel_event.wait)
+            settled.set()
+            if outcome == "failed":
+                raise PermissionError(5, "PRIVATE_DOWNLOAD_CLEANUP_FAILURE")
+            raise LocalSTTDownloadPortCancelled("synthetic download cancelled")
+
+    def reject_launch(*_args, **_kwargs):
+        raise AssertionError("cancelled provisioning must not launch a model process")
+
+    install_dir = offline.parent / "gemma-models" / spec.install_dirname
+    runtime = ManagedGemmaRuntimeOwner(
+        install_dir=install_dir,
+        process_factory=reject_launch,
+        transport_factory=reject_launch,
+    )
+    owner = ManagedGemmaTranslationOwner(runtime=runtime, downloader=Downloader())
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(f"isolated-gemma-{outcome}")
+        control.gemma = lambda: owner
+        admitted = await control.submit("gemma.prepare", {}, request_id="prepare-cancel")
+        await asyncio.wait_for(entered.wait(), 5)
+        assert owner.snapshot.state == "downloading"
+        assert staging_paths and staging_paths[0].is_dir()
+        assert (await control.operation(admitted["operation_id"]))["terminal"] is False
+
+        if outcome == "interrupted":
+            control.freeze_ingress()
+            await asyncio.wait_for(control.drain_operations(), 5)
+        else:
+            cancellation = await control.submit("gemma.cancel", {}, request_id="cancel-preparation")
+            cancel_receipt = await control.wait(cancellation["operation_id"], timeout=5)
+            assert cancel_receipt["status"] == "cancelled"
+            assert cancel_receipt["terminal"] is True
+        receipt = await control.wait(admitted["operation_id"], timeout=5)
+        assert receipt["status"] == outcome
+        assert receipt["terminal"] is True
+        assert settled.is_set()
+        assert not install_dir.exists()
+        assert all(not path.exists() for path in staging_paths)
+        if outcome == "failed":
+            assert owner.snapshot.state == "failed"
+            assert owner.snapshot.failure_code == "filesystem_failed"
+            assert owner.snapshot.cause_type == "PermissionError"
+            assert receipt["error"]["code"] == "application_operation_failed"
+            assert "diagnostics" in receipt
+            assert "PRIVATE_DOWNLOAD_CLEANUP_FAILURE" not in json.dumps(receipt)
+        elif outcome == "cancelled":
+            assert owner.snapshot.state == "cancelled"
+            assert "error" not in receipt
+            assert "diagnostics" not in receipt
+        if outcome != "interrupted":
+            next_operation = await control.submit(
+                "settings.apply", {"changes": {"locale": "ja"}}, request_id="after-cancel"
+            )
+            next_receipt = await control.wait(next_operation["operation_id"], timeout=5)
+            assert next_receipt["terminal"] is True
+            assert next_receipt["status"] == "degraded"
+            assert (
+                next_receipt["transaction"]["status"] == "settings_commit_success_runtime_degraded"
+            )
+            assert (await control.query("settings.current", {}))["settings"]["intent"]["ui"][
+                "locale"
+            ] == "ja"
+    finally:
+        await owner.close()
+        await app.stop()
+        sink.close()
