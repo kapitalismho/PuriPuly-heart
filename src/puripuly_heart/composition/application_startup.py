@@ -43,7 +43,7 @@ class ApplicationStartupAdapter:
     sync_presentation: Callable[[], None]
     notify_fallback: Callable[[tuple[str, ...], bool], None]
     runtime_logging: ApplicationRuntimeLoggingOwner
-    sync_runtime_signatures: Callable[[AppSettingsVNext], None]
+    initial_llm_binding_sink: Callable[[AppSettingsVNext, object | None], None]
     pipeline_launcher: RuntimePipelineLauncher
     pipeline: RuntimePipelineHandle
     sync_local_asr_notice: Callable[[], None]
@@ -150,24 +150,22 @@ class ApplicationStartupAdapter:
 
     async def launch_startup_runtime(self, state: ApplicationStartupState) -> None:
         settings = state.settings
-        self.sync_runtime_signatures(settings)
-        await self.pipeline_launcher.launch(
+        launch_settings = self.settings.project(settings, authoritative=self.settings.authoritative)
+        components = await self.pipeline_launcher.launch(
             runtime_pipeline_inputs_from_vnext(
-                self.settings.project(settings, authoritative=self.settings.authoritative),
+                launch_settings,
                 peer_translation_enabled=self.settings.peer_translation_enabled(),
             ),
             secrets=create_secret_store(
-                settings.intent.secrets,
+                launch_settings.intent.secrets,
                 config_path=self.pipeline_launcher.config_path,
             ),
             vrc_mic_state=self.pipeline.vrc_mic_state,
             vrc_mic_audio_gate=self.pipeline.vrc_mic_audio_gate,
             receiver_active=self.receiver_active(),
         )
+        self.initial_llm_binding_sink(launch_settings, components.llm_runtime.provider)
         self.sync_local_asr_notice()
-        components = self.pipeline.current
-        if components is None:
-            raise RuntimeError("Application pipeline did not provide runtime components")
         local_asr_runtime = components.local_asr_runtime
         llm_runtime = components.llm_runtime
         from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (

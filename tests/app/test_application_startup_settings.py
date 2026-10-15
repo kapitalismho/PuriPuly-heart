@@ -57,7 +57,7 @@ async def test_startup_restores_pre_fallback_canonical_when_persist_fails() -> N
         sync_presentation=lambda: None,
         notify_fallback=lambda *_args: None,
         runtime_logging=Mock(),
-        sync_runtime_signatures=lambda _settings: None,
+        initial_llm_binding_sink=lambda _settings, _provider: None,
         pipeline_launcher=Mock(),
         pipeline=Mock(),
         sync_local_asr_notice=lambda: None,

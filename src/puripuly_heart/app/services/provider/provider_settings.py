@@ -126,7 +126,7 @@ class ProviderApplicationOwner:
     results: SettingsTransactionResultOwner
     sync_memory: ProviderSettingsSync
     capture_runtime_signatures: Callable[[], None]
-    sync_signatures: ProviderSettingsSync
+    sync_stt_signatures: ProviderSettingsSync
     consume_superseded_settings: ProviderSupersededSettingsConsumer
     active_local_asr_change: ProviderSettingsPredicate
     compensate_local_asr: ProviderSettingsCompensation
@@ -407,7 +407,7 @@ class ProviderApplicationOwner:
                 if unavailable is not None:
                     self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
         elif result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-            self.sync_signatures(committed_settings)
+            self.sync_stt_signatures(committed_settings)
         self.remember_order22(self.settings.canonical)
         return True
 
@@ -572,7 +572,7 @@ class ProviderApplicationOwner:
         else:
             self.settings.canonical = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.sync_signatures(committed_settings)
+                self.sync_stt_signatures(committed_settings)
         self.remember_order22(self.settings.canonical)
         return True
 

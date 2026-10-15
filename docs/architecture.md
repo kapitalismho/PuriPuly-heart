@@ -190,7 +190,7 @@ Settings changes follow this path:
 - Settings persistence owns intent. Runtime owners own its application.
 - The provider-apply boundary coordinates capture and Local ASR owners.
 - Failed or incomplete application must not appear as successfully applied runtime state.
-- LLM applied-profile signatures and retry state follow the actual provider-replacement outcome, before usage refresh or STT convergence. STT signatures advance only after their own convergence. A successful LLM replacement therefore remains accurately tracked when an independent STT failure leaves the overall settings transaction committed but runtime-degraded.
+- LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.
 
 Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
 

@@ -1455,7 +1455,7 @@ class SettingsApplicationOwner:
         else:
             self.settings.canonical = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.runtime_effects.sync_signatures(committed_settings)
+                self.runtime_effects.sync_stt_signatures(committed_settings)
         self.projection.remember_order22(self.settings.canonical)
         return True
 
@@ -1608,7 +1608,7 @@ class SettingsApplicationOwner:
         else:
             self.settings.canonical = runtime_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.runtime_effects.sync_signatures(runtime_settings)
+                self.runtime_effects.sync_stt_signatures(runtime_settings)
         self.projection.remember_order24(self.settings.canonical)
         return True
 

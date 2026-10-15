@@ -174,7 +174,7 @@ class FakeRuntimeEffects:
     def restore_memory(self, _settings: AppSettingsVNext) -> None:
         return None
 
-    def sync_signatures(self, _settings: AppSettingsVNext) -> None:
+    def sync_stt_signatures(self, _settings: AppSettingsVNext) -> None:
         return None
 
     def state(self, _settings: AppSettingsVNext) -> SettingsRuntimeState:

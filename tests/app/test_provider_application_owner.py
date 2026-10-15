@@ -153,7 +153,7 @@ def _owner(
         results=results,
         sync_memory=lambda _settings: events.append("sync_memory"),
         capture_runtime_signatures=lambda: events.append("capture"),
-        sync_signatures=lambda _settings: events.append("signatures"),
+        sync_stt_signatures=lambda _settings: events.append("signatures"),
         consume_superseded_settings=lambda _settings: False,
         active_local_asr_change=lambda _base, _next: False,
         compensate_local_asr=lambda **_kwargs: SimpleNamespace(),

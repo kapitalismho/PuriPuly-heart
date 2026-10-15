@@ -126,22 +126,6 @@ class ProviderRuntimeSignatures:
     last_llm_provider: tuple[object, ...] | None = None
     superseded_settings_ids: set[int] = field(default_factory=set)
 
-    def sync(
-        self,
-        settings: AppSettingsVNext,
-        *,
-        canonical: AppSettingsVNext,
-        peer: PeerApplicationOwner,
-        peer_translation_enabled: bool = False,
-    ) -> None:
-        self.sync_stt(
-            settings,
-            canonical=canonical,
-            peer=peer,
-            peer_translation_enabled=peer_translation_enabled,
-        )
-        self.sync_llm(canonical)
-
     def sync_llm(self, canonical: AppSettingsVNext) -> None:
         self.last_llm_provider = build_llm_provider_signature(
             canonical,
@@ -390,7 +374,7 @@ class ProviderRuntimeComponents:
     llm_rebuild: LlmProviderRebuildOwner
     effects: ProviderRuntimeEffects
     signatures: ProviderRuntimeSignatures
-    sync_signatures: Callable[[AppSettingsVNext], None]
+    sync_stt_signatures: Callable[[AppSettingsVNext], None]
     capture_signatures_before_canonical_mutation: Callable[[], None]
 
 
@@ -572,7 +556,7 @@ def compose_provider_runtime(
         retry_sink=signature_state.mark_llm_retry,
     )
 
-    def sync_signatures(current: object) -> None:
+    def sync_stt_signatures(current: object) -> None:
         signature_state.sync_stt(
             current,
             canonical=canonical_settings(current),
@@ -598,7 +582,7 @@ def compose_provider_runtime(
         recover_gpu=effects.gpu_recovery,
         refresh_peer=effects.refresh_peer,
         refresh_self_stt=effects.refresh_self_stt,
-        signature_sink=sync_signatures,
+        signature_sink=sync_stt_signatures,
         current_settings_provider=lambda: settings.canonical,
         signature_cache_provider=lambda: signature_state.cache(peer()),
         self_signature_builder=lambda current: build_self_stt_provider_signature_from_vnext(
@@ -625,7 +609,7 @@ def compose_provider_runtime(
         llm_rebuild=llm_rebuild,
         effects=effects,
         signatures=signature_state,
-        sync_signatures=sync_signatures,
+        sync_stt_signatures=sync_stt_signatures,
         capture_signatures_before_canonical_mutation=(capture_signatures_before_canonical_mutation),
     )
 

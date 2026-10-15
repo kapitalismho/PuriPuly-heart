@@ -530,7 +530,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         success_sink=lambda _message: None,
         additional_signature_sink=lambda _settings: None,
     )
-    components.sync_signatures(settings_owner.canonical)
+    components.sync_stt_signatures(settings_owner.canonical)
 
     results = SettingsTransactionResultOwner()
     provider_application = ProviderApplicationOwner(
@@ -546,7 +546,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         results=results,
         sync_memory=lambda _value: None,
         capture_runtime_signatures=components.capture_signatures_before_canonical_mutation,
-        sync_signatures=components.sync_signatures,
+        sync_stt_signatures=components.sync_stt_signatures,
         consume_superseded_settings=lambda _value: False,
         active_local_asr_change=lambda _base, _next: False,
         compensate_local_asr=lambda **_kwargs: _noop(),
