@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "issue": 251,
+  "workstream": "provider-runtime partial-apply signature repair",
+  "status": "scoped repair verified and source frozen; native after-proof pending",
+  "provenance": {
+    "worker": "inference-core",
+    "original_observations": "Outputs originally observed in this worker's OMP session. This record was assembled afterward without rerunning tests, the composed smoke, native inference, or builds.",
+    "original_test_tool": "functions.bash",
+    "original_test_tool_labels": [
+      "Executing provider transition repair tests",
+      "Executing repaired provider behavior coverage",
+      "Executing final scoped provider recovery checks"
+    ],
+    "original_smoke_tool": "functions.eval",
+    "original_smoke_tool_label": "Exercising composed settings profile recovery",
+    "retained_smoke_output": "The original subprocess CompletedProcess stdout, stderr and return code remained in the eval runtime as repair_smoke. Evidence assembly read those retained values under the tool label Reading retained repair smoke output; it did not execute the smoke again.",
+    "raw_temporary_tree_removed": true,
+    "raw_temporary_tree_status": "The original smoke used TemporaryDirectory and printed OWNED_TEMP_STATE_REMOVED after leaving it. Its temporary settings, secrets, cache roots and host log are no longer available. No deleted log or file contents have been reconstructed or represented as retained artifacts.",
+    "sanitization": "Personal absolute paths and temporary directory names are omitted. Source paths are repository-relative. The isolated smoke instance label, synthetic operation labels, statuses and controlled-boundary observations are retained.",
+    "candidate_binding_limit": "No Git command was run for this evidence assembly, and this record does not assign an invented commit. SHA-256 values below identify the frozen files when this record was written. They were not independently archived at the start of each earlier test attempt. The two repaired product files were unchanged between the composed smoke and evidence assembly; subsequent worker edits affected tests only. This is not a complete source digest of concurrently integrated workstreams."
+  },
+  "root_cause": {
+    "summary": "An LLM replacement could succeed before later STT convergence failed. The old LLM signature and its deferred retry bookkeeping could then remain stale. Returning A to B to A compared desired A against cached A and skipped a replacement although the installed immutable request provider was bound to B.",
+    "warmup_distinction": "Preparing a runtime from current canonical settings does not replace the provider's immutable backend/device/spec binding. Requested profile and effective execution backend remain distinct, including legitimate E4B internal GPU-to-CPU fallback.",
+    "before_proof": "The original native safety attempts were retained by managed-execution. They were not rerun to confirm their failure during this repair. This record supplies controlled post-repair evidence, not native acceptance after-proof."
+  },
+  "repair": {
+    "product_files": [
+      "src/puripuly_heart/app/services/provider/provider_runtime_apply.py",
+      "src/puripuly_heart/app/wiring/wiring_provider_runtime.py"
+    ],
+    "behavior": [
+      "LlmProviderRebuildOwner commits an LLM-only signature immediately after successful provider replacement, before usage refresh and later STT work.",
+      "Construction yielding no provider or replacement raising marks the existing retry state immediately; the failed requested profile is not stamped as successfully applied.",
+      "Provider runtime convergence success synchronizes STT signatures separately and cannot overwrite the failed-LLM retry marker.",
+      "The existing combined signature synchronization and () retry-marker consumer remain available for their existing callers; no new retry-state field was introduced.",
+      "A settings transaction may remain committed/runtime-degraded for STT failure while the independently successful LLM binding is retained and correctly used by subsequent requests."
+    ],
+    "preserved": [
+      "No unapplied STT signature is published after STT convergence failure.",
+      "No degraded transaction is relabeled as wholly applied.",
+      "No force-all-rebuild policy or dynamic desired-backend lookup per request.",
+      "No execution guard bypass, prefix-refresh predicate change, inference profile change or model substitution.",
+      "No edits to translation_enable.py, control_repair_behavior.py or overlay tests."
+    ]
+  },
+  "source_hashes": {
+    "algorithm": "SHA-256",
+    "measurement_point": "Evidence assembly after the worker's source-freeze report",
+    "successful_command": "sha256sum src/puripuly_heart/app/services/provider/provider_runtime_apply.py src/puripuly_heart/app/wiring/wiring_provider_runtime.py tests/app/test_provider_runtime_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_alibaba_workspace.py src/puripuly_heart/core/local_translation/runtime.py src/puripuly_heart/providers/llm/managed_gemma.py",
+    "files": {
+      "src/puripuly_heart/app/services/provider/provider_runtime_apply.py": "da2db736d1dcffef157a690c3d061ab0b1996b52cd1063f6e1ef9fba3d9613d5",
+      "src/puripuly_heart/app/wiring/wiring_provider_runtime.py": "d6071c3fead608ec9f67f203a4bcb7a6b6e16b2ac1a3c607b526c5f3af348c93",
+      "tests/app/test_provider_runtime_owner.py": "0f806a3a50395c29df101d0085031a98c2db07dcbbfda179607e497ccf0ed714",
+      "tests/app/test_managed_gemma_provider_runtime_integration.py": "e45ab897ffa1832748a1330940d67151fe01a4d7b7a3cf3cc58871322c0ab9ce",
+      "tests/app/test_alibaba_workspace.py": "29104a16d0922f580d69696f3f0d1bbb2fb5ef22f3b55e08e9f3bae93eb133c1",
+      "src/puripuly_heart/core/local_translation/runtime.py": "80504e59aabb3d11b4ff66aab765677d84baf6c1baac54b3c747fdd09285c420",
+      "src/puripuly_heart/providers/llm/managed_gemma.py": "076789c2d04c1e410890dc5d1883d30f31820870322d7888de4f43ca8277ec45"
+    },
+    "assembly_environment_failure": "An initial PowerShell Get-FileHash invocation failed because the cmdlet was unavailable in that invocation. The subsequent sha256sum command succeeded. This was an evidence-assembly environment failure, not a test or product failure."
+  },
+  "deterministic_tests": {
+    "runner": "Existing project virtual-environment Python; personal interpreter path omitted",
+    "attempts": [
+      {
+        "label": "initial controlled-fixture attempt",
+        "command": "python -m pytest tests/app/test_provider_runtime_owner.py tests/app/test_provider_application_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_alibaba_workspace.py -o addopts=-s -q",
+        "exit_code": 1,
+        "passed": 41,
+        "failed": 3,
+        "duration_s": 1.69,
+        "observed_summary": "3 failed, 41 passed in 1.69s",
+        "failed_nodes": [
+          "tests/app/test_managed_gemma_provider_runtime_integration.py::test_partial_stt_failure_retains_actual_llm_binding_and_rebuilds_return_to_gpu[channel-refresh]",
+          "tests/app/test_managed_gemma_provider_runtime_integration.py::test_partial_stt_failure_retains_actual_llm_binding_and_rebuilds_return_to_gpu[gpu-recovery]",
+          "tests/app/test_managed_gemma_provider_runtime_integration.py::test_failed_llm_replacement_is_retryable_without_committing_failed_profile"
+        ],
+        "observed_assertions": [
+          "The two transition cases expected stt_runtime_apply_not_converged but received provider_runtime_apply_exception.",
+          "The failed-construction case expected provider_runtime_apply_unavailable but received provider_runtime_apply_exception."
+        ],
+        "diagnosis_and_correction": "The expanded integration fixture supplied a read-only SimpleNamespace configuration that could not serve the real apply_common configuration replacement boundary. It was changed to the actual TranslationRuntimeConfigurationOwner. Expected STT diagnostics, failure classification and actual consumer assertions were retained, not weakened.",
+        "scope_limit": "This failed fixture attempt did not exercise the intended later convergence boundary and was not native inference evidence."
+      },
+      {
+        "label": "corrected fixture and component-boundary tests",
+        "command": "python -m pytest tests/app/test_provider_runtime_owner.py tests/app/test_provider_application_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_alibaba_workspace.py -o addopts=-s -q",
+        "exit_code": 0,
+        "passed": 46,
+        "failed": 0,
+        "duration_s": 1.06,
+        "observed_summary": "46 passed in 1.06s"
+      },
+      {
+        "label": "final scoped provider and inference protections",
+        "command": "python -m pytest tests/app/test_provider_runtime_owner.py tests/app/test_provider_application_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_alibaba_workspace.py tests/app/test_wiring_providers.py tests/app/test_stt_provider_apply_vertical.py tests/app/test_managed_gemma_settings_refresh.py tests/core/local_translation tests/providers/test_managed_gemma_provider.py tests/providers/test_managed_gemma_concurrency.py -o addopts=-s -q",
+        "exit_code": 0,
+        "passed": 277,
+        "failed": 0,
+        "duration_s": 12.86,
+        "observed_summary": "277 passed in 12.86s"
+      }
+    ],
+    "decisive_protection": [
+      "Actual provider construction, replacement and translation consumption through the managed backend and core runtime owner across GPU-to-CPU-to-GPU partial application, with native process/provisioning/transport boundaries controlled.",
+      "Both ordinary channel refresh and coordinated GPU-recovery branches retain the correct LLM identity despite later STT failure.",
+      "Returned GPU requests use distinct slots, complete with their associated utterance identities, and occupy at most two active controlled translations on one live runtime.",
+      "Failed LLM construction retires the active provider, leaves the existing () retry marker rather than the failed requested identity, preserves successful STT synchronization, and permits a real consumer completion after retry.",
+      "Successful replacement identity is committed before a later usage-refresh failure; replacement failure marks retry while preserving the original exception.",
+      "Existing CPU serialization, E4B fallback, cancellation settlement, other-request progress, prefix ownership, transition and shutdown tests remain in the final scoped run."
+    ]
+  },
+  "composed_control_smoke": {
+    "invocation": "A throwaway inline Python program executed once in the existing project interpreter through functions.eval/subprocess.run. No persistent smoke script was created.",
+    "exit_code": 0,
+    "stderr": "",
+    "original_stdout_json": {
+      "result": "passed",
+      "checkout_import": "current source",
+      "instance": "isolated-provider-profile-repair-smoke",
+      "controlled_boundaries": [
+        "native process/version/provisioning/transport",
+        "inactive Soniox without credentials",
+        "external network prohibited",
+        "owned loopback UDP"
+      ],
+      "records": [
+        {"label": "initial-enable", "status": "applied", "transaction": null},
+        {"label": "initial-gpu-consumer", "status": "applied", "transaction": null},
+        {"label": "initial-gpu-consumer", "completed_translation": true, "bound_backend": "gpu", "effective_backend": "vulkan", "owned_processes": 1},
+        {"label": "apply-cpu", "status": "degraded", "transaction": "settings_commit_success_runtime_degraded"},
+        {"label": "consumer-cpu", "status": "applied", "transaction": null},
+        {"label": "consumer-cpu", "completed_translation": true, "bound_backend": "cpu", "effective_backend": "cpu", "owned_processes": 1},
+        {"label": "apply-gpu", "status": "degraded", "transaction": "settings_commit_success_runtime_degraded"},
+        {"label": "consumer-gpu", "status": "applied", "transaction": null},
+        {"label": "consumer-gpu", "completed_translation": true, "bound_backend": "gpu", "effective_backend": "vulkan", "owned_processes": 1},
+        {"label": "recover-False", "status": "applied", "transaction": null},
+        {"label": "recover-True", "status": "applied", "transaction": null},
+        {"label": "recovered-gpu-consumer", "status": "applied", "transaction": null},
+        {"label": "recovered-gpu-consumer", "completed_translation": true, "bound_backend": "gpu", "effective_backend": "vulkan", "owned_processes": 1}
+      ],
+      "launch_devices": ["Vulkan0", "none", "Vulkan0"],
+      "all_controlled_processes_released": true,
+      "remaining_managed_work": 0
+    },
+    "original_stdout_trailing_line": "OWNED_TEMP_STATE_REMOVED",
+    "asserted_by_the_original_executed_program": [
+      "The imported application runtime module resolved under the intended current checkout's src directory.",
+      "The explicitly bound instance's current capabilities exposed settings.apply, translation.set and text.submit.",
+      "Every observed operation receipt was terminal.",
+      "Both backend settings receipts remained degraded with transaction status settings_commit_success_runtime_degraded and diagnostic code stt.provider_not_ready.",
+      "settings.current retained the explicitly requested CPU and then GPU connection values.",
+      "Four translation events were received and associated with their admitted turn_id or child_turn_ids. Text admission alone was not treated as completion.",
+      "At each completion the installed provider's immutable backend and the core runtime's effective backend matched the expected controlled profile.",
+      "Exactly three controlled launch command arrays selected Vulkan0, none and Vulkan0. Supported off/on recovery did not create an extra launch.",
+      "All controlled process objects reported exit0 after shutdown; runtime readiness was cleared and both managed server-work and operation registries were empty."
+    ],
+    "assertion_provenance_limit": "The assertions above are taken from the retained original inline program, which exited0. Full diagnostic receipts and event objects were asserted in memory but not printed into stdout and are not claimed as separately retained files.",
+    "isolation": {
+      "temporary_roots": ["HOME", "USERPROFILE", "LOCALAPPDATA", "APPDATA", "HF_HOME", "TORCH_HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "TEMP", "TMP"],
+      "secrets": "Isolated encrypted-file path and synthetic passphrase; no provider credentials supplied.",
+      "providers": "Managed native execution/provisioning/version/transport were replaced with deterministic boundaries. Soniox remained inactive without credentials; its independent degradation was preserved.",
+      "network": "Real child-process launches and non-loopback socket.connect destinations were prohibited. OSC was configured off and pointed at an owned loopback UDP sink.",
+      "telemetry_and_context": "Telemetry and integrated context were disabled; capture was not enabled.",
+      "outputs": "Synthetic text only; owned loopback UDP and isolated headless logging. No GUI or model inference."
+    },
+    "cleanup": {
+      "application_stop_completed": true,
+      "runtime_close_completed": true,
+      "controlled_processes_exit0": true,
+      "managed_server_tasks_remaining": 0,
+      "managed_operation_tasks_remaining": 0,
+      "owned_udp_socket_closed": true,
+      "owned_log_sinks_closed": true,
+      "temporary_tree_removed": true,
+      "raw_log_retention": "None: the original temporary tree was removed. The retained eval stdout above is the durable observation copied into this record."
+    }
+  },
+  "formatting": {
+    "scope": "Only the five changed Python files",
+    "observed_check": "Black --check identified the two changed provider-behavior test files as needing formatting and left three files unchanged.",
+    "observed_action": "Black successfully formatted tests/app/test_provider_runtime_owner.py and tests/app/test_managed_gemma_provider_runtime_integration.py.",
+    "not_claimed": ["A subsequent all-file Black check", "Ruff pass", "Type-check pass", "Whole-repository formatting"]
+  },
+  "limits_and_remaining_obligations": [
+    "Controlled process/backend observations are not observations of real Vulkan or CPU model execution.",
+    "This smoke does not establish native model quality, latency, memory, MTP execution, GUI behavior, installed-runtime launching or E4B loading-mode performance.",
+    "The original native safety failures remain before-proof and are not reclassified as successful runs by these deterministic and controlled-composition results.",
+    "Native after-proof belongs to managed-execution after Director authorization and candidate integration.",
+    "Director owns the integrated verification barrier, architecture component-commit semantics and final candidate pin."
+  ]
+}

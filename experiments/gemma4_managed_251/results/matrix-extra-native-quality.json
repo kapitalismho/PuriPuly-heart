@@ -1,0 +1,247 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-extra-native-quality/v1",
+  "outputs": [
+    {
+      "case": "26b",
+      "phase": "cancel-peer",
+      "published": false,
+      "identity": {
+        "utterance_id": "53111122-fded-54ea-9b6d-a38fe778cf32",
+        "channel": "peer",
+        "source_language": "ko",
+        "target_language": "en",
+        "parent_utterance_id": "7c2cf873-5517-460b-9e5b-84bb625bb373"
+      },
+      "source": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "output": "I'll correct that. The meeting is on Tuesday at 14:30, not Thursday at 13:40."
+    },
+    {
+      "case": "26b",
+      "phase": "cancel-self",
+      "published": false,
+      "identity": {
+        "utterance_id": "2be20650-f43e-4354-83f2-f5badde333dc",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "2be20650-f43e-4354-83f2-f5badde333dc"
+      },
+      "source": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "output": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요."
+    },
+    {
+      "case": "26b",
+      "phase": "response-failure",
+      "published": false,
+      "identity": {
+        "utterance_id": "da882e83-4cb0-4c2a-9da8-fd775fb15641",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "da882e83-4cb0-4c2a-9da8-fd775fb15641"
+      },
+      "source": "Thank you.",
+      "output": "감사합니다."
+    },
+    {
+      "case": "26b",
+      "phase": "manual-capacity",
+      "published": true,
+      "identity": {
+        "utterance_id": "04f24b32-5895-4f1d-b0c5-cd7829264799",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "04f24b32-5895-4f1d-b0c5-cd7829264799"
+      },
+      "source": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "output": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요."
+    },
+    {
+      "case": "26b",
+      "phase": "shutdown",
+      "published": true,
+      "identity": {
+        "utterance_id": "46ba5db7-f2f4-557e-9bb9-7aca9b516617",
+        "channel": "peer",
+        "source_language": "ko",
+        "target_language": "en",
+        "parent_utterance_id": "3fb2bee4-f379-4041-a908-b292a8a98138"
+      },
+      "source": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "output": "Mina has 7 blue tickets, not 9. Meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door."
+    },
+    {
+      "case": "26b",
+      "phase": "shutdown",
+      "published": false,
+      "identity": {
+        "utterance_id": "6b169d14-0ce2-492b-bbb2-67652840b164",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "6b169d14-0ce2-492b-bbb2-67652840b164"
+      },
+      "source": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door.",
+      "output": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 게이트 3에서 만나세요. 작은 로봇 이름은 노리예요. 배터리는 42퍼센트니까 끄지 마세요. 정정하자면, 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12호실로 가져다 놓고 초록 상자는 문 옆에 두세요."
+    },
+    {
+      "case": "26b",
+      "phase": "shutdown",
+      "published": false,
+      "identity": {
+        "utterance_id": "5010114f-e7b1-4d85-ba8a-3085c4afac6b",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "5010114f-e7b1-4d85-ba8a-3085c4afac6b"
+      },
+      "source": "The synthetic shutdown queue has one manual turn.",
+      "output": "합성된 종료 대기열에 수동으로 한 번의 차례가 있어요."
+    },
+    {
+      "case": "e4b-safety-failed1",
+      "phase": "cancel-peer",
+      "published": false,
+      "identity": {
+        "utterance_id": "ea5d51a6-63a5-5168-9c74-204a94471639",
+        "channel": "peer",
+        "source_language": "ko",
+        "target_language": "en",
+        "parent_utterance_id": "29971835-2e18-434d-ad2a-37a27d773dbd"
+      },
+      "source": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "output": "I'll correct it. The meeting is on Tuesday at 14:30, not Thursday at 13:40."
+    },
+    {
+      "case": "e4b-safety-failed1",
+      "phase": "cancel-self",
+      "published": false,
+      "identity": {
+        "utterance_id": "a97675da-0718-4a28-8c66-89e0f7f0454e",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "a97675da-0718-4a28-8c66-89e0f7f0454e"
+      },
+      "source": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "output": "정정합니다. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분입니다."
+    },
+    {
+      "case": "e4b-safety-failed1",
+      "phase": "response-failure",
+      "published": false,
+      "identity": {
+        "utterance_id": "2c33f934-83c6-496d-95fa-ba7e63410e9d",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "2c33f934-83c6-496d-95fa-ba7e63410e9d"
+      },
+      "source": "Thank you.",
+      "output": "감사합니다."
+    },
+    {
+      "case": "e4b-safety-failed1",
+      "phase": "manual-capacity",
+      "published": true,
+      "identity": {
+        "utterance_id": "00769a19-e32e-431f-be0d-65ce407603b3",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "00769a19-e32e-431f-be0d-65ce407603b3"
+      },
+      "source": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "output": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요."
+    },
+    {
+      "case": "e4b-safety-failed1",
+      "phase": "active-backend-transition",
+      "published": false,
+      "identity": {
+        "utterance_id": "e27d0127-a2e3-4ae1-8fb2-957e6b10f42b",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "e27d0127-a2e3-4ae1-8fb2-957e6b10f42b"
+      },
+      "source": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "output": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요."
+    },
+    {
+      "case": "e4b-safety-failed2",
+      "phase": "cancel-peer",
+      "published": false,
+      "identity": {
+        "utterance_id": "7c77c91a-dbf0-5ce7-ba08-9ace7dd8dee0",
+        "channel": "peer",
+        "source_language": "ko",
+        "target_language": "en",
+        "parent_utterance_id": "1fb60c73-6882-4cea-916a-811ab96e6547"
+      },
+      "source": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "output": "Let me correct that. The meeting is on Tuesday at 2:30 PM, not Thursday at 1:40 PM."
+    },
+    {
+      "case": "e4b-safety-failed2",
+      "phase": "cancel-self",
+      "published": false,
+      "identity": {
+        "utterance_id": "57a63dad-9143-4275-b110-f1a3dcb0a6ae",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "57a63dad-9143-4275-b110-f1a3dcb0a6ae"
+      },
+      "source": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "output": "정정: 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요."
+    },
+    {
+      "case": "e4b-safety-failed2",
+      "phase": "response-failure",
+      "published": false,
+      "identity": {
+        "utterance_id": "ec0fd31a-9636-4bf0-a9b7-ef888c7f4528",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "ec0fd31a-9636-4bf0-a9b7-ef888c7f4528"
+      },
+      "source": "Thank you.",
+      "output": "감사합니다."
+    },
+    {
+      "case": "e4b-safety-failed2",
+      "phase": "manual-capacity",
+      "published": true,
+      "identity": {
+        "utterance_id": "18f45fa8-afe7-4d22-bb0d-fc3d59fc2127",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "18f45fa8-afe7-4d22-bb0d-fc3d59fc2127"
+      },
+      "source": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "output": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요."
+    },
+    {
+      "case": "e4b-safety-failed2",
+      "phase": "active-backend-transition",
+      "published": false,
+      "identity": {
+        "utterance_id": "dbc03979-e22f-46ca-9573-b254a75148e3",
+        "channel": "self",
+        "source_language": "en",
+        "target_language": "ko",
+        "parent_utterance_id": "dbc03979-e22f-46ca-9573-b254a75148e3"
+      },
+      "source": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "output": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요."
+    }
+  ],
+  "limits": [
+    "Includes actual native completions rejected/cancelled before application publication, plus manually admitted published outputs absent from recognition request_complete rows.",
+    "These are not additional successful recognition translations or loading-mode comparison samples."
+  ]
+}

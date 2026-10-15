@@ -1,0 +1,2290 @@
+{
+  "schema": "puripuly-heart/issue-251-distribution-evidence/v1",
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/251",
+  "activity": "Durable sanitized publication preparation from already-exercised evidence; no new model, build, test, or application execution while performance worker owns hardware.",
+  "candidate": {
+    "baseline": "766e25a39ac6cec6800bf15e994409cf76a0ffe5",
+    "final_frozen_commit": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+    "preliminary_failed_commit": "d0a0e891662dbb9735ac9fc4aff844d074ba51a6",
+    "scope": "Pinned Windows native distribution and isolated installed 26B Vulkan single-channel manual translation/persistence/resource release. Not issue-wide acceptance."
+  },
+  "owned_root_labels": {
+    "<CHECKOUT>": "Integrated source checkout at final frozen commit.",
+    "<BUILD_ROOT>": "Fresh owned final native-integration root, child issue251-91b2b3ef64; original absolute location remains private.",
+    "<PRELIMINARY_ROOT>": "Owned preliminary failed native build root, child issue251-1852634ff2.",
+    "<INSTALLED_STATE>": "Fresh normal user-Temp synthetic sandbox, third installed observation attempt; not live app data.",
+    "<EVENT_ATTEMPT_STATE>": "First normal user-Temp observation sandbox; inference succeeded but CLI event subscription timed out.",
+    "<FLUSH_ATTEMPT_STATE>": "Second normal user-Temp observation sandbox; OSC arrived before producer logfile flush.",
+    "<VERIFIED_DISTRIBUTION_INPUTS>": "Prior independently verified archive/input cache root.",
+    "<VERIFIED_MODEL_ASSETS>": "Read-only independently verified model assets; hardlinks only into owned synthetic state.",
+    "<ORIGINAL_BUILD_ENV>": "Existing Python 3.14.7/Flet build environment (read-only reused).",
+    "<SOXR_BUILD_ENV>": "Existing system-linked Soxr build environment.",
+    "<INNO_7_1_ROOT>": "Existing verified Inno Setup 7.1.0 compiler.",
+    "<CHECK_TOOLS_ENV>": "Existing development/check-tools Python environment.",
+    "<USER_HOME>": "Redacted original user home/cache parent; no live application settings used.",
+    "<CHECK_TOOLS_PYTHON_BASE>": "Base interpreter behind existing development/check-tools environment; only surfaced in the observer queue-timeout traceback."
+  },
+  "environment_and_boundaries": {
+    "build_python": "3.14.7",
+    "flet": "1.0.0",
+    "flet_cli": "1.0.0",
+    "inno_setup": "7.1.0",
+    "websockets_tool_dependency": "16.1.1",
+    "windows": "Windows x64",
+    "gpu": "Existing Vulkan0 device; no physical 8GB-card guarantee.",
+    "tool_recovery": "Fresh owned <PRELIMINARY_ROOT>/tool-env references original Flet build dependencies and preliminary hash-verified locked runtime site-packages read-only; no shared dependency environment mutation.",
+    "input_reuse": "Nine verified pinned upstream inputs, both verified llama archives, copied extracted pinned Flutter SDK and existing Cargo/Rustup/Pub/uv caches.",
+    "app_state": "HOME/USERPROFILE/APPDATA/LOCALAPPDATA/TEMP/TMP/HF and XDG state redirected into fresh normal user-Temp sandbox for final proof.",
+    "secrets": "Encrypted-file store, ephemeral new passphrase, no account credentials; all queried secret-presence values false. Passphrase neither persisted in evidence nor published.",
+    "disabled": "Telemetry, physical Self/Peer capture, microphone test, overlays and clipboard automatic translation inactive.",
+    "osc": "Explicit owned loopback UDP sink; both osc.port and osc.send_port set to sink60113; discovery/connection mode off still permits controlled chatbox send.",
+    "runtime_override": null,
+    "model_boundary": "Only explicitly selected 26B verified model reused; model weights were not bundled/downloaded by installer. No drafter or projector.",
+    "installer_boundary": "Normal genuine candidate packaging; alternate MyAppId/MyAppDataDirName/MyAppGroupName/InstallerSmokeAppDataRoot. SkipLocalSttProvisioning excludes unrelated ASR provisioning only. Production-identity installer compiled, never executed.",
+    "no_owner_replacement": "Final proof uses genuine installed puripuly.exe and product owners. Initial synthetic settings/model hardlinks seeded through installed Python modules; no runtime/process-factory monkeypatch.",
+    "policy": "No Git/index/remote mutation or publication; no shared directory ACL changes."
+  },
+  "runtime_and_model_identity": {
+    "release": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11537",
+    "build": "b11537",
+    "commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "official_archives": {
+      "cpu": {
+        "filename": "llama-b11537-bin-win-cpu-x64.zip",
+        "bytes": 19513247,
+        "sha256": "a05c2d35ebe9787489277d6e039b391fd006384a6c49d069395f3a7b47186fd2"
+      },
+      "vulkan": {
+        "filename": "llama-b11537-bin-win-vulkan-x64.zip",
+        "bytes": 33458882,
+        "sha256": "ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe"
+      }
+    },
+    "launcher_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+    "observed_image_version": {
+      "kind": "observed_child_image_version",
+      "unix_s": 1792083895.3847547,
+      "path": "<BUILD_ROOT>/installed/_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "version: 0.6.0-dev (build 11537, commit 8e2d31e0e)\nbuilt with Clang 20.1.8 for Windows x86_64\n"
+    },
+    "model_manifest": {
+      "manifest_version": 1,
+      "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+      "repo_id": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "upstream_repo_id": "google/gemma-4-26B-A4B-it",
+      "license": "Apache-2.0",
+      "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "files": [
+        "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
+      ]
+    },
+    "model_files": [
+      "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "installed-manifest.json"
+    ],
+    "installed_product_import": "<BUILD_ROOT>/installed/app/python.zip/puripuly_heart/__init__.pyc",
+    "model_integrity": "Installed product validate_gemma_install(..., verify_checksums=True, spec=gemma_26b_spec()) succeeded before host startup; exact original model files reused without modifications.",
+    "openmp": {
+      "license": "Apache-2.0 WITH LLVM-exception; bundled legacy sections retained",
+      "license_bytes": 19741,
+      "license_sha256": "fdad1758a9e1f9d5a81e18879b3406772115edc92c24bfa36b70c654f325e8e4",
+      "dll_bytes": 768000,
+      "dll_sha256": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c"
+    },
+    "exact_model_artifact": {
+      "repository": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "bytes": 14249047104,
+      "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+      "verification": "Actual installed validate_gemma_install(...verify_checksums=True...) seed exit0; no model substitution."
+    }
+  },
+  "full_build": {
+    "candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+    "source": "<CHECKOUT>",
+    "command": [
+      "pwsh",
+      "-NoProfile",
+      "-File",
+      "<CHECKOUT>/scripts/ci/build-native-release-artifacts.ps1",
+      "-ToolPython",
+      "<PRELIMINARY_ROOT>/tool-env/Scripts/python.exe",
+      "-PinnedInputRoot",
+      "<VERIFIED_DISTRIBUTION_INPUTS>/native-pinned-inputs",
+      "-PythonEmbedArchive",
+      "<VERIFIED_DISTRIBUTION_INPUTS>/native-pinned-inputs/python-3.14.7-embed-amd64.zip",
+      "-InnoSetupVersion",
+      "7.1.0",
+      "-InnoSetupCompiler",
+      "<INNO_7_1_ROOT>/ISCC.exe",
+      "-SoxrBuildEnvironment",
+      "<SOXR_BUILD_ENV>",
+      "-BuildRoot",
+      "<BUILD_ROOT>/build",
+      "-OutputDir",
+      "<BUILD_ROOT>/dist",
+      "-InstallerOutputDir",
+      "<BUILD_ROOT>/installer"
+    ],
+    "start_utc": "2026-10-15T16:42:21.156807+00:00",
+    "start_unix_s": 1792082541.1568186,
+    "cache_boundary": "Retained verified pinned inputs and llama archives; copied already-extracted pinned Flutter SDK; shared existing Cargo/Rustup/Pub/uv dependency caches. Own Python3.14.7 tool environment adds hash-verified runtime dependencies read-only to prior Flet1.0 build dependencies. App state, home, temp isolated. No production installer execution.",
+    "exit_code": 0,
+    "end_unix_s": 1792083126.7705662,
+    "end_utc": "2026-10-15T16:52:06.770571+00:00",
+    "product_provenance": {
+      "matched": true,
+      "product_source_files": 552,
+      "packaged_product_source_files": 552,
+      "source_unchanged_during_build": true
+    },
+    "elapsed_seconds": 585.6137475967407,
+    "pipeline": "scripts/ci/build-native-release-artifacts.ps1 -> scripts/ci/build-native-experimental.ps1; no SkipNativeBuild.",
+    "command_invocation": [
+      "<CHECK_TOOLS_ENV>/Scripts/python.exe",
+      "<BUILD_ROOT>/run_native_build.py",
+      "<CHECKOUT>",
+      "8786d1fcd8fcb966f0ae164acee289e535a7c862"
+    ],
+    "completed_stages": [
+      "verify-inputs",
+      "render-template",
+      "Flet/Flutter Windows native host build",
+      "locked hashed dependency staging",
+      "system-linked Soxr wheel/compliance sources",
+      "product source staging/metadata",
+      "overlay/GPU worker/console native compilation",
+      "managed Gemma runtime prepare/stage",
+      "VC runtime staging",
+      "compile-runtime",
+      "bundle-runtime",
+      "validate-target",
+      "validate-compliance",
+      "managed verify-package --launch",
+      "artifact manifest/cleanup include",
+      "release smoke commands and package validation",
+      "normal installer compilation/product metadata verification"
+    ],
+    "source_lineage": "All 552 product Python source SHA-256 entries in packaged bytecode provenance matched initial frozen source snapshot. Snapshot remained unchanged through full build. Native artifact manifest inventories final packaged files.",
+    "artifact_inventory_subset": [
+      {
+        "bytes": 9216,
+        "path": "_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+        "sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+      },
+      {
+        "bytes": 43637886,
+        "path": "app/python.zip",
+        "sha256": "a30d33762d938f8e42d29e2884ffa30359c8c1c22228290098f2bc411c461be3"
+      },
+      {
+        "bytes": 154624,
+        "path": "puripuly.exe",
+        "sha256": "3249b80ef7c6810c4d1228929d6ee642028bf388ee19b4a6adc1824f410a9a40"
+      },
+      {
+        "bytes": 196096,
+        "path": "PuriPulyHeart.exe",
+        "sha256": "53fbbb5804e1197b0b617556957476b0d71e86f887da35f031d7cefbfb4b3f99"
+      }
+    ],
+    "normal_installer": {
+      "filename": "installer/PuriPulyHeart-Setup-2.8.2.exe",
+      "sha256": "fbacfe464ae11999a074cde59cb540b72b24420c55299b21c70557368a2089b4",
+      "compiled": true,
+      "executed": false,
+      "hash_source": "build.stdout.txt terminal native installer SHA256 line"
+    }
+  },
+  "isolated_installer": {
+    "identity": "PuriPulyHeart-Issue251-91b2b3ef64",
+    "install": "<BUILD_ROOT>/installed",
+    "state": "<BUILD_ROOT>/smoke-sandbox/Temp/installer-appdata",
+    "boundary": "Genuine candidate; alternate installer identity; unrelated ASR provisioning skipped; Gemma runtime retained; no icons/production identity execution.",
+    "records": [
+      {
+        "label": "smoke-telemetry-seed",
+        "command": [
+          "<BUILD_ROOT>/dist/PuriPulyHeart.exe",
+          "--headless",
+          "--config",
+          "<BUILD_ROOT>/smoke-sandbox/Temp/installer-appdata/settings.json",
+          "installer-telemetry-preference",
+          "disable"
+        ],
+        "start_unix_s": 1792083131.5703306,
+        "end_unix_s": 1792083132.1020005,
+        "exit_code": 0
+      },
+      {
+        "label": "smoke-compile",
+        "command": [
+          "<INNO_7_1_ROOT>/ISCC.exe",
+          "/DNativeExperimental=1",
+          "/DMyPackagedAppDir=<BUILD_ROOT>/dist",
+          "/DMyStagedOverlayDir=<BUILD_ROOT>/dist",
+          "/DNativeCleanupInclude=<BUILD_ROOT>/native-installer-cleanup.iss",
+          "/DMyAppId=PuriPulyHeart-Issue251-91b2b3ef64",
+          "/DMyAppDirName=PuriPulyHeart-Issue251-91b2b3ef64",
+          "/DMyAppDataDirName=PuriPulyHeart-Issue251-91b2b3ef64",
+          "/DMyAppGroupName=PuriPulyHeart-Issue251-91b2b3ef64",
+          "/DInstallerSmokeAppDataRoot=<BUILD_ROOT>/smoke-sandbox/Temp/installer-appdata",
+          "/DSkipLocalSttProvisioning=1",
+          "/O<BUILD_ROOT>/installer-smoke",
+          "<CHECKOUT>/installer.iss"
+        ],
+        "start_unix_s": 1792083132.1030133,
+        "end_unix_s": 1792083198.5494149,
+        "exit_code": 0
+      },
+      {
+        "label": "smoke-install",
+        "command": [
+          "<BUILD_ROOT>/installer-smoke/PuriPulyHeart-Setup-2.8.2.exe",
+          "/VERYSILENT",
+          "/SUPPRESSMSGBOXES",
+          "/SP-",
+          "/NORESTART",
+          "/NOCLOSEAPPLICATIONS",
+          "/NORESTARTAPPLICATIONS",
+          "/DIR=<BUILD_ROOT>/installed",
+          "/TASKS=",
+          "/LOG=<BUILD_ROOT>/smoke-install.log"
+        ],
+        "start_unix_s": 1792083198.6865206,
+        "end_unix_s": 1792083221.0486474,
+        "exit_code": 0
+      }
+    ],
+    "sha256": "dce574062d171f2742516507877e7e6e954c203e8e85dc254cf90af497feb63d",
+    "filename": "installer-smoke/PuriPulyHeart-Setup-2.8.2.exe",
+    "install_exit_code": 0,
+    "retained": true,
+    "uninstalled": false,
+    "hash_source": "Successful install_smoke.py terminal output; retained task-local script computes SHA256 before invoking installer."
+  },
+  "installed_cycles": [
+    {
+      "cycle": 0,
+      "fresh_host": {
+        "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+        "host_pid": 60400,
+        "control_port": 63634,
+        "start_receipt": {
+          "output_version": 1,
+          "status": "ready",
+          "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+          "pid": 60400
+        },
+        "same_settings_file": "<INSTALLED_STATE>/Temp/installer-appdata/settings.json"
+      },
+      "persisted_settings_before_enable": {
+        "revision": 1,
+        "settings_version": 52,
+        "translation_model": "managed_gemma_26b",
+        "connection": "gpu",
+        "connection_history": {
+          "gemma4_26b_31b": "managed"
+        },
+        "selected_device": "auto",
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "telemetry_enabled": false,
+        "telemetry_state": {
+          "anonymous_id": null,
+          "last_sent_date_utc": null
+        },
+        "clipboard_auto_translate": false,
+        "osc": {
+          "connection_mode": "off",
+          "host": "127.0.0.1",
+          "port": 60113,
+          "send_port": 60113,
+          "receive_port": 9001,
+          "chatbox_address": "/chatbox/input",
+          "chatbox_send": true,
+          "chatbox_clear": false,
+          "chatbox_max_chars": 144,
+          "vrc_mic_intercept": false,
+          "chatbox_include_source": false,
+          "activation_notice_enabled": false
+        }
+      },
+      "supported_settings_apply": {
+        "exit_code": 4,
+        "receipt": {
+          "output_version": 1,
+          "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+          "operation_id": "db910a8fe78b46f8a78a637a4a2af17c",
+          "request_id": "40c548709f8e296e41e406d6df6dc653",
+          "status": "degraded",
+          "terminal": true,
+          "revision": 2,
+          "transaction": {
+            "status": "settings_commit_success_runtime_degraded",
+            "message": "settings.mutation.runtime_apply_failed",
+            "diagnostics": {
+              "schema_version": 1,
+              "diagnostic_id": "8e4f28b558614ca2b965314df4f7cd94",
+              "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+              "occurred_at": "2026-10-15T17:04:15.969+00:00",
+              "component": "provider.stt",
+              "operation": "provider_build",
+              "stage": "provider_build",
+              "severity": "error",
+              "disposition": "failed",
+              "code": "stt.provider_not_ready",
+              "category": "unknown",
+              "cause_id": null,
+              "operation_id": "db910a8fe78b46f8a78a637a4a2af17c",
+              "request_id": "40c548709f8e296e41e406d6df6dc653",
+              "channel": "self",
+              "turn_id": null,
+              "generation": 0,
+              "status_code": null,
+              "retry_after_ms": null,
+              "fields": {
+                "exception_class": "ValueError",
+                "provider": "soniox",
+                "transport": "unknown",
+                "tls_source": "unknown",
+                "proxy_source": "unknown",
+                "tls_backend": "unknown",
+                "recognition_cause": "provider_not_ready"
+              },
+              "file_evidence": "unknown",
+              "detail": {
+                "state": "available",
+                "rejected_fields": 0,
+                "truncated": false
+              },
+              "diagnostic_sequence": 2
+            },
+            "secondary_diagnostics": [],
+            "secondary_omitted_count": 0,
+            "secondary_truncated": false
+          }
+        },
+        "committed_model_after_apply": "managed_gemma_26b",
+        "committed_connection_after_apply": "gpu"
+      },
+      "capture_status": {
+        "self": {
+          "desired_active": false,
+          "effective_active": false,
+          "selected_provider": "soniox",
+          "runtime_provider": null,
+          "provider_status": "failed",
+          "failure_reason": "provider_failed"
+        },
+        "peer": {
+          "desired_active": false,
+          "effective_active": false,
+          "selected_provider": "soniox",
+          "runtime_provider": null,
+          "provider_status": "detached",
+          "failure_reason": null
+        }
+      },
+      "overlay_output": {
+        "settings_available": true,
+        "desired_enabled": false,
+        "configured_target": "steamvr",
+        "effective_target": null,
+        "attempting_target": null,
+        "lifecycle": "off",
+        "runtime_active": false,
+        "process_state": null,
+        "presentation_ready": false,
+        "desktop_visible": null,
+        "generation": null,
+        "failure_reason": null,
+        "auto_restart_scheduled": false,
+        "fallback_active": false,
+        "recovery_active": false,
+        "recovery_reason": null,
+        "ingress_stopped": false,
+        "calibration_draft_active": false
+      },
+      "all_secret_presence_false": true,
+      "translation_enable_receipt": {
+        "output_version": 1,
+        "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+        "operation_id": "371887ab4c594f0a8fa2761b98589985",
+        "request_id": "5968fc250371fc93b2d85ca452484987",
+        "status": "applied",
+        "terminal": true,
+        "revision": 2,
+        "translation_enabled": true
+      },
+      "owned_child": {
+        "observed_unix_s": 1792083874.133834,
+        "count": 1,
+        "runtime_override": null,
+        "process": {
+          "pid": 58784,
+          "exe": "<BUILD_ROOT>/installed/_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+          "ppid": 60400,
+          "create_time": 1792083856.6946752,
+          "name": "llama-server.exe",
+          "command": [
+            "<BUILD_ROOT>/installed/_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+            "--model",
+            "<INSTALLED_STATE>/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+            "--alias",
+            "puripuly-gemma-4-26b-a4b-q4",
+            "--load-mode",
+            "none",
+            "--ctx-size",
+            "4608",
+            "--parallel",
+            "3",
+            "--batch-size",
+            "512",
+            "--ubatch-size",
+            "512",
+            "--cache-type-k",
+            "f16",
+            "--cache-type-v",
+            "f16",
+            "--cache-prompt",
+            "--reasoning",
+            "off",
+            "--reasoning-budget",
+            "0",
+            "--warmup",
+            "--perf",
+            "--metrics",
+            "--no-webui",
+            "--threads-http",
+            "1",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63677",
+            "--prio",
+            "-1",
+            "--slot-save-path",
+            ".",
+            "--threads",
+            "4",
+            "--threads-batch",
+            "4",
+            "--device",
+            "Vulkan0",
+            "--n-gpu-layers",
+            "99",
+            "--flash-attn",
+            "on",
+            "--n-cpu-moe",
+            "24",
+            "--moe-cache-mib",
+            "2048",
+            "--swa-full",
+            "--cache-ram",
+            "0",
+            "--fit",
+            "off"
+          ],
+          "memory": {
+            "rss": 11095252992,
+            "vms": 18723532800,
+            "num_page_faults": 2919650,
+            "peak_wset": 11329994752,
+            "wset": 11095252992,
+            "peak_paged_pool": 639768,
+            "paged_pool": 564112,
+            "peak_nonpaged_pool": 628760,
+            "nonpaged_pool": 627968,
+            "pagefile": 18723532800,
+            "peak_pagefile": 18851831808,
+            "private": 18723532800
+          }
+        },
+        "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+        "props": {
+          "model_path": "<INSTALLED_STATE>/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+          "model_alias": "puripuly-gemma-4-26b-a4b-q4",
+          "total_slots": 3,
+          "context_per_slot": 1536,
+          "speculation": "none"
+        },
+        "profile_assertions": {
+          "--load-mode": "none",
+          "--ctx-size": "4608",
+          "--parallel": "3",
+          "--n-gpu-layers": "99",
+          "--n-cpu-moe": "24",
+          "--moe-cache-mib": "2048",
+          "--cache-ram": "0",
+          "--threads": "4",
+          "--threads-batch": "4",
+          "--batch-size": "512",
+          "--ubatch-size": "512",
+          "--cache-type-k": "f16",
+          "--cache-type-v": "f16",
+          "--flash-attn": "on",
+          "--fit": "off",
+          "--reasoning": "off",
+          "--reasoning-budget": "0",
+          "--prio": "-1",
+          "--threads-http": "1",
+          "--host": "127.0.0.1"
+        },
+        "memory_boundary": "Point-in-time psutil process counters before manual request. rss/wset are physical working set; private/pagefile/vms are commitment counters, not physical RAM. No GPU-memory or comparative performance claim."
+      },
+      "completed_translation": {
+        "synthetic_source": "The lantern is beside the quiet garden.",
+        "synthetic_translation": "등불이 조용한 정원 옆에 있어요.",
+        "admission_receipt": {
+          "output_version": 1,
+          "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+          "operation_id": "fe24c4675a24444dbbcea4686002a62d",
+          "request_id": "1207c651e1e165a39ab2cb89917907d0",
+          "status": "applied",
+          "terminal": true,
+          "revision": 2,
+          "admission": "admitted",
+          "turn_id": "185aa501-94c3-4e0e-bf50-f80a8d183129",
+          "child_turn_ids": [
+            "185aa501-94c3-4e0e-bf50-f80a8d183129"
+          ],
+          "output_delivery": "unobserved"
+        },
+        "owned_udp_receipt": {
+          "address": "/chatbox/input",
+          "params": [
+            "등불이 조용한 정원 옆에 있어요.",
+            true,
+            false
+          ],
+          "sender": [
+            "127.0.0.1",
+            55008
+          ],
+          "unix_s": 1792083875.6461706
+        },
+        "producer_terminal_lines": [
+          "2026-10-16 02:04:35.643 [INFO] pid=60400 puripuly_heart.runtime.session: [Diagnostic][LlmLatency] request_end request_id=1 utterance_id=185aa501-94c3-4e0e-bf50-f80a8d183129 parent_utterance_id=185aa501-94c3-4e0e-bf50-f80a8d183129 channel=self kind=manual source_language=en target_language=ko provider_generation=0 input_chars=39 prompt_chars=3448 context_chars=0 status=success request_ms=1258 queue_ms=0 attempts=1 winner_attempt=0"
+        ],
+        "producer_attempt_line": "2026-10-16 02:04:35.643 [INFO] pid=60400 puripuly_heart.runtime.session: [Diagnostic][LlmLatency] attempt_end request_id=1 attempt=0 provider=managed_gemma model=puripuly-gemma-4-26b-a4b-q4 actual_model=puripuly-gemma-4-26b-a4b-q4 transport=http_json status=success attempt_ms=1258 network_ms=1255 ttft_ms=none first_text_to_done_ms=none input_tokens=25 output_tokens=12 cached_input_tokens=820 reasoning_tokens=none server_prompt_ms=1006.715 server_generation_ms=244.478 server_generation_tps=44.994",
+        "producer_metrics": {
+          "pid": "60400",
+          "request_id": "1",
+          "attempt": "0",
+          "provider": "managed_gemma",
+          "model": "puripuly-gemma-4-26b-a4b-q4",
+          "actual_model": "puripuly-gemma-4-26b-a4b-q4",
+          "transport": "http_json",
+          "status": "success",
+          "attempt_ms": "1258",
+          "network_ms": "1255",
+          "ttft_ms": "none",
+          "first_text_to_done_ms": "none",
+          "input_tokens": "25",
+          "output_tokens": "12",
+          "cached_input_tokens": "820",
+          "reasoning_tokens": "none",
+          "server_prompt_ms": "1006.715",
+          "server_generation_ms": "244.478",
+          "server_generation_tps": "44.994"
+        },
+        "observed_unix_s": 1792083876.689305,
+        "timing_boundary": "Existing producer LlmLatency counters only; not an experimental benchmark. OSC timestamps are actual sink receive times; recording time is separate.",
+        "authority": "Admission receipt alone reports output_delivery unobserved; terminal producer record plus actual owned OSC receipt establish this completed synthetic output, not CLI stream delivery or VRChat receipt."
+      },
+      "effective_after_translation": {
+        "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+        "revision": 2,
+        "host_pid": 60400,
+        "translation_enabled": true,
+        "translation_runtime_ready": true
+      },
+      "shutdown": {
+        "command": {
+          "label": "stop-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "stop"
+          ],
+          "started": 1792083877.1524544,
+          "completed": 1792083878.6053247,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        "receipt": {
+          "output_version": 1,
+          "status": "stopped",
+          "terminal": true,
+          "instance_id": "417dc04b-067c-475a-9942-a76980bbef07",
+          "operation_id": "c42f3142df2749548ec93a2153f2c2c4",
+          "cleanup_outcome": "unobserved"
+        },
+        "child_observation": {
+          "kind": "child_release",
+          "unix_s": 1792083878.640019,
+          "cycle": 0,
+          "released": true,
+          "remaining": []
+        },
+        "listener_port": 63677,
+        "post_shutdown_listener_present": false,
+        "listener_evidence": "release_observations.final_listener_snapshot",
+        "event_follower_exit": {
+          "kind": "event_follower_exit",
+          "unix_s": 1792083878.6067696,
+          "cycle": 0,
+          "exit_code": 3
+        },
+        "boundary": "app stop receipt cleanup_outcome remains unobserved; independent child PID/create-time observation and later listener snapshot provide resource-release evidence."
+      },
+      "commands": [
+        {
+          "label": "start-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "start",
+            "--background"
+          ],
+          "started": 1792083851.5153818,
+          "completed": 1792083853.1021187,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-capabilities",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "capabilities"
+          ],
+          "started": 1792083853.102489,
+          "completed": 1792083853.4931655,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-settings-choices",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "choices"
+          ],
+          "started": 1792083853.4937136,
+          "completed": 1792083854.011251,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-settings-current",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "current"
+          ],
+          "started": 1792083854.012113,
+          "completed": 1792083854.2488692,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-app-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "status"
+          ],
+          "started": 1792083854.2497792,
+          "completed": 1792083854.4762762,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-capture-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "capture",
+            "status"
+          ],
+          "started": 1792083854.4772637,
+          "completed": 1792083854.7093039,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-overlay-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "overlay",
+            "status"
+          ],
+          "started": 1792083854.7102656,
+          "completed": 1792083854.9347506,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-osc-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "osc",
+            "status"
+          ],
+          "started": 1792083854.9357507,
+          "completed": 1792083855.163621,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-models-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "models",
+            "status"
+          ],
+          "started": 1792083855.164547,
+          "completed": 1792083855.3878136,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "0-secrets-presence",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "secrets",
+            "presence"
+          ],
+          "started": 1792083855.3888257,
+          "completed": 1792083855.6491807,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "persist-selection-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "apply",
+            "--arguments",
+            "{\"changes\": {\"translation.model\": \"managed_gemma_26b\", \"translation.connection\": \"gpu\"}}"
+          ],
+          "started": 1792083855.6501539,
+          "completed": 1792083855.9884174,
+          "exit_code": 4,
+          "stderr": ""
+        },
+        {
+          "label": "effective-settings-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "current"
+          ],
+          "started": 1792083855.9903238,
+          "completed": 1792083856.2115371,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "capture-after-apply-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "status"
+          ],
+          "started": 1792083856.2126207,
+          "completed": 1792083856.4349709,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "translation-on-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "translation",
+            "set",
+            "on"
+          ],
+          "started": 1792083856.436126,
+          "completed": 1792083870.9611137,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "manual-submit-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "text",
+            "submit",
+            "--stdin"
+          ],
+          "started": 1792083874.1573942,
+          "completed": 1792083875.6641002,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "diagnostics-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "query",
+            "diagnostics.history"
+          ],
+          "started": 1792083876.6912353,
+          "completed": 1792083876.9201605,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "post-translation-status-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "status"
+          ],
+          "started": 1792083876.921609,
+          "completed": 1792083877.1510253,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "stop-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "stop"
+          ],
+          "started": 1792083877.1524544,
+          "completed": 1792083878.6053247,
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ],
+      "local_evidence": "installed-cycle-0.log"
+    },
+    {
+      "cycle": 1,
+      "fresh_host": {
+        "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+        "host_pid": 21812,
+        "control_port": 63730,
+        "start_receipt": {
+          "output_version": 1,
+          "status": "ready",
+          "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+          "pid": 21812
+        },
+        "same_settings_file": "<INSTALLED_STATE>/Temp/installer-appdata/settings.json"
+      },
+      "persisted_settings_before_enable": {
+        "revision": 1,
+        "settings_version": 52,
+        "translation_model": "managed_gemma_26b",
+        "connection": "gpu",
+        "connection_history": {
+          "gemma4_26b_31b": "managed",
+          "managed_gemma_26b": "gpu"
+        },
+        "selected_device": "auto",
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "telemetry_enabled": false,
+        "telemetry_state": {
+          "anonymous_id": null,
+          "last_sent_date_utc": null
+        },
+        "clipboard_auto_translate": false,
+        "osc": {
+          "connection_mode": "off",
+          "host": "127.0.0.1",
+          "port": 60113,
+          "send_port": 60113,
+          "receive_port": 9001,
+          "chatbox_address": "/chatbox/input",
+          "chatbox_send": true,
+          "chatbox_clear": false,
+          "chatbox_max_chars": 144,
+          "vrc_mic_intercept": false,
+          "chatbox_include_source": false,
+          "activation_notice_enabled": false
+        }
+      },
+      "supported_settings_apply": {
+        "exit_code": 4,
+        "receipt": {
+          "output_version": 1,
+          "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+          "operation_id": "8381e50df18a4364ac7ee5be0c73107a",
+          "request_id": "a9565a6f32ec96a451509484754e785f",
+          "status": "degraded",
+          "terminal": true,
+          "revision": 1,
+          "transaction": {
+            "status": "settings_commit_success_runtime_degraded",
+            "message": "settings.mutation.runtime_apply_failed",
+            "diagnostics": {
+              "schema_version": 1,
+              "diagnostic_id": "591041d2f2d94aea984141258a93a18e",
+              "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+              "occurred_at": "2026-10-15T17:04:43.009+00:00",
+              "component": "provider.stt",
+              "operation": "provider_build",
+              "stage": "provider_build",
+              "severity": "error",
+              "disposition": "failed",
+              "code": "stt.provider_not_ready",
+              "category": "unknown",
+              "cause_id": null,
+              "operation_id": "8381e50df18a4364ac7ee5be0c73107a",
+              "request_id": "a9565a6f32ec96a451509484754e785f",
+              "channel": "self",
+              "turn_id": null,
+              "generation": 0,
+              "status_code": null,
+              "retry_after_ms": null,
+              "fields": {
+                "exception_class": "ValueError",
+                "provider": "soniox",
+                "transport": "unknown",
+                "tls_source": "unknown",
+                "proxy_source": "unknown",
+                "tls_backend": "unknown",
+                "recognition_cause": "provider_not_ready"
+              },
+              "file_evidence": "unknown",
+              "detail": {
+                "state": "available",
+                "rejected_fields": 0,
+                "truncated": false
+              },
+              "diagnostic_sequence": 2
+            },
+            "secondary_diagnostics": [],
+            "secondary_omitted_count": 0,
+            "secondary_truncated": false
+          }
+        },
+        "committed_model_after_apply": "managed_gemma_26b",
+        "committed_connection_after_apply": "gpu"
+      },
+      "capture_status": {
+        "self": {
+          "desired_active": false,
+          "effective_active": false,
+          "selected_provider": "soniox",
+          "runtime_provider": null,
+          "provider_status": "failed",
+          "failure_reason": "provider_failed"
+        },
+        "peer": {
+          "desired_active": false,
+          "effective_active": false,
+          "selected_provider": "soniox",
+          "runtime_provider": null,
+          "provider_status": "detached",
+          "failure_reason": null
+        }
+      },
+      "overlay_output": {
+        "settings_available": true,
+        "desired_enabled": false,
+        "configured_target": "steamvr",
+        "effective_target": null,
+        "attempting_target": null,
+        "lifecycle": "off",
+        "runtime_active": false,
+        "process_state": null,
+        "presentation_ready": false,
+        "desktop_visible": null,
+        "generation": null,
+        "failure_reason": null,
+        "auto_restart_scheduled": false,
+        "fallback_active": false,
+        "recovery_active": false,
+        "recovery_reason": null,
+        "ingress_stopped": false,
+        "calibration_draft_active": false
+      },
+      "all_secret_presence_false": true,
+      "translation_enable_receipt": {
+        "output_version": 1,
+        "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+        "operation_id": "980c8f2ef3214e3ea5f5ab0014723195",
+        "request_id": "f90ab148dc5164b8d577f6846dbd77b4",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "translation_enabled": true
+      },
+      "owned_child": {
+        "observed_unix_s": 1792083891.629094,
+        "count": 1,
+        "runtime_override": null,
+        "process": {
+          "pid": 53260,
+          "exe": "<BUILD_ROOT>/installed/_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+          "ppid": 21812,
+          "create_time": 1792083883.7366889,
+          "name": "llama-server.exe",
+          "command": [
+            "<BUILD_ROOT>/installed/_runtime/llama.cpp-b11537/vulkan/llama-server.exe",
+            "--model",
+            "<INSTALLED_STATE>/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+            "--alias",
+            "puripuly-gemma-4-26b-a4b-q4",
+            "--load-mode",
+            "none",
+            "--ctx-size",
+            "4608",
+            "--parallel",
+            "3",
+            "--batch-size",
+            "512",
+            "--ubatch-size",
+            "512",
+            "--cache-type-k",
+            "f16",
+            "--cache-type-v",
+            "f16",
+            "--cache-prompt",
+            "--reasoning",
+            "off",
+            "--reasoning-budget",
+            "0",
+            "--warmup",
+            "--perf",
+            "--metrics",
+            "--no-webui",
+            "--threads-http",
+            "1",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63775",
+            "--prio",
+            "-1",
+            "--slot-save-path",
+            ".",
+            "--threads",
+            "4",
+            "--threads-batch",
+            "4",
+            "--device",
+            "Vulkan0",
+            "--n-gpu-layers",
+            "99",
+            "--flash-attn",
+            "on",
+            "--n-cpu-moe",
+            "24",
+            "--moe-cache-mib",
+            "2048",
+            "--swa-full",
+            "--cache-ram",
+            "0",
+            "--fit",
+            "off"
+          ],
+          "memory": {
+            "rss": 11204640768,
+            "vms": 18843623424,
+            "num_page_faults": 2826094,
+            "peak_wset": 11295862784,
+            "wset": 11204640768,
+            "peak_paged_pool": 641808,
+            "paged_pool": 562992,
+            "peak_nonpaged_pool": 627960,
+            "nonpaged_pool": 627720,
+            "pagefile": 18843623424,
+            "peak_pagefile": 18847035392,
+            "private": 18843623424
+          }
+        },
+        "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+        "props": {
+          "model_path": "<INSTALLED_STATE>/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+          "model_alias": "puripuly-gemma-4-26b-a4b-q4",
+          "total_slots": 3,
+          "context_per_slot": 1536,
+          "speculation": "none"
+        },
+        "profile_assertions": {
+          "--load-mode": "none",
+          "--ctx-size": "4608",
+          "--parallel": "3",
+          "--n-gpu-layers": "99",
+          "--n-cpu-moe": "24",
+          "--moe-cache-mib": "2048",
+          "--cache-ram": "0",
+          "--threads": "4",
+          "--threads-batch": "4",
+          "--batch-size": "512",
+          "--ubatch-size": "512",
+          "--cache-type-k": "f16",
+          "--cache-type-v": "f16",
+          "--flash-attn": "on",
+          "--fit": "off",
+          "--reasoning": "off",
+          "--reasoning-budget": "0",
+          "--prio": "-1",
+          "--threads-http": "1",
+          "--host": "127.0.0.1"
+        },
+        "memory_boundary": "Point-in-time psutil process counters before manual request. rss/wset are physical working set; private/pagefile/vms are commitment counters, not physical RAM. No GPU-memory or comparative performance claim."
+      },
+      "completed_translation": {
+        "synthetic_source": "Please bring the blue notebook tomorrow.",
+        "synthetic_translation": "내일 파란색 공책 좀 가져다주세요.",
+        "admission_receipt": {
+          "output_version": 1,
+          "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+          "operation_id": "468c5fd0f58f421eaaf0f41a63df0175",
+          "request_id": "fac5ec0b3ee00289caa09cfa3023fa98",
+          "status": "applied",
+          "terminal": true,
+          "revision": 1,
+          "admission": "admitted",
+          "turn_id": "f68e9fce-7931-4387-b38a-69fa2915352c",
+          "child_turn_ids": [
+            "f68e9fce-7931-4387-b38a-69fa2915352c"
+          ],
+          "output_delivery": "unobserved"
+        },
+        "owned_udp_receipt": {
+          "address": "/chatbox/input",
+          "params": [
+            "내일 파란색 공책 좀 가져다주세요.",
+            true,
+            false
+          ],
+          "sender": [
+            "127.0.0.1",
+            50850
+          ],
+          "unix_s": 1792083892.466031
+        },
+        "producer_terminal_lines": [
+          "2026-10-16 02:04:52.463 [INFO] pid=21812 puripuly_heart.runtime.session: [Diagnostic][LlmLatency] request_end request_id=1 utterance_id=f68e9fce-7931-4387-b38a-69fa2915352c parent_utterance_id=f68e9fce-7931-4387-b38a-69fa2915352c channel=self kind=manual source_language=en target_language=ko provider_generation=0 input_chars=40 prompt_chars=3448 context_chars=0 status=success request_ms=576 queue_ms=0 attempts=1 winner_attempt=0"
+        ],
+        "producer_attempt_line": "2026-10-16 02:04:52.463 [INFO] pid=21812 puripuly_heart.runtime.session: [Diagnostic][LlmLatency] attempt_end request_id=1 attempt=0 provider=managed_gemma model=puripuly-gemma-4-26b-a4b-q4 actual_model=puripuly-gemma-4-26b-a4b-q4 transport=http_json status=success attempt_ms=576 network_ms=571 ttft_ms=none first_text_to_done_ms=none input_tokens=24 output_tokens=14 cached_input_tokens=820 reasoning_tokens=none server_prompt_ms=201.918 server_generation_ms=324.537 server_generation_tps=40.057",
+        "producer_metrics": {
+          "pid": "21812",
+          "request_id": "1",
+          "attempt": "0",
+          "provider": "managed_gemma",
+          "model": "puripuly-gemma-4-26b-a4b-q4",
+          "actual_model": "puripuly-gemma-4-26b-a4b-q4",
+          "transport": "http_json",
+          "status": "success",
+          "attempt_ms": "576",
+          "network_ms": "571",
+          "ttft_ms": "none",
+          "first_text_to_done_ms": "none",
+          "input_tokens": "24",
+          "output_tokens": "14",
+          "cached_input_tokens": "820",
+          "reasoning_tokens": "none",
+          "server_prompt_ms": "201.918",
+          "server_generation_ms": "324.537",
+          "server_generation_tps": "40.057"
+        },
+        "observed_unix_s": 1792083893.514229,
+        "timing_boundary": "Existing producer LlmLatency counters only; not an experimental benchmark. OSC timestamps are actual sink receive times; recording time is separate.",
+        "authority": "Admission receipt alone reports output_delivery unobserved; terminal producer record plus actual owned OSC receipt establish this completed synthetic output, not CLI stream delivery or VRChat receipt."
+      },
+      "effective_after_translation": {
+        "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+        "revision": 1,
+        "host_pid": 21812,
+        "translation_enabled": true,
+        "translation_runtime_ready": true
+      },
+      "shutdown": {
+        "command": {
+          "label": "stop-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "stop"
+          ],
+          "started": 1792083893.966794,
+          "completed": 1792083895.3163218,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        "receipt": {
+          "output_version": 1,
+          "status": "stopped",
+          "terminal": true,
+          "instance_id": "b6ec94ba-50d5-4ee2-bb31-4b587f1fa5a8",
+          "operation_id": "bb7e81625aa9468cb2484588115f64f1",
+          "cleanup_outcome": "unobserved"
+        },
+        "child_observation": {
+          "kind": "child_release",
+          "unix_s": 1792083895.3509514,
+          "cycle": 1,
+          "released": true,
+          "remaining": []
+        },
+        "listener_port": 63775,
+        "post_shutdown_listener_present": false,
+        "listener_evidence": "release_observations.final_listener_snapshot",
+        "event_follower_exit": {
+          "kind": "event_follower_exit",
+          "unix_s": 1792083895.3186877,
+          "cycle": 1,
+          "exit_code": 3
+        },
+        "boundary": "app stop receipt cleanup_outcome remains unobserved; independent child PID/create-time observation and later listener snapshot provide resource-release evidence."
+      },
+      "commands": [
+        {
+          "label": "start-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "start",
+            "--background"
+          ],
+          "started": 1792083878.6413436,
+          "completed": 1792083880.27652,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-capabilities",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "capabilities"
+          ],
+          "started": 1792083880.2781298,
+          "completed": 1792083880.6691663,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-settings-choices",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "choices"
+          ],
+          "started": 1792083880.6706553,
+          "completed": 1792083881.0980062,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-settings-current",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "current"
+          ],
+          "started": 1792083881.099866,
+          "completed": 1792083881.3250594,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-app-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "status"
+          ],
+          "started": 1792083881.3271275,
+          "completed": 1792083881.5515885,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-capture-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "capture",
+            "status"
+          ],
+          "started": 1792083881.5537636,
+          "completed": 1792083881.7712193,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-overlay-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "overlay",
+            "status"
+          ],
+          "started": 1792083881.7733076,
+          "completed": 1792083882.0042586,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-osc-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "osc",
+            "status"
+          ],
+          "started": 1792083882.006319,
+          "completed": 1792083882.2264352,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-models-status",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "models",
+            "status"
+          ],
+          "started": 1792083882.2288854,
+          "completed": 1792083882.465894,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "1-secrets-presence",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "secrets",
+            "presence"
+          ],
+          "started": 1792083882.467971,
+          "completed": 1792083882.7220812,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "persist-selection-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "apply",
+            "--arguments",
+            "{\"changes\": {\"translation.model\": \"managed_gemma_26b\", \"translation.connection\": \"gpu\"}}"
+          ],
+          "started": 1792083882.7244246,
+          "completed": 1792083883.0307071,
+          "exit_code": 4,
+          "stderr": ""
+        },
+        {
+          "label": "effective-settings-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "settings",
+            "current"
+          ],
+          "started": 1792083883.034816,
+          "completed": 1792083883.2556047,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "capture-after-apply-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "status"
+          ],
+          "started": 1792083883.2579565,
+          "completed": 1792083883.4859846,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "translation-on-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "translation",
+            "set",
+            "on"
+          ],
+          "started": 1792083883.4885604,
+          "completed": 1792083891.457403,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "manual-submit-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "text",
+            "submit",
+            "--stdin"
+          ],
+          "started": 1792083891.6392837,
+          "completed": 1792083892.4839044,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "diagnostics-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "query",
+            "diagnostics.history"
+          ],
+          "started": 1792083893.5169299,
+          "completed": 1792083893.7416728,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "post-translation-status-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "status"
+          ],
+          "started": 1792083893.74401,
+          "completed": 1792083893.9645028,
+          "exit_code": 0,
+          "stderr": ""
+        },
+        {
+          "label": "stop-1",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "stop"
+          ],
+          "started": 1792083893.966794,
+          "completed": 1792083895.3163218,
+          "exit_code": 0,
+          "stderr": ""
+        }
+      ],
+      "local_evidence": "installed-cycle-1.log"
+    }
+  ],
+  "restart_persistence": {
+    "same_config": "<INSTALLED_STATE>/Temp/installer-appdata/settings.json",
+    "no_state_reseed_between_cycles": true,
+    "distinct_host_ids_and_pids": true,
+    "selection_before_second_enable": {
+      "model": "managed_gemma_26b",
+      "connection": "gpu"
+    },
+    "effective_proof": "Second fresh host enabled translation and completed a second distinct synthetic request through its own installed pinned child; settings intent alone was not used as completion proof."
+  },
+  "release_observations": {
+    "child_checks": [
+      {
+        "kind": "child_release",
+        "unix_s": 1792083878.640019,
+        "cycle": 0,
+        "released": true,
+        "remaining": []
+      },
+      {
+        "kind": "child_release",
+        "unix_s": 1792083895.3509514,
+        "cycle": 1,
+        "released": true,
+        "remaining": []
+      }
+    ],
+    "final_owned_process_snapshot": {
+      "kind": "probe_cleanup",
+      "unix_s": 1792083895.433882,
+      "remaining_owned_servers": [],
+      "sink_closed": true
+    },
+    "final_listener_snapshot": {
+      "source": "Successful read-only PowerShell tool output after both final host shutdowns; no new application execution.",
+      "command": "Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object LocalPort -in 63677,63775 | Select-Object LocalAddress,LocalPort,OwningProcess",
+      "ports": [
+        63677,
+        63775
+      ],
+      "listeners": [],
+      "limitation": "Historical post-shutdown snapshot, not a claim these ephemeral ports can never be reassigned."
+    },
+    "nondecisive_socket_probe": {
+      "connect_ex": [
+        {
+          "port": 63677,
+          "result": 10035
+        },
+        {
+          "port": 63775,
+          "result": 10035
+        }
+      ],
+      "limitation": "Socket error10035/timeout is not alone decisive absence evidence; listener snapshot above is the port-release observation."
+    },
+    "security_observation": {
+      "source": "Same successful read-only PowerShell tool output",
+      "command": "Get-Acl <INSTALLED_STATE>/Local/puripuly-heart/control",
+      "owner": "<CURRENT_USER>",
+      "dacl_protected": true,
+      "dacl": "D:P(A;;FA;;;<CURRENT_USER_SID>)",
+      "one_user_full_access_ace": true,
+      "product_security_bypass": false
+    },
+    "hardware": "Exclusive model/GPU window released after these observations; managed-execution notified, Director granted next window. No further native/CPU-heavy execution by this worker.",
+    "cleanup": "Owned hosts/model children, event clients and UDP sink stopped/closed. Genuine unique installed tree, installer identity/registry, synthetic state/model hardlinks and original logs retained for evidence. No uninstall or retained-file deletion is claimed."
+  },
+  "failed_attempts": [
+    {
+      "attempt": "preliminary-native-build",
+      "candidate": "d0a0e891662dbb9735ac9fc4aff844d074ba51a6",
+      "command": [
+        "pwsh",
+        "-NoProfile",
+        "-File",
+        "<CHECKOUT>/scripts/ci/build-native-release-artifacts.ps1",
+        "-ToolPython",
+        "<ORIGINAL_BUILD_ENV>/Scripts/python.exe",
+        "-PinnedInputRoot",
+        "<VERIFIED_DISTRIBUTION_INPUTS>/native-pinned-inputs",
+        "-PythonEmbedArchive",
+        "<VERIFIED_DISTRIBUTION_INPUTS>/native-pinned-inputs/python-3.14.7-embed-amd64.zip",
+        "-InnoSetupVersion",
+        "7.1.0",
+        "-InnoSetupCompiler",
+        "<INNO_7_1_ROOT>/ISCC.exe",
+        "-SoxrBuildEnvironment",
+        "<SOXR_BUILD_ENV>",
+        "-BuildRoot",
+        "<PRELIMINARY_ROOT>/build",
+        "-OutputDir",
+        "<PRELIMINARY_ROOT>/dist",
+        "-InstallerOutputDir",
+        "<PRELIMINARY_ROOT>/installer"
+      ],
+      "start_unix_s": 1792081585.4746416,
+      "end_unix_s": 1792081996.702938,
+      "elapsed_seconds": 411.2282965183258,
+      "exit_code": 1,
+      "failure": "ModuleNotFoundError: No module named 'websockets'",
+      "stage": "managed_gemma_distribution prepare before compile/bundle/manifest/install",
+      "classification": "Tool environment prerequisite, not runtime inference failure.",
+      "retained_progress": "Host, locked runtime dependencies, Soxr, overlay, GPU worker and console compiled; all552 staged Python sources matched initial preliminary manifest.",
+      "recovery": "Fresh own Python3.14.7 tool environment plus full fresh-root pipeline at repaired frozen final commit; no stale product reuse or archive editing.",
+      "local_evidence": [
+        "<PRELIMINARY_ROOT>/build-run.json",
+        "<PRELIMINARY_ROOT>/build.stdout.txt",
+        "<PRELIMINARY_ROOT>/build.stderr.txt",
+        "<PRELIMINARY_ROOT>/preliminary-staged-source-identity.json"
+      ]
+    },
+    {
+      "attempt": "initial-c-drive-runtime-sandbox",
+      "candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+      "commands": [
+        {
+          "label": "start-0",
+          "command": [
+            "<BUILD_ROOT>/installed/puripuly.exe",
+            "--config",
+            "<BUILD_ROOT>/smoke-sandbox/Temp/installer-appdata/settings.json",
+            "--timeout",
+            "300",
+            "app",
+            "start",
+            "--background"
+          ],
+          "started": 1792083237.5990376,
+          "completed": 1792083237.853683,
+          "exit_code": 3,
+          "stderr": "{\"output_version\": 1, \"error\": {\"code\": \"invalid_input\", \"message\": \"Local input or control resource could not be accessed\"}}\r\n"
+        }
+      ],
+      "receipt": {
+        "kind": "command",
+        "unix_s": 1792083237.8536868,
+        "label": "start-0",
+        "command": [
+          "<BUILD_ROOT>/installed/puripuly.exe",
+          "--config",
+          "<BUILD_ROOT>/smoke-sandbox/Temp/installer-appdata/settings.json",
+          "--timeout",
+          "300",
+          "app",
+          "start",
+          "--background"
+        ],
+        "started": 1792083237.5990376,
+        "completed": 1792083237.853683,
+        "exit_code": 3,
+        "output": [],
+        "stderr": "{\"output_version\": 1, \"error\": {\"code\": \"invalid_input\", \"message\": \"Local input or control resource could not be accessed\"}}\r\n"
+      },
+      "failure": "Fresh control directory creation: _control_root -> security.protect -> SetFileSecurityW -> PermissionError WinError5. A later observation rejected the retained inherited/unprotected DACL with InstanceSecurityError: Instance security DACL is not exclusive.",
+      "classification": "Probe-owned runtime sandbox access environment; not failed inference. No model was started.",
+      "initial_acl_observation": {
+        "protected": false,
+        "owner": "<CURRENT_USER>",
+        "inherited_authenticated_users_permission": "Modify; not full user control"
+      },
+      "diagnostic_command": [
+        "<CHECK_TOOLS_ENV>/Scripts/python.exe",
+        "<BUILD_ROOT>/diagnose_start.py"
+      ],
+      "diagnostic_boundary": "Imports installed module and invokes the same _start_background operation without privacy-safe CLI exception wrapping to expose traceback; only the empty failed probe-owned control directory was removed once to observe original fresh-create failure.",
+      "original_terminal_observation": "The first direct diagnostic observed insecure-root rejection; after empty-root removal the fresh-create diagnostic observed WinError5. The latest original stderr file retains fresh-create WinError5; earlier rejection is retained here from observed tool output, not claimed as a separate surviving raw stderr file.",
+      "recovery": "Director-approved move of only synthetic runtime environment/state to fresh normal user-Temp. Genuine installed root/identity retained; no source change, shared ACL mutation, security bypass or runtime override.",
+      "local_evidence": [
+        "installed-proof-failed-c-drive-acl.json",
+        "startup-diagnostic.stderr.txt"
+      ]
+    },
+    {
+      "attempt": "translation-event-observer-timeout",
+      "candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+      "manual_admission": {
+        "kind": "command",
+        "unix_s": 1792083424.5368614,
+        "label": "manual-submit-0",
+        "command": [
+          "<BUILD_ROOT>/installed/puripuly.exe",
+          "--config",
+          "<EVENT_ATTEMPT_STATE>/Temp/installer-appdata/settings.json",
+          "--timeout",
+          "300",
+          "text",
+          "submit",
+          "--stdin"
+        ],
+        "started": 1792083423.005529,
+        "completed": 1792083424.5368593,
+        "exit_code": 0,
+        "output": [
+          {
+            "output_version": 1,
+            "instance_id": "aea10bfd-dede-4065-a50c-65183f3a5943",
+            "operation_id": "ad0e39109b914ef6a7237d41d79b87b7",
+            "request_id": "0bf823e005b872839a3fd802d7dc74e8",
+            "status": "applied",
+            "terminal": true,
+            "revision": 2,
+            "admission": "admitted",
+            "turn_id": "07350a09-4ca9-40dd-a4c7-9bddd44db1ad",
+            "child_turn_ids": [
+              "07350a09-4ca9-40dd-a4c7-9bddd44db1ad"
+            ],
+            "output_delivery": "unobserved"
+          }
+        ],
+        "stderr": ""
+      },
+      "failure": {
+        "kind": "failure",
+        "unix_s": 1792083724.5560553,
+        "type": "Empty",
+        "detail": "",
+        "traceback": "Traceback (most recent call last):\n  File \"<BUILD_ROOT>/probe_installed.py\", line 160, in <module>\n    event = event_queue.get(timeout=max(0.1, deadline - time.monotonic()))\n  File \"<CHECK_TOOLS_PYTHON_BASE>/Lib/queue.py\", line 209, in get\n    raise Empty\n_queue.Empty\n"
+      },
+      "follow_arguments": [
+        "<BUILD_ROOT>/installed/puripuly.exe",
+        "--config",
+        "<EVENT_ATTEMPT_STATE>/Temp/installer-appdata/settings.json",
+        "--timeout",
+        "300",
+        "events",
+        "follow",
+        "--topic",
+        "translation",
+        "--include-translations",
+        "--after",
+        "0"
+      ],
+      "legitimate_inference_progress": "Producer request_end success1259ms, input_tokens25, output_tokens12, cached_input_tokens820; synthetic translation: 등불이 조용한 정원 옆에 있어요. Actual owned installed pinned child ready; output owner chatbox accepted.",
+      "observer_limit": "No completion event received; no stream-validation pass. Event follower connection_lost after intentional host shutdown is separate from the successful model request.",
+      "shutdown": {
+        "kind": "command",
+        "unix_s": 1792083725.9606125,
+        "label": "cleanup-stop",
+        "command": [
+          "<BUILD_ROOT>/installed/puripuly.exe",
+          "--config",
+          "<EVENT_ATTEMPT_STATE>/Temp/installer-appdata/settings.json",
+          "--timeout",
+          "300",
+          "app",
+          "stop"
+        ],
+        "started": 1792083724.5576258,
+        "completed": 1792083725.9606109,
+        "exit_code": 0,
+        "output": [
+          {
+            "output_version": 1,
+            "status": "stopped",
+            "terminal": true,
+            "instance_id": "aea10bfd-dede-4065-a50c-65183f3a5943",
+            "operation_id": "9bddfacc7e9c4d7fa8d998f652eea533",
+            "cleanup_outcome": "unobserved"
+          }
+        ],
+        "stderr": ""
+      },
+      "cleanup": {
+        "kind": "probe_cleanup",
+        "unix_s": 1792083726.1855319,
+        "remaining_owned_servers": [],
+        "sink_closed": true
+      },
+      "recovery": "Director-authorized independent destination OSC receipt plus correlated terminal producer success, retaining stream gap rather than classifying successful inference as failed.",
+      "local_evidence": [
+        "installed-proof-event-observer-timeout.json",
+        "installed-first-translation.log"
+      ]
+    },
+    {
+      "attempt": "immediate-producer-file-observation",
+      "candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+      "manual_admission": {
+        "kind": "command",
+        "unix_s": 1792083818.8521001,
+        "label": "manual-submit-0",
+        "command": [
+          "<BUILD_ROOT>/installed/puripuly.exe",
+          "--config",
+          "<FLUSH_ATTEMPT_STATE>/Temp/installer-appdata/settings.json",
+          "--timeout",
+          "300",
+          "text",
+          "submit",
+          "--stdin"
+        ],
+        "started": 1792083817.3058455,
+        "completed": 1792083818.8520982,
+        "exit_code": 0,
+        "output": [
+          {
+            "output_version": 1,
+            "instance_id": "4567cd74-9d6e-4618-8e3d-3d6c67c44de8",
+            "operation_id": "cfc74fee183d4924be7f412bef091c0c",
+            "request_id": "297ad616bab0f5b760acd6360810c2d4",
+            "status": "applied",
+            "terminal": true,
+            "revision": 2,
+            "admission": "admitted",
+            "turn_id": "3eecdf3c-f495-44c0-af1c-26bd42297ca0",
+            "child_turn_ids": [
+              "3eecdf3c-f495-44c0-af1c-26bd42297ca0"
+            ],
+            "output_delivery": "unobserved"
+          }
+        ],
+        "stderr": ""
+      },
+      "observed_osc": [
+        {
+          "kind": "owned_osc",
+          "unix_s": 1792083818.8534012,
+          "cycle": 0,
+          "delivery": {
+            "address": "/chatbox/typing",
+            "params": [
+              true
+            ],
+            "sender": [
+              "127.0.0.1",
+              64796
+            ],
+            "unix_s": 1792083817.5433376
+          }
+        },
+        {
+          "kind": "owned_osc",
+          "unix_s": 1792083818.854653,
+          "cycle": 0,
+          "delivery": {
+            "address": "/chatbox/input",
+            "params": [
+              "등불이 조용한 정원 옆에 있어요.",
+              true,
+              false
+            ],
+            "sender": [
+              "127.0.0.1",
+              64796
+            ],
+            "unix_s": 1792083818.8318784
+          }
+        }
+      ],
+      "failure": {
+        "kind": "failure",
+        "unix_s": 1792083818.8625617,
+        "type": "RuntimeError",
+        "detail": "destination translation lacks correlated terminal producer success",
+        "traceback": "Traceback (most recent call last):\n  File \"<BUILD_ROOT>/probe_installed.py\", line 169, in <module>\n    raise RuntimeError('destination translation lacks correlated terminal producer success')\nRuntimeError: destination translation lacks correlated terminal producer success\n"
+      },
+      "classification": "Probe observed asynchronously flushed producer logfile too early; owned OSC already contained completed Korean output.",
+      "recovery": "Bounded10second observation wait for producer log delivery with unchanged required admission/terminal/destination assertions and unchanged model/profile. No inference retry/fallback in product. Fresh final probe then passed two separate host cycles.",
+      "cleanup": {
+        "kind": "probe_cleanup",
+        "unix_s": 1792083820.2466538,
+        "remaining_owned_servers": [],
+        "sink_closed": true
+      },
+      "local_evidence": [
+        "installed-proof-producer-flush-gap.json"
+      ]
+    },
+    {
+      "attempt": "known-inactive-stt-degradation",
+      "boundary": "Both final settings applications committed the selected26B/GPU intent but returned terminal degraded exit4: settings_commit_success_runtime_degraded, provider.stt/stt.provider_not_ready.",
+      "preserved": "Exact receipts in each cycle; no credentials supplied and capture remains off. Manual managed-local translations still legitimately completed. This does not claim STT readiness."
+    }
+  ],
+  "verification_gaps": [
+    "CLI translation event-stream delivery was not validated. Its timeout remains an observation gap; successful producer and owned OSC evidence do not prove subscriber delivery.",
+    "No actual GUI input/presentation validation by this worker.",
+    "No installed E4B CPU/MTP, two-channel admission/concurrency, cancellation/lifecycle stress or E4B loading-mode comparison by this worker; those require their owners evidence.",
+    "OSC receipt proves only the controlled local sink, not VRChat receipt or physical GUI presentation.",
+    "No GPU dedicated/shared memory measurement or benchmark comparison in this installed proof. Point-in-time process memory is not physical-RAM-only commitment and does not establish an 8GB-card resource guarantee.",
+    "app stop receipts have cleanup_outcome unobserved; independent child and listener observations are recorded separately.",
+    "Packaging inputs validated independently and product Python provenance matched; the full test suite and other checkpoint reviews are Director-owned and not rerun/claimed here.",
+    "Isolated smoke installer retains normal Gemma packaging but intentionally skips unrelated ASR provisioning. Synthetic installation/state remains retained, not uninstalled."
+  ],
+  "inherited_applicable_checks": {
+    "focused_distribution_tests": "32 passed dot outcomes, exit 0",
+    "official_archive_verification": {
+      "cpu": {
+        "filename": "llama-b11537-bin-win-cpu-x64.zip",
+        "bytes": 19513247,
+        "sha256": "a05c2d35ebe9787489277d6e039b391fd006384a6c49d069395f3a7b47186fd2"
+      },
+      "vulkan": {
+        "filename": "llama-b11537-bin-win-vulkan-x64.zip",
+        "bytes": 33458882,
+        "sha256": "ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe"
+      }
+    },
+    "real_prepare": "exit 0; CPU 23 selected files, Vulkan 24",
+    "real_pyinstaller_data_staging_and_package_launch": "exit 0; 50 staged files; CPU and Vulkan version launches; no model artifacts",
+    "installer_source_contract": "exit 0; no managed weights download or postinstall application launch",
+    "native_upstream_inputs": "all nine sizes and SHA-256 values verified",
+    "both_launcher_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+    "both_launcher_version": "version: 0.6.0-dev (build 11537, commit 8e2d31e0e)",
+    "libomp": {
+      "license": "Apache-2.0 WITH LLVM-exception; bundled legacy sections retained",
+      "license_bytes": 19741,
+      "license_sha256": "fdad1758a9e1f9d5a81e18879b3406772115edc92c24bfa36b70c654f325e8e4",
+      "dll_bytes": 768000,
+      "dll_sha256": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c"
+    },
+    "scope": "Prior worker evidence, not repeated by replacement. Official archives/source staging and focused distribution32 outcomes retained; subsequent final full build also exercises real packaged CPU/Vulkan version launch checks.",
+    "formatting": "Existing Black executable formatted tests/app/test_managed_gemma_distribution.py successfully; original build-env -m black attempt failed because Black absent. No semantic change intended."
+  },
+  "local_original_evidence": {
+    "boundary": "Raw logs/transcripts remain local; only task-root-relative filenames and original byte hashes published here. Hashes identify original unredacted local bytes, not reconstructed sanitized copies.",
+    "final_root": [
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build-run.json",
+        "bytes": 2048,
+        "sha256": "a79fb60447e3ccda124dde95f6963d82dfddd0382b85cd4f9fa3ea45b6a8f799"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "candidate-product-source.json",
+        "bytes": 68413,
+        "sha256": "60fe78c9bc8c50ff93a16782cfe8ae79927e595a2326dd548b67f77358c6b9f7"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build.stdout.txt",
+        "bytes": 1359871,
+        "sha256": "a42b6c7a27a605da75157d3fc809ce35b14ef933058c12886d719ec50879b138"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build.stderr.txt",
+        "bytes": 33207,
+        "sha256": "2f5d1d183f9d8c028e8d9f09514524bce6b4c3735f5803c62e8b1a43d333efd8"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "isolated-install-run.json",
+        "bytes": 2787,
+        "sha256": "b98ab465f65a811069265c8facd8e7bc23107d1bd33bc782c96475d1089a50b7"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "smoke-telemetry-seed.stdout.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "smoke-compile.stdout.txt",
+        "bytes": 1256950,
+        "sha256": "07eb915146b7d560e9b265e14850bc4ea89c5f0c5887f8b0ebd59446a187d869"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "smoke-install.log",
+        "bytes": 3941751,
+        "sha256": "22093811b60e897420f590c1d473d476dc06de71d5a668f0000c163ec5346564"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-proof.json",
+        "bytes": 379782,
+        "sha256": "b91905badc9ab68006c201efd1dadf8438b69d852f491aae2275cb30b26fd138"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-cycle-0.log",
+        "bytes": 7198,
+        "sha256": "84a84b430ed6b3a69600bc9faee57474f6238ce64a3eebd70fb694bca8140913"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-cycle-1.log",
+        "bytes": 15875,
+        "sha256": "e0bad94965ae8ef579de8f4cfb1323de808d49a3cdb9b0dbf2e5863da1888bdf"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-first-translation.log",
+        "bytes": 8478,
+        "sha256": "9dd4a9b5d9c91a4f5c31faf33ed43f830868f5b524cae020ad93f6648e5f4587"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-proof-failed-c-drive-acl.json",
+        "bytes": 2873,
+        "sha256": "4398f062cd2ff06255d9c9a5205f98cc5480857b17d32c381204c92cda7a4490"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "startup-diagnostic.stderr.txt",
+        "bytes": 1791,
+        "sha256": "528ba1f0134dcd1933b915a5c87103c7215a8ad7b8d306429a5d59804b224e1f"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-proof-event-observer-timeout.json",
+        "bytes": 171201,
+        "sha256": "b0a47ce7f6caec1ea894d00fa171c82dde3d1b83631db1dc556f9d91cde52d28"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "installed-proof-producer-flush-gap.json",
+        "bytes": 171182,
+        "sha256": "b9b1e9e631b5c6e97b9f55dd2b0f3e8f888214145069ee265db7acdbd631d417"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "events-0.stderr.txt",
+        "bytes": 133,
+        "sha256": "d8fb661bfe8fcbf0979a3b436eb24ff47f91ef22c5294c1407258a51a7d5d3e2"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "events-1.stderr.txt",
+        "bytes": 133,
+        "sha256": "d8fb661bfe8fcbf0979a3b436eb24ff47f91ef22c5294c1407258a51a7d5d3e2"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "dist/native-artifact-manifest.json",
+        "bytes": 6762760,
+        "sha256": "0825d7abe022d7c5427ab878d11e5d94c5e9de061ec2770e5351a9f6a5a62bba"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/bytecode.json",
+        "bytes": 4597437,
+        "sha256": "e5fa51477b2b0ef9c88818b3af7b726b4939b7c48747f3ff22ecedde510ad7e1"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/upstream-inputs.json",
+        "bytes": 2834,
+        "sha256": "ea17d8fd32d80576aa63a84970eb3045e14a7b59dc95e2876b84e01db9cd9c28"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/target-validation.json",
+        "bytes": 628871,
+        "sha256": "53416f2a611c61accb12a06406ba40337b60044e343dd81814b2c618c44781b5"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/release-target-validation.json",
+        "bytes": 628871,
+        "sha256": "53416f2a611c61accb12a06406ba40337b60044e343dd81814b2c618c44781b5"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/compliance-validation.json",
+        "bytes": 5739,
+        "sha256": "39ea476f4c0b67004c8310352d56caa4382ccbd216119a7b1febc1b8157bdcc0"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/release-compliance-validation.json",
+        "bytes": 5739,
+        "sha256": "39ea476f4c0b67004c8310352d56caa4382ccbd216119a7b1febc1b8157bdcc0"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "build/evidence/vc-runtime.json",
+        "bytes": 7271,
+        "sha256": "9cae2b53f3d68e4ce77f8e3811e0ad7016cf3946c1de94c7db0e9edb5d052031"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "run_native_build.py",
+        "bytes": 4321,
+        "sha256": "d7b12a110c1bd108a0766809f710e0d9ea3306ef55977fd8b20e858e90cb5440"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "install_smoke.py",
+        "bytes": 3726,
+        "sha256": "e50ddd733d05b1dba9e9a44c16b50e887bb7c68147f3bc69fd28b99c373611d8"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "probe_installed.py",
+        "bytes": 14914,
+        "sha256": "fd3f2e6257a57c46584faa0d163e5e3a39ea3e9c15e59ab130b7ddaa2bcb1e46"
+      },
+      {
+        "owned_root": "<BUILD_ROOT>",
+        "filename": "seed_installed_state.py",
+        "bytes": 2369,
+        "sha256": "d457c4a9565c0bd826107e8617412ebddf5786022a20db82fcd004c5ed91cfd6"
+      }
+    ],
+    "preliminary_root": [
+      {
+        "owned_root": "<PRELIMINARY_ROOT>",
+        "filename": "build-run.json",
+        "bytes": 1677,
+        "sha256": "d91ef5ef79270a4aefd54567d27086b8c2320b95c2dc88d9ebea061eea13de69"
+      },
+      {
+        "owned_root": "<PRELIMINARY_ROOT>",
+        "filename": "build.stdout.txt",
+        "bytes": 77603,
+        "sha256": "e181a771c3c91e350a08e721567f9e4fda20e27d6b65430e5c1266a9cc038725"
+      },
+      {
+        "owned_root": "<PRELIMINARY_ROOT>",
+        "filename": "build.stderr.txt",
+        "bytes": 36333,
+        "sha256": "d0fdb27abed8be4480e37d6c134f725c5aebb54ab024d8f7be12666b67b39e4f"
+      },
+      {
+        "owned_root": "<PRELIMINARY_ROOT>",
+        "filename": "candidate-product-source.json",
+        "bytes": 68413,
+        "sha256": "0f76e40806caefdec8b92e7a5bfdf73ebe4a5a3b362beab51600dec863f6b14f"
+      },
+      {
+        "owned_root": "<PRELIMINARY_ROOT>",
+        "filename": "preliminary-staged-source-identity.json",
+        "bytes": 471,
+        "sha256": "f4ab00e93a264984836f00d0d3433a94a8c09af7744fbf9d7e651fd636a9a389"
+      }
+    ]
+  },
+  "clock_boundary": "Command and sink epoch timestamps are UTC-based. Producer log prefixes use machine-local wall clock; no cross-clock performance arithmetic or comparative claim is made."
+}

@@ -1,0 +1,439 @@
+{
+  "raw_journal_sha256": "416233d9961aa2d18ea8888cc9d4549bb2e5526f496106d7c38c5d95a6cf4643",
+  "candidate": {
+    "head": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+    "source_tree_sha256": "0c7fd7e654c939b1226c129157bde3cde103d4f4128de5dec66c910f821361b2",
+    "harness_sha256": {
+      "compare.py": "547ce488e70bad95da6f31b723e284f59b00d9dd94d6c47624e9821ee89e2765",
+      "run.py": "25b3754db247776915bb28a7f8e91538f4f0442445b4179712e84a7c38090435",
+      "session.py": "3422eb2288f6fb7af90d02c57374989c8dea7b2e02b1c6ab0d59a92976d06a6d",
+      "summarize.py": "dfc5f5b8ab530e378a64b74688a48c250c52cf5f08688aab5919cac935d65d39",
+      "windows_metrics.py": "d8d9782c7743be4ea5d121078317f38a725275f33d7f9c72e4e6fe5c553d9534"
+    }
+  },
+  "record_counts": {
+    "stock_candidate": 1,
+    "cli": 22,
+    "stock_host_identity": 2,
+    "stock_managed_identity": 3,
+    "counter_setup": 3,
+    "adapter_discovered": 3,
+    "resource": 333,
+    "osc_received": 6,
+    "supported_manual_event": 2,
+    "known_inactive_stt_degradation": 1,
+    "stock_cleanup": 1
+  },
+  "native_active_maximum_by_pid": {},
+  "native_unfinished_intervals_at_owned_shutdown": [],
+  "native_draft_tokens_by_cpu_pid": {},
+  "global_no_stale_cancelled_publication": [],
+  "manual_admission_and_completion": [
+    {
+      "receipt_status": "applied",
+      "admission": "admitted",
+      "turn_id": "4445e358-38a2-4c3c-b954-8390141ceca2",
+      "child_turn_ids": [
+        "4445e358-38a2-4c3c-b954-8390141ceca2"
+      ],
+      "receipt_output_delivery": "unobserved",
+      "actual_translation_events": [
+        {
+          "output_version": 1,
+          "topic": "translation",
+          "channel": "self",
+          "source": "unknown",
+          "text": "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 식사 후에 3번 게이트에서 만나세요.",
+          "utterance_id": "4445e358-38a2-4c3c-b954-8390141ceca2",
+          "sequence": 6,
+          "instance_id": "bd21cb26-9d97-4796-83e5-3138a46a88b9"
+        }
+      ]
+    },
+    {
+      "receipt_status": "applied",
+      "admission": "admitted",
+      "turn_id": "da311a7c-a0bf-40ae-8a48-7678d52389ef",
+      "child_turn_ids": [
+        "da311a7c-a0bf-40ae-8a48-7678d52389ef"
+      ],
+      "receipt_output_delivery": "unobserved",
+      "actual_translation_events": [
+        {
+          "output_version": 1,
+          "topic": "translation",
+          "channel": "self",
+          "source": "unknown",
+          "text": "작은 로봇 이름은 노리예요. 배터리가 42퍼센트니까, 끄지 마세요.",
+          "utterance_id": "da311a7c-a0bf-40ae-8a48-7678d52389ef",
+          "sequence": 6,
+          "instance_id": "907350f9-3417-4c6e-8b13-d582ddacba08"
+        }
+      ]
+    }
+  ],
+  "no_fallback_readiness": [],
+  "controlled_outcomes": [],
+  "processes": [
+    {
+      "pid": 61680,
+      "command": [
+        "<source-runtime>/vulkan/llama-server.exe",
+        "--model",
+        "<isolated-models>/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+        "--alias",
+        "puripuly-gemma-4-e4b-q4",
+        "--load-mode",
+        "mmap",
+        "--ctx-size",
+        "4608",
+        "--parallel",
+        "3",
+        "--batch-size",
+        "512",
+        "--ubatch-size",
+        "512",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--cache-prompt",
+        "--reasoning",
+        "off",
+        "--reasoning-budget",
+        "0",
+        "--warmup",
+        "--perf",
+        "--metrics",
+        "--no-webui",
+        "--threads-http",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "62532",
+        "--prio",
+        "-1",
+        "--slot-save-path",
+        "<isolated-prefix-root>",
+        "--threads",
+        "4",
+        "--threads-batch",
+        "4",
+        "--device",
+        "Vulkan0",
+        "--n-gpu-layers",
+        "99",
+        "--flash-attn",
+        "on"
+      ],
+      "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+    },
+    {
+      "pid": 63756,
+      "command": [
+        "<source-runtime>/vulkan/llama-server.exe",
+        "--model",
+        "<isolated-models>/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+        "--alias",
+        "puripuly-gemma-4-26b-a4b-q4",
+        "--load-mode",
+        "none",
+        "--ctx-size",
+        "4608",
+        "--parallel",
+        "3",
+        "--batch-size",
+        "512",
+        "--ubatch-size",
+        "512",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--cache-prompt",
+        "--reasoning",
+        "off",
+        "--reasoning-budget",
+        "0",
+        "--warmup",
+        "--perf",
+        "--metrics",
+        "--no-webui",
+        "--threads-http",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "59821",
+        "--prio",
+        "-1",
+        "--slot-save-path",
+        "<isolated-prefix-root>",
+        "--threads",
+        "4",
+        "--threads-batch",
+        "4",
+        "--device",
+        "Vulkan0",
+        "--n-gpu-layers",
+        "99",
+        "--flash-attn",
+        "on",
+        "--n-cpu-moe",
+        "24",
+        "--moe-cache-mib",
+        "2048",
+        "--swa-full",
+        "--cache-ram",
+        "0",
+        "--fit",
+        "off"
+      ],
+      "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+    },
+    {
+      "pid": 63920,
+      "command": [
+        "<source-runtime>/vulkan/llama-server.exe",
+        "--model",
+        "<isolated-models>/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+        "--alias",
+        "puripuly-gemma-4-26b-a4b-q4",
+        "--load-mode",
+        "none",
+        "--ctx-size",
+        "4608",
+        "--parallel",
+        "3",
+        "--batch-size",
+        "512",
+        "--ubatch-size",
+        "512",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--cache-prompt",
+        "--reasoning",
+        "off",
+        "--reasoning-budget",
+        "0",
+        "--warmup",
+        "--perf",
+        "--metrics",
+        "--no-webui",
+        "--threads-http",
+        "1",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "52553",
+        "--prio",
+        "-1",
+        "--slot-save-path",
+        "<isolated-prefix-root>",
+        "--threads",
+        "4",
+        "--threads-batch",
+        "4",
+        "--device",
+        "Vulkan0",
+        "--n-gpu-layers",
+        "99",
+        "--flash-attn",
+        "on",
+        "--n-cpu-moe",
+        "24",
+        "--moe-cache-mib",
+        "2048",
+        "--swa-full",
+        "--cache-ram",
+        "0",
+        "--fit",
+        "off"
+      ],
+      "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+    }
+  ],
+  "cleanup": [
+    {
+      "t": 96337.6434054,
+      "kind": "stock_cleanup",
+      "children": [
+        {
+          "pid": 61680,
+          "create_time": 1792086345.833763,
+          "process_present": false,
+          "accepting_after_stop": false
+        },
+        {
+          "pid": 63756,
+          "create_time": 1792086364.76373,
+          "process_present": false,
+          "accepting_after_stop": false
+        },
+        {
+          "pid": 63920,
+          "create_time": 1792086381.3773386,
+          "process_present": false,
+          "accepting_after_stop": false
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "all_native_translation_outputs_including_rejected_response": [],
+  "supported_translation_events": [
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 식사 후에 3번 게이트에서 만나세요.",
+      "utterance_id": "4445e358-38a2-4c3c-b954-8390141ceca2",
+      "sequence": 6,
+      "instance_id": "bd21cb26-9d97-4796-83e5-3138a46a88b9"
+    },
+    {
+      "output_version": 1,
+      "topic": "translation",
+      "channel": "self",
+      "source": "unknown",
+      "text": "작은 로봇 이름은 노리예요. 배터리가 42퍼센트니까, 끄지 마세요.",
+      "utterance_id": "da311a7c-a0bf-40ae-8a48-7678d52389ef",
+      "sequence": 6,
+      "instance_id": "907350f9-3417-4c6e-8b13-d582ddacba08"
+    }
+  ],
+  "destination_packets": [
+    {
+      "t": 96297.1815809,
+      "kind": "osc_received",
+      "messages": [
+        {
+          "address": "/chatbox/typing",
+          "parameters": [
+            true
+          ]
+        }
+      ],
+      "sender_loopback": true
+    },
+    {
+      "t": 96298.3370606,
+      "kind": "osc_received",
+      "messages": [
+        {
+          "address": "/chatbox/input",
+          "parameters": [
+            "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 식사 후에 3번 게이트에서 만나세요.",
+            true,
+            false
+          ]
+        }
+      ],
+      "sender_loopback": true
+    },
+    {
+      "t": 96298.3381913,
+      "kind": "osc_received",
+      "messages": [
+        {
+          "address": "/chatbox/typing",
+          "parameters": [
+            false
+          ]
+        }
+      ],
+      "sender_loopback": true
+    },
+    {
+      "t": 96332.4933101,
+      "kind": "osc_received",
+      "messages": [
+        {
+          "address": "/chatbox/typing",
+          "parameters": [
+            true
+          ]
+        }
+      ],
+      "sender_loopback": true
+    },
+    {
+      "t": 96333.3898307,
+      "kind": "osc_received",
+      "messages": [
+        {
+          "address": "/chatbox/input",
+          "parameters": [
+            "작은 로봇 이름은 노리예요. 배터리가 42퍼센트니까, 끄지 마세요.",
+            true,
+            false
+          ]
+        }
+      ],
+      "sender_loopback": true
+    },
+    {
+      "t": 96333.3909725,
+      "kind": "osc_received",
+      "messages": [
+        {
+          "address": "/chatbox/typing",
+          "parameters": [
+            false
+          ]
+        }
+      ],
+      "sender_loopback": true
+    }
+  ],
+  "stock_hosts": [
+    {
+      "pid": 65304,
+      "create_time": 1792086342.364292,
+      "instance_id": "bd21cb26-9d97-4796-83e5-3138a46a88b9",
+      "executable_matches_observed_source_python": false,
+      "launch_argv0_matches_observed_source_python": true,
+      "os_executable_basename": "python.exe",
+      "import_root_matches_observed_source": true,
+      "cwd_matches_candidate": true,
+      "source_main_module_in_command": true
+    },
+    {
+      "pid": 55420,
+      "create_time": 1792086378.7149758,
+      "instance_id": "907350f9-3417-4c6e-8b13-d582ddacba08",
+      "executable_matches_observed_source_python": false,
+      "launch_argv0_matches_observed_source_python": true,
+      "os_executable_basename": "python.exe",
+      "import_root_matches_observed_source": true,
+      "cwd_matches_candidate": true,
+      "source_main_module_in_command": true
+    }
+  ],
+  "stock_persisted_selection_reads": [
+    {
+      "t": 96286.707228,
+      "model": "managed_gemma",
+      "connection": "gpu"
+    },
+    {
+      "t": 96318.7523772,
+      "model": "managed_gemma_26b",
+      "connection": "gpu"
+    },
+    {
+      "t": 96322.5694532,
+      "model": "managed_gemma_26b",
+      "connection": "gpu"
+    }
+  ],
+  "limits": [
+    "Native maxima include started-but-unfinished tasks as active until owned process termination; active shutdown also requires fresh native slot observations.",
+    "Manual terminal admission alone is not destination delivery; actual translation events and separate OSC routing records remain distinct.",
+    "No automated semantic quality verdict is assigned. Original synthetic native outputs, including injected rejected responses, are retained."
+  ]
+}

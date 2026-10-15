@@ -1,0 +1,252 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-selection/v1",
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/251",
+  "scope": "Actual source-GUI model selection, persistence, public download progress and cancellation, controlled startup failure, and real-asset product installation/promotion/reuse",
+  "publication_preparation": {
+    "mode": "offline consolidation of retained observations",
+    "new_gui_model_or_provider_execution": false,
+    "new_product_test_index_or_remote_mutations": false,
+    "original_records_and_screenshots": "Retained locally; only this sanitized JSON summary is added to the repository",
+    "sanitization": "No personal absolute paths, credentials, passphrases, raw private transcripts, signed download URLs or whole-desktop screenshots are included. Artifact references below are relative to named original task roots, not repository paths or external links."
+  },
+  "candidate_applicability": {
+    "accepted_frozen_product": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+    "implementation_baseline": "766e25a39ac6cec6800bf15e994409cf76a0ffe5",
+    "execution_binding": "The observations were made on the progressively integrated candidate source checkout, with its package import explicitly verified and Python 3.14.7. They were not newly rerun at the accepted frozen commit while the execution worker held the exclusive performance window. A complete source hash was not captured for every original GUI instance.",
+    "cancellation_repair_binding": "The original bad receipt and corrected fresh-process GUI receipt span checkpoint 66000fff and its authorized application-control cancellation repair.",
+    "promotion_binding": "The cache-backed product promotion and offline reuse probes used the repaired source application before the later internal dashboard-boundary repair.",
+    "later_internal_boundary_repair": {
+      "finding": "F2",
+      "change": "The application presentation port now carries gpu_only; composition discriminates model identity and the dashboard no longer imports backend assets. Obsolete notice.model_id was removed.",
+      "preserved_behavior": "26B runtime failures retain actionable GPU-only guidance; E4B CPU/GPU failures and 26B download failures retain generic preparation feedback. Progress/cancel data is unchanged.",
+      "behavior_checks": "103 passed in 2.26s, including actual composed-owner/status-callback to presentation-port to dashboard/localization behavior with a controlled backend failure boundary",
+      "original_architecture_gate": "5 passed in 0.17s",
+      "new_gui_execution_claim": false,
+      "applicability_limit": "These checks protect the changed internal discriminator at the frozen candidate; the retained GUI screenshots are not relabeled as a new post-F2 GUI run."
+    },
+    "acceptance_limit": "The Director accepted this source/UI/provisioning work for the frozen product. This record is not an installed-payload, native-inference, performance or whole-issue completion verdict."
+  },
+  "execution_and_isolation": {
+    "application": "Actual candidate Flet desktop application, not UI unit mocks or debug-preview mode",
+    "entrypoint": "python -m puripuly_heart.main --config <owned-task-root>/settings.json run-gui",
+    "controls": "Actual posted Win32 mouse input to the owned FLUTTERVIEW child; supported application CLI commands and owner-backed queries",
+    "presentation_observation": "PrintWindow captured only the owned top-level window. Windows UIA was explored and exposed only Window/FLUTTERVIEW, so owned client-coordinate input was used.",
+    "redirected_roots": ["LOCALAPPDATA", "APPDATA", "USERPROFILE", "HOME", "TEMP", "TMP"],
+    "download_phase_additional_roots": ["HF_HOME", "HF_HUB_CACHE", "HF_XET_CACHE"],
+    "secrets": "Task-owned encrypted-file backend and synthetic fixture credentials only; shared keyring and live settings were not used. A synthetic inactive Soniox key did not establish provider readiness; no external credential verification or capture was requested.",
+    "environment": "Inherited provider/Hugging Face credentials and runtime overrides were removed before explicitly selecting the candidate and controlled runtime root.",
+    "disabled": ["telemetry", "clipboard auto-translation", "scene context", "Self capture", "Peer capture", "translation execution", "microphone test", "overlay"],
+    "osc": "Configured/effective control mode off; both send-port fields directed to an exclusively owned loopback UDP sink held through teardown. Zero packets were observed at the owned sinks.",
+    "network": "Provider services were not requested. The real public managed-model downloader and public Hugging Face metadata/cache resolution were allowed only in the separately identified provisioning phases.",
+    "runtime_boundary": "Provisioning/error phases used a deliberately nonexistent task-owned PURIPULY_HEART_LLAMA_CPP_ROOT. No owned model/GPU process or translation was launched."
+  },
+  "gui_selection_and_persistence": {
+    "distinct_choices_observed": [
+      "Gemma 4 E4B (CPU)",
+      "Gemma 4 E4B (GPU)",
+      "Gemma 4 26B A4B QAT (GPU only)"
+    ],
+    "26b_presentation": "The distinct 26B card appeared in GPU Inference with Vulkan-only, 14.25 GB download, GPU/system-memory and no-CPU-fallback guidance. Selecting it displayed the distinct wrapped label and LLM inference GPU device controls without a CPU/backend connection card.",
+    "committed_selection": "Actual GUI selection committed translation.model=managed_gemma_26b and translation.connection=gpu. Canonical settings queries and persisted settings bytes confirmed the selection; the E4B CPU connection history remained independent.",
+    "e4b_preservation": "Actual explicit E4B GPU and E4B CPU selections committed managed_gemma/gpu and managed_gemma/cpu and displayed their preserved labels/controls.",
+    "fresh_process": {
+      "before_instance_id": "8a6ad6e7-9607-4c6c-8a17-149b67f5ee0d",
+      "after_instance_id": "8930e120-3c88-44cd-a002-0139b7166bab",
+      "after_host_pid": 54264,
+      "after_gui_pid": 464,
+      "model": "managed_gemma_26b",
+      "connection": "gpu",
+      "connection_history": {"managed_gemma": "cpu", "managed_gemma_26b": "gpu"},
+      "capture_and_translation_remained_off": true,
+      "observation": "After durable 26B selection was confirmed, supported app stop and a new GUI process/instance retained the selection and E4B CPU history."
+    },
+    "unsupported_26b_cpu_request": {
+      "command": "settings apply --arguments {\"changes\":{\"translation.connection\":\"cpu\"}}",
+      "status": "rejected",
+      "terminal": true,
+      "error_code": "invalid_arguments",
+      "cli_exit": 4,
+      "selection_after_request": {"model": "managed_gemma_26b", "connection": "gpu"}
+    },
+    "unrequested_assets": "Selection-only checks produced no llama-server process or model asset directory; only the provisioning lock existed under the isolated models root.",
+    "preserved_failures": [
+      "Inactive keyless Soniox produced stt.provider_not_ready/provider_failed during startup and aggregate provider apply. Model selection committed and LLM rebuild succeeded, but the GUI reported the aggregate settings apply remained pending. This is not presented as a wholly successful provider apply.",
+      "A synthetic inactive Soniox credential did not establish provider readiness. No external STT verification/capture was requested.",
+      "Automatic GPU discovery reported worker_executable_missing in the source checkout. The visible GPU device card does not establish successful device enumeration or Vulkan readiness.",
+      "An intermediate attempted restoration of 26B did not commit before an earlier restart; that process correctly retained the then-committed E4B CPU selection. The decisive 26B restart followed explicit query and persisted-byte confirmation."
+    ],
+    "evidence_refs": [
+      "selection_task/09-translation-picker-before-selection.png",
+      "selection_task/10-selected-26b-settings.png",
+      "selection_task/11-26b-selected-picker.png",
+      "selection_task/12-preserved-e4b-gpu-selection.png",
+      "selection_task/13-preserved-e4b-cpu-selection.png",
+      "selection_task/17-fresh-process-26b-gpu-only.png"
+    ]
+  },
+  "real_public_download_and_cancellation": {
+    "artifact": {
+      "repo_id": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
+    },
+    "admission": "Supported command gemma.prepare --arguments {} --no-wait invoked the actual public managed-model downloader.",
+    "progress": {"owner_percentages_observed": [0, 3], "actual_gui_percentage_at_cancel": 5},
+    "interaction": "Clicked the actual dashboard Cancel control, not a substituted downloader or CLI operation-cancel action.",
+    "settled_effects": "GUI and managed owner reported cancelled; downloader children exited and owned staging was removed. No target installation was promoted and no E4B/draft/projector assets appeared.",
+    "original_bad_receipt": {
+      "instance_id": "82b82552-7c11-4386-a4a3-6819b5182390",
+      "operation_id": "bc3c7ba1ae534dc29cb7b4b5f6c4a86b",
+      "request_id": "7320ec6ae38c07d261e382a18e1d1a8d",
+      "status": "failed",
+      "terminal": true,
+      "error": {"code": "application_operation_failed", "type": "unclassified"},
+      "diagnostic_id": "364dbb4b25ab43688c5b7849f88af453",
+      "cli_exit": 4,
+      "owner_state": "cancelled",
+      "diagnosis": "Settled clean managed preparation cancellation became GemmaProvisioningCancelled, but application control recognized only asyncio.CancelledError."
+    },
+    "authorized_repair": "Typed Gemma cancellation follows cancelled/interrupted handling. Grouped cancellation plus cleanup failure remains terminal failed rather than being masked as clean cancellation or escaping without a terminal receipt.",
+    "actual_fresh_gui_recheck": {
+      "instance_id": "8fd9a453-4c2d-4d86-88d1-fd4fd7c78b90",
+      "operation_id": "adad216b016641378d7de504069f16b2",
+      "request_id": "f99f539d272ca6df329fe5e3c8e81c20",
+      "flow": "Restarted the repaired candidate with the owned staged installation absent, invoked the actual public downloader again and clicked the actual dashboard Cancel control.",
+      "observed_percent_before_cancel": 0,
+      "status": "cancelled",
+      "terminal": true,
+      "error_absent": true,
+      "cli_exit": 6,
+      "owner_state": "cancelled",
+      "gui_text": "Local translation model setup was cancelled.",
+      "staging_and_installation_absent": true,
+      "limit": "The repaired bounded attempt remained at 0% before cancellation; positive real-transfer GUI progress was observed at 5% before the application-control-only repair."
+    },
+    "transfer_limit": "This phase was a genuine partial public-artifact transfer, not a complete 14.25 GB remote download or completed promotion proof.",
+    "evidence_refs": [
+      "provisioning_task/03-real-progress-before-dashboard-cancel.png",
+      "provisioning_task/04-real-dashboard-cancelled.png",
+      "provisioning_task/06-repaired-real-progress-before-cancel.png",
+      "provisioning_task/07-repaired-terminal-dashboard-cancelled.png"
+    ]
+  },
+  "actionable_controlled_startup_failure": {
+    "operation_id": "f2690472b49140f18f37f9a07818d3f7",
+    "controlled_cause": "The runtime-root override selected a deliberately absent task-owned directory, so the required Vulkan llama-server executable was unavailable. This was not actual GPU memory exhaustion.",
+    "initial_fixture_boundary": "For this error-display probe only, the exact retained artifact was hardlinked into owned model state with InstalledGemmaManifest.expected(spec), then product checksum validation passed. That manufactured installed manifest was not counted as product promotion evidence; the separate normal-cache installation below closes that gap.",
+    "owner_result": {"state": "failed", "failure_phase": "runtime", "error_type": "ManagedGemmaRuntimeError"},
+    "gui_text": "Couldn't load Gemma 4 26B on Vulkan. Check the selected GPU and available GPU/system memory, or explicitly choose another supported model. No CPU or cloud fallback is used.",
+    "selection_retained": {"model": "managed_gemma_26b", "connection": "gpu"},
+    "owned_model_launch_or_fallback": false,
+    "evidence_ref": "provisioning_task/05-actionable-controlled-runtime-failure.png"
+  },
+  "real_pinned_cache_product_installation": {
+    "managed_install_absent_before_prepare": true,
+    "cache_source": "The exact retained public artifact was hardlinked only into a task-owned Hugging Face snapshot at the pinned repository/revision/filename. No installed directory or installed manifest was supplied for this phase.",
+    "framework": "huggingface_hub 1.26.0",
+    "preflight": {"is_cached": true, "will_download": false, "file_size": 14249047104, "commit_hash": "7b92b5b28818151e8669af2e45e88d6086f490dd"},
+    "mechanism": "The unchanged product worker called normal hf_hub_download(local_dir=managed-staging). After public HEAD metadata resolution, the framework copied the exact pinned snapshot into staging. No fake downloader, spec or expected hash was substituted.",
+    "instance_id": "c0df4a2f-178f-4632-9100-dca723d99fc8",
+    "operation_id": "c5d30673bece41968af3bbb05bf7b4f8",
+    "request_id": "9629b0ecbae1044f94cfe5e066fc3cfd",
+    "manifest_origin": "Created by the running product provisioner",
+    "atomic_observation": {
+      "method": "Win32 ReadDirectoryChangesW on the owned models root",
+      "notification_count": 52,
+      "reported_overflow_or_error": false,
+      "timing_boundary": "Milliseconds from observer start, including application setup; not a request-performance measurement",
+      "sequence": [
+        {"elapsed_ms": 43421, "action": "added", "path": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl.staging-98fccee4cdaf49608fb1cada8cd9202e/installed-manifest.json"},
+        {"elapsed_ms": 43421, "action": "modified", "path": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl.staging-98fccee4cdaf49608fb1cada8cd9202e/installed-manifest.json"},
+        {"elapsed_ms": 53402, "action": "rename_old_name", "path": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl.staging-98fccee4cdaf49608fb1cada8cd9202e"},
+        {"elapsed_ms": 53402, "action": "rename_new_name", "path": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"}
+      ]
+    },
+    "post_install_validation": {
+      "function": "validate_gemma_install(spec=26B, verify_checksums=True)",
+      "outcome": "passed",
+      "inspect_gemma_install_state": "ready",
+      "size_bytes": 14249047104,
+      "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+      "manifest_model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+      "manifest_repo_id": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "manifest_revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "installed_entries": ["gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf", "installed-manifest.json"],
+      "installed_target_same_file_as_retained_source": false
+    },
+    "separate_readiness_result": "Installation/checksum/promotion completed, then gemma.prepare was terminal failed (CLI exit4) at the deliberately missing runtime. Owner failure_phase=runtime and error_type=ManagedGemmaRuntimeError. This is not labeled successful runtime preparation or translation.",
+    "network_limit": "The complete artifact came through the normal framework's retained-cache path, not another full 14.25 GB remote transfer. Public metadata resolution was allowed."
+  },
+  "fresh_offline_installed_reuse": {
+    "instance_id": "5d187c45-9643-4962-b859-3483b4e679eb",
+    "operation_id": "610690a910e7409fb9bfc9eff12887bf",
+    "request_id": "b33b75a4b4cd6d6713ac7ae5b53f362c",
+    "boundary": "Stopped the first application, moved its pinned snapshot cache outside the effective cache path, then launched a fresh process with HF_HUB_OFFLINE=1 and a deliberately nonexistent effective HF_HUB_CACHE.",
+    "application_result": "Supported gemma.prepare reached the expected missing-runtime startup failure, not download failure. Existing installed assets remained ready.",
+    "filesystem_observation": "No model changes or staging paths; only the observer's own stop marker generated a notification. No observer overflow/error was reported.",
+    "unchanged_installed_target": {"inode": 43347146414120982, "mtime_ns": 1792081920476326000},
+    "manifest_and_size_validation_after_reuse": "passed",
+    "full_checksum_evidence_applicability": "Initial full checksum validation remains applicable to the unchanged installed file; it was not relabeled as a second full hash run.",
+    "effective_hf_cache_remained_absent": true,
+    "interpretation": "Product installation was reused without downloader/cache/network access; runtime readiness still intentionally failed at the controlled unavailable-runtime boundary.",
+    "evidence_ref": "provisioning_task/09-offline-installed-reuse-runtime-unavailable.png"
+  },
+  "retained_deterministic_check_history": [
+    {"scope": "Initial 12 focused selection/config/app/UI/OSC modules", "outcome": "585 passed, 1 failed in 8.04s", "failure": "New synthetic downloader fixture used two progress arguments instead of HuggingFaceDownloadProgress; product rejected it correctly."},
+    {"scope": "Corrected typed-progress target-only installation/reuse fixture", "outcome": "1 passed in 0.72s", "preservation": "Verified bytes/manifest, progress, no E4B directory and reuse assertions retained."},
+    {"scope": "Required dashboard cancel binding and application initialization", "outcome": "3 passed in 0.74s; then 3 passed in 0.58s after named-handler E731 repair"},
+    {"scope": "Cancellation repair regression initial attempt", "outcome": "2 failed, 1 passed in 3.33s", "failure": "Cancellation/cleanup assertions passed; subsequent locale progress incorrectly expected applied despite intentionally unavailable Soniox.", "correction": "Expected exact terminal degraded/settings_commit_success_runtime_degraded and additionally asserted persisted locale ja; no cancellation, cleanup, failure or privacy assertion removed."},
+    {"scope": "Cancellation/cleanup/shutdown and neighboring control failure regressions", "outcome": "8 passed in 3.64s", "protected": "Clean cancellation, cleanup failure, shutdown interruption, staging cleanup, privacy and later durable settings progress."},
+    {"scope": "F2 notice/dashboard/presentation and composed-callback behavior", "outcome": "103 passed in 2.26s"},
+    {"scope": "Original dashboard contract architecture gate after F2", "outcome": "5 passed in 0.17s"}
+  ],
+  "cleanup_and_retained_resources": {
+    "supported_shutdown": "All owned GUI instances in these phases stopped through supported app stop. Receipts retained cleanup_outcome=unobserved.",
+    "separate_exit_observation": "Launchers exited0, owned windows disappeared, and final original launcher/host/Flet identities were separately observed absent. Downloader children exited before shutdown.",
+    "owned_udp_sinks": "Closed; zero packets observed",
+    "directory_observers": "Stopped; preflight scratch removed",
+    "partial_download_phase": "Owned staging and temporary Hugging Face cache were removed; no model installation remained after cancellation.",
+    "initial_error_fixture": "Owned hardlink/manufactured manifest removed after its controlled error probe; retained original artifact preserved.",
+    "final_promotion_phase": "Exact retained original and task-owned pinned snapshot hardlink were preserved. Verified product-created installation was preserved as a distinct 14.25 GB local copy under the task root; no weights are included in this repository evidence file.",
+    "retained_task_relative_locations": [
+      "provisioning_task/HuggingFace/hub-preserved-for-reuse-proof",
+      "provisioning_task/Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+    ],
+    "unrelated_live_instances_and_settings": "Untouched"
+  },
+  "limits_not_reclassified_as_passes": [
+    "No owned model/GPU execution or translation was performed by these source/UI/provisioning probes.",
+    "Controlled missing-runtime presentation is not a reproduction of GPU memory exhaustion or proof of device discovery/readiness.",
+    "The public transfer was intentionally cancelled; complete real-asset product promotion used the normal pinned-cache framework path, not a complete new remote download.",
+    "The initial manually staged installed manifest proved integrity/error display only; the separate product-created manifest and observed atomic promotion provide installation evidence.",
+    "Prepare terminal failures after successful installation/reuse are preserved as failures at the intentionally unavailable runtime, not reported as completed readiness.",
+    "The first optional promotion screenshot captured a minimized 160x28 window and is excluded from evidence. The later 09-offline-installed-reuse-runtime-unavailable.png is the valid owned-window capture.",
+    "The F2 gpu_only internal-boundary repair has 103 behavior and 5 architecture passes; no new post-F2 GUI execution is claimed.",
+    "This record does not establish installed-distribution launch, native CPU/MTP or fallback behavior, Self/Peer GPU overlap, performance comparison, full-suite success or whole-issue completion. Those are separate owners' evidence domains."
+  ],
+  "local_artifact_provenance": {
+    "roots": {
+      "selection_task": {"root_basename": "puripuly-251-selection-u7ahg83e", "contents_published": false},
+      "provisioning_task": {"root_basename": "puripuly-251-gui-provisioning-z4mwb2ca", "contents_published": false}
+    },
+    "hash_scope": "SHA-256 and byte sizes below were computed offline from the retained small original JSON/PNG files during publication preparation. No model asset was rehashed or application/test/model process launched for this consolidation.",
+    "artifacts": [
+      {"source_root": "selection_task", "relative_path": "selection-evidence.json", "size_bytes": 8635, "sha256": "6e29e100f54ace2b8c0aa4a7f50ee41b55c70f317c0185168b7ea977a1293877"},
+      {"source_root": "selection_task", "relative_path": "09-translation-picker-before-selection.png", "size_bytes": 63066, "sha256": "e3bd7349e55f079307ad170af50cd1dafd04455e0b55717865df423cb470deef"},
+      {"source_root": "selection_task", "relative_path": "10-selected-26b-settings.png", "size_bytes": 44986, "sha256": "e1151064e2dfc3c2a7efa1640a17e9984ed2e79aab8bc001a874e14723270359"},
+      {"source_root": "selection_task", "relative_path": "11-26b-selected-picker.png", "size_bytes": 66109, "sha256": "50cb0a56e43ac773cec4915afb79f152b2499f55bf99a157712625872faf8e7f"},
+      {"source_root": "selection_task", "relative_path": "12-preserved-e4b-gpu-selection.png", "size_bytes": 41499, "sha256": "6264451b888d8bc44f843ebec802a420f3971b7bb04eb2849b5f8fe7e9d5d2a6"},
+      {"source_root": "selection_task", "relative_path": "13-preserved-e4b-cpu-selection.png", "size_bytes": 33652, "sha256": "09c6bbaf1e06f69a22c36a974d17f875133eca65212d64f16272b8b0629d77e5"},
+      {"source_root": "selection_task", "relative_path": "17-fresh-process-26b-gpu-only.png", "size_bytes": 44315, "sha256": "010e6e35f6de04fed98d3072c44731144427fdd06602c5569cfffc2b7462ee1c"},
+      {"source_root": "provisioning_task", "relative_path": "provisioning-evidence.json", "size_bytes": 8617, "sha256": "16fd1163a59abfa1da12384f219803806e216393924a07c2254fa96406dac603"},
+      {"source_root": "provisioning_task", "relative_path": "cache-promotion-evidence.json", "size_bytes": 6622, "sha256": "a70891d49c3a3a093dcfc6789d5e858cabac116603246c661ae15f189703f0c9"},
+      {"source_root": "provisioning_task", "relative_path": "f2-boundary-repair-evidence.json", "size_bytes": 3044, "sha256": "f623df6a95747b4f0e47bcda8c2bd99a431b45306ed15d52cb0dc4f282e63ed0"},
+      {"source_root": "provisioning_task", "relative_path": "03-real-progress-before-dashboard-cancel.png", "size_bytes": 47870, "sha256": "e987ad740e8e3293e9c0e22c057710e6c819cdfc41b1bf2682667a329010796c"},
+      {"source_root": "provisioning_task", "relative_path": "04-real-dashboard-cancelled.png", "size_bytes": 47658, "sha256": "2b3c44867e6bb732a718a224bc2918a27391d865bff0c8d640c93f79d623b77f"},
+      {"source_root": "provisioning_task", "relative_path": "05-actionable-controlled-runtime-failure.png", "size_bytes": 55079, "sha256": "0a04956eb33d800eeb8daf0dc73bb6bf2a54fb6a9061788732dcc258539a5e4a"},
+      {"source_root": "provisioning_task", "relative_path": "06-repaired-real-progress-before-cancel.png", "size_bytes": 48016, "sha256": "74d552c726f90f1c28b04238d126ebce99ac24dabb924878712459f18377524e"},
+      {"source_root": "provisioning_task", "relative_path": "07-repaired-terminal-dashboard-cancelled.png", "size_bytes": 47658, "sha256": "2b3c44867e6bb732a718a224bc2918a27391d865bff0c8d640c93f79d623b77f"},
+      {"source_root": "provisioning_task", "relative_path": "09-offline-installed-reuse-runtime-unavailable.png", "size_bytes": 55079, "sha256": "0a04956eb33d800eeb8daf0dc73bb6bf2a54fb6a9061788732dcc258539a5e4a"}
+    ]
+  }
+}

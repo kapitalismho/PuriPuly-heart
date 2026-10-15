@@ -1,0 +1,476 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-afterproof/v1",
+  "candidate": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+  "source_tree_sha256": "cbd004e0bd448c1b6efb20f0836b247a5bb0c116adf3b5d736a878a81eb496c5",
+  "source_kind": "actual source composition; not installed distribution proof",
+  "status": "Both authorized source-native after-proof cases completed; severe26B loading-memory limit retained; no whole-issue or quality acceptance.",
+  "asset_manifest_sha256": "3625bb74a45c3fb69f95ac0e0f4da5c34e2fe3e0c7372160550b94a61a77725e",
+  "harness_sha256": {
+    "audit.py": "5cf1a212cdbf041e323dcc65d1a9f4a400dfb956413c9a806664e688e70f2be1",
+    "compare.py": "547ce488e70bad95da6f31b723e284f59b00d9dd94d6c47624e9821ee89e2765",
+    "pressure.py": "b8e9c4acf16b30037290fb1039d282272593edf572cf6aba233e241991e85e9d",
+    "run.py": "25b3754db247776915bb28a7f8e91538f4f0442445b4179712e84a7c38090435",
+    "session.py": "3a45f1c4fb5f758cf03134bbe112f09f23da604f35ee39f24c6d2e4732dc61b5",
+    "summarize.py": "e24a230b24243a081db6eb31e300c5c4e4dacd0fc98bb118fb566439e1aae848",
+    "windows_metrics.py": "d8d9782c7743be4ea5d121078317f38a725275f33d7f9c72e4e6fe5c553d9534"
+  },
+  "record_assertions": "Executed offline: one current671 source instance per raw journal; identical source/harness hashes; no failure/fatal/cleanup/watchdog/counter failure; all owned children exited/ports closed/tasks0.",
+  "supervisor_outcomes": {
+    "26b": [
+      {
+        "arm": "26b-failure",
+        "model": "managed_gemma_26b",
+        "backend": "gpu",
+        "mode": "product",
+        "exit_code": 0,
+        "start_unix_s": 1792090245.0536494,
+        "end_unix_s": 1792090305.4198534
+      }
+    ],
+    "e4b": [
+      {
+        "arm": "safety",
+        "model": "managed_gemma",
+        "backend": "gpu",
+        "mode": "product",
+        "exit_code": 0,
+        "start_unix_s": 1792090317.1290076,
+        "end_unix_s": 1792090466.2070212
+      }
+    ]
+  },
+  "application_completions": {
+    "26b": 6,
+    "e4b": 70
+  },
+  "native_translation_completions": {
+    "26b": 6,
+    "e4b": 78
+  },
+  "typed_mutation_receipts": {
+    "26b": [
+      {
+        "t": 100200.4934999,
+        "arguments": [
+          "translation",
+          "set",
+          "on"
+        ],
+        "exit_code": 4,
+        "status": "failed",
+        "terminal": true,
+        "operation_id": "42f1860032ae4d3e8063f7a2a5a5105a",
+        "request_id": "a9a8e5c814a8474e0920d0f2779d3fc2",
+        "transaction_status": null,
+        "diagnostic_component": null,
+        "diagnostic_code": null
+      },
+      {
+        "t": 100224.6158811,
+        "arguments": [
+          "translation",
+          "set",
+          "on"
+        ],
+        "exit_code": 0,
+        "status": "applied",
+        "terminal": true,
+        "operation_id": "17913e3102c54e5abb8f18e16bd8c545",
+        "request_id": "db20e02f3841386923bb923f8c636bc2",
+        "transaction_status": null,
+        "diagnostic_component": null,
+        "diagnostic_code": null
+      },
+      {
+        "t": 100232.0128285,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"peer_source\": \"ko\", \"peer_target\": \"en\"}}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "8b58fc53b0d8496ba643be459bcf9d66",
+        "request_id": "daf535d9f6823aee88a3e0eaa72833bb",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      }
+    ],
+    "e4b": [
+      {
+        "t": 100279.0694414,
+        "arguments": [
+          "translation",
+          "set",
+          "on"
+        ],
+        "exit_code": 0,
+        "status": "applied",
+        "terminal": true,
+        "operation_id": "758b60091545437fa9bf3b217dae170e",
+        "request_id": "aa79cc917b41bdb81686843682a06ff4",
+        "transaction_status": null,
+        "diagnostic_component": null,
+        "diagnostic_code": null
+      },
+      {
+        "t": 100299.1530807,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"peer_source\": \"ko\", \"peer_target\": \"en\"}}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "e2fd80c96bfb44858d63d2845df683b3",
+        "request_id": "3b358e3a900607af804bb226c9a52705",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      },
+      {
+        "t": 100348.1428574,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ja\"}}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "a25058898f60420aa41eef16b31a4c73",
+        "request_id": "7b4d39723e57c4b23f3d130e0d25aed8",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      },
+      {
+        "t": 100351.1073552,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"fr\"}}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "1e1b026b616a4a18a16597296ec3a3cf",
+        "request_id": "ea8a3dad08a39920bb345fb911ba7bef",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      },
+      {
+        "t": 100353.8148888,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"de\"}}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "99829687ff4e45e9b8d92ad543e551e5",
+        "request_id": "29b300e0e66e87c3ee6c40f660723481",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      },
+      {
+        "t": 100355.946223,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\"}}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "82085312332749c49cb3829820492dac",
+        "request_id": "a0468acf9d96b3d3a66d1a5f0bf345f8",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      },
+      {
+        "t": 100373.4879912,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"translation.connection\": \"cpu\"}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "c5014001984640658004c63fdfb3bda5",
+        "request_id": "f9f5fcf32e639315c713dc3d5be3a4a7",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      },
+      {
+        "t": 100388.9502203,
+        "arguments": [
+          "settings",
+          "apply",
+          "--arguments",
+          "{\"changes\": {\"translation.connection\": \"gpu\"}}"
+        ],
+        "exit_code": 4,
+        "status": "degraded",
+        "terminal": true,
+        "operation_id": "909a5c62938c4f3a9aff3f5122091ed2",
+        "request_id": "50eec83bc487bae087b34227719347a0",
+        "transaction_status": "settings_commit_success_runtime_degraded",
+        "diagnostic_component": "provider.stt",
+        "diagnostic_code": "stt.provider_not_ready"
+      }
+    ]
+  },
+  "preserved_inactive_stt_degraded_receipts": {
+    "26b": 1,
+    "e4b": 7
+  },
+  "no_fallback_and_retry": [
+    {
+      "t": 100200.4949922,
+      "kind": "no_fallback_assertion",
+      "failed_model": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+      "failure_code": "filesystem_failed",
+      "failure_phase": "provisioning",
+      "error_type": "ManagedGemmaRuntimeError",
+      "translation_enabled": false,
+      "provider_binding_available": true,
+      "native_readiness": null,
+      "fallback_processes": 0
+    },
+    {
+      "t": 100240.6538227,
+      "kind": "explicit_retry_outcome",
+      "completed_translations": 6,
+      "managed_processes": 1,
+      "selection_unchanged": true,
+      "translation_enabled": true,
+      "provider_binding_available": true,
+      "native_ready": true,
+      "pid": 69864,
+      "native_translation_completions": 6
+    }
+  ],
+  "e4b_gpu_return_native_pairs": [
+    {
+      "phase": "opposite:after-return-to-gpu",
+      "label": "after-return-to-gpu",
+      "concurrent": true,
+      "makespan_ms": 3260.7276999915484,
+      "server_active_overlap_s": 1.0367499999999996,
+      "result_ids": [
+        "0f6b30ec-6171-4b43-9d1d-59dc8e192d80",
+        "b1d95e60-1076-5c66-9745-f983f6ea323b"
+      ]
+    },
+    {
+      "phase": "opposite:after-return-to-gpu-repeat",
+      "label": "after-return-to-gpu-repeat",
+      "concurrent": true,
+      "makespan_ms": 1615.2888000069652,
+      "server_active_overlap_s": 1.289447,
+      "result_ids": [
+        "8685ed4f-d4e0-411c-b57f-b804d700d529",
+        "e0bfa9a3-ed48-529b-93c3-f7da5e9bce02"
+      ]
+    }
+  ],
+  "native_active_maximum_by_pid": {
+    "26b": {
+      "69864": 2
+    },
+    "e4b": {
+      "72040": 1,
+      "50884": 2,
+      "69380": 2
+    }
+  },
+  "e4b_controlled_outcomes": [
+    {
+      "t": 100329.0165403,
+      "kind": "ordering_outcome",
+      "channel": "peer",
+      "first_result_id": "7c778f42-234b-5460-aaea-9a78417325b2",
+      "second_result_id": "b159431f-dc8b-5107-9b4d-6ca3dd2aad4b",
+      "first_sequence": 131,
+      "second_sequence": 132,
+      "other_completed_before_first": true
+    },
+    {
+      "t": 100333.5443409,
+      "kind": "ordering_outcome",
+      "channel": "self",
+      "first_result_id": "96aa86e9-8a2e-40fa-a886-5db379a08f19",
+      "second_result_id": "9a8314d2-7ee9-4b4a-b0c0-1078619b8409",
+      "first_sequence": 137,
+      "second_sequence": 139,
+      "other_completed_before_first": true
+    },
+    {
+      "t": 100335.3454482,
+      "kind": "cancellation_outcome",
+      "cancelled_channel": "peer",
+      "same_process_pid": 50884,
+      "active_slots_after": 0,
+      "stale_publications": 0
+    },
+    {
+      "t": 100338.3090906,
+      "kind": "cancellation_outcome",
+      "cancelled_channel": "self",
+      "same_process_pid": 50884,
+      "active_slots_after": 0,
+      "stale_publications": 0
+    },
+    {
+      "t": 100342.5338474,
+      "kind": "response_failure_outcome",
+      "active_slots_after": 1,
+      "stale_publications": 0
+    },
+    {
+      "t": 100346.7590867,
+      "kind": "manual_capacity_outcome",
+      "observed_max_active": 2
+    },
+    {
+      "t": 100394.3715201,
+      "kind": "backend_return_outcome",
+      "pid": 69380,
+      "recovery_required": false,
+      "native_ready": true,
+      "translation_enabled": true,
+      "requests": [
+        {
+          "identity": {
+            "utterance_id": "0f6b30ec-6171-4b43-9d1d-59dc8e192d80",
+            "channel": "self",
+            "source_language": "en",
+            "target_language": "ko",
+            "parent_utterance_id": "0f6b30ec-6171-4b43-9d1d-59dc8e192d80"
+          },
+          "phase": "opposite:after-return-to-gpu",
+          "pid": 69380,
+          "slot_id": 0
+        },
+        {
+          "identity": {
+            "utterance_id": "b1d95e60-1076-5c66-9745-f983f6ea323b",
+            "channel": "peer",
+            "source_language": "ko",
+            "target_language": "en",
+            "parent_utterance_id": "76e7390e-aa5a-4b1c-a787-d773e1d453e8"
+          },
+          "phase": "opposite:after-return-to-gpu",
+          "pid": 69380,
+          "slot_id": 1
+        },
+        {
+          "identity": {
+            "utterance_id": "e0bfa9a3-ed48-529b-93c3-f7da5e9bce02",
+            "channel": "peer",
+            "source_language": "ko",
+            "target_language": "en",
+            "parent_utterance_id": "136387ce-2a79-426b-86ce-6ae05153228a"
+          },
+          "phase": "opposite:after-return-to-gpu-repeat",
+          "pid": 69380,
+          "slot_id": 1
+        },
+        {
+          "identity": {
+            "utterance_id": "8685ed4f-d4e0-411c-b57f-b804d700d529",
+            "channel": "self",
+            "source_language": "en",
+            "target_language": "ko",
+            "parent_utterance_id": "8685ed4f-d4e0-411c-b57f-b804d700d529"
+          },
+          "phase": "opposite:after-return-to-gpu-repeat",
+          "pid": 69380,
+          "slot_id": 0
+        }
+      ]
+    },
+    {
+      "t": 100394.4525472,
+      "kind": "shutdown_waiting_manual_admission",
+      "admission": {
+        "status": "admitted",
+        "turn_id": "c66ec7bf-2b4c-4731-a8af-45bf28fb3538",
+        "child_turn_ids": [
+          "c66ec7bf-2b4c-4731-a8af-45bf28fb3538"
+        ]
+      },
+      "active_native_slots": 2,
+      "pid": 69380
+    }
+  ],
+  "routing": {
+    "26b": {
+      "delivery_health": {
+        "owner_history": "retained",
+        "owner_history_capacity": 4096,
+        "owner_history_evictions": 0,
+        "observer": "available",
+        "observer_failure_count": 0,
+        "observer_failure_diagnostic_id": null,
+        "last_observer_failure_type": null
+      },
+      "peer_chatbox_denied": 3,
+      "by_decision": {
+        "denied": 3,
+        "published": 27
+      }
+    },
+    "e4b": {
+      "delivery_health": {
+        "owner_history": "retained",
+        "owner_history_capacity": 4096,
+        "owner_history_evictions": 0,
+        "observer": "available",
+        "observer_failure_count": 0,
+        "observer_failure_diagnostic_id": null,
+        "last_observer_failure_type": null
+      },
+      "peer_chatbox_denied": 34,
+      "by_decision": {
+        "denied": 34,
+        "published": 340
+      }
+    }
+  },
+  "related_records": [
+    "26b-afterproof.json",
+    "26b-afterproof-audit.json",
+    "e4b-afterproof.json",
+    "e4b-afterproof-audit.json",
+    "afterproof-memory-pressure.json",
+    "afterproof-human-quality-review.json",
+    "afterproof-release.json"
+  ],
+  "limits": [
+    "Original8786 failures and successful ABBA/sourceCPU/matrix observations remain attributed to8786 and unchanged; no pooling or comparison rerun.",
+    "Spawn failure and post-native response rejection are disclosed software injections, not observed hardware/network failures.",
+    "Capture-free synthetic recognition ingress and authorized Peer projection; no live audio, audio consent/capture activation, external translation service, GUI or VRChat presentation proof.",
+    "26B loading available-physical minimum155648B with5.385011s sampled below256MiB is material depletion despite real completion and no8s cutoff. Not RAM-safe, OOM/spill or performance guarantee.",
+    "After-proof true prelaunch samples are new observations; original missing baseline remains missing. Private commitment and shared GPU accounting are not physical-residency/spill diagnoses.",
+    "Two definite factual errors and two lexical concerns in separate76-application-output review; no blanket quality pass.",
+    "Final full native build/installed proof and issue acceptance remain Director/separate-owner responsibilities."
+  ]
+}

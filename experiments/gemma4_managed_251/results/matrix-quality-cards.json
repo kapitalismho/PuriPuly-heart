@@ -1,0 +1,2701 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-matrix-quality/v1",
+  "published_outputs": 293,
+  "unique_cards": 175,
+  "cards": [
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7장을 가지고 있어요, 9장이 아니라요. 점심 먹고 나서 3번 게이트에서 미나를 만나주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:first-prefix",
+          "result_id": "08c80e31-2f1d-4b38-8919-df59bc79033f"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7장을 가지고 있어요, 9장이 아니라요. 점심 먹고 나서 게이트 3번에서 미나를 만나주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:first-prefix",
+          "result_id": "f7e36838-fe79-5e94-8b16-b437dbb17d3f"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나 씨는 파란 티켓 7장을 가지고 있어요, 9장이 아니라요. 점심 드시고 3번 게이트에서 미나 씨를 만나주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:single",
+          "result_id": "d892690f-0184-47d9-86ef-9a60fdf30fa9"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리예요. 배터리가 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:single",
+          "result_id": "01e51d98-8674-50b3-ba7f-ed477bf5c2ce"
+        },
+        {
+          "case": "26b",
+          "phase": "same:serial-0",
+          "result_id": "a0c1c2e7-59d0-5b3e-9102-47fd067726ac"
+        },
+        {
+          "case": "26b",
+          "phase": "same:overlap-1",
+          "result_id": "f82fe43d-d8a9-4a78-9bc1-28c1616ec01a"
+        },
+        {
+          "case": "26b",
+          "phase": "same:overlap-5",
+          "result_id": "2a8b170b-5c61-4df2-9074-37db390243af"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:serial-1",
+          "result_id": "4f344f1e-02df-4033-b5d2-21bd1c6855bb"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-5",
+          "result_id": "52d34184-da57-470f-a28b-214f2bf2350b"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:serial-0",
+          "result_id": "1b5fe7f9-278f-500f-9fb8-fb2f4536a99c"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-5",
+          "result_id": "3f336717-05da-468d-8465-859bab1bd17d"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:serial-1",
+          "result_id": "f55d24ff-61cc-4d88-8430-e3dfe5ab9d56"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-1",
+          "result_id": "346763ec-5d5e-414d-86a9-b309c0d512f9"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:serial-1",
+          "result_id": "f4e86c0d-f7e1-4bd5-a8e2-a5c25fef0046"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-5",
+          "result_id": "70e72f32-0a4c-44ce-bd2d-19de3b503eab"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "response-failure",
+          "result_id": "44fa309e-fc9a-4e21-a971-5c791930cd89"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:single",
+          "result_id": "926a44a7-9548-5642-8310-c2380b1c05d2"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:serial-1",
+          "result_id": "c6f26546-8336-40ce-8cbc-0eeb2f9e4227"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-0",
+          "result_id": "9f4c2594-1597-5aae-b74e-5dce18f1c9f1"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:serial-1",
+          "result_id": "5f6de210-7b08-4481-8279-edfca5e557f2"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정할게요. 회의는 목요일 13:40이 아니라, 화요일 14:30이에요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:single",
+          "result_id": "c0ed08a5-7904-469d-8a41-095d35eb6ced"
+        },
+        {
+          "case": "26b",
+          "phase": "same:overlap-1",
+          "result_id": "b6761cd9-5d89-5f7c-a5b3-3e179d77ad26"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간색 상자는 12호실로 가져다주시고, 초록색 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:single",
+          "result_id": "5ce583af-1094-564f-a840-1dbb3aa13d68"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓을 9장이 아니라 7장 가지고 있어요. 점심 먹고 나서 3번 게이트로 미나를 만나러 와주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:serial-0",
+          "result_id": "d1a36fdd-fd46-4ab6-9510-ad1f89596e69"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리예요. 배터리는 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:serial-1",
+          "result_id": "ff59dd15-ac66-4104-8a02-7087c0f280cb"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정할게요. 회의는 목요일 13:40이 아니라 화요일 14:30이에요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:serial-1",
+          "result_id": "0f6f1f20-c488-58af-a125-b1149883d5a0"
+        },
+        {
+          "case": "26b",
+          "phase": "same:overlap-5",
+          "result_id": "fa10b704-c485-58cf-a857-b4dd95748f1b"
+        },
+        {
+          "case": "26b",
+          "phase": "cancel-peer",
+          "result_id": "97fa5f05-60e3-4ef3-a59b-a8d93c4936e6"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "그 작은 로봇 이름은 노리예요. 배터리가 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-0",
+          "result_id": "41350426-d6c7-5942-ab34-904a744e91d1"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-1",
+          "result_id": "5f280bef-0f77-4521-9d4e-5a0d729969dc"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7개를 가지고 있어요, 9개가 아니라요. 점심 먹고 나서 3번 게이트로 미나를 만나러 와 주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-0",
+          "result_id": "40719c58-ff8b-4ff0-a484-f159bbff4d79"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호실로 가져다주시고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-2",
+          "result_id": "33ebe365-e186-5fad-af68-c7d3a80d3b7b"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정할게요: 회의는 목요일 13:40이 아니라 화요일 14:30이에요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-2",
+          "result_id": "503235d3-c079-434e-9a2a-820484c17792"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:single",
+          "result_id": "3f10ebbb-7217-459e-883f-f4bf14dc9b05"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져다주시고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-3",
+          "result_id": "542606d0-84ea-42f3-93d9-bf276513c769"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-3",
+          "result_id": "8419f22f-412f-4098-89f4-5ef13639c386"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7장을 가지고 있어요, 9장이 아니라요. 점심 먹고 3번 게이트에서 미나를 만나주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-3",
+          "result_id": "3a7e028e-c5dc-532d-a420-fd375f1e6a21"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "그 작은 로봇 이름이 노리예요. 배터리가 42퍼센트니까, 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-4",
+          "result_id": "e7eec5ea-a2a8-5d7f-a9e7-e42494935215"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7개를 가지고 있어요, 9개가 아니라요. 점심 먹고 나서 3번 게이트로 미나를 만나러 가주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "same:overlap-4",
+          "result_id": "dc1de031-554e-4bca-8605-be1e0dc6da9c"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7장을 가지고 있어요, 9장이 아니라요. 점심 식사 후에 3번 게이트에서 미나를 만나주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:first-prefix",
+          "result_id": "a0541c81-9359-47d9-a6eb-aa0c2abae6ff"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:serial-0",
+          "result_id": "cc8229fd-3622-4e84-94b0-6c7a459792ac"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has seven blue tickets. Not nine. Let's meet at entrance number 3 after lunch.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:first-prefix",
+          "result_id": "d54c8560-e8b4-595c-a671-7efb8fbd1086"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-3",
+          "result_id": "d01ac7c7-28be-551b-805a-cf9a35dc4b01"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7개를 가지고 있어요, 9개가 아니라요. 점심 먹고 나서 3번 게이트로 미나를 만나러 와주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:single",
+          "result_id": "a8454f2d-4c8c-4647-8741-d4f441fb8a7b"
+        },
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-0",
+          "result_id": "1abdbca1-036e-4629-b336-e4a79ba7674e"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. The battery is at 42%, so please don't turn it off.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:single",
+          "result_id": "8b699ac5-5de7-592c-9877-685befaba61e"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please move the red box to room 12 and leave the green box by the door.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:single",
+          "result_id": "97955571-30c4-5197-aebf-76a69292572a"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. It has 42 percent battery left, so please don't turn it off.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:serial-0",
+          "result_id": "a4ad0f82-c518-5249-8087-8a70d7da876e"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:serial-0",
+          "result_id": "6afe645c-dc74-5816-97c6-46af24803c87"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "Let me correct myself. The meeting isn't Tuesday at 13:40, it's Tuesday at 14:30.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:serial-1",
+          "result_id": "1626002c-eeb9-5f97-8e59-6729d3c056f6"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The little robot's name is Nori. It has 42% battery left, so please don't turn it off.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-0",
+          "result_id": "e4d27747-c32f-528d-a846-a4578aa4bde0"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "I'll correct that. The meeting is at 2:30 PM on Tuesday, not 1:40 PM on Thursday.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-1",
+          "result_id": "0c8a64dc-ae38-5438-8183-507d79be3fd8"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please move the red box to room 12 and place the green box by the door.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-2",
+          "result_id": "b623df4f-e0c7-5988-b84f-3d2a60f21bbb"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정할게요: 회의는 목요일 13:40이 아니라, 화요일 14:30이에요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-2",
+          "result_id": "b2578e80-e8d7-449c-a6df-49decf22d35e"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has seven blue tickets. Not nine. Let's meet at Entrance 3 after lunch.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-3",
+          "result_id": "49528ca2-5f30-52b3-9e95-5ccaad93daf9"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. It's at 42% battery, so please don't turn it off.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-4",
+          "result_id": "bef79049-e683-588d-bef2-128b69b5833e"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓 7장을 가지고 있어요, 9장이 아니라요. 점심 먹고 나서 3번 게이트로 미나를 만나러 와주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-4",
+          "result_id": "7c3132d9-8c9b-4f33-9858-80c381035d93"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "I'll correct myself. The meeting is not Tuesday at 13:40, it's Tuesday at 14:30.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-5",
+          "result_id": "853e28e5-5e87-598d-95c2-6023d535a1ec"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란색 티켓 7개 가지고 있어요, 9개 아니고. 점심 먹고 나서 3번 게이트로 미나 만나러 와주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "natural-history",
+          "result_id": "78090a3f-7fd2-4acf-83e5-3eec272cbb5d"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The little robot's name is Nori. It's at 42% battery, so please don't turn it off.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "natural-history",
+          "result_id": "7c31c2d6-edd2-5ef5-b850-00268ad9f829"
+        }
+      ]
+    },
+    {
+      "source_text": "Good morning.",
+      "target_language": "ko",
+      "translated_text": "좋은 아침이에요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "ordered-peer",
+          "result_id": "306de110-04dc-4334-9ade-6f8cff1d73dc"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "ordered-peer",
+          "result_id": "bc8e42a7-6d3d-4a94-adbc-7ee0f3c7b4d1"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "ordered-peer",
+          "result_id": "e6620f32-fb54-4bb5-ada5-bb09dc93b968"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue tickets, not 9. Meet her at gate 3 after lunch. The little robot's name is Nori. The battery is at 42%, so please don't turn it off. Let me correct myself. The meeting is not on Thursday at 13:40, but on Tuesday at 14:30. Please move the red box to room 12 and place the green box by the door.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "ordered-peer",
+          "result_id": "84847a3a-8905-568e-93da-83df2851d765"
+        }
+      ]
+    },
+    {
+      "source_text": "고마워요.",
+      "target_language": "en",
+      "translated_text": "Thank you.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "ordered-peer",
+          "result_id": "abd35903-0d9b-5aa5-84ac-889149ad9e8b"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "ordered-peer",
+          "result_id": "f6d9c459-f103-5671-9910-7c6f17a438a9"
+        }
+      ]
+    },
+    {
+      "source_text": "안녕하세요.",
+      "target_language": "en",
+      "translated_text": "Hello.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "ordered-self",
+          "result_id": "08fa0337-274b-5758-8c8e-e7474122eb6e"
+        },
+        {
+          "case": "26b",
+          "phase": "active-backend-transition",
+          "result_id": "65236d9b-ed38-5e69-814c-a1cbc5089401"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "ordered-self",
+          "result_id": "e119fd75-755d-57ac-b602-3d438a3d5f3e"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "active-backend-transition",
+          "result_id": "22f3fe79-4b44-570f-8fcb-b492273aa64e"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "ordered-self",
+          "result_id": "0e9bfa19-8fda-5e16-a1de-51703c314eaf"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "active-backend-transition",
+          "result_id": "6721debc-eec7-56e0-8545-59ac33166bd2"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 표 7장을 가지고 있어요, 9장이 아니라요. 점심 식사 후에 3번 게이트에서 미나를 만나주세요. 작은 로봇의 이름은 노리예요. 배터리가 42%니까 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮겨주시고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "ordered-self",
+          "result_id": "5b367f2d-cfee-4d74-9d55-b0a3cc9300a7"
+        }
+      ]
+    },
+    {
+      "source_text": "Thank you.",
+      "target_language": "ko",
+      "translated_text": "감사합니다.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "ordered-self",
+          "result_id": "0beaa62e-7876-4bff-9fca-6479232ef42a"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "ordered-self",
+          "result_id": "723bd815-dc39-4c7d-ae07-f711ddda23aa"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "ordered-self",
+          "result_id": "9bdd49d7-13de-459a-a3ff-3ee8c099e057"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Its battery is at 42 percent, so please don't turn it off.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "cancel-peer",
+          "result_id": "2508bbbf-63b9-54de-a29d-3af8b472e9c9"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "I'll correct that. The meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "cancel-self",
+          "result_id": "8b8bd062-269c-5f3f-9194-75c7a2dcaa1c"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "cancel-self",
+          "result_id": "546cbccf-e1c8-44ab-aa25-83aaa18a90ee"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue slips. Not 9. Let's meet at entrance 3 after lunch. The small robot is called Nori. Its battery is at 42 percent, so please don't turn it off. I'll correct myself. The meeting is on Tuesday at 14:30, not Thursday at 13:40. Please move the red box to room 12 and place the green box next to the door.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "response-failure",
+          "result_id": "867ffce2-b075-5b0c-9fdc-8f5abe6ef224"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리예요. 배터리가 42% 남았으니 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "response-failure",
+          "result_id": "29f8e8ec-022c-4c10-a456-7a4dd2d1e63d"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please move the red box to room 12 and leave the green box beside the door.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "manual-capacity",
+          "result_id": "d3473ab7-e45c-5cb9-a630-eaf4f6b4023c"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12번 방으로 옮겨 주시고, 초록 상자는 문 옆에 놓아 주세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "manual-capacity",
+          "result_id": "86fcfffa-76d1-434f-9d83-c6b5cd47f9e1"
+        },
+        {
+          "case": "26b",
+          "phase": "active-backend-transition",
+          "result_id": "1b6edae2-b1fe-4e2f-b068-e30a45b316e7"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ja",
+      "translated_text": "ミナは青いチケットを9枚じゃなくて7枚持ってるよ。昼食後に3番ゲートで彼女と待ち合わせてね。",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "prefix-lru-en-ja",
+          "result_id": "0c2e6781-bc3d-4ed6-8fe9-83e5d163a745"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "fr",
+      "translated_text": "Mina a 7 tickets bleus, pas 9. Rendez-vous à la porte 3 après le déjeuner.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "prefix-lru-en-fr",
+          "result_id": "b44570e6-e073-48ba-8e17-e4abe7fc963a"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "de",
+      "translated_text": "Mina hat 7 blaue Tickets, nicht 9. Bitte trefft sie nach dem Mittagessen am Eingang 3.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "prefix-lru-en-de",
+          "result_id": "b4be36b6-b73d-4d7a-b466-44fec1221e9f"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 표 7장을 가지고 있어요, 9장이 아니라요. 점심 먹고 3번 입구에서 만나요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "prefix-lru-en-ko",
+          "result_id": "15b1a9b6-691c-4a58-9d7a-14515cc372f7"
+        }
+      ]
+    },
+    {
+      "source_text": "Hello.",
+      "target_language": "ko",
+      "translated_text": "안녕하세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "active-backend-transition",
+          "result_id": "2e7942c6-b0ca-4c0f-a9c2-22da5e68aed1"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "active-backend-transition",
+          "result_id": "7872bbfe-bacd-4343-9013-540c83992f79"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "active-backend-transition",
+          "result_id": "96c7c665-baab-43e5-9f21-237f752cff28"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리예요. 배터리가 42%니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:after-return-to-gpu",
+          "result_id": "1bb83b19-7925-40dd-a4ca-d0760a91d2e8"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-4",
+          "result_id": "a2954707-a7b7-598c-b5e8-6c8b79b771a6"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-5",
+          "result_id": "a2de6c07-dd6b-4fd9-82ce-877a0f2c62f0"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:after-return-to-gpu",
+          "result_id": "790eea75-de40-476c-8a10-3638cfa9598e"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:single",
+          "result_id": "8a3ea4c2-fa04-5f56-9302-6d90572f2ec6"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:serial-0",
+          "result_id": "91dff63b-14dd-5d08-93f1-74e9ede30536"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-5",
+          "result_id": "37535f27-d2dd-4b12-95b9-af61f99a8999"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:serial-0",
+          "result_id": "ed0a69d5-5add-51f7-b873-f1cc6884195f"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:overlap-0",
+          "result_id": "3a43e3a0-d18f-56e6-b7ab-a439ee2386b7"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-5",
+          "result_id": "fa15ed0e-eae8-4b7a-a8a9-88c5bfcd51f1"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:serial-0",
+          "result_id": "23513fb9-a1eb-5b64-948d-18c0f824e48d"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-5",
+          "result_id": "8e854509-1775-4e0e-9539-ffee2d792cdd"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-1",
+          "result_id": "c16108cc-7fff-4036-bea1-617aebb35021"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "Let me correct that. The meeting is on Tuesday at 2:30 PM, not Thursday at 1:40 PM.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:after-return-to-gpu",
+          "result_id": "84ac2c6f-3a1d-5def-b35a-e70e2c0b0713"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:serial-1",
+          "result_id": "d178e7eb-bd65-5387-8d7b-4e73a9d49a50"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:serial-1",
+          "result_id": "845dd80b-bb8d-5335-8166-f9a4d641eeec"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "cancel-self",
+          "result_id": "14623dbc-daac-5ceb-b384-f0e7b362b6ed"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓 9개가 아니라 7개를 가지고 있어요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:first-prefix",
+          "result_id": "c66dce55-840e-4f14-8686-e56933a30ca2"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:first-prefix",
+          "result_id": "c97a00a8-94c7-5cab-ae03-f0e4e92c4ed3"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:serial-0",
+          "result_id": "9edc2d3c-5180-45e8-9a7a-410a2420a657"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:first-prefix",
+          "result_id": "aa5d60ea-dfc5-53df-8bf3-ccd766cd2a0b"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개 있어요. 점심 식사 후에 게이트 3에서 만나주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:single",
+          "result_id": "6fca2924-c7d4-4f11-bd4d-b65d49aab8c6"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리야. 배터리가 42퍼센트니까 끄지 마.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:single",
+          "result_id": "db16de41-dd0c-5085-9d80-cfa9f5ba54c1"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-4",
+          "result_id": "0f17f4b4-1129-5f1a-9bd7-a7ae8c8d4e04"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정: 회의는 목요일 13:40이 아니라 화요일 14:30예요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:single",
+          "result_id": "f63434d6-71ff-4a6a-b02a-3e530ec9e013"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:single",
+          "result_id": "2cd49e2f-55c1-4ea2-ac45-c9f2bd80cb57"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-1",
+          "result_id": "b4273e9d-ce45-5bdb-a1a3-8153e694a4e7"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가고 녹색 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:single",
+          "result_id": "f1eb5c1e-c104-5df2-bda6-12d0814a4377"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇은 노리라고 해요. 배터리가 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:serial-1",
+          "result_id": "1813786d-ec3d-4bef-a8b5-94f5c1c58870"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-0",
+          "result_id": "73e8c390-6067-5052-9481-1e58cb74a794"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-1",
+          "result_id": "0c8d7da8-50b7-4dfc-898c-ba5ff9aab172"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-1",
+          "result_id": "8e56aa44-2bc7-4138-969b-c551f35f10e2"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:overlap-5",
+          "result_id": "69188e08-9a6d-455e-ab32-a0f8be3f46dd"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정합니다. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:serial-1",
+          "result_id": "8967186f-eb98-52a3-ab07-edcf14821f9e"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-2",
+          "result_id": "53cc2e2b-aa92-4608-b36b-ac541a71a0e0"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:overlap-5",
+          "result_id": "151890c0-0a38-5cd2-80cd-2935b7c2cd93"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:single",
+          "result_id": "17e335c2-4f6d-4a50-a1d9-262c9f1e3195"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 9장이 아니라 파란 티켓 7장을 가지고 있어요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-0",
+          "result_id": "9bc44c41-b43f-4184-a8fc-014dd26e4fdd"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정합니다. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분입니다.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-1",
+          "result_id": "221d0b9c-d3a7-5f6b-b8f3-21adc9ea7d4d"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:single",
+          "result_id": "a208edda-bb7c-4c1d-8536-ef279370e81f"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:single",
+          "result_id": "0c7d41ef-b8c9-41cc-915b-215ce0e53ea9"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가고 초록 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-2",
+          "result_id": "5ce413f0-2b4f-518b-b68a-f4a659349eed"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정: 회의는 목요일 13:40이 아니라 화요일 14:30입니다.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-2",
+          "result_id": "77070024-d92a-465a-a2df-cdc16c103429"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져다주고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-3",
+          "result_id": "efe85c98-6cc8-417c-b59e-57108b36d926"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7장이지 9장이 아니야. 점심 먹고 게이트 3에서 만나 줘.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-3",
+          "result_id": "af33774a-4dc4-502e-b6a4-7978528bf098"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 식사 후에 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-4",
+          "result_id": "12734557-f355-44a0-9161-cedee3e6f198"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-0",
+          "result_id": "0b088475-95a3-4c64-a1a7-4f07a8249b3c"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:first-prefix",
+          "result_id": "a445cad2-d58d-4aea-9bd4-271bfba8e602"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:single",
+          "result_id": "28466e39-36e4-4887-8a23-d6733fd9658a"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:first-prefix",
+          "result_id": "2bcc28c4-3f49-53b5-a993-398160e90ff1"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:serial-0",
+          "result_id": "693b1040-6f5f-4a58-8ba7-1158f970c770"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-4",
+          "result_id": "cefa9a70-ab7e-4961-8e27-87e31e829d4c"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정: 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "same:overlap-5",
+          "result_id": "25ee3cda-3270-571a-8616-aa06d570eed1"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-1",
+          "result_id": "f51a1c15-91dc-5828-bd45-a542e177aaac"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-2",
+          "result_id": "cd8003e7-6eea-487c-a057-74c1dbb5ae89"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:overlap-1",
+          "result_id": "e5038f61-2352-5794-ac62-7726e9a52aac"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:overlap-2",
+          "result_id": "068f0554-43fe-43ae-82b3-5dfcb22b4308"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-2",
+          "result_id": "02d8cb06-7398-419a-9126-a464bf62533a"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓 7개 가지고 있어요, 9개가 아니에요. 점심 식사 후에 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:first-prefix",
+          "result_id": "dfa8a024-1891-4c08-87b4-b570cfcaa707"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue signs. Not 9. Let's meet at entrance number 3 after lunch.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:first-prefix",
+          "result_id": "6482dde2-35fa-5425-9e4a-ec69f25c2336"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 식사 후에 3번 게이트에서 만나요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:single",
+          "result_id": "0e891e13-54ff-4c57-a7ac-0d85be24cae9"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Since it has 42% battery left, please don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:single",
+          "result_id": "ab7d51b4-b4bd-5ddd-97d6-15cb751d2895"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please move the red box to room 12 and put the green box next to the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:single",
+          "result_id": "ff6448ef-8adf-5474-938f-13e3b2a2a334"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-2",
+          "result_id": "f6c6d3db-214c-561a-b1c0-395abd9e38c9"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:serial-0",
+          "result_id": "e22694de-4821-4dfd-9628-b247d2dedd02"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-3",
+          "result_id": "69870011-4821-5ae8-83fa-a6861a7a0761"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-4",
+          "result_id": "80843006-97ca-4098-a824-ff1aa0e853a6"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Since it has 42 percent battery left, please don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:serial-0",
+          "result_id": "60a24238-a2fa-5fc4-a073-58f394f8df56"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-4",
+          "result_id": "9735be1c-9d81-5d92-a870-e24e80323cec"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "cancel-peer",
+          "result_id": "4e1515f2-0a77-5417-8d6d-e7a9341dfbba"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:serial-0",
+          "result_id": "16d39e40-8aa8-51c5-a064-8d286a87b97f"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. It has 42 percent battery left, so don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-0",
+          "result_id": "e7e517d9-b1f8-5f00-a505-fb0405485573"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-4",
+          "result_id": "4eb2870d-f3f2-52b8-99dc-d38273a733f5"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "I'll correct that. The meeting is on Tuesday at 2:30 PM, not Thursday at 1:40 PM.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-1",
+          "result_id": "5560ef5c-d970-590f-80fb-dd7cf027d3cf"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-5",
+          "result_id": "0d493528-a505-552c-8ae9-e9728f0035cf"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "cancel-self",
+          "result_id": "4dfc6816-5274-5251-a4f4-164dd33a0f02"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:after-return-to-gpu",
+          "result_id": "21f9e150-6d01-5895-9a9e-eada920e426f"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-1",
+          "result_id": "93f7cfae-89fc-5e32-86a2-bcace09ab473"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-5",
+          "result_id": "76085909-a890-5998-ba95-6cc83a7b3616"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-5",
+          "result_id": "1cd09bd0-287d-5bef-a9b4-31ee98f5e250"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please move the red box to room 12 and place the green box next to the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-2",
+          "result_id": "7fbb55df-95b9-5602-9721-98cd2e69316f"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:single",
+          "result_id": "f7660b40-a0be-533f-826b-c75cd9fba5d1"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-2",
+          "result_id": "3bfded05-6695-5f3e-8edb-3ed023ce9439"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:single",
+          "result_id": "53194385-dba6-5f96-a603-19ae2b797ac8"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-2",
+          "result_id": "0008f9d9-2134-517d-82b7-6b11353fd03c"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정할게요. 회의는 목요일 13:40이 아니라 화요일 14:30예요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-2",
+          "result_id": "e8b1fb9f-ac6b-4c07-a6d6-10190449049f"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue forms. Not 9. Let's meet at entrance number 3 after lunch.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-3",
+          "result_id": "7efa771d-7cae-5832-adf6-9c160d3cb317"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가서 놓고, 초록색 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-3",
+          "result_id": "0f063acf-e7b6-42da-a6e9-59edb31014d3"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 식사 후에 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-4",
+          "result_id": "ece5af8b-7a3f-468e-9a1f-1b3bd1ccca73"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 식사 후에 3번 게이트에서 만나요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "natural-history",
+          "result_id": "11904b20-c90b-42c2-b794-2d2763f2ee4f"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The little robot's name is Nori. It has 42 percent battery left, so don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "natural-history",
+          "result_id": "fb4c232a-63fb-54a7-aab2-39e94450e0c7"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "natural-history",
+          "result_id": "cb919eda-b35c-573c-915b-1216fed80116"
+        }
+      ]
+    },
+    {
+      "source_text": "고마워요.",
+      "target_language": "en",
+      "translated_text": "Thanks.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "ordered-peer",
+          "result_id": "8d9d9d7c-7d61-5349-b17e-67d1e4de24d3"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue tickets, not 9. Meet her at gate 3 after lunch. The small robot's name is Nori. Don't turn it off because it has 42 percent battery left. I'll correct that. The meeting is on Tuesday at 2:30 PM, not Thursday at 1:40 PM. Please move the red box to room 12 and place the green box next to the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "ordered-peer",
+          "result_id": "043c51c0-4b14-56d5-b403-6fa3ed02feaf"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 표 7장을 가지고 있고 9장이 아니에요. 점심 식사 후에 3번 게이트에서 만나요. 작은 로봇 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "ordered-self",
+          "result_id": "61a75994-03b9-4e20-a3d4-3986a171b2ad"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정합니다. 회의는 목요일 13:40이 아니라 화요일 14:30예요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "cancel-peer",
+          "result_id": "b85197e1-7090-4172-9a87-c8bcdb51d0cb"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Since its battery is at 42 percent, don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "cancel-peer",
+          "result_id": "d8ae1a58-3385-5f1c-98eb-4dd7550f4a5b"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "cancel-self",
+          "result_id": "6dc66f6f-5515-4ad5-901c-f48a55927bda"
+        },
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "response-failure",
+          "result_id": "aff73364-27a8-4c31-a015-450ac1313a9d"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue sheets, not 9. Let's meet at entrance number 3 after lunch. The small robot's name is Nori. Its battery is 42 percent; don't turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please move the red box to room 12 and put the green box next to the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "response-failure",
+          "result_id": "30c82c55-aa2c-52ae-93ed-7331f7b1ca35"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "manual-capacity",
+          "result_id": "3dddb3fd-031c-5dbb-849b-e21a94687a3f"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "manual-capacity",
+          "result_id": "be16ec56-2b8b-54cd-ac37-4a5f2268fe81"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "manual-capacity",
+          "result_id": "e275c283-f38d-40f9-9b19-23cbd4cbb207"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "manual-capacity",
+          "result_id": "342148a8-85ff-4da4-aac9-0eafb94a359e"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ja",
+      "translated_text": "ミナは青いチケットを7枚持っていて、9枚じゃないよ。お昼の後に3番の入り口で会おうね。",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "prefix-lru-en-ja",
+          "result_id": "4c3850bb-5133-40aa-8fcd-3b32e9fff829"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "fr",
+      "translated_text": "Mina a 7 tickets bleus, pas 9. S'il vous plaît, rencontrez-la à l'entrée 3 après le déjeuner.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "prefix-lru-en-fr",
+          "result_id": "07071543-58fe-4564-95e3-75d730a1e2b2"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "de",
+      "translated_text": "Mina hat 7 blaue Tickets, nicht 9. Trefft sie bitte nach dem Mittagessen am Eingang 3.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "prefix-lru-en-de",
+          "result_id": "9f0d62ee-badc-4f36-961d-ea581c6c1401"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "prefix-lru-en-de",
+          "result_id": "c619162f-975e-426a-8b71-7407aaa81176"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 표 7장을 가지고 있어요, 9장이 아니에요. 점심 먹고 3번 입구에서 만나요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "prefix-lru-en-ko",
+          "result_id": "39d0dd0d-d4db-4c4b-bfc2-2a7a0d7f7b0e"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 식사 후에 3번 게이트에서 만나세요. 작은 로봇 이름은 노리예요. 배터리는 42퍼센트이니 끄지 마세요. 정정하자면, 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12호실로 옮기고, 초록 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "active-shutdown",
+          "result_id": "ac6c496c-b1e3-4f93-8402-d55121793f46"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue tickets, not 9. Meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "active-shutdown",
+          "result_id": "212bb2e6-27f3-5f22-8a6e-083fc3d23103"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:first-prefix",
+          "result_id": "c55049ba-0d38-5879-b2bb-d6af919e701b"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-4",
+          "result_id": "a04dfbd9-909e-4328-9d19-9c1119ed2bc3"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:single",
+          "result_id": "d3086f07-eff4-4244-9ae0-ec81303184ab"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓 7장을 가지고 있어요, 9장이 아니에요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:single",
+          "result_id": "fa990553-f556-4861-acd9-e3eed19a0449"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정: 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:single",
+          "result_id": "6ae55dd3-a77d-4bef-9853-e0a9aa4612f7"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:single",
+          "result_id": "28c76223-9f6f-5f2a-82c5-361ce049f3a5"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 3번 게이트에서 만나세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:serial-0",
+          "result_id": "fb53e892-4471-41c1-8648-456b6fd150a1"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:serial-1",
+          "result_id": "82aa1088-4741-56a3-aea8-05278e54ac60"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-5",
+          "result_id": "f9b4b86f-9a25-5a47-9078-8282f5799daa"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:single",
+          "result_id": "6eb7a3cf-ba2f-4162-972e-343a219e9f47"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-2",
+          "result_id": "9ae8268b-fb5e-48d7-a1df-9860c4753d91"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름이 노리예요. 배터리가 42%니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-0",
+          "result_id": "fc9f01f0-388b-589c-ae8b-ccc67f153cc0"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:single",
+          "result_id": "20bd1d08-715d-5928-9365-b874ca416a65"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 3번 게이트에서 만나요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-0",
+          "result_id": "13566dc2-1b78-4e2e-a547-ef64f3d8b596"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:single",
+          "result_id": "8c6db980-3750-42b6-bd5f-22e06d8e77ef"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-0",
+          "result_id": "61253331-18ca-4dbb-97c6-9cab791928f8"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가시고 녹색 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-2",
+          "result_id": "7659f23b-2867-586e-8e04-178f33a97d09"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가 주시고, 초록색 상자는 문 옆에 놓아 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-3",
+          "result_id": "d9697d2d-ba3e-4374-a04f-58a78e6e6b19"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇은 노리라고 불러요. 배터리가 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-4",
+          "result_id": "d9e53220-0c5d-5df1-8f78-8f89f02eae0c"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:serial-1",
+          "result_id": "970a5013-445c-407e-8d94-d7ccbbba7338"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 먹고 3번 게이트에서 만나주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "same:overlap-4",
+          "result_id": "a7d10b42-2ffc-4645-9909-5fde84e24836"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니고요. 점심 먹고 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:first-prefix",
+          "result_id": "6c7a9f42-a9b4-48dc-b7bf-31a5a71db197"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue forms. Not 9. Let's meet at entrance 3 after lunch.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:first-prefix",
+          "result_id": "3229c2d1-7163-56ea-9d16-20028e3e7706"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. It only has 42 percent battery left, so don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:single",
+          "result_id": "14889b86-f557-5ca3-b6a5-f399f47d1d04"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정합니다. 미팅은 목요일 13:40이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:single",
+          "result_id": "f546e91e-950b-445f-9d77-282e844d0424"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니고요. 점심 먹고 3번 게이트에서 만나주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:serial-0",
+          "result_id": "390dfc74-65bb-46e4-9880-4889441406f8"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇은 노리라고 불려요. 배터리가 42%니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:serial-1",
+          "result_id": "95c4674a-d78a-4bca-9dea-b960088d5528"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:overlap-1",
+          "result_id": "a1016975-4c96-47af-8ddf-cd76180c5ca4"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Since it has 42 percent battery left, don't turn it off.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-0",
+          "result_id": "953bbcfd-3a2b-5451-89f2-1b28101b6ce7"
+        },
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-4",
+          "result_id": "453a035c-14e7-5ff0-9a06-6bfdf96b11fd"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니에요. 점심 식사 후에 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-0",
+          "result_id": "108e7cde-7647-434b-b998-e5556e2012f3"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇은 노리라고 불려요. 배터리가 42퍼센트니까 끄지 말아 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-1",
+          "result_id": "9bef364a-16a1-476a-a86a-63a1bfa1c9c3"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "I'll correct that. The meeting isn't on Tuesday at 2:40 PM, it's on Thursday at 2:30 PM.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-1",
+          "result_id": "a3779543-c9de-5c0d-a439-46f0c73bb46b"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has seven blue signs, not nine. Let's meet at the entrance number three after lunch.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-3",
+          "result_id": "ab762db0-753f-568f-b546-7112a2bbd9a8"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호까지 가져다 주고, 초록색 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-3",
+          "result_id": "25101207-cb6b-4a37-8470-73a9172f6d42"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "Let me correct that. The meeting isn't on Tuesday at 13:40, it's on Tuesday at 14:30.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-5",
+          "result_id": "628f2fe5-d381-5125-96cc-a0e4d396faa8"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 게이트 3에서 만나세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "natural-history",
+          "result_id": "59a0dc2e-a805-4360-be7c-a3ee171d4e7b"
+        },
+        {
+          "case": "cpu",
+          "phase": "same:serial-0",
+          "result_id": "a805e224-5c0e-4b1f-8dba-133e63361382"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has 7 blue tickets, not 9. Meet her at gate 3 after lunch. The little robot's name is Nori. Don't turn it off because it has 42% battery left. I'll correct that. The meeting is on Tuesday at 2:30 PM, not Thursday at 1:40 PM. Please move the red box to room 12 and put the green box next to the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "ordered-peer",
+          "result_id": "60323e56-bbb5-57a8-a22c-803731ba130e"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch. The small robot is called Nori. Its battery is 42 percent; do not turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 표 7장을 가지고 있고 9장이 아니에요. 점심 식사 후에 3번 게이트에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니까 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "ordered-self",
+          "result_id": "6f8881ed-205d-40b0-a0cb-e9af01e89da5"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "수정해서 말씀드리자면, 미팅은 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "cancel-peer",
+          "result_id": "3caba497-e437-4366-b642-ed392d78549f"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름은 노리예요. 배터리가 42퍼센트 남았으니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "cancel-self",
+          "result_id": "9cdebf1b-9ad1-4f18-9ac6-65b3d0823797"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요. 작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요. 정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요. 빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Mina has seven blue signs, not nine. Let's meet at the third entrance after lunch. The small robot's name is Nori. Its battery is 42 percent; don't turn it off. I'll correct that. The meeting is on Tuesday at 14:30, not Thursday at 13:40. Please move the red box to room 12 and put the green box next to the door.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "response-failure",
+          "result_id": "7212fe08-b66f-5752-85cc-559bc444542c"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ja",
+      "translated_text": "ミナは青いチケットを7枚持ってるよ、9枚じゃないんだ。ランチの後に3番の入り口で会ってね。",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "prefix-lru-en-ja",
+          "result_id": "cd2b31f4-8356-4ea2-ae24-64cc15e3124c"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "fr",
+      "translated_text": "Mina a sept billets bleus, pas neuf. Rendez-vous à l'entrée 3 après le déjeuner.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "prefix-lru-en-fr",
+          "result_id": "578fe7fd-64ae-4ec9-8aae-40b4899ece42"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 표 7장 가지고 있어요, 9장이 아니에요. 점심 후에 3번 입구에서 만나요.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "prefix-lru-en-ko",
+          "result_id": "f207f3bf-f999-4570-bccc-2f25b87a768f"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나가 파란 티켓이 9장이 아니라 7장이에요. 점심 먹고 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:first-prefix",
+          "result_id": "acd23eec-c47d-431d-95f1-abbc463b5764"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개 있어요. 점심 식사 후에 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:single",
+          "result_id": "9f1f9a22-a5a7-4703-9b09-727e7bcbd065"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가고 초록 상자는 문 옆에 놔주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:single",
+          "result_id": "69416553-b08e-5bf7-9fd7-1be7942d2599"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇은 노리라고 해요. 배터리가 42%니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:serial-1",
+          "result_id": "a6656346-382c-422d-817a-0584fb107cd9"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정합니다: 회의는 목요일 13시 40분이 아니라 화요일 14시 30분입니다.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:serial-1",
+          "result_id": "93f5250d-881a-562b-a80d-2d5f1e5a5dcc"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9장이 아니라 7장이에요. 점심 식사 후에 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:overlap-0",
+          "result_id": "b8b62b69-cb53-4d75-8c2c-3595ec909bd7"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가 주시고, 초록 상자는 문 옆에 놓아 주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:overlap-2",
+          "result_id": "5cca862c-c3ed-5805-8a40-866bf24105ce"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가시고 초록 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:overlap-3",
+          "result_id": "388be6d4-bbe6-4efa-b773-1b7da6ef43ef"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9장이 아니라 7장이에요. 점심 먹고 게이트 3에서 만나요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:overlap-3",
+          "result_id": "1518394b-7931-5b23-af5b-04a10c7f2517"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7개예요, 9개가 아니고요. 점심 먹고 3번 게이트에서 만나요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:overlap-4",
+          "result_id": "c62ec87d-65c5-4087-9bd7-663fc5753b93"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇 이름이 노리예요. 배터리가 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "same:overlap-4",
+          "result_id": "746b8582-8600-564b-ab8a-682cef7d2bf3"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나가 파란 티켓을 7개 가지고 있어요, 9개가 아니에요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:first-prefix",
+          "result_id": "3a3efb3f-7411-42c4-adc4-dcbde2344660"
+        }
+      ]
+    },
+    {
+      "source_text": "미나는 파란 표 7장을 가지고 있어요. 9장이 아니에요. 점심 후 3번 입구에서 만나요.",
+      "target_language": "en",
+      "translated_text": "Mina has seven blue signs. Not nine. Let's meet at entrance number three after lunch.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:first-prefix",
+          "result_id": "6fb5277b-4d95-5463-aba7-6fa8b2374425"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-3",
+          "result_id": "dceb9538-d402-59d1-82cc-0248a0581792"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:first-prefix",
+          "result_id": "e2743984-10f9-5743-be62-bb2c3ad6d492"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 9장이 아니라 파란 티켓 7장을 가지고 있어요. 점심 먹고 게이트 3에서 만나세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:single",
+          "result_id": "a6b0d089-1e11-423d-ba0d-e13f4885b72d"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. There's 42% battery left, so don't turn it off.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:single",
+          "result_id": "4eefe5bb-1e90-50e3-bf13-ebb364767f37"
+        }
+      ]
+    },
+    {
+      "source_text": "빨간 상자는 12번 방으로 옮기고 초록 상자는 문 옆에 놓아 주세요.",
+      "target_language": "en",
+      "translated_text": "Please move the red box to room 12 and leave the green box next to the door.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:single",
+          "result_id": "74626b6e-d463-553c-ab64-066845b9d6f7"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The little robot's name is Nori. Since it has 42 percent battery left, don't turn it off.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:serial-0",
+          "result_id": "b9e71a69-c979-57e3-b139-63d99f05b537"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "Let me correct that. The meeting isn't on Tuesday at 2 PM, but on Thursday at 1:40 PM.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:serial-1",
+          "result_id": "1a9b492d-d741-5a69-bba2-ded757fe1520"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 9개가 아니라 파란 티켓이 7개예요. 점심 식사 후에 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-0",
+          "result_id": "80a34d6e-73b4-40a1-a0fb-09e1cab3c847"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Don't turn it off since it has 42 percent battery left.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-0",
+          "result_id": "164e0c21-0717-5f2f-a592-250b93698788"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-4",
+          "result_id": "e059292f-852f-5673-8213-58839ba1bb9c"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇은 노리라고 불려요. 배터리가 42퍼센트니까 끄지 마세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-1",
+          "result_id": "d0c301e0-ce1d-48fe-a411-3ad6cd7ed339"
+        },
+        {
+          "case": "fallback",
+          "phase": "same:overlap-1",
+          "result_id": "8e983f6a-aec0-44c0-9403-5f3aa046a51f"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정합니다. 회의는 목요일 13:40이 아니라 화요일 14:30이에요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-2",
+          "result_id": "874c06cd-39a1-491f-897f-23a4791c6cb2"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가시고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-3",
+          "result_id": "f7aeef49-fcdb-420c-a256-f0226132bd07"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9장이 아니라 7장이에요. 점심 식사 후에 게이트 3에서 만나주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:first-prefix",
+          "result_id": "43822eab-fd5c-435a-9ace-2b2f45c9c565"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져가서 두고, 초록 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:single",
+          "result_id": "c852693b-ca09-5485-a948-30940bc0966a"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-3",
+          "result_id": "346ffac8-4d40-4c30-9563-48454c78c543"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓을 9장이 아니라 7장 가지고 있어요. 점심 식사 후에 3번 게이트에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:serial-0",
+          "result_id": "3656542e-220d-4181-9643-12c2e5608fb7"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:serial-1",
+          "result_id": "34b40b13-91e7-5a3f-bee4-9e8b05d92dc5"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호에 가져다 놓고 초록 상자는 문 옆에 두세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:overlap-2",
+          "result_id": "96e1792c-607e-5a16-8925-7ad140df82c9"
+        }
+      ]
+    },
+    {
+      "source_text": "Please carry the red box to room 12 and leave the green box beside the door.",
+      "target_language": "ko",
+      "translated_text": "빨간 상자는 12호로 가져다주고, 녹색 상자는 문 옆에 놓아주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:overlap-3",
+          "result_id": "d508d45f-2661-443a-8407-688c73bc0ebe"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9개가 아니라 7개예요. 점심 먹고 3번 게이트에서 만나주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:overlap-3",
+          "result_id": "521a0fd1-9540-5c88-8724-e56fff32ac51"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9장이 아니라 7장이에요. 점심 먹고 3번 게이트에서 만나주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:overlap-4",
+          "result_id": "4ef879fb-f3b5-4c46-bf08-ed56b3edcb00"
+        }
+      ]
+    },
+    {
+      "source_text": "Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40.",
+      "target_language": "ko",
+      "translated_text": "정정합니다: 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "same:overlap-5",
+          "result_id": "cd660800-cad4-52c0-bcaf-0f8fa27e1bd3"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 9장이 아니라 7장이에요. 점심 먹고 3번 게이트에서 만나요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:first-prefix",
+          "result_id": "88c85871-7394-438e-9b80-d3b46685dd9c"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Since there's 42 percent battery left, don't turn it off.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:single",
+          "result_id": "66ecc3a9-a883-53c9-98f7-01d356f9668b"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓 7개 가지고 있어요, 9개가 아니에요. 점심 먹고 게이트 3에서 만나 주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:serial-0",
+          "result_id": "87e7fc39-f4d5-446c-9921-86e6e92b715e"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "Let me correct that. The meeting isn't on Tuesday at 2:30 PM, it's on Thursday at 1:40 PM.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:serial-1",
+          "result_id": "63e1aac7-c81f-5ffd-9153-308b4368d220"
+        }
+      ]
+    },
+    {
+      "source_text": "Mina has 7 blue tickets, not 9. Please meet her at gate 3 after lunch.",
+      "target_language": "ko",
+      "translated_text": "미나는 파란 티켓이 7장이에요, 9장이 아니고요. 점심 먹고 3번 게이트에서 만나주세요.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-0",
+          "result_id": "ad0e8702-f096-4175-8fa3-d70367325ee7"
+        }
+      ]
+    },
+    {
+      "source_text": "작은 로봇의 이름은 노리예요. 배터리가 42퍼센트 남았으니 끄지 마세요.",
+      "target_language": "en",
+      "translated_text": "The small robot's name is Nori. Don't turn it off because it has 42 percent battery left.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-0",
+          "result_id": "259b8605-b824-529d-b0a9-365b5780f292"
+        }
+      ]
+    },
+    {
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "target_language": "en",
+      "translated_text": "I'll correct that. The meeting isn't on Tuesday at 2:30 PM, it's on Thursday at 1:40 PM.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-1",
+          "result_id": "9f41d0b5-9496-539a-a753-eda83f260292"
+        }
+      ]
+    },
+    {
+      "source_text": "The small robot is called Nori. Its battery is 42 percent; do not turn it off.",
+      "target_language": "ko",
+      "translated_text": "작은 로봇의 이름은 노리야. 배터리가 42퍼센트니까 끄지 마.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-5",
+          "result_id": "b0ffb60a-59e0-4bc5-9cc4-92083bdfed42"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Includes legitimate completed progress from both failed E4B safety attempts; those attempts remain failed.",
+    "Rejected/cancelled native outputs are retained separately in per-case audit files; ABBA176 quality is reviewed separately."
+  ]
+}

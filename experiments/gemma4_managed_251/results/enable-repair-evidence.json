@@ -1,0 +1,172 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-enable-repair/v1",
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/251",
+  "scope": "Bounded effective-enable rollback after failed or cancelled warmup, generation fencing, and controlled composed recovery",
+  "publication_preparation": {
+    "mode": "Offline consolidation of original accepted targeted tests and composed-control smoke",
+    "new_product_or_test_edits": false,
+    "new_test_application_gui_model_or_build_execution": false,
+    "new_git_index_or_remote_mutations": false,
+    "sanitization": "No personal absolute paths, credentials, passphrases, private transcripts, signed URLs, or whole-desktop screenshots. Local evidence references are relative to named task roots, not repository paths or public download links."
+  },
+  "candidate_applicability": {
+    "accepted_product_checkpoint_before_repair": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+    "implementation_baseline": "766e25a39ac6cec6800bf15e994409cf76a0ffe5",
+    "execution_binding": "The original targeted tests and smoke exercised that checkout plus the assigned working-tree owner/test repair. The smoke explicitly checked the imported TranslationEnableOwner source path against its checkout and recorded its source hash.",
+    "source_file": "src/puripuly_heart/app/services/translation_enable.py",
+    "source_sha256_at_smoke": "b2a6abc759db1bde43ce34a293dfe356833c6a6080a87f89c2a687a32d59465e",
+    "source_status": "Repair accepted and source frozen by the Director. This consolidation does not relabel the earlier run as a fresh execution of a later integrated candidate.",
+    "new_final_candidate_gui_execution": "Not run; awaiting the Director's frozen-candidate identity and explicit GUI execution GO."
+  },
+  "preserved_original_failure": {
+    "repository_evidence": "experiments/gemma4_managed_251/results/26b-no-fallback-attempt1.json",
+    "original_journal_root_basename": "puripuly-managed-251-final-k35xr0xk",
+    "original_journal_relative_path": "26b-no-fallback-attempt1/26b-failure/events.jsonl",
+    "original_journal_sha256": "8f4fdac22c979c3e7653ceda67460de1aa35d0d6ac171cfcf6c0d7d032cb6745",
+    "operation_id": "699a2191ac704d24974d3c6c1697b125",
+    "before": {"translation_enabled": false, "translation_runtime_ready": true},
+    "terminal_receipt": {"status": "failed", "terminal": true, "cli_exit": 4},
+    "defective_terminal_state": {"translation_enabled": true, "translation_runtime_ready": true, "managed_state": "failed", "backend": "gpu", "cause_type": "OSError"},
+    "controlled_boundary": "The original actual composed application rejected the selected 26B Vulkan spawn before native process creation; zero native or fallback processes were recorded.",
+    "preservation": "Original failed receipt, journal, and failed harness assertion remain unchanged. They were read, not rerun to confirm the observation."
+  },
+  "repair_contract": {
+    "demand_ordering": "Retain runtime_sink(True) before awaited warmup, because existing managed preparation demand is derived from that effective flag or Peer intent.",
+    "current_generation_failure": "Current-generation enabled warmup failure or cancellation publishes effective False and dashboard False, then re-raises the original exception unchanged.",
+    "post_await_fence": "A successful warmup result is accepted only for the original generation and enabled intent. There is no new True publication after the await.",
+    "late_failure": "An old failure cannot disable a newer pending or successful enable or clear that newer generation's starting projection.",
+    "disable_and_exhaustion": "Newer disable or managed exhaustion publishes off and fences old completion and failure.",
+    "stop_ingress": "Preserve the existing no-publication semantics. It fences old completion and failure without late success, True, or starting publication. It does not itself promise runtime configuration off; shutdown owns drain and teardown.",
+    "readiness": "translation_runtime_ready intentionally means provider attachment, not successful native initialization. A disabled lazy provider may remain binding-ready while models.status retains native preparation failure.",
+    "unchanged_mechanisms": ["No rollback teardown", "No previous-True restoration", "No alternate model or CPU/cloud fallback", "No selection persistence change", "No admission redesign", "No inference or performance mechanism changes"]
+  },
+  "scoped_targeted_tests": {
+    "command": "python -m pytest tests/app/test_translation_enable_owner.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_control_repair_behavior.py::test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning tests/app/test_control_repair_behavior.py::test_failed_26b_enable_stays_off_without_implicit_retry_and_recovers_explicitly -q",
+    "outcome": "passed",
+    "passed_cases": 48,
+    "failures_observed": 0,
+    "skips_observed": 0,
+    "wall_seconds": 20.07,
+    "output_provenance": "Original shell execution output retained in the worker transcript. Combined quiet options displayed 48 passing dots without a summary table; no separate JUnit report was generated. The Director accepted this scoped result. No rerun was performed for consolidation.",
+    "behavior_coverage": [
+      "Current-generation startup OSError, asyncio task cancellation, GemmaProvisioningCancelled, and cancellation plus PermissionError BaseExceptionGroup roll effective/dashboard state off and preserve exception identity.",
+      "Failure rolls off even when the previous effective flag was True; it does not blindly restore that value or invoke teardown.",
+      "A later explicit enable retries and succeeds.",
+      "Late failure preserves a newer pending or successful enable and its starting projection.",
+      "Newer enable, disable, exhaustion, and stop fence late warmup success and failure; disable/exhaustion publish off, while isolated stop makes no off-publication claim.",
+      "Real headless composition retains failed 26B/GPU/OSError state, attached provider, unchanged selection, and effective off.",
+      "Admitted text while terminally disabled causes no additional managed spawn or translation and preserves the failed model snapshot.",
+      "Explicit retry reaches managed ready and produces a correctly associated Self translation event through the real pipeline.",
+      "Actual composed provisioning cancellation rolls effective state off; cleanup failure remains failed rather than cancelled, with retained diagnostics and removed staging.",
+      "Full application shutdown reports interruption and settles provisioning with managed/provider resources released, without asserting isolated stop_ingress publishes off.",
+      "Real configuration and overlay presenter restore an existing translated Peer row to source-primary after warmup failure without new speech."
+    ]
+  },
+  "original_composed_control_smoke": {
+    "outcome": "passed",
+    "subprocess_exit_code": 0,
+    "stderr_empty": true,
+    "failure_diagnostic_timestamp": "2026-10-15T18:02:02.583+00:00",
+    "application": "Actual headless composition with real TranslationEnableOwner, ManagedGemmaTranslationOwner, ManagedGemmaRuntimeOwner, shared configuration, control operations, provisioning, and output callback wiring",
+    "capability_check": "Current control capabilities exposed translation.set, text.submit, and models.status before use.",
+    "before": {"translation_enabled": false, "translation_runtime_ready": true},
+    "operation_receipts": [
+      {"command": "translation.set", "request_id": "fail-first", "operation_id": "125f87e8dab7411380f279027910cb1c", "status": "failed", "terminal": true},
+      {"command": "text.submit", "request_id": "off-text", "operation_id": "ba2115d9706b4c31b89b6a5bbdae85ec", "status": "applied", "terminal": true},
+      {"command": "translation.set", "request_id": "retry-same-selection", "operation_id": "80a343d44f334eba903b1efc355d0bd7", "status": "applied", "terminal": true},
+      {"command": "text.submit", "request_id": "on-text", "operation_id": "86e12ab0267445a8973438c7042cc9af", "status": "applied", "terminal": true}
+    ],
+    "failed_receipt": {
+      "status": "failed", "terminal": true,
+      "error": {"code": "application_operation_failed", "type": "unclassified"},
+      "diagnostic_id": "c68057a1c3ca43be8d94c4c6be76e362",
+      "diagnostic_fields": {"exception_class": "unclassified", "cause_class_1": "OSError", "errno": 5}
+    },
+    "after_failure": {"translation_enabled": false, "translation_runtime_ready": true},
+    "dashboard_after_failure": "off, with starting projection cleared",
+    "managed_failure": {"state": "failed", "backend": "gpu", "error_type": "ManagedGemmaRuntimeError", "failure_phase": "provisioning", "failure_code": "filesystem_failed", "cause_type": "OSError", "os_error_code": 5, "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"},
+    "failure_diagnostic_preservation": "The native-owner snapshot retained its existing OSError-derived filesystem/provisioning classification; the repair did not reinterpret or suppress it.",
+    "failure_boundary": "The first controlled Vulkan process-factory call raised OSError before creating any process. Runtime readiness was None, and no fallback process existed.",
+    "osc_destination_observation": {"receiver": "Owned actual loopback UDP socket", "address": "/avatar/parameters/PuriPuly_Trans", "values": [true, false], "interpretation": "Provisional enable and rollback reached the real OSC sender and destination socket, not only a mocked callback."},
+    "disabled_text": {"admission": "admitted", "translation_turns_settled": true, "total_spawn_attempts_after_text": 1, "translation_calls": 0, "managed_failure_snapshot_unchanged": true},
+    "explicit_retry": {"status": "applied", "terminal": true, "managed_state": "ready", "backend": "gpu", "effective_backend": "vulkan", "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl", "total_spawn_attempts": 2, "controlled_processes_created": 1},
+    "both_attempts_selected": {"alias": "puripuly-gemma-4-26b-a4b-q4", "device": "Vulkan0", "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"},
+    "selected_settings_retained": {"model": "managed_gemma_26b", "connection": "gpu"},
+    "recovered_translation_event": {"topic": "translation", "channel": "self", "text": "controlled smoke translation", "utterance_id": "94fb9caa-d1f6-4625-8668-b29aeae23435", "identity_matches_admitted_turn_or_child": true, "translation_calls": 1},
+    "controlled_boundaries": [
+      "A small synthetic target asset retained 26B model identity/filename but replaced the real asset size/hash. Real provisioning, checksum validation, installation, and installed reuse ran against those synthetic bytes.",
+      "Runtime version validation and process factory were controlled; the placeholder executable was never executed.",
+      "The transport deterministically acknowledged readiness/prefix preparation and returned one synthetic translation. No native server, GPU inference, or quality/performance claim follows from this response."
+    ],
+    "isolation": {
+      "settings_and_secrets": "Task-owned settings with encrypted-file secrets and a synthetic passphrase; no live settings or external translation credentials were used.",
+      "redirected_roots": ["LOCALAPPDATA", "APPDATA", "HTTP extension directory", "model installation", "runtime logging"],
+      "disabled": ["telemetry", "integrated context", "Self capture", "Peer capture", "GUI", "overlay"],
+      "stt": "Inactive keyless Soniox selection; no external recognition/capture request was made.",
+      "network": "Only owned loopback OSC sockets; downloader and native boundaries were controlled.",
+      "scope_limit": "This smoke did not claim a fully redirected desktop/Hugging Face profile, actual native execution, or GUI interaction."
+    },
+    "cleanup": {"controlled_process_returncodes": [0], "transport_closes": 1, "native_readiness_after_close": false, "udp_sink_closed": true, "synthetic_state_removed": true, "removed": ["synthetic model installation", "settings", "encrypted secrets", "placeholder executable", "task-owned local application state", "extension directory"], "retained": ["result.json", "stdout.txt", "stderr.txt", "runtime.log"], "script": "Executed in memory; no throwaway script file was retained."}
+  },
+  "local_artifact_provenance": {
+    "root_basename": "puripuly-enable-251-smoke-xt168cy6",
+    "hash_scope": "SHA-256 and byte sizes computed offline from the retained original small evidence files during this consolidation; no product/application/test execution or model rehash.",
+    "artifacts": [
+      {"relative_path": "result.json", "size_bytes": 4350, "sha256": "314ee80874957cad28e8047df78526cedba7038e0e31cd5e0d0ee4ea2a390fa1"},
+      {"relative_path": "stdout.txt", "size_bytes": 4314, "sha256": "a5865dcd04c1ecd0facaf9e5e47ec88f65d3046943f6d12d524552a7ff40ff25"},
+      {"relative_path": "stderr.txt", "size_bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+      {"relative_path": "runtime.log", "size_bytes": 6945, "sha256": "d8daafc9eac6d97756b8578b552564a9bd9bca2c7170fb0145010906402694ee"}
+    ],
+    "cleanup_record_note": "result.json includes the later recorded removal of owned synthetic state. Original stdout.txt preserves the subprocess output before that cleanup bookkeeping field was added."
+  },
+  "prepared_final_candidate_gui_probe": {
+    "status": "Prepared read-only; not executed and no probe resources allocated. Awaiting frozen-candidate GUI GO.",
+    "original_selection_evidence": "experiments/gemma4_managed_251/results/selection-evidence.json",
+    "original_task_roots": {"selection": "puripuly-251-selection-u7ahg83e", "provisioning": "puripuly-251-gui-provisioning-z4mwb2ca"},
+    "original_helper_availability": "The selection worker confirmed the original GUI helpers were Python eval cells, not retained scripts. Original local JSON/PNG/log evidence is available. Do not claim an existing reusable script file.",
+    "owned_verified_asset_source": {
+      "source_root": "puripuly-251-gui-provisioning-z4mwb2ca",
+      "relative_install_dir": "Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+      "entries": ["installed-manifest.json", "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"],
+      "repo_id": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "size_bytes": 14249047104,
+      "original_verified_sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+      "provenance": "Original normal product promotion and full checksum evidence in cache-promotion-evidence.json; installation was a distinct product-created copy, not a manufactured installed manifest.",
+      "preservation": "Original installation/cache/evidence remains read-only. After GO, hardlink/copy the verified target and copy its product-created manifest into a new exclusively owned probe root; no new model download."
+    },
+    "launch_and_controls": {
+      "entrypoint": "Owned candidate Python environment: python -m puripuly_heart.main --config <new-owned-root>/settings.json run-gui",
+      "identity": "After GO, bind the specified candidate/source hashes and actual imported package/executable to the fresh process, control instance, Flet child PID, and owned HWND before interaction.",
+      "driver": "Enumerate only the owned Flet PID's top-level window and its FLUTTERVIEW child. Use Win32 PostMessageW mouse move/down/up mapped to child-client coordinates. Restore the owned window and use PrintWindow for owned-window-only presentation evidence.",
+      "geometry": "Re-observe final-candidate geometry before input. Old 1136x850 images place TRANS around top-level (135,585) and Cancel around (1058,113), but those coordinates are references, not trusted offsets.",
+      "uia_limit": "Original UIA exposed only Window/FLUTTERVIEW, not semantic button nodes. A minimized 160x28 capture is invalid presentation evidence.",
+      "query_boundary": "Use current capabilities and owner-backed app.status/models.status/settings.current observations. Initiate enable and cancel through actual GUI controls, not gemma.prepare or a replacement GUI callback. Retain GUI task diagnostics and any operation receipts that actually exist; do not manufacture a CLI enable receipt for a mouse action."
+    },
+    "planned_isolation": [
+      "Allocate a new synthetic profile/settings/secrets/log/temp/model/extension root after GO; redirect LOCALAPPDATA, APPDATA, USERPROFILE, HOME, TEMP, TMP, HF_HOME, HF_HUB_CACHE, and HF_XET_CACHE.",
+      "Use isolated encrypted-file secrets; strip inherited provider/Hugging Face credentials and runtime overrides before setting a deliberately absent task-owned runtime root.",
+      "Force Hugging Face offline with an absent effective cache; reuse the verified installation. Disable telemetry, clipboard auto-translation, scene context, capture, microphone test, and overlay.",
+      "Keep OSC control off and direct both port/send_port fields to an owned loopback sink held through teardown.",
+      "No native build, real inference, public download, private audio, live settings, or unrelated desktop input. Preserve original resource roots."
+    ],
+    "planned_observations": [
+      "Capture the inactive final-candidate dashboard and disabled/provider-binding-ready state with 26B/GPU selection before interaction.",
+      "Click the actual TRANS tile. At the deliberately missing-runtime failure, observe retained failed 26B/GPU state and actionable no-fallback error text, effective disabled state, and actual final-candidate tile rendering off. Capture only the owned window.",
+      "For a deterministic native-free cancellation interval, after startup acquire the existing LocalSTTProvisioningLease on the NEW owned models root. A second actual TRANS click then enters real managed checking while waiting for that lease. Click actual dashboard Cancel, observe settled cancellation plus effective/tile off, then release only the probe-owned lease. This is a planned controlled lease-contention boundary, not a performed download cancellation or native startup.",
+      "Click actual TRANS again after cancellation with the lease released. Observe that a fresh explicit attempt reaches the same selected model's controlled missing-runtime error and converges off; this proves GUI retry remains usable, not successful native readiness.",
+      "Successful same-selection recovery is already demonstrated only at the controlled composed boundary in this record. Any actual ready/inference GUI recovery needs a separately coordinated Director-owned native execution window.",
+      "Stop through supported app stop; separately observe launcher/host/Flet exit, owned window disappearance, no model/downloader/fallback children, owned socket closure, and removal of only newly created probe state. Preserve receipts/failures and owned screenshots/logs."
+    ],
+    "existing_reference_images": ["provisioning_task/01-26b-inactive-before-download.png", "provisioning_task/03-real-progress-before-dashboard-cancel.png", "provisioning_task/05-actionable-controlled-runtime-failure.png", "provisioning_task/07-repaired-terminal-dashboard-cancelled.png", "provisioning_task/09-offline-installed-reuse-runtime-unavailable.png"],
+    "execution_gate": "No GUI launch or interaction, model state preparation, lease acquisition, asset copy, or native execution until the Director supplies a new frozen-candidate GO."
+  },
+  "limits_not_reclassified_as_passes": [
+    "No final-candidate actual GUI toggle/failure/cancel/retry observation has yet been performed for this bounded repair.",
+    "Controlled smoke readiness and translation are not actual Vulkan readiness, native inference, model quality, resource-cost, or performance evidence.",
+    "The source hash identifies the repaired owner at the original smoke; no complete source hash was captured for every dependency in that run.",
+    "No new formatter, linter, type checker, full test suite, installed-distribution, GUI, or native-model run is claimed by this evidence consolidation.",
+    "The separate E4B GPU-return/provider-signature convergence repair belongs to its own workstream and evidence.",
+    "This record is not a whole-issue completion verdict or publication/merge/release authorization."
+  ]
+}

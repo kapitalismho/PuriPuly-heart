@@ -1,0 +1,115 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-afterproof-release/v1",
+  "candidate": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+  "source_tree_sha256": "cbd004e0bd448c1b6efb20f0836b247a5bb0c116adf3b5d736a878a81eb496c5",
+  "basis": "Completed run supervisors and terminal owned-exit/closed-port/zero-task journal observations; not a new later PID/port inspection.",
+  "cases": {
+    "26b": {
+      "raw_journal_sha256": "fdb701811c69e040d97694d64cad8d67aa75764e28845b32c46db5f51c07cd58",
+      "cleanup": [
+        {
+          "t": 100245.6033026,
+          "kind": "shutdown_ports",
+          "states": [
+            {
+              "pid": 69864,
+              "port": 62435,
+              "accepting_after_shutdown": false
+            }
+          ]
+        },
+        {
+          "t": 100245.6034072,
+          "kind": "cleanup",
+          "managed_processes": [
+            {
+              "pid": 69864,
+              "returncode": 1
+            }
+          ],
+          "remaining_owned_tasks": 0,
+          "checks": {
+            "26b_no_fallback": true,
+            "smoke_completed": 6
+          }
+        }
+      ],
+      "supervisor_outcomes": [
+        {
+          "arm": "26b-failure",
+          "model": "managed_gemma_26b",
+          "backend": "gpu",
+          "mode": "product",
+          "exit_code": 0,
+          "start_unix_s": 1792090245.0536494,
+          "end_unix_s": 1792090305.4198534
+        }
+      ]
+    },
+    "e4b": {
+      "raw_journal_sha256": "c76121a6d21bbc8c9c947d3fd5cfeae0c41679f84a6aa02806ee4edba6c98396",
+      "cleanup": [
+        {
+          "t": 100406.2982304,
+          "kind": "shutdown_ports",
+          "states": [
+            {
+              "pid": 50884,
+              "port": 61337,
+              "accepting_after_shutdown": false
+            },
+            {
+              "pid": 72040,
+              "port": 62735,
+              "accepting_after_shutdown": false
+            },
+            {
+              "pid": 69380,
+              "port": 63322,
+              "accepting_after_shutdown": false
+            }
+          ]
+        },
+        {
+          "t": 100406.2983483,
+          "kind": "cleanup",
+          "managed_processes": [
+            {
+              "pid": 50884,
+              "returncode": 1
+            },
+            {
+              "pid": 72040,
+              "returncode": 1
+            },
+            {
+              "pid": 69380,
+              "returncode": 1
+            }
+          ],
+          "remaining_owned_tasks": 0,
+          "checks": {
+            "completed_translations": 44,
+            "expected_translations": 44,
+            "one_managed_process": true,
+            "positive_self_chatbox": true,
+            "peer_chatbox_denied": true
+          }
+        }
+      ],
+      "supervisor_outcomes": [
+        {
+          "arm": "safety",
+          "model": "managed_gemma",
+          "backend": "gpu",
+          "mode": "product",
+          "exit_code": 0,
+          "start_unix_s": 1792090317.1290076,
+          "end_unix_s": 1792090466.2070212
+        }
+      ]
+    }
+  },
+  "hardware_release_notified": true,
+  "observation_limit": "Native exit1 accompanies explicit owned termination; not labeled unexplained crash. No unrelated process was terminated. Original33-PID/19-port cleanup remains separate."
+}

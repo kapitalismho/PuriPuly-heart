@@ -1,0 +1,190 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-startup/v1",
+  "arms": [
+    {
+      "arm": "A1",
+      "mode": "mmap",
+      "spawn_to_initial_prefix_request_ms": 6143.287500002771,
+      "initial_prefix_request_latency_ms": 2226.073700003326,
+      "initial_native_prefix_timings": {
+        "cache_n": 0,
+        "prompt_n": 825,
+        "prompt_ms": 2221.128,
+        "prompt_per_token_ms": 2.692276363636364,
+        "prompt_per_second": 371.4328935567873,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "initial_native_prefix_tokens_evaluated": 825,
+      "enable_control_latency_ms": 8591.28690000216,
+      "first_channel_requests": [
+        {
+          "phase": "same:first-prefix",
+          "channel": "self",
+          "latency_ms": 536.1005000013392,
+          "result_id": "bc88f13f-5a18-419f-a8e3-e58361b76050"
+        },
+        {
+          "phase": "same:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1418.1122000009054,
+          "result_id": "dac9ab45-9e37-5ab9-a77e-f9c99572b7f7"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "self",
+          "latency_ms": 482.0477000030223,
+          "result_id": "325a596e-6cc5-43fc-b98c-80745a8e7867"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1276.2539999966975,
+          "result_id": "4652cd39-473b-534c-a13b-22d896bdb26d"
+        }
+      ]
+    },
+    {
+      "arm": "B1",
+      "mode": "none",
+      "spawn_to_initial_prefix_request_ms": 6144.206900004065,
+      "initial_prefix_request_latency_ms": 2268.0550000077346,
+      "initial_native_prefix_timings": {
+        "cache_n": 0,
+        "prompt_n": 825,
+        "prompt_ms": 2262.785,
+        "prompt_per_token_ms": 2.7427696969696966,
+        "prompt_per_second": 364.59495709932673,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "initial_native_prefix_tokens_evaluated": 825,
+      "enable_control_latency_ms": 8646.451499997056,
+      "first_channel_requests": [
+        {
+          "phase": "same:first-prefix",
+          "channel": "self",
+          "latency_ms": 542.3050999961561,
+          "result_id": "76486156-a1af-43e6-ba09-038059eccbc8"
+        },
+        {
+          "phase": "same:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1442.7198999910615,
+          "result_id": "54893b5b-82d4-5172-8c60-21e9302142bd"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "self",
+          "latency_ms": 481.7952999874251,
+          "result_id": "ba9bce59-4e66-48a7-9892-0ae4170c0c6f"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1306.0944000026211,
+          "result_id": "21bcd8f7-895a-5ad9-b647-04df03db71d5"
+        }
+      ]
+    },
+    {
+      "arm": "B2",
+      "mode": "none",
+      "spawn_to_initial_prefix_request_ms": 6134.382000003825,
+      "initial_prefix_request_latency_ms": 2233.2282999996096,
+      "initial_native_prefix_timings": {
+        "cache_n": 0,
+        "prompt_n": 825,
+        "prompt_ms": 2228.02,
+        "prompt_per_token_ms": 2.700630303030303,
+        "prompt_per_second": 370.2839292286425,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "initial_native_prefix_tokens_evaluated": 825,
+      "enable_control_latency_ms": 8595.727899999474,
+      "first_channel_requests": [
+        {
+          "phase": "same:first-prefix",
+          "channel": "self",
+          "latency_ms": 535.1572000072338,
+          "result_id": "cc9bc0bc-9f60-4022-8223-83dacaa2b622"
+        },
+        {
+          "phase": "same:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1398.2417000079295,
+          "result_id": "a67fa88c-c7c1-5fec-bef5-10178f398f75"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "self",
+          "latency_ms": 478.78570000466425,
+          "result_id": "33476d58-37dd-4dd7-8846-96c94f1ae2d5"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1316.9231999927433,
+          "result_id": "142970c5-27d3-5bd4-986c-eb12b5c95913"
+        }
+      ]
+    },
+    {
+      "arm": "A2",
+      "mode": "mmap",
+      "spawn_to_initial_prefix_request_ms": 6117.858500001603,
+      "initial_prefix_request_latency_ms": 2276.44909999799,
+      "initial_native_prefix_timings": {
+        "cache_n": 0,
+        "prompt_n": 825,
+        "prompt_ms": 2271.265,
+        "prompt_per_token_ms": 2.7530484848484846,
+        "prompt_per_second": 363.2337045655175,
+        "predicted_n": 1,
+        "predicted_ms": 0.001,
+        "predicted_per_token_ms": 0.0,
+        "predicted_per_second": 0.0
+      },
+      "initial_native_prefix_tokens_evaluated": 825,
+      "enable_control_latency_ms": 8614.8600000015,
+      "first_channel_requests": [
+        {
+          "phase": "same:first-prefix",
+          "channel": "self",
+          "latency_ms": 557.094000003417,
+          "result_id": "83218cd7-552c-4ce0-9967-c5c62e7b18c8"
+        },
+        {
+          "phase": "same:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1398.528499994427,
+          "result_id": "2803f034-954a-5176-b7aa-70d4dcc832d6"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "self",
+          "latency_ms": 483.38499999954365,
+          "result_id": "5307a1ef-6fb7-429a-919b-bd3d7f16d6ba"
+        },
+        {
+          "phase": "opposite:first-prefix",
+          "channel": "peer",
+          "latency_ms": 1320.158899994567,
+          "result_id": "d76138d0-85f1-5e1e-a9be-192de667d88b"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Spawn-to-prefix includes native loading/health and preparation; enable-control latency includes control overhead and prefix persistence. None is a pure cold-disk load measurement.",
+    "Integrity hashing warmed filesystem cache before fresh lifecycles. Initial one-token native prefix generation is not one of the176 application translation outputs.",
+    "Actual first channel request timings remain separate from repeated-request aggregation."
+  ]
+}

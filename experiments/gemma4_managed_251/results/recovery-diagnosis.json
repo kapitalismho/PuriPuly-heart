@@ -1,0 +1,247 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-recovery/v1",
+  "candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+  "original_attempts": [
+    "e4b-safety-attempt1.json",
+    "e4b-safety-attempt2.json"
+  ],
+  "attempt2_raw_journal_sha256": "9a4cb3ff0735625aaf78e79d6406c04cd3557a9bcc6e568d409f301e2c2a3961",
+  "attempt2_receipts": [
+    {
+      "t": 96354.2998034,
+      "arguments": [
+        "translation",
+        "set",
+        "on"
+      ],
+      "exit_code": 0,
+      "status": "applied",
+      "terminal": true,
+      "operation_id": "13079bceff9e45a8b81691968ac7423d",
+      "request_id": "05c3639e510e90f486d601f504449c57",
+      "transaction_status": null,
+      "diagnostic_component": null,
+      "diagnostic_code": null
+    },
+    {
+      "t": 96366.467009,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"peer_source\": \"ko\", \"peer_target\": \"en\"}}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "2e72ef37f2ac4371bf29025ad0ef782d",
+      "request_id": "d90fa11c4a3175aee4c78a04f8fbac27",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96397.5716573,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ja\"}}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "9da5ca7661744919aec1d3d3107cbbb8",
+      "request_id": "b43063bf0ddfae6be06a90173ad4c245",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96399.4530069,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"fr\"}}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "88a22462600c46799f1ac15479b4cf30",
+      "request_id": "eaa1ea7ff841835df702d3a6eb3b3a6c",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96401.1919485,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"de\"}}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "059d94a7989c44eb927b3db00dd93a1a",
+      "request_id": "4eb18500a127d091a6c020360cccfdb6",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96402.5287198,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"languages\": {\"source\": \"en\", \"target\": \"ko\"}}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "0e18b9e461e04782bdcee53255d301bf",
+      "request_id": "71bf986ec96bbf913f4a65e2f64da381",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96411.7783846,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"translation.connection\": \"cpu\"}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "8e217a7a9c2446118f782ef35745673c",
+      "request_id": "1b14f2a419cd184262dae0540c43ab8b",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96418.5440483,
+      "arguments": [
+        "settings",
+        "apply",
+        "--arguments",
+        "{\"changes\": {\"translation.connection\": \"gpu\"}}"
+      ],
+      "exit_code": 4,
+      "status": "degraded",
+      "terminal": true,
+      "operation_id": "6ffe4d64b7b248c682599ea35a270462",
+      "request_id": "b0b35036fe000f1fed08e520f33c10f0",
+      "transaction_status": "settings_commit_success_runtime_degraded",
+      "diagnostic_component": "provider.stt",
+      "diagnostic_code": "stt.provider_not_ready"
+    },
+    {
+      "t": 96421.9860995,
+      "arguments": [
+        "translation",
+        "set",
+        "off"
+      ],
+      "exit_code": 0,
+      "status": "applied",
+      "terminal": true,
+      "operation_id": "b83ce3c0614745859ec00263432f6d98",
+      "request_id": "df477984779b969f4365062ac1fd6b44",
+      "transaction_status": null,
+      "diagnostic_component": null,
+      "diagnostic_code": null
+    },
+    {
+      "t": 96422.1441536,
+      "arguments": [
+        "translation",
+        "set",
+        "on"
+      ],
+      "exit_code": 0,
+      "status": "applied",
+      "terminal": true,
+      "operation_id": "8c7fdc4e23c74b5090c32c90f163d925",
+      "request_id": "46cf88e8b9b0e171123dcaf3b16c89cf",
+      "transaction_status": null,
+      "diagnostic_component": null,
+      "diagnostic_code": null
+    }
+  ],
+  "observed_sequence": [
+    {
+      "event": "Initial E4B Vulkan",
+      "pid": 22176,
+      "spawn_s": 96343.8368992,
+      "exit_s": 96404.6329396
+    },
+    {
+      "event": "Actual CPU/MTP transition",
+      "pid": 58664,
+      "spawn_s": 96404.6705627,
+      "exit_s": 96419.3312023
+    },
+    {
+      "event": "Canonical GPU intent committed with inactive-STT degraded receipt",
+      "t": 96418.5440483
+    },
+    {
+      "event": "Approved supported off/on prepares actual new Vulkan child",
+      "pid": 62788,
+      "spawn_s": 96419.359286,
+      "prepared_s": 96422.1443061,
+      "exit_s": 96422.3887697
+    },
+    {
+      "event": "Self and Peer provider.llm errors; no post-recovery native translation completion",
+      "diagnostic_ids": [
+        "fba8147e84474320bea1ccf137d2e70e",
+        "ec334fe483fd4b7984954dd95f57a61e"
+      ],
+      "cause_class": "RuntimeError"
+    },
+    {
+      "event": "Actual request wait times out; attempt remains failed",
+      "stage": "opposite:after-return-to-gpu",
+      "t": 96602.1568855
+    }
+  ],
+  "source_supported_relationship": {
+    "owner": "src/puripuly_heart/app/services/provider/provider_runtime_apply.py:206-228",
+    "chain": [
+      "ProviderRuntimeOwner.apply rebuilds LLM before STT convergence, then updates signature cache only after convergence succeeds.",
+      "Successful GPU-to-CPU provider replacement followed by inactive-STT convergence failure can leave cached LLM signature at GPU.",
+      "Next CPU-to-GPU plan compares requested GPU to stale cached GPU and skips LLM replacement.",
+      "Connection-only changes also do not trigger the managed-prefix refresh predicate in settings_runtime_effects.py:76-91.",
+      "Actual disable/enable demand prepares from current canonical GPU selection, while an existing provider bound to CPU can remain.",
+      "ManagedGemmaLLMProvider.translate uses its bound self.backend, not current canonical selection."
+    ],
+    "binding_source": "src/puripuly_heart/app/wiring/wiring_llm_factory.py:711-731",
+    "translation_source": "src/puripuly_heart/providers/llm/managed_gemma.py:303-325",
+    "limits": [
+      "Private signature-cache and provider backend values were not directly captured in the original failed attempt.",
+      "The original process observation validated profile before journaling attempted argv. The rejected CPU argv and exact guard message were not retained. No actual post-recovery CPU spawn is claimed.",
+      "The stale-binding explanation is source-supported diagnosis, not an invented direct native observation. Future harness journals attempted original/effective argv before the unchanged guard."
+    ]
+  },
+  "smallest_missing_verification": [
+    "Same-model CPU-to-GPU settings reconciliation must bind the effective provider to GPU even after unrelated inactive-STT degradation.",
+    "Actual new GPU child/profile must remain active through repeated Self/Peer completions and positive native overlap.",
+    "Then observe two actual active GPU requests plus admitted waiting manual work at shutdown, with no late publication and complete release."
+  ],
+  "no_fallback_contract_adjudication": {
+    "original_failure_preserved": true,
+    "provider_binding_semantics": "app.status.translation_runtime_ready intentionally means provider binding and was already true while disabled. It is not native model readiness.",
+    "actual_enable_bug": "translation_enabled remained true after managed warmup failure. Director assigned bounded rollback/generation repair.",
+    "replacement_protection": "After approved repair, require enabled=false, provider binding still=true, failed26B/GPU state, actual owner.runtime.readiness=None, no native/fallback processes, followed by explicit retry and six real smoke completions.",
+    "prepared_but_not_exercised": true
+  },
+  "release": "All original children exited and ports closed; final-cleanup.json records one current inspection of33 recorded PIDs absent and19 ports closed. No further model executions occurred."
+}

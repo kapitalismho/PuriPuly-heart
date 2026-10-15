@@ -1,0 +1,2664 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-pressure/v1",
+  "runs": {
+    "26b": {
+      "raw_journal_sha256": "c8d97cfaec1dc6ed651bf96fe3b9b2bc90f83edf8191d6ce9ad1dda92ef6b243",
+      "processes": [
+        {
+          "pid": 58212,
+          "model_filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 95408.6519193,
+          "exit_s": 95504.2342591,
+          "samples": 367,
+          "live_window_sample_gaps_s": {
+            "n": 366,
+            "median": 0.2592883499964955,
+            "p95": 0.26245559999370016,
+            "max": 0.305983300000662
+          },
+          "first_sample_delay_after_spawn_s": 0.2560574999952223,
+          "last_sample_to_exit_gap_s": 0.12183450000884477,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 95408.9079768,
+            "phase": "model-load",
+            "available_physical_bytes": 9865506816,
+            "commit_headroom_bytes": 16924934144,
+            "committed_bytes": 59958153216,
+            "commit_limit_bytes": 76883087360
+          },
+          "physical_minimum": {
+            "time_s": 95412.7964714,
+            "phase": "model-load",
+            "stage": "loading",
+            "sample": {
+              "time": 95412.7964714,
+              "WorkingSetSize": 9674076160,
+              "PeakWorkingSetSize": 10049445888,
+              "PrivateUsage": 15188123648,
+              "PeakPagefileUsage": 15188123648,
+              "PageFaultCount": 2767857,
+              "cpu_seconds": 0.125,
+              "system_available_physical_bytes": 12550144,
+              "system_committed_bytes": 75325218816,
+              "system_commit_limit_bytes": 84497076224,
+              "system_commit_headroom_bytes": 9171857408,
+              "process_gpu_dedicated_bytes": 4091621376.0,
+              "process_gpu_shared_bytes": 10909118464.0,
+              "process_gpu_committed_bytes": 15000739840.0,
+              "device_gpu_dedicated_bytes": 9549463552.0,
+              "device_gpu_shared_bytes": 11499773952.0,
+              "device_gpu_committed_bytes": 21340577792.0,
+              "gpu_engine_percent": 20.449710686718696,
+              "system_pages_input_per_second": 546727.9768003732,
+              "system_page_reads_per_second": 3845.7331494080854
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 6,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 95412.2773474,
+                "last_low_sample_s": 95412.7964714,
+                "sample_supported_span_s": 0.5191239999985555,
+                "low_samples": 3,
+                "largest_within_run_gap_s": 0.2608842000045115,
+                "preceding_above_or_lifetime_boundary_s": 95412.017835,
+                "following_above_or_lifetime_boundary_s": 95413.0561102,
+                "outer_bracket_s": 1.0382752000004984,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 1.0382752000004984,
+              "runs": [
+                {
+                  "first_low_sample_s": 95410.9796351,
+                  "last_low_sample_s": 95411.4986304,
+                  "sample_supported_span_s": 0.5189953000081005,
+                  "low_samples": 3,
+                  "largest_within_run_gap_s": 0.2603469000023324,
+                  "preceding_above_or_lifetime_boundary_s": 95410.7204586,
+                  "following_above_or_lifetime_boundary_s": 95411.7571642,
+                  "outer_bracket_s": 1.036705599995912,
+                  "phases": [
+                    "model-load"
+                  ],
+                  "stages": [
+                    "loading"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 95412.2773474,
+                  "last_low_sample_s": 95412.7964714,
+                  "sample_supported_span_s": 0.5191239999985555,
+                  "low_samples": 3,
+                  "largest_within_run_gap_s": 0.2608842000045115,
+                  "preceding_above_or_lifetime_boundary_s": 95412.017835,
+                  "following_above_or_lifetime_boundary_s": 95413.0561102,
+                  "outer_bracket_s": 1.0382752000004984,
+                  "phases": [
+                    "model-load"
+                  ],
+                  "stages": [
+                    "loading"
+                  ]
+                }
+              ]
+            },
+            "512": {
+              "low_samples": 17,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 95410.7204586,
+                "last_low_sample_s": 95413.8350663,
+                "sample_supported_span_s": 3.1146077000012156,
+                "low_samples": 13,
+                "largest_within_run_gap_s": 0.2608842000045115,
+                "preceding_above_or_lifetime_boundary_s": 95410.4618584,
+                "following_above_or_lifetime_boundary_s": 95414.0948057,
+                "outer_bracket_s": 3.6329473000077996,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 3.6329473000077996,
+              "runs": [
+                {
+                  "first_low_sample_s": 95410.7204586,
+                  "last_low_sample_s": 95413.8350663,
+                  "sample_supported_span_s": 3.1146077000012156,
+                  "low_samples": 13,
+                  "largest_within_run_gap_s": 0.2608842000045115,
+                  "preceding_above_or_lifetime_boundary_s": 95410.4618584,
+                  "following_above_or_lifetime_boundary_s": 95414.0948057,
+                  "outer_bracket_s": 3.6329473000077996,
+                  "phases": [
+                    "model-load"
+                  ],
+                  "stages": [
+                    "loading"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 95418.7559739,
+                  "last_low_sample_s": 95419.5815709,
+                  "sample_supported_span_s": 0.8255970000027446,
+                  "low_samples": 4,
+                  "largest_within_run_gap_s": 0.28877869999269024,
+                  "preceding_above_or_lifetime_boundary_s": 95418.4969524,
+                  "following_above_or_lifetime_boundary_s": 95419.8403997,
+                  "outer_bracket_s": 1.3434472999942955,
+                  "phases": [
+                    "model-load"
+                  ],
+                  "stages": [
+                    "loading"
+                  ]
+                }
+              ]
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 6,
+            "longest_sample_supported_run": {
+              "first_low_sample_s": 95412.2773474,
+              "last_low_sample_s": 95412.7964714,
+              "sample_supported_span_s": 0.5191239999985555,
+              "low_samples": 3,
+              "largest_within_run_gap_s": 0.2608842000045115,
+              "preceding_above_or_lifetime_boundary_s": 95412.017835,
+              "following_above_or_lifetime_boundary_s": 95413.0561102,
+              "outer_bracket_s": 1.0382752000004984,
+              "phases": [
+                "model-load"
+              ],
+              "stages": [
+                "loading"
+              ]
+            },
+            "maximum_possible_continuous_low_window_between_above_observations_s": 1.0382752000004984,
+            "runs": [
+              {
+                "first_low_sample_s": 95410.9796351,
+                "last_low_sample_s": 95411.4986304,
+                "sample_supported_span_s": 0.5189953000081005,
+                "low_samples": 3,
+                "largest_within_run_gap_s": 0.2603469000023324,
+                "preceding_above_or_lifetime_boundary_s": 95410.7204586,
+                "following_above_or_lifetime_boundary_s": 95411.7571642,
+                "outer_bracket_s": 1.036705599995912,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              },
+              {
+                "first_low_sample_s": 95412.2773474,
+                "last_low_sample_s": 95412.7964714,
+                "sample_supported_span_s": 0.5191239999985555,
+                "low_samples": 3,
+                "largest_within_run_gap_s": 0.2608842000045115,
+                "preceding_above_or_lifetime_boundary_s": 95412.017835,
+                "following_above_or_lifetime_boundary_s": 95413.0561102,
+                "outer_bracket_s": 1.0382752000004984,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              }
+            ]
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 367,
+              "median": 10990911488,
+              "p95": 11013177344,
+              "max": 11165040640
+            },
+            "PrivateUsage": {
+              "n": 367,
+              "median": 18736664576,
+              "p95": 18779553792,
+              "max": 18837225472
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 367,
+              "median": 7643783168.0,
+              "p95": 7643783168.0,
+              "max": 7646527488.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 367,
+              "median": 10839339008.0,
+              "p95": 10839367680.0,
+              "max": 10934284288.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 367,
+              "median": 13110059008.0,
+              "p95": 13179744256.0,
+              "max": 13220638720.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 367,
+              "median": 11429994496.0,
+              "p95": 11445366784.0,
+              "max": 11524939776.0
+            },
+            "system_pages_input_per_second": {
+              "n": 367,
+              "median": 291.33250827966987,
+              "p95": 526640.4060444376,
+              "max": 729638.7250310134
+            },
+            "system_page_reads_per_second": {
+              "n": 367,
+              "median": 50.40088085231767,
+              "p95": 4246.145680489076,
+              "max": 9745.750015557858
+            }
+          },
+          "by_phase": {
+            "active-backend-transition": {
+              "stage": "transition",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 2006597632,
+              "minimum_commit_headroom_bytes": 9922109440
+            },
+            "cancel-peer": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 1860677632,
+              "minimum_commit_headroom_bytes": 9495834624
+            },
+            "cancel-self": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 1852284928,
+              "minimum_commit_headroom_bytes": 9523372032
+            },
+            "manual-capacity": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 14,
+              "minimum_available_physical_bytes": 1874481152,
+              "minimum_commit_headroom_bytes": 9584861184
+            },
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 54,
+              "minimum_available_physical_bytes": 12550144,
+              "minimum_commit_headroom_bytes": 6392791040
+            },
+            "natural-history": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 3482689536,
+              "minimum_commit_headroom_bytes": 9528287232
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 4052426752,
+              "minimum_commit_headroom_bytes": 9865498624
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 3821158400,
+              "minimum_commit_headroom_bytes": 9877733376
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 3792109568,
+              "minimum_commit_headroom_bytes": 9833639936
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 3728248832,
+              "minimum_commit_headroom_bytes": 9782927360
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 3735830528,
+              "minimum_commit_headroom_bytes": 9786191872
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 3640590336,
+              "minimum_commit_headroom_bytes": 9702752256
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 3591655424,
+              "minimum_commit_headroom_bytes": 9705660416
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 3869552640,
+              "minimum_commit_headroom_bytes": 9833848832
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 3814146048,
+              "minimum_commit_headroom_bytes": 9904218112
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 14,
+              "minimum_available_physical_bytes": 3858087936,
+              "minimum_commit_headroom_bytes": 9526353920
+            },
+            "ordered-peer": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 15,
+              "minimum_available_physical_bytes": 3359055872,
+              "minimum_commit_headroom_bytes": 9028575232
+            },
+            "ordered-self": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 16,
+              "minimum_available_physical_bytes": 2123235328,
+              "minimum_commit_headroom_bytes": 8976666624
+            },
+            "prefix-lru-en-de": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 2125996032,
+              "minimum_commit_headroom_bytes": 9923870720
+            },
+            "prefix-lru-en-fr": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 2069102592,
+              "minimum_commit_headroom_bytes": 9897705472
+            },
+            "prefix-lru-en-ja": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 2119741440,
+              "minimum_commit_headroom_bytes": 9631723520
+            },
+            "prefix-lru-en-ko": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 2128568320,
+              "minimum_commit_headroom_bytes": 9922285568
+            },
+            "response-failure": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 17,
+              "minimum_available_physical_bytes": 1864597504,
+              "minimum_commit_headroom_bytes": 9575993344
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 3513020416,
+              "minimum_commit_headroom_bytes": 9561526272
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 1062502400,
+              "minimum_commit_headroom_bytes": 9687719936
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 3882594304,
+              "minimum_commit_headroom_bytes": 9880547328
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 4289433600,
+              "minimum_commit_headroom_bytes": 9901391872
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 4291379200,
+              "minimum_commit_headroom_bytes": 9909538816
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 4342870016,
+              "minimum_commit_headroom_bytes": 10002038784
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 4327505920,
+              "minimum_commit_headroom_bytes": 9994956800
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 4191965184,
+              "minimum_commit_headroom_bytes": 9884536832
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 3009937408,
+              "minimum_commit_headroom_bytes": 9678295040
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 3406585856,
+              "minimum_commit_headroom_bytes": 9855639552
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 17,
+              "minimum_available_physical_bytes": 1524895744,
+              "minimum_commit_headroom_bytes": 9691611136
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 1275908096,
+              "minimum_commit_headroom_bytes": 9887100928
+            }
+          }
+        },
+        {
+          "pid": 63348,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "none",
+          "spawn_s": 95504.2704306,
+          "exit_s": 95519.5113604,
+          "samples": 59,
+          "live_window_sample_gaps_s": {
+            "n": 58,
+            "median": 0.25989785000274424,
+            "p95": 0.2737529000005452,
+            "max": 0.31989600000088103
+          },
+          "first_sample_delay_after_spawn_s": 0.001516000003903173,
+          "last_sample_to_exit_gap_s": 0.06964240000525024,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 95504.2719466,
+            "phase": "active-backend-transition",
+            "available_physical_bytes": 13051977728,
+            "commit_headroom_bytes": 17445986304,
+            "committed_bytes": 62210580480,
+            "commit_limit_bytes": 79656566784
+          },
+          "physical_minimum": {
+            "time_s": 95519.1505125,
+            "phase": "cpu-to-gpu-transition",
+            "stage": "transition",
+            "sample": {
+              "time": 95519.1505125,
+              "WorkingSetSize": 6253432832,
+              "PeakWorkingSetSize": 6256582656,
+              "PrivateUsage": 3768356864,
+              "PeakPagefileUsage": 3771568128,
+              "PageFaultCount": 1707165,
+              "cpu_seconds": 40.578125,
+              "system_available_physical_bytes": 6739107840,
+              "system_committed_bytes": 65697214464,
+              "system_commit_limit_bytes": 78022447104,
+              "system_commit_headroom_bytes": 12325232640,
+              "process_gpu_dedicated_bytes": null,
+              "process_gpu_shared_bytes": null,
+              "process_gpu_committed_bytes": null,
+              "device_gpu_dedicated_bytes": 5435297792.0,
+              "device_gpu_shared_bytes": 605409280.0,
+              "device_gpu_committed_bytes": 6309797888.0,
+              "gpu_engine_percent": null,
+              "system_pages_input_per_second": 0.0,
+              "system_page_reads_per_second": 0.0
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.31989600000088103,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.31989600000088103,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.31989600000088103,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 59,
+              "median": 5980307456,
+              "p95": 6229282816,
+              "max": 6253432832
+            },
+            "PrivateUsage": {
+              "n": 59,
+              "median": 3496263680,
+              "p95": 3744182272,
+              "max": 3768356864
+            },
+            "process_gpu_dedicated_bytes": null,
+            "process_gpu_shared_bytes": null,
+            "device_gpu_dedicated_bytes": {
+              "n": 59,
+              "median": 5442637824.0,
+              "p95": 5505552384.0,
+              "max": 5517348864.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 59,
+              "median": 605409280.0,
+              "p95": 605409280.0,
+              "max": 605884416.0
+            },
+            "system_pages_input_per_second": {
+              "n": 59,
+              "median": 119.084341292649,
+              "p95": 53338.99737922442,
+              "max": 1381405.3955756885
+            },
+            "system_page_reads_per_second": {
+              "n": 59,
+              "median": 19.371435655839324,
+              "p95": 7283.3211944646755,
+              "max": 9216.974053523292
+            }
+          },
+          "by_phase": {
+            "active-backend-transition": {
+              "stage": "transition",
+              "sample_count": 57,
+              "minimum_available_physical_bytes": 6743486464,
+              "minimum_commit_headroom_bytes": 12317384704
+            },
+            "cpu-to-gpu-transition": {
+              "stage": "transition",
+              "sample_count": 2,
+              "minimum_available_physical_bytes": 6739107840,
+              "minimum_commit_headroom_bytes": 12325232640
+            }
+          }
+        },
+        {
+          "pid": 61372,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 95519.5469818,
+          "exit_s": 95530.9839733,
+          "samples": 45,
+          "live_window_sample_gaps_s": {
+            "n": 44,
+            "median": 0.2595249500009231,
+            "p95": 0.26190100000530947,
+            "max": 0.26263399999879766
+          },
+          "first_sample_delay_after_spawn_s": 0.001098299995646812,
+          "last_sample_to_exit_gap_s": 0.010763600002974272,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 95519.5480801,
+            "phase": "cpu-to-gpu-transition",
+            "available_physical_bytes": 13002989568,
+            "commit_headroom_bytes": 15738736640,
+            "committed_bytes": 61929545728,
+            "commit_limit_bytes": 77668282368
+          },
+          "physical_minimum": {
+            "time_s": 95530.4545218,
+            "phase": "shutdown",
+            "stage": "shutdown",
+            "sample": {
+              "time": 95530.4545218,
+              "WorkingSetSize": 4245475328,
+              "PeakWorkingSetSize": 4245475328,
+              "PrivateUsage": 4477464576,
+              "PeakPagefileUsage": 4477497344,
+              "PageFaultCount": 1154127,
+              "cpu_seconds": 1.78125,
+              "system_available_physical_bytes": 8565489664,
+              "system_committed_bytes": 66741841920,
+              "system_commit_limit_bytes": 77668282368,
+              "system_commit_headroom_bytes": 10926440448,
+              "process_gpu_dedicated_bytes": 2855292928.0,
+              "process_gpu_shared_bytes": 806375424.0,
+              "process_gpu_committed_bytes": 3661668352.0,
+              "device_gpu_dedicated_bytes": 8290590720.0,
+              "device_gpu_shared_bytes": 1396768768.0,
+              "device_gpu_committed_bytes": 9961152512.0,
+              "gpu_engine_percent": 94.81402579657846,
+              "system_pages_input_per_second": 34622.168377615766,
+              "system_page_reads_per_second": 1633.48806095244
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.26263399999879766,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.26263399999879766,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.26263399999879766,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 45,
+              "median": 3657535488,
+              "p95": 4242182144,
+              "max": 4245528576
+            },
+            "PrivateUsage": {
+              "n": 45,
+              "median": 3897532416,
+              "p95": 4474306560,
+              "max": 4477464576
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 43,
+              "median": 2855292928.0,
+              "p95": 2856972288.0,
+              "max": 2856972288.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 43,
+              "median": 792522752.0,
+              "p95": 806375424.0,
+              "max": 806375424.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 45,
+              "median": 8289148928.0,
+              "p95": 8292270080.0,
+              "max": 8292270080.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 45,
+              "median": 1382916096.0,
+              "p95": 1396768768.0,
+              "max": 1396768768.0
+            },
+            "system_pages_input_per_second": {
+              "n": 45,
+              "median": 138.94099176079916,
+              "p95": 12450.050352004195,
+              "max": 34622.168377615766
+            },
+            "system_page_reads_per_second": {
+              "n": 45,
+              "median": 19.137254301576334,
+              "p95": 1633.48806095244,
+              "max": 3267.7508075004985
+            }
+          },
+          "by_phase": {
+            "cpu-to-gpu-transition": {
+              "stage": "transition",
+              "sample_count": 23,
+              "minimum_available_physical_bytes": 9262297088,
+              "minimum_commit_headroom_bytes": 11632832512
+            },
+            "opposite:after-return-to-gpu": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 8989995008,
+              "minimum_commit_headroom_bytes": 11257180160
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 14,
+              "minimum_available_physical_bytes": 8565489664,
+              "minimum_commit_headroom_bytes": 10926440448
+            }
+          }
+        }
+      ]
+    },
+    "cpu": {
+      "raw_journal_sha256": "5d290f0a0d06cd1dd6f0da41fd358c5592f3741345196d6c467c92b41c6ec800",
+      "processes": [
+        {
+          "pid": 65036,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "none",
+          "spawn_s": 96066.2057835,
+          "exit_s": 96136.5973771,
+          "samples": 270,
+          "live_window_sample_gaps_s": {
+            "n": 269,
+            "median": 0.25963149999734014,
+            "p95": 0.2621168000041507,
+            "max": 0.31283629999961704
+          },
+          "first_sample_delay_after_spawn_s": 0.18367749999742955,
+          "last_sample_to_exit_gap_s": 0.2331525000045076,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 96066.389461,
+            "phase": "model-load",
+            "available_physical_bytes": 10474201088,
+            "commit_headroom_bytes": 14106136576,
+            "committed_bytes": 62776950784,
+            "commit_limit_bytes": 76883087360
+          },
+          "physical_minimum": {
+            "time_s": 96136.1045686,
+            "phase": "route-drain",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 96136.1045686,
+              "WorkingSetSize": 10063237120,
+              "PeakWorkingSetSize": 10718756864,
+              "PrivateUsage": 9501634560,
+              "PeakPagefileUsage": 9504854016,
+              "PageFaultCount": 3926032,
+              "cpu_seconds": 169.125,
+              "system_available_physical_bytes": 333004800,
+              "system_committed_bytes": 73821777920,
+              "system_commit_limit_bytes": 82313359360,
+              "system_commit_headroom_bytes": 8491581440,
+              "process_gpu_dedicated_bytes": null,
+              "process_gpu_shared_bytes": null,
+              "process_gpu_committed_bytes": null,
+              "device_gpu_dedicated_bytes": 5936824320.0,
+              "device_gpu_shared_bytes": 697204736.0,
+              "device_gpu_committed_bytes": 6939643904.0,
+              "gpu_engine_percent": null,
+              "system_pages_input_per_second": 35497.51998878256,
+              "system_page_reads_per_second": 2977.7084049190357
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.31283629999961704,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 32,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 96130.3902032,
+                "last_low_sample_s": 96136.1045686,
+                "sample_supported_span_s": 5.714365399995586,
+                "low_samples": 23,
+                "largest_within_run_gap_s": 0.26234489999478683,
+                "preceding_above_or_lifetime_boundary_s": 96130.1314472,
+                "following_above_or_lifetime_boundary_s": 96136.3642246,
+                "outer_bracket_s": 6.2327774000004865,
+                "phases": [
+                  "opposite:overlap-4",
+                  "opposite:overlap-5",
+                  "route-drain"
+                ],
+                "stages": [
+                  "active_or_settled_request_group"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 6.2327774000004865,
+              "runs": [
+                {
+                  "first_low_sample_s": 96123.6359303,
+                  "last_low_sample_s": 96123.8958474,
+                  "sample_supported_span_s": 0.25991709998925216,
+                  "low_samples": 2,
+                  "largest_within_run_gap_s": 0.25991709998925216,
+                  "preceding_above_or_lifetime_boundary_s": 96123.3755281,
+                  "following_above_or_lifetime_boundary_s": 96124.1551162,
+                  "outer_bracket_s": 0.7795880999910878,
+                  "phases": [
+                    "opposite:overlap-1"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96124.6734206,
+                  "last_low_sample_s": 96125.9754784,
+                  "sample_supported_span_s": 1.3020577999996021,
+                  "low_samples": 6,
+                  "largest_within_run_gap_s": 0.2626733999932185,
+                  "preceding_above_or_lifetime_boundary_s": 96124.4135619,
+                  "following_above_or_lifetime_boundary_s": 96126.2347262,
+                  "outer_bracket_s": 1.8211642999958713,
+                  "phases": [
+                    "opposite:overlap-2"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96129.870264,
+                  "last_low_sample_s": 96129.870264,
+                  "sample_supported_span_s": 0.0,
+                  "low_samples": 1,
+                  "largest_within_run_gap_s": 0,
+                  "preceding_above_or_lifetime_boundary_s": 96129.6076576,
+                  "following_above_or_lifetime_boundary_s": 96130.1314472,
+                  "outer_bracket_s": 0.5237895999889588,
+                  "phases": [
+                    "opposite:overlap-4"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96130.3902032,
+                  "last_low_sample_s": 96136.1045686,
+                  "sample_supported_span_s": 5.714365399995586,
+                  "low_samples": 23,
+                  "largest_within_run_gap_s": 0.26234489999478683,
+                  "preceding_above_or_lifetime_boundary_s": 96130.1314472,
+                  "following_above_or_lifetime_boundary_s": 96136.3642246,
+                  "outer_bracket_s": 6.2327774000004865,
+                  "phases": [
+                    "opposite:overlap-4",
+                    "opposite:overlap-5",
+                    "route-drain"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                }
+              ]
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.31283629999961704,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 270,
+              "median": 8639301632.0,
+              "p95": 10425569280,
+              "max": 10715320320
+            },
+            "PrivateUsage": {
+              "n": 270,
+              "median": 6159687680.0,
+              "p95": 9501634560,
+              "max": 9501634560
+            },
+            "process_gpu_dedicated_bytes": null,
+            "process_gpu_shared_bytes": null,
+            "device_gpu_dedicated_bytes": {
+              "n": 270,
+              "median": 5944141824.0,
+              "p95": 6027587584.0,
+              "max": 6078705664.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 270,
+              "median": 682704896.0,
+              "p95": 697204736.0,
+              "max": 697204736.0
+            },
+            "system_pages_input_per_second": {
+              "n": 270,
+              "median": 123.04833377720635,
+              "p95": 12966.93161164311,
+              "max": 44925.76228390128
+            },
+            "system_page_reads_per_second": {
+              "n": 270,
+              "median": 15.36632340206964,
+              "p95": 1674.4662209814815,
+              "max": 6202.655264338691
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 16,
+              "minimum_available_physical_bytes": 4713680896,
+              "minimum_commit_headroom_bytes": 10706194432
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 24,
+              "minimum_available_physical_bytes": 1742315520,
+              "minimum_commit_headroom_bytes": 7619117056
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 579883008,
+              "minimum_commit_headroom_bytes": 8249020416
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 468393984,
+              "minimum_commit_headroom_bytes": 7817990144
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 405512192,
+              "minimum_commit_headroom_bytes": 7971123200
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 561213440,
+              "minimum_commit_headroom_bytes": 8130416640
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 449323008,
+              "minimum_commit_headroom_bytes": 8770375680
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 368893952,
+              "minimum_commit_headroom_bytes": 8371380224
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 1030209536,
+              "minimum_commit_headroom_bytes": 7815127040
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 666685440,
+              "minimum_commit_headroom_bytes": 7807303680
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 14,
+              "minimum_available_physical_bytes": 1229832192,
+              "minimum_commit_headroom_bytes": 8020484096
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 333004800,
+              "minimum_commit_headroom_bytes": 8368910336
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 25,
+              "minimum_available_physical_bytes": 4470771712,
+              "minimum_commit_headroom_bytes": 10469621760
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 3179200512,
+              "minimum_commit_headroom_bytes": 9072467968
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 3077664768,
+              "minimum_commit_headroom_bytes": 9083908096
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 2789621760,
+              "minimum_commit_headroom_bytes": 8701206528
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 2566127616,
+              "minimum_commit_headroom_bytes": 8436645888
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 2454593536,
+              "minimum_commit_headroom_bytes": 8171896832
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 2095501312,
+              "minimum_commit_headroom_bytes": 7761031168
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 3412672512,
+              "minimum_commit_headroom_bytes": 9443000320
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 3382796288,
+              "minimum_commit_headroom_bytes": 9286815744
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 17,
+              "minimum_available_physical_bytes": 3570819072,
+              "minimum_commit_headroom_bytes": 9864171520
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 1,
+              "minimum_available_physical_bytes": 5257527296,
+              "minimum_commit_headroom_bytes": 12801015808
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 13,
+              "minimum_available_physical_bytes": 4737433600,
+              "minimum_commit_headroom_bytes": 10722828288
+            }
+          }
+        }
+      ]
+    },
+    "fallback": {
+      "raw_journal_sha256": "ac496cca2eb8d5f972983a257e90d59ba3b197a2324f8bfa6b6c602559fbf60a",
+      "processes": [
+        {
+          "pid": 59756,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "none",
+          "spawn_s": 96146.9170852,
+          "exit_s": 96217.5607586,
+          "samples": 271,
+          "live_window_sample_gaps_s": {
+            "n": 270,
+            "median": 0.2595407499902649,
+            "p95": 0.2621777999884216,
+            "max": 0.3150347999908263
+          },
+          "first_sample_delay_after_spawn_s": 0.25851610000245273,
+          "last_sample_to_exit_gap_s": 0.2403788999945391,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 96147.1756013,
+            "phase": "model-load",
+            "available_physical_bytes": 10487324672,
+            "commit_headroom_bytes": 15587274752,
+            "committed_bytes": 64053460992,
+            "commit_limit_bytes": 79640735744
+          },
+          "physical_minimum": {
+            "time_s": 96200.9804868,
+            "phase": "opposite:overlap-0",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 96200.9804868,
+              "WorkingSetSize": 10373591040,
+              "PeakWorkingSetSize": 10383089664,
+              "PrivateUsage": 8104972288,
+              "PeakPagefileUsage": 8108191744,
+              "PageFaultCount": 3367472,
+              "cpu_seconds": 138.359375,
+              "system_available_physical_bytes": 262643712,
+              "system_committed_bytes": 71901683712,
+              "system_commit_limit_bytes": 80730267648,
+              "system_commit_headroom_bytes": 8828583936,
+              "process_gpu_dedicated_bytes": null,
+              "process_gpu_shared_bytes": null,
+              "process_gpu_committed_bytes": null,
+              "device_gpu_dedicated_bytes": 5820583936.0,
+              "device_gpu_shared_bytes": 699265024.0,
+              "device_gpu_committed_bytes": 6819217408.0,
+              "gpu_engine_percent": null,
+              "system_pages_input_per_second": 12312.506219898583,
+              "system_page_reads_per_second": 1978.795642483701
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 1,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 96200.9804868,
+                "last_low_sample_s": 96200.9804868,
+                "sample_supported_span_s": 0.0,
+                "low_samples": 1,
+                "largest_within_run_gap_s": 0,
+                "preceding_above_or_lifetime_boundary_s": 96200.7214181,
+                "following_above_or_lifetime_boundary_s": 96201.2403114,
+                "outer_bracket_s": 0.5188933000026736,
+                "phases": [
+                  "opposite:overlap-0"
+                ],
+                "stages": [
+                  "active_or_settled_request_group"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.5188933000026736,
+              "runs": [
+                {
+                  "first_low_sample_s": 96200.9804868,
+                  "last_low_sample_s": 96200.9804868,
+                  "sample_supported_span_s": 0.0,
+                  "low_samples": 1,
+                  "largest_within_run_gap_s": 0,
+                  "preceding_above_or_lifetime_boundary_s": 96200.7214181,
+                  "following_above_or_lifetime_boundary_s": 96201.2403114,
+                  "outer_bracket_s": 0.5188933000026736,
+                  "phases": [
+                    "opposite:overlap-0"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                }
+              ]
+            },
+            "512": {
+              "low_samples": 17,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 96199.6836131,
+                "last_low_sample_s": 96200.9804868,
+                "sample_supported_span_s": 1.296873700004653,
+                "low_samples": 6,
+                "largest_within_run_gap_s": 0.2597523000004003,
+                "preceding_above_or_lifetime_boundary_s": 96199.4229836,
+                "following_above_or_lifetime_boundary_s": 96201.2403114,
+                "outer_bracket_s": 1.8173278000031132,
+                "phases": [
+                  "opposite:overlap-0",
+                  "opposite:serial-1"
+                ],
+                "stages": [
+                  "active_or_settled_request_group"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 1.8173278000031132,
+              "runs": [
+                {
+                  "first_low_sample_s": 96198.9047788,
+                  "last_low_sample_s": 96198.9047788,
+                  "sample_supported_span_s": 0.0,
+                  "low_samples": 1,
+                  "largest_within_run_gap_s": 0,
+                  "preceding_above_or_lifetime_boundary_s": 96198.6450227,
+                  "following_above_or_lifetime_boundary_s": 96199.1626766,
+                  "outer_bracket_s": 0.5176538999949116,
+                  "phases": [
+                    "opposite:serial-1"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96199.6836131,
+                  "last_low_sample_s": 96200.9804868,
+                  "sample_supported_span_s": 1.296873700004653,
+                  "low_samples": 6,
+                  "largest_within_run_gap_s": 0.2597523000004003,
+                  "preceding_above_or_lifetime_boundary_s": 96199.4229836,
+                  "following_above_or_lifetime_boundary_s": 96201.2403114,
+                  "outer_bracket_s": 1.8173278000031132,
+                  "phases": [
+                    "opposite:overlap-0",
+                    "opposite:serial-1"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96209.7891967,
+                  "last_low_sample_s": 96210.0483491,
+                  "sample_supported_span_s": 0.2591524000017671,
+                  "low_samples": 2,
+                  "largest_within_run_gap_s": 0.2591524000017671,
+                  "preceding_above_or_lifetime_boundary_s": 96209.5314142,
+                  "following_above_or_lifetime_boundary_s": 96210.307911,
+                  "outer_bracket_s": 0.7764967999974033,
+                  "phases": [
+                    "opposite:overlap-4"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96211.3511689,
+                  "last_low_sample_s": 96212.1299311,
+                  "sample_supported_span_s": 0.778762200003257,
+                  "low_samples": 4,
+                  "largest_within_run_gap_s": 0.26032190000114497,
+                  "preceding_above_or_lifetime_boundary_s": 96211.0878596,
+                  "following_above_or_lifetime_boundary_s": 96212.3878677,
+                  "outer_bracket_s": 1.3000081000063801,
+                  "phases": [
+                    "opposite:overlap-4",
+                    "opposite:overlap-5"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                },
+                {
+                  "first_low_sample_s": 96213.1671209,
+                  "last_low_sample_s": 96213.9476474,
+                  "sample_supported_span_s": 0.780526499991538,
+                  "low_samples": 4,
+                  "largest_within_run_gap_s": 0.26215229999797884,
+                  "preceding_above_or_lifetime_boundary_s": 96212.9071798,
+                  "following_above_or_lifetime_boundary_s": 96214.2059668,
+                  "outer_bracket_s": 1.298787000006996,
+                  "phases": [
+                    "opposite:overlap-5"
+                  ],
+                  "stages": [
+                    "active_or_settled_request_group"
+                  ]
+                }
+              ]
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 1,
+            "longest_sample_supported_run": {
+              "first_low_sample_s": 96200.9804868,
+              "last_low_sample_s": 96200.9804868,
+              "sample_supported_span_s": 0.0,
+              "low_samples": 1,
+              "largest_within_run_gap_s": 0,
+              "preceding_above_or_lifetime_boundary_s": 96200.7214181,
+              "following_above_or_lifetime_boundary_s": 96201.2403114,
+              "outer_bracket_s": 0.5188933000026736,
+              "phases": [
+                "opposite:overlap-0"
+              ],
+              "stages": [
+                "active_or_settled_request_group"
+              ]
+            },
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.5188933000026736,
+            "runs": [
+              {
+                "first_low_sample_s": 96200.9804868,
+                "last_low_sample_s": 96200.9804868,
+                "sample_supported_span_s": 0.0,
+                "low_samples": 1,
+                "largest_within_run_gap_s": 0,
+                "preceding_above_or_lifetime_boundary_s": 96200.7214181,
+                "following_above_or_lifetime_boundary_s": 96201.2403114,
+                "outer_bracket_s": 0.5188933000026736,
+                "phases": [
+                  "opposite:overlap-0"
+                ],
+                "stages": [
+                  "active_or_settled_request_group"
+                ]
+              }
+            ]
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 271,
+              "median": 8660602880,
+              "p95": 11670151168,
+              "max": 11678150656
+            },
+            "PrivateUsage": {
+              "n": 271,
+              "median": 6311587840,
+              "p95": 9544773632,
+              "max": 9547927552
+            },
+            "process_gpu_dedicated_bytes": null,
+            "process_gpu_shared_bytes": null,
+            "device_gpu_dedicated_bytes": {
+              "n": 271,
+              "median": 5865672704.0,
+              "p95": 6046027776.0,
+              "max": 6104223744.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 271,
+              "median": 696201216.0,
+              "p95": 699367424.0,
+              "max": 710479872.0
+            },
+            "system_pages_input_per_second": {
+              "n": 271,
+              "median": 181.4296346393179,
+              "p95": 29654.27731131504,
+              "max": 194737.21823494905
+            },
+            "system_page_reads_per_second": {
+              "n": 271,
+              "median": 30.805510181606188,
+              "p95": 1944.1104809113374,
+              "max": 6899.397578945699
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 4598067200,
+              "minimum_commit_headroom_bytes": 12033306624
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 24,
+              "minimum_available_physical_bytes": 1037516800,
+              "minimum_commit_headroom_bytes": 8301416448
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 262643712,
+              "minimum_commit_headroom_bytes": 7977582592
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 926973952,
+              "minimum_commit_headroom_bytes": 9102290944
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 815947776,
+              "minimum_commit_headroom_bytes": 8958054400
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 630640640,
+              "minimum_commit_headroom_bytes": 8678989824
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 517136384,
+              "minimum_commit_headroom_bytes": 8411222016
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 472965120,
+              "minimum_commit_headroom_bytes": 8079966208
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 574853120,
+              "minimum_commit_headroom_bytes": 8776843264
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 483815424,
+              "minimum_commit_headroom_bytes": 8302460928
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 15,
+              "minimum_available_physical_bytes": 646287360,
+              "minimum_commit_headroom_bytes": 8965644288
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 560144384,
+              "minimum_commit_headroom_bytes": 8093466624
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 24,
+              "minimum_available_physical_bytes": 4228370432,
+              "minimum_commit_headroom_bytes": 12038639616
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 2764009472,
+              "minimum_commit_headroom_bytes": 10567200768
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 2168201216,
+              "minimum_commit_headroom_bytes": 9615736832
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 2052870144,
+              "minimum_commit_headroom_bytes": 9508806656
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 1884413952,
+              "minimum_commit_headroom_bytes": 9464782848
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 1581502464,
+              "minimum_commit_headroom_bytes": 9096511488
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 1139453952,
+              "minimum_commit_headroom_bytes": 8484122624
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 3175452672,
+              "minimum_commit_headroom_bytes": 10876223488
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 2898698240,
+              "minimum_commit_headroom_bytes": 10623553536
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 18,
+              "minimum_available_physical_bytes": 3245637632,
+              "minimum_commit_headroom_bytes": 10910253056
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 1,
+              "minimum_available_physical_bytes": 5956644864,
+              "minimum_commit_headroom_bytes": 9311715328
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 13,
+              "minimum_available_physical_bytes": 4424712192,
+              "minimum_commit_headroom_bytes": 12033576960
+            }
+          }
+        }
+      ]
+    },
+    "A1": {
+      "raw_journal_sha256": "beaa9977ce145d6a39d37803a06989c0f89eb3cf1f7c4e750aa69cee4cfb1da5",
+      "processes": [
+        {
+          "pid": 61056,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 94587.7222429,
+          "exit_s": 94622.9561457,
+          "samples": 135,
+          "live_window_sample_gaps_s": {
+            "n": 134,
+            "median": 0.25881064999703085,
+            "p95": 0.26138900000660215,
+            "max": 0.32190759999502916
+          },
+          "first_sample_delay_after_spawn_s": 0.20978950000426266,
+          "last_sample_to_exit_gap_s": 0.2009906999883242,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 94587.9320324,
+            "phase": "model-load",
+            "available_physical_bytes": 11819454464,
+            "commit_headroom_bytes": 17674043392,
+            "committed_bytes": 59209043968,
+            "commit_limit_bytes": 76883087360
+          },
+          "physical_minimum": {
+            "time_s": 94622.4949404,
+            "phase": "route-drain",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 94622.4949404,
+              "WorkingSetSize": 6630727680,
+              "PeakWorkingSetSize": 6630727680,
+              "PrivateUsage": 6875762688,
+              "PeakPagefileUsage": 6875791360,
+              "PageFaultCount": 2226136,
+              "cpu_seconds": 3.453125,
+              "system_available_physical_bytes": 4713541632,
+              "system_committed_bytes": 66445660160,
+              "system_commit_limit_bytes": 76883087360,
+              "system_commit_headroom_bytes": 10437427200,
+              "process_gpu_dedicated_bytes": 2855133184.0,
+              "process_gpu_shared_bytes": 803618816.0,
+              "process_gpu_committed_bytes": 3658752000.0,
+              "device_gpu_dedicated_bytes": 8446599168.0,
+              "device_gpu_shared_bytes": 1395048448.0,
+              "device_gpu_committed_bytes": 10275483648.0,
+              "gpu_engine_percent": 0.0,
+              "system_pages_input_per_second": 54.2005000383275,
+              "system_page_reads_per_second": 7.742928576903929
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.32190759999502916,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.32190759999502916,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.32190759999502916,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 135,
+              "median": 5070401536,
+              "p95": 6630727680,
+              "max": 6630727680
+            },
+            "PrivateUsage": {
+              "n": 135,
+              "median": 5318774784,
+              "p95": 6875762688,
+              "max": 6875762688
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 134,
+              "median": 2855133184.0,
+              "p95": 2855133184.0,
+              "max": 2855133184.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 134,
+              "median": 803618816.0,
+              "p95": 803618816.0,
+              "max": 803618816.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 135,
+              "median": 8451715072.0,
+              "p95": 8542494720.0,
+              "max": 8585224192.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 135,
+              "median": 1395027968.0,
+              "p95": 1402171392.0,
+              "max": 1402171392.0
+            },
+            "system_pages_input_per_second": {
+              "n": 135,
+              "median": 34.63300748804103,
+              "p95": 1512.4164321706567,
+              "max": 18993.257046452058
+            },
+            "system_page_reads_per_second": {
+              "n": 135,
+              "median": 7.7000432742432015,
+              "p95": 303.0691312197266,
+              "max": 4329.629095107519
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 23,
+              "minimum_available_physical_bytes": 8256348160,
+              "minimum_commit_headroom_bytes": 13833637888
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 5860671488,
+              "minimum_commit_headroom_bytes": 10997886976
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5339963392,
+              "minimum_commit_headroom_bytes": 11196583936
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5289639936,
+              "minimum_commit_headroom_bytes": 11167064064
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5160460288,
+              "minimum_commit_headroom_bytes": 11003265024
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 5010624512,
+              "minimum_commit_headroom_bytes": 10849681408
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 4848467968,
+              "minimum_commit_headroom_bytes": 10684739584
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 4804345856,
+              "minimum_commit_headroom_bytes": 10581852160
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5425401856,
+              "minimum_commit_headroom_bytes": 10635550720
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 5477281792,
+              "minimum_commit_headroom_bytes": 11341328384
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 5507981312,
+              "minimum_commit_headroom_bytes": 10682060800
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 4713541632,
+              "minimum_commit_headroom_bytes": 10435588096
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 7780200448,
+              "minimum_commit_headroom_bytes": 13403582464
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6149312512,
+              "minimum_commit_headroom_bytes": 10850906112
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6152036352,
+              "minimum_commit_headroom_bytes": 11076673536
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6249955328,
+              "minimum_commit_headroom_bytes": 11111141376
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6094376960,
+              "minimum_commit_headroom_bytes": 11025743872
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 5958316032,
+              "minimum_commit_headroom_bytes": 10950729728
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 5961728000,
+              "minimum_commit_headroom_bytes": 11012009984
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 7140802560,
+              "minimum_commit_headroom_bytes": 12284522496
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6404337664,
+              "minimum_commit_headroom_bytes": 11102056448
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 7355011072,
+              "minimum_commit_headroom_bytes": 12973821952
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 1,
+              "minimum_available_physical_bytes": 7103725568,
+              "minimum_commit_headroom_bytes": 14440239104
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 8176631808,
+              "minimum_commit_headroom_bytes": 13728436224
+            }
+          }
+        }
+      ]
+    },
+    "B1": {
+      "raw_journal_sha256": "e3f732fca16e173f4232761c00ee4b652e9bf242ace03e6b377587db66b07ae4",
+      "processes": [
+        {
+          "pid": 61216,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 94632.5533146,
+          "exit_s": 94667.6855943,
+          "samples": 135,
+          "live_window_sample_gaps_s": {
+            "n": 134,
+            "median": 0.2585692499997094,
+            "p95": 0.26282579998951405,
+            "max": 0.3031656999955885
+          },
+          "first_sample_delay_after_spawn_s": 0.1919586000003619,
+          "last_sample_to_exit_gap_s": 0.17411929999070708,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 94632.7452732,
+            "phase": "model-load",
+            "available_physical_bytes": 11457212416,
+            "commit_headroom_bytes": 17503809536,
+            "committed_bytes": 59379277824,
+            "commit_limit_bytes": 76883087360
+          },
+          "physical_minimum": {
+            "time_s": 94663.1283927,
+            "phase": "opposite:overlap-4",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 94663.1283927,
+              "WorkingSetSize": 5617045504,
+              "PeakWorkingSetSize": 5617045504,
+              "PrivateUsage": 8472375296,
+              "PeakPagefileUsage": 8472432640,
+              "PageFaultCount": 2002049,
+              "cpu_seconds": 2.375,
+              "system_available_physical_bytes": 5917749248,
+              "system_committed_bytes": 67784335360,
+              "system_commit_limit_bytes": 76883087360,
+              "system_commit_headroom_bytes": 9098752000,
+              "process_gpu_dedicated_bytes": 2858328064.0,
+              "process_gpu_shared_bytes": 2391326720.0,
+              "process_gpu_committed_bytes": 5249654784.0,
+              "device_gpu_dedicated_bytes": 8455360512.0,
+              "device_gpu_shared_bytes": 2982502400.0,
+              "device_gpu_committed_bytes": 11871592448.0,
+              "gpu_engine_percent": 89.17820665297289,
+              "system_pages_input_per_second": 0.0,
+              "system_page_reads_per_second": 0.0
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.3031656999955885,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.3031656999955885,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.3031656999955885,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 135,
+              "median": 4057800704,
+              "p95": 5617102848,
+              "max": 5617102848
+            },
+            "PrivateUsage": {
+              "n": 135,
+              "median": 6909898752,
+              "p95": 8472440832,
+              "max": 8472440832
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 135,
+              "median": 2858328064.0,
+              "p95": 2858328064.0,
+              "max": 2858328064.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 135,
+              "median": 2391314432.0,
+              "p95": 2391326720.0,
+              "max": 2391326720.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 135,
+              "median": 8451166208.0,
+              "p95": 8493576192.0,
+              "max": 8514019328.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 135,
+              "median": 2981666816.0,
+              "p95": 2982502400.0,
+              "max": 2982821888.0
+            },
+            "system_pages_input_per_second": {
+              "n": 135,
+              "median": 11.582296074373783,
+              "p95": 512.579621976354,
+              "max": 2689.2250679301364
+            },
+            "system_page_reads_per_second": {
+              "n": 135,
+              "median": 3.865851848186452,
+              "p95": 82.02407289362182,
+              "max": 502.41080482375736
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 23,
+              "minimum_available_physical_bytes": 8794501120,
+              "minimum_commit_headroom_bytes": 11920011264
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6971518976,
+              "minimum_commit_headroom_bytes": 10125987840
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6358675456,
+              "minimum_commit_headroom_bytes": 9554006016
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6374277120,
+              "minimum_commit_headroom_bytes": 9558380544
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6224486400,
+              "minimum_commit_headroom_bytes": 9400410112
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6076338176,
+              "minimum_commit_headroom_bytes": 9253289984
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 5917749248,
+              "minimum_commit_headroom_bytes": 9075359744
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5920722944,
+              "minimum_commit_headroom_bytes": 9097691136
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6635286528,
+              "minimum_commit_headroom_bytes": 9791582208
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6513446912,
+              "minimum_commit_headroom_bytes": 9712652288
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6726615040,
+              "minimum_commit_headroom_bytes": 9888718848
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 5928022016,
+              "minimum_commit_headroom_bytes": 9087315968
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 8583901184,
+              "minimum_commit_headroom_bytes": 11799384064
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 7554879488,
+              "minimum_commit_headroom_bytes": 10693795840
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7441805312,
+              "minimum_commit_headroom_bytes": 10548113408
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7466729472,
+              "minimum_commit_headroom_bytes": 10608259072
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7334449152,
+              "minimum_commit_headroom_bytes": 10454032384
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 2,
+              "minimum_available_physical_bytes": 7157526528,
+              "minimum_commit_headroom_bytes": 10203967488
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 7116460032,
+              "minimum_commit_headroom_bytes": 10170687488
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 8081158144,
+              "minimum_commit_headroom_bytes": 11220750336
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 7810818048,
+              "minimum_commit_headroom_bytes": 10991136768
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 8207417344,
+              "minimum_commit_headroom_bytes": 11349037056
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 1,
+              "minimum_available_physical_bytes": 7993982976,
+              "minimum_commit_headroom_bytes": 11301306368
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 8803516416,
+              "minimum_commit_headroom_bytes": 11960311808
+            }
+          }
+        }
+      ]
+    },
+    "B2": {
+      "raw_journal_sha256": "22b33d5d4fa5bdbf08ea968d7299bc0559441e3f7a80c01614ea9511a19023a1",
+      "processes": [
+        {
+          "pid": 44772,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 94677.3696546,
+          "exit_s": 94712.2908793,
+          "samples": 134,
+          "live_window_sample_gaps_s": {
+            "n": 133,
+            "median": 0.25868820000323467,
+            "p95": 0.2612457999930484,
+            "max": 0.3194218999997247
+          },
+          "first_sample_delay_after_spawn_s": 0.18934949999675155,
+          "last_sample_to_exit_gap_s": 0.17626739999104757,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 94677.5590041,
+            "phase": "model-load",
+            "available_physical_bytes": 11554439168,
+            "commit_headroom_bytes": 17663975424,
+            "committed_bytes": 59219111936,
+            "commit_limit_bytes": 76883087360
+          },
+          "physical_minimum": {
+            "time_s": 94709.2785485,
+            "phase": "route-drain",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 94709.2785485,
+              "WorkingSetSize": 5621506048,
+              "PeakWorkingSetSize": 5621506048,
+              "PrivateUsage": 8482926592,
+              "PeakPagefileUsage": 8482967552,
+              "PageFaultCount": 2026558,
+              "cpu_seconds": 2.125,
+              "system_available_physical_bytes": 5930450944,
+              "system_committed_bytes": 67778035712,
+              "system_commit_limit_bytes": 76883087360,
+              "system_commit_headroom_bytes": 9105051648,
+              "process_gpu_dedicated_bytes": 2858328064.0,
+              "process_gpu_shared_bytes": 2391326720.0,
+              "process_gpu_committed_bytes": 5249654784.0,
+              "device_gpu_dedicated_bytes": 8497274880.0,
+              "device_gpu_shared_bytes": 2990542848.0,
+              "device_gpu_committed_bytes": 11922632704.0,
+              "gpu_engine_percent": 0.0,
+              "system_pages_input_per_second": 454.5558736583317,
+              "system_page_reads_per_second": 58.276394058760474
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.3194218999997247,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.3194218999997247,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.3194218999997247,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 134,
+              "median": 4115898368.0,
+              "p95": 5621506048,
+              "max": 5621506048
+            },
+            "PrivateUsage": {
+              "n": 134,
+              "median": 6976327680.0,
+              "p95": 8482926592,
+              "max": 8482926592
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 134,
+              "median": 2858328064.0,
+              "p95": 2858328064.0,
+              "max": 2858328064.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 134,
+              "median": 2391314432.0,
+              "p95": 2391326720.0,
+              "max": 2391326720.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 134,
+              "median": 8434020352.0,
+              "p95": 8533897216.0,
+              "max": 8565354496.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 134,
+              "median": 2980763648.0,
+              "p95": 2990866432.0,
+              "max": 2990866432.0
+            },
+            "system_pages_input_per_second": {
+              "n": 134,
+              "median": 27.13206527343266,
+              "p95": 924.2184691727477,
+              "max": 8345.94037825733
+            },
+            "system_page_reads_per_second": {
+              "n": 134,
+              "median": 3.8714210319444096,
+              "p95": 87.76127102740976,
+              "max": 5077.3053265339595
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 23,
+              "minimum_available_physical_bytes": 8500666368,
+              "minimum_commit_headroom_bytes": 11112325120
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 7082172416,
+              "minimum_commit_headroom_bytes": 10210496512
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6365003776,
+              "minimum_commit_headroom_bytes": 9498931200
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6374359040,
+              "minimum_commit_headroom_bytes": 9525399552
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6211760128,
+              "minimum_commit_headroom_bytes": 9347747840
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6077562880,
+              "minimum_commit_headroom_bytes": 9314480128
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5937188864,
+              "minimum_commit_headroom_bytes": 9162199040
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 5940011008,
+              "minimum_commit_headroom_bytes": 9113223168
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6719688704,
+              "minimum_commit_headroom_bytes": 9755578368
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6525886464,
+              "minimum_commit_headroom_bytes": 9644429312
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6849392640,
+              "minimum_commit_headroom_bytes": 9939103744
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 5930450944,
+              "minimum_commit_headroom_bytes": 9096638464
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 8267128832,
+              "minimum_commit_headroom_bytes": 10982309888
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 7723376640,
+              "minimum_commit_headroom_bytes": 10981335040
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7405109248,
+              "minimum_commit_headroom_bytes": 10407264256
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7545556992,
+              "minimum_commit_headroom_bytes": 10744172544
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7392755712,
+              "minimum_commit_headroom_bytes": 10559459328
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7280230400,
+              "minimum_commit_headroom_bytes": 10456719360
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 7264378880,
+              "minimum_commit_headroom_bytes": 10432585728
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 7766343680,
+              "minimum_commit_headroom_bytes": 10464686080
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 7770320896,
+              "minimum_commit_headroom_bytes": 10486960128
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 7939502080,
+              "minimum_commit_headroom_bytes": 10661507072
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 1,
+              "minimum_available_physical_bytes": 6917763072,
+              "minimum_commit_headroom_bytes": 9797722112
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 8481185792,
+              "minimum_commit_headroom_bytes": 11072962560
+            }
+          }
+        }
+      ]
+    },
+    "A2": {
+      "raw_journal_sha256": "c0c516bd2974149afad7f704c548c4eb37d107e3c540ec6bc58d4ced3f956e0e",
+      "processes": [
+        {
+          "pid": 51588,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 94722.1724947,
+          "exit_s": 94757.2871978,
+          "samples": 135,
+          "live_window_sample_gaps_s": {
+            "n": 134,
+            "median": 0.2587091000023065,
+            "p95": 0.261533299999428,
+            "max": 0.2904304000112461
+          },
+          "first_sample_delay_after_spawn_s": 0.18885369999043178,
+          "last_sample_to_exit_gap_s": 0.20433049999701325,
+          "prelaunch_baseline": {
+            "captured": false,
+            "reason": "Monitor starts after native spawn; no prelaunch observation is reconstructed."
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 94722.3613484,
+            "phase": "model-load",
+            "available_physical_bytes": 11237576704,
+            "commit_headroom_bytes": 16907792384,
+            "committed_bytes": 59975294976,
+            "commit_limit_bytes": 76883087360
+          },
+          "physical_minimum": {
+            "time_s": 94751.9139479,
+            "phase": "opposite:overlap-4",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 94751.9139479,
+              "WorkingSetSize": 6602698752,
+              "PeakWorkingSetSize": 6626828288,
+              "PrivateUsage": 6854500352,
+              "PeakPagefileUsage": 6878732288,
+              "PageFaultCount": 2187422,
+              "cpu_seconds": 2.5625,
+              "system_available_physical_bytes": 3860340736,
+              "system_committed_bytes": 67368460288,
+              "system_commit_limit_bytes": 76883087360,
+              "system_commit_headroom_bytes": 9514627072,
+              "process_gpu_dedicated_bytes": 2855133184.0,
+              "process_gpu_shared_bytes": 803618816.0,
+              "process_gpu_committed_bytes": 3658752000.0,
+              "device_gpu_dedicated_bytes": 8617529344.0,
+              "device_gpu_shared_bytes": 1401180160.0,
+              "device_gpu_committed_bytes": 10458206208.0,
+              "gpu_engine_percent": 65.91783526943429,
+              "system_pages_input_per_second": 828.3998589793729,
+              "system_page_reads_per_second": 107.88463279731367
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.2904304000112461,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.2904304000112461,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.2904304000112461,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 135,
+              "median": 5069631488,
+              "p95": 6630043648,
+              "max": 6630043648
+            },
+            "PrivateUsage": {
+              "n": 135,
+              "median": 5322170368,
+              "p95": 6881812480,
+              "max": 6881824768
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 134,
+              "median": 2855133184.0,
+              "p95": 2855133184.0,
+              "max": 2855133184.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 134,
+              "median": 803618816.0,
+              "p95": 803618816.0,
+              "max": 803618816.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 135,
+              "median": 8469942272.0,
+              "p95": 8697745408.0,
+              "max": 8718454784.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 135,
+              "median": 1399574528.0,
+              "p95": 1401847808.0,
+              "max": 1402826752.0
+            },
+            "system_pages_input_per_second": {
+              "n": 135,
+              "median": 34.88558690348554,
+              "p95": 3650.342834160241,
+              "max": 318932.07805989176
+            },
+            "system_page_reads_per_second": {
+              "n": 135,
+              "median": 7.730003350956452,
+              "p95": 437.4217818240798,
+              "max": 2952.5783744888035
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 23,
+              "minimum_available_physical_bytes": 7651209216,
+              "minimum_commit_headroom_bytes": 12964024320
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 5698162688,
+              "minimum_commit_headroom_bytes": 11146280960
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 4650688512,
+              "minimum_commit_headroom_bytes": 9985253376
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 4662259712,
+              "minimum_commit_headroom_bytes": 10001506304
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 4473339904,
+              "minimum_commit_headroom_bytes": 9782620160
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 4042702848,
+              "minimum_commit_headroom_bytes": 9589207040
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 3860340736,
+              "minimum_commit_headroom_bytes": 9410142208
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 3963936768,
+              "minimum_commit_headroom_bytes": 9482203136
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 4923490304,
+              "minimum_commit_headroom_bytes": 10248278016
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 4770897920,
+              "minimum_commit_headroom_bytes": 10135068672
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 5101498368,
+              "minimum_commit_headroom_bytes": 10414071808
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 4129337344,
+              "minimum_commit_headroom_bytes": 9660547072
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 7238418432,
+              "minimum_commit_headroom_bytes": 12643344384
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6299062272,
+              "minimum_commit_headroom_bytes": 11703734272
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6157651968,
+              "minimum_commit_headroom_bytes": 11559034880
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6165839872,
+              "minimum_commit_headroom_bytes": 11569532928
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 6005932032,
+              "minimum_commit_headroom_bytes": 11419570176
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 5862305792,
+              "minimum_commit_headroom_bytes": 11272048640
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 5876441088,
+              "minimum_commit_headroom_bytes": 11283775488
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6724853760,
+              "minimum_commit_headroom_bytes": 12153516032
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 6444478464,
+              "minimum_commit_headroom_bytes": 11854217216
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 6865006592,
+              "minimum_commit_headroom_bytes": 12267139072
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 1,
+              "minimum_available_physical_bytes": 6354477056,
+              "minimum_commit_headroom_bytes": 14816350208
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 7654178816,
+              "minimum_commit_headroom_bytes": 12958416896
+            }
+          }
+        }
+      ]
+    }
+  },
+  "method": [
+    "Only samples inside each recorded native PID spawn-to-exit window are attributed to that PID; postexit monitor samples are excluded.",
+    "Sample-supported spans are last-low minus first-low with every recorded intervening sample low; they are not proof of continuous pressure between discrete observations.",
+    "Outer brackets and maximum possible low windows use surrounding above-threshold observations or process-lifetime boundaries. Sampling gaps are explicit; threshold crossings can occur unseen.",
+    "The configured watchdog is physical available<256MiB OR commit headroom<512MiB for8s. Physical<512MiB is an additional analysis threshold, not that watchdog's physical threshold.",
+    "Global paging/device counters include other workloads. Private commitment is not physical residency; sharedGPU accounting does not diagnose spill/OOM/RAM safety."
+  ]
+}

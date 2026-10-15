@@ -1,0 +1,950 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-pressure/v1",
+  "runs": {
+    "26b-failure": {
+      "raw_journal_sha256": "fdb701811c69e040d97694d64cad8d67aa75764e28845b32c46db5f51c07cd58",
+      "processes": [
+        {
+          "pid": 69864,
+          "model_filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 100200.8567013,
+          "exit_s": 100241.5477426,
+          "samples": 153,
+          "live_window_sample_gaps_s": {
+            "n": 152,
+            "median": 0.26395815000432776,
+            "p95": 0.26588239999546204,
+            "max": 0.3421078999963356
+          },
+          "first_sample_delay_after_spawn_s": 0.4673443000065163,
+          "last_sample_to_exit_gap_s": 0.02648080000653863,
+          "prelaunch_baseline": {
+            "captured": true,
+            "observation": {
+              "t": 100200.8270583,
+              "kind": "prelaunch_system_baseline",
+              "phase": "startup",
+              "observer_pid": 11508,
+              "sample_started": 100200.8269836,
+              "sample_completed": 100200.8270545,
+              "system_available_physical_bytes": 5045506048,
+              "system_committed_bytes": 74494599168,
+              "system_commit_limit_bytes": 84436283392,
+              "system_commit_headroom_bytes": 9941684224
+            },
+            "reason": null
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 100201.3240456,
+            "phase": "model-load",
+            "available_physical_bytes": 4937129984,
+            "commit_headroom_bytes": 9773658112,
+            "committed_bytes": 74662625280,
+            "commit_limit_bytes": 84436283392
+          },
+          "physical_minimum": {
+            "time_s": 100204.7551752,
+            "phase": "model-load",
+            "stage": "loading",
+            "sample": {
+              "time": 100204.7551752,
+              "WorkingSetSize": 6025224192,
+              "PeakWorkingSetSize": 6027223040,
+              "PrivateUsage": 12721029120,
+              "PeakPagefileUsage": 12721029120,
+              "PageFaultCount": 1975745,
+              "cpu_seconds": 0.015625,
+              "system_available_physical_bytes": 155648,
+              "system_committed_bytes": 87598714880,
+              "system_commit_limit_bytes": 94224793600,
+              "system_commit_headroom_bytes": 6626078720,
+              "process_gpu_dedicated_bytes": 4085231616.0,
+              "process_gpu_shared_bytes": 7695319040.0,
+              "process_gpu_committed_bytes": 12636979200.0,
+              "device_gpu_dedicated_bytes": 16808955904.0,
+              "device_gpu_shared_bytes": 8862765056.0,
+              "device_gpu_committed_bytes": 27159441408.0,
+              "gpu_engine_percent": 0.0,
+              "system_pages_input_per_second": 8118.66361496052,
+              "system_page_reads_per_second": 4275.5505120024045
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 21,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 100202.9036697,
+                "last_low_sample_s": 100208.2886809,
+                "sample_supported_span_s": 5.385011200007284,
+                "low_samples": 21,
+                "largest_within_run_gap_s": 0.3421078999963356,
+                "preceding_above_or_lifetime_boundary_s": 100202.6392162,
+                "following_above_or_lifetime_boundary_s": 100208.5534793,
+                "outer_bracket_s": 5.914263099999516,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 5.914263099999516,
+              "runs": [
+                {
+                  "first_low_sample_s": 100202.9036697,
+                  "last_low_sample_s": 100208.2886809,
+                  "sample_supported_span_s": 5.385011200007284,
+                  "low_samples": 21,
+                  "largest_within_run_gap_s": 0.3421078999963356,
+                  "preceding_above_or_lifetime_boundary_s": 100202.6392162,
+                  "following_above_or_lifetime_boundary_s": 100208.5534793,
+                  "outer_bracket_s": 5.914263099999516,
+                  "phases": [
+                    "model-load"
+                  ],
+                  "stages": [
+                    "loading"
+                  ]
+                }
+              ]
+            },
+            "512": {
+              "low_samples": 22,
+              "longest_sample_supported_run": {
+                "first_low_sample_s": 100202.9036697,
+                "last_low_sample_s": 100208.5534793,
+                "sample_supported_span_s": 5.649809599999571,
+                "low_samples": 22,
+                "largest_within_run_gap_s": 0.3421078999963356,
+                "preceding_above_or_lifetime_boundary_s": 100202.6392162,
+                "following_above_or_lifetime_boundary_s": 100208.8176277,
+                "outer_bracket_s": 6.178411500004586,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              },
+              "maximum_possible_continuous_low_window_between_above_observations_s": 6.178411500004586,
+              "runs": [
+                {
+                  "first_low_sample_s": 100202.9036697,
+                  "last_low_sample_s": 100208.5534793,
+                  "sample_supported_span_s": 5.649809599999571,
+                  "low_samples": 22,
+                  "largest_within_run_gap_s": 0.3421078999963356,
+                  "preceding_above_or_lifetime_boundary_s": 100202.6392162,
+                  "following_above_or_lifetime_boundary_s": 100208.8176277,
+                  "outer_bracket_s": 6.178411500004586,
+                  "phases": [
+                    "model-load"
+                  ],
+                  "stages": [
+                    "loading"
+                  ]
+                }
+              ]
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 21,
+            "longest_sample_supported_run": {
+              "first_low_sample_s": 100202.9036697,
+              "last_low_sample_s": 100208.2886809,
+              "sample_supported_span_s": 5.385011200007284,
+              "low_samples": 21,
+              "largest_within_run_gap_s": 0.3421078999963356,
+              "preceding_above_or_lifetime_boundary_s": 100202.6392162,
+              "following_above_or_lifetime_boundary_s": 100208.5534793,
+              "outer_bracket_s": 5.914263099999516,
+              "phases": [
+                "model-load"
+              ],
+              "stages": [
+                "loading"
+              ]
+            },
+            "maximum_possible_continuous_low_window_between_above_observations_s": 5.914263099999516,
+            "runs": [
+              {
+                "first_low_sample_s": 100202.9036697,
+                "last_low_sample_s": 100208.2886809,
+                "sample_supported_span_s": 5.385011200007284,
+                "low_samples": 21,
+                "largest_within_run_gap_s": 0.3421078999963356,
+                "preceding_above_or_lifetime_boundary_s": 100202.6392162,
+                "following_above_or_lifetime_boundary_s": 100208.5534793,
+                "outer_bracket_s": 5.914263099999516,
+                "phases": [
+                  "model-load"
+                ],
+                "stages": [
+                  "loading"
+                ]
+              }
+            ]
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 153,
+              "median": 11001397248,
+              "p95": 11010756608,
+              "max": 11171667968
+            },
+            "PrivateUsage": {
+              "n": 153,
+              "median": 18666602496,
+              "p95": 18790768640,
+              "max": 18818478080
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 152,
+              "median": 7587760128.0,
+              "p95": 7639064576.0,
+              "max": 7639064576.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 152,
+              "median": 10829787136.0,
+              "p95": 10843467776.0,
+              "max": 10940575744.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 153,
+              "median": 20186939392.0,
+              "p95": 20260098048.0,
+              "max": 20268748800.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 153,
+              "median": 11997650944.0,
+              "p95": 12015407104.0,
+              "max": 12102938624.0
+            },
+            "system_pages_input_per_second": {
+              "n": 153,
+              "median": 4569.158257410793,
+              "p95": 616033.7200757457,
+              "max": 690310.1459121217
+            },
+            "system_page_reads_per_second": {
+              "n": 153,
+              "median": 561.670475847981,
+              "p95": 3314.8394823351136,
+              "max": 5732.071773403187
+            }
+          },
+          "by_phase": {
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 76,
+              "minimum_available_physical_bytes": 155648,
+              "minimum_commit_headroom_bytes": 3380461568
+            },
+            "opposite:smoke-overlap": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 31,
+              "minimum_available_physical_bytes": 2911354880,
+              "minimum_commit_headroom_bytes": 11249090560
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 19,
+              "minimum_available_physical_bytes": 2775625728,
+              "minimum_commit_headroom_bytes": 11228581888
+            },
+            "same:smoke-overlap": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 2960510976,
+              "minimum_commit_headroom_bytes": 11270000640
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 4,
+              "minimum_available_physical_bytes": 3285327872,
+              "minimum_commit_headroom_bytes": 15074115584
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 2794233856,
+              "minimum_commit_headroom_bytes": 11020701696
+            }
+          }
+        }
+      ]
+    },
+    "safety": {
+      "raw_journal_sha256": "c76121a6d21bbc8c9c947d3fd5cfeae0c41679f84a6aa02806ee4edba6c98396",
+      "processes": [
+        {
+          "pid": 50884,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 100267.7808263,
+          "exit_s": 100359.2134811,
+          "samples": 345,
+          "live_window_sample_gaps_s": {
+            "n": 344,
+            "median": 0.26403510000091046,
+            "p95": 0.26585559999512043,
+            "max": 0.2950224999949569
+          },
+          "first_sample_delay_after_spawn_s": 0.38760819999151863,
+          "last_sample_to_exit_gap_s": 0.18979610000678804,
+          "prelaunch_baseline": {
+            "captured": true,
+            "observation": {
+              "t": 100267.7509748,
+              "kind": "prelaunch_system_baseline",
+              "phase": "startup",
+              "observer_pid": 59148,
+              "sample_started": 100267.7509069,
+              "sample_completed": 100267.7509715,
+              "system_available_physical_bytes": 14094209024,
+              "system_committed_bytes": 74568036352,
+              "system_commit_limit_bytes": 92593184768,
+              "system_commit_headroom_bytes": 18025148416
+            },
+            "reason": null
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 100268.1684345,
+            "phase": "model-load",
+            "available_physical_bytes": 13995892736,
+            "commit_headroom_bytes": 17887637504,
+            "committed_bytes": 74705547264,
+            "commit_limit_bytes": 92593184768
+          },
+          "physical_minimum": {
+            "time_s": 100357.4108706,
+            "phase": "prefix-lru-en-ko",
+            "stage": "active_or_settled_request_group",
+            "sample": {
+              "time": 100357.4108706,
+              "WorkingSetSize": 9921265664,
+              "PeakWorkingSetSize": 9921265664,
+              "PrivateUsage": 10170478592,
+              "PeakPagefileUsage": 10170511360,
+              "PageFaultCount": 3365952,
+              "cpu_seconds": 0.703125,
+              "system_available_physical_bytes": 2780524544,
+              "system_committed_bytes": 85805928448,
+              "system_commit_limit_bytes": 95858483200,
+              "system_commit_headroom_bytes": 10052554752,
+              "process_gpu_dedicated_bytes": 2849439744.0,
+              "process_gpu_shared_bytes": 812589056.0,
+              "process_gpu_committed_bytes": 3662028800.0,
+              "device_gpu_dedicated_bytes": 15340433408.0,
+              "device_gpu_shared_bytes": 1961631744.0,
+              "device_gpu_committed_bytes": 18079645696.0,
+              "gpu_engine_percent": 96.27795653952535,
+              "system_pages_input_per_second": 19.082053977024444,
+              "system_page_reads_per_second": 3.816410795404889
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.38760819999151863,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.38760819999151863,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.38760819999151863,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 345,
+              "median": 7482642432,
+              "p95": 9763442688,
+              "max": 9942265856
+            },
+            "PrivateUsage": {
+              "n": 345,
+              "median": 7727190016,
+              "p95": 10012512256,
+              "max": 10191499264
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 344,
+              "median": 2848915456.0,
+              "p95": 2849439744.0,
+              "max": 2849439744.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 344,
+              "median": 809836544.0,
+              "p95": 812589056.0,
+              "max": 812589056.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 345,
+              "median": 15372996608.0,
+              "p95": 15387414528.0,
+              "max": 15422279680.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 345,
+              "median": 1956245504.0,
+              "p95": 1961631744.0,
+              "max": 1969627136.0
+            },
+            "system_pages_input_per_second": {
+              "n": 345,
+              "median": 95.24466258435343,
+              "p95": 6463.739144123555,
+              "max": 62207.417227047066
+            },
+            "system_page_reads_per_second": {
+              "n": 345,
+              "median": 15.286143225811877,
+              "p95": 992.5123025362151,
+              "max": 6580.955469376075
+            }
+          },
+          "by_phase": {
+            "active-backend-transition": {
+              "stage": "transition",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 2804805632,
+              "minimum_commit_headroom_bytes": 10019500032
+            },
+            "cancel-peer": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 4199628800,
+              "minimum_commit_headroom_bytes": 10111897600
+            },
+            "cancel-self": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 3727990784,
+              "minimum_commit_headroom_bytes": 9597730816
+            },
+            "manual-capacity": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 3380424704,
+              "minimum_commit_headroom_bytes": 10307674112
+            },
+            "model-load": {
+              "stage": "loading",
+              "sample_count": 30,
+              "minimum_available_physical_bytes": 10491895808,
+              "minimum_commit_headroom_bytes": 14050983936
+            },
+            "natural-history": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 5883367424,
+              "minimum_commit_headroom_bytes": 9562775552
+            },
+            "opposite:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 11,
+              "minimum_available_physical_bytes": 7703592960,
+              "minimum_commit_headroom_bytes": 11359526912
+            },
+            "opposite:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6513606656,
+              "minimum_commit_headroom_bytes": 10172891136
+            },
+            "opposite:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6375645184,
+              "minimum_commit_headroom_bytes": 10018402304
+            },
+            "opposite:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 6379360256,
+              "minimum_commit_headroom_bytes": 10017308672
+            },
+            "opposite:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 6225063936,
+              "minimum_commit_headroom_bytes": 9870155776
+            },
+            "opposite:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6103683072,
+              "minimum_commit_headroom_bytes": 9740537856
+            },
+            "opposite:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6098821120,
+              "minimum_commit_headroom_bytes": 9746194432
+            },
+            "opposite:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6969315328,
+              "minimum_commit_headroom_bytes": 10622443520
+            },
+            "opposite:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 6670016512,
+              "minimum_commit_headroom_bytes": 10327105536
+            },
+            "opposite:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 13,
+              "minimum_available_physical_bytes": 7096066048,
+              "minimum_commit_headroom_bytes": 10735640576
+            },
+            "ordered-peer": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 14,
+              "minimum_available_physical_bytes": 5709135872,
+              "minimum_commit_headroom_bytes": 9417420800
+            },
+            "ordered-self": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 17,
+              "minimum_available_physical_bytes": 4517904384,
+              "minimum_commit_headroom_bytes": 9144598528
+            },
+            "prefix-lru-en-de": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 2874511360,
+              "minimum_commit_headroom_bytes": 10135650304
+            },
+            "prefix-lru-en-fr": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 10,
+              "minimum_available_physical_bytes": 3025874944,
+              "minimum_commit_headroom_bytes": 10249752576
+            },
+            "prefix-lru-en-ja": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 13,
+              "minimum_available_physical_bytes": 3243548672,
+              "minimum_commit_headroom_bytes": 10379333632
+            },
+            "prefix-lru-en-ko": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 9,
+              "minimum_available_physical_bytes": 2780524544,
+              "minimum_commit_headroom_bytes": 10051616768
+            },
+            "response-failure": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 17,
+              "minimum_available_physical_bytes": 3571429376,
+              "minimum_commit_headroom_bytes": 9484435456
+            },
+            "route-drain": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 6095826944,
+              "minimum_commit_headroom_bytes": 9773105152
+            },
+            "same:first-prefix": {
+              "stage": "language_pair_first_prefix",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 10032570368,
+              "minimum_commit_headroom_bytes": 13656469504
+            },
+            "same:overlap-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 8854351872,
+              "minimum_commit_headroom_bytes": 12480159744
+            },
+            "same:overlap-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 8726622208,
+              "minimum_commit_headroom_bytes": 12351533056
+            },
+            "same:overlap-2": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 8576888832,
+              "minimum_commit_headroom_bytes": 12206178304
+            },
+            "same:overlap-3": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 5,
+              "minimum_available_physical_bytes": 8403419136,
+              "minimum_commit_headroom_bytes": 12011864064
+            },
+            "same:overlap-4": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 8284811264,
+              "minimum_commit_headroom_bytes": 11894317056
+            },
+            "same:overlap-5": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 8,
+              "minimum_available_physical_bytes": 8118775808,
+              "minimum_commit_headroom_bytes": 11703549952
+            },
+            "same:serial-0": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 9306591232,
+              "minimum_commit_headroom_bytes": 12893175808
+            },
+            "same:serial-1": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 7,
+              "minimum_available_physical_bytes": 9007648768,
+              "minimum_commit_headroom_bytes": 12620849152
+            },
+            "same:single": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 16,
+              "minimum_available_physical_bytes": 9605812224,
+              "minimum_commit_headroom_bytes": 13221785600
+            },
+            "startup:first-prefix": {
+              "stage": "startup_first_prefix",
+              "sample_count": 12,
+              "minimum_available_physical_bytes": 10379866112,
+              "minimum_commit_headroom_bytes": 13933105152
+            }
+          }
+        },
+        {
+          "pid": 72040,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "none",
+          "spawn_s": 100359.3396361,
+          "exit_s": 100385.2224049,
+          "samples": 99,
+          "live_window_sample_gaps_s": {
+            "n": 98,
+            "median": 0.2633503999968525,
+            "p95": 0.2656455999967875,
+            "max": 0.28921219999028835
+          },
+          "first_sample_delay_after_spawn_s": 0.002178399998228997,
+          "last_sample_to_exit_gap_s": 0.06726619999972172,
+          "prelaunch_baseline": {
+            "captured": true,
+            "observation": {
+              "t": 100359.308651,
+              "kind": "prelaunch_system_baseline",
+              "phase": "active-backend-transition",
+              "observer_pid": 59148,
+              "sample_started": 100359.3085821,
+              "sample_completed": 100359.3086481,
+              "system_available_physical_bytes": 12788613120,
+              "system_committed_bytes": 75484565504,
+              "system_commit_limit_bytes": 94795366400,
+              "system_commit_headroom_bytes": 19310800896
+            },
+            "reason": null
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 100359.3418145,
+            "phase": "active-backend-transition",
+            "available_physical_bytes": 12790284288,
+            "commit_headroom_bytes": 19312082944,
+            "committed_bytes": 75483283456,
+            "commit_limit_bytes": 94795366400
+          },
+          "physical_minimum": {
+            "time_s": 100383.0283453,
+            "phase": "active-backend-transition",
+            "stage": "transition",
+            "sample": {
+              "time": 100383.0283453,
+              "WorkingSetSize": 6228758528,
+              "PeakWorkingSetSize": 6228758528,
+              "PrivateUsage": 3743899648,
+              "PeakPagefileUsage": 3743940608,
+              "PageFaultCount": 1700041,
+              "cpu_seconds": 108.484375,
+              "system_available_physical_bytes": 2063863808,
+              "system_committed_bytes": 83734261760,
+              "system_commit_limit_bytes": 94632157184,
+              "system_commit_headroom_bytes": 10897895424,
+              "process_gpu_dedicated_bytes": null,
+              "process_gpu_shared_bytes": null,
+              "process_gpu_committed_bytes": null,
+              "device_gpu_dedicated_bytes": 12504395776.0,
+              "device_gpu_shared_bytes": 1162780672.0,
+              "device_gpu_committed_bytes": 14442405888.0,
+              "gpu_engine_percent": null,
+              "system_pages_input_per_second": 972.9770818288928,
+              "system_page_reads_per_second": 243.2442704572232
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.28921219999028835,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.28921219999028835,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.28921219999028835,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 99,
+              "median": 5980291072,
+              "p95": 6228758528,
+              "max": 6252888064
+            },
+            "PrivateUsage": {
+              "n": 99,
+              "median": 3496177664,
+              "p95": 3743899648,
+              "max": 3768078336
+            },
+            "process_gpu_dedicated_bytes": null,
+            "process_gpu_shared_bytes": null,
+            "device_gpu_dedicated_bytes": {
+              "n": 99,
+              "median": 12497580032.0,
+              "p95": 12511997952.0,
+              "max": 12511997952.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 99,
+              "median": 1162485760.0,
+              "p95": 1162780672.0,
+              "max": 1162780672.0
+            },
+            "system_pages_input_per_second": {
+              "n": 99,
+              "median": 1648.5985582739706,
+              "p95": 33058.20239101017,
+              "max": 82834.89757759651
+            },
+            "system_page_reads_per_second": {
+              "n": 99,
+              "median": 365.9941143571485,
+              "p95": 4207.886356576442,
+              "max": 11233.142189555845
+            }
+          },
+          "by_phase": {
+            "active-backend-transition": {
+              "stage": "transition",
+              "sample_count": 96,
+              "minimum_available_physical_bytes": 2063863808,
+              "minimum_commit_headroom_bytes": 10882084864
+            },
+            "cpu-to-gpu-transition": {
+              "stage": "transition",
+              "sample_count": 3,
+              "minimum_available_physical_bytes": 2144837632,
+              "minimum_commit_headroom_bytes": 10860523520
+            }
+          }
+        },
+        {
+          "pid": 69380,
+          "model_filename": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+          "backend": "Vulkan0",
+          "spawn_s": 100385.3450584,
+          "exit_s": 100400.5545266,
+          "samples": 58,
+          "live_window_sample_gaps_s": {
+            "n": 57,
+            "median": 0.26366050000069663,
+            "p95": 0.2659079000004567,
+            "max": 0.26596520000020973
+          },
+          "first_sample_delay_after_spawn_s": 0.0018739000079222023,
+          "last_sample_to_exit_gap_s": 0.18911469999875408,
+          "prelaunch_baseline": {
+            "captured": true,
+            "observation": {
+              "t": 100385.3148211,
+              "kind": "prelaunch_system_baseline",
+              "phase": "cpu-to-gpu-transition",
+              "observer_pid": 59148,
+              "sample_started": 100385.3147318,
+              "sample_completed": 100385.3148179,
+              "system_available_physical_bytes": 8409595904,
+              "system_committed_bytes": 80007249920,
+              "system_commit_limit_bytes": 94632157184,
+              "system_commit_headroom_bytes": 14624907264
+            },
+            "reason": null
+          },
+          "earliest_postspawn_not_prelaunch": {
+            "time_s": 100385.3469323,
+            "phase": "cpu-to-gpu-transition",
+            "available_physical_bytes": 8406847488,
+            "commit_headroom_bytes": 14623563776,
+            "committed_bytes": 80008593408,
+            "commit_limit_bytes": 94632157184
+          },
+          "physical_minimum": {
+            "time_s": 100400.1045763,
+            "phase": "shutdown",
+            "stage": "shutdown",
+            "sample": {
+              "time": 100400.1045763,
+              "WorkingSetSize": 4419510272,
+              "PeakWorkingSetSize": 4419510272,
+              "PrivateUsage": 4652507136,
+              "PeakPagefileUsage": 4652519424,
+              "PageFaultCount": 1204895,
+              "cpu_seconds": 0.171875,
+              "system_available_physical_bytes": 3444895744,
+              "system_committed_bytes": 85081235456,
+              "system_commit_limit_bytes": 94632157184,
+              "system_commit_headroom_bytes": 9550921728,
+              "process_gpu_dedicated_bytes": 2848391168.0,
+              "process_gpu_shared_bytes": 813690880.0,
+              "process_gpu_committed_bytes": 3662082048.0,
+              "device_gpu_dedicated_bytes": 15347216384.0,
+              "device_gpu_shared_bytes": 1976463360.0,
+              "device_gpu_committed_bytes": 18087841792.0,
+              "gpu_engine_percent": 91.1557276680506,
+              "system_pages_input_per_second": 382.00405378163214,
+              "system_page_reads_per_second": 49.16883860555661
+            }
+          },
+          "below_physical_mib": {
+            "256": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.26596520000020973,
+              "runs": []
+            },
+            "512": {
+              "low_samples": 0,
+              "longest_sample_supported_run": null,
+              "maximum_possible_continuous_low_window_between_above_observations_s": 0.26596520000020973,
+              "runs": []
+            }
+          },
+          "configured_watchdog_predicate": {
+            "low_samples": 0,
+            "longest_sample_supported_run": null,
+            "maximum_possible_continuous_low_window_between_above_observations_s": 0.26596520000020973,
+            "runs": []
+          },
+          "watchdog_cutoff_events": [],
+          "accounting_and_global_paging": {
+            "WorkingSetSize": {
+              "n": 58,
+              "median": 3858143232.0,
+              "p95": 4419432448,
+              "max": 4419510272
+            },
+            "PrivateUsage": {
+              "n": 58,
+              "median": 4089053184.0,
+              "p95": 4652507136,
+              "max": 4652507136
+            },
+            "process_gpu_dedicated_bytes": {
+              "n": 56,
+              "median": 2847539200.0,
+              "p95": 2848391168.0,
+              "max": 2848391168.0
+            },
+            "process_gpu_shared_bytes": {
+              "n": 56,
+              "median": 807985152.0,
+              "p95": 813690880.0,
+              "max": 813690880.0
+            },
+            "device_gpu_dedicated_bytes": {
+              "n": 58,
+              "median": 15345774592.0,
+              "p95": 15347216384.0,
+              "max": 15347216384.0
+            },
+            "device_gpu_shared_bytes": {
+              "n": 58,
+              "median": 1967022080.0,
+              "p95": 1976463360.0,
+              "max": 1976463360.0
+            },
+            "system_pages_input_per_second": {
+              "n": 58,
+              "median": 1153.3298423672004,
+              "p95": 38523.88405311276,
+              "max": 387279.4744396768
+            },
+            "system_page_reads_per_second": {
+              "n": 58,
+              "median": 290.94921538737947,
+              "p95": 3795.8643262624937,
+              "max": 9675.32727370191
+            }
+          },
+          "by_phase": {
+            "cpu-to-gpu-transition": {
+              "stage": "transition",
+              "sample_count": 16,
+              "minimum_available_physical_bytes": 4783751168,
+              "minimum_commit_headroom_bytes": 10666090496
+            },
+            "opposite:after-return-to-gpu": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 13,
+              "minimum_available_physical_bytes": 4201930752,
+              "minimum_commit_headroom_bytes": 10187976704
+            },
+            "opposite:after-return-to-gpu-repeat": {
+              "stage": "active_or_settled_request_group",
+              "sample_count": 6,
+              "minimum_available_physical_bytes": 4045221888,
+              "minimum_commit_headroom_bytes": 10076581888
+            },
+            "shutdown": {
+              "stage": "shutdown",
+              "sample_count": 23,
+              "minimum_available_physical_bytes": 3444895744,
+              "minimum_commit_headroom_bytes": 9550921728
+            }
+          }
+        }
+      ]
+    }
+  },
+  "method": [
+    "Only samples inside each recorded native PID spawn-to-exit window are attributed to that PID; postexit monitor samples are excluded.",
+    "Sample-supported spans are last-low minus first-low with every recorded intervening sample low; they are not proof of continuous pressure between discrete observations.",
+    "Outer brackets and maximum possible low windows use surrounding above-threshold observations or process-lifetime boundaries. Sampling gaps are explicit; threshold crossings can occur unseen.",
+    "The configured watchdog is physical available<256MiB OR commit headroom<512MiB for8s. Physical<512MiB is an additional analysis threshold, not that watchdog's physical threshold.",
+    "Global paging/device counters include other workloads. Private commitment is not physical residency; sharedGPU accounting does not diagnose spill/OOM/RAM safety."
+  ]
+}

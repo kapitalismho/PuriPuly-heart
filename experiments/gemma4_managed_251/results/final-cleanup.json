@@ -1,0 +1,250 @@
+{
+  "processes": [
+    {
+      "pid": 732,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 22176,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 44772,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 48420,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 50700,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 51588,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 51808,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 54000,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 55420,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 56304,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 58212,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 58664,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 58688,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 59112,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 59276,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 59756,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 60276,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 60436,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 60504,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 61056,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 61216,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 61372,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 61680,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 62488,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 62788,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 63076,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 63348,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 63756,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 63920,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 64080,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 64528,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 65036,
+      "present": false,
+      "matches_owned_identity": false
+    },
+    {
+      "pid": 65304,
+      "present": false,
+      "matches_owned_identity": false
+    }
+  ],
+  "ports": [
+    {
+      "port": 49464,
+      "accepting": false
+    },
+    {
+      "port": 52175,
+      "accepting": false
+    },
+    {
+      "port": 52553,
+      "accepting": false
+    },
+    {
+      "port": 53763,
+      "accepting": false
+    },
+    {
+      "port": 53859,
+      "accepting": false
+    },
+    {
+      "port": 55069,
+      "accepting": false
+    },
+    {
+      "port": 55338,
+      "accepting": false
+    },
+    {
+      "port": 55464,
+      "accepting": false
+    },
+    {
+      "port": 55576,
+      "accepting": false
+    },
+    {
+      "port": 55883,
+      "accepting": false
+    },
+    {
+      "port": 56350,
+      "accepting": false
+    },
+    {
+      "port": 57474,
+      "accepting": false
+    },
+    {
+      "port": 57757,
+      "accepting": false
+    },
+    {
+      "port": 57851,
+      "accepting": false
+    },
+    {
+      "port": 59821,
+      "accepting": false
+    },
+    {
+      "port": 60956,
+      "accepting": false
+    },
+    {
+      "port": 62532,
+      "accepting": false
+    },
+    {
+      "port": 63619,
+      "accepting": false
+    },
+    {
+      "port": 64062,
+      "accepting": false
+    }
+  ],
+  "owned_present": 0,
+  "accepting_ports": 0,
+  "boundary": "One current read-only inspection of only recorded owned PIDs/ports; PID reuse is not owned. No process was terminated."
+}

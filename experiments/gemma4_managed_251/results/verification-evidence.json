@@ -1,0 +1,141 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-product-verification/v1",
+  "scope": "Product checkpoint checks and review coverage. This is not a terminal completion verdict, CI result, merge, or release record.",
+  "baseline": "766e25a39ac6cec6800bf15e994409cf76a0ffe5",
+  "product_candidate": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+  "product_change_inventory": {
+    "command": "git diff --name-only 766e25a39ac6cec6800bf15e994409cf76a0ffe5 671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+    "changed_files": 80,
+    "original_output_reference": "artifact://387",
+    "scope_limit": "Experiment/evidence additions are outside this product range and require separate checkpoint coverage. Internal references identify retained local observations, not public GitHub links."
+  },
+  "final_affected_checks": [
+    {
+      "owner": "signature-ownership-repair",
+      "result": "473 passed in 36.87s",
+      "original_output_reference": "artifact://357",
+      "portable_evidence": "signature-ownership-evidence.json",
+      "candidate_applicability": "Final post-secrets-snapshot-edit execution preceded commit pinning; unchanged-source freeze and recorded post-pin hashes establish applicability to 671ca2ac.",
+      "coverage": "Affected provider/settings/startup/lifecycle/pipeline/STT/managed-runtime consumers, including eight composed signature-ownership cases. Exact command and output are retained in the linked record.",
+      "limit": "Eight separately executed composed cases are also included in the 473; counts are not additive. Controlled native boundaries are not physical model inference."
+    },
+    {
+      "owner": "Director",
+      "original_job": "bg_54",
+      "command": "python -m pytest -ra -o addopts= tests/architecture tests/app/test_translation_enable_owner.py tests/app/test_overlay_translation_enabled_sync.py tests/app/test_application_startup_settings.py tests/app/test_settings_runtime_effects.py tests/app/test_settings_application_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_control_repair_behavior.py tests/release_evidence/test_local_asr_production_composition.py",
+      "environment": "Windows, Python 3.14.7, pytest 9.1.1, explicit worktree cwd; pytest reported that worktree as rootdir.",
+      "collected": 538,
+      "result": "538 passed in 108.77s",
+      "wall_seconds": 110.15,
+      "candidate_applicability": "Ran on the frozen repaired source pinned as 671ca2ac while the command was in flight; no source changes occurred during the run.",
+      "coverage": "Entire architecture suite plus enablement, overlay, startup, generic settings, actual managed-provider integration, control repair and production-evidence composition.",
+      "limit": "Overlaps the 473-case run; counts are not summed. This is not the entire repository suite."
+    }
+  ],
+  "style_checks": [
+    {
+      "command": "python -m ruff check src tests scripts build.spec experiments/gemma4_managed_251",
+      "result": "All checks passed!",
+      "scope": "Frozen final product and then-current experiment surface. Later experiment verification is recorded separately below."
+    },
+    {
+      "command": "python -m black --check src tests scripts",
+      "result": "1066 files would be left unchanged",
+      "scope": "Frozen final product/test/script surface. Earlier two-file Black failures were corrected before the final product checkpoint; they are not erased."
+    },
+    {
+      "command": "python -m ruff check experiments/gemma4_managed_251 && python -m ruff format --check experiments/gemma4_managed_251",
+      "observed_stdout": "All checks passed!\n11 files already formatted\n",
+      "scope": "Executed by the Director after the 671 native afterproof and execution-owner freeze. Later distribution/evidence-only additions are not claimed as part of this invocation."
+    }
+  ],
+  "preserved_test_history": [
+    {
+      "command": "python -m pytest -ra -o addopts= tests/domain tests/config tests/core tests/app tests/providers tests/ui tests/architecture tests/scripts tests/cli tests/release_evidence",
+      "original_output_reference": "artifact://84",
+      "collected": 8027,
+      "passed": 7926,
+      "failed": 92,
+      "skipped": 9,
+      "duration_seconds": 891.72,
+      "status": "Failed original combined run; never relabeled as passing.",
+      "in_scope_repairs": "Three failures concerned a stale scene-prefix caller, the dashboard backend-import boundary, and an unregistered shielded native-task ownership site. All were repaired and specifically rechecked/reviewed.",
+      "remaining_89": "An unchanged application-test logging setup leaks root handlers/redaction into later provider diagnostics. The diagnosis retained a minimal unchanged-predecessor/four-signature reproduction and an isolated 89-case pass. Implicated sources were compared with the baseline; no baseline execution is claimed. The Director deferred that cross-suite test-isolation defect outside issue 251.",
+      "skip_limit": "Nine skips requiring real subprocess/process environments remain recorded; these are not passes."
+    },
+    {
+      "original_job": "bg_26",
+      "scope": "Complete existing Providers CI shard in a fresh process during the earlier repair window.",
+      "result": "869 passed, 3 warnings in 116.12s",
+      "candidate_limit": "Earlier evidence, not a fresh 671 execution and not a replacement for the failed combined run. No remote CI execution is claimed."
+    },
+    {
+      "original_job": "bg_28",
+      "scope": "All architecture tests, scene-context tests and the entire application control-repair module after the first three checkpoint repairs.",
+      "result": "459 passed in 56.34s",
+      "candidate_limit": "Earlier checkpoint evidence. The later 538-case run renews the architecture/control coverage; unchanged scene behavior retains earlier coverage."
+    },
+    {
+      "original_job": "bg_51",
+      "scope": "Architecture, scene, enablement, overlay, application control, provider owners/integration/wiring, STT, Gemma and distribution after the first recovery repairs.",
+      "result": "703 passed in 85.63s",
+      "candidate_limit": "7cff repair evidence, not a fresh 671 result. The final affected and integrated runs renew the changed signature relationships."
+    }
+  ],
+  "checkpoint_review_chain": [
+    {
+      "mode": "FULL_REVIEW",
+      "range": "766e25a39ac6cec6800bf15e994409cf76a0ffe5..d0a0e891662dbb9735ac9fc4aff844d074ba51a6",
+      "reviewers": ["checkpoint-review: whole checkpoint", "runtime-compat-review: focused runtime compatibility"],
+      "result": "findings",
+      "adjudicated_findings": [
+        "Migrate the stale scene-prefix caller while retaining scene-independent prefix behavior.",
+        "Move the GPU-only presentation discriminator to the application-facing notice port; do not import backend asset implementation into the dashboard.",
+        "Register the exact shielded native-task ownership site under the existing reviewed lifecycle policy with a bounded lifetime/multiplicity rationale; no blanket exception."
+      ],
+      "repair_candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+      "repair_result": "Both originating reviewers returned repair_verified; unaffected full coverage retained.",
+      "limit": "A code checkpoint verdict, not whole-issue completion or GitHub approval."
+    },
+    {
+      "mode": "FULL_REVIEW",
+      "range": "8786d1fcd8fcb966f0ae164acee289e535a7c862..7cffc6b8bb8f3da2544f42a4f76319ff91759513",
+      "reviewer": "application-recovery-review",
+      "coverage": "All 11 changed files and directly affected provider/settings/enablement/publication/lifecycle relationships.",
+      "result": "findings",
+      "accepted_finding": "F1: the retained generic combined signature writer could erase the failed-LLM () retry marker after a legitimate unrelated locale success, allowing same-profile application to skip a missing provider.",
+      "finding_basis": "Conclusive static control/data flow. The reviewer did not execute or claim a native reproduction.",
+      "original_native_failures": "The 8786 failed 26B enable and E4B GPU-return attempts remain separate before-proof, not passes."
+    },
+    {
+      "mode": "REPAIR_VERIFY",
+      "range": "7cffc6b8bb8f3da2544f42a4f76319ff91759513..671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+      "reviewer": "application-recovery-review",
+      "result": "repair_verified",
+      "coverage": "Complete 14-file repair, all remaining signature writers/callers, settings/restoration/post-transaction consumers, both initializers, exact launch-snapshot/secret consistency and composed recovery protection.",
+      "closure": "Combined writer deleted without aliases; generic paths are STT-only. Actual initial attachment/replacement owns LLM identity, None remains retryable, matching attached providers still skip needless replacement, and newer canonical intent cannot impersonate the captured launch binding.",
+      "decisive_behavior": "Failed replacement -> successful persisted unrelated locale without marker loss -> nonforced same-profile actual replacement -> completed consumer translation; initial present/None, restoration and advancing-intent cases protect neighboring semantics.",
+      "retained_coverage": "Unaffected prior whole/focused checkpoint coverage remains applicable. No profile, admission/slot/native-transport, CPU/MTP/fallback or mmap mechanism changed in this delta.",
+      "gui_applicability": "The recorded 7cff missing-runtime failure/off, checking/cancel/off and explicit retry/error/off observations remain applicable to unchanged enable/UI behavior. They are not relabeled as fresh 671 GUI execution.",
+      "reviewer_execution": "Read-only diff/source/caller/evidence inspection and candidate identity lookup; no test, model, GUI or build execution by this reviewer.",
+      "limit": "The reviewer explicitly left current installed proof, native afterproof, frozen experiment review and terminal audit as Goal obligations. Subsequent native afterproof is recorded separately."
+    }
+  ],
+  "actual_behavior_records": {
+    "selection_provisioning_persistence": "selection-evidence.json",
+    "enable_controlled_composition": "enable-repair-evidence.json",
+    "provider_controlled_composition": "provider-repair-evidence.json",
+    "signature_controlled_composition": "signature-ownership-evidence.json",
+    "actual_gui_enable_repair": "enable-gui-evidence.json",
+    "actual_671_native_afterproof": "afterproof-evidence.json",
+    "original_installed_8786": "distribution-evidence.json",
+    "loading_decision_and_other_native_cases": "../RESULTS.md"
+  },
+  "publication_and_verification_limits": [
+    "No fresh full-repository green run, type-check result, remote CI, merge, release or deployment is claimed.",
+    "Controlled composed smokes are not native model inference; native, GUI and installed observations are separate boundaries.",
+    "Counts from overlapping test selections or repeated native scenarios are not summed into unique coverage.",
+    "Native quality failures, severe loading-memory depletion, failed attempts and unavailable original prelaunch baselines remain in their linked records.",
+    "Original local-session references preserve provenance but are not public links. Portable commands, outcomes, boundaries and linked sanitized records carry the substantive evidence."
+  ]
+}

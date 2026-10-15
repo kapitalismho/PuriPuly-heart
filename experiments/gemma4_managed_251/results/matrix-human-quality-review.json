@@ -1,0 +1,219 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-matrix-human-quality/v1",
+  "source": "matrix-quality-cards.json",
+  "unique_cards_reviewed": 175,
+  "published_outputs_represented": 293,
+  "blanket_quality_pass": false,
+  "definite_factual_error_instances": 7,
+  "lexical_concern_instances": 10,
+  "definite_factual_errors": [
+    {
+      "card": 24,
+      "assessment": "Rejected day changed from Thursday to Tuesday; affirmed Tuesday14:30 retained.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:serial-1",
+          "result_id": "1626002c-eeb9-5f97-8e59-6729d3c056f6"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "Let me correct myself. The meeting isn't Tuesday at 13:40, it's Tuesday at 14:30."
+    },
+    {
+      "card": 32,
+      "assessment": "Rejected day changed from Thursday to Tuesday; affirmed Tuesday14:30 retained.",
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "opposite:overlap-5",
+          "result_id": "853e28e5-5e87-598d-95c2-6023d535a1ec"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "I'll correct myself. The meeting is not Tuesday at 13:40, it's Tuesday at 14:30."
+    },
+    {
+      "card": 123,
+      "assessment": "Correction direction/day and rejected/affirmed times changed.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-1",
+          "result_id": "a3779543-c9de-5c0d-a439-46f0c73bb46b"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "I'll correct that. The meeting isn't on Tuesday at 2:40 PM, it's on Thursday at 2:30 PM."
+    },
+    {
+      "card": 126,
+      "assessment": "Rejected day changed from Thursday to Tuesday; affirmed Tuesday14:30 retained.",
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-5",
+          "result_id": "628f2fe5-d381-5125-96cc-a0e4d396faa8"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "Let me correct that. The meeting isn't on Tuesday at 13:40, it's on Tuesday at 14:30."
+    },
+    {
+      "card": 153,
+      "assessment": "Correction reversed and Tuesday time changed to2PM.",
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:serial-1",
+          "result_id": "1a9b492d-d741-5a69-bba2-ded757fe1520"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "Let me correct that. The meeting isn't on Tuesday at 2 PM, but on Thursday at 1:40 PM."
+    },
+    {
+      "card": 171,
+      "assessment": "Affirmed/rejected corrected meeting times reversed.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:serial-1",
+          "result_id": "63e1aac7-c81f-5ffd-9153-308b4368d220"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "Let me correct that. The meeting isn't on Tuesday at 2:30 PM, it's on Thursday at 1:40 PM."
+    },
+    {
+      "card": 174,
+      "assessment": "Affirmed/rejected corrected meeting times reversed.",
+      "instances": [
+        {
+          "case": "fallback",
+          "phase": "opposite:overlap-1",
+          "result_id": "9f41d0b5-9496-539a-a753-eda83f260292"
+        }
+      ],
+      "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.",
+      "translated_text": "I'll correct that. The meeting isn't on Tuesday at 2:30 PM, it's on Thursday at 1:40 PM."
+    }
+  ],
+  "lexical_concerns": [
+    {
+      "card": 132,
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "response-failure",
+          "result_id": "7212fe08-b66f-5752-85cc-559bc444542c"
+        }
+      ],
+      "output": "Mina has seven blue signs, not nine. Let's meet at the third entrance after lunch. The small robot's name is Nori. Its battery is 42 percent; don't turn it off. I'll correct that. The meeting is on Tuesday at 14:30, not Thursday at 13:40. Please move the red box to room 12 and put the green box next to the door."
+    },
+    {
+      "card": 72,
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:first-prefix",
+          "result_id": "6482dde2-35fa-5425-9e4a-ec69f25c2336"
+        }
+      ],
+      "output": "Mina has 7 blue signs. Not 9. Let's meet at entrance number 3 after lunch."
+    },
+    {
+      "card": 44,
+      "instances": [
+        {
+          "case": "26b",
+          "phase": "response-failure",
+          "result_id": "867ffce2-b075-5b0c-9fdc-8f5abe6ef224"
+        }
+      ],
+      "output": "Mina has 7 blue slips. Not 9. Let's meet at entrance 3 after lunch. The small robot is called Nori. Its battery is at 42 percent, so please don't turn it off. I'll correct myself. The meeting is on Tuesday at 14:30, not Thursday at 13:40. Please move the red box to room 12 and place the green box next to the door."
+    },
+    {
+      "card": 82,
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "opposite:overlap-3",
+          "result_id": "7efa771d-7cae-5832-adf6-9c160d3cb317"
+        }
+      ],
+      "output": "Mina has 7 blue forms. Not 9. Let's meet at entrance number 3 after lunch."
+    },
+    {
+      "card": 115,
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:first-prefix",
+          "result_id": "3229c2d1-7163-56ea-9d16-20028e3e7706"
+        }
+      ],
+      "output": "Mina has 7 blue forms. Not 9. Let's meet at entrance 3 after lunch."
+    },
+    {
+      "card": 148,
+      "instances": [
+        {
+          "case": "cpu",
+          "phase": "opposite:first-prefix",
+          "result_id": "6fb5277b-4d95-5463-aba7-6fa8b2374425"
+        },
+        {
+          "case": "cpu",
+          "phase": "opposite:overlap-3",
+          "result_id": "dceb9538-d402-59d1-82cc-0248a0581792"
+        },
+        {
+          "case": "fallback",
+          "phase": "opposite:first-prefix",
+          "result_id": "e2743984-10f9-5743-be62-bb2c3ad6d492"
+        }
+      ],
+      "output": "Mina has seven blue signs. Not nine. Let's meet at entrance number three after lunch."
+    },
+    {
+      "card": 124,
+      "instances": [
+        {
+          "case": "e4b-safety-failed2",
+          "phase": "opposite:overlap-3",
+          "result_id": "ab762db0-753f-568f-b546-7112a2bbd9a8"
+        }
+      ],
+      "output": "Mina has seven blue signs, not nine. Let's meet at the entrance number three after lunch."
+    },
+    {
+      "card": 93,
+      "instances": [
+        {
+          "case": "e4b-safety-failed1",
+          "phase": "response-failure",
+          "result_id": "30c82c55-aa2c-52ae-93ed-7331f7b1ca35"
+        }
+      ],
+      "output": "Mina has 7 blue sheets, not 9. Let's meet at entrance number 3 after lunch. The small robot's name is Nori. Its battery is 42 percent; don't turn it off. Correction: the meeting is on Tuesday at 14:30, not Thursday at 13:40. Please move the red box to room 12 and put the green box next to the door."
+    }
+  ],
+  "other_observations": [
+    "Remaining cards preserve core quantities, colors, negation and destinations; register, politeness and minor awkwardness vary. This is not a claim that every utterance is stylistically ideal.",
+    "Korean 표 is ambiguous; signs/forms/sheets/slips differ from fixture-intended tickets and remain lexical concerns rather than uniformly proven mistranslations.",
+    "English-to-Korean Mina sentences sometimes have awkward subject/particle phrasing; meaning remains recognizable. Japanese/French/German prefix-change outputs preserve the required quantities and destinations, with register/idiom variation.",
+    "These are unforced ordinary-sampling matrix outputs, including completed progress inside failed attempts; not an additional loading-mode quality comparison or a population accuracy estimate.",
+    "ABBA176 has a separate human review with8 correction reversals; do not erase either set of failures.",
+    "SourceCLI2 translated outputs were separately read against executed fixed inputs and preserve names,quantities,negation anddestination; raw stdin bytes were not separately journaled."
+  ],
+  "scope": "293 recognition request_complete outputs; additional native-associated manual/shutdown publications are counted separately, not silently omitted.",
+  "additional_native_readback": {
+    "reviewed_outputs": 17,
+    "published_outputs": 4,
+    "unpublished_outputs": 13,
+    "source": "matrix-extra-native-quality.json",
+    "assessment": "All17 additional native source/output pairs were read. Core quantities, names, negation, corrected times and destinations were retained; technical shutdown-queue wording is awkward. Publication status is not changed by this assessment.",
+    "shutdown_boundary": "One26B-scenario Peer result published during ordered shutdown; waiting manual result did not. This is not a zero-publication-from-close-request assertion."
+  }
+}

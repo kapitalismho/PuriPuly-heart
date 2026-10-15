@@ -1,0 +1,628 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-enable-gui/v1",
+  "scope": "7cff current-code native-free actual Flet GUI TRANS failure, dashboard Cancel during owned lease checking, explicit TRANS retry, and owned cleanup. Not a whole-issue completion verdict or fresh-GUI claim for any later repaired candidate.",
+  "result": "observed_failure_cancel_retry_effectively_and_visually_off",
+  "candidate": {
+    "commit": "7cffc6b8bb8f3da2544f42a4f76319ff91759513",
+    "later_candidate_applicability": "After this run, the Director reported an unrelated generic provider-signature-writer consumer gap requiring another bounded repair. This record remains exact7cff proof; the translation_enable.py hash is expected to remain unchanged, but applicability to a fresh pin requires its assigned review. No later candidate GUI execution is claimed. All owned GUI/host/resources were closed and cleaned before releasing the source window for that repair.",
+    "identity_evidence": "Read-only git rev-parse HEAD before launch; companion process used the same Python, child environment and frozen checkout src as actual GUI host. Actual capabilities/app.status bound the active control instance to host PID52044. No product/test/docs edits or Git/index/remote mutations in this task.",
+    "source_file": "src/puripuly_heart/app/services/translation_enable.py",
+    "source_sha256": "b2a6abc759db1bde43ce34a293dfe356833c6a6080a87f89c2a687a32d59465e",
+    "python_version": "3.14.7 (MSC v.1944 64 bit AMD64)",
+    "imported_package": "src/puripuly_heart/__init__.py",
+    "imported_owner": "src/puripuly_heart/app/services/translation_enable.py",
+    "integrated_test_context": "Director-supplied703 integrated passing tests are accepted context, not re-executed here. This actual-GUI observation corroborates that candidate; tests do not substitute for GUI input/presentation and this GUI probe does not replace native inference evidence."
+  },
+  "execution": {
+    "started_at_utc": "2026-10-15T18:19:04.631124+00:00",
+    "stopped_at_utc": "2026-10-15T18:22:33.213400+00:00",
+    "task_root_basename": "puripuly-251-enable-gui-_2cbdpjs",
+    "entrypoint": "python -m puripuly_heart.main --config <owned-task-root>/settings.json run-gui",
+    "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+    "host_and_launcher_pid": 52044,
+    "flet_pid": 66436,
+    "top_hwnd": 37490870,
+    "flutterview_hwnd": 3540646,
+    "top_window_class": "FLUTTER_RUNNER_WIN32_WINDOW",
+    "child_class": "FLUTTERVIEW",
+    "fresh_observed_top_rect": [
+      392,
+      115,
+      1528,
+      965
+    ],
+    "fresh_observed_child_client_rect": [
+      0,
+      0,
+      1136,
+      850
+    ],
+    "capture": "Win32 PrintWindow on only the owned top HWND; no desktop capture, clipboard, or unrelated-window input. Each retained PNG is1136x850 and not minimized.",
+    "input": "Win32 PostMessageW WM_MOUSEMOVE/WM_LBUTTONDOWN/WM_LBUTTONUP to the owned FLUTTERVIEW. Locations chosen after visually reading fresh owned screenshots; child coordinates derived from actual window/client origins.",
+    "clicks": [
+      {
+        "at_utc": "2026-10-15T18:20:27.246669+00:00",
+        "label": "TRANS first explicit enable from observed inactive tile",
+        "top_client": [
+          136,
+          585
+        ],
+        "child_client": [
+          136,
+          585
+        ],
+        "post_succeeded": [
+          true,
+          true,
+          true
+        ],
+        "spacing_seconds": null,
+        "observed_result": "Hover appearance changed, but no managed operation/state/log began; no activation success claimed.",
+        "foreground_owned_result": null
+      },
+      {
+        "at_utc": "2026-10-15T18:20:52.031411+00:00",
+        "label": "TRANS activation with owned-window foreground and spaced posted input",
+        "top_client": [
+          136,
+          585
+        ],
+        "child_client": [
+          136,
+          585
+        ],
+        "post_succeeded": null,
+        "spacing_seconds": [
+          0.3,
+          0.2
+        ],
+        "observed_result": null,
+        "foreground_owned_result": false
+      },
+      {
+        "at_utc": "2026-10-15T18:21:32.602662+00:00",
+        "label": "TRANS second explicit enable with owned provisioning lease held",
+        "top_client": [
+          136,
+          585
+        ],
+        "child_client": [
+          136,
+          585
+        ],
+        "post_succeeded": [
+          true,
+          true,
+          true
+        ],
+        "spacing_seconds": [
+          0.3,
+          0.2
+        ],
+        "observed_result": null,
+        "foreground_owned_result": null
+      },
+      {
+        "at_utc": "2026-10-15T18:21:51.922817+00:00",
+        "label": "Actual dashboard Cancel from visually located checking notice",
+        "top_client": [
+          1057,
+          113
+        ],
+        "child_client": [
+          1057,
+          113
+        ],
+        "post_succeeded": [
+          true,
+          true,
+          true
+        ],
+        "spacing_seconds": [
+          0.3,
+          0.2
+        ],
+        "observed_result": null,
+        "foreground_owned_result": null
+      },
+      {
+        "at_utc": "2026-10-15T18:22:06.423205+00:00",
+        "label": "Actual TRANS explicit retry after settled Cancel and lease release",
+        "top_client": [
+          136,
+          585
+        ],
+        "child_client": [
+          136,
+          585
+        ],
+        "post_succeeded": [
+          true,
+          true,
+          true
+        ],
+        "spacing_seconds": [
+          0.3,
+          0.2
+        ],
+        "observed_result": null,
+        "foreground_owned_result": null
+      }
+    ]
+  },
+  "promised_result_and_gap_closed": "Headless tests could pass while the real dashboard left TRANS on, failed to expose Cancel, or could not retry. Actual owned GUI input was paired with independent current owner queries and owned-window captures for all three paths. Success here means correct failure/cancel/retry-off behavior at a deliberately unavailable runtime, not successful model activation.",
+  "isolation": {
+    "new_synthetic_settings": true,
+    "encrypted_file_secrets": "Fresh task-owned encrypted_file backend with a generated in-memory passphrase and no provider credentials; settings, empty encrypted store and migration backup removed after shutdown. No shared keyring or live settings.",
+    "redirected": [
+      "LOCALAPPDATA",
+      "APPDATA",
+      "USERPROFILE",
+      "HOME",
+      "TEMP",
+      "TMP",
+      "HF_HOME",
+      "HF_HUB_CACHE",
+      "HF_XET_CACHE"
+    ],
+    "dependency_lookup": "Redirected APPDATA initially hid installed user-site dependencies. Added the existing installed Python3.14 dependency site explicitly to child PYTHONPATH alongside candidate src; no dependency install or network fetch.",
+    "missing_runtime_override": {
+      "environment_variable": "PURIPULY_HEART_LLAMA_CPP_ROOT",
+      "task_relative_value": "runtime-deliberately-absent",
+      "absent_before_launch": true,
+      "absent_after_all_attempts": true,
+      "meaning": "Required selected Vulkan executable unavailable before native process creation; no real model/GPU inference or alternate backend allowed."
+    },
+    "huggingface": "HF_HUB_OFFLINE=1, HF_HUB_DISABLE_TELEMETRY=1 and task-owned absent effective HF_HUB_CACHE; no downloader started or new model download. Effective cache remained absent.",
+    "disabled_and_unrequested": [
+      "telemetry",
+      "clipboard auto-translation",
+      "Self audio capture",
+      "Peer audio capture",
+      "microphone test",
+      "overlay",
+      "provider credential verification",
+      "manual text/translation submissions"
+    ],
+    "integrated_context_limit": "Settings initialization supplied integrated_context.enabled=false, but current settings query showed true because the product fixed policy normalizes this field. No context-off claim is made. USERPROFILE redirected VRChat log lookup to the empty owned profile (vrchat_scene_tailer.py25-29); the automatic scene observer reported only process-present status, not private logs/content. No audio or transcript input and no desktop/private-window capture was requested.",
+    "osc": {
+      "configured_mode": "off",
+      "effective_mode": "off",
+      "host": "127.0.0.1",
+      "configured_port_and_send_port": 58391,
+      "owned_udp_receiver_held_until_host_exit": true,
+      "received_packets": 0,
+      "destination_effect_claim": "No OSC translation delta/output claim: OSC mode was intentionally off."
+    }
+  },
+  "asset_reuse": {
+    "source_root_basename": "puripuly-251-gui-provisioning-z4mwb2ca",
+    "source_relative_dir": "Local/puripuly-heart/models/gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+    "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+    "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl",
+    "size_bytes": 14249047104,
+    "original_verified_sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+    "manifest_sha256": "5533658c8a3717356065cf267c19852319aec2c4bdff0301f3d0f05e4f35b869",
+    "fixture": "Hardlinked exact product-promoted original asset into NEW owned installation and copied the original product-created manifest unchanged. os.path.samefile confirmed shared asset identity; original size/mtime/inode and manifest hash unchanged after execution. Removed only new link during cleanup.",
+    "proof_boundary": "Installed-state reuse, not a fresh promotion, checksum rerun, public download, or download-progress cancellation. Original product promotion/full-checksum evidence remains separate in cache-promotion-evidence.json under the source task root and selection-evidence.json."
+  },
+  "before": {
+    "app_status": {
+      "observed_at_utc": "2026-10-15T18:19:18.260553+00:00",
+      "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+      "host_pid": 52044,
+      "translation_enabled": false,
+      "translation_runtime_ready": true,
+      "self_capture_effective": false,
+      "peer_capture_effective": false,
+      "microphone_test": "off"
+    },
+    "gemma": {
+      "state": "idle",
+      "backend": null,
+      "progress_percent": null,
+      "error_type": null,
+      "failure_phase": null,
+      "failure_code": null,
+      "cause_type": null,
+      "worker_exit_code": null,
+      "status_code": null,
+      "os_error_code": null,
+      "model_id": null
+    },
+    "selection": {
+      "model": "managed_gemma_26b",
+      "connection": "gpu"
+    },
+    "visual": "Inactive pale TRANS tile; TALK/LISTEN/CAPTIONS also inactive. Initial notice described OSC off.",
+    "screenshot": "01-inactive-owned-dashboard.png"
+  },
+  "first_effective_toggle": {
+    "app_status": {
+      "observed_at_utc": "2026-10-15T18:20:53.075920+00:00",
+      "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+      "host_pid": 52044,
+      "translation_enabled": false,
+      "translation_runtime_ready": true,
+      "self_capture_effective": false,
+      "peer_capture_effective": false,
+      "microphone_test": "off"
+    },
+    "models_observed_at_utc": "2026-10-15T18:20:54.194804+00:00",
+    "gemma": {
+      "state": "failed",
+      "backend": "gpu",
+      "progress_percent": null,
+      "error_type": "ManagedGemmaRuntimeError",
+      "failure_phase": "runtime",
+      "failure_code": "runtime_failed",
+      "cause_type": "ManagedGemmaRuntimeError",
+      "worker_exit_code": null,
+      "status_code": null,
+      "os_error_code": null,
+      "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+    },
+    "screenshot": "03-first-effective-toggle-failure-off.png",
+    "visual_observation": "Full actionable26B/Vulkan nofallback error visible; TRANS has inactive pale background and translation glyph, no startup spinner.",
+    "application_control_receipt": null,
+    "receipt_boundary": "Actual GUI calls have no ApplicationControlOwner operation receipt. Owner snapshots, owned-window presentation and application logs are the observed terminal evidence."
+  },
+  "cancellation": {
+    "control_boundary": "Existing LocalSTTProvisioningLease acquired only for new owned models root after startup. Actual TRANS entered checking while waiting for this lease. No downloader bytes/progress or native startup.",
+    "lease_acquired_at_utc": "2026-10-15T18:21:32.014007+00:00",
+    "checking_app_status": {
+      "observed_at_utc": "2026-10-15T18:21:33.316289+00:00",
+      "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+      "host_pid": 52044,
+      "translation_enabled": true,
+      "translation_runtime_ready": true,
+      "self_capture_effective": false,
+      "peer_capture_effective": false,
+      "microphone_test": "off"
+    },
+    "checking_gemma": {
+      "state": "checking",
+      "backend": "gpu",
+      "progress_percent": null,
+      "error_type": null,
+      "failure_phase": null,
+      "failure_code": null,
+      "cause_type": null,
+      "worker_exit_code": null,
+      "status_code": null,
+      "os_error_code": null,
+      "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+    },
+    "checking_visual": "Checking the local translation model...; visible dashboard Cancel; TRANS spinner and coral starting label.",
+    "checking_screenshot": "04-owned-lease-checking-cancel-visible.png",
+    "actual_cancel_click_client": [
+      1057,
+      113
+    ],
+    "settled_before_owned_lease_release": {
+      "app_status": {
+        "observed_at_utc": "2026-10-15T18:21:52.723421+00:00",
+        "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+        "host_pid": 52044,
+        "translation_enabled": false,
+        "translation_runtime_ready": true,
+        "self_capture_effective": false,
+        "peer_capture_effective": false,
+        "microphone_test": "off"
+      },
+      "gemma": {
+        "state": "cancelled",
+        "backend": "gpu",
+        "progress_percent": null,
+        "error_type": null,
+        "failure_phase": null,
+        "failure_code": null,
+        "cause_type": null,
+        "worker_exit_code": null,
+        "status_code": null,
+        "os_error_code": null,
+        "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+      }
+    },
+    "lease_released_at_utc": "2026-10-15T18:21:53.418279+00:00",
+    "after_release": {
+      "app_status": {
+        "observed_at_utc": "2026-10-15T18:21:53.729209+00:00",
+        "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+        "host_pid": 52044,
+        "translation_enabled": false,
+        "translation_runtime_ready": true,
+        "self_capture_effective": false,
+        "peer_capture_effective": false,
+        "microphone_test": "off"
+      },
+      "models_observed_at_utc": "2026-10-15T18:21:53.968614+00:00",
+      "gemma": {
+        "state": "cancelled",
+        "backend": "gpu",
+        "progress_percent": null,
+        "error_type": null,
+        "failure_phase": null,
+        "failure_code": null,
+        "cause_type": null,
+        "worker_exit_code": null,
+        "status_code": null,
+        "os_error_code": null,
+        "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+      },
+      "screenshot": "05-dashboard-cancel-settled-off.png",
+      "visual_observation": "Local translation model setup was cancelled. TRANS pale/inactive with normal translation glyph; spinner and Cancel gone.",
+      "application_control_receipt": null,
+      "receipt_boundary": "Actual GUI calls have no ApplicationControlOwner operation receipt. Owner snapshots, owned-window presentation and application logs are the observed terminal evidence."
+    },
+    "no_staging_after_settlement": true
+  },
+  "explicit_retry": {
+    "app_status": {
+      "observed_at_utc": "2026-10-15T18:22:07.323798+00:00",
+      "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+      "host_pid": 52044,
+      "translation_enabled": false,
+      "translation_runtime_ready": true,
+      "self_capture_effective": false,
+      "peer_capture_effective": false,
+      "microphone_test": "off"
+    },
+    "models_observed_at_utc": "2026-10-15T18:22:07.624023+00:00",
+    "gemma": {
+      "state": "failed",
+      "backend": "gpu",
+      "progress_percent": null,
+      "error_type": "ManagedGemmaRuntimeError",
+      "failure_phase": "runtime",
+      "failure_code": "runtime_failed",
+      "cause_type": "ManagedGemmaRuntimeError",
+      "worker_exit_code": null,
+      "status_code": null,
+      "os_error_code": null,
+      "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+    },
+    "screenshot": "06-explicit-retry-actionable-failure-off.png",
+    "visual_observation": "Actual TRANS click usable after settled cancellation and lease release; full same26B/Vulkan nofallback error reappeared and TRANS returned pale/inactive with no spinner.",
+    "application_control_receipt": null,
+    "receipt_boundary": "Actual GUI calls have no ApplicationControlOwner operation receipt. Owner snapshots, owned-window presentation and application logs are the observed terminal evidence."
+  },
+  "actionable_error_text": "Couldn't load Gemma 4 26B on Vulkan. Check the selected GPU and available GPU/system memory, or explicitly choose another supported model. No CPU or cloud fallback is used.",
+  "selection_after_retry": {
+    "model": "managed_gemma_26b",
+    "connection": "gpu",
+    "unchanged_revision": 1
+  },
+  "native_resource_observation": {
+    "owned_process_baseline": [
+      {
+        "pid": 52044,
+        "name": "python.exe"
+      },
+      {
+        "pid": 66436,
+        "name": "flet.exe"
+      }
+    ],
+    "descendants_seen_during_inputs": [
+      {
+        "pid": 66436,
+        "name": "flet.exe"
+      }
+    ],
+    "sampling_interval_seconds": 0.05,
+    "limit": "Owned descendant sampling is not an OS process-creation trace and can miss short-lived helpers. Independent deliberately absent runtime executable prevents a real native model process; current models.status failed/runtime and no ready model or fallback was observed.",
+    "staging_paths_observed": []
+  },
+  "retained_nonpasses_and_diagnostics": [
+    {
+      "kind": "preflight_environment_failure",
+      "observed": "Initial same-interpreter preflight failed ModuleNotFoundError:httpx after APPDATA isolation changed user-site lookup. No GUI/model launch had begun.",
+      "resolution": "Used the existing installed dependency path explicitly; second companion preflight passed before GUI launch. No download/install."
+    },
+    {
+      "kind": "input_not_activated",
+      "observed": "Initial tightly posted move/down/up returned success and changed hover appearance but models remained idle; no managed log/state transition. File02 name suggests failure but its image is NOT activation/failure proof.",
+      "screenshot": "02-first-toggle-actionable-failure-off.png",
+      "resolution": "Preserved attempt; spaced move/down/up by0.3/0.2s. Owned SetForegroundWindow attempt returned false, not relabeled successful. Spaced posted sequence then caused actual checking→failed and off."
+    },
+    {
+      "kind": "intentional_keyless_stt_startup_failure",
+      "observed": "stt.provider_not_ready/ValueError retained in logs and diagnostics.history; Self/Peer capture stayed effectively false. No credentials or external verification/capture supplied."
+    },
+    {
+      "kind": "expected_gui_task_errors",
+      "observed": "Failure/cancellation produced redacted concurrent.futures ERROR records; shutdown retained two ManagedGemma lifecycle outcome=failed/task_done/ManagedGemmaRuntimeError records from controlled missing-runtime attempts. They are retained, not suppressed or called a clean diagnostic run."
+    },
+    {
+      "kind": "receipt_boundary",
+      "observed": "GUI toggle calls UiApplicationBoundary directly under existing locks; Cancel invokes managed_gemma.cancel. Neither creates ApplicationControlOwner operation identity. No CLI mutation was issued merely to attach a receipt. Current-owner terminal snapshots plus actual interaction/presentation/logs are this GUI proof."
+    }
+  ],
+  "cleanup": {
+    "supported_stop_receipt": {
+      "output_version": 1,
+      "status": "stopped",
+      "terminal": true,
+      "instance_id": "c50b59df-61d5-41a2-9254-6601e456ec2c",
+      "operation_id": "123f04f8f83d4f8487a1c9576927443e",
+      "cleanup_outcome": "unobserved"
+    },
+    "stop_cli_exit_code": 0,
+    "launcher_exit_code": 0,
+    "separate_process_identity_observations": [
+      {
+        "pid": 52044,
+        "name": "python.exe",
+        "same_process_exists": false
+      },
+      {
+        "pid": 66436,
+        "name": "flet.exe",
+        "same_process_exists": false
+      }
+    ],
+    "top_hwnd_exists_after_stop": false,
+    "flutterview_hwnd_exists_after_stop": false,
+    "former_loopback_endpoints": [
+      {
+        "label": "control",
+        "port": 50233,
+        "connect_ex": 10035,
+        "refused_or_unavailable": true
+      },
+      {
+        "label": "flet",
+        "port": 50227,
+        "connect_ex": 10035,
+        "refused_or_unavailable": true
+      }
+    ],
+    "endpoint_limit": "Loopback connect_ex returned10035 for both former endpoints; no successful connection observed. Process/window disappearance and app.stop identity are separately recorded; this is not relabeled a10061 refusal or proof of every internal teardown callback.",
+    "lease_closed": true,
+    "monitor_thread_stopped": true,
+    "monitor_terminal_race": "One NoSuchProcess while the owned parent exited; preserved as expected sampling race.",
+    "udp_closed": true,
+    "new_settings_secrets_backup_model_link_profile_cache_control_extensions_temp_removed": true,
+    "original_asset_and_manifest_preserved": true,
+    "unrelated_resources": "No unrelated process/window/socket/state was stopped or edited; no unconditional kill.",
+    "stop_receipt_limit": "cleanup_outcome=unobserved preserved. Separate observed process/window exit, released lease/socket and owned filesystem cleanup do not prove every internal teardown callback."
+  },
+  "local_evidence": {
+    "task_root_basename": "puripuly-251-enable-gui-_2cbdpjs",
+    "artifacts": [
+      {
+        "relative_path": "01-inactive-owned-dashboard.png",
+        "size_bytes": 52152,
+        "sha256": "462e904ea997ddbadacb74121a5615a4faa84f641f1bbd860e504aad6a78e6be"
+      },
+      {
+        "relative_path": "02-first-toggle-actionable-failure-off.png",
+        "size_bytes": 52170,
+        "sha256": "78da713a67aca0fc2cbddae5d1974b9aeb6b772473c3f08a25e6d9b8d5e3db20"
+      },
+      {
+        "relative_path": "03-first-effective-toggle-failure-off.png",
+        "size_bytes": 55099,
+        "sha256": "67fbe9abb48d05ede06869593b02f5d26c71380d6ca54a7de0e92e4ee5ba7ec6"
+      },
+      {
+        "relative_path": "04-owned-lease-checking-cancel-visible.png",
+        "size_bytes": 45556,
+        "sha256": "361713f5ff74c5d0632de1f8f6b6aa9aefbd33d63381f2575b20b4b66aa5c5e3"
+      },
+      {
+        "relative_path": "05-dashboard-cancel-settled-off.png",
+        "size_bytes": 47658,
+        "sha256": "2b3c44867e6bb732a718a224bc2918a27391d865bff0c8d640c93f79d623b77f"
+      },
+      {
+        "relative_path": "06-explicit-retry-actionable-failure-off.png",
+        "size_bytes": 55099,
+        "sha256": "67fbe9abb48d05ede06869593b02f5d26c71380d6ca54a7de0e92e4ee5ba7ec6"
+      },
+      {
+        "relative_path": "gui.stderr.log",
+        "size_bytes": 1644,
+        "sha256": "d687b0243158f9502e4181eebf36c3c34c763d870d02268480a643cd4a01d1a3"
+      },
+      {
+        "relative_path": "gui.stdout.log",
+        "size_bytes": 76,
+        "sha256": "0defda15a35b4d24a75d09292173e8b47b07ffc5bfe086325141ee1a02e15365"
+      },
+      {
+        "relative_path": "observations.json",
+        "size_bytes": 125681,
+        "sha256": "be97ede50b92dd4c623fa42f0bd7d509f67512346024a46f01419f86e3262f25"
+      },
+      {
+        "relative_path": "puripuly_heart.log",
+        "size_bytes": 7521,
+        "sha256": "9f2b349688b1d47abe9e0d757f58d064257d0473649a27be05be09a0e71dfa4d"
+      }
+    ],
+    "screenshots": [
+      {
+        "relative_path": "01-inactive-owned-dashboard.png",
+        "captured_at_utc": "2026-10-15T18:19:47.353763+00:00",
+        "dimensions": [
+          1136,
+          850
+        ],
+        "owned_pid": 66436,
+        "owned_hwnd": 37490870,
+        "flutterview_hwnd": 3540646,
+        "sha256": "462e904ea997ddbadacb74121a5615a4faa84f641f1bbd860e504aad6a78e6be"
+      },
+      {
+        "relative_path": "02-first-toggle-actionable-failure-off.png",
+        "captured_at_utc": "2026-10-15T18:20:31.317009+00:00",
+        "dimensions": [
+          1136,
+          850
+        ],
+        "owned_pid": 66436,
+        "owned_hwnd": 37490870,
+        "flutterview_hwnd": 3540646,
+        "sha256": "78da713a67aca0fc2cbddae5d1974b9aeb6b772473c3f08a25e6d9b8d5e3db20"
+      },
+      {
+        "relative_path": "03-first-effective-toggle-failure-off.png",
+        "captured_at_utc": "2026-10-15T18:20:55.221981+00:00",
+        "dimensions": [
+          1136,
+          850
+        ],
+        "owned_pid": 66436,
+        "owned_hwnd": 37490870,
+        "flutterview_hwnd": 3540646,
+        "sha256": "67fbe9abb48d05ede06869593b02f5d26c71380d6ca54a7de0e92e4ee5ba7ec6"
+      },
+      {
+        "relative_path": "04-owned-lease-checking-cancel-visible.png",
+        "captured_at_utc": "2026-10-15T18:21:35.731753+00:00",
+        "dimensions": [
+          1136,
+          850
+        ],
+        "owned_pid": 66436,
+        "owned_hwnd": 37490870,
+        "flutterview_hwnd": 3540646,
+        "sha256": "361713f5ff74c5d0632de1f8f6b6aa9aefbd33d63381f2575b20b4b66aa5c5e3"
+      },
+      {
+        "relative_path": "05-dashboard-cancel-settled-off.png",
+        "captured_at_utc": "2026-10-15T18:21:54.449740+00:00",
+        "dimensions": [
+          1136,
+          850
+        ],
+        "owned_pid": 66436,
+        "owned_hwnd": 37490870,
+        "flutterview_hwnd": 3540646,
+        "sha256": "2b3c44867e6bb732a718a224bc2918a27391d865bff0c8d640c93f79d623b77f"
+      },
+      {
+        "relative_path": "06-explicit-retry-actionable-failure-off.png",
+        "captured_at_utc": "2026-10-15T18:22:08.552171+00:00",
+        "dimensions": [
+          1136,
+          850
+        ],
+        "owned_pid": 66436,
+        "owned_hwnd": 37490870,
+        "flutterview_hwnd": 3540646,
+        "sha256": "67fbe9abb48d05ede06869593b02f5d26c71380d6ca54a7de0e92e4ee5ba7ec6"
+      }
+    ],
+    "sanitization": "Durable record contains no personal absolute paths, passphrases, provider credentials, private transcripts, control auth tokens, clipboard content, or whole-desktop images. Full task-local observations/logs retained only under the named task root; references are root-relative."
+  },
+  "limits": [
+    "No real native executable/model process, GPU readiness, successful inference, translation quality, performance, installed-distribution or restart-persistence proof from this run. Native-positive evidence belongs to separate owner.",
+    "Missing-runtime explicit retry establishes reattempt/error/off usability, not native-ready recovery.",
+    "Lease-controlled Cancel establishes checking/cancel settlement, not actual downloader cancellation/progress. Original public-download/progress/cancel and promotion records remain separate.",
+    "No tests, type checker, linter, formatter, builds or native-distribution checks executed by this GUI validation task. Product/tests/docs read-only; only new assigned repository evidence artifact authored.",
+    "No whole-issue completion, review approval, publication, branch/index/history or remote authorization claimed."
+  ]
+}

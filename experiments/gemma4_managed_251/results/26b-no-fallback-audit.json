@@ -1,0 +1,82 @@
+{
+  "raw_journal_sha256": "8f4fdac22c979c3e7653ceda67460de1aa35d0d6ac171cfcf6c0d7d032cb6745",
+  "candidate": {
+    "head": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+    "source_tree_sha256": "0c7fd7e654c939b1226c129157bde3cde103d4f4128de5dec66c910f821361b2",
+    "harness_sha256": {
+      "compare.py": "547ce488e70bad95da6f31b723e284f59b00d9dd94d6c47624e9821ee89e2765",
+      "run.py": "25b3754db247776915bb28a7f8e91538f4f0442445b4179712e84a7c38090435",
+      "session.py": "3422eb2288f6fb7af90d02c57374989c8dea7b2e02b1c6ab0d59a92976d06a6d",
+      "summarize.py": "dfc5f5b8ab530e378a64b74688a48c250c52cf5f08688aab5919cac935d65d39",
+      "windows_metrics.py": "d8d9782c7743be4ea5d121078317f38a725275f33d7f9c72e4e6fe5c553d9534"
+    }
+  },
+  "record_counts": {
+    "instance": 1,
+    "app_event": 17,
+    "cli": 8,
+    "pre_translation_state": 1,
+    "injected_spawn_failure": 1,
+    "expected_control_rejection": 1,
+    "no_fallback_state": 1,
+    "failure": 1,
+    "routing_snapshot": 1,
+    "shutdown_ports": 1,
+    "cleanup": 1
+  },
+  "native_active_maximum_by_pid": {},
+  "native_unfinished_intervals_at_owned_shutdown": [],
+  "native_draft_tokens_by_cpu_pid": {},
+  "global_no_stale_cancelled_publication": [],
+  "manual_admission_and_completion": [],
+  "no_fallback_readiness": [
+    {
+      "gemma": {
+        "state": "failed",
+        "backend": "gpu",
+        "progress_percent": null,
+        "error_type": "ManagedGemmaRuntimeError",
+        "failure_phase": "provisioning",
+        "failure_code": "filesystem_failed",
+        "cause_type": "OSError",
+        "worker_exit_code": null,
+        "status_code": null,
+        "os_error_code": null,
+        "model_id": "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+      },
+      "translation_enabled": true,
+      "translation_runtime_ready": true
+    }
+  ],
+  "controlled_outcomes": [],
+  "processes": [],
+  "cleanup": [
+    {
+      "t": 96236.2632403,
+      "kind": "shutdown_ports",
+      "states": []
+    },
+    {
+      "t": 96236.2633322,
+      "kind": "cleanup",
+      "managed_processes": [],
+      "remaining_owned_tasks": 0,
+      "checks": {}
+    }
+  ],
+  "failures": [
+    {
+      "kind": "failure",
+      "stage": "startup",
+      "error": "RuntimeError",
+      "detail": "26B rejection did not preserve failed/not-ready managed state"
+    }
+  ],
+  "all_native_translation_outputs_including_rejected_response": [],
+  "supported_translation_events": [],
+  "limits": [
+    "Native interval maxima exclude unfinished intervals; active shutdown additionally requires fresh native slot observations.",
+    "Manual terminal admission alone is not destination delivery; actual translation events and separate OSC routing records remain distinct.",
+    "No automated semantic quality verdict is assigned. Original synthetic native outputs, including injected rejected responses, are retained."
+  ]
+}

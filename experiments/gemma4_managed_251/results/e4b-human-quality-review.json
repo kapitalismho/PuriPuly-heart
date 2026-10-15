@@ -1,0 +1,34 @@
+{
+  "schema": "puripuly-heart/managed-gemma-251-human-quality/v1",
+  "source": "e4b-loading-comparison.json#quality_cards",
+  "candidate": "8786d1fcd8fcb966f0ae164acee289e535a7c862",
+  "method": "Human semantic readback of every distinct synthetic source/target/output card. Instance counts and per-arm association come from the retained comparator cards; no outputs were removed or regenerated for quality.",
+  "unique_cards_reviewed": 13,
+  "completed_outputs_represented": 176,
+  "all_matched_outputs_identical_across_four_arms": true,
+  "blanket_quality_pass": false,
+  "definite_semantic_error_instances": 8,
+  "lexical_ambiguity_instances": 8,
+  "loading_mode_quality_regression_observed": false,
+  "reviews": [
+    {"card": 1, "instances": 48, "assessment": "Meaning preserved: Mina, seven not nine blue tickets, gate three and after lunch; natural polite Korean."},
+    {"card": 2, "instances": 32, "assessment": "Names, battery quantity and do-not-switch-off negation preserved. Informal Korean register is a presentation choice; this source does not specify social formality."},
+    {"card": 3, "instances": 24, "assessment": "Correction direction preserved: Tuesday14:30, not Thursday13:40."},
+    {"card": 4, "instances": 12, "assessment": "Red/green objects and different destinations correctly preserved."},
+    {"card": 5, "instances": 8, "assessment": "Meaning preserved; colloquial Korean abbreviation for percent and informal register."},
+    {"card": 6, "instances": 4, "assessment": "Short correction label; Tuesday14:30 versus rejected Thursday13:40 preserved."},
+    {"card": 7, "instances": 4, "assessment": "Deliver versus carry is a minor verb choice in this room-delivery context. Object colors and destinations preserved."},
+    {"card": 8, "instances": 8, "assessment": "Lexical concern: Korean 표 becomes blue signs, not the fixture's intended tickets. The Korean noun is ambiguous without stronger context. Seven/nine/three are correct spelled-out quantities; automatic digit-surface flags are not numeric errors.", "classification": "lexical_ambiguity", "instances_per_arm": {"A1": 2, "B1": 2, "B2": 2, "A2": 2}},
+    {"card": 9, "instances": 4, "assessment": "Battery quantity and negative instruction preserved. Adds only, a minor emphasis not explicit in the source."},
+    {"card": 10, "instances": 8, "assessment": "Room12, red box and green box beside door correctly preserved."},
+    {"card": 11, "instances": 12, "assessment": "Nori,42percent battery and do-not-turn-off instruction correctly preserved."},
+    {"card": 12, "instances": 4, "assessment": "Correct Korean-to-English correction: Tuesday2:30PM, not Thursday1:40PM. Twelve-hour rendering is equivalent."},
+    {"card": 13, "instances": 8, "classification": "definite_semantic_error", "assessment": "The corrected and rejected meeting times are reversed. Source affirms Tuesday14:30 and rejects Thursday13:40; output rejects Tuesday14:30 and affirms Thursday13:40. Material semantic failure, despite the automatic surface checks finding both times.", "source_text": "정정할게요. 회의는 목요일 13시 40분이 아니라 화요일 14시 30분이에요.", "translated_text": "Let me correct that. The meeting isn't on Tuesday at 14:30, it's on Thursday at 13:40.", "phases": ["opposite:overlap-1", "opposite:overlap-5"], "instances_per_arm": {"A1": 2, "B1": 2, "B2": 2, "A2": 2}}
+  ],
+  "interpretation": [
+    "Transport/native/application completion is not semantic correctness. complete_comparison means acquisition/comparability gates passed, not that every translation passed quality review or that issue251 is complete.",
+    "The material semantic failure and lexical ambiguity occur identically across both loading modes. They are retained limitations, not evidence that loading mode caused a regression.",
+    "The cause of the reversed correction was not diagnosed. This record does not attribute it to application routing, native cache behavior or model quality alone.",
+    "No source, history, sampler parameter, output assertion or loading profile was retuned to hide these outcomes. Director owns acceptance and any separate diagnosis."
+  ]
+}

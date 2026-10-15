@@ -1,0 +1,195 @@
+{
+  "issue": 251,
+  "scope": "Accepted application-recovery FULL_REVIEW F1: remaining generic signature-writer migration and initial-binding snapshot relationships.",
+  "worker": "signature-ownership-repair",
+  "candidate": {
+    "director_reported_frozen_commit": "671ca2ac68a184a2d6915e9efd36464b52d5b0f5",
+    "identity_authority": "Director assignment supplied the pinned commit. This worker did not execute Git operations to independently resolve it.",
+    "measurement_phase": "Tests and smoke ran on the completed uncommitted repair before Director pinning. SHA-256 identities below were measured read-only after the Director reported the pin and source freeze; they are not represented as in-run hash capture.",
+    "source_sha256": {
+      "src/puripuly_heart/app/ports/settings_runtime_effects.py": "fc216e781d6bb344636ffec233021dccfd5903a3272015866605b1d4d88c07f1",
+      "src/puripuly_heart/app/services/provider/provider_settings.py": "8594edfa6aa33811521b54b363f72199fb790fc74cc25203a71ee2b4973c39a0",
+      "src/puripuly_heart/app/services/settings/settings_application.py": "937b7075380d4673a3c3c3500add90a4ecc6a8b9b6eb34af4281954dcda8fbcf",
+      "src/puripuly_heart/app/services/settings/settings_runtime_effects.py": "f7caae6df75e4d996ada5d54710ac995110d871fabf14f92d119ae70f1f3c19d",
+      "src/puripuly_heart/app/wiring/wiring_provider_runtime.py": "e78044a56abefbde5cca23d882417f41f4b4568490a3c595511f06db246ec224",
+      "src/puripuly_heart/composition/application_runtime.py": "d342344fafaf9659a5c1a902a0d19a91bccaf4aefbd1020253bb8686db30e0ab",
+      "src/puripuly_heart/composition/application_startup.py": "dea4982152297eee55fe3e627aea716918751a802f5e1db66acc99a7f9d522d0",
+      "tests/app/test_application_startup_settings.py": "dcec2ea97cfa8d9c47dc9fff37531c7f570403902fcfdce044590d9fce3eedc1",
+      "tests/app/test_managed_gemma_provider_runtime_integration.py": "d4ff9e77711e35ba181cecb7d6ccfa39d5034e17cce53d231913e341666fe813",
+      "tests/app/test_provider_application_owner.py": "f6dff2ab8563c96f648458d6b2d2d656552f180e922779383c9a5e2fed02c099",
+      "tests/app/test_settings_application_owner.py": "b7468f94c247157d53bfffba1f773bb7d1b238cb829301f0d92d86d4e811cac7",
+      "tests/app/test_settings_runtime_effects.py": "28f359865385b89e6c0c91319cb5f6166a16d9da35b572b182cbbccf5602a39c",
+      "tests/app/test_stt_provider_apply_vertical.py": "31137679913bc0f5b2219e5b8f60338f9ab30036a8bc48d88fdd4e44550a761f",
+      "tests/conftest.py": "5936986ffbda0ca28384868af21ed6ff442442831ff9353ec509f073f75ccb62",
+      "tests/core/local_translation/test_gemma_runtime.py": "0af8c53aae1d552bbd8bda3fe874d4c1c038fcd1911edaa35b79a4c063c804c6"
+    },
+    "hash_command": "sha256sum src/puripuly_heart/app/ports/settings_runtime_effects.py src/puripuly_heart/app/services/provider/provider_settings.py src/puripuly_heart/app/services/settings/settings_application.py src/puripuly_heart/app/services/settings/settings_runtime_effects.py src/puripuly_heart/app/wiring/wiring_provider_runtime.py src/puripuly_heart/composition/application_runtime.py src/puripuly_heart/composition/application_startup.py tests/app/test_application_startup_settings.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_provider_application_owner.py tests/app/test_settings_application_owner.py tests/app/test_settings_runtime_effects.py tests/app/test_stt_provider_apply_vertical.py tests/conftest.py tests/core/local_translation/test_gemma_runtime.py",
+    "source_binding": "Pytest tests/conftest.py prepends this worktree/src. Final smoke explicitly set PYTHONPATH to this worktree/src and asserted application_runtime.__file__ equals cwd/src/puripuly_heart/composition/application_runtime.py."
+  },
+  "implementation": {
+    "outcome": "ProviderRuntimeSignatures.sync removed completely; generic settings/restoration/explicit/post-transaction bookkeeping migrated to explicitly named STT-only interfaces. Actual replacement and initial attachment own LLM identity and the existing () retry marker.",
+    "initial_attachment": "Both normal startup and production-evidence initialization record provider presence after successful pipeline launch/installation, using the same projected snapshot used for pipeline inputs. Startup secrets also come from that projected snapshot. Provider attachment is not native readiness.",
+    "preserved": [
+      "Existing failed-None/exception retry representation and replacement-owned publication before usage/STT.",
+      "STT convergence and committed/runtime-degraded classifications.",
+      "Normal no-rebuild behavior for genuinely matching actual providers.",
+      "Immutable provider profiles, managed prefix-refresh predicate, readiness semantics, model/runtime policies and no-fallback guarantees."
+    ],
+    "not_changed": [
+      "translation_enable.py",
+      "Maintained documentation",
+      "Other experiment evidence",
+      "Native/core model or profile implementation"
+    ]
+  },
+  "verification": {
+    "final_affected_suite": {
+      "command": "python -m pytest tests/app/test_provider_runtime_owner.py tests/app/test_provider_application_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_alibaba_workspace.py tests/app/test_wiring_providers.py tests/app/test_stt_provider_apply_vertical.py tests/app/test_managed_gemma_settings_refresh.py tests/app/test_settings_runtime_effects.py tests/app/test_settings_application_owner.py tests/app/test_application_startup_settings.py tests/app/test_application_runtime_lifecycle.py tests/app/test_runtime_pipeline_composition.py tests/app/test_runtime_pipeline_custom_http.py tests/app/test_local_asr_production_evidence_composition.py tests/release_evidence/test_local_asr_production_composition.py tests/app/test_provider_settings_composition.py tests/app/test_canonical_settings_persistence.py tests/app/test_self_stt_source_language_runtime.py tests/app/test_control_repair_behavior.py tests/core/local_translation tests/providers/test_managed_gemma_provider.py tests/providers/test_managed_gemma_concurrency.py -o addopts=-s -q",
+      "outcome": "passed",
+      "exit_code": 0,
+      "passed": 473,
+      "original_output_summary": "473 passed in 36.87s",
+      "full_original_output_reference": "artifact://357",
+      "local_transcript_reference": "history://signature-ownership-repair, tool call Verifying final snapshot-consistent candidate",
+      "phase": "After the last source edit aligning startup secrets with the projected launch snapshot.",
+      "failure_output_explanation": "Expected negative startup/release-evidence cases emitted startup_prepare_failed, packaged-Windows prerequisite rejection, missing-model/audio FileNotFoundError, and missing canonical-owner diagnostics. These are retained in the original output and are not test-suite failures or evidence of actual native execution. The suite reported no failed or skipped tests.",
+      "privacy": "Personal absolute paths in original fixture diagnostics are not copied here; the unmodified full tool output is retained at the internal reference."
+    },
+    "expanded_composed_cases": {
+      "command": "python -m pytest tests/app/test_managed_gemma_provider_runtime_integration.py -k composed -o addopts=-s -q",
+      "outcome": "passed",
+      "exit_code": 0,
+      "original_stdout": "........\n8 passed, 10 deselected in 7.55s\n",
+      "phase": "After fixture expansion, before the final startup secrets-snapshot consistency edit; all eight were also included in the final 473-test run.",
+      "cases": [
+        "Converged STT: failed replacement -> legitimate locale success -> existing retry remains -> same-profile nonforced replacement -> completed consumer.",
+        "Initial attached/unavailable outcome across startup and production-evidence initialization: four collected cases.",
+        "Memory restoration plus successful unrelated locale cannot overwrite a nonempty actual CPU binding with desired GPU intent; explicit GPU replacement and consumption complete.",
+        "Canonical intent advances during initial construction: startup and production-evidence initialization retain the GPU launch identity, unrelated locale succeeds without restamping, and explicit CPU replacement plus consumption complete: two collected cases."
+      ]
+    },
+    "earlier_current_worker_run": {
+      "command": "python -m pytest tests/app/test_provider_runtime_owner.py tests/app/test_provider_application_owner.py tests/app/test_managed_gemma_provider_runtime_integration.py tests/app/test_alibaba_workspace.py tests/app/test_wiring_providers.py tests/app/test_stt_provider_apply_vertical.py tests/app/test_managed_gemma_settings_refresh.py tests/app/test_settings_runtime_effects.py tests/app/test_settings_application_owner.py tests/app/test_application_startup_settings.py tests/app/test_application_runtime_lifecycle.py tests/app/test_runtime_pipeline_composition.py tests/app/test_runtime_pipeline_custom_http.py tests/app/test_local_asr_production_evidence_composition.py tests/release_evidence/test_local_asr_production_composition.py tests/app/test_provider_settings_composition.py tests/app/test_canonical_settings_persistence.py tests/app/test_self_stt_source_language_runtime.py tests/app/test_control_repair_behavior.py tests/core/local_translation tests/providers/test_managed_gemma_provider.py tests/providers/test_managed_gemma_concurrency.py -o addopts=-s -q",
+      "original_output_summary": "473 passed in 39.26s",
+      "full_original_output_reference": "artifact://350",
+      "phase": "Before the final startup secrets-snapshot consistency edit; not substituted for the final run."
+    },
+    "predecessor_evidence_earlier_only": {
+      "owner": "inference-core",
+      "source": "agent://inference-core final frozen ownership-transfer result; history://inference-core",
+      "command": "python -m pytest tests/app/test_managed_gemma_provider_runtime_integration.py -k composed -o addopts=-s -q",
+      "reported_original_output_summary": "4 passed, 10 deselected in 5.28s.",
+      "phase": "Before ownership transfer, expanded startup/production snapshot coverage and final repair. Earlier evidence only; not final-candidate verification.",
+      "formatting": "Predecessor Black initially identified two files; bg_53 formatted application_startup.py and the integration test and had completed before STOP acknowledgment. No predecessor commands remained in flight."
+    },
+    "style": {
+      "black": "Black --check passed all 13 changed Python files; after import consolidation it rechecked the final integration test; after the last source edit Ruff and Black rechecked application_startup.py successfully.",
+      "ruff_initial_failure": "I001 in the composed fixture import block: two adjacent imports from puripuly_heart.composition. Consolidated into one import; no behavior/assertion weakened.",
+      "ruff_final": "Ruff passed all 13 changed files after repair; application_startup.py was checked again after its final one-line argument edit.",
+      "not_claimed": [
+        "Type checking",
+        "Repository-wide test pass"
+      ]
+    }
+  },
+  "composed_smoke": {
+    "provenance": "Retained Eval Python variables signature_smoke_result, signature_smoke_before and signature_smoke_pre_final_snapshot in history://signature-ownership-repair. Recovered without reexecution for this evidence artifact.",
+    "execution": "A throwaway Python -c subprocess drove the real headless composition through current capabilities, settings.apply, translation.set, text.submit, settings.current, app.status and a translation-event subscription. It reused the isolated controlled-boundary fixture but did not invoke a pytest test function.",
+    "initial_source_guard_abort": {
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 92, in <module>\n    asyncio.run(main())\n    ~~~~~~~~~~~^^^^^^^^\n  File \"C:\\Python314\\Lib\\asyncio\\runners.py\", line 205, in run\n    return runner.run(main)\n           ~~~~~~~~~~^^^^^^\n  File \"C:\\Python314\\Lib\\asyncio\\runners.py\", line 128, in run\n    return self._loop.run_until_complete(task)\n           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^\n  File \"C:\\Python314\\Lib\\asyncio\\base_events.py\", line 720, in run_until_complete\n    return future.result()\n           ~~~~~~~~~~~~~^^\n  File \"<string>\", line 15, in main\n    assert Path(application_runtime.__file__).resolve() == checkout / 'src/puripuly_heart/composition/application_runtime.py'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+      "diagnosis": "Shared venv editable installation imported the primary checkout, not this worktree. The explicit source-identity assertion rejected it before creating the temporary tree or application.",
+      "observed_import_inspection": "Read-only inspection confirmed cwd was the requested worktree while application_runtime.__file__ was under the primary checkout/src. Personal paths are omitted here.",
+      "correction": "Set subprocess PYTHONPATH explicitly to worktree/src, retained cwd and the source-identity assertion. No product change or weakened guard."
+    },
+    "corrected_before_final_snapshot_edit": {
+      "exit_code": 0,
+      "stderr": "",
+      "phase": "Passed with explicit checked import before final startup secrets-snapshot argument edit; repeated on final source below."
+    },
+    "final": {
+      "exit_code": 0,
+      "stdout": "{\n  \"source_checkout_verified\": true,\n  \"instance_id\": \"isolated-signature-writer-regression\",\n  \"initial_attached_without_native_preparation\": true,\n  \"failed_replacement\": {\n    \"terminal\": true,\n    \"status\": \"degraded\",\n    \"transaction\": \"settings_commit_success_runtime_degraded\",\n    \"diagnostic\": \"provider_runtime_apply_unavailable\",\n    \"provider_present\": false,\n    \"retry_marker\": []\n  },\n  \"unrelated_locale\": {\n    \"terminal\": true,\n    \"status\": \"applied\",\n    \"transaction\": \"settings_commit_success_runtime_applied\",\n    \"locale_persisted\": \"ja\",\n    \"no_replacement\": true,\n    \"retry_preserved\": true\n  },\n  \"recovery\": {\n    \"terminal\": true,\n    \"status\": \"applied\",\n    \"actual_replacement_count\": 2,\n    \"bound_backend\": \"cpu\",\n    \"effective_backend\": \"cpu\",\n    \"completed_utterance_id\": \"f5546116-2713-4027-ae0e-bc1507d1218d\",\n    \"completed_text\": \"translated\",\n    \"native_launches_controlled\": 1,\n    \"translation_transport_completions\": 1\n  },\n  \"matching_actual_binding\": {\n    \"legitimate_locale_success\": true,\n    \"binding_identity_retained\": true,\n    \"matching_apply_skipped_replacement\": true\n  },\n  \"cleanup\": {\n    \"controlled_process_exit_codes\": [\n      0\n    ],\n    \"transports_closed\": true,\n    \"runtime_task_registries_empty\": true,\n    \"application_shutdown_completed\": true,\n    \"temporary_tree_removed\": true\n  },\n  \"limits\": [\n    \"Native executable validation, provisioning, process and transport were controlled; no model or native inference executed.\",\n    \"STT used deterministic transport behind the real scoped provider/capture owners and stayed converged.\",\n    \"Settings, secrets, home/cache/temp/config roots and logging were isolated; telemetry/integrated context/OSC connection disabled; owned loopback UDP sink; external connects/process launches prohibited.\",\n    \"Real headless composition and supported controls, terminal settings operations and correlated translation event observed; no GUI/installed/restart/native model-quality claim.\"\n  ]\n}\n",
+      "stderr": "",
+      "phase": "After the final source edit; exact captured stdout is retained, not reconstructed receipts.",
+      "observations": {
+        "source_checkout_verified": true,
+        "instance_id": "isolated-signature-writer-regression",
+        "initial_attached_without_native_preparation": true,
+        "failed_replacement": {
+          "terminal": true,
+          "status": "degraded",
+          "transaction": "settings_commit_success_runtime_degraded",
+          "diagnostic": "provider_runtime_apply_unavailable",
+          "provider_present": false,
+          "retry_marker": []
+        },
+        "unrelated_locale": {
+          "terminal": true,
+          "status": "applied",
+          "transaction": "settings_commit_success_runtime_applied",
+          "locale_persisted": "ja",
+          "no_replacement": true,
+          "retry_preserved": true
+        },
+        "recovery": {
+          "terminal": true,
+          "status": "applied",
+          "actual_replacement_count": 2,
+          "bound_backend": "cpu",
+          "effective_backend": "cpu",
+          "completed_utterance_id": "f5546116-2713-4027-ae0e-bc1507d1218d",
+          "completed_text": "translated",
+          "native_launches_controlled": 1,
+          "translation_transport_completions": 1
+        },
+        "matching_actual_binding": {
+          "legitimate_locale_success": true,
+          "binding_identity_retained": true,
+          "matching_apply_skipped_replacement": true
+        },
+        "cleanup": {
+          "controlled_process_exit_codes": [
+            0
+          ],
+          "transports_closed": true,
+          "runtime_task_registries_empty": true,
+          "application_shutdown_completed": true,
+          "temporary_tree_removed": true
+        },
+        "limits": [
+          "Native executable validation, provisioning, process and transport were controlled; no model or native inference executed.",
+          "STT used deterministic transport behind the real scoped provider/capture owners and stayed converged.",
+          "Settings, secrets, home/cache/temp/config roots and logging were isolated; telemetry/integrated context/OSC connection disabled; owned loopback UDP sink; external connects/process launches prohibited.",
+          "Real headless composition and supported controls, terminal settings operations and correlated translation event observed; no GUI/installed/restart/native model-quality claim."
+        ]
+      }
+    },
+    "receipt_and_consumer_limits": "Captured stdout records actual assertion-backed receipt/state observations, not full receipt JSON. The raw temporary settings/log/event tree was removed and is not reconstructed. The completed translation event was associated with the admitted parent/child turn identity; admission alone was not counted as completion.",
+    "controlled_boundaries": [
+      "Native executable validation, provisioning, process and HTTP transport were deterministic replacements. No model or actual GPU/CPU inference.",
+      "STT used a deterministic scoped transport behind the real provider factory, runtime and capture owners; it was converged and not an inactive-provider bypass.",
+      "Settings, encrypted-file secrets, home/config/cache/temp roots and logging isolated. Telemetry and integrated context disabled; OSC connection off with an owned loopback UDP sink.",
+      "External connections and subprocess launches inside the probe rejected; native process lifecycle represented by the controlled process objects."
+    ],
+    "cleanup": "Observed application/runtime shutdown, controlled process exit0, closed transports and STT sessions, empty managed server/operation task registries, closed owned socket/logging and removed temporary tree. No throwaway script or temporary state retained.",
+    "not_proved": [
+      "GUI presentation/input",
+      "Installed distribution",
+      "Fresh-process persistence",
+      "Native model readiness, quality, concurrency performance or hardware behavior"
+    ]
+  },
+  "remaining_and_authority": {
+    "source_status": "Frozen; this artifact is the only mutation authorized for this follow-up.",
+    "review": "Director reports origin-critic REPAIR_VERIFY requested; no review approval inferred.",
+    "director_reported_not_worker_executed": [
+      "Candidate pinned to 671ca2ac68a184a2d6915e9efd36464b52d5b0f5.",
+      "Architecture updated for initial attachment/snapshot and generic STT-only ownership.",
+      "Global Ruff, Black1066 and experiment Ruff/format11 passed; Main bg54 pending at assignment."
+    ],
+    "native_evidence": "Original failed native attempts remain preserved and were not rerun for confirmation. Native recovery, installed proof and integrated acceptance remain with assigned owners.",
+    "no_fabrication": "No deleted receipts, logs, stdout or measurements were reconstructed. Raw final smoke stdout comes directly from the retained subprocess result; source hashes were measured only at the stated later phase."
+  }
+}
