@@ -55,6 +55,7 @@ from puripuly_heart.config.provider_values import STT_INTERNAL_SAMPLE_RATE_HZ, L
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import (
+    MANAGED_GEMMA_MODELS,
     TranslationModel,
     provider_llm_for_translation,
 )
@@ -77,7 +78,7 @@ def managed_gemma_prefix_refresh_required(
 ) -> bool:
     settings = transition.settings
     model = settings.intent.translation.model
-    if model != TranslationModel.MANAGED_GEMMA.value:
+    if model not in MANAGED_GEMMA_MODELS:
         return False
     previous = transition.previous_settings
     return bool(

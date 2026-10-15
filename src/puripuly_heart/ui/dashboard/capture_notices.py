@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
 )
+from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
 from puripuly_heart.ui.gpu_notice import GpuDashboardNotice, GpuNoticeAction
 from puripuly_heart.ui.i18n import t
 
@@ -130,6 +131,12 @@ def managed_gemma_capture_notice(
     if notice is None or notice.status not in MANAGED_GEMMA_NOTICE_KEYS:
         return None
     key = MANAGED_GEMMA_NOTICE_KEYS[notice.status]
+    if (
+        notice.status == "failed"
+        and notice.model_id == GEMMA_26B_MODEL_ID
+        and notice.failure_phase == "runtime"
+    ):
+        key = "dashboard.managed_gemma_notice.gpu_only_failed"
     text = (
         t(key, percent=notice.progress_percent or 0) if notice.status == "downloading" else t(key)
     )

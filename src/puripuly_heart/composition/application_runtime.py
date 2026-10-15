@@ -612,6 +612,11 @@ def compose_application_runtime(
                 status=snapshot.state,
                 backend=snapshot.backend,
                 progress_percent=snapshot.progress_percent,
+                action=(
+                    "cancel" if snapshot.state in {"checking", "downloading", "preparing"} else None
+                ),
+                model_id=snapshot.model_id,
+                failure_phase=snapshot.failure_phase,
             )
         )
 

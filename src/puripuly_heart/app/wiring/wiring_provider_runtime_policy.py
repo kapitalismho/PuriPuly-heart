@@ -12,7 +12,10 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_OPENAI,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.config.translation_values import provider_llm_for_translation
+from puripuly_heart.config.translation_values import (
+    MANAGED_GEMMA_MODELS,
+    provider_llm_for_translation,
+)
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 
@@ -39,7 +42,7 @@ def build_llm_provider_signature(
     local_llm = settings.intent.local_llm
     languages = settings.intent.languages
     provider_llm = provider_llm_for_translation(translation.model, translation.connection)
-    managed_gemma_selected = translation.model == "managed_gemma"
+    managed_gemma_selected = translation.model in MANAGED_GEMMA_MODELS
     primary_uses_openrouter = provider_llm == "openrouter"
     uses_openrouter = primary_uses_openrouter
     uses_managed_openrouter = bool(

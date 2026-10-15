@@ -71,6 +71,17 @@ def test_luna_osc_selection_has_new_id_and_keeps_both_connections() -> None:
     assert TRANSLATION_CONNECTION_BY_MODEL_ID.get(14) is None
 
 
+def test_gemma_26b_osc_selection_is_additive_gpu_only_and_preserves_e4b() -> None:
+    message = decode_control_message("/avatar/parameters/PuriPuly_Translator", 15)
+    assert TRANSLATION_MODEL_IDS[message.value] == "managed_gemma_26b"
+    assert TRANSLATION_CONNECTION_BY_MODEL_ID[message.value] == "gpu"
+    assert translation_model_id_for_selection("managed_gemma_26b", "gpu") == 15
+    assert translation_model_id_for_selection("managed_gemma", "cpu") == 10
+    assert translation_model_id_for_selection("managed_gemma", "gpu") == 11
+    with pytest.raises(KeyError):
+        translation_model_id_for_selection("managed_gemma_26b", "cpu")
+
+
 def test_codec_validates_absolute_boolean_and_integer_controls() -> None:
     bool_message = decode_control_message("/avatar/parameters/PuriPuly_Talk", True)
     integer_message = decode_control_message("/avatar/parameters/PuriPuly_SelfASR", 5)
@@ -216,14 +227,17 @@ def test_osc_public_abi_snapshot_is_append_only_and_exact() -> None:
         11: "managed_gemma",
         13: "deepseek_v4_flash_41",
         14: "gpt_6_luna",
+        15: "managed_gemma_26b",
     }
     assert dict(TRANSLATION_CONNECTION_BY_MODEL_ID) == {
         10: "cpu",
         11: "gpu",
+        15: "gpu",
     }
     assert dict(TRANSLATION_MODEL_ID_BY_SELECTION) == {
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
+        ("managed_gemma_26b", "gpu"): 15,
     }
     assert dict(LANGUAGE_IDS) == {
         0: "ar",

@@ -10,6 +10,8 @@ from puripuly_heart.core.local_translation.assets import (
     GEMMA_LICENSE,
     GEMMA_LICENSE_URL,
     GemmaModelSpec,
+    e4b_gemma_spec,
+    gemma_26b_spec,
 )
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaMetrics,
@@ -19,6 +21,15 @@ from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaRuntimeOwner,
 )
 from puripuly_heart.core.local_translation.runtime_profile import GemmaRuntimePaths
+
+
+@pytest.fixture(autouse=True)
+def isolated_thread_profile(tmp_path, monkeypatch):
+    from puripuly_heart.core.local_translation import runtime_profile
+
+    monkeypatch.setattr(
+        runtime_profile, "default_threads_profile_path", lambda: tmp_path / "threads.json"
+    )
 
 
 class FakeProcess:
@@ -83,6 +94,9 @@ class FakeTransport:
 
     async def wait_until_ready(self, *, timeout_s: float) -> None:
         self.ready_calls.append(timeout_s)
+
+    async def wait_slot_idle(self, *, slot_id: int) -> None:
+        return None
 
     async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
         if self.prefix_failure is not None:
@@ -217,6 +231,9 @@ def _runtime(
     provision_calls = []
     logs = []
 
+    async def validate_version(_executable: Path) -> None:
+        return None
+
     async def provisioner(**kwargs):
         provision_calls.append(kwargs)
 
@@ -252,6 +269,7 @@ def _runtime(
         log_sink=lambda message, level: logs.append((message, level)),
         shutdown_timeout_s=shutdown_timeout_s,
         prefix_cache=prefix_cache,
+        version_validator=validate_version,
     )
     return owner, commands, processes, transports, provision_calls, logs
 
@@ -429,7 +447,9 @@ async def test_vulkan_prefill_failure_stops_gpu_and_prepares_cpu_prefix(tmp_path
 
 
 @pytest.mark.asyncio
-async def test_prefix_cancellation_stops_process_and_transport(tmp_path: Path) -> None:
+async def test_prefix_cancellation_keeps_settled_runtime_available_for_retry(
+    tmp_path: Path,
+) -> None:
     owner, _commands, processes, transports, _provision_calls, _logs = _runtime(
         tmp_path,
         transport_failures=(asyncio.CancelledError(),),
@@ -443,9 +463,18 @@ async def test_prefix_cancellation_stops_process_and_transport(tmp_path: Path) -
             system_prompt="translate",
         )
 
-    assert processes[0].terminated
-    assert transports[0].closed
+    assert not processes[0].terminated
+    assert not transports[0].closed
     assert owner.readiness is None
+    transports[0].prefix_failure = None
+    await owner.prepare(
+        backend="cpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+    assert len(processes) == 1
+    await owner.close()
 
 
 @pytest.mark.asyncio
@@ -681,6 +710,7 @@ async def test_close_cancels_hanging_translation_before_teardown(tmp_path: Path)
     owner, _commands, processes, transports, _provision_calls, _logs = _runtime(
         tmp_path,
         transport_builder=HangingTransport,
+        shutdown_timeout_s=0.1,
     )
     operation = asyncio.create_task(
         owner.translate(
@@ -726,9 +756,9 @@ async def test_close_bounds_uncooperative_operation_and_hides_readiness(tmp_path
         await asyncio.wait_for(owner.close(), timeout=0.5)
 
     assert owner.readiness is None
-    assert processes[0].returncode is None
+    assert processes[0].terminated
     transports[0].allow_finish.set()
-    with pytest.raises(ManagedGemmaRuntimeClosedError):
+    with pytest.raises(asyncio.CancelledError):
         await operation
     await owner.close()
     assert processes[0].terminated
@@ -892,3 +922,559 @@ async def test_fourth_identity_evicts_only_lru_slot(tmp_path: Path) -> None:
         "Translate de to en",
     ]
     assert transports[0].prefix_slots == [0, 1, 2, 1]
+
+
+class ControlledTransport(FakeTransport):
+    def __init__(self, base_url: str) -> None:
+        super().__init__(base_url)
+        self.started: asyncio.Queue[tuple[str, int]] = asyncio.Queue()
+        self.gates: dict[str, asyncio.Event] = {}
+        self.active: dict[int, str] = {}
+        self.peak_active = 0
+        self.failures: set[str] = set()
+        self.settlements: dict[int, asyncio.Event] = {}
+        self.settling = asyncio.Event()
+        self.fail_prompt: str | None = None
+
+    async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
+        assert slot_id not in self.active
+        if system_prompt == self.fail_prompt:
+            raise RuntimeError("prefix backend failure")
+        await super().prepare_prefix(system_prompt=system_prompt, slot_id=slot_id)
+
+    async def restore_prefix(self, *, filename: str, slot_id: int) -> bool:
+        assert slot_id not in self.active
+        return await super().restore_prefix(filename=filename, slot_id=slot_id)
+
+    async def save_prefix(self, *, filename: str, slot_id: int) -> None:
+        assert slot_id not in self.active
+        await super().save_prefix(filename=filename, slot_id=slot_id)
+
+    async def translate(self, *, system_prompt: str, user_message: str, slot_id: int):
+        assert slot_id not in self.active
+        self.active[slot_id] = user_message
+        self.peak_active = max(self.peak_active, len(self.active))
+        self.gates[user_message] = asyncio.Event()
+        await self.started.put((user_message, slot_id))
+        await self.gates[user_message].wait()
+        if user_message in self.failures:
+            raise RuntimeError("request failed")
+        del self.active[slot_id]
+        return ManagedGemmaResponse(user_message, self.response.metrics)
+
+    async def wait_slot_idle(self, *, slot_id: int) -> None:
+        self.settling.set()
+        gate = self.settlements.get(slot_id)
+        if gate is not None:
+            await gate.wait()
+        self.active.pop(slot_id, None)
+
+
+def _request(owner, text: str, *, backend="gpu", spec=None, reverse=False):
+    return asyncio.create_task(
+        owner.translate(
+            backend=backend,
+            spec=spec,
+            source_language="en" if reverse else "ko",
+            target_language="ko" if reverse else "en",
+            system_prompt="Translate {source_language} to {target_language}",
+            user_message=text,
+        )
+    )
+
+
+async def _started(transport: ControlledTransport) -> tuple[str, int]:
+    return await asyncio.wait_for(transport.started.get(), timeout=1.0)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("spec", [e4b_gemma_spec(), gemma_26b_spec()], ids=["e4b", "26b"])
+@pytest.mark.parametrize("reverse", [False, True], ids=["same-pair", "opposite-pair"])
+async def test_gpu_overlaps_two_requests_and_reuses_only_idle_slots(tmp_path, spec, reverse):
+    owner, commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    await owner.prepare(
+        backend="gpu",
+        spec=spec,
+        source_language="ko",
+        target_language="en",
+        system_prompt="Translate {source_language} to {target_language}",
+    )
+    transport = transports[0]
+    first = _request(owner, "self", spec=spec)
+    _, first_slot = await _started(transport)
+    second = _request(owner, "peer", spec=spec, reverse=reverse)
+    _, second_slot = await _started(transport)
+    third = _request(owner, "manual", spec=spec, reverse=True)
+    await asyncio.sleep(0)
+    assert first_slot != second_slot
+    assert transport.peak_active == 2
+    assert len(commands) == len(processes) == 1
+    assert not third.done()
+    transport.gates["self"].set()
+    assert (await first).text == "self"
+    _, third_slot = await _started(transport)
+    assert third_slot != second_slot
+    assert transport.peak_active == 2
+    transport.gates["manual"].set()
+    assert (await third).text == "manual"
+    transport.gates["peer"].set()
+    assert (await second).text == "peer"
+    assert len(transport.prefixes) == 3
+    assert not processes[0].terminated
+    await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fail_gpu", [False, True], ids=["cpu", "gpu-fallback"])
+async def test_effective_cpu_serializes_pending_requests(tmp_path, fail_gpu):
+    owner, _commands, _processes, transports, _calls, _logs = _runtime(
+        tmp_path, fail_gpu=fail_gpu, transport_builder=ControlledTransport
+    )
+    backend = "gpu" if fail_gpu else "cpu"
+    await owner.prepare(
+        backend=backend, source_language="ko", target_language="en", system_prompt="translate"
+    )
+    transport = transports[0]
+    first = _request(owner, "self", backend=backend)
+    _, first_slot = await _started(transport)
+    second = _request(owner, "peer", backend=backend, reverse=True)
+    await asyncio.sleep(0)
+    assert transport.started.empty()
+    transport.gates["self"].set()
+    assert (await first).text == "self"
+    await _started(transport)
+    transport.gates["peer"].set()
+    assert (await second).text == "peer"
+    assert transport.peak_active == 1
+    assert owner.readiness.effective_backend == "cpu"
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_request_drains_without_blocking_other_channel_or_reusing_busy_slot(
+    tmp_path,
+):
+    owner, _commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    await owner.prepare(
+        backend="gpu", source_language="ko", target_language="en", system_prompt="translate"
+    )
+    transport = transports[0]
+    first = _request(owner, "cancelled")
+    _, cancelled_slot = await _started(transport)
+    second = _request(owner, "valid", reverse=True)
+    _, valid_slot = await _started(transport)
+    first.cancel()
+    first.cancel()
+    third = _request(owner, "next")
+    await asyncio.sleep(0)
+    assert not first.done()
+    assert not processes[0].terminated
+    transport.gates["valid"].set()
+    assert (await second).text == "valid"
+    _, next_slot = await _started(transport)
+    assert next_slot != cancelled_slot
+    transport.gates["next"].set()
+    assert (await third).text == "next"
+    assert not first.done()
+    transport.gates["cancelled"].set()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    fourth = _request(owner, "reuse", reverse=True)
+    await _started(transport)
+    transport.gates["reuse"].set()
+    assert (await fourth).text == "reuse"
+    assert not processes[0].terminated
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_failure_waits_for_server_settlement_while_other_work_completes(tmp_path):
+    owner, _commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    await owner.prepare(
+        backend="gpu", source_language="ko", target_language="en", system_prompt="translate"
+    )
+    transport = transports[0]
+    first = _request(owner, "failed")
+    _, failed_slot = await _started(transport)
+    second = _request(owner, "valid", reverse=True)
+    await _started(transport)
+    transport.failures.add("failed")
+    transport.settlements[failed_slot] = asyncio.Event()
+    transport.gates["failed"].set()
+    await transport.settling.wait()
+    third = _request(owner, "next")
+    transport.gates["valid"].set()
+    assert (await second).text == "valid"
+    _, next_slot = await _started(transport)
+    assert next_slot != failed_slot
+    transport.gates["next"].set()
+    assert (await third).text == "next"
+    assert not first.done()
+    transport.settlements[failed_slot].set()
+    with pytest.raises(RuntimeError, match="request failed"):
+        await first
+    assert not processes[0].terminated
+    await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("new_model", [False, True], ids=["backend", "model"])
+async def test_runtime_transition_drains_work_and_rejects_superseded_results(tmp_path, new_model):
+    owner, commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    await owner.prepare(
+        backend="gpu", source_language="ko", target_language="en", system_prompt="translate"
+    )
+    transport = transports[0]
+    first = _request(owner, "self")
+    await _started(transport)
+    second = _request(owner, "peer", reverse=True)
+    await _started(transport)
+    change = asyncio.create_task(
+        owner.prepare(
+            backend="gpu" if new_model else "cpu",
+            spec=gemma_26b_spec() if new_model else e4b_gemma_spec(),
+            source_language="ja",
+            target_language="en",
+            system_prompt="translate",
+        )
+    )
+    await asyncio.sleep(0)
+    assert owner.readiness is None
+    assert len(commands) == 1
+    assert not processes[0].terminated
+    transport.gates["self"].set()
+    with pytest.raises(ManagedGemmaRuntimeError, match="superseded"):
+        await first
+    assert not processes[0].terminated
+    transport.gates["peer"].set()
+    with pytest.raises(ManagedGemmaRuntimeError, match="superseded"):
+        await second
+    ready = await asyncio.wait_for(change, timeout=1.0)
+    assert ready.effective_backend == ("vulkan" if new_model else "cpu")
+    assert len(commands) == 2
+    assert processes[0].terminated
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_prefix_failure_fallback_drains_other_valid_gpu_work_before_stopping(tmp_path):
+    owner, commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    await owner.prepare(
+        backend="gpu", source_language="ko", target_language="en", system_prompt="translate"
+    )
+    transport = transports[0]
+    first = _request(owner, "valid")
+    await _started(transport)
+    transport.fail_prompt = "fail prefix"
+    change = asyncio.create_task(
+        owner.prepare(
+            backend="gpu",
+            source_language="ja",
+            target_language="en",
+            system_prompt="fail prefix",
+        )
+    )
+    await asyncio.sleep(0)
+    assert not processes[0].terminated
+    transport.gates["valid"].set()
+    assert (await first).text == "valid"
+    ready = await asyncio.wait_for(change, timeout=1.0)
+    assert ready.effective_backend == "cpu"
+    assert processes[0].terminated
+    assert len(commands) == 2
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_26b_rejects_cpu_before_assets_and_never_falls_back_on_gpu_failure(tmp_path):
+    owner, commands, _processes, _transports, calls, _logs = _runtime(tmp_path, fail_gpu=True)
+    arguments = dict(
+        spec=gemma_26b_spec(), source_language="ko", target_language="en", system_prompt="translate"
+    )
+    with pytest.raises(ManagedGemmaRuntimeError, match="requires a working Vulkan GPU"):
+        await owner.prepare(backend="cpu", **arguments)
+    assert calls == commands == []
+    with pytest.raises(ManagedGemmaRuntimeError, match="startup failed"):
+        await owner.prepare(backend="gpu", **arguments)
+    assert len(commands) == 1
+    assert "--device" in commands[0]
+    assert owner.readiness is None
+
+
+@pytest.mark.asyncio
+async def test_26b_prefix_failure_never_substitutes_cpu_or_e4b(tmp_path):
+    owner, commands, processes, _transports, _calls, _logs = _runtime(
+        tmp_path, transport_failures=(RuntimeError("GPU memory"),)
+    )
+    with pytest.raises(ManagedGemmaRuntimeError, match="prefix preparation failed"):
+        await owner.prepare(
+            backend="gpu",
+            spec=gemma_26b_spec(),
+            source_language="ko",
+            target_language="en",
+            system_prompt="translate",
+        )
+    assert len(commands) == 1
+    assert processes[0].terminated
+    assert owner.readiness is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "version,returncode,valid",
+    [
+        ("version: 0.6.0-dev (build 11537, commit 8e2d31e0e)", 0, True),
+        (
+            "version: 0.6.0-dev (build 11537, commit 8e2d31e0eb658d0382d3106a61369dff81f0c080)",
+            0,
+            True,
+        ),
+        ("version: 0.6.0-dev (build 10423, commit a94d563ed)", 0, False),
+        ("version: 0.6.0-dev (build 11537, commit a94d563ed)", 0, False),
+        ("version: 0.6.0-dev (build 11537, commit 8e2d31e0e)", 1, False),
+        ("unknown", 0, False),
+    ],
+)
+async def test_executable_version_rejects_unpinned_build_or_commit(
+    tmp_path,
+    monkeypatch,
+    version,
+    returncode,
+    valid,
+):
+    class VersionProcess:
+        async def communicate(self):
+            return version.encode(), None
+
+    process = VersionProcess()
+    process.returncode = returncode
+    calls = []
+
+    async def execute(*args, **kwargs):
+        calls.append(args)
+        return process
+
+    monkeypatch.setattr(runtime_module.asyncio, "create_subprocess_exec", execute)
+    executable = tmp_path / "override" / "llama-server.exe"
+    if valid:
+        await runtime_module.validate_gemma_runtime_version(executable)
+    else:
+        with pytest.raises(ManagedGemmaRuntimeError, match="Incompatible llama.cpp executable"):
+            await runtime_module.validate_gemma_runtime_version(executable)
+    assert calls == [(str(executable), "--version")]
+
+
+@pytest.mark.asyncio
+async def test_incompatible_runtime_override_is_rejected_without_cpu_substitution(tmp_path):
+    owner, commands, _processes, _transports, _calls, _logs = _runtime(tmp_path)
+
+    async def reject(_executable):
+        raise runtime_module.ManagedGemmaRuntimeVersionError("Use b11537; remove override")
+
+    owner._version_validator = reject
+    with pytest.raises(ManagedGemmaRuntimeError, match="remove override"):
+        await owner.prepare(
+            backend="gpu",
+            source_language="ko",
+            target_language="en",
+            system_prompt="translate",
+        )
+    assert commands == []
+    assert owner.readiness is None
+
+
+@pytest.mark.asyncio
+async def test_prefix_identity_separates_effective_backend_and_fixed_profile(tmp_path, monkeypatch):
+    owner, _commands, _processes, _transports, _calls, _logs = _runtime(tmp_path)
+    arguments = dict(source_language="ko", target_language="en", system_prompt="translate")
+    cpu = await owner.prepare(backend="cpu", **arguments)
+    gpu = await owner.prepare(backend="gpu", **arguments)
+    assert cpu.prefix_identity != gpu.prefix_identity
+    monkeypatch.setattr(runtime_module, "GEMMA_RUNTIME_PROFILE_VERSION", "replacement-profile")
+    upgraded = await owner.prepare(backend="gpu", **arguments)
+    assert upgraded.prefix_identity != gpu.prefix_identity
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_lru_eviction_keeps_both_active_prefixes_untouched(tmp_path):
+    owner, _commands, _processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    template = "Translate {source_language} to {target_language}"
+    for source in ("ko", "ja", "de"):
+        await owner.prepare(
+            backend="gpu",
+            source_language=source,
+            target_language="en",
+            system_prompt=template,
+        )
+    transport = transports[0]
+    first = _request(owner, "self")
+    _, first_slot = await _started(transport)
+    second = _request(owner, "peer", reverse=True)
+    _, second_slot = await _started(transport)
+    third = asyncio.create_task(
+        owner.prepare(
+            backend="gpu",
+            source_language="fr",
+            target_language="en",
+            system_prompt=template,
+        )
+    )
+    await asyncio.sleep(0)
+    assert not third.done()
+    transport.gates["self"].set()
+    assert (await first).text == "self"
+    await asyncio.wait_for(third, timeout=1)
+    assert transport.prefix_slots[-1] != second_slot
+    assert transport.active == {second_slot: "peer"}
+    transport.gates["peer"].set()
+    assert (await second).text == "peer"
+    await owner.prepare(
+        backend="gpu",
+        source_language="en",
+        target_language="ko",
+        system_prompt=template,
+    )
+    assert transport.prefix_slots[-1] != second_slot
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_drains_both_gpu_requests_and_rejects_waiting_manual_request(tmp_path):
+    owner, _commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+    transport = transports[0]
+    first = _request(owner, "self")
+    await _started(transport)
+    second = _request(owner, "peer", reverse=True)
+    await _started(transport)
+    third = _request(owner, "manual")
+    closing = asyncio.create_task(owner.close())
+    await asyncio.sleep(0)
+    assert owner.readiness is None
+    assert not processes[0].terminated
+    transport.gates["self"].set()
+    transport.gates["peer"].set()
+    outcomes = await asyncio.gather(first, second, third, return_exceptions=True)
+    assert all(isinstance(outcome, asyncio.CancelledError) for outcome in outcomes)
+    await closing
+    assert processes[0].terminated
+    assert transport.closed
+
+
+@pytest.mark.asyncio
+async def test_unobservable_failed_slot_is_not_reused_before_other_result_and_restart(tmp_path):
+    class UnobservableTransport(ControlledTransport):
+        async def wait_slot_idle(self, *, slot_id: int) -> None:
+            self.settling.set()
+            raise TimeoutError("slot state unavailable")
+
+    owner, commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=UnobservableTransport
+    )
+    await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+    transport = transports[0]
+    first = _request(owner, "failed")
+    await _started(transport)
+    second = _request(owner, "valid", reverse=True)
+    await _started(transport)
+    transport.failures.add("failed")
+    transport.gates["failed"].set()
+    with pytest.raises(RuntimeError, match="request failed"):
+        await first
+    replacement = asyncio.create_task(
+        owner.prepare(
+            backend="gpu",
+            source_language="ja",
+            target_language="en",
+            system_prompt="translate",
+        )
+    )
+    await asyncio.sleep(0)
+    assert len(commands) == 1
+    assert not processes[0].terminated
+    transport.gates["valid"].set()
+    assert (await second).text == "valid"
+    await asyncio.wait_for(replacement, timeout=1)
+    assert processes[0].terminated
+    assert len(commands) == 2
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_prefix_drain_does_not_block_other_completed_result(tmp_path):
+    class BlockingPrefixTransport(ControlledTransport):
+        def __init__(self, base_url):
+            super().__init__(base_url)
+            self.prefix_started = asyncio.Event()
+            self.finish_prefix = asyncio.Event()
+
+        async def prepare_prefix(self, *, system_prompt, slot_id):
+            if system_prompt == "blocked prefix":
+                self.prefix_started.set()
+                await self.finish_prefix.wait()
+            await super().prepare_prefix(system_prompt=system_prompt, slot_id=slot_id)
+
+    owner, _commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=BlockingPrefixTransport
+    )
+    await owner.prepare(
+        backend="gpu",
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+    transport = transports[0]
+    valid = _request(owner, "valid")
+    await _started(transport)
+    preparation = asyncio.create_task(
+        owner.prepare(
+            backend="gpu",
+            source_language="ja",
+            target_language="en",
+            system_prompt="blocked prefix",
+        )
+    )
+    await transport.prefix_started.wait()
+    preparation.cancel()
+    await asyncio.sleep(0)
+    transport.gates["valid"].set()
+    assert (await asyncio.wait_for(valid, timeout=1)).text == "valid"
+    assert not preparation.done()
+    assert not processes[0].terminated
+    transport.finish_prefix.set()
+    with pytest.raises(asyncio.CancelledError):
+        await preparation
+    assert not processes[0].terminated
+    await owner.prepare(
+        backend="gpu",
+        source_language="ja",
+        target_language="en",
+        system_prompt="blocked prefix",
+    )
+    assert len(processes) == 1
+    await owner.close()

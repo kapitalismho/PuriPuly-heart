@@ -252,6 +252,7 @@ class TranslatorApp:
                 toggle_overlay=self._on_overlay_toggle,
                 retry_peer_process_capture=self._on_retry_peer_process_capture,
                 run_gpu_notice_action=self.application.handle_gpu_notice_action,
+                run_managed_gemma_notice_action=self.application.handle_managed_gemma_notice_action,
             ),
         )
 

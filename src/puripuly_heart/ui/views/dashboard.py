@@ -6,6 +6,7 @@ import flet as ft
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
+    ManagedGemmaNoticeAction,
     OscControlPresentationState,
 )
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
@@ -132,6 +133,9 @@ class DashboardView(ft.Column):
         self.on_toggle_peer_translation = None
         self.on_retry_peer_process_capture = None
         self.on_gpu_notice_action: Callable[[GpuNoticeAction], object] | None = None
+        self.on_managed_gemma_notice_action: Callable[[ManagedGemmaNoticeAction], object] | None = (
+            None
+        )
         self.on_language_change: Callable[[LanguageSelectionChange], None] | None = None
         self.on_message_input_activity = None
 
@@ -229,6 +233,7 @@ class DashboardView(ft.Column):
         self.on_toggle_overlay = capture.toggle_overlay
         self.on_retry_peer_process_capture = capture.retry_peer_process_capture
         self.on_gpu_notice_action = capture.run_gpu_notice_action
+        self.on_managed_gemma_notice_action = capture.run_managed_gemma_notice_action
 
     def _toggle_overlay(self) -> None:
         enabled = True
@@ -911,6 +916,13 @@ class DashboardView(ft.Column):
             if selected != "gpu" or gpu_action is None
             else lambda: self._run_gpu_notice_action(gpu_action)
         )
+        if selected == "managed_gemma" and _action == "cancel":
+            action_label = t("dashboard.managed_gemma_action.cancel")
+
+            def cancel_managed_gemma() -> None:
+                self._run_notice_action(self.on_managed_gemma_notice_action, "cancel")
+
+            on_action = cancel_managed_gemma
         yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
         try:
             self.display_card.set_notice(

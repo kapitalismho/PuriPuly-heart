@@ -197,7 +197,10 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 | 모델                 | 실행 환경     | 양자화        |
 | ------------------ | --------- | ---------- |
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | GPU 전용 (Vulkan) | UD Q4_K_XL |
 | OpenAI 호환 API      | —         | —          |
+
+모델 파일은 설치 프로그램에 포함되지 않으며, 선택한 모델이 필요할 때 다운로드합니다. 26B 다운로드 크기는 약 14.25 GB입니다. 모델 선택은 재시작 후에도 유지됩니다. 26B는 Vulkan GPU 전용이며 초기화 실패 시 CPU나 E4B로 자동 전환하지 않습니다. GPU 번역은 하나의 런타임에서 Self/Peer 요청을 최대 2개까지 동시에 처리하고, CPU 번역은 순차 처리합니다. [고정 프로필 및 관리형 로컬 번역 계약](../cli.md#managed-local-translation)을 참고하세요.
 
 
 ---

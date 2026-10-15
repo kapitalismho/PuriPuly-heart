@@ -9,13 +9,23 @@ from uuid import UUID
 import httpx
 
 from puripuly_heart.core.http_client_logging import suppress_http_client_logs
-from puripuly_heart.core.llm.latency import AttemptLatency, current_attempt
+from puripuly_heart.core.llm.latency import (
+    AttemptLatency,
+    current_attempt,
+    current_request,
+    observe_attempt,
+)
+from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID, GemmaModelSpec
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaMetrics,
     ManagedGemmaResponse,
     ManagedGemmaRuntimeOwner,
 )
-from puripuly_heart.core.local_translation.runtime_profile import GemmaBackend
+from puripuly_heart.core.local_translation.runtime_profile import (
+    MANAGED_GEMMA_26B_MODEL_ALIAS,
+    MANAGED_GEMMA_MODEL_ALIAS,
+    GemmaBackend,
+)
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.error_details import LLMResponseError
@@ -114,6 +124,30 @@ class HttpxManagedGemmaTransport:
             slot_id=slot_id,
         )
 
+    async def wait_slot_idle(self, *, slot_id: int) -> None:
+        timeout = self.timeout.read if isinstance(self.timeout, httpx.Timeout) else self.timeout
+        async with asyncio.timeout(timeout or 120.0):
+            while True:
+                response = await self._require_client().get("/slots")
+                response.raise_for_status()
+                slots = response.json()
+                if isinstance(slots, list):
+                    for slot in slots:
+                        if isinstance(slot, dict) and slot.get("id") == slot_id:
+                            if slot.get("is_processing") is False:
+                                return
+                            break
+                    else:
+                        raise LLMResponseError(
+                            "managed Gemma slot was missing during settlement",
+                            provider="managed_gemma",
+                        )
+                else:
+                    raise LLMResponseError(
+                        "managed Gemma slot state was invalid", provider="managed_gemma"
+                    )
+                await asyncio.sleep(min(self.poll_interval_s, 0.1))
+
     async def restore_prefix(self, *, filename: str, slot_id: int) -> bool:
         try:
             response = await self._require_client().post(
@@ -121,15 +155,20 @@ class HttpxManagedGemmaTransport:
                 json={"filename": filename},
             )
         except httpx.HTTPError:
+            await self.wait_slot_idle(slot_id=slot_id)
             return False
         return response.status_code == 200
 
     async def save_prefix(self, *, filename: str, slot_id: int) -> None:
-        response = await self._require_client().post(
-            f"/slots/{slot_id}?action=save",
-            json={"filename": filename},
-        )
-        response.raise_for_status()
+        try:
+            response = await self._require_client().post(
+                f"/slots/{slot_id}?action=save",
+                json={"filename": filename},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            await self.wait_slot_idle(slot_id=slot_id)
+            raise
 
     async def translate(
         self,
@@ -239,6 +278,7 @@ class ManagedGemmaLLMProvider:
     vulkan_device: str = "Vulkan0"
     release_runtime: Callable[[], Awaitable[None]] | None = None
     runtime_logging: ProviderObservationPort | None = None
+    spec: GemmaModelSpec | None = None
     _closed: bool = field(init=False, default=False, repr=False)
     _released: bool = field(init=False, default=False, repr=False)
 
@@ -274,7 +314,18 @@ class ManagedGemmaLLMProvider:
         }
         if max_output_tokens is not None:
             runtime_kwargs["max_output_tokens"] = max_output_tokens
-        response = await self.runtime.translate(**runtime_kwargs)  # type: ignore[arg-type]
+        if self.spec is not None:
+            runtime_kwargs["spec"] = self.spec
+        model = (
+            MANAGED_GEMMA_26B_MODEL_ALIAS
+            if self.spec is not None and self.spec.model_id == GEMMA_26B_MODEL_ID
+            else MANAGED_GEMMA_MODEL_ALIAS
+        )
+        with observe_attempt(provider="managed_gemma", model=model):
+            response = await self.runtime.translate(**runtime_kwargs)  # type: ignore[arg-type]
+            request = current_request()
+            if request is not None:
+                request.winner_attempt = 0
 
         return Translation(
             utterance_id=utterance_id,

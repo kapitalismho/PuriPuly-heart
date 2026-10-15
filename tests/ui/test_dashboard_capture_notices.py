@@ -119,3 +119,34 @@ def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
         assert notice.text == ("i18n:dashboard.managed_gemma_notice.downloading:percent=42")
     else:
         assert notice.text == f"i18n:{MANAGED_GEMMA_NOTICE_KEYS[status]}"
+
+
+def test_26b_runtime_failure_is_actionable_without_claiming_fallback() -> None:
+    from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
+
+    notice = managed_gemma_capture_notice(
+        ManagedGemmaDashboardNotice(
+            status="failed",
+            backend="gpu",
+            model_id=GEMMA_26B_MODEL_ID,
+            failure_phase="runtime",
+        )
+    )
+    assert notice is not None
+    assert notice.tone == "error"
+    assert notice.text == "i18n:dashboard.managed_gemma_notice.gpu_only_failed"
+
+
+def test_26b_download_failure_remains_a_provisioning_failure() -> None:
+    from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
+
+    notice = managed_gemma_capture_notice(
+        ManagedGemmaDashboardNotice(
+            status="failed",
+            backend="gpu",
+            model_id=GEMMA_26B_MODEL_ID,
+            failure_phase="download",
+        )
+    )
+    assert notice is not None
+    assert notice.text == "i18n:dashboard.managed_gemma_notice.failed"

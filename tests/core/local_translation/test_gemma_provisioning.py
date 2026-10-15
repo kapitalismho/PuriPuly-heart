@@ -847,3 +847,42 @@ async def test_programmer_and_status_failures_do_not_trigger_source_fallback(
         assert not install_dir.exists()
     assert modelscope_server.requests == []
     assert list(tmp_path.glob("gemma.staging-*")) == []
+
+
+@pytest.mark.asyncio
+async def test_26b_provisioning_installs_only_selected_target_and_reuses_valid_install(tmp_path):
+    content = b"isolated-26b-target-fixture"
+    pinned = assets.gemma_26b_spec()
+    spec = replace(
+        pinned,
+        assets=(
+            assets.GemmaAsset(
+                filename=pinned.model_filename,
+                size_bytes=len(content),
+                sha256=hashlib.sha256(content).hexdigest(),
+            ),
+        ),
+    )
+    downloader = FakeDownloader({spec.model_filename: content})
+    install_dir = tmp_path / spec.install_dirname
+    first = await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=install_dir,
+        spec=spec,
+    )
+    second = await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=install_dir,
+        spec=spec,
+    )
+    assert first == second == assets.InstalledGemmaManifest.expected(spec)
+    assert [request.remote_path for request in downloader.requests] == [spec.model_filename]
+    assert downloader.requests[0].repo_id == pinned.repo_id
+    assert downloader.requests[0].revision == pinned.revision
+    assert assets.validate_gemma_install(install_dir, spec=spec) == first
+    assert {path.name for path in install_dir.iterdir()} == {
+        spec.model_filename,
+        assets.GEMMA_INSTALLED_MANIFEST_FILENAME,
+    }
+    assert not (tmp_path / assets.e4b_gemma_spec().install_dirname).exists()
+    assert not tuple(tmp_path.glob("*.staging-*"))

@@ -57,9 +57,12 @@ For package-managed dependencies, the authoritative license texts are distribute
 
 llama.cpp CPU and Vulkan runtime
 Source: https://github.com/ggml-org/llama.cpp
-Pinned release: https://github.com/ggml-org/llama.cpp/releases/tag/b10423
-Pinned commit: a94d563ed801d1da1b8c2432946de07d0231bb3d
+Pinned release: https://github.com/ggml-org/llama.cpp/releases/tag/b11537
+Pinned commit: 8e2d31e0eb658d0382d3106a61369dff81f0c080
 License: MIT
+
+Bundled LLVM OpenMP runtime (libomp.dll): Apache-2.0 WITH LLVM-exception.
+The complete upstream LICENSE-LLVM-OpenMP, including its additional legacy notices, is installed alongside libomp.dll in each llama.cpp backend directory.
 
 Windows releases contain the pinned llama.cpp server runtime required for managed local translation. The application installer does not contain Gemma model weights. The complete llama.cpp license is installed at third_party/llama.cpp/LICENSE.
 

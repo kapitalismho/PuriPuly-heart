@@ -12,7 +12,7 @@
   "native_runtime_root": ".",
   "soxr_runtime_root": "site-packages/soxr",
   "soxr_compliance_root": "third_party/soxr",
-  "llama_runtime_root": "_runtime/llama.cpp-b10423",
+  "llama_runtime_root": "_runtime/llama.cpp-b11537",
   "local_qwen_runtime_root": "_runtime/local_qwen",
   "overlay_executable": "PuriPulyHeartOverlay.exe",
   "gpu_worker_executable": "PuriPulyHeartGpuWorker.exe",

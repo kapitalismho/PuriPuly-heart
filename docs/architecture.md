@@ -239,6 +239,27 @@ Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. B
 
 Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `core/runtime/provider_rebuild.py`. Behavior: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`.
 
+### Managed local translation
+
+- **Model and provisioning identity**
+  - E4B and 26B A4B QAT are distinct managed selections behind the same `LLMProvider` boundary.
+  - Each model owns its pinned assets, installation directory and verified manifest. Provisioning is on demand and atomic; selecting E4B does not provision 26B.
+  - The runtime owner validates the executable's pinned build/commit before launch, including supported runtime-root overrides.
+- **Execution ownership**
+  - One managed runtime owner owns one server and one loaded target model. Vulkan admits at most two active translations; effective CPU execution admits one.
+  - Three resident language-pair prefix slots are cache capacity, not authorization for three active translations. Same-pair concurrent requests reserve different mutable slots.
+  - The provider factory delegates managed capacity to this owner rather than applying the unrelated remote-provider concurrency preference. Channel owners retain turn ordering, stale-result rejection and destination eligibility.
+- **Slots and lifecycle**
+  - A request retains its slot through native completion or cancellation settlement. Prefix preparation, restore, save and LRU eviction cannot overwrite a busy slot.
+  - Model, device and backend transitions drain active work before replacing the server and reject results from superseded state. A failed request cannot terminate another valid request merely to reclaim its slot.
+  - Prefix compatibility includes model/artifact, runtime/executable, effective backend/profile, prompt/template and language pair.
+- **Backend policy**
+  - E4B preserves serialized CPU MTP and its internal GPU-to-CPU fallback; fallback uses CPU admission and the CPU profile.
+  - 26B is Vulkan-only with the fixed owner-selected placement/cache profile. Initialization failure is actionable, not permission to substitute CPU, E4B or a remote provider.
+
+Implementation: `core/local_translation/runtime.py`, `runtime_profile.py`, `assets.py`, `prefix_cache.py`, `providers/llm/managed_gemma.py`, and `app/wiring/wiring_managed_gemma.py`. Behavior: `tests/core/local_translation/test_gemma_runtime.py`, `tests/providers/test_managed_gemma_concurrency.py`. Fixed profiles and selection controls: [CLI guide](cli.md#managed-local-translation).
+
+
 ### ChatGPT connection
 
 - ChatGPT authentication is separate from Broker.

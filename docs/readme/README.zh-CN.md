@@ -177,7 +177,10 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 | 模型 | 运行环境 | 量化 |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | 仅 GPU (Vulkan) | UD Q4_K_XL |
 | OpenAI 兼容 API | — | — |
+
+模型权重不随安装程序打包，仅在需要所选模型时下载。26B 下载大小约为 14.25 GB，模型选择在重启后保留。26B 仅支持 Vulkan GPU；初始化失败时不会自动切换到 CPU 或 E4B。GPU 在同一个运行时中最多同时处理两个 Self/Peer 请求，CPU 仍按顺序处理。参见[固定配置与托管本地翻译契约](../cli.md#managed-local-translation)。
 
 ---
 

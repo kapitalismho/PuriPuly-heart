@@ -3,12 +3,14 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import subprocess
 import zipfile
 from pathlib import Path
 
 import pytest
 
 from puripuly_heart.release_evidence import managed_gemma_distribution as distribution
+from puripuly_heart.release_evidence.native_distribution import NativeArtifactLayout
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -108,6 +110,7 @@ def test_runtime_archive_stages_only_server_dependency_closure(tmp_path: Path) -
         "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
         "mtp-gemma-4-E4B-it.gguf",
         "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+        "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
         "mmproj-model-f16.gguf",
     ],
 )
@@ -327,12 +330,20 @@ def test_prepare_runtime_reuses_valid_output_without_replacement(
     assert result["release"]["build"] == distribution.LLAMA_CPP_BUILD
 
 
-def test_installer_verifier_rejects_install_time_managed_gemma_download(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "identity",
+    [
+        "unsloth/gemma-4-E4B-it-qat-GGUF",
+        "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+        "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+    ],
+)
+def test_installer_verifier_rejects_install_time_managed_gemma_download(
+    tmp_path: Path, identity: str
+) -> None:
     installer_path = tmp_path / "installer.iss"
     installer_path.write_text(
-        '[Files]\nSource: "{#MyPackagedAppDir}\\*"\n'
-        "https://huggingface.co/unsloth/gemma-4-E4B-it-qat-GGUF/resolve/revision/"
-        "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf\n",
+        '[Files]\nSource: "{#MyPackagedAppDir}\\*"\n' + identity,
         encoding="utf-8",
     )
 
@@ -385,3 +396,81 @@ def test_llama_cpp_license_and_notice_have_required_provenance() -> None:
     assert all(marker in license_text for marker in distribution.LICENSE_REQUIRED_MARKERS)
     assert "llama.cpp CPU and Vulkan runtime" in notice
     assert distribution.LLAMA_CPP_COMMIT in notice
+
+
+def test_native_layout_stages_the_pinned_packaged_runtime_root(tmp_path: Path) -> None:
+    layout = NativeArtifactLayout.load(ROOT / "native/windows_host/artifact-layout.json")
+
+    assert layout.resolve(tmp_path, "llama_runtime_root") == (
+        tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
+    )
+
+
+def test_runtime_archive_requires_the_openmp_runtime_and_license(tmp_path: Path) -> None:
+    contract = next(contract for contract in distribution.ARCHIVES if contract.backend == "cpu")
+    assert {"libomp.dll", "license-llvm-openmp"} <= contract.required_files
+    archive_path = tmp_path / contract.filename
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        for name in sorted(contract.required_files - {"license-llvm-openmp"}):
+            archive.writestr(name, name)
+
+    with pytest.raises(RuntimeError, match="missing required files.*license-llvm-openmp"):
+        distribution._extract_runtime_archive(archive_path, tmp_path / "runtime", contract)
+
+
+def test_package_launch_checks_each_owned_backend_executable(monkeypatch, tmp_path: Path) -> None:
+    _write_package(tmp_path)
+    observed = []
+
+    def launch(command, **kwargs):
+        observed.append((command, kwargs["cwd"]))
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout="",
+            stderr=(
+                "version: 0.6.0-dev "
+                f"(build {distribution.LLAMA_CPP_BUILD.removeprefix('b')}, "
+                f"commit {distribution.LLAMA_CPP_COMMIT[:9]})\n"
+            ),
+        )
+
+    monkeypatch.setattr(distribution.subprocess, "run", launch)
+
+    result = distribution.verify_package(tmp_path, launch=True)
+
+    runtime_root = tmp_path / distribution.PACKAGED_RUNTIME_RELATIVE_DIR
+    assert observed == [
+        (
+            [str(runtime_root / backend / "llama-server.exe"), "--version"],
+            runtime_root / backend,
+        )
+        for backend in ("cpu", "vulkan")
+    ]
+    assert result["launched_backends"] == ["cpu", "vulkan"]
+
+
+@pytest.mark.parametrize(
+    ("build_suffix", "commit_suffix", "mismatch"),
+    [("0", "", "build"), ("", "0", "commit")],
+)
+def test_package_launch_rejects_extended_runtime_identities(
+    monkeypatch, tmp_path: Path, build_suffix: str, commit_suffix: str, mismatch: str
+) -> None:
+    _write_package(tmp_path)
+
+    def launch(command, **kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=(
+                f"build {distribution.LLAMA_CPP_BUILD.removeprefix('b')}{build_suffix}, "
+                f"commit {distribution.LLAMA_CPP_COMMIT[:9]}{commit_suffix}"
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(distribution.subprocess, "run", launch)
+
+    with pytest.raises(RuntimeError, match=f"{mismatch} identity mismatch"):
+        distribution.verify_package(tmp_path, launch=True)

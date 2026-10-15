@@ -149,3 +149,25 @@ def test_retired_install_removal_reports_failures_and_keeps_sweeping(tmp_path, m
     assert len(failures) == 1
     assert failures[0][0] == staging
     assert isinstance(failures[0][1], OSError)
+
+
+def test_26b_spec_is_distinct_pinned_text_only_artifact():
+    spec = assets.resolve_gemma_spec(assets.GEMMA_26B_MODEL_ID)
+    assert spec == assets.gemma_26b_spec()
+    assert spec.repo_id == "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
+    assert spec.revision == "7b92b5b28818151e8669af2e45e88d6086f490dd"
+    assert spec.model_filename == "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
+    assert spec.draft_filename is None
+    assert spec.assets == (
+        assets.GemmaAsset(
+            filename=spec.model_filename,
+            size_bytes=14_249_047_104,
+            sha256="a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+        ),
+    )
+    assert tuple(spec.sources) == ("huggingface",)
+    assert spec.sources["huggingface"].repo_id == spec.repo_id
+    assert spec.sources["huggingface"].revision == spec.revision
+    assert assets.resolve_gemma_spec().model_id == assets.GEMMA_MODEL_ID
+    assert assets.default_gemma_install_dir(spec) != assets.default_gemma_install_dir()
+    assert assets.InstalledGemmaManifest.expected(spec).files == (spec.model_filename,)

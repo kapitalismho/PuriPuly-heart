@@ -10,7 +10,8 @@ from puripuly_heart.app.services.managed_gemma_translation import (
 )
 from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.local_translation.assets import GEMMA_MODEL_ID
+from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS, TranslationModel
+from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID, GEMMA_MODEL_ID
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.prefix_cache import (
     GemmaPrefixCache,
@@ -27,12 +28,16 @@ def managed_gemma_selection(
     settings: AppSettingsVNext,
 ) -> ManagedGemmaTranslationSelection:
     translation = settings.intent.translation
-    if translation.model != "managed_gemma":
+    if translation.model not in MANAGED_GEMMA_MODELS:
         raise ValueError("managed Gemma selection requires the managed Gemma model")
     backend = translation.connection
     if backend not in {"cpu", "gpu"}:
         raise ValueError("managed Gemma connection must be CPU or GPU")
-    model_id = GEMMA_MODEL_ID
+    model_id = (
+        GEMMA_26B_MODEL_ID
+        if translation.model == TranslationModel.MANAGED_GEMMA_26B
+        else GEMMA_MODEL_ID
+    )
     languages = settings.intent.languages
     source_language = languages.source_language
     target_language = languages.target_language
@@ -74,7 +79,7 @@ async def sync_managed_gemma_demand(
     if settings is None:
         return
     model = settings.intent.translation.model
-    if model != "managed_gemma":
+    if model not in MANAGED_GEMMA_MODELS:
         return
     await managed_gemma.prepare(managed_gemma_selection(settings))
 

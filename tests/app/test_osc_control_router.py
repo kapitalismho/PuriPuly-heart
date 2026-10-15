@@ -184,10 +184,12 @@ async def test_router_routes_on_device_translation_model_ids() -> None:
 
     assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 10)
     assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 11)
+    assert await router.dispatch_packet("/avatar/parameters/PuriPuly_Translator", 15)
 
     assert application.calls == [
         ("model", ("managed_gemma", "cpu")),
         ("model", ("managed_gemma", "gpu")),
+        ("model", ("managed_gemma_26b", "gpu")),
     ]
     await router.close()
 

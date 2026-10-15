@@ -23,8 +23,8 @@ def test_cpu_profile_preserves_fixed_common_and_mtp_contract(tmp_path: Path) -> 
         threads_profile=CPU_PROFILE,
     )
 
-    assert LLAMA_CPP_BUILD == "b10423"
-    assert LLAMA_CPP_COMMIT == "a94d563ed801d1da1b8c2432946de07d0231bb3d"
+    assert LLAMA_CPP_BUILD == "b11537"
+    assert LLAMA_CPP_COMMIT == "8e2d31e0eb658d0382d3106a61369dff81f0c080"
     assert _values(command, "--load-mode") == ["mmap"]
     assert _values(command, "--threads") == ["4"]
     assert _values(command, "--threads-batch") == ["12"]
@@ -139,3 +139,68 @@ def test_load_or_detect_thread_profile_corrupt_file_redetects(
     profile = load_or_detect_thread_profile(path, physical_cores=8, logical_cores=16)
     assert profile == LlamaCppThreadProfile(4, 12, 1)
     assert path.is_file()
+
+
+def test_26b_fixed_vulkan_profile_uses_exact_artifact_and_no_drafter(tmp_path):
+    from puripuly_heart.core.local_translation.assets import gemma_26b_spec
+
+    spec = gemma_26b_spec()
+    command = build_gemma_server_command(
+        executable=Path("llama-server.exe"),
+        install_dir=tmp_path,
+        backend="gpu",
+        port=38192,
+        vulkan_device="Vulkan2",
+        spec=spec,
+    )
+    expected = {
+        "--model": str(tmp_path / "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"),
+        "--alias": "puripuly-gemma-4-26b-a4b-q4",
+        "--device": "Vulkan2",
+        "--n-gpu-layers": "99",
+        "--n-cpu-moe": "24",
+        "--moe-cache-mib": "2048",
+        "--load-mode": "none",
+        "--cache-ram": "0",
+        "--fit": "off",
+        "--threads": "4",
+        "--threads-batch": "4",
+        "--ctx-size": "4608",
+        "--parallel": "3",
+        "--batch-size": "512",
+        "--ubatch-size": "512",
+        "--cache-type-k": "f16",
+        "--cache-type-v": "f16",
+        "--flash-attn": "on",
+        "--reasoning": "off",
+        "--reasoning-budget": "0",
+        "--prio": "-1",
+        "--threads-http": "1",
+        "--host": "127.0.0.1",
+        "--port": "38192",
+    }
+    for flag, value in expected.items():
+        assert _values(command, flag) == [value]
+    for flag in ("--swa-full", "--cache-prompt", "--warmup", "--perf", "--metrics", "--no-webui"):
+        assert command.count(flag) == 1
+    assert not any(item.startswith("--spec-") for item in command)
+
+
+def test_26b_cpu_profile_is_unsupported_before_detecting_threads(tmp_path, monkeypatch):
+    import pytest
+
+    from puripuly_heart.core.local_translation import runtime_profile
+    from puripuly_heart.core.local_translation.assets import gemma_26b_spec
+
+    def unexpected_detection():
+        raise AssertionError("26B CPU must not detect or persist a CPU thread profile")
+
+    monkeypatch.setattr(runtime_profile, "load_or_detect_thread_profile", unexpected_detection)
+    with pytest.raises(ValueError, match="requires a working Vulkan GPU"):
+        build_gemma_server_command(
+            executable=Path("llama-server.exe"),
+            install_dir=tmp_path,
+            backend="cpu",
+            port=38192,
+            spec=gemma_26b_spec(),
+        )

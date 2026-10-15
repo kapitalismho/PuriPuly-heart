@@ -332,6 +332,12 @@ class TranslationIntent:
     gpu_device_id: str = "auto"
 
     def __post_init__(self) -> None:
+        if self.model == "managed_gemma_26b":
+            object.__setattr__(self, "connection", "gpu")
+        history = dict(self.connection_history)
+        if "managed_gemma_26b" in history:
+            history["managed_gemma_26b"] = "gpu"
+        object.__setattr__(self, "connection_history", history)
         device_id = self.gpu_device_id if isinstance(self.gpu_device_id, str) else "auto"
         object.__setattr__(self, "gpu_device_id", device_id.strip() or "auto")
 

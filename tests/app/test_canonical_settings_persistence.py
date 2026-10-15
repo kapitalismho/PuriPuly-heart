@@ -830,3 +830,37 @@ def test_old_official_deepseek_primary_materializes_as_41_direct() -> None:
     assert result.model == "deepseek_v4_flash_41"
     assert result.connection == "official_byok"
     assert result.deepseek.llm_model == "deepseek-flash"
+
+
+@pytest.mark.parametrize("connection", ["gpu", "cpu", "managed", "invalid"])
+def test_26b_canonical_selection_normalizes_gpu_and_survives_reload(
+    tmp_path: Path, connection: str
+) -> None:
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model="managed_gemma_26b",
+                connection=connection,
+                connection_history={"managed_gemma": "cpu", "managed_gemma_26b": connection},
+            ),
+        ),
+    )
+    owner = SettingsOwner(
+        path=tmp_path / "settings.json",
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+        canonical=materialize_canonical_translation_settings(settings),
+        authoritative=True,
+    )
+    owner.persist()
+    result = load_vnext_settings(owner.path)
+    assert result.ok
+    assert result.settings is not None
+    translation = result.settings.intent.translation
+    assert translation.model == "managed_gemma_26b"
+    assert translation.connection == "gpu"
+    assert translation.connection_history == {"managed_gemma": "cpu", "managed_gemma_26b": "gpu"}
+    assert settings.intent.translation.openrouter_model == translation.openrouter_model

@@ -11,8 +11,12 @@ class TranslationModel(str, Enum):
     GPT_6_LUNA = "gpt_6_luna"
     QWEN_38_FLASH = "qwen38_flash"
     MANAGED_GEMMA = "managed_gemma"
+    MANAGED_GEMMA_26B = "managed_gemma_26b"
     LOCAL_LLM = "local_llm"
     CUSTOM_HTTP = "custom_http"
+
+
+MANAGED_GEMMA_MODELS = (TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED_GEMMA_26B)
 
 
 class TranslationConnection(str, Enum):
@@ -56,6 +60,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
         TranslationConnection.CPU,
         TranslationConnection.GPU,
     ),
+    TranslationModel.MANAGED_GEMMA_26B: (TranslationConnection.GPU,),
     TranslationModel.LOCAL_LLM: (TranslationConnection.OLLAMA,),
     TranslationModel.CUSTOM_HTTP: (TranslationConnection.CUSTOM_HTTP,),
 }
@@ -87,7 +92,7 @@ def default_translation_connection(model: TranslationModel) -> TranslationConnec
 
 
 def provider_llm_for_translation(model: str, connection: str) -> str:
-    if model == TranslationModel.MANAGED_GEMMA:
+    if model in MANAGED_GEMMA_MODELS:
         return "managed_gemma"
     if model == "local_llm":
         return "local_llm"
@@ -107,6 +112,7 @@ def provider_llm_for_translation(model: str, connection: str) -> str:
 
 
 __all__ = [
+    "MANAGED_GEMMA_MODELS",
     "TRANSLATION_CONNECTIONS_BY_MODEL",
     "TRANSLATION_CONNECTION_PRIORITY",
     "TranslationConnection",

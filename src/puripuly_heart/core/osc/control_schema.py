@@ -100,6 +100,7 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         11: "managed_gemma",
         13: "deepseek_v4_flash_41",
         14: "gpt_6_luna",
+        15: "managed_gemma_26b",
     }
 )
 
@@ -107,6 +108,7 @@ TRANSLATION_CONNECTION_BY_MODEL_ID: Final[Mapping[int, str]] = MappingProxyType(
     {
         10: "cpu",
         11: "gpu",
+        15: "gpu",
     }
 )
 
@@ -175,6 +177,7 @@ TRANSLATION_MODEL_ID_BY_SELECTION: Final[Mapping[tuple[str, str], int]] = Mappin
     {
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
+        ("managed_gemma_26b", "gpu"): 15,
     }
 )
 LANGUAGE_ID_BY_CODE: Final[Mapping[str, int]] = MappingProxyType(
@@ -215,7 +218,7 @@ def registry_for_parameter(name: str) -> Mapping[int, str] | None:
 
 
 def translation_model_id_for_selection(model: str, connection: str) -> int:
-    if model == "managed_gemma":
+    if model in {"managed_gemma", "managed_gemma_26b"}:
         return TRANSLATION_MODEL_ID_BY_SELECTION[(model, connection)]
     return TRANSLATION_MODEL_ID_BY_VALUE[model]
 

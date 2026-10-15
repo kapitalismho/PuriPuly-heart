@@ -22,6 +22,10 @@ GEMMA_INSTALLED_MANIFEST_VERSION = 1
 GEMMA_UPSTREAM_REPO_ID = "google/gemma-4-E4B-it"
 GEMMA_LICENSE = "Apache-2.0"
 GEMMA_LICENSE_URL = "https://www.apache.org/licenses/LICENSE-2.0"
+GEMMA_26B_MODEL_ID = "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
+GEMMA_26B_REPO_ID = "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
+GEMMA_26B_REVISION = "7b92b5b28818151e8669af2e45e88d6086f490dd"
+GEMMA_26B_MODEL_FILENAME = "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
 
 
 class GemmaAssetError(RuntimeError):
@@ -111,9 +115,39 @@ def e4b_gemma_spec() -> GemmaModelSpec:
     )
 
 
+def gemma_26b_spec() -> GemmaModelSpec:
+    return GemmaModelSpec(
+        model_id=GEMMA_26B_MODEL_ID,
+        repo_id=GEMMA_26B_REPO_ID,
+        revision=GEMMA_26B_REVISION,
+        model_filename=GEMMA_26B_MODEL_FILENAME,
+        draft_filename=None,
+        install_dirname=GEMMA_26B_MODEL_ID,
+        upstream_repo_id="google/gemma-4-26B-A4B-it",
+        license=GEMMA_LICENSE,
+        license_url=GEMMA_LICENSE_URL,
+        assets=(
+            GemmaAsset(
+                filename=GEMMA_26B_MODEL_FILENAME,
+                size_bytes=14_249_047_104,
+                sha256="a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+            ),
+        ),
+        sources={
+            "huggingface": GemmaAssetSource(
+                name="huggingface",
+                repo_id=GEMMA_26B_REPO_ID,
+                revision=GEMMA_26B_REVISION,
+            ),
+        },
+    )
+
+
 def resolve_gemma_spec(model_id: str | None = None) -> GemmaModelSpec:
     if model_id is None or model_id == GEMMA_MODEL_ID:
         return e4b_gemma_spec()
+    if model_id == GEMMA_26B_MODEL_ID:
+        return gemma_26b_spec()
     raise ValueError(f"unsupported Gemma model id: {model_id}")
 
 
@@ -336,6 +370,10 @@ def _remove_path(path: Path) -> None:
 
 
 __all__ = [
+    "GEMMA_26B_MODEL_ID",
+    "GEMMA_26B_REPO_ID",
+    "GEMMA_26B_REVISION",
+    "GEMMA_26B_MODEL_FILENAME",
     "GEMMA_ASSETS",
     "GEMMA_DRAFT_FILENAME",
     "GEMMA_INSTALL_DIRNAME",
@@ -359,6 +397,7 @@ __all__ = [
     "InstalledGemmaManifest",
     "default_gemma_install_dir",
     "e4b_gemma_spec",
+    "gemma_26b_spec",
     "inspect_gemma_install",
     "remove_retired_managed_gemma_installs",
     "resolve_gemma_spec",

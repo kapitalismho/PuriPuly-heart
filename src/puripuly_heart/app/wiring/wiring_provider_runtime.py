@@ -21,6 +21,7 @@ from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
@@ -495,7 +496,7 @@ def compose_provider_runtime(
         canonical = canonical_settings(settings_value)
         translation = canonical.intent.translation
         secrets = create_secret_store(canonical.intent.secrets, config_path=config_path)
-        if translation.model == "managed_gemma":
+        if translation.model in MANAGED_GEMMA_MODELS:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             config = translation_runtime_configuration_provider()

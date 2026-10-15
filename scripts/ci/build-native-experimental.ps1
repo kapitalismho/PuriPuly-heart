@@ -145,7 +145,7 @@ $pythonEmbedRoot = Join-Path $BuildRoot "official-python-embed"
 $requirementsPath = Join-Path $BuildRoot "requirements-native.txt"
 $requirementsExportPath = Join-Path $BuildRoot "requirements-export.txt"
 $soxrRoot = Join-Path $BuildRoot "soxr-release-inputs"
-$llamaRoot = Join-Path $BuildRoot "llama.cpp-b10423"
+$llamaRoot = Join-Path $BuildRoot "llama.cpp-b11537"
 $llamaCache = Join-Path $BuildRoot "llama-cache"
 $artifactRoot = Join-Path $BuildRoot "artifact"
 $evidenceRoot = Join-Path $BuildRoot "evidence"
@@ -355,7 +355,7 @@ jni_flutter = "1.0.3"
         "-m", "puripuly_heart.release_evidence.managed_gemma_distribution", "prepare",
         "--repo-root", $repoRoot, "--cache-dir", $llamaCache, "--output-root", $llamaRoot
     ) -WorkingDirectory $repoRoot
-    Copy-Tree -Source $llamaRoot -Destination (Join-Path $artifactRoot "_runtime\llama.cpp-b10423")
+    Copy-Tree -Source $llamaRoot -Destination (Join-Path $artifactRoot "_runtime\llama.cpp-b11537")
     Copy-Tree -Source (Join-Path $repoRoot "third_party\llama.cpp") -Destination (Join-Path $artifactRoot "third_party\llama.cpp")
     $localQwenRoot = Join-Path $artifactRoot "_runtime\local_qwen"
     New-Item -ItemType Directory -Path $localQwenRoot -Force | Out-Null

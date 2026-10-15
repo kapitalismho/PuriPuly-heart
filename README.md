@@ -177,7 +177,12 @@ GPU inference runs on Vulkan. It works regardless of the vendor — Radeon or Ar
 | Model | Runtime | Quantization |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | GPU only (Vulkan) | UD Q4_K_XL |
 | OpenAI-compatible API | — | — |
+
+Managed Gemma weights download only when the selected model is needed; they are not bundled with the installer. The 26B download is approximately 14.25 GB. Model selection persists across restarts. E4B supports CPU with MTP or GPU; 26B requires a working Vulkan GPU and does not silently switch to CPU or E4B after a failure. Select another model/backend explicitly if the reported device or resource problem cannot be resolved.
+
+Self and Peer can translate concurrently on one managed GPU runtime, with at most two active requests. CPU translation remains serialized. The three retained language-pair prefix slots are separate from this active-request limit. See the [managed local translation contract](docs/cli.md#managed-local-translation) for model identities and fixed profiles.
 
 ---
 

@@ -1159,6 +1159,36 @@ async def test_dashboard_gpu_action_runs_as_page_task(
     assert actions == ["install"]
 
 
+@pytest.mark.asyncio
+async def test_dashboard_managed_download_cancel_runs_owned_action(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
+
+    view = _make_dashboard(monkeypatch)
+    tasks = []
+    actions = []
+
+    class Page:
+        def run_task(self, callback):
+            tasks.append(asyncio.create_task(callback()))
+
+    async def cancel(action):
+        actions.append(action)
+
+    attach_dummy_page(monkeypatch, view, Page())
+    view.on_managed_gemma_notice_action = cancel
+    view.set_managed_gemma_notice(
+        ManagedGemmaDashboardNotice(status="downloading", progress_percent=37, action="cancel")
+    )
+    label, callback = view.display_card.notice_actions[-1]
+    assert label == dashboard_module.t("dashboard.managed_gemma_action.cancel")
+    assert callable(callback)
+    callback()
+    await tasks[-1]
+    assert actions == ["cancel"]
+
+
 def test_dashboard_steamvr_overlay_failure_notice_uses_actionable_reason_without_status_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1468,6 +1498,7 @@ def test_dashboard_bound_intents_receive_every_owned_interaction(
         "overlay": [],
         "retry_peer": [],
         "gpu": [],
+        "managed_gemma": [],
     }
     view.bind_dashboard_intents(
         translation=DashboardTranslationIntents(
@@ -1482,6 +1513,7 @@ def test_dashboard_bound_intents_receive_every_owned_interaction(
             toggle_overlay=lambda enabled: calls["overlay"].append(enabled),
             retry_peer_process_capture=lambda: calls["retry_peer"].append(True),
             run_gpu_notice_action=lambda action: calls["gpu"].append(action),
+            run_managed_gemma_notice_action=lambda action: calls["managed_gemma"].append(action),
         ),
     )
 
@@ -1502,6 +1534,7 @@ def test_dashboard_bound_intents_receive_every_owned_interaction(
     assert [change.source_code for change in calls["language"]] == ["ja"]
     assert calls["retry_peer"] == []
     assert calls["gpu"] == []
+    assert calls["managed_gemma"] == []
 
 
 def test_dashboard_secondary_target_dialog_offers_none_and_blocks_the_primary(

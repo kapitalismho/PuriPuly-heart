@@ -4,14 +4,16 @@ import asyncio
 import hashlib
 import inspect
 import logging
+import re
 import socket
 import subprocess
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 from puripuly_heart.core.local_translation.assets import (
+    GEMMA_26B_MODEL_ID,
     GemmaModelSpec,
     default_gemma_install_dir,
     e4b_gemma_spec,
@@ -19,6 +21,7 @@ from puripuly_heart.core.local_translation.assets import (
 from puripuly_heart.core.local_translation.prefix_cache import GemmaPrefixCache
 from puripuly_heart.core.local_translation.provisioning import ensure_gemma_installed
 from puripuly_heart.core.local_translation.runtime_profile import (
+    GEMMA_RUNTIME_PROFILE_VERSION,
     LLAMA_CPP_BUILD,
     LLAMA_CPP_COMMIT,
     EffectiveGemmaBackend,
@@ -31,12 +34,48 @@ from puripuly_heart.core.local_translation.runtime_profile import (
 GEMMA_PROMPT_TEMPLATE_VERSION = "translation-prefix-v1"
 GEMMA_SLOT_COUNT = 3
 
+_ServerResult = TypeVar("_ServerResult")
+
+
+async def validate_gemma_runtime_version(executable: Path) -> None:
+    process = await asyncio.create_subprocess_exec(
+        str(executable),
+        "--version",
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    try:
+        output, _ = await asyncio.wait_for(process.communicate(), timeout=10.0)
+    except BaseException:
+        if process.returncode is None:
+            process.kill()
+        await process.wait()
+        raise
+    version = output.decode("utf-8", errors="replace")
+    match = re.search(r"\bbuild\s+(\d+),\s+commit\s+([0-9a-f]{9,40})\b", version)
+    if (
+        process.returncode != 0
+        or match is None
+        or f"b{match[1]}" != LLAMA_CPP_BUILD
+        or not LLAMA_CPP_COMMIT.startswith(match[2])
+    ):
+        raise ManagedGemmaRuntimeVersionError(
+            f"Incompatible llama.cpp executable: {executable}. "
+            f"Use {LLAMA_CPP_BUILD} ({LLAMA_CPP_COMMIT[:9]}) or remove "
+            "PURIPULY_HEART_LLAMA_CPP_ROOT to use the managed runtime."
+        )
+
 
 class ManagedGemmaRuntimeError(RuntimeError):
     pass
 
 
 class ManagedGemmaRuntimeClosedError(ManagedGemmaRuntimeError):
+    pass
+
+
+class ManagedGemmaRuntimeVersionError(ManagedGemmaRuntimeError):
     pass
 
 
@@ -55,6 +94,8 @@ class ManagedGemmaTransport(Protocol):
     async def wait_until_ready(self, *, timeout_s: float) -> None: ...
 
     async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None: ...
+
+    async def wait_slot_idle(self, *, slot_id: int) -> None: ...
 
     async def restore_prefix(self, *, filename: str, slot_id: int) -> bool: ...
 
@@ -149,6 +190,8 @@ def _prefix_identity(
     system_prompt: str,
     source_language: str,
     target_language: str,
+    effective_backend: EffectiveGemmaBackend,
+    profile_identity: str,
 ) -> str:
     payload = "\0".join(
         (
@@ -156,6 +199,10 @@ def _prefix_identity(
             spec.revision,
             LLAMA_CPP_BUILD,
             LLAMA_CPP_COMMIT,
+            effective_backend,
+            profile_identity,
+            GEMMA_RUNTIME_PROFILE_VERSION,
+            *(f"{asset.filename}:{asset.sha256}" for asset in spec.assets),
             GEMMA_PROMPT_TEMPLATE_VERSION,
             source_language,
             target_language,
@@ -169,7 +216,7 @@ class ManagedGemmaRuntimeOwner:
     resource_fields = ("process", "transport", "prefix_identity", "active_backend")
     stop_ingress = "reject readiness and translation after close"
     shutdown_policy = "close HTTP transport, terminate server, then kill after bounded grace"
-    late_callback_rule = "serialized operations; three resident prefix slots; LRU eviction"
+    late_callback_rule = "request-local slots; drain superseded work; reject obsolete results"
 
     def __init__(
         self,
@@ -184,6 +231,7 @@ class ManagedGemmaRuntimeOwner:
         startup_timeout_s: float = 120.0,
         shutdown_timeout_s: float = 10.0,
         prefix_cache: GemmaPrefixCache | None = None,
+        version_validator: Callable[[Path], Awaitable[None]] = validate_gemma_runtime_version,
     ) -> None:
         self._explicit_install_dir = None if install_dir is None else install_dir.resolve()
         self._install_dir = (self._explicit_install_dir or default_gemma_install_dir()).resolve()
@@ -196,6 +244,7 @@ class ManagedGemmaRuntimeOwner:
         self._startup_timeout_s = max(0.1, float(startup_timeout_s))
         self._shutdown_timeout_s = max(0.1, float(shutdown_timeout_s))
         self._prefix_cache = prefix_cache
+        self._version_validator = version_validator
         self._process: ManagedGemmaRuntimeProcess | None = None
         self._transport: ManagedGemmaTransport | None = None
         self._requested_backend: GemmaBackend | None = None
@@ -205,9 +254,15 @@ class ManagedGemmaRuntimeOwner:
         self._prefix_identity: str | None = None
         self._slot_identities: list[str | None] = [None] * GEMMA_SLOT_COUNT
         self._slot_lru: list[int] = list(range(GEMMA_SLOT_COUNT))
-        self._active_slot: int | None = None
+        self._busy_slots: set[int] = set()
+        self._slot_changed = asyncio.Event()
+        self._generation = 0
+        self._unsettled = False
+        self._transitioning = False
         self._readiness: ManagedGemmaReadiness | None = None
         self._lock = asyncio.Lock()
+        self._condition = asyncio.Condition(self._lock)
+        self._server_tasks: set[asyncio.Task[object]] = set()
         self._operation_tasks: set[asyncio.Task[object]] = set()
         self._releasing = False
         self._closed = False
@@ -241,9 +296,8 @@ class ManagedGemmaRuntimeOwner:
     ) -> ManagedGemmaReadiness:
         task = self._register_operation()
         try:
-            async with self._lock:
-                self._ensure_accepting()
-                return await self._prepare_locked(
+            async with self._condition:
+                readiness, _slot_id = await self._prepare_locked(
                     backend=backend,
                     source_language=source_language,
                     target_language=target_language,
@@ -252,6 +306,7 @@ class ManagedGemmaRuntimeOwner:
                     provision_kwargs=provision_kwargs,
                     spec=spec,
                 )
+                return readiness
         finally:
             self._operation_tasks.discard(task)
 
@@ -268,10 +323,10 @@ class ManagedGemmaRuntimeOwner:
         max_output_tokens: int | None = None,
     ) -> ManagedGemmaResponse:
         task = self._register_operation()
+        slot_id: int | None = None
         try:
-            async with self._lock:
-                self._ensure_accepting()
-                readiness = await self._prepare_locked(
+            async with self._condition:
+                readiness, slot_id = await self._prepare_locked(
                     backend=backend,
                     source_language=source_language,
                     target_language=target_language,
@@ -283,26 +338,89 @@ class ManagedGemmaRuntimeOwner:
                 transport = self._transport
                 if transport is None:
                     raise ManagedGemmaRuntimeError("managed Gemma transport is unavailable")
-                slot_id = self._active_slot
-                if slot_id is None:
-                    raise ManagedGemmaRuntimeError("managed Gemma slot is unavailable")
-                transport_kwargs = {
-                    "system_prompt": build_managed_gemma_system_prompt(
-                        system_prompt=system_prompt,
-                        source_language=source_language,
-                        target_language=target_language,
-                    ),
-                    "user_message": user_message,
-                    "slot_id": slot_id,
-                }
-                if max_output_tokens is not None:
-                    transport_kwargs["max_output_tokens"] = max_output_tokens
-                response = await transport.translate(**transport_kwargs)  # type: ignore[arg-type]
-                self._ensure_accepting()
-                self._log_metrics(readiness, response.metrics)
-                return response
+                generation = self._generation
+                self._busy_slots.add(slot_id)
+            transport_kwargs = {
+                "system_prompt": build_managed_gemma_system_prompt(
+                    system_prompt=system_prompt,
+                    source_language=source_language,
+                    target_language=target_language,
+                ),
+                "user_message": user_message,
+                "slot_id": slot_id,
+            }
+            if max_output_tokens is not None:
+                transport_kwargs["max_output_tokens"] = max_output_tokens
+            response = await self._await_server_work(
+                self._translate_settled(transport, transport_kwargs, slot_id)
+            )
+            self._ensure_accepting()
+            if generation != self._generation:
+                raise ManagedGemmaRuntimeError("managed Gemma result superseded by runtime change")
+            self._ensure_process_alive()
+            self._log_metrics(readiness, response.metrics)
+            return response
         finally:
+            if slot_id is not None:
+                self._busy_slots.discard(slot_id)
+                self._slot_changed.set()
             self._operation_tasks.discard(task)
+
+    async def _wait_slot_change_locked(self) -> None:
+        self._slot_changed.clear()
+        self._condition.release()
+        cancellation: asyncio.CancelledError | None = None
+        try:
+            await self._slot_changed.wait()
+        finally:
+            while True:
+                try:
+                    await self._condition.acquire()
+                    break
+                except asyncio.CancelledError as exc:
+                    cancellation = exc
+            if cancellation is not None:
+                raise cancellation
+
+    async def _drain_locked(self) -> None:
+        while self._busy_slots:
+            await self._wait_slot_change_locked()
+
+    async def _await_server_work(self, work: Awaitable[_ServerResult]) -> _ServerResult:
+        task = asyncio.ensure_future(work)
+        self._server_tasks.add(task)
+        cancellation: asyncio.CancelledError | None = None
+        try:
+            while not task.done():
+                try:
+                    await asyncio.shield(task)
+                except asyncio.CancelledError as exc:
+                    cancellation = exc
+                except BaseException:
+                    break
+            if cancellation is not None:
+                if not task.cancelled():
+                    task.exception()
+                raise cancellation
+            return task.result()
+        finally:
+            self._server_tasks.discard(task)
+
+    async def _translate_settled(
+        self,
+        transport: ManagedGemmaTransport,
+        arguments: dict[str, object],
+        slot_id: int,
+    ) -> ManagedGemmaResponse:
+        try:
+            return await transport.translate(**arguments)  # type: ignore[arg-type]
+        except Exception:
+            try:
+                await transport.wait_slot_idle(slot_id=slot_id)
+            except Exception:
+                self._unsettled = True
+            self._slot_identities[slot_id] = None
+            raise
 
     def _register_operation(self) -> asyncio.Task[object]:
         if self._closed:
@@ -331,13 +449,17 @@ class ManagedGemmaRuntimeOwner:
         vulkan_device: str,
         provision_kwargs: Mapping[str, object] | None,
         spec: GemmaModelSpec | None,
-    ) -> ManagedGemmaReadiness:
+    ) -> tuple[ManagedGemmaReadiness, int]:
         self._ensure_accepting()
         if backend not in {"cpu", "gpu"}:
             raise ValueError("managed Gemma backend must be cpu or gpu")
         if not source_language.strip() or not target_language.strip():
             raise ValueError("managed Gemma language pair must be non-empty")
         resolved_spec = spec or self._active_spec or e4b_gemma_spec()
+        if resolved_spec.model_id == GEMMA_26B_MODEL_ID and backend != "gpu":
+            raise ManagedGemmaRuntimeError(
+                "Gemma 4 26B requires a working Vulkan GPU; select E4B for CPU inference"
+            )
         install_dir = (
             self._explicit_install_dir or default_gemma_install_dir(resolved_spec)
         ).resolve()
@@ -346,54 +468,77 @@ class ManagedGemmaRuntimeOwner:
             source_language=source_language,
             target_language=target_language,
         )
-        identity = _prefix_identity(
-            spec=resolved_spec,
-            system_prompt=rendered_prompt,
-            source_language=source_language,
-            target_language=target_language,
-        )
-        process_alive = self._process is not None and self._process.returncode is None
         requested_vulkan_device = vulkan_device if backend == "gpu" else None
-        runtime_changed = (
-            not process_alive
-            or self._requested_backend != backend
-            or self._requested_vulkan_device != requested_vulkan_device
-            or self._active_spec != resolved_spec
-            or self._install_dir != install_dir
+        while True:
+            await self._condition.wait_for(lambda: not self._transitioning)
+            self._ensure_accepting()
+            process_alive = self._process is not None and self._process.returncode is None
+            runtime_changed = (
+                not process_alive
+                or self._requested_backend != backend
+                or self._requested_vulkan_device != requested_vulkan_device
+                or self._active_spec != resolved_spec
+                or self._install_dir != install_dir
+                or self._unsettled
+            )
+            if runtime_changed:
+                self._transitioning = True
+                if not self._unsettled:
+                    self._generation += 1
+                self._readiness = None
+                try:
+                    await self._drain_locked()
+                    self._ensure_accepting()
+                    self._install_dir = install_dir
+                    kwargs = dict(provision_kwargs or {})
+                    kwargs.setdefault("install_dir", install_dir)
+                    kwargs.setdefault("spec", resolved_spec)
+                    await self._provisioner(**kwargs)
+                    self._ensure_accepting()
+                    await self._stop_locked()
+                    try:
+                        await self._start_locked(
+                            backend=backend, vulkan_device=vulkan_device, spec=resolved_spec
+                        )
+                        self._ensure_process_alive()
+                    except asyncio.CancelledError:
+                        await self._stop_locked()
+                        raise
+                    except Exception as exc:
+                        await self._stop_locked()
+                        if (
+                            backend != "gpu"
+                            or resolved_spec.model_id == GEMMA_26B_MODEL_ID
+                            or isinstance(exc, ManagedGemmaRuntimeVersionError)
+                        ):
+                            raise ManagedGemmaRuntimeError(
+                                f"managed Gemma {backend} startup failed; "
+                                f"check the runtime and GPU resources or explicitly select E4B CPU: {exc}"
+                            ) from exc
+                        self._emit(
+                            "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_start_failed",
+                            logging.WARNING,
+                        )
+                        await self._start_locked(
+                            backend="cpu", vulkan_device=vulkan_device, spec=resolved_spec
+                        )
+                        self._ensure_process_alive()
+                    self._requested_backend = backend
+                    self._requested_vulkan_device = requested_vulkan_device
+                    self._active_spec = resolved_spec
+                finally:
+                    self._transitioning = False
+                    self._condition.notify_all()
+            capacity = 2 if self._effective_backend == "vulkan" else 1
+            if len(self._busy_slots) < capacity:
+                break
+            await self._wait_slot_change_locked()
+        effective = self._effective_backend
+        if effective is None:
+            raise ManagedGemmaRuntimeError("managed Gemma backend is unavailable")
+        identity = self._make_prefix_identity(
+            resolved_spec, rendered_prompt, source_language, target_language, effective
         )
-        if runtime_changed:
-            self._install_dir = install_dir
-            kwargs = dict(provision_kwargs or {})
-            kwargs.setdefault("install_dir", self._install_dir)
-            kwargs.setdefault("spec", resolved_spec)
-            await self._provisioner(**kwargs)
-            self._ensure_accepting()
-            await self._stop_locked()
-            try:
-                await self._start_locked(
-                    backend=backend,
-                    vulkan_device=vulkan_device,
-                    spec=resolved_spec,
-                )
-                self._ensure_process_alive()
-            except asyncio.CancelledError:
-                await self._stop_locked()
-                raise
-            except Exception as exc:
-                await self._stop_locked()
-                if backend != "gpu":
-                    raise ManagedGemmaRuntimeError("managed Gemma CPU startup failed") from exc
-                self._emit(
-                    "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_start_failed",
-                    logging.WARNING,
-                )
-                await self._start_locked(
-                    backend="cpu",
-                    vulkan_device=vulkan_device,
-                    spec=resolved_spec,
-                )
-                self._ensure_process_alive()
-            self._ensure_accepting()
         slot_id, needs_prefix = self._assign_slot(identity)
         if needs_prefix:
             self._readiness = None
@@ -401,60 +546,58 @@ class ManagedGemmaRuntimeOwner:
             transport = self._transport
             if transport is None:
                 raise ManagedGemmaRuntimeError("managed Gemma transport is unavailable")
-            restored = await self._restore_prefix_locked(transport, identity, slot_id)
-            if not restored:
+            try:
+                await self._await_server_work(
+                    self._prepare_prefix(transport, identity, slot_id, rendered_prompt)
+                )
+            except Exception as exc:
+                self._transitioning = True
                 try:
-                    await transport.prepare_prefix(
-                        system_prompt=rendered_prompt,
-                        slot_id=slot_id,
-                    )
-                    self._ensure_process_alive()
-                except asyncio.CancelledError:
+                    await self._drain_locked()
+                    self._ensure_accepting()
                     await self._stop_locked()
-                    raise
-                except Exception as exc:
-                    if backend != "gpu" or self._effective_backend != "vulkan":
-                        await self._stop_locked()
+                    if (
+                        backend != "gpu"
+                        or effective != "vulkan"
+                        or resolved_spec.model_id == GEMMA_26B_MODEL_ID
+                    ):
                         raise ManagedGemmaRuntimeError(
-                            "managed Gemma prefix preparation failed"
+                            "managed Gemma prefix preparation failed; check backend resources "
+                            "or explicitly select another supported model/backend"
                         ) from exc
-                    await self._stop_locked()
                     self._emit(
                         "[ManagedGemma] backend_fallback requested=gpu effective=cpu reason=vulkan_prefill_failed",
                         logging.WARNING,
                     )
                     await self._start_locked(
-                        backend="cpu",
-                        vulkan_device=vulkan_device,
-                        spec=resolved_spec,
+                        backend="cpu", vulkan_device=vulkan_device, spec=resolved_spec
+                    )
+                    self._requested_backend = backend
+                    self._requested_vulkan_device = requested_vulkan_device
+                    self._active_spec = resolved_spec
+                    effective = "cpu"
+                    identity = self._make_prefix_identity(
+                        resolved_spec, rendered_prompt, source_language, target_language, effective
                     )
                     slot_id, _needs_prefix = self._assign_slot(identity)
-                    self._slot_identities[slot_id] = None
                     transport = self._transport
                     if transport is None:
                         raise ManagedGemmaRuntimeError("managed Gemma transport is unavailable")
                     try:
-                        await transport.prepare_prefix(
-                            system_prompt=rendered_prompt,
-                            slot_id=slot_id,
+                        await self._await_server_work(
+                            self._prepare_prefix(transport, identity, slot_id, rendered_prompt)
                         )
-                        self._ensure_process_alive()
                     except BaseException:
                         await self._stop_locked()
                         raise
-                await self._save_prefix_locked(transport, identity, slot_id)
+                finally:
+                    self._transitioning = False
+                    self._condition.notify_all()
             self._ensure_accepting()
             self._slot_identities[slot_id] = identity
         self._prefix_identity = identity
-        self._active_slot = slot_id
-        effective = self._effective_backend
-        if effective is None:
-            raise ManagedGemmaRuntimeError("managed Gemma backend is unavailable")
         self._ensure_accepting()
         self._ensure_process_alive()
-        self._requested_backend = backend
-        self._requested_vulkan_device = requested_vulkan_device
-        self._active_spec = resolved_spec
         readiness = ManagedGemmaReadiness(
             requested_backend=backend,
             effective_backend=effective,
@@ -463,13 +606,54 @@ class ManagedGemmaRuntimeOwner:
             prefix_identity=identity,
         )
         self._readiness = readiness
-        return readiness
+        return readiness, slot_id
+
+    def _make_prefix_identity(
+        self,
+        spec: GemmaModelSpec,
+        prompt: str,
+        source: str,
+        target: str,
+        backend: EffectiveGemmaBackend,
+    ) -> str:
+        executable = (
+            self._runtime_paths.vulkan_server
+            if backend == "vulkan"
+            else self._runtime_paths.cpu_server
+        )
+        return _prefix_identity(
+            spec=spec,
+            system_prompt=prompt,
+            source_language=source,
+            target_language=target,
+            effective_backend=backend,
+            profile_identity=self._profile_identity + "\0" + str(executable.resolve()),
+        )
+
+    async def _prepare_prefix(
+        self,
+        transport: ManagedGemmaTransport,
+        identity: str,
+        slot_id: int,
+        prompt: str,
+    ) -> None:
+        try:
+            restored = await self._restore_prefix_locked(transport, identity, slot_id)
+            if not restored:
+                await transport.prepare_prefix(system_prompt=prompt, slot_id=slot_id)
+                self._ensure_process_alive()
+                await self._save_prefix_locked(transport, identity, slot_id)
+        except Exception:
+            try:
+                await transport.wait_slot_idle(slot_id=slot_id)
+            except Exception:
+                self._unsettled = True
+            raise
 
     def _clear_slots(self) -> None:
         self._slot_identities = [None] * GEMMA_SLOT_COUNT
         self._slot_lru = list(range(GEMMA_SLOT_COUNT))
         self._prefix_identity = None
-        self._active_slot = None
 
     def _touch_slot(self, slot_id: int) -> None:
         if slot_id in self._slot_lru:
@@ -478,14 +662,14 @@ class ManagedGemmaRuntimeOwner:
 
     def _assign_slot(self, identity: str) -> tuple[int, bool]:
         for slot_id, resident in enumerate(self._slot_identities):
-            if resident == identity:
+            if resident == identity and slot_id not in self._busy_slots:
                 self._touch_slot(slot_id)
                 return slot_id, False
         for slot_id, resident in enumerate(self._slot_identities):
-            if resident is None:
+            if resident is None and slot_id not in self._busy_slots:
                 self._touch_slot(slot_id)
                 return slot_id, True
-        slot_id = self._slot_lru[0]
+        slot_id = next(slot for slot in self._slot_lru if slot not in self._busy_slots)
         self._touch_slot(slot_id)
         return slot_id, True
 
@@ -503,6 +687,7 @@ class ManagedGemmaRuntimeOwner:
         try:
             restored = await transport.restore_prefix(filename=filename, slot_id=slot_id)
         except Exception:
+            await transport.wait_slot_idle(slot_id=slot_id)
             return False
         if restored:
             cache.touch(identity, backend)
@@ -526,6 +711,7 @@ class ManagedGemmaRuntimeOwner:
         try:
             await transport.save_prefix(filename=filename, slot_id=slot_id)
         except Exception:
+            await transport.wait_slot_idle(slot_id=slot_id)
             self._emit(
                 f"[ManagedGemma] prefix_cache save_failed backend={backend} identity={identity[:12]} slot={slot_id}",
                 logging.WARNING,
@@ -585,6 +771,7 @@ class ManagedGemmaRuntimeOwner:
         )
         if not executable.is_file():
             raise ManagedGemmaRuntimeError(f"managed llama.cpp server is missing: {executable}")
+        await self._version_validator(executable)
         port = self._port_allocator()
         process_cwd = self._install_dir
         slot_save_path = None
@@ -601,6 +788,9 @@ class ManagedGemmaRuntimeOwner:
             slot_save_path=slot_save_path,
             spec=spec,
         )
+        port_index = command.index("--port")
+        self._profile_identity = "\0".join(command[1:port_index] + command[port_index + 2 :])
+        self._unsettled = False
         process = await self._process_factory(command, process_cwd)
         self._process = process
         try:
@@ -653,9 +843,16 @@ class ManagedGemmaRuntimeOwner:
             if done:
                 await asyncio.gather(*done, return_exceptions=True)
             if pending:
-                raise ManagedGemmaRuntimeError(
-                    f"managed Gemma operations did not stop: {len(pending)}"
-                )
+                await self._stop_locked()
+                for work in tuple(self._server_tasks):
+                    work.cancel()
+                done, pending = await asyncio.wait(pending, timeout=self._shutdown_timeout_s)
+                if done:
+                    await asyncio.gather(*done, return_exceptions=True)
+                if pending:
+                    raise ManagedGemmaRuntimeError(
+                        f"managed Gemma operations did not stop: {len(pending)}"
+                    )
 
     async def _stop_locked(self) -> None:
         transport = self._transport
@@ -770,8 +967,10 @@ __all__ = [
     "ManagedGemmaResponse",
     "ManagedGemmaRuntimeClosedError",
     "ManagedGemmaRuntimeError",
+    "ManagedGemmaRuntimeVersionError",
     "ManagedGemmaRuntimeOwner",
     "ManagedGemmaRuntimeProcess",
     "ManagedGemmaTransport",
     "build_managed_gemma_system_prompt",
+    "validate_gemma_runtime_version",
 ]

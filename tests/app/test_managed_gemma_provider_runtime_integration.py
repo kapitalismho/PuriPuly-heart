@@ -33,7 +33,7 @@ class RecordingLlmRuntime:
         return previous
 
 
-def _managed_settings() -> AppSettingsVNext:
+def _managed_settings(model: str = TranslationModel.MANAGED_GEMMA.value) -> AppSettingsVNext:
     settings = AppSettingsVNext()
     return replace(
         settings,
@@ -41,7 +41,7 @@ def _managed_settings() -> AppSettingsVNext:
             settings.intent,
             translation=replace(
                 settings.intent.translation,
-                model=TranslationModel.MANAGED_GEMMA.value,
+                model=model,
                 connection=TranslationConnection.GPU.value,
             ),
         ),
@@ -124,8 +124,10 @@ def _components(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["managed_gemma", "managed_gemma_26b"])
 async def test_provider_is_installed_without_preparing_when_translation_is_off(
     monkeypatch: pytest.MonkeyPatch,
+    model: str,
 ) -> None:
     events: list[object] = []
     provider = object()
@@ -146,7 +148,7 @@ async def test_provider_is_installed_without_preparing_when_translation_is_off(
 
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
     runtime = RecordingLlmRuntime(events)
-    settings = _managed_settings()
+    settings = _managed_settings(model)
     components = _components(
         settings=settings,
         runtime=runtime,
@@ -162,8 +164,10 @@ async def test_provider_is_installed_without_preparing_when_translation_is_off(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["managed_gemma", "managed_gemma_26b"])
 async def test_provider_waits_for_readiness_when_translation_is_on(
     monkeypatch: pytest.MonkeyPatch,
+    model: str,
 ) -> None:
     events: list[object] = []
     entered = asyncio.Event()
@@ -193,7 +197,7 @@ async def test_provider_waits_for_readiness_when_translation_is_on(
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
     runtime = RecordingLlmRuntime(events)
     previous = runtime.provider
-    settings = _managed_settings()
+    settings = _managed_settings(model)
     components = _components(
         settings=settings,
         runtime=runtime,
@@ -216,8 +220,10 @@ async def test_provider_waits_for_readiness_when_translation_is_on(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["managed_gemma", "managed_gemma_26b"])
 async def test_provider_prepares_when_peer_translation_is_on(
     monkeypatch: pytest.MonkeyPatch,
+    model: str,
 ) -> None:
     events: list[object] = []
     provider = object()
@@ -238,7 +244,7 @@ async def test_provider_prepares_when_peer_translation_is_on(
 
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", create_backend)
     runtime = RecordingLlmRuntime(events)
-    settings = _managed_settings()
+    settings = _managed_settings(model)
     components = _components(
         settings=settings,
         runtime=runtime,

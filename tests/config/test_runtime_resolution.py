@@ -1665,3 +1665,24 @@ def test_resolved_output_uses_lookup_references_not_raw_secret_values() -> None:
     assert config.fallback.target.credential.reference is not None
     assert "sk-" not in config.fallback.target.credential.reference
     assert "secret" not in config.fallback.target.credential.reference
+
+
+@pytest.mark.parametrize("connection", ["gpu", "cpu", "managed", "invalid"])
+def test_26b_normalization_and_resolution_never_substitute_model_or_remote_provider(
+    connection: str,
+) -> None:
+    runtime_resolution = _runtime_resolution_module()
+    intent = runtime_resolution.normalize_translation_runtime_intent(
+        model="managed_gemma_26b", connection=connection
+    )
+    assert intent.model == "managed_gemma_26b"
+    assert intent.connection == "gpu"
+    config = runtime_resolution.resolve_llm_config(
+        runtime_resolution.RuntimeResolutionInput(translation=intent)
+    )
+    assert config.provider == "managed_gemma"
+    assert config.model == "puripuly-gemma-4-26b-a4b-q4"
+    assert config.provider_options == {"backend": "gpu"}
+    assert config.fallback is None
+    assert len(config.attempts) == 1
+    assert not config.credential.required

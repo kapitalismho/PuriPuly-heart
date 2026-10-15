@@ -18,7 +18,10 @@ from puripuly_heart.app.services.managed_gemma_translation import (
 from puripuly_heart.app.wiring.wiring_managed_gemma import managed_gemma_selection
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
-from puripuly_heart.core.local_asr.local_stt_download_port import LocalSTTDownloadPortError
+from puripuly_heart.core.local_asr.local_stt_download_port import (
+    HuggingFaceDownloadProgress,
+    LocalSTTDownloadPortError,
+)
 from puripuly_heart.core.local_translation import assets, provisioning
 from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
@@ -444,3 +447,108 @@ async def test_modelscope_http_failure_preserves_download_status_metadata(
         assert owner.snapshot.status_code == 503
     finally:
         await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_26b_selection_installs_only_its_verified_target_and_reuses_it(
+    tmp_path, monkeypatch
+) -> None:
+    contents = b"synthetic-26b-target"
+    real_spec = assets.resolve_gemma_spec(assets.GEMMA_26B_MODEL_ID)
+    spec = replace(
+        real_spec,
+        assets=(
+            assets.GemmaAsset(
+                real_spec.model_filename,
+                len(contents),
+                hashlib.sha256(contents).hexdigest(),
+            ),
+        ),
+    )
+    monkeypatch.setattr(assets, "gemma_26b_spec", lambda: spec)
+    downloads = []
+
+    class Downloader:
+        async def download(self, request, *, cancel_event, on_progress):
+            downloads.append(request.remote_path)
+            destination = request.local_dir / request.remote_path
+            destination.write_bytes(contents)
+            on_progress(HuggingFaceDownloadProgress(len(contents), len(contents)))
+            return destination
+
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation, model="managed_gemma_26b", connection="gpu"
+            ),
+        ),
+    )
+    selection = managed_gemma_selection(settings)
+    install_dir = tmp_path / spec.install_dirname
+
+    async def prepare(**kwargs):
+        await provisioning.ensure_gemma_installed(
+            install_dir=install_dir,
+            **kwargs["provision_kwargs"],
+        )
+        return _readiness(str(kwargs["backend"]))
+
+    statuses = []
+    owner = ManagedGemmaTranslationOwner(
+        runtime=RecordingRuntime(prepare),
+        downloader=Downloader(),
+        status_sink=statuses.append,
+    )
+    try:
+        activation = await owner.prepare(selection)
+        assert activation.readiness.effective_backend == "vulkan"
+        assert owner.snapshot.model_id == assets.GEMMA_26B_MODEL_ID
+        assert install_dir.joinpath(spec.model_filename).read_bytes() == contents
+        assert assets.validate_gemma_install(install_dir, spec=spec).model_id == spec.model_id
+        assert not tmp_path.joinpath(assets.GEMMA_MODEL_ID).exists()
+        assert downloads == [spec.model_filename]
+        assert any(snapshot.state == "downloading" for snapshot in statuses)
+        await owner.prepare(selection)
+        assert downloads == [spec.model_filename]
+    finally:
+        await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_old_model_release_cannot_overtake_new_model_preparation() -> None:
+    release_started = asyncio.Event()
+    release_finish = asyncio.Event()
+
+    class Runtime(RecordingRuntime):
+        async def release(self):
+            release_started.set()
+            await release_finish.wait()
+            await super().release()
+
+    runtime = Runtime(lambda **kwargs: _readiness(str(kwargs["backend"])))
+    owner = ManagedGemmaTranslationOwner(runtime=runtime)
+    first = await owner.prepare(_selection("cpu"))
+    releasing = asyncio.create_task(first.release())
+    await release_started.wait()
+    second = asyncio.create_task(
+        owner.prepare(replace(_selection("gpu"), model_id=assets.GEMMA_26B_MODEL_ID))
+    )
+    await asyncio.sleep(0)
+    assert len(runtime.calls) == 1
+    release_finish.set()
+    await releasing
+    await second
+    assert runtime.calls[-1]["spec"].model_id == assets.GEMMA_26B_MODEL_ID
+    assert owner.snapshot.state == "ready"
+    assert owner.snapshot.model_id == assets.GEMMA_26B_MODEL_ID
+    await first.release()
+    assert runtime.release_count == 1
+    await owner.close()
+
+
+def test_26b_application_selection_rejects_cpu_without_substitution() -> None:
+    with pytest.raises(ValueError, match="requires the GPU backend"):
+        replace(_selection("cpu"), model_id=assets.GEMMA_26B_MODEL_ID)

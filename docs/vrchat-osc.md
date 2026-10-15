@@ -106,6 +106,7 @@
 | 11 | Gemma 4 E4B GPU |
 | 13 | DeepSeek V4.1 Flash |
 | 14 | GPT 6 Luna |
+| 15 | Gemma 4 26B A4B QAT GPU (local, Vulkan only) |
 
 - Used by: `PuriPuly_Translator`
 

@@ -32,9 +32,7 @@ from puripuly_heart.config.provider_values import (
     normalize_owned_referral_id,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.config.translation_values import (
-    TranslationModel,
-)
+from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.hardware_fingerprint import get_raw_hardware_fingerprint
 from puripuly_heart.core.managed_openrouter_broker_client import (
@@ -455,7 +453,7 @@ def compose_managed_account(
         current = settings.canonical
         if (
             current is not None
-            and current.intent.translation.model == TranslationModel.MANAGED_GEMMA.value
+            and current.intent.translation.model in MANAGED_GEMMA_MODELS
             and managed_gemma is not None
         ):
             if sync_local_translation_demand is not None:

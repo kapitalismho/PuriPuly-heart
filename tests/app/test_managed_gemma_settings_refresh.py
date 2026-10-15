@@ -62,8 +62,11 @@ def _transition(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["source", "target", "prompt"])
-async def test_managed_gemma_language_or_prompt_change_rebuilds_prefix(change: str) -> None:
-    previous = _with_model(AppSettingsVNext(), TranslationModel.MANAGED_GEMMA.value)
+@pytest.mark.parametrize("model", ["managed_gemma", "managed_gemma_26b"])
+async def test_managed_gemma_language_or_prompt_change_rebuilds_prefix(
+    change: str, model: str
+) -> None:
+    previous = _with_model(AppSettingsVNext(), model)
     current = previous
     if change == "prompt":
         current = _with_prompt(previous, "changed prompt")

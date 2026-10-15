@@ -40,6 +40,7 @@ class ManagedGemmaTranslationSnapshot:
     worker_exit_code: int | None = None
     status_code: int | None = None
     os_error_code: int | None = None
+    model_id: str | None = None
 
 
 ManagedGemmaTranslationStatusSink = Callable[[ManagedGemmaTranslationSnapshot], None]
@@ -88,6 +89,7 @@ class ManagedGemmaTranslationOwner:
         self._prepare_task: asyncio.Task[ManagedGemmaReadiness] | None = None
         self._linger_task: asyncio.Task[None] | None = None
         self._active_generation: int | None = None
+        self._selected_model_id: str | None = None
         self._closed = False
 
     @property
@@ -112,6 +114,7 @@ class ManagedGemmaTranslationOwner:
             generation = self._generation
             cancel_event = threading.Event()
             self._cancel_event = cancel_event
+            self._selected_model_id = selection.model_id
             self._publish("checking", backend=backend, progress_percent=None)
 
             def on_status(update: GemmaProvisioningUpdate) -> None:
@@ -311,12 +314,13 @@ class ManagedGemmaTranslationOwner:
                 self._publish("idle", backend=None, progress_percent=None)
 
     async def _release_generation(self, generation: int) -> None:
-        if self._active_generation != generation:
-            return
-        self._active_generation = None
-        await self._runtime.release()
-        if not self._closed:
-            self._publish("idle", backend=None, progress_percent=None)
+        async with self._lock:
+            if self._active_generation != generation:
+                return
+            self._active_generation = None
+            await self._runtime.release()
+            if not self._closed:
+                self._publish("idle", backend=None, progress_percent=None)
 
     def _publish(
         self,
@@ -343,6 +347,7 @@ class ManagedGemmaTranslationOwner:
             worker_exit_code=worker_exit_code,
             status_code=status_code,
             os_error_code=os_error_code,
+            model_id=self._selected_model_id if backend is not None else None,
         )
         self._snapshot = snapshot
         if self._status_sink is not None:

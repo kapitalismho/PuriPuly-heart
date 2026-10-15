@@ -363,6 +363,41 @@ GPT 6 Luna (`translation.model: gpt_6_luna`) uses fixed request parameters:
 - The `chatgpt` connection omits `temperature`.
 - These parameters are not editable CLI settings.
 
+### Managed local translation
+
+Discover current values with `settings choices` before applying them:
+
+| `translation.model` | Supported `translation.connection` | Managed model |
+| --- | --- | --- |
+| `managed_gemma` | `cpu`, `gpu` | Gemma 4 E4B IT QAT; existing selection/defaults retained |
+| `managed_gemma_26b` | `gpu` only | Gemma 4 26B A4B IT QAT |
+
+Apply model and connection together through `settings apply`. The normal settings owner persists the selection; observe it again after a fresh process restart. `gemma.prepare` prepares the selected model, and `gemma.cancel` cancels ongoing preparation. Use `models status` for the managed Gemma owner, not ASR-specific `gpu status`. A completed preparation is not evidence of a completed translation; correlate `text submit` admission with the translation events.
+
+Models download on demand with progress, cancellation, checksum validation and atomic installation. No weights are bundled with the installer. The 26B target is `unsloth/gemma-4-26B-A4B-it-qat-GGUF` revision `7b92b5b28818151e8669af2e45e88d6086f490dd`, file `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf`, 14249047104 bytes, SHA-256 `a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891`. It has no draft model or multimodal projector. E4B retains its existing pinned target and CPU MTP drafter.
+
+The managed runtime is pinned to llama.cpp **b11537 / `8e2d31e0eb658d0382d3106a61369dff81f0c080`**. Source runtime files live under `build/llama.cpp/llama.cpp-b11537/{cpu,vulkan}`; installed files live under `_runtime/llama.cpp-b11537/{cpu,vulkan}`. `PURIPULY_HEART_LLAMA_CPP_ROOT` may select a compatible root with those backend subdirectories, but an incompatible executable build/commit is rejected. Distribution archive identities are in [the runtime notice](../third_party/llama.cpp/README.md).
+
+These are fixed deployment profiles, not CLI tuning settings:
+
+| Concern | E4B CPU | E4B GPU | 26B GPU |
+| --- | --- | --- | --- |
+| Loading | `mmap` | `mmap` | `none` |
+| Device / GPU layers | `none` / 0 | Selected Vulkan device / 99 | Selected Vulkan device / 99 |
+| Target / batch threads | Persisted detected profile | 4 / 4 | 4 / 4 |
+| Flash attention | Off | On | On |
+| MTP | E4B drafter, on | Off | Off |
+| Expert placement / cache | Not applied | Not applied | `--n-cpu-moe 24 --moe-cache-mib 2048` |
+| Additional placement controls | Unchanged | Unchanged | `--swa-full --cache-ram 0 --fit off` |
+| Active translations | 1 | Up to 2 | Up to 2 |
+
+All profiles keep total context 4608, three server slots (1536 tokens each), batch/ubatch 512, f16 K/V cache, prompt reuse, reasoning off with budget 0, priority -1, warmup/performance/metrics, no web UI, one HTTP thread and an owned dynamic loopback port. CPU detection uses target `max(1,min(ceil(physical_cores*0.5),6))` and batch `max(1,min(ceil(logical_cores*0.75),12))`; an 8C/16T system detects 4/12. CPU draft threads are 1/1, device `none`, GPU layers 0, f16 K/V, `draft-mtp`, draft maximum/minimum 3/2 and minimum probability 0.0.
+
+Self and Peer share one model/server without sharing mutable generation state. Three retained prefix slots do not enable three simultaneous generations. Manual translations use the same active capacity. Cancellation retains its slot until owned server work is settled; model/backend changes and shutdown drain or cancel owned work before replacement.
+
+E4B may fall back internally from GPU to its serialized CPU/MTP profile. **26B never falls back to CPU or E4B.** Resolve the reported Vulkan/device/resource problem or explicitly select another supported model/backend. Neither managed model uses a remote translation-provider fallback.
+
+
 ### Other settings
 
 The finite command catalog also includes:

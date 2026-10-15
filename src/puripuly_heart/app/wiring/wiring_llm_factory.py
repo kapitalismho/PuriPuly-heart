@@ -40,6 +40,8 @@ from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_OPENROUTER_MANAGED_QQ,
     CREDENTIAL_REF_QWEN_BEIJING,
     CREDENTIAL_REF_QWEN_SINGAPORE,
+    MANAGED_GEMMA_26B_MODEL,
+    MANAGED_GEMMA_MODEL,
     OPENAI_MODEL_GPT_6_LUNA,
     PROVIDER_CHATGPT,
     PROVIDER_DEEPSEEK,
@@ -63,6 +65,11 @@ from puripuly_heart.core.chatgpt.session import (
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.local_translation.assets import (
+    GEMMA_26B_MODEL_ID,
+    GEMMA_MODEL_ID,
+    resolve_gemma_spec,
+)
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.managed_openrouter_release import OpenRouterReleaseRuntimeConfig
@@ -713,6 +720,12 @@ def _provider_from_resolved_target(
         return ManagedGemmaLLMProvider(
             runtime=managed_gemma_runtime,
             backend=backend,
+            spec=resolve_gemma_spec(
+                {
+                    MANAGED_GEMMA_MODEL: GEMMA_MODEL_ID,
+                    MANAGED_GEMMA_26B_MODEL: GEMMA_26B_MODEL_ID,
+                }[target.model]
+            ),
             vulkan_device=vulkan_device,
             release_runtime=managed_gemma_release,
             runtime_logging=runtime_logging,
@@ -938,6 +951,8 @@ def create_llm_provider_from_resolved_config(
             runtime_logging=runtime_logging,
             request_admission=base if isinstance(base, ChatGptPlanLLMProvider) else None,
         )
+    if config.primary.provider == PROVIDER_MANAGED_GEMMA:
+        return base
     return SemaphoreLLMProvider(
         inner=base,
         semaphore=asyncio.Semaphore(config.concurrency_limit),

@@ -375,6 +375,13 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
     assert managed["managed_gemma_gpu"].section == t(
         "settings.translation_model.section.gpu_inference"
     )
+    gemma_26b = managed["managed_gemma_26b"]
+    assert gemma_26b.label == t("provider.managed_gemma_26b")
+    assert gemma_26b.label != managed["managed_gemma_gpu"].label
+    assert gemma_26b.description == t("settings.translation_model.managed_gemma_26b.description")
+    assert gemma_26b.description
+    assert gemma_26b.section == t("settings.translation_model.section.gpu_inference")
+    assert not gemma_26b.disabled
 
     cloud_gemma = next(
         option for option in options if option.value == TranslationModel.GEMMA4_26B_31B.value

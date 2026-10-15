@@ -42,17 +42,20 @@ LICENSE_REQUIRED_MARKERS = (
 KNOWN_MODEL_FILENAMES = {
     "gemma-4-e4b-it-qat-ud-q4_k_xl.gguf",
     "mtp-gemma-4-e4b-it.gguf",
+    "gemma-4-26b-a4b-it-qat-ud-q4_k_xl.gguf",
     "gemma-4-12b-it-qat-ud-q4_k_xl.gguf",
 }
 INSTALLER_FORBIDDEN_IDENTITIES = KNOWN_MODEL_FILENAMES | {
     "unsloth/gemma-4-e4b-it-qat-gguf",
+    "unsloth/gemma-4-26b-a4b-it-qat-gguf",
     "unsloth/gemma-4-12b-it-qat-gguf",
 }
 COMMON_REQUIRED_FILES = {
     "ggml-base.dll",
     "ggml-cpu-x64.dll",
     "ggml.dll",
-    "libomp140.x86_64.dll",
+    "libomp.dll",
+    "license-llvm-openmp",
     "llama-common.dll",
     "llama-server-impl.dll",
     "llama-server.exe",
@@ -569,9 +572,9 @@ def verify_package(package_root: Path, *, launch: bool = False) -> dict[str, obj
                     f"{backend} packaged llama.cpp server failed with exit code "
                     f"{completed.returncode}: {output.strip()}"
                 )
-            if f"build {LLAMA_CPP_BUILD.removeprefix('b')}" not in output:
+            if re.search(rf"\bbuild {LLAMA_CPP_BUILD.removeprefix('b')}\b", output) is None:
                 raise RuntimeError(f"{backend} packaged llama.cpp server build identity mismatch")
-            if f"commit {LLAMA_CPP_COMMIT[:9]}" not in output:
+            if re.search(rf"\bcommit {LLAMA_CPP_COMMIT[:9]}\b", output) is None:
                 raise RuntimeError(f"{backend} packaged llama.cpp server commit identity mismatch")
             launched_backends.append(backend)
     return {

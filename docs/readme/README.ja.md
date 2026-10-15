@@ -176,7 +176,10 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 | モデル | 実行環境 | 量子化 |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | GPU専用 (Vulkan) | UD Q4_K_XL |
 | OpenAI互換API | — | — |
+
+モデルはインストーラーに含まれず、選択したモデルが必要になったときにダウンロードされます。26Bのダウンロードは約14.25 GBです。モデル選択は再起動後も保持されます。26BはVulkan GPU専用で、初期化に失敗してもCPUやE4Bへ自動切り替えしません。GPUでは1つのランタイムでSelf/Peerの最大2リクエストを同時処理し、CPUでは順番に処理します。[固定プロファイルと管理対象ローカル翻訳の契約](../cli.md#managed-local-translation)を参照してください。
 
 ---
 

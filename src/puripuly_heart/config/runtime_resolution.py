@@ -53,6 +53,7 @@ TRANSLATION_MODEL_GPT_6_LUNA: Final = "gpt_6_luna"
 TRANSLATION_MODEL_QWEN_38_FLASH: Final = "qwen38_flash"
 TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH: Final = "openrouter_qwen35_flash"
 TRANSLATION_MODEL_MANAGED_GEMMA: Final = "managed_gemma"
+TRANSLATION_MODEL_MANAGED_GEMMA_26B: Final = "managed_gemma_26b"
 TRANSLATION_MODEL_LOCAL_LLM: Final = "local_llm"
 TRANSLATION_MODEL_CUSTOM_HTTP: Final = "custom_http"
 
@@ -69,6 +70,7 @@ TranslationModelName: TypeAlias = Literal[
     "qwen38_flash",
     "openrouter_qwen35_flash",
     "managed_gemma",
+    "managed_gemma_26b",
     "local_llm",
     "custom_http",
 ]
@@ -81,6 +83,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_QWEN_38_FLASH,
     TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH,
     TRANSLATION_MODEL_MANAGED_GEMMA,
+    TRANSLATION_MODEL_MANAGED_GEMMA_26B,
     TRANSLATION_MODEL_LOCAL_LLM,
     TRANSLATION_MODEL_CUSTOM_HTTP,
 )
@@ -150,6 +153,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
             TRANSLATION_CONNECTION_CPU,
             TRANSLATION_CONNECTION_GPU,
         ),
+        TRANSLATION_MODEL_MANAGED_GEMMA_26B: (TRANSLATION_CONNECTION_GPU,),
         TRANSLATION_MODEL_LOCAL_LLM: (TRANSLATION_CONNECTION_OLLAMA,),
         TRANSLATION_MODEL_CUSTOM_HTTP: (TRANSLATION_CONNECTION_CUSTOM_HTTP,),
     }
@@ -207,6 +211,7 @@ LOCAL_LLM_BACKEND_OLLAMA: Final = "ollama"
 LOCAL_LLM_DEFAULT_BASE_URL: Final = "http://127.0.0.1:11434/v1"
 LOCAL_LLM_DEFAULT_MODEL: Final = "llama3.1:8b"
 MANAGED_GEMMA_MODEL: Final = "puripuly-gemma-4-e4b-q4"
+MANAGED_GEMMA_26B_MODEL: Final = "puripuly-gemma-4-26b-a4b-q4"
 QWEN_REGION_BEIJING: Final = "beijing"
 QWEN_REGION_SINGAPORE: Final = "singapore"
 
@@ -1474,10 +1479,17 @@ def _resolve_translation_target(
             credential=_no_credential(),
         )
 
-    if translation.model == TRANSLATION_MODEL_MANAGED_GEMMA:
+    if translation.model in (
+        TRANSLATION_MODEL_MANAGED_GEMMA,
+        TRANSLATION_MODEL_MANAGED_GEMMA_26B,
+    ):
         return _resolved_direct_provider_target(
             provider=PROVIDER_MANAGED_GEMMA,
-            model=MANAGED_GEMMA_MODEL,
+            model=(
+                MANAGED_GEMMA_26B_MODEL
+                if translation.model == TRANSLATION_MODEL_MANAGED_GEMMA_26B
+                else MANAGED_GEMMA_MODEL
+            ),
             credential=_no_credential(),
             provider_options={"backend": translation.connection},
         )
@@ -1674,6 +1686,7 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
     if translation.model not in (
         TRANSLATION_MODEL_CUSTOM_HTTP,
         TRANSLATION_MODEL_MANAGED_GEMMA,
+        TRANSLATION_MODEL_MANAGED_GEMMA_26B,
         TRANSLATION_MODEL_LOCAL_LLM,
     ):
         fallback_plan = _fallback_plan_for_target(primary)
@@ -1731,6 +1744,7 @@ __all__ = [
     "LOCAL_LLM_DEFAULT_BASE_URL",
     "LOCAL_LLM_DEFAULT_MODEL",
     "MANAGED_GEMMA_MODEL",
+    "MANAGED_GEMMA_26B_MODEL",
     "LLM_PROVIDERS",
     "OPENROUTER_SOURCE_BYOK",
     "OPENROUTER_MANAGED_CREDENTIAL_KINDS",
@@ -1807,6 +1821,7 @@ __all__ = [
     "TRANSLATION_MODEL_CUSTOM_HTTP",
     "TRANSLATION_MODEL_LOCAL_LLM",
     "TRANSLATION_MODEL_MANAGED_GEMMA",
+    "TRANSLATION_MODEL_MANAGED_GEMMA_26B",
     "TRANSLATION_MODEL_OPENROUTER_QWEN_35_FLASH",
     "TRANSLATION_MODELS",
     "TranslationConnectionName",

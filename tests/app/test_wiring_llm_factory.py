@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict, replace
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from puripuly_heart.app.wiring_managed_auth_factory import (
@@ -172,10 +174,10 @@ async def test_managed_gemma_target_uses_injected_runtime_and_activation_release
         managed_gemma_release=release,
     )
 
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, ManagedGemmaLLMProvider)
-    assert provider.inner.runtime is runtime
-    assert provider.inner.backend == "gpu"
+    assert isinstance(provider, ManagedGemmaLLMProvider)
+    assert provider.runtime is runtime
+    assert provider.backend == "gpu"
+    assert provider.spec.model_id == "gemma-4-e4b-it-qat-ud-q4-k-xl"
 
     await provider.close()
     await provider.close()
@@ -403,3 +405,62 @@ def test_combined_gemma_byok_without_key_does_not_fall_back_to_managed(
             secrets=secrets,
             managed_release_service=object(),
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("model", "model_id"),
+    [
+        ("managed_gemma", "gemma-4-e4b-it-qat-ud-q4-k-xl"),
+        ("managed_gemma_26b", "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"),
+    ],
+)
+async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_limit_one(
+    model: str, model_id: str
+) -> None:
+    both_entered = asyncio.Event()
+    finish = asyncio.Event()
+    calls = []
+
+    class Runtime:
+        async def translate(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 2:
+                both_entered.set()
+            await finish.wait()
+            return SimpleNamespace(text=kwargs["user_message"])
+
+    provider = create_llm_provider_from_resolved_config(
+        resolve_llm_config(
+            RuntimeResolutionInput(
+                translation=TranslationRuntimeIntent(
+                    model=model, connection="gpu", concurrency_limit=1
+                )
+            )
+        ),
+        secrets=InMemorySecretStore(),
+        managed_gemma_runtime=Runtime(),
+    )
+    identities = [uuid4(), uuid4()]
+    tasks = [
+        asyncio.create_task(
+            provider.translate(
+                utterance_id=identity,
+                text=f"synthetic {index}",
+                system_prompt="translate",
+                source_language="en",
+                target_language="ko",
+            )
+        )
+        for index, identity in enumerate(identities)
+    ]
+    try:
+        await asyncio.wait_for(both_entered.wait(), timeout=2)
+        assert all(call["spec"].model_id == model_id for call in calls)
+        finish.set()
+        results = await asyncio.gather(*tasks)
+        assert [result.utterance_id for result in results] == identities
+        assert results[0].text != results[1].text
+    finally:
+        finish.set()
+        await asyncio.gather(*tasks, return_exceptions=True)

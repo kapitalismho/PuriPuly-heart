@@ -122,6 +122,7 @@ from puripuly_heart.config.resolved import (
     VAD_ONSET_MIN,
 )
 from puripuly_heart.config.translation_values import (
+    MANAGED_GEMMA_MODELS,
     TranslationConnection,
     TranslationModel,
     default_translation_connection,
@@ -288,6 +289,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
+    TranslationModel.MANAGED_GEMMA_26B: "provider.managed_gemma_26b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
     TranslationModel.DEEPSEEK_V4_FLASH: "provider.deepseek_v4_flash",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "provider.deepseek_v4_flash_41",
@@ -313,6 +315,7 @@ _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
 }
 _TRANSLATION_MODELS = (
     TranslationModel.MANAGED_GEMMA,
+    TranslationModel.MANAGED_GEMMA_26B,
     TranslationModel.GEMMA4_26B_31B,
     TranslationModel.DEEPSEEK_V4_FLASH,
     TranslationModel.DEEPSEEK_V4_FLASH_41,
@@ -331,6 +334,7 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
     TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.gpu_inference",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.others",
     TranslationModel.DEEPSEEK_V4_FLASH_41: "settings.translation_model.section.recommended_cloud",
@@ -2648,7 +2652,7 @@ class SettingsView(ft.Column):
     def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
         return (
-            model == TranslationModel.MANAGED_GEMMA
+            model in MANAGED_GEMMA_MODELS
             and settings.translation.connection == TranslationConnection.GPU
         )
 
@@ -4390,7 +4394,7 @@ class SettingsView(ft.Column):
         self._deepseek_key.visible = bool(not is_custom_http and llm == LLMProviderName.DEEPSEEK)
         self._sync_openrouter_pkce_button_state(settings)
         self._translation_connection_row.visible = (
-            not is_custom_http and settings.translation.model != TranslationModel.MANAGED_GEMMA
+            not is_custom_http and settings.translation.model not in MANAGED_GEMMA_MODELS
         )
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
@@ -4948,7 +4952,7 @@ class SettingsView(ft.Column):
                 openrouter_alias = OpenRouterSelectionAlias.GEMINI_FLASH_BYOK
         elif model == TranslationModel.QWEN_38_FLASH:
             llm_provider = LLMProviderName.QWEN
-        elif model == TranslationModel.MANAGED_GEMMA:
+        elif model in MANAGED_GEMMA_MODELS:
             llm_provider = LLMProviderName.MANAGED_GEMMA
         elif model == TranslationModel.LOCAL_LLM:
             llm_provider = LLMProviderName.LOCAL_LLM
@@ -5019,8 +5023,8 @@ class SettingsView(ft.Column):
 
         if (
             connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
-            or model == TranslationModel.MANAGED_GEMMA
-            or old_model == TranslationModel.MANAGED_GEMMA
+            or model in MANAGED_GEMMA_MODELS
+            or old_model in MANAGED_GEMMA_MODELS
         ) and getattr(self, "on_providers_changed", None) is not None:
             self.on_providers_changed()
 
@@ -5089,7 +5093,7 @@ class SettingsView(ft.Column):
             if display_settings is not None
             else TranslationModel.GEMMA4_26B_31B
         )
-        if model == TranslationModel.MANAGED_GEMMA:
+        if model in MANAGED_GEMMA_MODELS:
             return
         connections = supported_translation_connections(model)
         options = [
