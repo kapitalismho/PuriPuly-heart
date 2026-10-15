@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
 
 from puripuly_heart.app.wiring import wiring_provider_runtime
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
@@ -21,7 +22,7 @@ from puripuly_heart.config.settings_vnext.serialization import to_dict
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
-from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.messages import ErrorDiagnostics, TransactionResult
 from puripuly_heart.core.runtime_logging import RuntimeLoggingSinks
 from puripuly_heart.core.translation_backend import LlmTranslationBackend, TranslationBackendRequest
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
@@ -643,4 +644,194 @@ async def test_failed_managed_to_byok_apply_clears_managed_usage_view(composed, 
         assert presentation.projections["managed_key"]["visible"] is False
         assert presentation.projections["managed_key"]["remaining_percent"] is None
         _assert_backend_identity(_runtime(app), None)
+        await _assert_disabled(app)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ("peer", "self", "gpu", "convergence"))
+async def test_llm_and_stt_failure_preserves_both_causes_and_unforced_recovery(
+    composed, monkeypatch, stage
+):
+    route = ROUTES[0]
+    async with composed(route, initial=OLD_CREDENTIAL) as (app, _store, requests, _path):
+        owner = app._provider.provider_application.runtime
+        llm_diagnostic = ErrorDiagnostics(
+            component="provider.llm",
+            operation="provider_construction",
+            code="provider.auth",
+            category="auth",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=401,
+            retry_after_ms=None,
+            fields={},
+        )
+        stt_diagnostic = ErrorDiagnostics(
+            component="provider.stt",
+            operation="provider_application",
+            code="stt.provider_not_ready",
+            category="lifecycle",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
+        )
+
+        def fail_backend(**_kwargs):
+            error = RuntimeError("controlled provider construction failure")
+            error.failure_diagnostics = llm_diagnostic
+            raise RuntimeError("controlled provider construction wrapper") from error
+
+        async def fail_stt(*_args):
+            error = RuntimeError("controlled independent runtime failure")
+            error.failure_diagnostics = stt_diagnostic
+            raise error
+
+        build_plan = type(owner).build_plan
+
+        def combined_plan(self, *args, **kwargs):
+            return replace(
+                build_plan(self, *args, **kwargs),
+                should_refresh_peer=stage == "peer",
+                should_refresh_self_stt=stage == "self",
+                coordinated_gpu_restart=stage == "gpu",
+            )
+
+        with monkeypatch.context() as failure:
+            failure.setattr(type(owner), "build_plan", combined_plan)
+            failure.setattr(wiring_provider_runtime, "create_translation_backend", fail_backend)
+            if stage == "convergence":
+                state = owner.state_provider
+                failure.setattr(owner, "self_runtime_convergence", lambda _settings: False)
+                failure.setattr(
+                    owner,
+                    "state_provider",
+                    lambda settings: replace(
+                        state(settings), self_failure_diagnostics=stt_diagnostic
+                    ),
+                )
+            else:
+                failure.setattr(
+                    owner,
+                    {"peer": "refresh_peer", "self": "refresh_self_stt", "gpu": "recover_gpu"}[
+                        stage
+                    ],
+                    fail_stt,
+                )
+            result = await _submit(
+                app, "secrets.set", {"name": route.secret_key, "value": NEW_CREDENTIAL}
+            )
+
+        assert result["status"] == "degraded"
+        transaction = result["transaction"]
+        assert transaction["diagnostics"]["diagnostic_id"] == llm_diagnostic.diagnostic_id
+        assert transaction["diagnostics"]["code"] == llm_diagnostic.code
+        secondary = transaction["secondary_diagnostics"]
+        assert len(secondary) == 1
+        assert secondary[0]["diagnostic_id"] == stt_diagnostic.diagnostic_id
+        assert secondary[0]["code"] == stt_diagnostic.code
+        assert secondary[0]["cause_id"] == llm_diagnostic.diagnostic_id
+        _assert_saved_credential(app, route.secret_key, NEW_CREDENTIAL)
+        _assert_backend_identity(_runtime(app), None)
+        await _assert_disabled(app)
+
+        assert await app.apply_providers(persist_settings=False) is True
+        await _assert_live_request(app, route, NEW_CREDENTIAL, requests)
+        assert _verification(app, route).status == "unknown"
+        await _assert_disabled(app)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("restoration_fails", (False, True))
+async def test_committed_runtime_resync_retains_both_failures_and_restore_cause(
+    composed, monkeypatch, restoration_fails
+):
+    route = ROUTES[0]
+    async with composed(route, initial=OLD_CREDENTIAL) as (app, store, requests, _path):
+        application = app._provider.provider_application
+        owner = application.runtime
+        current = app.compatibility_settings()
+        store.set(route.secret_key, NEW_CREDENTIAL)
+        save_diagnostic = ErrorDiagnostics(
+            component="settings_repository",
+            operation="save",
+            code="settings_save_failed",
+            category="transaction",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
+        )
+        llm_diagnostic = replace(
+            save_diagnostic,
+            diagnostic_id=uuid4().hex,
+            component="provider.llm",
+            code="provider.auth",
+            category="auth",
+            status_code=401,
+        )
+        stt_diagnostic = replace(
+            save_diagnostic,
+            diagnostic_id=uuid4().hex,
+            component="provider.stt",
+            code="stt.provider_not_ready",
+            category="lifecycle",
+        )
+        failure_result = TransactionResult(
+            status="settings_commit_success_runtime_degraded",
+            message=None,
+            diagnostics=save_diagnostic,
+        )
+
+        def fail_backend(**_kwargs):
+            error = RuntimeError("controlled provider construction failure")
+            error.failure_diagnostics = llm_diagnostic
+            raise RuntimeError("controlled provider construction wrapper") from error
+
+        async def fail_stt():
+            error = RuntimeError("controlled independent runtime failure")
+            error.failure_diagnostics = stt_diagnostic
+            raise error
+
+        sync_memory = application.sync_memory
+        sync_attempts = 0
+
+        def restore(settings):
+            nonlocal sync_attempts
+            sync_attempts += 1
+            if restoration_fails and sync_attempts == 2:
+                raise RuntimeError("controlled memory restoration failure")
+            sync_memory(settings)
+
+        with monkeypatch.context() as failure:
+            failure.setattr(wiring_provider_runtime, "create_translation_backend", fail_backend)
+            failure.setattr(owner, "refresh_self_stt", fail_stt)
+            failure.setattr(application, "sync_memory", restore)
+            await application._resync_committed_provider_runtime(
+                base_settings=current,
+                committed_settings=current,
+                plan=ProviderRuntimeApplyPlan(True, False, True),
+                failure_result=failure_result,
+            )
+
+        result = application.results.current
+        _assert_private(result)
+        assert result.status == "settings_commit_success_runtime_degraded"
+        assert result.diagnostics.diagnostic_id == save_diagnostic.diagnostic_id
+        secondary = result.secondary_diagnostics
+        assert len(secondary) == (3 if restoration_fails else 2)
+        assert secondary[0].diagnostic_id == llm_diagnostic.diagnostic_id
+        assert secondary[0].cause_id == save_diagnostic.diagnostic_id
+        assert secondary[1].diagnostic_id == stt_diagnostic.diagnostic_id
+        assert secondary[1].cause_id == llm_diagnostic.diagnostic_id
+        if restoration_fails:
+            assert secondary[2].code == "settings_memory_restore_failed"
+            assert secondary[2].cause_id == llm_diagnostic.diagnostic_id
+        _assert_saved_credential(app, route.secret_key, NEW_CREDENTIAL)
+        _assert_backend_identity(_runtime(app), None)
+
+        assert await app.apply_providers(persist_settings=False) is True
+        await _assert_live_request(app, route, NEW_CREDENTIAL, requests)
         await _assert_disabled(app)

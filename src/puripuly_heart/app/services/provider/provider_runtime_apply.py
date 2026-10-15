@@ -97,6 +97,13 @@ class ProviderRuntimeConvergenceError(RuntimeError):
         super().__init__(message)
 
 
+class _ProviderRuntimeApplyFailures(RuntimeError):
+    def __init__(self, primary: Exception, secondary: Exception) -> None:
+        self.primary = primary
+        self.secondary = secondary
+        super().__init__("Independent provider runtime applications failed")
+
+
 @dataclass(frozen=True, slots=True)
 class LlmProviderRebuildContext:
     settings: object
@@ -222,23 +229,23 @@ class ProviderRuntimeOwner:
                 await self.rebuild_llm()
             except Exception as exc:
                 llm_error = exc
-        if plan.coordinated_gpu_restart:
-            await self.recover_gpu(settings, plan)
+        try:
+            if plan.coordinated_gpu_restart:
+                await self.recover_gpu(settings, plan)
+            else:
+                if plan.should_refresh_peer:
+                    await self.refresh_peer()
+                if plan.should_refresh_self_stt:
+                    await self.refresh_self_stt()
             self._require_stt_runtime_convergence(settings)
             self.signature_sink(settings)
+        except Exception as exc:
+            if llm_error is not None:
+                raise _ProviderRuntimeApplyFailures(llm_error, exc) from llm_error
+            raise
+        finally:
             if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
                 self.llm_retry_sink()
-            if llm_error is not None:
-                raise llm_error
-            return
-        if plan.should_refresh_peer:
-            await self.refresh_peer()
-        if plan.should_refresh_self_stt:
-            await self.refresh_self_stt()
-        self._require_stt_runtime_convergence(settings)
-        self.signature_sink(settings)
-        if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
-            self.llm_retry_sink()
         if llm_error is not None:
             raise llm_error
 
@@ -299,6 +306,8 @@ def _settings_mutation_diagnostics(
     surface: str = "translation_provider",
     exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
+    if isinstance(exception, _ProviderRuntimeApplyFailures):
+        exception = exception.primary
     current = exception
     for _ in range(4):
         if current is None:
@@ -352,6 +361,33 @@ def _exception_code(exc: BaseException, fallback: str) -> str:
     if isinstance(exc, SelfCaptureRuntimeApplyError):
         return SelfCaptureRuntimeApplyError.code
     return fallback
+
+
+def _settings_mutation_secondary_diagnostics(
+    *,
+    primary: ErrorDiagnostics,
+    component: str,
+    operation: str,
+    code: str,
+    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
+    surface: str = "translation_provider",
+    exception: BaseException | None = None,
+) -> tuple[ErrorDiagnostics, ...]:
+    if not isinstance(exception, _ProviderRuntimeApplyFailures):
+        return ()
+    return (
+        replace(
+            _settings_mutation_diagnostics(
+                component=component,
+                operation=operation,
+                code=_exception_code(exception.secondary, code),
+                category=category,
+                surface=surface,
+                exception=exception.secondary,
+            ),
+            cause_id=primary.diagnostic_id,
+        ),
+    )
 
 
 def _runtime_apply_failed_result(
@@ -572,6 +608,24 @@ class ProviderRuntimeApplyAdapter:
         try:
             await self.owner.apply(self.settings, self.plan)
         except Exception as exc:
+            primary = exc.primary if isinstance(exc, _ProviderRuntimeApplyFailures) else exc
+            diagnostics = _settings_mutation_diagnostics(
+                component="provider_application",
+                operation=self.operation,
+                code=_exception_code(primary, "provider_runtime_apply_exception"),
+                category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
+                surface=self.surface,
+                exception=primary,
+            )
+            secondary = _settings_mutation_secondary_diagnostics(
+                primary=diagnostics,
+                component="provider_application",
+                operation=self.operation,
+                code="provider_runtime_apply_exception",
+                category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
+                surface=self.surface,
+                exception=exc,
+            )
             return RuntimeApplyResult(
                 status=RUNTIME_APPLY_STATUS_FAILED,
                 message=UserMessageRef(
@@ -579,14 +633,8 @@ class ProviderRuntimeApplyAdapter:
                     params={"phase": "runtime_apply"},
                     severity=SEVERITY_WARNING,
                 ),
-                diagnostics=_settings_mutation_diagnostics(
-                    component="provider_application",
-                    operation=self.operation,
-                    code=_exception_code(exc, "provider_runtime_apply_exception"),
-                    category=DIAGNOSTIC_CATEGORY_LIFECYCLE,
-                    surface=self.surface,
-                    exception=exc,
-                ),
+                diagnostics=diagnostics,
+                secondary_diagnostics=secondary,
             )
         unavailable_result = _provider_runtime_apply_unavailable_result(
             owner=self.owner,

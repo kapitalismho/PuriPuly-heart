@@ -499,6 +499,7 @@ Saving the active DeepSeek, OpenAI, Gemini, or OpenRouter BYOK translation key a
 - Secret values are never returned in settings, query results, operation receipts, or logs.
 - Delete removes the secret from local storage.
 - If a key is persisted but runtime application fails, the operation reports `degraded` with the retained failure cause. The stored key remains saved and can still be verified separately; neither a successful save nor a successful key probe claims that the live provider adopted it.
+- If independent STT/GPU application also fails, its cause is retained as a linked secondary diagnostic. The missing translation backend remains eligible for recovery through an ordinary provider apply.
 
 Verification is a limited key/protocol probe, not proof of healthy live recognition:
 
