@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "run_count": 49,
+  "completed_requests": 2156,
+  "assertions": [
+    "All n24\u2013n18 curve configurations collected",
+    "Every completed run:44 requests;2/12/30 phases;EOS/bounded automated checks;graceful0;matching identities/P/C;Self0/Peer1/slot2unused;15 native overlaps;effective controls absent;exact PID/adapter memory observed;cache executed;Vulkan_Host buffers"
+  ],
+  "failed_runs_retained": [],
+  "manual_quality_review": "Separate required record, not replaced by automated checks"
+}

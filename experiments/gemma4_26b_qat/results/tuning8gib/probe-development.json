@@ -1,0 +1,9 @@
+{
+  "scope": "Experimental helper development only; no product tests/build/type-check claims.",
+  "failures": [
+    {"command": "<APP_PYTHON> experiments/gemma4_26b_qat/summarize_tuning8gib.py", "stage": "First contaminated control aggregation", "exit_code": 1, "error": "SyntaxError: closing parenthesis ')' does not match opening parenthesis '{' at the compact output print", "repair": "Closed the result dictionary correctly. Subsequent actual aggregation exited0. No runtime measurement, assertion or workload was changed."},
+    {"command": "<APP_PYTHON> experiments/gemma4_26b_qat/summarize_tuning8gib.py", "stage": "Contaminated control cache parsing", "exit_code": 0, "observed_incomplete_evidence": "cache_used false: group slot parser initially assumed one space after q4_0 colon", "repair": "Accepted native whitespace with :\\s*. Full sanitized native log already retained the slot line. Explicit .cache-correction.json sidecars preserve the original parse and recovered evidence. No model rerun was used to hide the parser omission."}
+  ],
+  "unchanged_controls": "Original CASES, request routine and Self/Peer workload retained. Clean control identities/P/C were compared to pinned #245 separately in clean/workload-inheritance.json.",
+  "measurement_exclusions": "All pre-restart measurements excluded by owner report independently of these helper repairs; see contamination.json."
+}

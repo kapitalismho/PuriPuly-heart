@@ -1,0 +1,267 @@
+{
+  "observed_utc": "2026-10-15T23:17:25.809617+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 16694800384,
+    "system_committed_bytes": 56759115776,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 20123971584,
+    "device_gpu_dedicated_bytes": 4271906816.0,
+    "device_gpu_shared_bytes": 524697600.0,
+    "device_gpu_committed_bytes": 5095649280.0,
+    "system_pages_input_per_second": 0.0,
+    "system_page_reads_per_second": 0.0
+  },
+  "counter_errors": {},
+  "owned_exits": [
+    {
+      "run": "tuning8gib-clean-n24-c2048-a1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2048-curve",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2048-curve",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c2048-curve",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n20-c2048-curve",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n19-c2048-curve",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n18-c2048-curve",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2948-target1-s923",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2952-target1-s924",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2540-target1-s795",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2543-target1-s796",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2132-target1-s667",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2135-target1-s668",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c1723-target1-s539",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c1727-target1-s540",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n20-c1315-target1-s411",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n20-c1318-target1-s412",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n20-c1321-target1-s413",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n19-c907-target1-s283",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n19-c910-target1-s284",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n19-c913-target1-s285",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n18-c498-target1-s155",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n18-c501-target1-s156",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n18-c505-target1-s157",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2048-a2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2948-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2540-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2132-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c1723-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c3051-band1-s955",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c3054-band1-s956",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2642-band1-s827",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2645-band1-s828",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2234-band1-s699",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2237-band1-s700",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c1825-band1-s571",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c1829-band1-s572",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2890-refine-r1",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n21-c1723-r3",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2132-r3",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n22-c2048-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2642-b2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2540-r3",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n23-c2048-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c3051-b2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2948-r3",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2890-refine-r2",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2048-a3",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "run": "tuning8gib-clean-n24-c2945-target2-s922",
+      "exit": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    }
+  ],
+  "owned_native_run_count": 49,
+  "owned_observers": "Per-run sampler/thread and no-touch Windows observer handles closed by lifecycle finally blocks; no long-lived observer service created.",
+  "unrelated_process_policy": "No unrelated application/Python/model process stopped or modified. Existing app processes remain outside ownership.",
+  "cleanup": "Unique raw evidence directories intentionally retained externally. No app, GUI, audio, UDP sink or other service created. No model server remains observed."
+}

@@ -1,0 +1,275 @@
+{
+  "result": "Completed read-only source/evidence research. No repository changes, model runs, builds, tests, or benchmarks performed. Arithmetic below was computed offline from pinned source and retained #245 geometry; calculated values are not new runtime observations.",
+  "critical_findings": [
+    {
+      "finding": "The native cache already logs usable expert-slot count. Historical public run JSON drops that line during extraction; verbosity is not the problem.",
+      "evidence": "Pinned llama-moe-cache.cpp:443–448 emits effective device cache MiB, then a separate `impl: 24 layers, q4_0: 640 slots (20.8%)`-shaped group line. Existing run_matrix.py's placement_cache_log filter retains `MoE cache` and `llama_moe_cache:` but not `layers, ... slots (...)`. Its current location moved from line279 to286 during sibling edits.",
+      "consequence": "Retain both allocation and group lines, with original raw-log line references. HTTP server `n_slots = 3` is unrelated to expert-cache slots."
+    },
+    {
+      "finding": "#254's warning-only undersized-cache wording is incomplete for this model.",
+      "evidence": "llama-moe-cache.cpp:321–331 warns and disables each undersized group, then throws `MoE cache is too small to hold the experts of one token` when no enabled group remains. llama-context.cpp:468–469 creates the cache without a local fallback; :3994–3998 catches context-initialization exception, logs failure, and returns nullptr.",
+      "consequence": "For this single-group model, a positive request below the minimum should be recorded as cache-initialization failure, not assumed to produce a successful cache-off server. Multi-group partial disablement can be warning-only. Preserve actual outcomes; never treat a disabled/failed cache as a small enabled-cache measurement."
+    }
+  ],
+  "source_backed_semantics": {
+    "grouping": "Only layers with all expert weight tensors in host WEIGHTS buffers qualify; they are assigned to the layer's GPU and grouped by identical expert tensor layout. Device budgets split by configured tensor split or free memory; groups on each device split by host-expert byte count. For this one-GPU homogeneous model all N host-expert layers share one global LRU/bank pair, not N separate caches and not one cache per Self/Peer slot.",
+    "slot_identity": "One usable slot stores one expert belonging to one particular layer, keyed as layer*n_expert+expert. The fused gate/up and down planes for that expert share the slot index. Capacity is N*128 usable slots; the actual allocation includes one additional padding plane in each bank, even on Vulkan.",
+    "general_allocation_formula": "A_g(s)=sum_t PAD(t.nb[2]*(s+1), backend_alignment). Select the largest integer s<=group_layers*n_expert such that A_g(s)<=allocated_group_budget. Disable the group if s<n_expert_used_max. Actual logged device size is the backend buffer size after allocation, not requested budget.",
+    "fixed_model_geometry": {
+      "expert_count_per_layer": 128,
+      "active_experts": 8,
+      "fused_gate_up_bytes_per_plane": 2230272,
+      "down_bytes_per_plane": 1115136,
+      "bytes_per_usable_slot_increment": 3345408,
+      "mib_per_slot_increment": 3.1904296875,
+      "homogeneous_group_formula": "For the retained geometry/alignment, A(s)=(s+1)*3345408 bytes. This reproduces historical rounded native sizes. Reconcile against actual native size and slot count in every new run rather than assuming backend allocation behavior.",
+      "usable_slots_from_integer_request": "s=min(N*128, floor(requested_MiB*1048576/3345408)-1), provided s>=8.",
+      "canonical_integer_request_for_s_slots": "R(s)=ceil((s+1)*3345408/1048576). All integer requests R(s)..R(s+1)-1 yield the same effective cache.",
+      "minimum_enabled": {
+        "usable_slots": 8,
+        "allocated_bytes_calculated": 30108672,
+        "effective_mib_calculated": 28.7138671875,
+        "minimum_integer_requested_mib": 29
+      },
+      "historical_control": {
+        "requested_mib": 2048,
+        "usable_slots_calculated": 640,
+        "allocated_bytes_calculated": 2144406528,
+        "effective_mib_calculated": 2045.0654296875,
+        "native_logged_effective_mib": 2045.07,
+        "equivalent_integer_request_range": [
+          2046,
+          2048
+        ]
+      },
+      "historical_large_cache": {
+        "requested_mib": 3072,
+        "usable_slots_calculated": 961,
+        "allocated_bytes_calculated": 3218282496,
+        "effective_mib_calculated": 3069.193359375,
+        "native_logged_effective_mib": 3069.19,
+        "equivalent_integer_request_range": [
+          3070,
+          3072
+        ]
+      }
+    },
+    "execution_limits": "get_slot_map bypasses zero tokens, >32 tokens, or min(n_tokens*active_experts,128)>usable_slots. Therefore minimum8-slot caching admits one-token decode but bypasses larger batches; it is not equivalent to the normal cache path. At >=128 slots, the slot-capacity predicate no longer restricts any <=32-token batch for this model. Larger prefill can still copy already-cached expert tensor ranges through copy_experts without filling/evicting the cache.",
+    "device_bank_limit": "#245 directly queried a 2,147,483,648-byte per-buffer/allocation cap. Fused bank size=(s+1)*2230272, so at most961 usable slots fit this retained layout. The first integer request causing962 usable slots is3073MiB. This is calculated from the established cap, not a proposed failure rerun. Do not rerun the retained4096 failure or change the backend; issue's target-filling region should remain below this limit."
+  },
+  "n24_to_n18": {
+    "note": "Following rows translate #254's rough requested-MiB starting points into calculated effective caches. They are not measured target/band classifications. Same request gives the same slots/effective allocation at every N here; lower N changes resident expert layers and host-expert coverage.",
+    "fixed_2048_curve": "Every n24–n18 / requested2048 uses640 cache slots and calculated effective2045.0654296875MiB. Coverage of host experts is respectively20.83%,21.74%,22.73%,23.81%,25.00%,26.32%,27.78%. Hit rate must still be measured; coverage percentage is not hit rate.",
+    "starting_point_rows": [
+      {
+        "N": 24,
+        "host_experts": 3072,
+        "target": {
+          "requested_mib": 2890,
+          "slots": 904,
+          "effective_mib": 2887.3388671875,
+          "next_slot_request_mib": 2891
+        },
+        "band": {
+          "requested_mib": 2990,
+          "slots": 936,
+          "effective_mib": 2989.4326171875,
+          "next_slot_request_mib": 2993
+        }
+      },
+      {
+        "N": 23,
+        "host_experts": 2944,
+        "target": {
+          "requested_mib": 2530,
+          "slots": 791,
+          "effective_mib": 2526.8203125,
+          "next_slot_request_mib": 2531
+        },
+        "band": {
+          "requested_mib": 2640,
+          "slots": 826,
+          "effective_mib": 2638.4853515625,
+          "next_slot_request_mib": 2642
+        }
+      },
+      {
+        "N": 22,
+        "host_experts": 2816,
+        "target": {
+          "requested_mib": 2130,
+          "slots": 666,
+          "effective_mib": 2128.0166015625,
+          "next_slot_request_mib": 2132
+        },
+        "band": {
+          "requested_mib": 2230,
+          "slots": 697,
+          "effective_mib": 2226.919921875,
+          "next_slot_request_mib": 2231
+        }
+      },
+      {
+        "N": 21,
+        "host_experts": 2688,
+        "target": {
+          "requested_mib": 1720,
+          "slots": 538,
+          "effective_mib": 1719.6416015625,
+          "next_slot_request_mib": 1723
+        },
+        "band": {
+          "requested_mib": 1820,
+          "slots": 569,
+          "effective_mib": 1818.544921875,
+          "next_slot_request_mib": 1822
+        }
+      },
+      {
+        "N": 20,
+        "host_experts": 2560,
+        "target": {
+          "requested_mib": 1310,
+          "slots": 409,
+          "effective_mib": 1308.076171875,
+          "next_slot_request_mib": 1312
+        },
+        "band": {
+          "requested_mib": 1420,
+          "slots": 444,
+          "effective_mib": 1419.7412109375,
+          "next_slot_request_mib": 1423
+        }
+      },
+      {
+        "N": 19,
+        "host_experts": 2432,
+        "target": {
+          "requested_mib": 900,
+          "slots": 281,
+          "effective_mib": 899.701171875,
+          "next_slot_request_mib": 903
+        },
+        "band": {
+          "requested_mib": 1000,
+          "slots": 312,
+          "effective_mib": 998.6044921875,
+          "next_slot_request_mib": 1002
+        }
+      },
+      {
+        "N": 18,
+        "host_experts": 2304,
+        "target": {
+          "requested_mib": 500,
+          "slots": 155,
+          "effective_mib": 497.70703125,
+          "next_slot_request_mib": 501
+        },
+        "band": {
+          "requested_mib": 600,
+          "slots": 187,
+          "effective_mib": 599.80078125,
+          "next_slot_request_mib": 603
+        }
+      }
+    ]
+  },
+  "concrete_search_algorithm": [
+    {
+      "step": 1,
+      "action": "Measure matched current n24/2048 control and the fixed2048 placement curve first. For each N retain maximum lifecycle PID dedicated peak P_N across its runs and observed effective cache E_N. Do not infer all placements from the issue's ~0.40GiB slope."
+    },
+    {
+      "step": 2,
+      "action": "For target T=8589934592 bytes, use provisional effective budget E_guess=E_N+T-P_N. Convert to slot index using A(s), clamp to enabled minimum8 and supported bank maximum961, then use canonical integer request R(s). Repeat separately for B=8697308774 bytes when band variants are decision-relevant. This additive estimate is a starting guess only; total process peak is not the cache allocation."
+    },
+    {
+      "step": 3,
+      "action": "For each fresh full-workload lifecycle, prove requested arguments, actual N/layer count, native effective cache and usable slots, cache execution/destructor evidence, successful completion/quality, PID-adapter memory observations, and clean exit. Keep unsuccessful, safety-stopped, cache-off, and over-ceiling records. Classify using maximum peak across all runs of that effective configuration."
+    },
+    {
+      "step": 4,
+      "action": "Maintain pass/fail brackets in effective slot space, not requested-MiB space. Use measured headroom/3345408 only to propose a jump; then measure that point. If it crosses the boundary, bisect integer slot indices. Never retest a different requested value in the same slot plateau as a purported cache refinement."
+    },
+    {
+      "step": 5,
+      "action": "Refine to a highest measured passing slot count and test its next distinct effective slot, R(s+1). Report the upper neighboring observation or supported hard allocation limit. Repeat finalists in fresh counterbalanced lifecycles, reclassify on the largest observed peak, and back off slots if repeats cross the boundary. Record margins to both boundaries and compare each margin with the observed run-to-run peak range."
+    },
+    {
+      "step": 6,
+      "action": "Be explicit about proof limits: cache-bank allocation is monotone in slots, but sampled full-lifecycle process peak is noisy and not proven globally monotone. A binary-search/local-adjacency result is an experimentally bounded frontier, not proof that every unmeasured larger cache fails. If observations are nonmonotone or the adjacent step is below peak variation, inspect the affected neighboring region and label unresolved/marginal boundaries rather than claiming an exact largest cache. No source-only calculation proves an eligible measured memory peak."
+    }
+  ],
+  "exact_evidence_contract": {
+    "allocation": [
+      "Preserve sanitized effective native command and runtime/model identity.",
+      "Preserve native `impl: Vulkan0 MoE cache size = ... MiB for ... MiB of host experts` line.",
+      "Preserve each `impl: N layers, q4_0: s slots (p%)` line. Assert expected group/layer count and positive enabled slots; distinguish these from server parallel slots.",
+      "Report requested MiB, native rounded effective MiB, usable slots, and calculated bank bytes labeled calculated. Do not present the two-decimal log as byte-exact observation.",
+      "Preserve host/model/KV/compute allocation lines and warnings/errors, with raw-log hash and original line references."
+    ],
+    "execution": [
+      "Graceful destructor prints `llama_moe_cache: ubatch <= 8: hits = H, misses = M, hit rate = ...%, uploaded = U MiB`.",
+      "Also retain `ubatch  > 8` bucket and `large batches: C experts copied from the cache, V MiB` when emitted.",
+      "Prove actual accesses through a nonempty hit/miss bucket and uploads on fresh runs; hits need not be positive for a legitimate tiny/thrashing cache. Do not incorrectly require all buckets/copies to be nonzero.",
+      "Source suppresses a stats bucket when hits+misses==0 and suppresses large-copy line when count==0. Missing line after incomplete/forced teardown is unavailable, not invented zero. Distinguish source-suppressed/unemitted from independently observed counters.",
+      "Counters are whole-lifecycle buckets including warmup, not per-phase telemetry. Hits/misses count deduplicated selected experts per layer cache-plan invocation, not raw token*expert selections. Large-copy count increments separately per expert tensor-bank copy; do not reinterpret it as distinct routed experts. Logical uploaded/copied MiB is not measured PCIe bandwidth."
+    ],
+    "lifecycle": [
+      "Confirm 44 requests, intended per-phase/channel counts, complete native server slot intervals and preserved token identities.",
+      "Destructor counters are emitted by impl::~impl -> log_stats, so preserve graceful signal result, exit0, no safety stop, and final raw log after process exit. A load/ready line alone is not cache-use proof.",
+      "Historical runner currently gathers logs after process completion, which is the right ordering. Forced termination can destroy destructor evidence even when translations completed; retain such runs without a false execution-proof pass."
+    ]
+  },
+  "historical_evidence_observed": {
+    "2048A1": "Native effective2045.07MiB; small hits83745/misses35020,70.51%,uploaded111728.85MiB; >8 hits3800/misses24411,13.47%,uploaded77881.58MiB; large copies12254,19547.76MiB.",
+    "3072B1": "Native effective3069.19MiB; small hits98158/misses20259,82.89%,uploaded64634.92MiB; >8 hits11808/misses25038,32.05%,uploaded79881.98MiB; large copies10120,16143.57MiB.",
+    "memory_variation_risk": "Historical3072 lifecycle peaks differ by50110464 bytes (~47.79MiB), far more than one3.19043MiB cache slot. The larger lifecycle peak must not be replaced by steady/active peak. Boundary precision materially finer than observed peak variation should be labeled marginal."
+  },
+  "sources": [
+    {
+      "description": "Pinned whole-slot allocation, group disable/throw, native allocation/slot logging",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-moe-cache.cpp#L221-L450"
+    },
+    {
+      "description": "Pinned execution gating and destructor stats",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-moe-cache.cpp#L458-L598"
+    },
+    {
+      "description": "Context creation/error propagation",
+      "url": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-context.cpp#L3981-L3998"
+    },
+    {
+      "description": "Model metadata:128 experts,8 active; tensor dimensions",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6/experiments/gemma4_26b_qat/results/identity.json"
+    },
+    {
+      "description": "Established bank geometry and actual device limits, section6",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/ee4620b5ce96b56202c17a06bf979852cb6d6cbd/experiments/gemma4_26b_qat/FOLLOWUP.md"
+    },
+    {
+      "description": "Historical workload/lifecycle/counter limits",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6/experiments/gemma4_26b_qat/SELFPEER.md"
+    },
+    {
+      "description": "Observed2048 native lines",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6/experiments/gemma4_26b_qat/results/selfpeer/selfpeer-cache2048-a1.json#L2500-L2564"
+    },
+    {
+      "description": "Observed3072 native lines",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6/experiments/gemma4_26b_qat/results/selfpeer/selfpeer-cache3072-b1.json#L2495-L2558"
+    },
+    {
+      "description": "Current experiment contract",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/issues/254"
+    },
+    {
+      "description": "Prior decision/evidence",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/issues/245"
+    }
+  ],
+  "director_actions": "Integrate findings into experimental tooling/evidence only. Ensure new extractor preserves group slots and validates requested versus effective cache. Reconcile #254 warning-only wording without changing pinned upstream runtime. Director owns verification and any source/document/history/GitHub changes. No runtime checks were run by this researcher.",
+  "coordination_limit": "Peer messages and automated issue-report writes were all denied by the runtime read-only gate. An incremental result requested relay to measurement-owner; please forward final slot table/algorithm as needed."
+}

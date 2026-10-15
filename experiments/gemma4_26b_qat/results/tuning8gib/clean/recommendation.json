@@ -1,0 +1,70 @@
+{
+  "status": "experimental_recommendation_not_owner_adoption",
+  "recommended_target_configuration": "n24-c2890",
+  "profile": {
+    "runtime": "llama.cpp b11537 / 8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "n_cpu_moe": 24,
+    "load_mode": "none",
+    "moe_cache_mib_requested": 2890,
+    "usable_expert_cache_slots": 904,
+    "effective_cache_mib_native_rounded": 2887.34,
+    "effective_cache_bytes_source_calculated": 3027594240,
+    "all_other_controls": "Unchanged issue254 fixed Vulkan profile and44-request Self/Peer workload"
+  },
+  "class": "target",
+  "maximum_lifecycle_sampled_dedicated": {
+    "bytes": 8526270464.0,
+    "GiB": 7.940708160400391,
+    "GB": 8.526270464
+  },
+  "margins": {
+    "target": {
+      "bytes": 63664128.0,
+      "MiB": 60.71484375,
+      "marginal": false
+    },
+    "ceiling": {
+      "bytes": 171038310.0,
+      "MiB": 163.11484336853027,
+      "marginal": false
+    }
+  },
+  "observed_peak_variation_bytes": 1003520.0,
+  "repeat_standard_vs_control": {
+    "repeat_standard_met": true,
+    "candidate_run_median_range_seconds": [
+      0.7551559999992605,
+      0.7605290000064997
+    ],
+    "reference_run_median_range_seconds": [
+      0.8667352000047686,
+      0.9106560999935027
+    ],
+    "pair_median_gain_ms": 116.517449998355,
+    "pair_p95_gain_ms": 133.31449999532197,
+    "serial_median_gain_ms": 121.41355000494514,
+    "dedicated_delta_bytes": 885764096.0,
+    "pair_median_gain_ms_per_100MiB_extra": 13.793447059009614
+  },
+  "best_target_selection": "n23/2540 and n24/2890 run medians overlap; no repeatable superiority claimed between them.2890 uses62296064 fewer dedicated bytes and pooled differences are within the observed35.471ms n23 run-median spread; prefer lower VRAM. n23/2048 and n22/2048 are demonstrably slower than2890 across both repeats, not equivalent within observed spreads.",
+  "band_rule": "Fails: n23/2642 B2=764.1284ms exceeds target2890 minimum755.156ms. All band runs retained; pooled6.2421ms apparent gain is not repeatable, pairp95 worsens13.1862ms. No additional repeat can erase the existing violation.",
+  "band_vs_best_target": {
+    "repeat_standard_met": false,
+    "candidate_run_median_range_seconds": [
+      0.7343299999920418,
+      0.7641283999982988
+    ],
+    "reference_run_median_range_seconds": [
+      0.7551559999992605,
+      0.7605290000064997
+    ],
+    "pair_median_gain_ms": 6.242100003873929,
+    "pair_p95_gain_ms": -13.1861999980174,
+    "serial_median_gain_ms": 6.879849992401432,
+    "dedicated_delta_bytes": 169250816.0,
+    "pair_median_gain_ms_per_100MiB_extra": 3.8672287722749354
+  },
+  "n24_target_boundary_correction": "2948 reclassified BAND across all3 runs after peak8590503936B. Final highest measured target slot is922 at requested2945MiB, with next923-slot all-run max above target.2945 measured median762.1443ms and larger VRAM do not displace lower-VRAM2890.",
+  "quality": "2156EOS outputs,9 exact pairs/6sources, all covered by independent direct semantic audit and final independent ledger coverage audit. Preserve temporal and only-two emphasis caveats; not unconditional fidelity.",
+  "owner_disposition": "Unchanged #245 adopted serving profile remains authoritative until the project owner records adopt-refined or keep-control. Experiment evidence alone changes no product/settings."
+}

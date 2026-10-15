@@ -1,0 +1,49 @@
+{
+  "issue": 254,
+  "baseline_commit": "ccab84af268ba58ce47d501132b69e7a583d861b",
+  "verification_owner": "Prerequisite researcher; Director handoff before first model launch",
+  "artifact_root": "<ARTIFACT_ROOT>",
+  "app_python": "<APP_PYTHON>",
+  "python_version": "3.14.7",
+  "available_modules": ["psutil", "httpx"],
+  "model": {
+    "repository": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+    "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+    "bytes": 14249047104,
+    "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+    "verification": "Fresh full file hash and size matched the issue before measurement authorization."
+  },
+  "runtime": {
+    "build": "b11537",
+    "source_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "version_observed": "b11537 / 8e2d31e0e",
+    "executable_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+    "archive_sha256": "ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe",
+    "backend": "Vulkan"
+  },
+  "host": {
+    "cpu": "AMD Ryzen 7 9800X3D",
+    "cpu_topology": "8 cores / 16 logical processors",
+    "ram_class": "32 GiB",
+    "gpu": "AMD Radeon RX 7900 XTX, 24-GiB class",
+    "driver": "32.0.31041.1004",
+    "vulkan_driver": "26.8.1",
+    "adapter_instance": "luid_0x00000000_0x0000f60b_phys_0"
+  },
+  "prelaunch_observations": {
+    "named_model_runtime_conflicts": [],
+    "whole_device_counter_errors": {},
+    "whole_device_counter_worked": true,
+    "available_physical_GB_approximate_range": [8.0, 8.3],
+    "commit_headroom_GB_approximate": 19.9,
+    "existing_application_and_python_processes": "Left untouched; unrelated processes are outside ownership.",
+    "server_pid_counter_evidence": "Must be established by each actual owned lifecycle, not inferred from device preflight."
+  },
+  "authorization": {
+    "existing_ram_pressure": "Accepted per issue; no unrelated process stops or memory trimming.",
+    "model_launch": "Exclusive measurement-owner ownership after prerequisite handoff.",
+    "watchdog": {"minimum_available_physical_bytes": 268435456, "minimum_commit_headroom_bytes": 536870912, "sustained_seconds": 8, "owned_process_only": true}
+  },
+  "historical_reference": "The restored resume.json is stale history, not a current profile or recommendation. The authoritative #245 final owner decision selects n24/load-mode none/cache2048.",
+  "limits": "No physical 8GiB card, app/GUI/audio/coexistence or adoption claim."
+}

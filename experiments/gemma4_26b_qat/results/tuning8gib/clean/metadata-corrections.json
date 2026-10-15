@@ -1,0 +1,8 @@
+{
+  "correction": "The inherited run_matrix baseline_commit field referred to #245's original product/fixture commit, not the current execution checkout. experiment_baseline in every final per-run JSON correctly identifies ccab84af268ba58ce47d501132b69e7a583d861b. Current task execution baseline is ccab84af, with task-local experimental helpers; no product source changes.",
+  "affected_runs": ["tuning8gib-clean-n24-c2048-a1", "tuning8gib-clean-n23-c2048-curve", "tuning8gib-clean-n22-c2048-curve", "tuning8gib-clean-n21-c2048-curve", "tuning8gib-clean-n20-c2048-curve", "tuning8gib-clean-n19-c2048-curve", "tuning8gib-clean-n18-c2048-curve"],
+  "inherited_baseline_commit_value": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "actual_execution_baseline_commit": "ccab84af268ba58ce47d501132b69e7a583d861b",
+  "later_records": "selfpeer_probes now writes baseline_commit=ccab84af and explicitly labels fixture_origin_product_commit=7a8151be. This metadata correction does not change workload, counters or measured outcomes.",
+  "preservation": "Earlier original per-run records retained verbatim, corrected here rather than silently rewritten."
+}

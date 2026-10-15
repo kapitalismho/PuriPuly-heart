@@ -1,0 +1,333 @@
+{
+  "stage": "target",
+  "boundary_bytes": 8589934592,
+  "started_utc": "2026-10-15T22:52:15.275862+00:00",
+  "status": "completed",
+  "method": "Exact source slot arithmetic predicts a starting point only. Each requested cache executes the unchanged44-request full lifecycle. Measured maximum lifecycle PID dedicated peaks decide. Finish only at an eligible slot and its observed next-slot over-boundary neighbor; integer requests sharing an allocation are not distinct effective caches.",
+  "placements": {
+    "24": {
+      "curve_reference": "tuning8gib-clean-n24-c2048-a1",
+      "predicted_noncache_base_bytes": 5496099840.0,
+      "predicted_start_slots": 923,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n24-c2948-target1-s923",
+          "slots": 923,
+          "requested_mib": 2948
+        },
+        {
+          "run": "tuning8gib-clean-n24-c2952-target1-s924",
+          "slots": 924,
+          "requested_mib": 2952
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 923,
+      "eligible_requested_mib_range": [
+        2948,
+        2951
+      ],
+      "eligible": {
+        "peak_bytes": 8589500416.0,
+        "runs": [
+          "tuning8gib-clean-n24-c2948-target1-s923"
+        ],
+        "requested_mib": [
+          2948
+        ]
+      },
+      "next_slots": 924,
+      "next": {
+        "peak_bytes": 8593649664.0,
+        "runs": [
+          "tuning8gib-clean-n24-c2952-target1-s924"
+        ],
+        "requested_mib": [
+          2952
+        ]
+      },
+      "margin_bytes": 434176.0,
+      "slot_increment_bytes": 3345408
+    },
+    "23": {
+      "curve_reference": "tuning8gib-clean-n23-c2048-curve",
+      "predicted_noncache_base_bytes": 5924312064.0,
+      "predicted_start_slots": 795,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n23-c2540-target1-s795",
+          "slots": 795,
+          "requested_mib": 2540
+        },
+        {
+          "run": "tuning8gib-clean-n23-c2543-target1-s796",
+          "slots": 796,
+          "requested_mib": 2543
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 795,
+      "eligible_requested_mib_range": [
+        2540,
+        2542
+      ],
+      "eligible": {
+        "peak_bytes": 8588566528.0,
+        "runs": [
+          "tuning8gib-clean-n23-c2540-target1-s795"
+        ],
+        "requested_mib": [
+          2540
+        ]
+      },
+      "next_slots": 796,
+      "next": {
+        "peak_bytes": 8591712256.0,
+        "runs": [
+          "tuning8gib-clean-n23-c2543-target1-s796"
+        ],
+        "requested_mib": [
+          2543
+        ]
+      },
+      "margin_bytes": 1368064.0,
+      "slot_increment_bytes": 3345408
+    },
+    "22": {
+      "curve_reference": "tuning8gib-clean-n22-c2048-curve",
+      "predicted_noncache_base_bytes": 6352917504.0,
+      "predicted_start_slots": 667,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n22-c2132-target1-s667",
+          "slots": 667,
+          "requested_mib": 2132
+        },
+        {
+          "run": "tuning8gib-clean-n22-c2135-target1-s668",
+          "slots": 668,
+          "requested_mib": 2135
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 667,
+      "eligible_requested_mib_range": [
+        2132,
+        2134
+      ],
+      "eligible": {
+        "peak_bytes": 8587763712.0,
+        "runs": [
+          "tuning8gib-clean-n22-c2132-target1-s667"
+        ],
+        "requested_mib": [
+          2132
+        ]
+      },
+      "next_slots": 668,
+      "next": {
+        "peak_bytes": 8590909440.0,
+        "runs": [
+          "tuning8gib-clean-n22-c2135-target1-s668"
+        ],
+        "requested_mib": [
+          2135
+        ]
+      },
+      "margin_bytes": 2170880.0,
+      "slot_increment_bytes": 3345408
+    },
+    "21": {
+      "curve_reference": "tuning8gib-clean-n21-c2048-curve",
+      "predicted_noncache_base_bytes": 6781129728.0,
+      "predicted_start_slots": 539,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n21-c1723-target1-s539",
+          "slots": 539,
+          "requested_mib": 1723
+        },
+        {
+          "run": "tuning8gib-clean-n21-c1727-target1-s540",
+          "slots": 540,
+          "requested_mib": 1727
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 539,
+      "eligible_requested_mib_range": [
+        1723,
+        1726
+      ],
+      "eligible": {
+        "peak_bytes": 8587362304.0,
+        "runs": [
+          "tuning8gib-clean-n21-c1723-target1-s539"
+        ],
+        "requested_mib": [
+          1723
+        ]
+      },
+      "next_slots": 540,
+      "next": {
+        "peak_bytes": 8590508032.0,
+        "runs": [
+          "tuning8gib-clean-n21-c1727-target1-s540"
+        ],
+        "requested_mib": [
+          1727
+        ]
+      },
+      "margin_bytes": 2572288.0,
+      "slot_increment_bytes": 3345408
+    },
+    "20": {
+      "curve_reference": "tuning8gib-clean-n20-c2048-curve",
+      "predicted_noncache_base_bytes": 7209604096.0,
+      "predicted_start_slots": 411,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n20-c1315-target1-s411",
+          "slots": 411,
+          "requested_mib": 1315
+        },
+        {
+          "run": "tuning8gib-clean-n20-c1318-target1-s412",
+          "slots": 412,
+          "requested_mib": 1318
+        },
+        {
+          "run": "tuning8gib-clean-n20-c1321-target1-s413",
+          "slots": 413,
+          "requested_mib": 1321
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 412,
+      "eligible_requested_mib_range": [
+        1318,
+        1320
+      ],
+      "eligible": {
+        "peak_bytes": 8589574144.0,
+        "runs": [
+          "tuning8gib-clean-n20-c1318-target1-s412"
+        ],
+        "requested_mib": [
+          1318
+        ]
+      },
+      "next_slots": 413,
+      "next": {
+        "peak_bytes": 8593244160.0,
+        "runs": [
+          "tuning8gib-clean-n20-c1321-target1-s413"
+        ],
+        "requested_mib": [
+          1321
+        ]
+      },
+      "margin_bytes": 360448.0,
+      "slot_increment_bytes": 3345408
+    },
+    "19": {
+      "curve_reference": "tuning8gib-clean-n19-c2048-curve",
+      "predicted_noncache_base_bytes": 7637947392.0,
+      "predicted_start_slots": 283,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n19-c907-target1-s283",
+          "slots": 283,
+          "requested_mib": 907
+        },
+        {
+          "run": "tuning8gib-clean-n19-c910-target1-s284",
+          "slots": 284,
+          "requested_mib": 910
+        },
+        {
+          "run": "tuning8gib-clean-n19-c913-target1-s285",
+          "slots": 285,
+          "requested_mib": 913
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 284,
+      "eligible_requested_mib_range": [
+        910,
+        912
+      ],
+      "eligible": {
+        "peak_bytes": 8589303808.0,
+        "runs": [
+          "tuning8gib-clean-n19-c910-target1-s284"
+        ],
+        "requested_mib": [
+          910
+        ]
+      },
+      "next_slots": 285,
+      "next": {
+        "peak_bytes": 8593453056.0,
+        "runs": [
+          "tuning8gib-clean-n19-c913-target1-s285"
+        ],
+        "requested_mib": [
+          913
+        ]
+      },
+      "margin_bytes": 630784.0,
+      "slot_increment_bytes": 3345408
+    },
+    "18": {
+      "curve_reference": "tuning8gib-clean-n18-c2048-curve",
+      "predicted_noncache_base_bytes": 8066421760.0,
+      "predicted_start_slots": 155,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n18-c498-target1-s155",
+          "slots": 155,
+          "requested_mib": 498
+        },
+        {
+          "run": "tuning8gib-clean-n18-c501-target1-s156",
+          "slots": 156,
+          "requested_mib": 501
+        },
+        {
+          "run": "tuning8gib-clean-n18-c505-target1-s157",
+          "slots": 157,
+          "requested_mib": 505
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 156,
+      "eligible_requested_mib_range": [
+        501,
+        504
+      ],
+      "eligible": {
+        "peak_bytes": 8588369920.0,
+        "runs": [
+          "tuning8gib-clean-n18-c501-target1-s156"
+        ],
+        "requested_mib": [
+          501
+        ]
+      },
+      "next_slots": 157,
+      "next": {
+        "peak_bytes": 8591777792.0,
+        "runs": [
+          "tuning8gib-clean-n18-c505-target1-s157"
+        ],
+        "requested_mib": [
+          505
+        ]
+      },
+      "margin_bytes": 1564672.0,
+      "slot_increment_bytes": 3345408
+    }
+  },
+  "finished_utc": "2026-10-15T23:01:16.063385+00:00"
+}

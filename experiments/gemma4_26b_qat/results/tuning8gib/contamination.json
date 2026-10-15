@@ -1,0 +1,27 @@
+{
+  "cohort": "owner_reported_local_model_overlap_before_clean_restart",
+  "authority": "Owner statement is ground truth; no attempt was made to reconfirm the past overlap.",
+  "reason": "Another local-model experiment briefly overlapped. The owner requested all #254 measurements collected so far be excluded and fully remeasured.",
+  "comparison_eligible": false,
+  "memory_classification_eligible": false,
+  "repeat_evidence_eligible": false,
+  "all_parent_summary_and_timings": "Superseded contaminated observations only. Do not combine with clean/ results or use their peaks to classify clean configurations.",
+  "runs": [
+    {"run": "tuning8gib-n24-c2048-a1", "started_utc": "2026-10-15T22:43:48Z", "completed_requests": 44, "observed_status": "completed", "exit": 0},
+    {"run": "tuning8gib-n23-c2048-curve", "started_utc": "2026-10-15T22:44:48Z", "completed_requests": 44, "observed_status": "completed", "exit": 0},
+    {"run": "tuning8gib-n22-c2048-curve", "started_utc": "2026-10-15T22:45:46Z", "completed_requests": 44, "observed_status": "completed", "exit": 0},
+    {"run": "tuning8gib-n21-c2048-curve", "started_utc": "2026-10-15T22:46:18Z", "completed_requests": 30, "observed_status": "failed", "exit": 0, "corrected_shutdown_classification": "Owner-requested graceful interruption after contamination notice, not native failure/OOM/watchdog", "owned_server_pid": 4048, "error": "Subsequent local HTTP request rejected after the owned server was gracefully signalled."}
+  ],
+  "completed_requests_total": 162,
+  "queued_not_launched": ["tuning8gib-n20-c2048-curve", "tuning8gib-n19-c2048-curve", "tuning8gib-n18-c2048-curve"],
+  "stop_command": "<APP_PYTHON> experiments/gemma4_26b_qat/run_matrix.py --signal 4048",
+  "ownership": "Only the verified owned n21 server PID4048 was signalled. No unrelated process stopped. Its failed wrapper stopped the && sequence before n20.",
+  "restart_destination": "clean/",
+  "restart_identity_prefix": "tuning8gib-clean-",
+  "clean_restart_preflight_utc": "2026-10-15T22:48:04.335131+00:00",
+  "first_clean_launch_started_utc": "2026-10-15T22:48:04.872402+00:00",
+  "restart_preconditions": "Fresh runtime-name enumeration must be empty before launch. Every new lifecycle records lightweight name/PID-only runtime conflict observation; any detected overlap excludes that run and requires remeasurement after absence.",
+  "communication_limit": "Director reported hub command unavailable and no cross-session endpoint exposed; owner identified overlap as brief/past. Fresh empty preflight is the authorized restart boundary.",
+  "quality_reuse": "Independent semantic judgments may transfer only for identical input/output strings. Contaminated occurrence counts, EOS counts, timings and memory do not transfer.",
+  "preservation": "Original public run JSON/native logs/slot ledgers/compact samples and raw external evidence remain unchanged. Parsing recovery sidecars remain attached."
+}

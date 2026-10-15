@@ -1,0 +1,18 @@
+{
+  "observed_utc": "2026-10-15T22:54:17.462573+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 14949072896,
+    "system_committed_bytes": 58084720640,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 18798366720,
+    "device_gpu_dedicated_bytes": 4319092736.0,
+    "device_gpu_shared_bytes": 542531584.0,
+    "device_gpu_committed_bytes": 5144670208.0,
+    "system_pages_input_per_second": 1058.1150625498583,
+    "system_page_reads_per_second": 202.3354821803804
+  },
+  "counter_errors": {},
+  "pressure_qualified_by_explicit_override": true,
+  "pressure_boundary": "User-approved existing background RAM; no unrelated processes changed; not actual VRChat coexistence."
+}

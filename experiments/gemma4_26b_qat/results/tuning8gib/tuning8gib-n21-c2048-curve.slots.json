@@ -1,0 +1,666 @@
+{
+  "events": [
+    {
+      "native_seconds": 7.64537,
+      "slot": 0,
+      "task": 1,
+      "event": "processing task",
+      "line": 233
+    },
+    {
+      "native_seconds": 8.863658,
+      "slot": 0,
+      "task": 1,
+      "event": "stop processing",
+      "line": 242
+    },
+    {
+      "native_seconds": 8.889947999999999,
+      "slot": 1,
+      "task": 16,
+      "event": "processing task",
+      "line": 253
+    },
+    {
+      "native_seconds": 10.217500000000001,
+      "slot": 1,
+      "task": 16,
+      "event": "stop processing",
+      "line": 262
+    },
+    {
+      "native_seconds": 10.243449,
+      "slot": 0,
+      "task": 39,
+      "event": "processing task",
+      "line": 273
+    },
+    {
+      "native_seconds": 10.566445,
+      "slot": 0,
+      "task": 39,
+      "event": "stop processing",
+      "line": 283
+    },
+    {
+      "native_seconds": 10.599901000000001,
+      "slot": 1,
+      "task": 52,
+      "event": "processing task",
+      "line": 294
+    },
+    {
+      "native_seconds": 11.095953000000002,
+      "slot": 1,
+      "task": 52,
+      "event": "stop processing",
+      "line": 304
+    },
+    {
+      "native_seconds": 11.129650999999999,
+      "slot": 1,
+      "task": 74,
+      "event": "processing task",
+      "line": 315
+    },
+    {
+      "native_seconds": 11.621971,
+      "slot": 1,
+      "task": 74,
+      "event": "stop processing",
+      "line": 323
+    },
+    {
+      "native_seconds": 11.658579999999999,
+      "slot": 0,
+      "task": 90,
+      "event": "processing task",
+      "line": 334
+    },
+    {
+      "native_seconds": 12.187756,
+      "slot": 0,
+      "task": 90,
+      "event": "stop processing",
+      "line": 342
+    },
+    {
+      "native_seconds": 12.204862,
+      "slot": 0,
+      "task": 108,
+      "event": "processing task",
+      "line": 353
+    },
+    {
+      "native_seconds": 12.724758,
+      "slot": 0,
+      "task": 108,
+      "event": "stop processing",
+      "line": 361
+    },
+    {
+      "native_seconds": 12.749856000000001,
+      "slot": 1,
+      "task": 125,
+      "event": "processing task",
+      "line": 372
+    },
+    {
+      "native_seconds": 13.137452,
+      "slot": 1,
+      "task": 125,
+      "event": "stop processing",
+      "line": 380
+    },
+    {
+      "native_seconds": 13.166455000000001,
+      "slot": 1,
+      "task": 139,
+      "event": "processing task",
+      "line": 391
+    },
+    {
+      "native_seconds": 13.78898,
+      "slot": 1,
+      "task": 139,
+      "event": "stop processing",
+      "line": 399
+    },
+    {
+      "native_seconds": 13.805203,
+      "slot": 0,
+      "task": 161,
+      "event": "processing task",
+      "line": 410
+    },
+    {
+      "native_seconds": 14.232197999999999,
+      "slot": 0,
+      "task": 161,
+      "event": "stop processing",
+      "line": 418
+    },
+    {
+      "native_seconds": 14.256992,
+      "slot": 0,
+      "task": 174,
+      "event": "processing task",
+      "line": 429
+    },
+    {
+      "native_seconds": 14.792197,
+      "slot": 0,
+      "task": 174,
+      "event": "stop processing",
+      "line": 437
+    },
+    {
+      "native_seconds": 14.829916,
+      "slot": 1,
+      "task": 192,
+      "event": "processing task",
+      "line": 448
+    },
+    {
+      "native_seconds": 15.292442,
+      "slot": 1,
+      "task": 192,
+      "event": "stop processing",
+      "line": 456
+    },
+    {
+      "native_seconds": 15.327841,
+      "slot": 1,
+      "task": 208,
+      "event": "processing task",
+      "line": 467
+    },
+    {
+      "native_seconds": 15.718424,
+      "slot": 1,
+      "task": 208,
+      "event": "stop processing",
+      "line": 475
+    },
+    {
+      "native_seconds": 15.733398000000001,
+      "slot": 0,
+      "task": 222,
+      "event": "processing task",
+      "line": 486
+    },
+    {
+      "native_seconds": 16.246198,
+      "slot": 0,
+      "task": 222,
+      "event": "stop processing",
+      "line": 494
+    },
+    {
+      "native_seconds": 16.252066,
+      "slot": 0,
+      "task": 239,
+      "event": "processing task",
+      "line": 506
+    },
+    {
+      "native_seconds": 16.252205,
+      "slot": 1,
+      "task": 240,
+      "event": "processing task",
+      "line": 515
+    },
+    {
+      "native_seconds": 16.80891,
+      "slot": 0,
+      "task": 239,
+      "event": "stop processing",
+      "line": 526
+    },
+    {
+      "native_seconds": 17.000512,
+      "slot": 1,
+      "task": 240,
+      "event": "stop processing",
+      "line": 531
+    },
+    {
+      "native_seconds": 17.006376,
+      "slot": 0,
+      "task": 262,
+      "event": "processing task",
+      "line": 543
+    },
+    {
+      "native_seconds": 17.006476,
+      "slot": 1,
+      "task": 263,
+      "event": "processing task",
+      "line": 552
+    },
+    {
+      "native_seconds": 17.610091,
+      "slot": 1,
+      "task": 263,
+      "event": "stop processing",
+      "line": 563
+    },
+    {
+      "native_seconds": 17.658875000000002,
+      "slot": 0,
+      "task": 262,
+      "event": "stop processing",
+      "line": 568
+    },
+    {
+      "native_seconds": 17.664939,
+      "slot": 0,
+      "task": 281,
+      "event": "processing task",
+      "line": 580
+    },
+    {
+      "native_seconds": 17.665111,
+      "slot": 1,
+      "task": 282,
+      "event": "processing task",
+      "line": 589
+    },
+    {
+      "native_seconds": 18.239878,
+      "slot": 1,
+      "task": 282,
+      "event": "stop processing",
+      "line": 600
+    },
+    {
+      "native_seconds": 18.31301,
+      "slot": 0,
+      "task": 281,
+      "event": "stop processing",
+      "line": 605
+    },
+    {
+      "native_seconds": 18.31945,
+      "slot": 1,
+      "task": 299,
+      "event": "processing task",
+      "line": 616
+    },
+    {
+      "native_seconds": 18.495199,
+      "slot": 0,
+      "task": 301,
+      "event": "processing task",
+      "line": 629
+    },
+    {
+      "native_seconds": 19.035676,
+      "slot": 0,
+      "task": 301,
+      "event": "stop processing",
+      "line": 637
+    },
+    {
+      "native_seconds": 19.211256,
+      "slot": 1,
+      "task": 299,
+      "event": "stop processing",
+      "line": 642
+    },
+    {
+      "native_seconds": 19.23022,
+      "slot": 0,
+      "task": 322,
+      "event": "processing task",
+      "line": 654
+    },
+    {
+      "native_seconds": 19.373761000000002,
+      "slot": 1,
+      "task": 324,
+      "event": "processing task",
+      "line": 666
+    },
+    {
+      "native_seconds": 20.001365,
+      "slot": 1,
+      "task": 324,
+      "event": "stop processing",
+      "line": 674
+    },
+    {
+      "native_seconds": 20.023833,
+      "slot": 0,
+      "task": 322,
+      "event": "stop processing",
+      "line": 679
+    },
+    {
+      "native_seconds": 20.039895,
+      "slot": 0,
+      "task": 341,
+      "event": "processing task",
+      "line": 691
+    },
+    {
+      "native_seconds": 20.188851,
+      "slot": 1,
+      "task": 343,
+      "event": "processing task",
+      "line": 703
+    },
+    {
+      "native_seconds": 20.737273,
+      "slot": 1,
+      "task": 343,
+      "event": "stop processing",
+      "line": 711
+    },
+    {
+      "native_seconds": 20.785088000000002,
+      "slot": 0,
+      "task": 341,
+      "event": "stop processing",
+      "line": 716
+    },
+    {
+      "native_seconds": 20.804016999999998,
+      "slot": 1,
+      "task": 359,
+      "event": "processing task",
+      "line": 727
+    },
+    {
+      "native_seconds": 20.978391000000002,
+      "slot": 0,
+      "task": 361,
+      "event": "processing task",
+      "line": 740
+    },
+    {
+      "native_seconds": 21.515199,
+      "slot": 0,
+      "task": 361,
+      "event": "stop processing",
+      "line": 748
+    },
+    {
+      "native_seconds": 21.706405,
+      "slot": 1,
+      "task": 359,
+      "event": "stop processing",
+      "line": 753
+    },
+    {
+      "native_seconds": 21.72143,
+      "slot": 1,
+      "task": 383,
+      "event": "processing task",
+      "line": 764
+    },
+    {
+      "native_seconds": 21.873781,
+      "slot": 0,
+      "task": 385,
+      "event": "processing task",
+      "line": 777
+    },
+    {
+      "native_seconds": 22.462699999999998,
+      "slot": 1,
+      "task": 383,
+      "event": "stop processing",
+      "line": 785
+    }
+  ],
+  "intervals": [
+    {
+      "slot": 0,
+      "task": 1,
+      "start": 7.64537,
+      "end": 8.863658,
+      "start_line": 233,
+      "end_line": 242
+    },
+    {
+      "slot": 1,
+      "task": 16,
+      "start": 8.889947999999999,
+      "end": 10.217500000000001,
+      "start_line": 253,
+      "end_line": 262
+    },
+    {
+      "slot": 0,
+      "task": 39,
+      "start": 10.243449,
+      "end": 10.566445,
+      "start_line": 273,
+      "end_line": 283
+    },
+    {
+      "slot": 1,
+      "task": 52,
+      "start": 10.599901000000001,
+      "end": 11.095953000000002,
+      "start_line": 294,
+      "end_line": 304
+    },
+    {
+      "slot": 1,
+      "task": 74,
+      "start": 11.129650999999999,
+      "end": 11.621971,
+      "start_line": 315,
+      "end_line": 323
+    },
+    {
+      "slot": 0,
+      "task": 90,
+      "start": 11.658579999999999,
+      "end": 12.187756,
+      "start_line": 334,
+      "end_line": 342
+    },
+    {
+      "slot": 0,
+      "task": 108,
+      "start": 12.204862,
+      "end": 12.724758,
+      "start_line": 353,
+      "end_line": 361
+    },
+    {
+      "slot": 1,
+      "task": 125,
+      "start": 12.749856000000001,
+      "end": 13.137452,
+      "start_line": 372,
+      "end_line": 380
+    },
+    {
+      "slot": 1,
+      "task": 139,
+      "start": 13.166455000000001,
+      "end": 13.78898,
+      "start_line": 391,
+      "end_line": 399
+    },
+    {
+      "slot": 0,
+      "task": 161,
+      "start": 13.805203,
+      "end": 14.232197999999999,
+      "start_line": 410,
+      "end_line": 418
+    },
+    {
+      "slot": 0,
+      "task": 174,
+      "start": 14.256992,
+      "end": 14.792197,
+      "start_line": 429,
+      "end_line": 437
+    },
+    {
+      "slot": 1,
+      "task": 192,
+      "start": 14.829916,
+      "end": 15.292442,
+      "start_line": 448,
+      "end_line": 456
+    },
+    {
+      "slot": 1,
+      "task": 208,
+      "start": 15.327841,
+      "end": 15.718424,
+      "start_line": 467,
+      "end_line": 475
+    },
+    {
+      "slot": 0,
+      "task": 222,
+      "start": 15.733398000000001,
+      "end": 16.246198,
+      "start_line": 486,
+      "end_line": 494
+    },
+    {
+      "slot": 0,
+      "task": 239,
+      "start": 16.252066,
+      "end": 16.80891,
+      "start_line": 506,
+      "end_line": 526
+    },
+    {
+      "slot": 1,
+      "task": 240,
+      "start": 16.252205,
+      "end": 17.000512,
+      "start_line": 515,
+      "end_line": 531
+    },
+    {
+      "slot": 1,
+      "task": 263,
+      "start": 17.006476,
+      "end": 17.610091,
+      "start_line": 552,
+      "end_line": 563
+    },
+    {
+      "slot": 0,
+      "task": 262,
+      "start": 17.006376,
+      "end": 17.658875000000002,
+      "start_line": 543,
+      "end_line": 568
+    },
+    {
+      "slot": 1,
+      "task": 282,
+      "start": 17.665111,
+      "end": 18.239878,
+      "start_line": 589,
+      "end_line": 600
+    },
+    {
+      "slot": 0,
+      "task": 281,
+      "start": 17.664939,
+      "end": 18.31301,
+      "start_line": 580,
+      "end_line": 605
+    },
+    {
+      "slot": 0,
+      "task": 301,
+      "start": 18.495199,
+      "end": 19.035676,
+      "start_line": 629,
+      "end_line": 637
+    },
+    {
+      "slot": 1,
+      "task": 299,
+      "start": 18.31945,
+      "end": 19.211256,
+      "start_line": 616,
+      "end_line": 642
+    },
+    {
+      "slot": 1,
+      "task": 324,
+      "start": 19.373761000000002,
+      "end": 20.001365,
+      "start_line": 666,
+      "end_line": 674
+    },
+    {
+      "slot": 0,
+      "task": 322,
+      "start": 19.23022,
+      "end": 20.023833,
+      "start_line": 654,
+      "end_line": 679
+    },
+    {
+      "slot": 1,
+      "task": 343,
+      "start": 20.188851,
+      "end": 20.737273,
+      "start_line": 703,
+      "end_line": 711
+    },
+    {
+      "slot": 0,
+      "task": 341,
+      "start": 20.039895,
+      "end": 20.785088000000002,
+      "start_line": 691,
+      "end_line": 716
+    },
+    {
+      "slot": 0,
+      "task": 361,
+      "start": 20.978391000000002,
+      "end": 21.515199,
+      "start_line": 740,
+      "end_line": 748
+    },
+    {
+      "slot": 1,
+      "task": 359,
+      "start": 20.804016999999998,
+      "end": 21.706405,
+      "start_line": 727,
+      "end_line": 753
+    },
+    {
+      "slot": 1,
+      "task": 383,
+      "start": 21.72143,
+      "end": 22.462699999999998,
+      "start_line": 764,
+      "end_line": 785
+    }
+  ],
+  "unreleased": [
+    {
+      "native_seconds": 21.873781,
+      "slot": 0,
+      "task": 385,
+      "event": "processing task",
+      "line": 777
+    }
+  ],
+  "slot_counts": {
+    "0": 14,
+    "1": 15
+  },
+  "pairs": [],
+  "association": "Per-slot ordinal pairing is valid only with22 complete intervals in each pinned slot and one request/channel/round; native timings are not joined to API request timings."
+}

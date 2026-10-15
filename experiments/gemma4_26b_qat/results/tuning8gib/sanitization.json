@@ -1,0 +1,8 @@
+{
+  "status": "no_matches",
+  "method": "Specialized literal/regex scan of all durable tuning8gib evidence and both tuning reports for explicit Windows drive paths, the known local username path, and HF credential assignment patterns.",
+  "scope": ["results/tuning8gib/", "TUNING8GIB.md", "TUNING8GIB_TIMINGS.md"],
+  "observed_result": "No matches found after narrowing the drive-path regex to avoid matching the tail of https:// URLs.",
+  "sanitization": "Artifact roots/checkouts/model/Python paths use explicit placeholders. Raw path-bearing original logs and full raw samples remain external. Model prompts, histories and translations are the fixed synthetic fixture.",
+  "limits": "A bounded path/credential-pattern scan is not a comprehensive secret detector. HF_TOKEN and HUGGING_FACE_HUB_TOKEN plus LLAMA_* variables were removed from owned model child environments; this is not an all-environment-secret removal claim. No unrelated private command lines were captured for lifecycle runtime-conflict observations."
+}

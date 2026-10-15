@@ -1,0 +1,96 @@
+{
+  "run": "tuning8gib-n24-c2048-a1",
+  "original_cache_execution": {
+    "requested_mib": 2048,
+    "state": "allocated_and_used",
+    "allocations": [
+      {
+        "effective_mib_rounded_native": 2045.07,
+        "host_experts_mib_rounded_native": 9801.0,
+        "line": "0.12.055.528 I impl:    Vulkan0 MoE cache size =  2045.07 MiB for 9801.00 MiB of host experts"
+      }
+    ],
+    "destructor_buckets": [
+      {
+        "ubatch": "<=8",
+        "hits": 83145,
+        "misses": 35508,
+        "hit_rate": 0.7007408156557356,
+        "uploaded_mib_rounded_native": 113285.78,
+        "line": "0.36.295.027 I llama_moe_cache: ubatch <= 8: hits = 83145, misses = 35508, hit rate = 70.07%, uploaded = 113285.78 MiB"
+      },
+      {
+        "ubatch": ">8",
+        "hits": 4523,
+        "misses": 30462,
+        "hit_rate": 0.12928397884807774,
+        "uploaded_mib_rounded_native": 97186.87,
+        "line": "0.36.295.031 I llama_moe_cache: ubatch  > 8: hits = 4523, misses = 30462, hit rate = 12.93%, uploaded = 97186.87 MiB"
+      }
+    ],
+    "large_batches": [
+      {
+        "experts_copied": 8818,
+        "copied_mib_rounded_native": 14066.6,
+        "line": "0.36.295.166 I llama_moe_cache: large batches: 8818 experts copied from the cache, 14066.60 MiB"
+      }
+    ],
+    "warnings": [],
+    "scope": "Whole lifecycle including native warmup; logical upload/copy MiB, not measured PCIe traffic."
+  },
+  "recovered_cache_execution": {
+    "requested_mib": 2048,
+    "state": "allocated_and_used",
+    "allocations": [
+      {
+        "effective_mib_rounded_native": 2045.07,
+        "host_experts_mib_rounded_native": 9801.0,
+        "line": "0.12.055.528 I impl:    Vulkan0 MoE cache size =  2045.07 MiB for 9801.00 MiB of host experts"
+      }
+    ],
+    "groups": [
+      {
+        "layers": 24,
+        "tensor_type": "q4_0",
+        "slots": 640,
+        "host_expert_count": 3072,
+        "slot_coverage_fraction": 0.20833333333333334,
+        "effective_bytes_source_formula": 2144406528,
+        "slot_bytes_source_formula": 3345408,
+        "line": "0.12.055.534 I impl: 24 layers, q4_0:   640 slots (20.8%)"
+      }
+    ],
+    "destructor_buckets": [
+      {
+        "ubatch": "<=8",
+        "hits": 83145,
+        "misses": 35508,
+        "hit_rate": 0.7007408156557356,
+        "uploaded_mib_rounded_native": 113285.78,
+        "line": "0.36.295.027 I llama_moe_cache: ubatch <= 8: hits = 83145, misses = 35508, hit rate = 70.07%, uploaded = 113285.78 MiB"
+      },
+      {
+        "ubatch": ">8",
+        "hits": 4523,
+        "misses": 30462,
+        "hit_rate": 0.12928397884807774,
+        "uploaded_mib_rounded_native": 97186.87,
+        "line": "0.36.295.031 I llama_moe_cache: ubatch  > 8: hits = 4523, misses = 30462, hit rate = 12.93%, uploaded = 97186.87 MiB"
+      }
+    ],
+    "large_batches": [
+      {
+        "experts_copied": 8818,
+        "copied_mib_rounded_native": 14066.6,
+        "line": "0.36.295.166 I llama_moe_cache: large batches: 8818 experts copied from the cache, 14066.60 MiB"
+      }
+    ],
+    "warnings": [
+      "0.12.329.506 I srv    load_model: prompt cache is disabled - use `--cache-ram N` to enable it",
+      "0.12.329.775 W srv          init: --cache-idle-slots requires --cache-ram, disabling"
+    ],
+    "slot_formula_source": "llama.cpp8e2d31e0e src/llama-moe-cache.cpp:264-328,444-456; fused Q4_0 gate/up2230272+down1115136 bytes/slot and one mandatory padding plane; exact source-derived bytes, native effective MiB rounded2dp.",
+    "scope": "Whole lifecycle including native warmup; logical upload/copy MiB, not measured PCIe traffic."
+  },
+  "reason": "First control used inherited placement filter, which omitted the separate native group/slot line. Original full sanitized native log preserved; recovery is parsing, not a new measurement."
+}

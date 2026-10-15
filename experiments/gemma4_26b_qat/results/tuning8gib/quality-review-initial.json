@@ -1,0 +1,153 @@
+{
+  "activity": "Independent bounded manual semantic review for issue #254; initial nine-pair set only",
+  "status": "Complete for the supplied nine unique input/output strings. Awaiting the Director's later clean-run expanded set for continuation.",
+  "scope": {
+    "record": "experiments/gemma4_26b_qat/results/tuning8gib/quality-unique.json",
+    "observed_snapshot": "D82E",
+    "unique_pairs": 9,
+    "synthetic_sources": 6,
+    "recorded_occurrences": 88,
+    "recorded_runs": [
+      "tuning8gib-n24-c2048-a1",
+      "tuning8gib-n23-c2048-curve"
+    ],
+    "performance_exclusion": "The owner has classified the existing measurement cohort as contaminated by another local-model session. Nothing in this review validates its timing, memory, repeatability, eligibility, or recommendation. Semantic judgments remain reusable only for IDENTICAL input/output strings."
+  },
+  "overall_quality_finding": "All nine strings preserve the fixture's core names, numbers, negations, and corrective contrasts. No configuration-specific material translation damage is observed in this bounded set. Two inherited nuances must remain explicit: 'within 5 minutes' is not exactly 'in 5 minutes', and '2장만' adds 'only two' emphasis. This is not an unqualified exact-fidelity pass or a broad model-quality conclusion.",
+  "surface_integrity": {
+    "applies_to": "Every one of the nine pairs below",
+    "manual_observation": "All outputs are complete sentences or complete two-sentence translations. No visible truncation, pathological repetition, reasoning trace, translation commentary, or instruction leakage.",
+    "recorded_completion_evidence": "All 88 listed occurrences have stop_type 'eos'. All nine records retain true nonempty/numbers_present/no_reasoning/not_truncated predicates.",
+    "limit": "EOS and automated results were read from the retained records, not reproduced by running a model or independently audited against raw runtime logs. Their semantic limitations are closed here by direct source/output reading, not by treating number-presence checks as sufficient."
+  },
+  "per_id": [
+    {
+      "id": "1351f036a4fcd63f",
+      "input": "Mina did not buy 12 tickets; she bought 2.",
+      "output": "미나가 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+      "judgment": "Core meaning preserved, with inherited added emphasis.",
+      "concrete_evidence": "'Mina' becomes '미나'; '12 tickets' and its rejection become '티켓을 12장 산 게 아니라'; the actual purchase remains '2장 ... 샀어요'. The negation does not incorrectly attach to the purchase of two.",
+      "caveat": "'2장만' means 'only two tickets', adding explicit exclusivity/emphasis absent from the literal English wording. Do not label the two variants identical in nuance.",
+      "configuration_attribution": "Exact pair already appears in the pinned #245 evidence and occurs in both current n24 control and n23 records. This is a preexisting shared wording nuance, not observed n23-specific damage.",
+      "recorded_occurrences": 5
+    },
+    {
+      "id": "27ca1947fd98eff1",
+      "input": "Please wait here. I will be back in 5 minutes.",
+      "output": "여기서 기다려 주세요. 5분 뒤에 올게요.",
+      "judgment": "Faithful idiomatic translation of the instruction and approximately five-minute return time.",
+      "concrete_evidence": "'Please wait here' becomes '여기서 기다려 주세요'; 'in 5 minutes' becomes '5분 뒤에'; '올게요' preserves the speaker's commitment to come to the waiting location.",
+      "caveat": "'올게요' literally says 'I'll come' rather than explicitly using 'return', but the waiting-here context carries the return meaning. Unlike the '안에' variant, this wording does not substitute a within-five-minutes upper bound.",
+      "configuration_attribution": "Exact pair is inherited from #245 and present in both current configurations. No configuration-specific material degradation observed.",
+      "recorded_occurrences": 5
+    },
+    {
+      "id": "2e37d3748acd5be0",
+      "input": "유나는 3시가 아니라 4시에 도착해요.",
+      "output": "Yuna is arriving at 4, not 3.",
+      "judgment": "Meaning preserved.",
+      "concrete_evidence": "'유나' becomes 'Yuna'; '3시가 아니라 4시에' becomes 'at 4, not 3'; '도착해요' becomes 'is arriving'. The corrected arrival time and rejected time retain their proper roles.",
+      "caveat": "English omits the explicit word 'o'clock', but 'arriving at 4, not 3' naturally expresses the same clock-time contrast. No AM/PM value is invented.",
+      "configuration_attribution": "Exact pair is inherited from #245 and present in both current configurations. No configuration-specific material degradation observed.",
+      "recorded_occurrences": 2
+    },
+    {
+      "id": "4e2fb418d6a53458",
+      "input": "Mina did not buy 12 tickets; she bought 2.",
+      "output": "미나가 티켓을 12장 산 게 아니라, 2장 샀어요.",
+      "judgment": "Meaning preserved without the added 'only' marker.",
+      "concrete_evidence": "'Mina' becomes '미나'; 'did not buy 12 tickets' becomes '티켓을 12장 산 게 아니라'; 'she bought 2' becomes '2장 샀어요'. Both quantities and the corrective negation are intact.",
+      "caveat": "The omitted object particle after '2장' is normal colloquial Korean, not a missing quantity or truncated clause. This variant lacks the extra '만' emphasis in ID 1351f036a4fcd63f.",
+      "configuration_attribution": "Exact pair is inherited from #245 and present in both current configurations. Variation between '2장' and '2장만' is not new configuration-specific damage.",
+      "recorded_occurrences": 11
+    },
+    {
+      "id": "6b4ce7e12d25567b",
+      "input": "그 열쇠는 제 것이 아니라 민수 것이에요.",
+      "output": "That key isn't mine, it's Minsu's.",
+      "judgment": "Meaning preserved.",
+      "concrete_evidence": "'그 열쇠' becomes 'That key'; '제 것이 아니라' becomes 'isn't mine'; '민수 것이에요' becomes 'it's Minsu's'. The key belongs to Minsu, not the speaker; ownership is not reversed.",
+      "caveat": "'Minsu' is a reasonable rendering of '민수' within this synthetic fixture. The English comma splice is a minor punctuation issue, not semantic loss.",
+      "configuration_attribution": "Exact pair is inherited from #245 and present in both current configurations. No configuration-specific material degradation observed.",
+      "recorded_occurrences": 14
+    },
+    {
+      "id": "8eeb9630ba4e5b92",
+      "input": "Please wait here. I will be back in 5 minutes.",
+      "output": "여기서 기다려 주세요. 5분 안에 돌아올게요.",
+      "judgment": "Core instruction, return commitment, and number preserved; temporal fidelity has an inherited caveat.",
+      "concrete_evidence": "'Please wait here' becomes '여기서 기다려 주세요'; 'be back' becomes '돌아올게요'; the quantity remains '5분'. However, '안에' means 'within', making five minutes an upper bound rather than the source's ordinary approximately-five-minutes-later reading.",
+      "caveat": "Do not certify exact temporal equivalence. This is a real bounded wording/meaning imprecision even though the general wait-and-return message survives.",
+      "configuration_attribution": "Exact pair and this caveat are explicitly documented in #245. The pair occurs in both current n24 control and n23 records, so the present evidence does not support attributing the imprecision to the n23 configuration.",
+      "recorded_occurrences": 9
+    },
+    {
+      "id": "9db61efbd35b1374",
+      "input": "아까 말한 파란 문 말고 빨간 문으로 와 주세요.",
+      "output": "Please come to the red door, not the blue one I mentioned earlier.",
+      "judgment": "Core destination correction preserved.",
+      "concrete_evidence": "'빨간 문으로 와 주세요' becomes 'Please come to the red door'; '파란 문 말고' becomes 'not the blue one'; '아까 말한' becomes 'mentioned earlier'. The requested red destination is not confused with the rejected blue destination.",
+      "caveat": "The Korean leaves the subject of '말한' implicit; English makes it 'I'. That is a plausible contextual explicitation, not something the standalone Korean explicitly names. Retain this small source ambiguity rather than claiming word-for-word identity.",
+      "configuration_attribution": "The exact English wording is already in #245 and present in both current configurations. The implicit-subject explicitation is shared/inherited, not observed configuration-specific damage.",
+      "recorded_occurrences": 14
+    },
+    {
+      "id": "ccfe38c884f599bd",
+      "input": "유나는 3시가 아니라 4시에 도착해요.",
+      "output": "Yuna arrives at 4, not 3.",
+      "judgment": "Meaning preserved.",
+      "concrete_evidence": "'유나' becomes 'Yuna'; '4시에' remains 'at 4'; '3시가 아니라' remains 'not 3'; '도착해요' becomes 'arrives'. Name, arrival event, both times, and the direction of correction survive.",
+      "caveat": "'Arrives' versus 'is arriving' is an ordinary scheduling/aspect choice here, not a change to the corrected time. As in the other Yuna variant, no AM/PM detail is supplied.",
+      "configuration_attribution": "Exact pair is inherited from #245 and present in both current configurations. No configuration-specific material degradation observed.",
+      "recorded_occurrences": 14
+    },
+    {
+      "id": "ffb4415c4591f5ca",
+      "input": "I thought you were joking, but I was wrong.",
+      "output": "농담인 줄 알았는데, 아니었네요.",
+      "judgment": "Meaning preserved through natural Korean subject omission and reformulation.",
+      "concrete_evidence": "'thought you were joking' becomes '농담인 줄 알았는데'; the correction 'but I was wrong' becomes '아니었네요', conveying the realization that it was not a joke. The output does not affirm joking or drop the reversal.",
+      "caveat": "The English 'I' and 'you' are not explicitly repeated in Korean, and being wrong is expressed as 'it wasn't [a joke]'. Both are normal contextual Korean renderings, not an identity reversal or material omission in this fixture.",
+      "configuration_attribution": "Exact pair is inherited from #245 and present in both current configurations. No configuration-specific material degradation observed.",
+      "recorded_occurrences": 14
+    }
+  ],
+  "shared_versus_configuration_specific": {
+    "observed_relationship": "All nine exact input/output strings occur in both the current n24/2048 record and n23/2048 record. All nine also match the prior pinned #245 unique-pair record.",
+    "preexisting_caveats": [
+      "Within-five-minutes upper-bound wording in ID 8eeb9630ba4e5b92.",
+      "Added only-two emphasis in ID 1351f036a4fcd63f.",
+      "Minor inherited contextual explicitations or punctuation noted per ID; none changes the core fixture contrast."
+    ],
+    "configuration_specific_damage": "None observed in the reviewed strings. This statement does not establish equivalence for unseen outputs, future configurations, or unreviewed clean runs."
+  },
+  "sources": [
+    {
+      "description": "Current requirements and native-only quality scope",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/issues/254"
+    },
+    {
+      "description": "Authoritative local synthetic source definitions",
+      "path": "experiments/gemma4_26b_qat/run_matrix.py:27-39"
+    },
+    {
+      "description": "Current reviewed pair text, predicates, and occurrence ledger",
+      "path": "experiments/gemma4_26b_qat/results/tuning8gib/quality-unique.json"
+    },
+    {
+      "description": "Pinned original #245 exact pair strings",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6/experiments/gemma4_26b_qat/results/selfpeer/quality-unique.json"
+    },
+    {
+      "description": "Pinned original #245 caveats and review boundary",
+      "url": "https://github.com/kapitalismho/PuriPuly-heart/blob/c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6/experiments/gemma4_26b_qat/results/selfpeer/quality-review.json"
+    }
+  ],
+  "execution_and_limits": {
+    "performed": "Read-only source/record inspection and independent manual comparison of all nine unique pairs; static JSON projections for counts and completion metadata.",
+    "not_performed": "No file modifications, model invocations, builds, tests, timing/memory validation, performance recommendation, or final checkpoint review.",
+    "continuation": "Reuse the nine judgments only when both source and output strings are identical. Review any newly supplied unique strings independently; clean-run EOS/coverage metadata must come from the later clean cohort rather than inheriting the contaminated cohort's occurrence counts."
+  },
+  "review_author": "Independent quality-review researcher, Director-delegated",
+  "reuse_policy": "Exact input AND output string equality only. Recompute coverage and EOS from final clean run records; initial contaminated occurrences are not reused as performance or completion evidence."
+}

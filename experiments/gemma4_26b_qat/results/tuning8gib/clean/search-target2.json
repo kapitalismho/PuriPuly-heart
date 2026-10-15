@@ -1,0 +1,53 @@
+{
+  "stage": "target",
+  "boundary_bytes": 8589934592,
+  "started_utc": "2026-10-15T23:15:57.869944+00:00",
+  "status": "completed",
+  "method": "Exact source slot arithmetic predicts a starting point only. Each requested cache executes the unchanged44-request full lifecycle. Measured maximum lifecycle PID dedicated peaks decide. Finish only at an eligible slot and its observed next-slot over-boundary neighbor; integer requests sharing an allocation are not distinct effective caches.",
+  "placements": {
+    "24": {
+      "curve_reference": "tuning8gib-clean-n24-c2048-a1",
+      "predicted_noncache_base_bytes": 5496099840.0,
+      "predicted_start_slots": 923,
+      "new_runs": [
+        {
+          "run": "tuning8gib-clean-n24-c2945-target2-s922",
+          "slots": 922,
+          "requested_mib": 2945
+        }
+      ],
+      "status": "measured_neighbor_bracket",
+      "eligible_slots": 922,
+      "eligible_requested_mib_range": [
+        2945,
+        2947
+      ],
+      "eligible": {
+        "peak_bytes": 8586092544.0,
+        "runs": [
+          "tuning8gib-clean-n24-c2945-target2-s922"
+        ],
+        "requested_mib": [
+          2945
+        ]
+      },
+      "next_slots": 923,
+      "next": {
+        "peak_bytes": 8590503936.0,
+        "runs": [
+          "tuning8gib-clean-n24-c2948-target1-s923",
+          "tuning8gib-clean-n24-c2948-r2",
+          "tuning8gib-clean-n24-c2948-r3"
+        ],
+        "requested_mib": [
+          2948,
+          2948,
+          2948
+        ]
+      },
+      "margin_bytes": 3842048.0,
+      "slot_increment_bytes": 3345408
+    }
+  },
+  "finished_utc": "2026-10-15T23:16:27.644077+00:00"
+}

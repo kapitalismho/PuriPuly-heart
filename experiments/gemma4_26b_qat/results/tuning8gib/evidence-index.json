@@ -1,0 +1,491 @@
+{
+  "issue": 254,
+  "report": "../../TUNING8GIB.md",
+  "timings": "../../TUNING8GIB_TIMINGS.md",
+  "current_cohort": "clean/ only",
+  "clean_runs": 49,
+  "clean_outputs": 2156,
+  "configurations": 34,
+  "contaminated_runs": 4,
+  "contaminated_outputs": 162,
+  "authority": "Director owns candidate pin, publication, final experimental acceptance and routing of owner disposition; worker makes no Git/GitHub mutations or adoption.",
+  "entrypoints": {
+    "summary": "clean/summary.json",
+    "quality_unique": "clean/quality-unique.json",
+    "quality_full_per_id": "clean/quality-review.json",
+    "independent_final_quality": "clean/quality-confirmation.json",
+    "initial_semantic_review": "quality-review-initial.json",
+    "prerequisites": "prerequisites.json",
+    "cache_source_evidence": "cache-semantics.json",
+    "contamination": "contamination.json",
+    "probe_development_failures": "probe-development.json",
+    "baseline_metadata_correction": "clean/metadata-corrections.json",
+    "historical_workload_identity": "clean/workload-inheritance.json",
+    "target_brackets_initial": "clean/search-target1.json",
+    "target_n24_reclassification_bracket": "clean/search-target2.json",
+    "band_brackets": "clean/search-band1.json",
+    "counterbalanced_reverse_plan": "clean/repeat-plan.json",
+    "focused_checks": "clean/focused-check.json",
+    "sanitization_scan": "sanitization.json",
+    "release": "clean/release.json",
+    "recommendation": "clean/recommendation.json"
+  },
+  "per_run": [
+    {
+      "id": "tuning8gib-clean-n24-c2048-a1",
+      "result": "clean/tuning8gib-clean-n24-c2048-a1.json",
+      "samples": "clean/tuning8gib-clean-n24-c2048-a1.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2048-a1.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2048-a1.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2048-a1.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2048-curve",
+      "result": "clean/tuning8gib-clean-n23-c2048-curve.json",
+      "samples": "clean/tuning8gib-clean-n23-c2048-curve.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2048-curve.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2048-curve.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2048-curve.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2048-curve",
+      "result": "clean/tuning8gib-clean-n22-c2048-curve.json",
+      "samples": "clean/tuning8gib-clean-n22-c2048-curve.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2048-curve.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2048-curve.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2048-curve.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c2048-curve",
+      "result": "clean/tuning8gib-clean-n21-c2048-curve.json",
+      "samples": "clean/tuning8gib-clean-n21-c2048-curve.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c2048-curve.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c2048-curve.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c2048-curve.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n20-c2048-curve",
+      "result": "clean/tuning8gib-clean-n20-c2048-curve.json",
+      "samples": "clean/tuning8gib-clean-n20-c2048-curve.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n20-c2048-curve.slots.json",
+      "native_log": "clean/tuning8gib-clean-n20-c2048-curve.native.log",
+      "preflight": "clean/tuning8gib-clean-n20-c2048-curve.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n19-c2048-curve",
+      "result": "clean/tuning8gib-clean-n19-c2048-curve.json",
+      "samples": "clean/tuning8gib-clean-n19-c2048-curve.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n19-c2048-curve.slots.json",
+      "native_log": "clean/tuning8gib-clean-n19-c2048-curve.native.log",
+      "preflight": "clean/tuning8gib-clean-n19-c2048-curve.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n18-c2048-curve",
+      "result": "clean/tuning8gib-clean-n18-c2048-curve.json",
+      "samples": "clean/tuning8gib-clean-n18-c2048-curve.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n18-c2048-curve.slots.json",
+      "native_log": "clean/tuning8gib-clean-n18-c2048-curve.native.log",
+      "preflight": "clean/tuning8gib-clean-n18-c2048-curve.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2948-target1-s923",
+      "result": "clean/tuning8gib-clean-n24-c2948-target1-s923.json",
+      "samples": "clean/tuning8gib-clean-n24-c2948-target1-s923.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2948-target1-s923.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2948-target1-s923.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2948-target1-s923.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2952-target1-s924",
+      "result": "clean/tuning8gib-clean-n24-c2952-target1-s924.json",
+      "samples": "clean/tuning8gib-clean-n24-c2952-target1-s924.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2952-target1-s924.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2952-target1-s924.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2952-target1-s924.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2540-target1-s795",
+      "result": "clean/tuning8gib-clean-n23-c2540-target1-s795.json",
+      "samples": "clean/tuning8gib-clean-n23-c2540-target1-s795.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2540-target1-s795.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2540-target1-s795.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2540-target1-s795.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2543-target1-s796",
+      "result": "clean/tuning8gib-clean-n23-c2543-target1-s796.json",
+      "samples": "clean/tuning8gib-clean-n23-c2543-target1-s796.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2543-target1-s796.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2543-target1-s796.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2543-target1-s796.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2132-target1-s667",
+      "result": "clean/tuning8gib-clean-n22-c2132-target1-s667.json",
+      "samples": "clean/tuning8gib-clean-n22-c2132-target1-s667.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2132-target1-s667.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2132-target1-s667.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2132-target1-s667.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2135-target1-s668",
+      "result": "clean/tuning8gib-clean-n22-c2135-target1-s668.json",
+      "samples": "clean/tuning8gib-clean-n22-c2135-target1-s668.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2135-target1-s668.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2135-target1-s668.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2135-target1-s668.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c1723-target1-s539",
+      "result": "clean/tuning8gib-clean-n21-c1723-target1-s539.json",
+      "samples": "clean/tuning8gib-clean-n21-c1723-target1-s539.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c1723-target1-s539.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c1723-target1-s539.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c1723-target1-s539.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c1727-target1-s540",
+      "result": "clean/tuning8gib-clean-n21-c1727-target1-s540.json",
+      "samples": "clean/tuning8gib-clean-n21-c1727-target1-s540.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c1727-target1-s540.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c1727-target1-s540.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c1727-target1-s540.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n20-c1315-target1-s411",
+      "result": "clean/tuning8gib-clean-n20-c1315-target1-s411.json",
+      "samples": "clean/tuning8gib-clean-n20-c1315-target1-s411.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n20-c1315-target1-s411.slots.json",
+      "native_log": "clean/tuning8gib-clean-n20-c1315-target1-s411.native.log",
+      "preflight": "clean/tuning8gib-clean-n20-c1315-target1-s411.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n20-c1318-target1-s412",
+      "result": "clean/tuning8gib-clean-n20-c1318-target1-s412.json",
+      "samples": "clean/tuning8gib-clean-n20-c1318-target1-s412.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n20-c1318-target1-s412.slots.json",
+      "native_log": "clean/tuning8gib-clean-n20-c1318-target1-s412.native.log",
+      "preflight": "clean/tuning8gib-clean-n20-c1318-target1-s412.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n20-c1321-target1-s413",
+      "result": "clean/tuning8gib-clean-n20-c1321-target1-s413.json",
+      "samples": "clean/tuning8gib-clean-n20-c1321-target1-s413.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n20-c1321-target1-s413.slots.json",
+      "native_log": "clean/tuning8gib-clean-n20-c1321-target1-s413.native.log",
+      "preflight": "clean/tuning8gib-clean-n20-c1321-target1-s413.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n19-c907-target1-s283",
+      "result": "clean/tuning8gib-clean-n19-c907-target1-s283.json",
+      "samples": "clean/tuning8gib-clean-n19-c907-target1-s283.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n19-c907-target1-s283.slots.json",
+      "native_log": "clean/tuning8gib-clean-n19-c907-target1-s283.native.log",
+      "preflight": "clean/tuning8gib-clean-n19-c907-target1-s283.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n19-c910-target1-s284",
+      "result": "clean/tuning8gib-clean-n19-c910-target1-s284.json",
+      "samples": "clean/tuning8gib-clean-n19-c910-target1-s284.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n19-c910-target1-s284.slots.json",
+      "native_log": "clean/tuning8gib-clean-n19-c910-target1-s284.native.log",
+      "preflight": "clean/tuning8gib-clean-n19-c910-target1-s284.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n19-c913-target1-s285",
+      "result": "clean/tuning8gib-clean-n19-c913-target1-s285.json",
+      "samples": "clean/tuning8gib-clean-n19-c913-target1-s285.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n19-c913-target1-s285.slots.json",
+      "native_log": "clean/tuning8gib-clean-n19-c913-target1-s285.native.log",
+      "preflight": "clean/tuning8gib-clean-n19-c913-target1-s285.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n18-c498-target1-s155",
+      "result": "clean/tuning8gib-clean-n18-c498-target1-s155.json",
+      "samples": "clean/tuning8gib-clean-n18-c498-target1-s155.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n18-c498-target1-s155.slots.json",
+      "native_log": "clean/tuning8gib-clean-n18-c498-target1-s155.native.log",
+      "preflight": "clean/tuning8gib-clean-n18-c498-target1-s155.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n18-c501-target1-s156",
+      "result": "clean/tuning8gib-clean-n18-c501-target1-s156.json",
+      "samples": "clean/tuning8gib-clean-n18-c501-target1-s156.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n18-c501-target1-s156.slots.json",
+      "native_log": "clean/tuning8gib-clean-n18-c501-target1-s156.native.log",
+      "preflight": "clean/tuning8gib-clean-n18-c501-target1-s156.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n18-c505-target1-s157",
+      "result": "clean/tuning8gib-clean-n18-c505-target1-s157.json",
+      "samples": "clean/tuning8gib-clean-n18-c505-target1-s157.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n18-c505-target1-s157.slots.json",
+      "native_log": "clean/tuning8gib-clean-n18-c505-target1-s157.native.log",
+      "preflight": "clean/tuning8gib-clean-n18-c505-target1-s157.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2048-a2",
+      "result": "clean/tuning8gib-clean-n24-c2048-a2.json",
+      "samples": "clean/tuning8gib-clean-n24-c2048-a2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2048-a2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2048-a2.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2048-a2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2948-r2",
+      "result": "clean/tuning8gib-clean-n24-c2948-r2.json",
+      "samples": "clean/tuning8gib-clean-n24-c2948-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2948-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2948-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2948-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2540-r2",
+      "result": "clean/tuning8gib-clean-n23-c2540-r2.json",
+      "samples": "clean/tuning8gib-clean-n23-c2540-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2540-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2540-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2540-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2132-r2",
+      "result": "clean/tuning8gib-clean-n22-c2132-r2.json",
+      "samples": "clean/tuning8gib-clean-n22-c2132-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2132-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2132-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2132-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c1723-r2",
+      "result": "clean/tuning8gib-clean-n21-c1723-r2.json",
+      "samples": "clean/tuning8gib-clean-n21-c1723-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c1723-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c1723-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c1723-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c3051-band1-s955",
+      "result": "clean/tuning8gib-clean-n24-c3051-band1-s955.json",
+      "samples": "clean/tuning8gib-clean-n24-c3051-band1-s955.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c3051-band1-s955.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c3051-band1-s955.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c3051-band1-s955.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c3054-band1-s956",
+      "result": "clean/tuning8gib-clean-n24-c3054-band1-s956.json",
+      "samples": "clean/tuning8gib-clean-n24-c3054-band1-s956.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c3054-band1-s956.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c3054-band1-s956.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c3054-band1-s956.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2642-band1-s827",
+      "result": "clean/tuning8gib-clean-n23-c2642-band1-s827.json",
+      "samples": "clean/tuning8gib-clean-n23-c2642-band1-s827.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2642-band1-s827.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2642-band1-s827.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2642-band1-s827.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2645-band1-s828",
+      "result": "clean/tuning8gib-clean-n23-c2645-band1-s828.json",
+      "samples": "clean/tuning8gib-clean-n23-c2645-band1-s828.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2645-band1-s828.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2645-band1-s828.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2645-band1-s828.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2234-band1-s699",
+      "result": "clean/tuning8gib-clean-n22-c2234-band1-s699.json",
+      "samples": "clean/tuning8gib-clean-n22-c2234-band1-s699.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2234-band1-s699.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2234-band1-s699.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2234-band1-s699.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2237-band1-s700",
+      "result": "clean/tuning8gib-clean-n22-c2237-band1-s700.json",
+      "samples": "clean/tuning8gib-clean-n22-c2237-band1-s700.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2237-band1-s700.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2237-band1-s700.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2237-band1-s700.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c1825-band1-s571",
+      "result": "clean/tuning8gib-clean-n21-c1825-band1-s571.json",
+      "samples": "clean/tuning8gib-clean-n21-c1825-band1-s571.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c1825-band1-s571.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c1825-band1-s571.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c1825-band1-s571.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c1829-band1-s572",
+      "result": "clean/tuning8gib-clean-n21-c1829-band1-s572.json",
+      "samples": "clean/tuning8gib-clean-n21-c1829-band1-s572.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c1829-band1-s572.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c1829-band1-s572.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c1829-band1-s572.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2890-refine-r1",
+      "result": "clean/tuning8gib-clean-n24-c2890-refine-r1.json",
+      "samples": "clean/tuning8gib-clean-n24-c2890-refine-r1.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2890-refine-r1.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2890-refine-r1.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2890-refine-r1.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n21-c1723-r3",
+      "result": "clean/tuning8gib-clean-n21-c1723-r3.json",
+      "samples": "clean/tuning8gib-clean-n21-c1723-r3.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n21-c1723-r3.slots.json",
+      "native_log": "clean/tuning8gib-clean-n21-c1723-r3.native.log",
+      "preflight": "clean/tuning8gib-clean-n21-c1723-r3.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2132-r3",
+      "result": "clean/tuning8gib-clean-n22-c2132-r3.json",
+      "samples": "clean/tuning8gib-clean-n22-c2132-r3.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2132-r3.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2132-r3.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2132-r3.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n22-c2048-r2",
+      "result": "clean/tuning8gib-clean-n22-c2048-r2.json",
+      "samples": "clean/tuning8gib-clean-n22-c2048-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n22-c2048-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n22-c2048-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n22-c2048-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2642-b2",
+      "result": "clean/tuning8gib-clean-n23-c2642-b2.json",
+      "samples": "clean/tuning8gib-clean-n23-c2642-b2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2642-b2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2642-b2.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2642-b2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2540-r3",
+      "result": "clean/tuning8gib-clean-n23-c2540-r3.json",
+      "samples": "clean/tuning8gib-clean-n23-c2540-r3.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2540-r3.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2540-r3.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2540-r3.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n23-c2048-r2",
+      "result": "clean/tuning8gib-clean-n23-c2048-r2.json",
+      "samples": "clean/tuning8gib-clean-n23-c2048-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n23-c2048-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n23-c2048-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n23-c2048-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c3051-b2",
+      "result": "clean/tuning8gib-clean-n24-c3051-b2.json",
+      "samples": "clean/tuning8gib-clean-n24-c3051-b2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c3051-b2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c3051-b2.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c3051-b2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2948-r3",
+      "result": "clean/tuning8gib-clean-n24-c2948-r3.json",
+      "samples": "clean/tuning8gib-clean-n24-c2948-r3.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2948-r3.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2948-r3.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2948-r3.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2890-refine-r2",
+      "result": "clean/tuning8gib-clean-n24-c2890-refine-r2.json",
+      "samples": "clean/tuning8gib-clean-n24-c2890-refine-r2.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2890-refine-r2.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2890-refine-r2.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2890-refine-r2.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2048-a3",
+      "result": "clean/tuning8gib-clean-n24-c2048-a3.json",
+      "samples": "clean/tuning8gib-clean-n24-c2048-a3.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2048-a3.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2048-a3.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2048-a3.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    },
+    {
+      "id": "tuning8gib-clean-n24-c2945-target2-s922",
+      "result": "clean/tuning8gib-clean-n24-c2945-target2-s922.json",
+      "samples": "clean/tuning8gib-clean-n24-c2945-target2-s922.samples.jsonl",
+      "slots": "clean/tuning8gib-clean-n24-c2945-target2-s922.slots.json",
+      "native_log": "clean/tuning8gib-clean-n24-c2945-target2-s922.native.log",
+      "preflight": "clean/tuning8gib-clean-n24-c2945-target2-s922.headroom.json",
+      "exact_commands": "result JSON command and probe_command token arrays; sanitized root/checkouts only"
+    }
+  ],
+  "candidate_sources": [
+    "windows_metrics.py",
+    "windows_memory.py",
+    "summarize_timings.py",
+    "summarize_selfpeer.py",
+    "summarize.py",
+    "followup_probes.py",
+    "run_matrix.py",
+    "selfpeer_probes.py",
+    "summarize_tuning8gib.py",
+    "bracket_tuning8gib.py",
+    "quality_tuning8gib.py"
+  ],
+  "raw_evidence": "<ARTIFACT_ROOT>/tuning8gib/runs/<run-id>/; path-bearing originals remain external",
+  "limits": "Native-only on24GiB-class7900XTX. No physical8GiB card/app/GUI/audio/coexistence/rollout claim."
+}

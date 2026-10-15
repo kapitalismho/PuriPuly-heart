@@ -1,0 +1,119 @@
+{
+  "activity": "Final independent bounded quality confirmation for issue #254",
+  "status": "Complete for the frozen final clean set.",
+  "sources_read": [
+    "experiments/gemma4_26b_qat/results/tuning8gib/clean/quality-unique.json",
+    "experiments/gemma4_26b_qat/results/tuning8gib/clean/quality-review.json"
+  ],
+  "independently_observed_counts": {
+    "distinct_clean_run_ids": 49,
+    "output_occurrences": 2156,
+    "unique_input_output_pairs": 9,
+    "unique_source_inputs": 6,
+    "previously_reviewed_exact_pairs": 9,
+    "new_or_changed_pairs": 0,
+    "reviewed_output_occurrences": 2156,
+    "unreviewed_output_occurrences": 0
+  },
+  "exact_match_confirmation": "I read all nine final source/output strings and confirmed they are identical to my original nine judgments. I also compared the two final files directly: every per-ID source/output matches, every complete clean occurrence ledger matches exactly after order normalization, every per-ID clean count equals its ledger length, and every embedded original judgment retains the same ID/source/output. No match was inferred from ID alone.",
+  "per_id_final_coverage": [
+    {
+      "id": "1351f036a4fcd63f",
+      "occurrences": 151,
+      "exact_original_pair_match": true,
+      "output": "미나가 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+      "retained_judgment": "Mina, 12-versus-2 correction, and negation preserved; '2장만' adds inherited only-two emphasis."
+    },
+    {
+      "id": "27ca1947fd98eff1",
+      "occurrences": 151,
+      "exact_original_pair_match": true,
+      "output": "여기서 기다려 주세요. 5분 뒤에 올게요.",
+      "retained_judgment": "Wait-here instruction and approximately-five-minutes-later commitment preserved. Coming back is contextually conveyed by '올게요'."
+    },
+    {
+      "id": "2e37d3748acd5be0",
+      "occurrences": 49,
+      "exact_original_pair_match": true,
+      "output": "Yuna is arriving at 4, not 3.",
+      "retained_judgment": "Yuna and arrival at 4, not 3, preserved; no AM/PM detail invented."
+    },
+    {
+      "id": "4e2fb418d6a53458",
+      "occurrences": 241,
+      "exact_original_pair_match": true,
+      "output": "미나가 티켓을 12장 산 게 아니라, 2장 샀어요.",
+      "retained_judgment": "Mina, both ticket counts, and corrective negation preserved, without added 'only' marker."
+    },
+    {
+      "id": "6b4ce7e12d25567b",
+      "occurrences": 343,
+      "exact_original_pair_match": true,
+      "output": "That key isn't mine, it's Minsu's.",
+      "retained_judgment": "Key belongs to Minsu, not the speaker. Minor inherited comma splice is punctuation, not semantic loss."
+    },
+    {
+      "id": "8eeb9630ba4e5b92",
+      "occurrences": 192,
+      "exact_original_pair_match": true,
+      "output": "여기서 기다려 주세요. 5분 안에 돌아올게요.",
+      "retained_judgment": "Wait-here instruction, return, and number preserved, but '안에' means within five minutes. Retain the inherited upper-bound temporal imprecision; not exact temporal equivalence."
+    },
+    {
+      "id": "9db61efbd35b1374",
+      "occurrences": 343,
+      "exact_original_pair_match": true,
+      "output": "Please come to the red door, not the blue one I mentioned earlier.",
+      "retained_judgment": "Red destination versus rejected previously mentioned blue door preserved. 'I mentioned' explicitly resolves a subject left implicit by the Korean source; retain that inherited source ambiguity."
+    },
+    {
+      "id": "ccfe38c884f599bd",
+      "occurrences": 343,
+      "exact_original_pair_match": true,
+      "output": "Yuna arrives at 4, not 3.",
+      "retained_judgment": "Yuna, arrival, both times, and direction of correction preserved. Scheduling/aspect wording does not change the corrected time."
+    },
+    {
+      "id": "ffb4415c4591f5ca",
+      "occurrences": 343,
+      "exact_original_pair_match": true,
+      "output": "농담인 줄 알았는데, 아니었네요.",
+      "retained_judgment": "Initial belief that it was joking and subsequent correction preserved through natural Korean subject omission and '아니었네요'."
+    }
+  ],
+  "every_occurrence_coverage": {
+    "run_request_counts": "All 49 run IDs have exactly 44 occurrence records each.",
+    "per_run_expected_identity_set": "Exactly one Self and one Peer request for first_prefix round 0, serial_pairs rounds 0–5, and simultaneous_pairs rounds 0–14.",
+    "missing_or_unexpected_request_identities": [],
+    "duplicate_run_phase_channel_round_keys": [],
+    "final_phase_totals": {
+      "first_prefix": 98,
+      "serial_pairs": 588,
+      "simultaneous_pairs": 1470
+    },
+    "final_channel_totals": {
+      "Self": 1078,
+      "Peer": 1078
+    },
+    "review_ledger_total": 2156,
+    "unique_pair_ledger_total": 2156,
+    "full_per_id_ledger_mismatches": []
+  },
+  "eos_and_predicates": {
+    "recorded_eos_occurrences": 2156,
+    "non_eos_or_missing_stop_type_occurrences": 0,
+    "required_predicates": "nonempty, numbers_present, no_reasoning, and not_truncated are true on all nine final pair records.",
+    "false_or_missing_required_predicate_anomalies": [],
+    "manual_surface_observation": "The identical nine reviewed strings contain no visible truncation, pathological repetition, reasoning trace, translation commentary, or instruction leakage."
+  },
+  "caveat_summary": {
+    "temporal": "192 outputs say within five minutes; 151 say five minutes later. Preserve the temporal distinction rather than certifying exact equivalence.",
+    "emphasis": "151 outputs explicitly add only-two emphasis; the 241 other Mina outputs omit that extra marker. Both preserve two, not twelve.",
+    "attribution": "These exact strings and their caveats predate the clean cohort and were shared by the original control and comparison records. No new configuration-specific material damage appears in the final unique set.",
+    "other_limits": "Keep the original per-ID contextual/punctuation caveats. Nine pairs across six synthetic sources do not establish broad translation quality or model superiority."
+  },
+  "mismatches": [],
+  "historical_count_note": "The embedded manual_judgment_with_original_limits.recorded_occurrences values intentionally retain the initial review's historical counts. They are not final clean counts. The final clean_occurrences fields and full occurrence ledgers independently agree with all 2,156 final occurrences.",
+  "verification_boundary": "This confirmation covers exact semantic strings, recorded EOS/predicates, and final clean review-ledger coverage. It does not independently audit raw runtime completions or validate timing, memory, repeatability, eligibility, or a configuration recommendation. Contaminated pre-restart measurements remain outside this confirmation.",
+  "actions": "Read-only file inspection, static JSON projections, and in-memory comparison only. No files changed and no model/runtime execution."
+}

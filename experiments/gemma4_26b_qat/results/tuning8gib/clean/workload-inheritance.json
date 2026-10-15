@@ -1,0 +1,34 @@
+{
+  "historical_commit": "c3da5bb5f97ede9b2cfb31ce1d0f1f590e7e2ec6",
+  "historical_run": "selfpeer-cache2048-a1",
+  "current_run": "tuning8gib-clean-n24-c2048-a1",
+  "compared_requests": 44,
+  "identity_fields": [
+    "phase",
+    "index",
+    "round",
+    "channel",
+    "slot",
+    "case_index",
+    "prompt_sha256",
+    "system_sha256",
+    "temperature",
+    "seed",
+    "max_output_tokens"
+  ],
+  "all_workload_identities_equal": true,
+  "all_actual_evaluated_and_cached_prompt_counts_equal": true,
+  "output_token_differences": [
+    {
+      "ordinal": 21,
+      "old_O": 22,
+      "clean_O": 21
+    },
+    {
+      "ordinal": 27,
+      "old_O": 22,
+      "clean_O": 21
+    }
+  ],
+  "limit": "Historical timing/memory is not used as current-session control; this compares only unchanged workload and prompt/cache token accounting."
+}

@@ -1,0 +1,5344 @@
+{
+  "baseline": "ccab84af268ba58ce47d501132b69e7a583d861b",
+  "target_bytes": 8589934592,
+  "ceiling_bytes": 8697308774,
+  "runs": [
+    {
+      "profile": "tuning8gib-n24-c2048-a1",
+      "started_utc": "2026-10-15T22:43:48Z",
+      "status": "completed",
+      "error": null,
+      "n_cpu_moe": 24,
+      "cache_mib": 2048,
+      "measurement_group": "control",
+      "cold_readiness_seconds": 12.556860600001528,
+      "elapsed_seconds": 37.28181900001073,
+      "cpu_seconds": 4.984375,
+      "cpu_one_core_percent": 13.369452279135215,
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c",
+      "safety_cutoff": null,
+      "gpu_adapter_luid": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "device_gpu_dedicated_bytes": [
+          "luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "device_gpu_shared_bytes": [
+          "luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "device_gpu_committed_bytes": [
+          "luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "gpu_engine_percent": [
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_0_engtype_3D",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_1_engtype_Copy",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_2_engtype_Compute 0",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_3_engtype_Copy",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_4_engtype_Timer 0",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_5_engtype_Security 1",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_6_engtype_Video JPEG 0",
+          "pid_65972_luid_0x00000000_0x0000F60B_phys_0_eng_7_engtype_Video Codec Engine"
+        ],
+        "system_pages_input_per_second": [
+          ""
+        ],
+        "system_page_reads_per_second": [
+          ""
+        ]
+      },
+      "cache_execution": {
+        "requested_mib": 2048,
+        "state": "allocated_and_used",
+        "allocations": [
+          {
+            "effective_mib_rounded_native": 2045.07,
+            "host_experts_mib_rounded_native": 9801.0,
+            "line": "0.12.055.528 I impl:    Vulkan0 MoE cache size =  2045.07 MiB for 9801.00 MiB of host experts"
+          }
+        ],
+        "groups": [
+          {
+            "layers": 24,
+            "tensor_type": "q4_0",
+            "slots": 640,
+            "host_expert_count": 3072,
+            "slot_coverage_fraction": 0.20833333333333334,
+            "effective_bytes_source_formula": 2144406528,
+            "slot_bytes_source_formula": 3345408,
+            "line": "0.12.055.534 I impl: 24 layers, q4_0:   640 slots (20.8%)"
+          }
+        ],
+        "destructor_buckets": [
+          {
+            "ubatch": "<=8",
+            "hits": 83145,
+            "misses": 35508,
+            "hit_rate": 0.7007408156557356,
+            "uploaded_mib_rounded_native": 113285.78,
+            "line": "0.36.295.027 I llama_moe_cache: ubatch <= 8: hits = 83145, misses = 35508, hit rate = 70.07%, uploaded = 113285.78 MiB"
+          },
+          {
+            "ubatch": ">8",
+            "hits": 4523,
+            "misses": 30462,
+            "hit_rate": 0.12928397884807774,
+            "uploaded_mib_rounded_native": 97186.87,
+            "line": "0.36.295.031 I llama_moe_cache: ubatch  > 8: hits = 4523, misses = 30462, hit rate = 12.93%, uploaded = 97186.87 MiB"
+          }
+        ],
+        "large_batches": [
+          {
+            "experts_copied": 8818,
+            "copied_mib_rounded_native": 14066.6,
+            "line": "0.36.295.166 I llama_moe_cache: large batches: 8818 experts copied from the cache, 14066.60 MiB"
+          }
+        ],
+        "warnings": [
+          "0.12.329.506 I srv    load_model: prompt cache is disabled - use `--cache-ram N` to enable it",
+          "0.12.329.775 W srv          init: --cache-idle-slots requires --cache-ram, disabling"
+        ],
+        "slot_formula_source": "llama.cpp8e2d31e0e src/llama-moe-cache.cpp:264-328,444-456; fused Q4_0 gate/up2230272+down1115136 bytes/slot and one mandatory padding plane; exact source-derived bytes, native effective MiB rounded2dp.",
+        "scope": "Whole lifecycle including native warmup; logical upload/copy MiB, not measured PCIe traffic."
+      },
+      "preflight": {
+        "observed_utc": "2026-10-15T22:43:47.898677+00:00",
+        "model_runtime_processes": [],
+        "resources": {
+          "system_available_physical_bytes": 7923585024,
+          "system_committed_bytes": 57906388992,
+          "system_commit_limit_bytes": 76883087360,
+          "system_commit_headroom_bytes": 18976698368,
+          "device_gpu_dedicated_bytes": 4368125952.0,
+          "device_gpu_shared_bytes": 536166400.0,
+          "device_gpu_committed_bytes": 5188964352.0,
+          "system_pages_input_per_second": 1677.6170411410712,
+          "system_page_reads_per_second": 238.7123062493224
+        },
+        "counter_errors": {},
+        "pressure_qualified_by_explicit_override": true,
+        "pressure_boundary": "User-approved existing background RAM; no unrelated processes changed; not actual VRChat coexistence."
+      },
+      "completed": 44,
+      "checks": {
+        "complete_44": true,
+        "phase_counts": true,
+        "eos_and_automated_bounded_quality": true,
+        "fresh_graceful_exit": true,
+        "workload_identity": true,
+        "prompt_evaluated_cached_counts": true,
+        "self0_peer1_slot2_unused": true,
+        "native_overlap_15": true,
+        "effective_backend_controls_absent": true,
+        "pid_exact_adapter_dedicated_observed": true,
+        "cache_used": true,
+        "vulkan_host": true
+      },
+      "complete_measurement": true,
+      "memory_class": "target",
+      "lifecycle_resources": {
+        "PageFaultCount": {
+          "n": 151,
+          "median": 4294315,
+          "p95": 4329815,
+          "min": 564,
+          "max": 4346619
+        },
+        "PeakPagefileUsage": {
+          "n": 151,
+          "median": 18720583680,
+          "p95": 18720583680,
+          "min": 389120,
+          "max": 18720583680
+        },
+        "PeakWorkingSetSize": {
+          "n": 151,
+          "median": 11111641088,
+          "p95": 11111641088,
+          "min": 2224128,
+          "max": 11111641088
+        },
+        "PrivateUsage": {
+          "n": 151,
+          "median": 18668494848,
+          "p95": 18717417472,
+          "min": 114688,
+          "max": 18720514048
+        },
+        "WorkingSetSize": {
+          "n": 151,
+          "median": 10955259904,
+          "p95": 11016257536,
+          "min": 69632,
+          "max": 11039326208
+        },
+        "cpu_seconds": {
+          "n": 151,
+          "median": 2.421875,
+          "p95": 4.734375,
+          "min": 0.0,
+          "max": 4.984375
+        },
+        "device_gpu_committed_bytes": {
+          "n": 151,
+          "median": 23641427968.0,
+          "p95": 23678521344.0,
+          "min": 5178740736.0,
+          "max": 23681404928.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 151,
+          "median": 11974127616.0,
+          "p95": 12009811968.0,
+          "min": 4356755456.0,
+          "max": 12012695552.0
+        },
+        "device_gpu_shared_bytes": {
+          "n": 151,
+          "median": 11375910912.0,
+          "p95": 11376041984.0,
+          "min": 536166400.0,
+          "max": 11491422208.0
+        },
+        "gpu_engine_percent": {
+          "n": 148,
+          "median": 42.66642203999908,
+          "p95": 64.61247468092225,
+          "min": 0.0,
+          "max": 69.2081769374454
+        },
+        "process_gpu_committed_bytes": {
+          "n": 149,
+          "median": 18478280704.0,
+          "p95": 18478809088.0,
+          "min": 11853824.0,
+          "max": 18478809088.0
+        },
+        "process_gpu_dedicated_bytes": {
+          "n": 149,
+          "median": 7638933504.0,
+          "p95": 7640506368.0,
+          "min": 11517952.0,
+          "max": 7640506368.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 149,
+          "median": 10839744512.0,
+          "p95": 10839875584.0,
+          "min": 335872.0,
+          "max": 10955255808.0
+        },
+        "system_available_physical_bytes": {
+          "n": 151,
+          "median": 1282605056,
+          "p95": 7177850880,
+          "min": 8400896,
+          "max": 12410646528
+        },
+        "system_commit_headroom_bytes": {
+          "n": 151,
+          "median": 9619128320,
+          "p95": 18150809600,
+          "min": 5599899648,
+          "max": 19190792192
+        },
+        "system_commit_limit_bytes": {
+          "n": 151,
+          "median": 85581942784,
+          "p95": 86664781824,
+          "min": 76883087360,
+          "max": 86664781824
+        },
+        "system_committed_bytes": {
+          "n": 151,
+          "median": 76617994240,
+          "p95": 76946841600,
+          "min": 57692295168,
+          "max": 77045653504
+        },
+        "system_page_reads_per_second": {
+          "n": 151,
+          "median": 241.34234612917044,
+          "p95": 10125.837230390101,
+          "min": 0.0,
+          "max": 18454.171872050003
+        },
+        "system_pages_input_per_second": {
+          "n": 151,
+          "median": 1649.1726985493312,
+          "p95": 627854.0330420231,
+          "min": 0.0,
+          "max": 732076.5554940415
+        }
+      },
+      "memory_units": {
+        "process_gpu_dedicated_bytes": {
+          "bytes": 7640506368.0,
+          "GiB": 7.115776062011719,
+          "GB": 7.640506368
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 12012695552.0,
+          "GiB": 11.187694549560547,
+          "GB": 12.012695552
+        },
+        "WorkingSetSize": {
+          "bytes": 11039326208,
+          "GiB": 10.281173706054688,
+          "GB": 11.039326208
+        },
+        "PrivateUsage": {
+          "bytes": 18720514048,
+          "GiB": 17.434837341308594,
+          "GB": 18.720514048
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 10955255808.0,
+          "GiB": 10.202877044677734,
+          "GB": 10.955255808
+        }
+      },
+      "phase_resources": {
+        "load": {
+          "PageFaultCount": {
+            "n": 52,
+            "median": 3030830.5,
+            "p95": 4271890,
+            "min": 564,
+            "max": 4273525
+          },
+          "PeakPagefileUsage": {
+            "n": 52,
+            "median": 15279312896.0,
+            "p95": 18533535744,
+            "min": 389120,
+            "max": 18594426880
+          },
+          "PeakWorkingSetSize": {
+            "n": 52,
+            "median": 10351142912.0,
+            "p95": 11111641088,
+            "min": 2224128,
+            "max": 11111641088
+          },
+          "PrivateUsage": {
+            "n": 52,
+            "median": 15162023936.0,
+            "p95": 18533535744,
+            "min": 389120,
+            "max": 18594418688
+          },
+          "WorkingSetSize": {
+            "n": 52,
+            "median": 9304078336.0,
+            "p95": 11039326208,
+            "min": 2224128,
+            "max": 11039326208
+          },
+          "cpu_seconds": {
+            "n": 52,
+            "median": 0.421875,
+            "p95": 0.890625,
+            "min": 0.0,
+            "max": 0.890625
+          },
+          "device_gpu_committed_bytes": {
+            "n": 52,
+            "median": 19946934272.0,
+            "p95": 23523254272.0,
+            "min": 5178740736.0,
+            "max": 23582121984.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 52,
+            "median": 8432443392.0,
+            "p95": 11877568512.0,
+            "min": 4357902336.0,
+            "max": 11932766208.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 52,
+            "median": 11229261824.0,
+            "p95": 11428507648.0,
+            "min": 536166400.0,
+            "max": 11491422208.0
+          },
+          "gpu_engine_percent": {
+            "n": 50,
+            "median": 0.0,
+            "p95": 29.86898712950909,
+            "min": 0.0,
+            "max": 42.98699926435096
+          },
+          "process_gpu_committed_bytes": {
+            "n": 51,
+            "median": 14784184320.0,
+            "p95": 18356310016.0,
+            "min": 11853824.0,
+            "max": 18415177728.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 51,
+            "median": 4091088896.0,
+            "p95": 7532314624.0,
+            "min": 11517952.0,
+            "max": 7588560896.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 51,
+            "median": 10693095424.0,
+            "p95": 10892341248.0,
+            "min": 335872.0,
+            "max": 10955255808.0
+          },
+          "system_available_physical_bytes": {
+            "n": 52,
+            "median": 647307264.0,
+            "p95": 7846363136,
+            "min": 8400896,
+            "max": 7923683328
+          },
+          "system_commit_headroom_bytes": {
+            "n": 52,
+            "median": 8995084288.0,
+            "p95": 18848305152,
+            "min": 5599899648,
+            "max": 18982748160
+          },
+          "system_commit_limit_bytes": {
+            "n": 52,
+            "median": 82325176320.0,
+            "p95": 82325176320,
+            "min": 76883087360,
+            "max": 84500717568
+          },
+          "system_committed_bytes": {
+            "n": 52,
+            "median": 73263169536.0,
+            "p95": 76725276672,
+            "min": 57900339200,
+            "max": 76756836352
+          },
+          "system_page_reads_per_second": {
+            "n": 52,
+            "median": 2481.6139451625995,
+            "p95": 15077.576952218355,
+            "min": 461.427657171288,
+            "max": 18454.171872050003
+          },
+          "system_pages_input_per_second": {
+            "n": 52,
+            "median": 343579.75057672174,
+            "p95": 691281.4217917583,
+            "min": 3021.34805086939,
+            "max": 732076.5554940415
+          }
+        },
+        "first_prefix": {
+          "PageFaultCount": {
+            "n": 12,
+            "median": 4284219.0,
+            "p95": 4285547,
+            "min": 4280428,
+            "max": 4285547
+          },
+          "PeakPagefileUsage": {
+            "n": 12,
+            "median": 18717474816.0,
+            "p95": 18720538624,
+            "min": 18599194624,
+            "max": 18720538624
+          },
+          "PeakWorkingSetSize": {
+            "n": 12,
+            "median": 11111641088.0,
+            "p95": 11111641088,
+            "min": 11111641088,
+            "max": 11111641088
+          },
+          "PrivateUsage": {
+            "n": 12,
+            "median": 18717417472.0,
+            "p95": 18720514048,
+            "min": 18599194624,
+            "max": 18720514048
+          },
+          "WorkingSetSize": {
+            "n": 12,
+            "median": 10944481280.0,
+            "p95": 10948861952,
+            "min": 10930245632,
+            "max": 10948861952
+          },
+          "cpu_seconds": {
+            "n": 12,
+            "median": 0.9375,
+            "p95": 1.203125,
+            "min": 0.890625,
+            "max": 1.203125
+          },
+          "device_gpu_committed_bytes": {
+            "n": 12,
+            "median": 23637471232.0,
+            "p95": 23647694848.0,
+            "min": 23583723520.0,
+            "max": 23647694848.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 12,
+            "median": 11974127616.0,
+            "p95": 11984351232.0,
+            "min": 11926351872.0,
+            "max": 11984351232.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 12,
+            "median": 11370381312.0,
+            "p95": 11370381312.0,
+            "min": 11362783232.0,
+            "max": 11370381312.0
+          },
+          "gpu_engine_percent": {
+            "n": 12,
+            "median": 53.38788156819356,
+            "p95": 60.51162187774505,
+            "min": 0.6645912875735208,
+            "max": 60.51162187774505
+          },
+          "process_gpu_committed_bytes": {
+            "n": 12,
+            "median": 18474721280.0,
+            "p95": 18474721280.0,
+            "min": 18416779264.0,
+            "max": 18474721280.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 12,
+            "median": 7640506368.0,
+            "p95": 7640506368.0,
+            "min": 7589584896.0,
+            "max": 7640506368.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 12,
+            "median": 10834214912.0,
+            "p95": 10834214912.0,
+            "min": 10826616832.0,
+            "max": 10834214912.0
+          },
+          "system_available_physical_bytes": {
+            "n": 12,
+            "median": 1249437696.0,
+            "p95": 1363062784,
+            "min": 1142345728,
+            "max": 1363062784
+          },
+          "system_commit_headroom_bytes": {
+            "n": 12,
+            "median": 8748230656.0,
+            "p95": 8928669696,
+            "min": 8629956608,
+            "max": 8928669696
+          },
+          "system_commit_limit_bytes": {
+            "n": 12,
+            "median": 85581942784.0,
+            "p95": 85581942784,
+            "min": 85581942784,
+            "max": 85581942784
+          },
+          "system_committed_bytes": {
+            "n": 12,
+            "median": 76833712128.0,
+            "p95": 76951986176,
+            "min": 76653273088,
+            "max": 76951986176
+          },
+          "system_page_reads_per_second": {
+            "n": 12,
+            "median": 285.2085283356233,
+            "p95": 1161.576491614419,
+            "min": 150.6652624664205,
+            "max": 1161.576491614419
+          },
+          "system_pages_input_per_second": {
+            "n": 12,
+            "median": 1978.3779348646121,
+            "p95": 5819.8987666060375,
+            "min": 1065.956731949925,
+            "max": 5819.8987666060375
+          }
+        },
+        "serial_pairs": {
+          "PageFaultCount": {
+            "n": 26,
+            "median": 4294967.5,
+            "p95": 4299730,
+            "min": 4286385,
+            "max": 4300500
+          },
+          "PeakPagefileUsage": {
+            "n": 26,
+            "median": 18720583680.0,
+            "p95": 18720583680,
+            "min": 18720583680,
+            "max": 18720583680
+          },
+          "PeakWorkingSetSize": {
+            "n": 26,
+            "median": 11111641088.0,
+            "p95": 11111641088,
+            "min": 11111641088,
+            "max": 11111641088
+          },
+          "PrivateUsage": {
+            "n": 26,
+            "median": 18674348032.0,
+            "p95": 18720497664,
+            "min": 18666131456,
+            "max": 18720497664
+          },
+          "WorkingSetSize": {
+            "n": 26,
+            "median": 10958475264.0,
+            "p95": 10961625088,
+            "min": 10949136384,
+            "max": 10961625088
+          },
+          "cpu_seconds": {
+            "n": 26,
+            "median": 2.5546875,
+            "p95": 3.015625,
+            "min": 1.234375,
+            "max": 3.015625
+          },
+          "device_gpu_committed_bytes": {
+            "n": 26,
+            "median": 23645622272.0,
+            "p95": 23646408704.0,
+            "min": 23637471232.0,
+            "max": 23651651584.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 11976749056.0,
+            "p95": 11979108352.0,
+            "min": 11972554752.0,
+            "max": 11982778368.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 26,
+            "median": 11375910912.0,
+            "p95": 11375910912.0,
+            "min": 11370381312.0,
+            "max": 11375910912.0
+          },
+          "gpu_engine_percent": {
+            "n": 26,
+            "median": 48.18915825240978,
+            "p95": 55.41208678623975,
+            "min": 35.60138166360813,
+            "max": 66.59054781009272
+          },
+          "process_gpu_committed_bytes": {
+            "n": 26,
+            "median": 18478678016.0,
+            "p95": 18478678016.0,
+            "min": 18474721280.0,
+            "max": 18478678016.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 7638933504.0,
+            "p95": 7640506368.0,
+            "min": 7638933504.0,
+            "max": 7640506368.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 26,
+            "median": 10839744512.0,
+            "p95": 10839744512.0,
+            "min": 10834214912.0,
+            "max": 10839744512.0
+          },
+          "system_available_physical_bytes": {
+            "n": 26,
+            "median": 1164883968.0,
+            "p95": 1353412608,
+            "min": 936984576,
+            "max": 1377169408
+          },
+          "system_commit_headroom_bytes": {
+            "n": 26,
+            "median": 8752136192.0,
+            "p95": 10009747456,
+            "min": 8603983872,
+            "max": 10046787584
+          },
+          "system_commit_limit_bytes": {
+            "n": 26,
+            "median": 85581942784.0,
+            "p95": 86664781824,
+            "min": 85581942784,
+            "max": 86664781824
+          },
+          "system_committed_bytes": {
+            "n": 26,
+            "median": 76848214016.0,
+            "p95": 76977958912,
+            "min": 76617994240,
+            "max": 77045653504
+          },
+          "system_page_reads_per_second": {
+            "n": 26,
+            "median": 14.044184289854636,
+            "p95": 611.4655421064425,
+            "min": 0.0,
+            "max": 1424.5742273596322
+          },
+          "system_pages_input_per_second": {
+            "n": 26,
+            "median": 80.27928389578756,
+            "p95": 4543.345487822104,
+            "min": 0.0,
+            "max": 6565.208978406014
+          }
+        },
+        "simultaneous_pairs": {
+          "PageFaultCount": {
+            "n": 55,
+            "median": 4315522,
+            "p95": 4329045,
+            "min": 4300814,
+            "max": 4329815
+          },
+          "PeakPagefileUsage": {
+            "n": 55,
+            "median": 18720583680,
+            "p95": 18720583680,
+            "min": 18720583680,
+            "max": 18720583680
+          },
+          "PeakWorkingSetSize": {
+            "n": 55,
+            "median": 11111641088,
+            "p95": 11111641088,
+            "min": 11111641088,
+            "max": 11111641088
+          },
+          "PrivateUsage": {
+            "n": 55,
+            "median": 18671079424,
+            "p95": 18676076544,
+            "min": 18665336832,
+            "max": 18676080640
+          },
+          "WorkingSetSize": {
+            "n": 55,
+            "median": 10958139392,
+            "p95": 10963066880,
+            "min": 10952323072,
+            "max": 10963070976
+          },
+          "cpu_seconds": {
+            "n": 55,
+            "median": 3.5,
+            "p95": 4.5625,
+            "min": 3.015625,
+            "max": 4.828125
+          },
+          "device_gpu_committed_bytes": {
+            "n": 55,
+            "median": 23646277632.0,
+            "p95": 23681404928.0,
+            "min": 23641427968.0,
+            "max": 23681404928.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 55,
+            "median": 11977535488.0,
+            "p95": 12012695552.0,
+            "min": 11972554752.0,
+            "max": 12012695552.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 55,
+            "median": 11376041984.0,
+            "p95": 11376041984.0,
+            "min": 11375910912.0,
+            "max": 11376041984.0
+          },
+          "gpu_engine_percent": {
+            "n": 55,
+            "median": 46.605201381266376,
+            "p95": 66.76227223819872,
+            "min": 37.86932846487763,
+            "max": 69.2081769374454
+          },
+          "process_gpu_committed_bytes": {
+            "n": 55,
+            "median": 18478809088.0,
+            "p95": 18478809088.0,
+            "min": 18478678016.0,
+            "max": 18478809088.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 55,
+            "median": 7638933504.0,
+            "p95": 7638933504.0,
+            "min": 7638933504.0,
+            "max": 7638933504.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 55,
+            "median": 10839875584.0,
+            "p95": 10839875584.0,
+            "min": 10839744512.0,
+            "max": 10839875584.0
+          },
+          "system_available_physical_bytes": {
+            "n": 55,
+            "median": 1368018944,
+            "p95": 1485377536,
+            "min": 1151352832,
+            "max": 1494196224
+          },
+          "system_commit_headroom_bytes": {
+            "n": 55,
+            "median": 10004643840,
+            "p95": 10142236672,
+            "min": 9827737600,
+            "max": 10162278400
+          },
+          "system_commit_limit_bytes": {
+            "n": 55,
+            "median": 86664781824,
+            "p95": 86664781824,
+            "min": 86664781824,
+            "max": 86664781824
+          },
+          "system_committed_bytes": {
+            "n": 55,
+            "median": 76660137984,
+            "p95": 76829528064,
+            "min": 76502503424,
+            "max": 76837044224
+          },
+          "system_page_reads_per_second": {
+            "n": 55,
+            "median": 8.024136602901528,
+            "p95": 572.0871860871597,
+            "min": 0.0,
+            "max": 2303.8599253165407
+          },
+          "system_pages_input_per_second": {
+            "n": 55,
+            "median": 32.20587282142367,
+            "p95": 4535.939992205736,
+            "min": 0.0,
+            "max": 8061.72286741483
+          }
+        },
+        "shutdown": {
+          "PageFaultCount": {
+            "n": 6,
+            "median": 4329845.0,
+            "p95": 4346619,
+            "min": 4329815,
+            "max": 4346619
+          },
+          "PeakPagefileUsage": {
+            "n": 6,
+            "median": 18720583680.0,
+            "p95": 18720583680,
+            "min": 18720583680,
+            "max": 18720583680
+          },
+          "PeakWorkingSetSize": {
+            "n": 6,
+            "median": 11111641088.0,
+            "p95": 11111641088,
+            "min": 11111641088,
+            "max": 11111641088
+          },
+          "PrivateUsage": {
+            "n": 6,
+            "median": 4577728512.0,
+            "p95": 18671648768,
+            "min": 114688,
+            "max": 18671648768
+          },
+          "WorkingSetSize": {
+            "n": 6,
+            "median": 3713568768.0,
+            "p95": 10958667776,
+            "min": 69632,
+            "max": 10958667776
+          },
+          "cpu_seconds": {
+            "n": 6,
+            "median": 4.9453125,
+            "p95": 4.984375,
+            "min": 4.828125,
+            "max": 4.984375
+          },
+          "device_gpu_committed_bytes": {
+            "n": 6,
+            "median": 9693476864.0,
+            "p95": 23645753344.0,
+            "min": 5185294336.0,
+            "max": 23645753344.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 6,
+            "median": 4579328000.0,
+            "p95": 11977338880.0,
+            "min": 4356755456.0,
+            "max": 11977338880.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 6,
+            "median": 3965347840.0,
+            "p95": 11376041984.0,
+            "min": 536166400.0,
+            "max": 11376041984.0
+          },
+          "gpu_engine_percent": {
+            "n": 5,
+            "median": 0.0,
+            "p95": 4.418837875524906,
+            "min": 0.0,
+            "max": 4.418837875524906
+          },
+          "process_gpu_committed_bytes": {
+            "n": 5,
+            "median": 6650368000.0,
+            "p95": 18478809088.0,
+            "min": 215957504.0,
+            "max": 18478809088.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 5,
+            "median": 223686656.0,
+            "p95": 7638933504.0,
+            "min": 212504576.0,
+            "max": 7638933504.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 5,
+            "median": 5570252800.0,
+            "p95": 10839875584.0,
+            "min": 3452928.0,
+            "max": 10839875584.0
+          },
+          "system_available_physical_bytes": {
+            "n": 6,
+            "median": 8619485184.0,
+            "p95": 12410646528,
+            "min": 1485680640,
+            "max": 12410646528
+          },
+          "system_commit_headroom_bytes": {
+            "n": 6,
+            "median": 18352728064.0,
+            "p95": 19190792192,
+            "min": 10150858752,
+            "max": 19190792192
+          },
+          "system_commit_limit_bytes": {
+            "n": 6,
+            "median": 80060196864.0,
+            "p95": 86664781824,
+            "min": 76883087360,
+            "max": 86664781824
+          },
+          "system_committed_bytes": {
+            "n": 6,
+            "median": 62502385664.0,
+            "p95": 76513923072,
+            "min": 57692295168,
+            "max": 76513923072
+          },
+          "system_page_reads_per_second": {
+            "n": 6,
+            "median": 316.52419393584756,
+            "p95": 1032.9169989216346,
+            "min": 8.04209554492033,
+            "max": 1032.9169989216346
+          },
+          "system_pages_input_per_second": {
+            "n": 6,
+            "median": 2097.620996042745,
+            "p95": 6569.352113141596,
+            "min": 48.25257326952198,
+            "max": 6569.352113141596
+          }
+        }
+      },
+      "sample_cadence_seconds": {
+        "n": 150,
+        "median": 0.24905684999976074,
+        "p95": 0.26362820000213105,
+        "min": 0.02459769998677075,
+        "max": 0.26561539999966044
+      },
+      "phases": {
+        "first_prefix": {
+          "Self": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 993.085,
+              "p95": 993.085,
+              "min": 993.085,
+              "max": 993.085
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 914.3225403666353,
+              "p95": 914.3225403666353,
+              "min": 914.3225403666353,
+              "max": 914.3225403666353
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 336.888,
+              "p95": 336.888,
+              "min": 336.888,
+              "max": 336.888
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 35.62014675500463,
+              "p95": 35.62014675500463,
+              "min": 35.62014675500463,
+              "max": 35.62014675500463
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 13,
+              "p95": 13,
+              "min": 13,
+              "max": 13
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.3688906000024872,
+              "p95": 1.3688906000024872,
+              "min": 1.3688906000024872,
+              "max": 1.3688906000024872
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.0242717000073753,
+              "p95": 1.0242717000073753,
+              "min": 1.0242717000073753,
+              "max": 1.0242717000073753
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 961.294,
+              "p95": 961.294,
+              "min": 961.294,
+              "max": 961.294
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 948.7212028786199,
+              "p95": 948.7212028786199,
+              "min": 948.7212028786199,
+              "max": 948.7212028786199
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 466.989,
+              "p95": 466.989,
+              "min": 466.989,
+              "max": 466.989
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 42.82756124876603,
+              "p95": 42.82756124876603,
+              "min": 42.82756124876603,
+              "max": 42.82756124876603
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 21,
+              "p95": 21,
+              "min": 21,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.472770299995318,
+              "p95": 1.472770299995318,
+              "min": 1.472770299995318,
+              "max": 1.472770299995318
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.004724400001578,
+              "p95": 1.004724400001578,
+              "min": 1.004724400001578,
+              "max": 1.004724400001578
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 2,
+              "median": 977.1895,
+              "p95": 993.085,
+              "min": 961.294,
+              "max": 993.085
+            },
+            "prefill_tps": {
+              "n": 2,
+              "median": 931.5218716226276,
+              "p95": 948.7212028786199,
+              "min": 914.3225403666353,
+              "max": 948.7212028786199
+            },
+            "decode_ms": {
+              "n": 2,
+              "median": 401.9385,
+              "p95": 466.989,
+              "min": 336.888,
+              "max": 466.989
+            },
+            "decode_tps": {
+              "n": 2,
+              "median": 39.22385400188533,
+              "p95": 42.82756124876603,
+              "min": 35.62014675500463,
+              "max": 42.82756124876603
+            },
+            "prompt_evaluated_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 2,
+              "median": 0.0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 2,
+              "median": 17.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 2,
+              "median": 1.4208304499989026,
+              "p95": 1.472770299995318,
+              "min": 1.3688906000024872,
+              "max": 1.472770299995318
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 2,
+              "median": 1.0144980500044767,
+              "p95": 1.0242717000073753,
+              "min": 1.004724400001578,
+              "max": 1.0242717000073753
+            }
+          }
+        },
+        "serial_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 169.968,
+              "p95": 179.703,
+              "min": 38.394,
+              "max": 179.703
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 151.81768006598853,
+              "p95": 164.32214182174567,
+              "min": 26.04573631296557,
+              "max": 164.32214182174567
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 400.9685,
+              "p95": 430.906,
+              "min": 298.467,
+              "max": 430.906
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 37.25446792283313,
+              "p95": 37.441030377155975,
+              "min": 35.34102482546353,
+              "max": 37.441030377155975
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 882.0,
+              "p95": 907,
+              "min": 882,
+              "max": 907
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 908.0,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 16.0,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.6094067500016536,
+              "p95": 0.635055699996883,
+              "min": 0.37091789999976754,
+              "max": 0.635055699996883
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.201027349990909,
+              "p95": 0.20838019999791868,
+              "min": 0.0720702000107849,
+              "max": 0.20838019999791868
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 166.111,
+              "p95": 198.581,
+              "min": 38.41,
+              "max": 198.581
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 146.58198397126057,
+              "p95": 155.43538097859525,
+              "min": 26.03488674824265,
+              "max": 155.43538097859525
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 330.91949999999997,
+              "p95": 482.187,
+              "min": 272.256,
+              "max": 482.187
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 42.347215920026656,
+              "p95": 44.07616361071933,
+              "min": 41.477683969082534,
+              "max": 44.07616361071933
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.0,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 884.0,
+              "p95": 911,
+              "min": 884,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 15.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.5398564000061015,
+              "p95": 0.7044519000046421,
+              "min": 0.4682743000012124,
+              "max": 0.7044519000046421
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.20170150000194553,
+              "p95": 0.221911500004353,
+              "min": 0.07302669998898637,
+              "max": 0.221911500004353
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 12,
+              "median": 169.968,
+              "p95": 198.581,
+              "min": 38.394,
+              "max": 198.581
+            },
+            "prefill_tps": {
+              "n": 12,
+              "median": 148.9625267915132,
+              "p95": 164.32214182174567,
+              "min": 26.03488674824265,
+              "max": 164.32214182174567
+            },
+            "decode_ms": {
+              "n": 12,
+              "median": 366.9705,
+              "p95": 482.187,
+              "min": 272.256,
+              "max": 482.187
+            },
+            "decode_tps": {
+              "n": 12,
+              "median": 39.45935717311926,
+              "p95": 44.07616361071933,
+              "min": 35.34102482546353,
+              "max": 44.07616361071933
+            },
+            "prompt_evaluated_tokens": {
+              "n": 12,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 12,
+              "median": 884.0,
+              "p95": 911,
+              "min": 882,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 12,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 12,
+              "median": 15.5,
+              "p95": 21,
+              "min": 12,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.5459352500038221,
+              "p95": 0.7044519000046421,
+              "min": 0.37091789999976754,
+              "max": 0.7044519000046421
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.201027349990909,
+              "p95": 0.221911500004353,
+              "min": 0.0720702000107849,
+              "max": 0.221911500004353
+            }
+          }
+        },
+        "simultaneous_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 207.352,
+              "p95": 223.66,
+              "min": 167.579,
+              "max": 223.66
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 133.89313415135663,
+              "p95": 164.0371895742649,
+              "min": 116.24787624072252,
+              "max": 164.0371895742649
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 536.48,
+              "p95": 739.54,
+              "min": 388.653,
+              "max": 739.54
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 28.302882005284918,
+              "p95": 30.934085650296353,
+              "min": 18.065215427693975,
+              "max": 30.934085650296353
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 25,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 882,
+              "p95": 882,
+              "min": 882,
+              "max": 882
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 908,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 16,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.8424730999977328,
+              "p95": 0.939677300004405,
+              "min": 0.6174010999966413,
+              "max": 0.939677300004405
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.22995239999727346,
+              "p95": 0.41986670000187587,
+              "min": 0.1756900000036694,
+              "max": 0.41986670000187587
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 209.153,
+              "p95": 242.082,
+              "min": 152.517,
+              "max": 242.082
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 124.26041158871716,
+              "p95": 157.35950746474163,
+              "min": 108.86773024390908,
+              "max": 157.35950746474163
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 604.674,
+              "p95": 836.179,
+              "min": 410.854,
+              "max": 836.179
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 28.346144215733055,
+              "p95": 33.35943841768241,
+              "min": 19.845404300499112,
+              "max": 33.35943841768241
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 884,
+              "p95": 884,
+              "min": 884,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 910,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 15,
+              "p95": 22,
+              "min": 13,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.844680199996219,
+              "p95": 1.0739999000070384,
+              "min": 0.6596538000012515,
+              "max": 1.0739999000070384
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.23684179999690969,
+              "p95": 0.4413626000023214,
+              "min": 0.16985970000678208,
+              "max": 0.4413626000023214
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 30,
+              "median": 207.7725,
+              "p95": 241.925,
+              "min": 152.517,
+              "max": 242.082
+            },
+            "prefill_tps": {
+              "n": 30,
+              "median": 124.65350251161668,
+              "p95": 163.22818717609408,
+              "min": 108.86773024390908,
+              "max": 164.0371895742649
+            },
+            "decode_ms": {
+              "n": 30,
+              "median": 569.8695,
+              "p95": 739.54,
+              "min": 388.653,
+              "max": 836.179
+            },
+            "decode_tps": {
+              "n": 30,
+              "median": 28.32451311050899,
+              "p95": 33.306054089031846,
+              "min": 18.065215427693975,
+              "max": 33.35943841768241
+            },
+            "prompt_evaluated_tokens": {
+              "n": 30,
+              "median": 26.0,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 30,
+              "median": 883.0,
+              "p95": 884,
+              "min": 882,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 30,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 30,
+              "median": 15.5,
+              "p95": 22,
+              "min": 12,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.8435766499969759,
+              "p95": 1.0515795999963302,
+              "min": 0.6174010999966413,
+              "max": 1.0739999000070384
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.23332379999919794,
+              "p95": 0.4207289000041783,
+              "min": 0.16985970000678208,
+              "max": 0.4413626000023214
+            }
+          }
+        }
+      },
+      "pairs": {
+        "serial_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 6,
+            "median": 1.1243540499926894,
+            "p95": 1.2044557000044733,
+            "min": 0.919813400003477,
+            "max": 1.2044557000044733
+          },
+          "client_start_skew_seconds": {
+            "n": 6,
+            "median": 0.5767998000083026,
+            "p95": 0.7045644000027096,
+            "min": 0.3710395000089193,
+            "max": 0.7045644000027096
+          },
+          "client_overlap_seconds": {
+            "n": 6,
+            "median": 0.0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          }
+        },
+        "simultaneous_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 15,
+            "median": 0.8836284999997588,
+            "p95": 1.0742802000022493,
+            "min": 0.7333352999994531,
+            "max": 1.0742802000022493
+          },
+          "client_start_skew_seconds": {
+            "n": 15,
+            "median": 0.00017510000907350332,
+            "p95": 0.00019069999689236283,
+            "min": 0.00016900000628083944,
+            "max": 0.00019069999689236283
+          },
+          "client_overlap_seconds": {
+            "n": 15,
+            "median": 0.7858182000054512,
+            "p95": 0.9081826000037836,
+            "min": 0.6172415999899385,
+            "max": 0.9081826000037836
+          }
+        }
+      },
+      "first_completion_seconds": 14.335137500005658,
+      "native_overlap_rounds": 15,
+      "native_overlap": {
+        "first_prefix": {
+          "n": 1,
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "serial_pairs": {
+          "n": 6,
+          "median": 0.0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "simultaneous_pairs": {
+          "n": 15,
+          "median": 0.6315400000000047,
+          "p95": 0.7145490000000052,
+          "min": 0.6005759999999967,
+          "max": 0.7145490000000052
+        }
+      },
+      "host_model_buffers": [
+        "0.04.026.473 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB",
+        "0.04.026.475 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+      ]
+    },
+    {
+      "profile": "tuning8gib-n23-c2048-curve",
+      "started_utc": "2026-10-15T22:44:48Z",
+      "status": "completed",
+      "error": null,
+      "n_cpu_moe": 23,
+      "cache_mib": 2048,
+      "measurement_group": "curve",
+      "cold_readiness_seconds": 8.203166200008127,
+      "elapsed_seconds": 31.91909619999933,
+      "cpu_seconds": 2.78125,
+      "cpu_one_core_percent": 8.713435939956403,
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c",
+      "safety_cutoff": null,
+      "gpu_adapter_luid": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "device_gpu_dedicated_bytes": [
+          "luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "device_gpu_shared_bytes": [
+          "luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "device_gpu_committed_bytes": [
+          "luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "gpu_engine_percent": [
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_0_engtype_3D",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_1_engtype_Copy",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_2_engtype_Compute 0",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_3_engtype_Copy",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_4_engtype_Timer 0",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_5_engtype_Security 1",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_6_engtype_Video JPEG 0",
+          "pid_52156_luid_0x00000000_0x0000F60B_phys_0_eng_7_engtype_Video Codec Engine"
+        ],
+        "system_pages_input_per_second": [
+          ""
+        ],
+        "system_page_reads_per_second": [
+          ""
+        ]
+      },
+      "cache_execution": {
+        "requested_mib": 2048,
+        "state": "allocated_and_used",
+        "allocations": [
+          {
+            "effective_mib_rounded_native": 2045.07,
+            "host_experts_mib_rounded_native": 9392.62,
+            "line": "0.07.767.543 I impl:    Vulkan0 MoE cache size =  2045.07 MiB for 9392.62 MiB of host experts"
+          }
+        ],
+        "groups": [
+          {
+            "layers": 23,
+            "tensor_type": "q4_0",
+            "slots": 640,
+            "host_expert_count": 2944,
+            "slot_coverage_fraction": 0.21739130434782608,
+            "effective_bytes_source_formula": 2144406528,
+            "slot_bytes_source_formula": 3345408,
+            "line": "0.07.767.556 I impl: 23 layers, q4_0:   640 slots (21.7%)"
+          }
+        ],
+        "destructor_buckets": [
+          {
+            "ubatch": "<=8",
+            "hits": 80906,
+            "misses": 32622,
+            "hit_rate": 0.712652385314636,
+            "uploaded_mib_rounded_native": 104078.2,
+            "line": "0.31.018.347 I llama_moe_cache: ubatch <= 8: hits = 80906, misses = 32622, hit rate = 71.27%, uploaded = 104078.20 MiB"
+          },
+          {
+            "ubatch": ">8",
+            "hits": 4672,
+            "misses": 26381,
+            "hit_rate": 0.150452452259041,
+            "uploaded_mib_rounded_native": 84166.73,
+            "line": "0.31.018.351 I llama_moe_cache: ubatch  > 8: hits = 4672, misses = 26381, hit rate = 15.05%, uploaded = 84166.73 MiB"
+          }
+        ],
+        "large_batches": [
+          {
+            "experts_copied": 9618,
+            "copied_mib_rounded_native": 15342.78,
+            "line": "0.31.018.500 I llama_moe_cache: large batches: 9618 experts copied from the cache, 15342.78 MiB"
+          }
+        ],
+        "warnings": [
+          "0.07.957.045 I srv    load_model: prompt cache is disabled - use `--cache-ram N` to enable it",
+          "0.07.957.171 W srv          init: --cache-idle-slots requires --cache-ram, disabling"
+        ],
+        "slot_formula_source": "llama.cpp8e2d31e0e src/llama-moe-cache.cpp:264-328,444-456; fused Q4_0 gate/up2230272+down1115136 bytes/slot and one mandatory padding plane; exact source-derived bytes, native effective MiB rounded2dp.",
+        "scope": "Whole lifecycle including native warmup; logical upload/copy MiB, not measured PCIe traffic."
+      },
+      "preflight": {
+        "observed_utc": "2026-10-15T22:44:47.490977+00:00",
+        "model_runtime_processes": [],
+        "resources": {
+          "system_available_physical_bytes": 12509995008,
+          "system_committed_bytes": 57603305472,
+          "system_commit_limit_bytes": 76883087360,
+          "system_commit_headroom_bytes": 19279781888,
+          "device_gpu_dedicated_bytes": 4352036864.0,
+          "device_gpu_shared_bytes": 536166400.0,
+          "device_gpu_committed_bytes": 5180575744.0,
+          "system_pages_input_per_second": 82.84556625441608,
+          "system_page_reads_per_second": 26.510581201413146
+        },
+        "counter_errors": {},
+        "pressure_qualified_by_explicit_override": true,
+        "pressure_boundary": "User-approved existing background RAM; no unrelated processes changed; not actual VRChat coexistence."
+      },
+      "completed": 44,
+      "checks": {
+        "complete_44": true,
+        "phase_counts": true,
+        "eos_and_automated_bounded_quality": true,
+        "fresh_graceful_exit": true,
+        "workload_identity": true,
+        "prompt_evaluated_cached_counts": true,
+        "self0_peer1_slot2_unused": true,
+        "native_overlap_15": true,
+        "effective_backend_controls_absent": true,
+        "pid_exact_adapter_dedicated_observed": true,
+        "cache_used": true,
+        "vulkan_host": true
+      },
+      "complete_measurement": true,
+      "memory_class": "target",
+      "lifecycle_resources": {
+        "PageFaultCount": {
+          "n": 129,
+          "median": 2744820,
+          "p95": 2776372,
+          "min": 565,
+          "max": 2776765
+        },
+        "PeakPagefileUsage": {
+          "n": 129,
+          "median": 18953392128,
+          "p95": 18953392128,
+          "min": 397312,
+          "max": 18953392128
+        },
+        "PeakWorkingSetSize": {
+          "n": 129,
+          "median": 10908766208,
+          "p95": 10908766208,
+          "min": 2228224,
+          "max": 10908766208
+        },
+        "PrivateUsage": {
+          "n": 129,
+          "median": 18672553984,
+          "p95": 18855694336,
+          "min": 118784,
+          "max": 18922926080
+        },
+        "WorkingSetSize": {
+          "n": 129,
+          "median": 10616119296,
+          "p95": 10805518336,
+          "min": 73728,
+          "max": 10850033664
+        },
+        "cpu_seconds": {
+          "n": 129,
+          "median": 1.625,
+          "p95": 2.65625,
+          "min": 0.0,
+          "max": 2.78125
+        },
+        "device_gpu_committed_bytes": {
+          "n": 129,
+          "median": 23636447232.0,
+          "p95": 23646400512.0,
+          "min": 5135233024.0,
+          "max": 23656886272.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 129,
+          "median": 12397772800.0,
+          "p95": 12407648256.0,
+          "min": 4308344832.0,
+          "max": 12417871872.0
+        },
+        "device_gpu_shared_bytes": {
+          "n": 129,
+          "median": 10938617856.0,
+          "p95": 10939236352.0,
+          "min": 526831616.0,
+          "max": 11077881856.0
+        },
+        "gpu_engine_percent": {
+          "n": 126,
+          "median": 43.89196031616411,
+          "p95": 62.48817966903073,
+          "min": 0.0,
+          "max": 65.08831871712553
+        },
+        "process_gpu_committed_bytes": {
+          "n": 127,
+          "median": 18478931968.0,
+          "p95": 18478931968.0,
+          "min": 11853824.0,
+          "max": 18478931968.0
+        },
+        "process_gpu_dedicated_bytes": {
+          "n": 127,
+          "median": 8067145728.0,
+          "p95": 8068718592.0,
+          "min": 11517952.0,
+          "max": 8068718592.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 127,
+          "median": 10411786240.0,
+          "p95": 10411786240.0,
+          "min": 335872.0,
+          "max": 10541715456.0
+        },
+        "system_available_physical_bytes": {
+          "n": 129,
+          "median": 1461575680,
+          "p95": 7529271296,
+          "min": 869769216,
+          "max": 12471169024
+        },
+        "system_commit_headroom_bytes": {
+          "n": 129,
+          "median": 9586262016,
+          "p95": 17837273088,
+          "min": 5996769280,
+          "max": 23268233216
+        },
+        "system_commit_limit_bytes": {
+          "n": 129,
+          "median": 86694854656,
+          "p95": 86694854656,
+          "min": 76883087360,
+          "max": 86694854656
+        },
+        "system_committed_bytes": {
+          "n": 129,
+          "median": 76917157888,
+          "p95": 77348859904,
+          "min": 57709912064,
+          "max": 77415251968
+        },
+        "system_page_reads_per_second": {
+          "n": 129,
+          "median": 289.1635943034772,
+          "p95": 12369.918548596224,
+          "min": 60.152305637875095,
+          "max": 14635.336206195627
+        },
+        "system_pages_input_per_second": {
+          "n": 129,
+          "median": 1875.8364607294839,
+          "p95": 652511.446461509,
+          "min": 430.4963623057385,
+          "max": 719484.9477392845
+        }
+      },
+      "memory_units": {
+        "process_gpu_dedicated_bytes": {
+          "bytes": 8068718592.0,
+          "GiB": 7.514579772949219,
+          "GB": 8.068718592
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 12417871872.0,
+          "GiB": 11.565044403076172,
+          "GB": 12.417871872
+        },
+        "WorkingSetSize": {
+          "bytes": 10850033664,
+          "GiB": 10.104881286621094,
+          "GB": 10.850033664
+        },
+        "PrivateUsage": {
+          "bytes": 18922926080,
+          "GiB": 17.623348236083984,
+          "GB": 18.92292608
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 10541715456.0,
+          "GiB": 9.817737579345703,
+          "GB": 10.541715456
+        }
+      },
+      "phase_resources": {
+        "load": {
+          "PageFaultCount": {
+            "n": 34,
+            "median": 2693242.0,
+            "p95": 2729633,
+            "min": 565,
+            "max": 2729656
+          },
+          "PeakPagefileUsage": {
+            "n": 34,
+            "median": 15320838144.0,
+            "p95": 18829271040,
+            "min": 397312,
+            "max": 18829307904
+          },
+          "PeakWorkingSetSize": {
+            "n": 34,
+            "median": 10908766208.0,
+            "p95": 10908766208,
+            "min": 2228224,
+            "max": 10908766208
+          },
+          "PrivateUsage": {
+            "n": 34,
+            "median": 15184347136.0,
+            "p95": 18829271040,
+            "min": 397312,
+            "max": 18829299712
+          },
+          "WorkingSetSize": {
+            "n": 34,
+            "median": 10772654080.0,
+            "p95": 10821029888,
+            "min": 2228224,
+            "max": 10850033664
+          },
+          "cpu_seconds": {
+            "n": 34,
+            "median": 0.21875,
+            "p95": 0.625,
+            "min": 0.0,
+            "max": 0.625
+          },
+          "device_gpu_committed_bytes": {
+            "n": 34,
+            "median": 19946795008.0,
+            "p95": 23578050560.0,
+            "min": 5176381440.0,
+            "max": 23578050560.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 34,
+            "median": 8853381120.0,
+            "p95": 12350984192.0,
+            "min": 4347842560.0,
+            "max": 12350984192.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 34,
+            "median": 10792325120.0,
+            "p95": 11048521728.0,
+            "min": 536166400.0,
+            "max": 11077881856.0
+          },
+          "gpu_engine_percent": {
+            "n": 32,
+            "median": 0.0,
+            "p95": 29.60376600955555,
+            "min": 0.0,
+            "max": 50.70614461338737
+          },
+          "process_gpu_committed_bytes": {
+            "n": 33,
+            "median": 14784045056.0,
+            "p95": 18415300608.0,
+            "min": 11853824.0,
+            "max": 18415300608.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 33,
+            "median": 4519170048.0,
+            "p95": 8016773120.0,
+            "min": 11517952.0,
+            "max": 8016773120.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 33,
+            "median": 10264875008.0,
+            "p95": 10512355328.0,
+            "min": 335872.0,
+            "max": 10541715456.0
+          },
+          "system_available_physical_bytes": {
+            "n": 34,
+            "median": 1113526272.0,
+            "p95": 12125130752,
+            "min": 869769216,
+            "max": 12471169024
+          },
+          "system_commit_headroom_bytes": {
+            "n": 34,
+            "median": 8858699776.0,
+            "p95": 18846949376,
+            "min": 5996769280,
+            "max": 19166752768
+          },
+          "system_commit_limit_bytes": {
+            "n": 34,
+            "median": 82338660352.0,
+            "p95": 83424157696,
+            "min": 76883087360,
+            "max": 84518690816
+          },
+          "system_committed_bytes": {
+            "n": 34,
+            "median": 73438388224.0,
+            "p95": 77114068992,
+            "min": 57716334592,
+            "max": 77136830464
+          },
+          "system_page_reads_per_second": {
+            "n": 34,
+            "median": 4026.766747736752,
+            "p95": 14232.757987307352,
+            "min": 60.152305637875095,
+            "max": 14635.336206195627
+          },
+          "system_pages_input_per_second": {
+            "n": 34,
+            "median": 591489.0861586005,
+            "p95": 705000.5832016286,
+            "min": 433.9126871248463,
+            "max": 719484.9477392845
+          }
+        },
+        "first_prefix": {
+          "PageFaultCount": {
+            "n": 11,
+            "median": 2733415,
+            "p95": 2734515,
+            "min": 2730433,
+            "max": 2734515
+          },
+          "PeakPagefileUsage": {
+            "n": 11,
+            "median": 18953392128,
+            "p95": 18953392128,
+            "min": 18833477632,
+            "max": 18953392128
+          },
+          "PeakWorkingSetSize": {
+            "n": 11,
+            "median": 10908766208,
+            "p95": 10908766208,
+            "min": 10908766208,
+            "max": 10908766208
+          },
+          "PrivateUsage": {
+            "n": 11,
+            "median": 18855694336,
+            "p95": 18922926080,
+            "min": 18763595776,
+            "max": 18922926080
+          },
+          "WorkingSetSize": {
+            "n": 11,
+            "median": 10734706688,
+            "p95": 10831351808,
+            "min": 10642722816,
+            "max": 10831351808
+          },
+          "cpu_seconds": {
+            "n": 11,
+            "median": 0.828125,
+            "p95": 1.078125,
+            "min": 0.625,
+            "max": 1.078125
+          },
+          "device_gpu_committed_bytes": {
+            "n": 11,
+            "median": 23642443776.0,
+            "p95": 23652667392.0,
+            "min": 23579652096.0,
+            "max": 23652667392.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 12407648256.0,
+            "p95": 12417871872.0,
+            "min": 12352585728.0,
+            "max": 12417871872.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 11,
+            "median": 10933706752.0,
+            "p95": 10933706752.0,
+            "min": 10925977600.0,
+            "max": 10933706752.0
+          },
+          "gpu_engine_percent": {
+            "n": 11,
+            "median": 50.18436062882595,
+            "p95": 62.30926342856059,
+            "min": 0.5024479573035748,
+            "max": 62.30926342856059
+          },
+          "process_gpu_committed_bytes": {
+            "n": 11,
+            "median": 18474975232.0,
+            "p95": 18474975232.0,
+            "min": 18416902144.0,
+            "max": 18474975232.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 8068718592.0,
+            "p95": 8068718592.0,
+            "min": 8017797120.0,
+            "max": 8068718592.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 11,
+            "median": 10406256640.0,
+            "p95": 10406256640.0,
+            "min": 10398527488.0,
+            "max": 10406256640.0
+          },
+          "system_available_physical_bytes": {
+            "n": 11,
+            "median": 1284685824,
+            "p95": 1394569216,
+            "min": 1106157568,
+            "max": 1394569216
+          },
+          "system_commit_headroom_bytes": {
+            "n": 11,
+            "median": 9310740480,
+            "p95": 9422503936,
+            "min": 8225345536,
+            "max": 9422503936
+          },
+          "system_commit_limit_bytes": {
+            "n": 11,
+            "median": 86694854656,
+            "p95": 86694854656,
+            "min": 85598965760,
+            "max": 86694854656
+          },
+          "system_committed_bytes": {
+            "n": 11,
+            "median": 77348859904,
+            "p95": 77415251968,
+            "min": 77186510848,
+            "max": 77415251968
+          },
+          "system_page_reads_per_second": {
+            "n": 11,
+            "median": 1009.0456317771384,
+            "p95": 12917.91050181857,
+            "min": 176.52080698894017,
+            "max": 12917.91050181857
+          },
+          "system_pages_input_per_second": {
+            "n": 11,
+            "median": 8633.966022331853,
+            "p95": 59201.05339322522,
+            "min": 1111.278716725828,
+            "max": 59201.05339322522
+          }
+        },
+        "serial_pairs": {
+          "PageFaultCount": {
+            "n": 27,
+            "median": 2741991,
+            "p95": 2747905,
+            "min": 2734532,
+            "max": 2747905
+          },
+          "PeakPagefileUsage": {
+            "n": 27,
+            "median": 18953392128,
+            "p95": 18953392128,
+            "min": 18953392128,
+            "max": 18953392128
+          },
+          "PeakWorkingSetSize": {
+            "n": 27,
+            "median": 10908766208,
+            "p95": 10908766208,
+            "min": 10908766208,
+            "max": 10908766208
+          },
+          "PrivateUsage": {
+            "n": 27,
+            "median": 18672570368,
+            "p95": 18761236480,
+            "min": 18666860544,
+            "max": 18763599872
+          },
+          "WorkingSetSize": {
+            "n": 27,
+            "median": 10614784000,
+            "p95": 10642718720,
+            "min": 10608504832,
+            "max": 10642792448
+          },
+          "cpu_seconds": {
+            "n": 27,
+            "median": 1.59375,
+            "p95": 1.640625,
+            "min": 1.15625,
+            "max": 1.640625
+          },
+          "device_gpu_committed_bytes": {
+            "n": 27,
+            "median": 23641681920.0,
+            "p95": 23645478912.0,
+            "min": 23641284608.0,
+            "max": 23645478912.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 27,
+            "median": 12401356800.0,
+            "p95": 12407123968.0,
+            "min": 12401356800.0,
+            "max": 12407123968.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 27,
+            "median": 10939236352.0,
+            "p95": 10939236352.0,
+            "min": 10933706752.0,
+            "max": 10939236352.0
+          },
+          "gpu_engine_percent": {
+            "n": 27,
+            "median": 45.75566668052619,
+            "p95": 54.02770930384651,
+            "min": 34.78278870727988,
+            "max": 54.142813630321726
+          },
+          "process_gpu_committed_bytes": {
+            "n": 27,
+            "median": 18478931968.0,
+            "p95": 18478931968.0,
+            "min": 18474975232.0,
+            "max": 18478931968.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 27,
+            "median": 8067145728.0,
+            "p95": 8068718592.0,
+            "min": 8067145728.0,
+            "max": 8068718592.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 27,
+            "median": 10411786240.0,
+            "p95": 10411786240.0,
+            "min": 10406256640.0,
+            "max": 10411786240.0
+          },
+          "system_available_physical_bytes": {
+            "n": 27,
+            "median": 1537859584,
+            "p95": 1639833600,
+            "min": 1332064256,
+            "max": 1651306496
+          },
+          "system_commit_headroom_bytes": {
+            "n": 27,
+            "median": 9652445184,
+            "p95": 9777696768,
+            "min": 9337917440,
+            "max": 9781575680
+          },
+          "system_commit_limit_bytes": {
+            "n": 27,
+            "median": 86694854656,
+            "p95": 86694854656,
+            "min": 86694854656,
+            "max": 86694854656
+          },
+          "system_committed_bytes": {
+            "n": 27,
+            "median": 77042409472,
+            "p95": 77335920640,
+            "min": 76913278976,
+            "max": 77356937216
+          },
+          "system_page_reads_per_second": {
+            "n": 27,
+            "median": 236.98338625962293,
+            "p95": 2811.4141013012886,
+            "min": 68.25727532214422,
+            "max": 8950.070619461017
+          },
+          "system_pages_input_per_second": {
+            "n": 27,
+            "median": 1312.126375024176,
+            "p95": 10872.233437063383,
+            "min": 461.7403918850933,
+            "max": 53147.918086001686
+          }
+        },
+        "simultaneous_pairs": {
+          "PageFaultCount": {
+            "n": 52,
+            "median": 2763405.0,
+            "p95": 2776372,
+            "min": 2748301,
+            "max": 2776372
+          },
+          "PeakPagefileUsage": {
+            "n": 52,
+            "median": 18953392128.0,
+            "p95": 18953392128,
+            "min": 18953392128,
+            "max": 18953392128
+          },
+          "PeakWorkingSetSize": {
+            "n": 52,
+            "median": 10908766208.0,
+            "p95": 10908766208,
+            "min": 10908766208,
+            "max": 10908766208
+          },
+          "PrivateUsage": {
+            "n": 52,
+            "median": 18672836608.0,
+            "p95": 18673692672,
+            "min": 18666246144,
+            "max": 18673692672
+          },
+          "WorkingSetSize": {
+            "n": 52,
+            "median": 10615959552.0,
+            "p95": 10616590336,
+            "min": 10609045504,
+            "max": 10616590336
+          },
+          "cpu_seconds": {
+            "n": 52,
+            "median": 2.4296875,
+            "p95": 2.625,
+            "min": 1.640625,
+            "max": 2.65625
+          },
+          "device_gpu_committed_bytes": {
+            "n": 52,
+            "median": 23641681920.0,
+            "p95": 23646662656.0,
+            "min": 23621505024.0,
+            "max": 23656886272.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 52,
+            "median": 12401356800.0,
+            "p95": 12406685696.0,
+            "min": 12382830592.0,
+            "max": 12416561152.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 52,
+            "median": 10938927104.0,
+            "p95": 10939236352.0,
+            "min": 10938617856.0,
+            "max": 10939236352.0
+          },
+          "gpu_engine_percent": {
+            "n": 52,
+            "median": 46.550264499779004,
+            "p95": 62.66902251335386,
+            "min": 35.56964489107398,
+            "max": 65.08831871712553
+          },
+          "process_gpu_committed_bytes": {
+            "n": 52,
+            "median": 18478931968.0,
+            "p95": 18478931968.0,
+            "min": 18478931968.0,
+            "max": 18478931968.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 52,
+            "median": 8067145728.0,
+            "p95": 8067145728.0,
+            "min": 8067145728.0,
+            "max": 8067145728.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 52,
+            "median": 10411786240.0,
+            "p95": 10411786240.0,
+            "min": 10411786240.0,
+            "max": 10411786240.0
+          },
+          "system_available_physical_bytes": {
+            "n": 52,
+            "median": 1466120192.0,
+            "p95": 1624920064,
+            "min": 1331929088,
+            "max": 1663602688
+          },
+          "system_commit_headroom_bytes": {
+            "n": 52,
+            "median": 9799043072.0,
+            "p95": 10265681920,
+            "min": 9444450304,
+            "max": 10312605696
+          },
+          "system_commit_limit_bytes": {
+            "n": 52,
+            "median": 86694854656.0,
+            "p95": 86694854656,
+            "min": 86694854656,
+            "max": 86694854656
+          },
+          "system_committed_bytes": {
+            "n": 52,
+            "median": 76895811584.0,
+            "p95": 77215797248,
+            "min": 76382248960,
+            "max": 77250404352
+          },
+          "system_page_reads_per_second": {
+            "n": 52,
+            "median": 228.73732093131332,
+            "p95": 1467.2810322941757,
+            "min": 64.37328782141884,
+            "max": 5446.853665901849
+          },
+          "system_pages_input_per_second": {
+            "n": 52,
+            "median": 1504.9069388959724,
+            "p95": 8445.19851021733,
+            "min": 430.4963623057385,
+            "max": 169082.27168067486
+          }
+        },
+        "shutdown": {
+          "PageFaultCount": {
+            "n": 5,
+            "median": 2776401,
+            "p95": 2776765,
+            "min": 2776372,
+            "max": 2776765
+          },
+          "PeakPagefileUsage": {
+            "n": 5,
+            "median": 18953392128,
+            "p95": 18953392128,
+            "min": 18953392128,
+            "max": 18953392128
+          },
+          "PeakWorkingSetSize": {
+            "n": 5,
+            "median": 10908766208,
+            "p95": 10908766208,
+            "min": 10908766208,
+            "max": 10908766208
+          },
+          "PrivateUsage": {
+            "n": 5,
+            "median": 5437329408,
+            "p95": 18673684480,
+            "min": 118784,
+            "max": 18673684480
+          },
+          "WorkingSetSize": {
+            "n": 5,
+            "median": 4487659520,
+            "p95": 10616590336,
+            "min": 73728,
+            "max": 10616590336
+          },
+          "cpu_seconds": {
+            "n": 5,
+            "median": 2.703125,
+            "p95": 2.78125,
+            "min": 2.65625,
+            "max": 2.78125
+          },
+          "device_gpu_committed_bytes": {
+            "n": 5,
+            "median": 10511659008.0,
+            "p95": 23621505024.0,
+            "min": 5135233024.0,
+            "max": 23621505024.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 5,
+            "median": 4532514816.0,
+            "p95": 12382830592.0,
+            "min": 4308344832.0,
+            "max": 12382830592.0
+          },
+          "device_gpu_shared_bytes": {
+            "n": 5,
+            "median": 4812435456.0,
+            "p95": 10938617856.0,
+            "min": 526831616.0,
+            "max": 10938617856.0
+          },
+          "gpu_engine_percent": {
+            "n": 4,
+            "median": 0.0,
+            "p95": 0.0,
+            "min": 0.0,
+            "max": 0.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 4,
+            "median": 7079374848.0,
+            "p95": 18478931968.0,
+            "min": 1072394240.0,
+            "max": 18478931968.0
+          },
+          "process_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 224485376.0,
+            "p95": 8067145728.0,
+            "min": 212504576.0,
+            "max": 8067145728.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 4,
+            "median": 5998460928.0,
+            "p95": 10411786240.0,
+            "min": 3452928.0,
+            "max": 10411786240.0
+          },
+          "system_available_physical_bytes": {
+            "n": 5,
+            "median": 7529271296,
+            "p95": 12071919616,
+            "min": 1483599872,
+            "max": 12071919616
+          },
+          "system_commit_headroom_bytes": {
+            "n": 5,
+            "median": 19173175296,
+            "p95": 23268233216,
+            "min": 10114605056,
+            "max": 23268233216
+          },
+          "system_commit_limit_bytes": {
+            "n": 5,
+            "median": 86694854656,
+            "p95": 86694854656,
+            "min": 76883087360,
+            "max": 86694854656
+          },
+          "system_committed_bytes": {
+            "n": 5,
+            "median": 63426621440,
+            "p95": 76580249600,
+            "min": 57709912064,
+            "max": 76580249600
+          },
+          "system_page_reads_per_second": {
+            "n": 5,
+            "median": 289.1635943034772,
+            "p95": 829.9903167796375,
+            "min": 106.19967131201729,
+            "max": 829.9903167796375
+          },
+          "system_pages_input_per_second": {
+            "n": 5,
+            "median": 3037.03251392375,
+            "p95": 8405.358746884065,
+            "min": 716.8477813561167,
+            "max": 8405.358746884065
+          }
+        }
+      },
+      "sample_cadence_seconds": {
+        "n": 128,
+        "median": 0.24908965000213357,
+        "p95": 0.2635957000020426,
+        "min": 0.14831029999186285,
+        "max": 0.26482430000032764
+      },
+      "phases": {
+        "first_prefix": {
+          "Self": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 968.983,
+              "p95": 968.983,
+              "min": 968.983,
+              "max": 968.983
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 937.0649433478195,
+              "p95": 937.0649433478195,
+              "min": 937.0649433478195,
+              "max": 937.0649433478195
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 338.218,
+              "p95": 338.218,
+              "min": 338.218,
+              "max": 338.218
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 35.48007498122513,
+              "p95": 35.48007498122513,
+              "min": 35.48007498122513,
+              "max": 35.48007498122513
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 13,
+              "p95": 13,
+              "min": 13,
+              "max": 13
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.311642299988307,
+              "p95": 1.311642299988307,
+              "min": 1.311642299988307,
+              "max": 1.311642299988307
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 0.9734606999991229,
+              "p95": 0.9734606999991229,
+              "min": 0.9734606999991229,
+              "max": 0.9734606999991229
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 942.362,
+              "p95": 942.362,
+              "min": 942.362,
+              "max": 942.362
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 967.7809589096335,
+              "p95": 967.7809589096335,
+              "min": 967.7809589096335,
+              "max": 967.7809589096335
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 468.33,
+              "p95": 468.33,
+              "min": 468.33,
+              "max": 468.33
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 42.70493028420131,
+              "p95": 42.70493028420131,
+              "min": 42.70493028420131,
+              "max": 42.70493028420131
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 21,
+              "p95": 21,
+              "min": 21,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.4498836000129813,
+              "p95": 1.4498836000129813,
+              "min": 1.4498836000129813,
+              "max": 1.4498836000129813
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 0.9812612000096124,
+              "p95": 0.9812612000096124,
+              "min": 0.9812612000096124,
+              "max": 0.9812612000096124
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 2,
+              "median": 955.6724999999999,
+              "p95": 968.983,
+              "min": 942.362,
+              "max": 968.983
+            },
+            "prefill_tps": {
+              "n": 2,
+              "median": 952.4229511287265,
+              "p95": 967.7809589096335,
+              "min": 937.0649433478195,
+              "max": 967.7809589096335
+            },
+            "decode_ms": {
+              "n": 2,
+              "median": 403.274,
+              "p95": 468.33,
+              "min": 338.218,
+              "max": 468.33
+            },
+            "decode_tps": {
+              "n": 2,
+              "median": 39.09250263271322,
+              "p95": 42.70493028420131,
+              "min": 35.48007498122513,
+              "max": 42.70493028420131
+            },
+            "prompt_evaluated_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 2,
+              "median": 0.0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 2,
+              "median": 17.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 2,
+              "median": 1.3807629500006442,
+              "p95": 1.4498836000129813,
+              "min": 1.311642299988307,
+              "max": 1.4498836000129813
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 2,
+              "median": 0.9773609500043676,
+              "p95": 0.9812612000096124,
+              "min": 0.9734606999991229,
+              "max": 0.9812612000096124
+            }
+          }
+        },
+        "serial_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 162.2735,
+              "p95": 171.51,
+              "min": 33.663,
+              "max": 171.51
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 158.50366217498106,
+              "p95": 172.89607093678794,
+              "min": 29.70620562635535,
+              "max": 172.89607093678794
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 408.1925,
+              "p95": 435.257,
+              "min": 288.202,
+              "max": 435.257
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 37.811969439707724,
+              "p95": 38.22292085227558,
+              "min": 34.462398077457685,
+              "max": 38.22292085227558
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 882.0,
+              "p95": 907,
+              "min": 882,
+              "max": 907
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 908.0,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 16.0,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.598932450004213,
+              "p95": 0.6314882000006037,
+              "min": 0.327107100005378,
+              "max": 0.6314882000006037
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.18877810000412865,
+              "p95": 0.2006554999970831,
+              "min": 0.038604100001975894,
+              "max": 0.2006554999970831
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 160.239,
+              "p95": 192.736,
+              "min": 39.939,
+              "max": 192.736
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 153.20809029530653,
+              "p95": 163.40648042866968,
+              "min": 25.038183229424874,
+              "max": 163.40648042866968
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 340.409,
+              "p95": 505.741,
+              "min": 267.36,
+              "max": 505.741
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 41.677488276908214,
+              "p95": 44.88330341113106,
+              "min": 39.28523324204193,
+              "max": 44.88330341113106
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.0,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 884.0,
+              "p95": 911,
+              "min": 884,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 15.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.5339823000031174,
+              "p95": 0.7158690000069328,
+              "min": 0.43778360000578687,
+              "max": 0.7158690000069328
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.1938503999990644,
+              "p95": 0.2131117999961134,
+              "min": 0.07565450000402052,
+              "max": 0.2131117999961134
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 12,
+              "median": 162.2735,
+              "p95": 192.736,
+              "min": 33.663,
+              "max": 192.736
+            },
+            "prefill_tps": {
+              "n": 12,
+              "median": 154.60252036242116,
+              "p95": 172.89607093678794,
+              "min": 25.038183229424874,
+              "max": 172.89607093678794
+            },
+            "decode_ms": {
+              "n": 12,
+              "median": 377.078,
+              "p95": 505.741,
+              "min": 267.36,
+              "max": 505.741
+            },
+            "decode_tps": {
+              "n": 12,
+              "median": 38.75407704715876,
+              "p95": 44.88330341113106,
+              "min": 34.462398077457685,
+              "max": 44.88330341113106
+            },
+            "prompt_evaluated_tokens": {
+              "n": 12,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 12,
+              "median": 884.0,
+              "p95": 911,
+              "min": 882,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 12,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 12,
+              "median": 15.5,
+              "p95": 21,
+              "min": 12,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.5549170000012964,
+              "p95": 0.7158690000069328,
+              "min": 0.327107100005378,
+              "max": 0.7158690000069328
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.18929370000114432,
+              "p95": 0.2131117999961134,
+              "min": 0.038604100001975894,
+              "max": 0.2131117999961134
+            }
+          }
+        },
+        "simultaneous_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 197.021,
+              "p95": 225.174,
+              "min": 157.78,
+              "max": 225.174
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 139.51518473305265,
+              "p95": 170.9318226216058,
+              "min": 115.46626164654887,
+              "max": 170.9318226216058
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 532.248,
+              "p95": 774.045,
+              "min": 383.602,
+              "max": 774.045
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 28.109771212016675,
+              "p95": 32.01119965171815,
+              "min": 18.70242570461389,
+              "max": 32.01119965171815
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 25,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 882,
+              "p95": 882,
+              "min": 882,
+              "max": 882
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 908,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 16,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.8201294999889797,
+              "p95": 0.9367862000071909,
+              "min": 0.6048544999939622,
+              "max": 0.9367862000071909
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.20198809998692013,
+              "p95": 0.39639290000195615,
+              "min": 0.16252220000023954,
+              "max": 0.39639290000195615
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 208.218,
+              "p95": 231.32,
+              "min": 146.697,
+              "max": 231.32
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 124.1167761553942,
+              "p95": 163.60252765905233,
+              "min": 114.65808005044954,
+              "max": 163.60252765905233
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 537.797,
+              "p95": 809.207,
+              "min": 395.285,
+              "max": 809.207
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 29.58477764574201,
+              "p95": 33.81382782675147,
+              "min": 20.647754470669003,
+              "max": 33.81382782675147
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 884,
+              "p95": 884,
+              "min": 884,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 910,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 15,
+              "p95": 22,
+              "min": 13,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.821835499998997,
+              "p95": 1.0086912999977358,
+              "min": 0.610155800008215,
+              "max": 1.0086912999977358
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.2465327999962028,
+              "p95": 0.4168603999860352,
+              "min": 0.1683125999988988,
+              "max": 0.4168603999860352
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 30,
+              "median": 199.65800000000002,
+              "p95": 225.594,
+              "min": 146.697,
+              "max": 231.32
+            },
+            "prefill_tps": {
+              "n": 30,
+              "median": 127.42516978416428,
+              "p95": 170.35049614582005,
+              "min": 114.65808005044954,
+              "max": 170.9318226216058
+            },
+            "decode_ms": {
+              "n": 30,
+              "median": 535.0225,
+              "p95": 774.045,
+              "min": 383.602,
+              "max": 809.207
+            },
+            "decode_tps": {
+              "n": 30,
+              "median": 28.665842990620533,
+              "p95": 33.74137907764566,
+              "min": 18.70242570461389,
+              "max": 33.81382782675147
+            },
+            "prompt_evaluated_tokens": {
+              "n": 30,
+              "median": 26.0,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 30,
+              "median": 883.0,
+              "p95": 884,
+              "min": 882,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 30,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 30,
+              "median": 15.5,
+              "p95": 22,
+              "min": 12,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.8212318000005325,
+              "p95": 1.0027228999970248,
+              "min": 0.6048544999939622,
+              "max": 1.0086912999977358
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.22087199999805307,
+              "p95": 0.39639290000195615,
+              "min": 0.16252220000023954,
+              "max": 0.4168603999860352
+            }
+          }
+        }
+      },
+      "pairs": {
+        "serial_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 6,
+            "median": 1.1310670000020764,
+            "p95": 1.19603819999611,
+            "min": 0.8673406000016257,
+            "max": 1.19603819999611
+          },
+          "client_start_skew_seconds": {
+            "n": 6,
+            "median": 0.5947459500021068,
+            "p95": 0.7159688999963691,
+            "min": 0.32720790000166744,
+            "max": 0.7159688999963691
+          },
+          "client_overlap_seconds": {
+            "n": 6,
+            "median": 0.0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          }
+        },
+        "simultaneous_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 15,
+            "median": 0.8589732999971602,
+            "p95": 1.008951600000728,
+            "min": 0.683210399991367,
+            "max": 1.008951600000728
+          },
+          "client_start_skew_seconds": {
+            "n": 15,
+            "median": 0.00017819998902268708,
+            "p95": 0.00022370000078808516,
+            "min": 0.0001638999965507537,
+            "max": 0.00022370000078808516
+          },
+          "client_overlap_seconds": {
+            "n": 15,
+            "median": 0.7738258999888785,
+            "p95": 0.9119635999959428,
+            "min": 0.6048630999866873,
+            "max": 0.9119635999959428
+          }
+        }
+      },
+      "first_completion_seconds": 9.813266500001191,
+      "native_overlap_rounds": 15,
+      "native_overlap": {
+        "first_prefix": {
+          "n": 1,
+          "median": 0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "serial_pairs": {
+          "n": 6,
+          "median": 0.0,
+          "p95": 0,
+          "min": 0,
+          "max": 0
+        },
+        "simultaneous_pairs": {
+          "n": 15,
+          "median": 0.6088569999999969,
+          "p95": 0.7493040000000022,
+          "min": 0.5811199999999985,
+          "max": 0.7493040000000022
+        }
+      },
+      "host_model_buffers": [
+        "0.01.382.091 I load_tensors:      Vulkan0 model buffer size =  4181.22 MiB",
+        "0.01.382.092 I load_tensors:  Vulkan_Host model buffer size =  9788.64 MiB"
+      ]
+    }
+  ],
+  "configurations": {
+    "n24-c2048": {
+      "n_cpu_moe": 24,
+      "cache_mib": 2048,
+      "run_ids": [
+        "tuning8gib-n24-c2048-a1"
+      ],
+      "run_count": 1,
+      "complete_measurement_run_count": 1,
+      "memory_class": "target",
+      "dedicated_peak": {
+        "bytes": 7640506368.0,
+        "GiB": 7.115776062011719,
+        "GB": 7.640506368
+      },
+      "observed_peak_variation_bytes": 0.0,
+      "margins": {
+        "target": {
+          "bytes": 949428224.0,
+          "MiB": 905.4453125,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 1056802406.0,
+          "MiB": 1007.8453121185303,
+          "marginal": false
+        }
+      },
+      "phases": {
+        "first_prefix": {
+          "Self": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 993.085,
+              "p95": 993.085,
+              "min": 993.085,
+              "max": 993.085
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 914.3225403666353,
+              "p95": 914.3225403666353,
+              "min": 914.3225403666353,
+              "max": 914.3225403666353
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 336.888,
+              "p95": 336.888,
+              "min": 336.888,
+              "max": 336.888
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 35.62014675500463,
+              "p95": 35.62014675500463,
+              "min": 35.62014675500463,
+              "max": 35.62014675500463
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 13,
+              "p95": 13,
+              "min": 13,
+              "max": 13
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.3688906000024872,
+              "p95": 1.3688906000024872,
+              "min": 1.3688906000024872,
+              "max": 1.3688906000024872
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.0242717000073753,
+              "p95": 1.0242717000073753,
+              "min": 1.0242717000073753,
+              "max": 1.0242717000073753
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 961.294,
+              "p95": 961.294,
+              "min": 961.294,
+              "max": 961.294
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 948.7212028786199,
+              "p95": 948.7212028786199,
+              "min": 948.7212028786199,
+              "max": 948.7212028786199
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 466.989,
+              "p95": 466.989,
+              "min": 466.989,
+              "max": 466.989
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 42.82756124876603,
+              "p95": 42.82756124876603,
+              "min": 42.82756124876603,
+              "max": 42.82756124876603
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 21,
+              "p95": 21,
+              "min": 21,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.472770299995318,
+              "p95": 1.472770299995318,
+              "min": 1.472770299995318,
+              "max": 1.472770299995318
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.004724400001578,
+              "p95": 1.004724400001578,
+              "min": 1.004724400001578,
+              "max": 1.004724400001578
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 2,
+              "median": 977.1895,
+              "p95": 993.085,
+              "min": 961.294,
+              "max": 993.085
+            },
+            "prefill_tps": {
+              "n": 2,
+              "median": 931.5218716226276,
+              "p95": 948.7212028786199,
+              "min": 914.3225403666353,
+              "max": 948.7212028786199
+            },
+            "decode_ms": {
+              "n": 2,
+              "median": 401.9385,
+              "p95": 466.989,
+              "min": 336.888,
+              "max": 466.989
+            },
+            "decode_tps": {
+              "n": 2,
+              "median": 39.22385400188533,
+              "p95": 42.82756124876603,
+              "min": 35.62014675500463,
+              "max": 42.82756124876603
+            },
+            "prompt_evaluated_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 2,
+              "median": 0.0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 2,
+              "median": 17.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 2,
+              "median": 1.4208304499989026,
+              "p95": 1.472770299995318,
+              "min": 1.3688906000024872,
+              "max": 1.472770299995318
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 2,
+              "median": 1.0144980500044767,
+              "p95": 1.0242717000073753,
+              "min": 1.004724400001578,
+              "max": 1.0242717000073753
+            }
+          }
+        },
+        "serial_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 169.968,
+              "p95": 179.703,
+              "min": 38.394,
+              "max": 179.703
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 151.81768006598853,
+              "p95": 164.32214182174567,
+              "min": 26.04573631296557,
+              "max": 164.32214182174567
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 400.9685,
+              "p95": 430.906,
+              "min": 298.467,
+              "max": 430.906
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 37.25446792283313,
+              "p95": 37.441030377155975,
+              "min": 35.34102482546353,
+              "max": 37.441030377155975
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 882.0,
+              "p95": 907,
+              "min": 882,
+              "max": 907
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 908.0,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 16.0,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.6094067500016536,
+              "p95": 0.635055699996883,
+              "min": 0.37091789999976754,
+              "max": 0.635055699996883
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.201027349990909,
+              "p95": 0.20838019999791868,
+              "min": 0.0720702000107849,
+              "max": 0.20838019999791868
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 166.111,
+              "p95": 198.581,
+              "min": 38.41,
+              "max": 198.581
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 146.58198397126057,
+              "p95": 155.43538097859525,
+              "min": 26.03488674824265,
+              "max": 155.43538097859525
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 330.91949999999997,
+              "p95": 482.187,
+              "min": 272.256,
+              "max": 482.187
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 42.347215920026656,
+              "p95": 44.07616361071933,
+              "min": 41.477683969082534,
+              "max": 44.07616361071933
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.0,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 884.0,
+              "p95": 911,
+              "min": 884,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 15.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.5398564000061015,
+              "p95": 0.7044519000046421,
+              "min": 0.4682743000012124,
+              "max": 0.7044519000046421
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.20170150000194553,
+              "p95": 0.221911500004353,
+              "min": 0.07302669998898637,
+              "max": 0.221911500004353
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 12,
+              "median": 169.968,
+              "p95": 198.581,
+              "min": 38.394,
+              "max": 198.581
+            },
+            "prefill_tps": {
+              "n": 12,
+              "median": 148.9625267915132,
+              "p95": 164.32214182174567,
+              "min": 26.03488674824265,
+              "max": 164.32214182174567
+            },
+            "decode_ms": {
+              "n": 12,
+              "median": 366.9705,
+              "p95": 482.187,
+              "min": 272.256,
+              "max": 482.187
+            },
+            "decode_tps": {
+              "n": 12,
+              "median": 39.45935717311926,
+              "p95": 44.07616361071933,
+              "min": 35.34102482546353,
+              "max": 44.07616361071933
+            },
+            "prompt_evaluated_tokens": {
+              "n": 12,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 12,
+              "median": 884.0,
+              "p95": 911,
+              "min": 882,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 12,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 12,
+              "median": 15.5,
+              "p95": 21,
+              "min": 12,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.5459352500038221,
+              "p95": 0.7044519000046421,
+              "min": 0.37091789999976754,
+              "max": 0.7044519000046421
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.201027349990909,
+              "p95": 0.221911500004353,
+              "min": 0.0720702000107849,
+              "max": 0.221911500004353
+            }
+          }
+        },
+        "simultaneous_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 207.352,
+              "p95": 223.66,
+              "min": 167.579,
+              "max": 223.66
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 133.89313415135663,
+              "p95": 164.0371895742649,
+              "min": 116.24787624072252,
+              "max": 164.0371895742649
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 536.48,
+              "p95": 739.54,
+              "min": 388.653,
+              "max": 739.54
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 28.302882005284918,
+              "p95": 30.934085650296353,
+              "min": 18.065215427693975,
+              "max": 30.934085650296353
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 25,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 882,
+              "p95": 882,
+              "min": 882,
+              "max": 882
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 908,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 16,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.8424730999977328,
+              "p95": 0.939677300004405,
+              "min": 0.6174010999966413,
+              "max": 0.939677300004405
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.22995239999727346,
+              "p95": 0.41986670000187587,
+              "min": 0.1756900000036694,
+              "max": 0.41986670000187587
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 209.153,
+              "p95": 242.082,
+              "min": 152.517,
+              "max": 242.082
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 124.26041158871716,
+              "p95": 157.35950746474163,
+              "min": 108.86773024390908,
+              "max": 157.35950746474163
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 604.674,
+              "p95": 836.179,
+              "min": 410.854,
+              "max": 836.179
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 28.346144215733055,
+              "p95": 33.35943841768241,
+              "min": 19.845404300499112,
+              "max": 33.35943841768241
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 884,
+              "p95": 884,
+              "min": 884,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 910,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 15,
+              "p95": 22,
+              "min": 13,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.844680199996219,
+              "p95": 1.0739999000070384,
+              "min": 0.6596538000012515,
+              "max": 1.0739999000070384
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.23684179999690969,
+              "p95": 0.4413626000023214,
+              "min": 0.16985970000678208,
+              "max": 0.4413626000023214
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 30,
+              "median": 207.7725,
+              "p95": 241.925,
+              "min": 152.517,
+              "max": 242.082
+            },
+            "prefill_tps": {
+              "n": 30,
+              "median": 124.65350251161668,
+              "p95": 163.22818717609408,
+              "min": 108.86773024390908,
+              "max": 164.0371895742649
+            },
+            "decode_ms": {
+              "n": 30,
+              "median": 569.8695,
+              "p95": 739.54,
+              "min": 388.653,
+              "max": 836.179
+            },
+            "decode_tps": {
+              "n": 30,
+              "median": 28.32451311050899,
+              "p95": 33.306054089031846,
+              "min": 18.065215427693975,
+              "max": 33.35943841768241
+            },
+            "prompt_evaluated_tokens": {
+              "n": 30,
+              "median": 26.0,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 30,
+              "median": 883.0,
+              "p95": 884,
+              "min": 882,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 30,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 30,
+              "median": 15.5,
+              "p95": 22,
+              "min": 12,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.8435766499969759,
+              "p95": 1.0515795999963302,
+              "min": 0.6174010999966413,
+              "max": 1.0739999000070384
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.23332379999919794,
+              "p95": 0.4207289000041783,
+              "min": 0.16985970000678208,
+              "max": 0.4413626000023214
+            }
+          }
+        }
+      },
+      "pairs": {
+        "serial_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 6,
+            "median": 1.1243540499926894,
+            "p95": 1.2044557000044733,
+            "min": 0.919813400003477,
+            "max": 1.2044557000044733
+          },
+          "client_start_skew_seconds": {
+            "n": 6,
+            "median": 0.5767998000083026,
+            "p95": 0.7045644000027096,
+            "min": 0.3710395000089193,
+            "max": 0.7045644000027096
+          },
+          "client_overlap_seconds": {
+            "n": 6,
+            "median": 0.0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          }
+        },
+        "simultaneous_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 15,
+            "median": 0.8836284999997588,
+            "p95": 1.0742802000022493,
+            "min": 0.7333352999994531,
+            "max": 1.0742802000022493
+          },
+          "client_start_skew_seconds": {
+            "n": 15,
+            "median": 0.00017510000907350332,
+            "p95": 0.00019069999689236283,
+            "min": 0.00016900000628083944,
+            "max": 0.00019069999689236283
+          },
+          "client_overlap_seconds": {
+            "n": 15,
+            "median": 0.7858182000054512,
+            "p95": 0.9081826000037836,
+            "min": 0.6172415999899385,
+            "max": 0.9081826000037836
+          }
+        }
+      },
+      "run_simultaneous_medians_seconds": [
+        0.8836284999997588
+      ],
+      "run_serial_medians_seconds": [
+        1.1243540499926894
+      ],
+      "memory_peaks": {
+        "process_gpu_dedicated_bytes": {
+          "bytes": 7640506368.0,
+          "GiB": 7.115776062011719,
+          "GB": 7.640506368
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 12012695552.0,
+          "GiB": 11.187694549560547,
+          "GB": 12.012695552
+        },
+        "WorkingSetSize": {
+          "bytes": 11039326208,
+          "GiB": 10.281173706054688,
+          "GB": 11.039326208
+        },
+        "PrivateUsage": {
+          "bytes": 18720514048,
+          "GiB": 17.434837341308594,
+          "GB": 18.720514048
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 10955255808.0,
+          "GiB": 10.202877044677734,
+          "GB": 10.955255808
+        }
+      },
+      "pooling": "Only complete observed runs pooled from original requests/pairs. Classification uses maximum lifecycle sampled peak across ALL runs, including failures.",
+      "versus_control_per_GiB": {
+        "dedicated_delta_bytes": 0.0,
+        "dedicated_delta_GiB": 0.0,
+        "definition": "Signed metric change versus pooled current-session control divided by signed GiB added (negative means saved). Near-zero denominators are not a useful efficiency estimate.",
+        "pairs": {},
+        "phases": {},
+        "host_memory": {}
+      },
+      "repeatably_beats_control": false
+    },
+    "n23-c2048": {
+      "n_cpu_moe": 23,
+      "cache_mib": 2048,
+      "run_ids": [
+        "tuning8gib-n23-c2048-curve"
+      ],
+      "run_count": 1,
+      "complete_measurement_run_count": 1,
+      "memory_class": "target",
+      "dedicated_peak": {
+        "bytes": 8068718592.0,
+        "GiB": 7.514579772949219,
+        "GB": 8.068718592
+      },
+      "observed_peak_variation_bytes": 0.0,
+      "margins": {
+        "target": {
+          "bytes": 521216000.0,
+          "MiB": 497.0703125,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 628590182.0,
+          "MiB": 599.4703121185303,
+          "marginal": false
+        }
+      },
+      "phases": {
+        "first_prefix": {
+          "Self": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 968.983,
+              "p95": 968.983,
+              "min": 968.983,
+              "max": 968.983
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 937.0649433478195,
+              "p95": 937.0649433478195,
+              "min": 937.0649433478195,
+              "max": 937.0649433478195
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 338.218,
+              "p95": 338.218,
+              "min": 338.218,
+              "max": 338.218
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 35.48007498122513,
+              "p95": 35.48007498122513,
+              "min": 35.48007498122513,
+              "max": 35.48007498122513
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 908,
+              "p95": 908,
+              "min": 908,
+              "max": 908
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 13,
+              "p95": 13,
+              "min": 13,
+              "max": 13
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.311642299988307,
+              "p95": 1.311642299988307,
+              "min": 1.311642299988307,
+              "max": 1.311642299988307
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 0.9734606999991229,
+              "p95": 0.9734606999991229,
+              "min": 0.9734606999991229,
+              "max": 0.9734606999991229
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 1,
+              "median": 942.362,
+              "p95": 942.362,
+              "min": 942.362,
+              "max": 942.362
+            },
+            "prefill_tps": {
+              "n": 1,
+              "median": 967.7809589096335,
+              "p95": 967.7809589096335,
+              "min": 967.7809589096335,
+              "max": 967.7809589096335
+            },
+            "decode_ms": {
+              "n": 1,
+              "median": 468.33,
+              "p95": 468.33,
+              "min": 468.33,
+              "max": 468.33
+            },
+            "decode_tps": {
+              "n": 1,
+              "median": 42.70493028420131,
+              "p95": 42.70493028420131,
+              "min": 42.70493028420131,
+              "max": 42.70493028420131
+            },
+            "prompt_evaluated_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 1,
+              "median": 0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 1,
+              "median": 912,
+              "p95": 912,
+              "min": 912,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 1,
+              "median": 21,
+              "p95": 21,
+              "min": 21,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 1,
+              "median": 1.4498836000129813,
+              "p95": 1.4498836000129813,
+              "min": 1.4498836000129813,
+              "max": 1.4498836000129813
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 1,
+              "median": 0.9812612000096124,
+              "p95": 0.9812612000096124,
+              "min": 0.9812612000096124,
+              "max": 0.9812612000096124
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 2,
+              "median": 955.6724999999999,
+              "p95": 968.983,
+              "min": 942.362,
+              "max": 968.983
+            },
+            "prefill_tps": {
+              "n": 2,
+              "median": 952.4229511287265,
+              "p95": 967.7809589096335,
+              "min": 937.0649433478195,
+              "max": 967.7809589096335
+            },
+            "decode_ms": {
+              "n": 2,
+              "median": 403.274,
+              "p95": 468.33,
+              "min": 338.218,
+              "max": 468.33
+            },
+            "decode_tps": {
+              "n": 2,
+              "median": 39.09250263271322,
+              "p95": 42.70493028420131,
+              "min": 35.48007498122513,
+              "max": 42.70493028420131
+            },
+            "prompt_evaluated_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "prompt_cached_tokens": {
+              "n": 2,
+              "median": 0.0,
+              "p95": 0,
+              "min": 0,
+              "max": 0
+            },
+            "prompt_total_tokens": {
+              "n": 2,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 2,
+              "median": 17.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 2,
+              "median": 1.3807629500006442,
+              "p95": 1.4498836000129813,
+              "min": 1.311642299988307,
+              "max": 1.4498836000129813
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 2,
+              "median": 0.9773609500043676,
+              "p95": 0.9812612000096124,
+              "min": 0.9734606999991229,
+              "max": 0.9812612000096124
+            }
+          }
+        },
+        "serial_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 162.2735,
+              "p95": 171.51,
+              "min": 33.663,
+              "max": 171.51
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 158.50366217498106,
+              "p95": 172.89607093678794,
+              "min": 29.70620562635535,
+              "max": 172.89607093678794
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 408.1925,
+              "p95": 435.257,
+              "min": 288.202,
+              "max": 435.257
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 37.811969439707724,
+              "p95": 38.22292085227558,
+              "min": 34.462398077457685,
+              "max": 38.22292085227558
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 882.0,
+              "p95": 907,
+              "min": 882,
+              "max": 907
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 908.0,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 16.0,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.598932450004213,
+              "p95": 0.6314882000006037,
+              "min": 0.327107100005378,
+              "max": 0.6314882000006037
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.18877810000412865,
+              "p95": 0.2006554999970831,
+              "min": 0.038604100001975894,
+              "max": 0.2006554999970831
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 6,
+              "median": 160.239,
+              "p95": 192.736,
+              "min": 39.939,
+              "max": 192.736
+            },
+            "prefill_tps": {
+              "n": 6,
+              "median": 153.20809029530653,
+              "p95": 163.40648042866968,
+              "min": 25.038183229424874,
+              "max": 163.40648042866968
+            },
+            "decode_ms": {
+              "n": 6,
+              "median": 340.409,
+              "p95": 505.741,
+              "min": 267.36,
+              "max": 505.741
+            },
+            "decode_tps": {
+              "n": 6,
+              "median": 41.677488276908214,
+              "p95": 44.88330341113106,
+              "min": 39.28523324204193,
+              "max": 44.88330341113106
+            },
+            "prompt_evaluated_tokens": {
+              "n": 6,
+              "median": 25.0,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 6,
+              "median": 884.0,
+              "p95": 911,
+              "min": 884,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 6,
+              "median": 910.0,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 6,
+              "median": 15.0,
+              "p95": 21,
+              "min": 13,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.5339823000031174,
+              "p95": 0.7158690000069328,
+              "min": 0.43778360000578687,
+              "max": 0.7158690000069328
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 6,
+              "median": 0.1938503999990644,
+              "p95": 0.2131117999961134,
+              "min": 0.07565450000402052,
+              "max": 0.2131117999961134
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 12,
+              "median": 162.2735,
+              "p95": 192.736,
+              "min": 33.663,
+              "max": 192.736
+            },
+            "prefill_tps": {
+              "n": 12,
+              "median": 154.60252036242116,
+              "p95": 172.89607093678794,
+              "min": 25.038183229424874,
+              "max": 172.89607093678794
+            },
+            "decode_ms": {
+              "n": 12,
+              "median": 377.078,
+              "p95": 505.741,
+              "min": 267.36,
+              "max": 505.741
+            },
+            "decode_tps": {
+              "n": 12,
+              "median": 38.75407704715876,
+              "p95": 44.88330341113106,
+              "min": 34.462398077457685,
+              "max": 44.88330341113106
+            },
+            "prompt_evaluated_tokens": {
+              "n": 12,
+              "median": 25.5,
+              "p95": 28,
+              "min": 1,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 12,
+              "median": 884.0,
+              "p95": 911,
+              "min": 882,
+              "max": 911
+            },
+            "prompt_total_tokens": {
+              "n": 12,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 12,
+              "median": 15.5,
+              "p95": 21,
+              "min": 12,
+              "max": 21
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.5549170000012964,
+              "p95": 0.7158690000069328,
+              "min": 0.327107100005378,
+              "max": 0.7158690000069328
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 12,
+              "median": 0.18929370000114432,
+              "p95": 0.2131117999961134,
+              "min": 0.038604100001975894,
+              "max": 0.2131117999961134
+            }
+          }
+        },
+        "simultaneous_pairs": {
+          "Self": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 197.021,
+              "p95": 225.174,
+              "min": 157.78,
+              "max": 225.174
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 139.51518473305265,
+              "p95": 170.9318226216058,
+              "min": 115.46626164654887,
+              "max": 170.9318226216058
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 532.248,
+              "p95": 774.045,
+              "min": 383.602,
+              "max": 774.045
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 28.109771212016675,
+              "p95": 32.01119965171815,
+              "min": 18.70242570461389,
+              "max": 32.01119965171815
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 25,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 882,
+              "p95": 882,
+              "min": 882,
+              "max": 882
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 908,
+              "p95": 910,
+              "min": 907,
+              "max": 910
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 16,
+              "p95": 17,
+              "min": 12,
+              "max": 17
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.8201294999889797,
+              "p95": 0.9367862000071909,
+              "min": 0.6048544999939622,
+              "max": 0.9367862000071909
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.20198809998692013,
+              "p95": 0.39639290000195615,
+              "min": 0.16252220000023954,
+              "max": 0.39639290000195615
+            }
+          },
+          "Peer": {
+            "prefill_ms": {
+              "n": 15,
+              "median": 208.218,
+              "p95": 231.32,
+              "min": 146.697,
+              "max": 231.32
+            },
+            "prefill_tps": {
+              "n": 15,
+              "median": 124.1167761553942,
+              "p95": 163.60252765905233,
+              "min": 114.65808005044954,
+              "max": 163.60252765905233
+            },
+            "decode_ms": {
+              "n": 15,
+              "median": 537.797,
+              "p95": 809.207,
+              "min": 395.285,
+              "max": 809.207
+            },
+            "decode_tps": {
+              "n": 15,
+              "median": 29.58477764574201,
+              "p95": 33.81382782675147,
+              "min": 20.647754470669003,
+              "max": 33.81382782675147
+            },
+            "prompt_evaluated_tokens": {
+              "n": 15,
+              "median": 26,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 15,
+              "median": 884,
+              "p95": 884,
+              "min": 884,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 15,
+              "median": 910,
+              "p95": 912,
+              "min": 908,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 15,
+              "median": 15,
+              "p95": 22,
+              "min": 13,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.821835499998997,
+              "p95": 1.0086912999977358,
+              "min": 0.610155800008215,
+              "max": 1.0086912999977358
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 15,
+              "median": 0.2465327999962028,
+              "p95": 0.4168603999860352,
+              "min": 0.1683125999988988,
+              "max": 0.4168603999860352
+            }
+          },
+          "pooled": {
+            "prefill_ms": {
+              "n": 30,
+              "median": 199.65800000000002,
+              "p95": 225.594,
+              "min": 146.697,
+              "max": 231.32
+            },
+            "prefill_tps": {
+              "n": 30,
+              "median": 127.42516978416428,
+              "p95": 170.35049614582005,
+              "min": 114.65808005044954,
+              "max": 170.9318226216058
+            },
+            "decode_ms": {
+              "n": 30,
+              "median": 535.0225,
+              "p95": 774.045,
+              "min": 383.602,
+              "max": 809.207
+            },
+            "decode_tps": {
+              "n": 30,
+              "median": 28.665842990620533,
+              "p95": 33.74137907764566,
+              "min": 18.70242570461389,
+              "max": 33.81382782675147
+            },
+            "prompt_evaluated_tokens": {
+              "n": 30,
+              "median": 26.0,
+              "p95": 28,
+              "min": 24,
+              "max": 28
+            },
+            "prompt_cached_tokens": {
+              "n": 30,
+              "median": 883.0,
+              "p95": 884,
+              "min": 882,
+              "max": 884
+            },
+            "prompt_total_tokens": {
+              "n": 30,
+              "median": 909.0,
+              "p95": 912,
+              "min": 907,
+              "max": 912
+            },
+            "predicted_output_tokens": {
+              "n": 30,
+              "median": 15.5,
+              "p95": 22,
+              "min": 12,
+              "max": 22
+            },
+            "decode_eval_tokens": {
+              "n": 0,
+              "median": null,
+              "p95": null,
+              "min": null,
+              "max": null
+            },
+            "wall_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.8212318000005325,
+              "p95": 1.0027228999970248,
+              "min": 0.6048544999939622,
+              "max": 1.0086912999977358
+            },
+            "streaming_TTFT_seconds_including_apply_template": {
+              "n": 30,
+              "median": 0.22087199999805307,
+              "p95": 0.39639290000195615,
+              "min": 0.16252220000023954,
+              "max": 0.4168603999860352
+            }
+          }
+        }
+      },
+      "pairs": {
+        "serial_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 6,
+            "median": 1.1310670000020764,
+            "p95": 1.19603819999611,
+            "min": 0.8673406000016257,
+            "max": 1.19603819999611
+          },
+          "client_start_skew_seconds": {
+            "n": 6,
+            "median": 0.5947459500021068,
+            "p95": 0.7159688999963691,
+            "min": 0.32720790000166744,
+            "max": 0.7159688999963691
+          },
+          "client_overlap_seconds": {
+            "n": 6,
+            "median": 0.0,
+            "p95": 0,
+            "min": 0,
+            "max": 0
+          }
+        },
+        "simultaneous_pairs": {
+          "release_to_both_complete_seconds": {
+            "n": 15,
+            "median": 0.8589732999971602,
+            "p95": 1.008951600000728,
+            "min": 0.683210399991367,
+            "max": 1.008951600000728
+          },
+          "client_start_skew_seconds": {
+            "n": 15,
+            "median": 0.00017819998902268708,
+            "p95": 0.00022370000078808516,
+            "min": 0.0001638999965507537,
+            "max": 0.00022370000078808516
+          },
+          "client_overlap_seconds": {
+            "n": 15,
+            "median": 0.7738258999888785,
+            "p95": 0.9119635999959428,
+            "min": 0.6048630999866873,
+            "max": 0.9119635999959428
+          }
+        }
+      },
+      "run_simultaneous_medians_seconds": [
+        0.8589732999971602
+      ],
+      "run_serial_medians_seconds": [
+        1.1310670000020764
+      ],
+      "memory_peaks": {
+        "process_gpu_dedicated_bytes": {
+          "bytes": 8068718592.0,
+          "GiB": 7.514579772949219,
+          "GB": 8.068718592
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 12417871872.0,
+          "GiB": 11.565044403076172,
+          "GB": 12.417871872
+        },
+        "WorkingSetSize": {
+          "bytes": 10850033664,
+          "GiB": 10.104881286621094,
+          "GB": 10.850033664
+        },
+        "PrivateUsage": {
+          "bytes": 18922926080,
+          "GiB": 17.623348236083984,
+          "GB": 18.92292608
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 10541715456.0,
+          "GiB": 9.817737579345703,
+          "GB": 10.541715456
+        }
+      },
+      "pooling": "Only complete observed runs pooled from original requests/pairs. Classification uses maximum lifecycle sampled peak across ALL runs, including failures.",
+      "versus_control_per_GiB": {
+        "dedicated_delta_bytes": 428212224.0,
+        "dedicated_delta_GiB": 0.3988037109375,
+        "definition": "Signed metric change versus pooled current-session control divided by signed GiB added (negative means saved). Near-zero denominators are not a useful efficiency estimate.",
+        "pairs": {
+          "median_ms_per_GiB": -61.822895139665604,
+          "p95_ms_per_GiB": -163.81141451253853
+        },
+        "phases": {
+          "first_prefix": {
+            "Self": {
+              "prefill_ms_per_GiB": -60.43574655647405,
+              "prefill_tps_per_GiB": 57.02655807219504,
+              "decode_ms_per_GiB": 3.334973982246812,
+              "decode_tps_per_GiB": -0.3512298655652562
+            },
+            "Peer": {
+              "prefill_ms_per_GiB": -47.47197551270283,
+              "prefill_tps_per_GiB": 47.79232366270673,
+              "decode_ms_per_GiB": 3.3625564738292217,
+              "decode_tps_per_GiB": -0.3074970498053844
+            },
+            "pooled": {
+              "prefill_ms_per_GiB": -53.95386103458844,
+              "prefill_tps_per_GiB": 52.40944086745088,
+              "decode_ms_per_GiB": 3.3487652280380167,
+              "decode_tps_per_GiB": -0.3293634576853114
+            }
+          },
+          "serial_pairs": {
+            "Self": {
+              "prefill_ms_per_GiB": -19.293952861952803,
+              "prefill_tps_per_GiB": 16.765095021997805,
+              "decode_ms_per_GiB": 18.114174471992627,
+              "decode_tps_per_GiB": 1.3979346269472548
+            },
+            "Peer": {
+              "prefill_ms_per_GiB": -14.724035506580925,
+              "prefill_tps_per_GiB": 16.614956537062913,
+              "decode_ms_per_GiB": 23.794913988368585,
+              "decode_tps_per_GiB": -1.679341552625123
+            },
+            "pooled": {
+              "prefill_ms_per_GiB": -19.293952861952803,
+              "prefill_tps_per_GiB": 14.142279563170499,
+              "decode_ms_per_GiB": 25.344548515457504,
+              "decode_tps_per_GiB": -1.7684893761458245
+            }
+          },
+          "simultaneous_pairs": {
+            "Self": {
+              "prefill_ms_per_GiB": -25.904974594429184,
+              "prefill_tps_per_GiB": 14.097287531452023,
+              "decode_ms_per_GiB": -10.611736761554871,
+              "decode_tps_per_GiB": -0.48422516634632584
+            },
+            "Peer": {
+              "prefill_ms_per_GiB": -2.3445117845117904,
+              "prefill_tps_per_GiB": -0.3601657391434511,
+              "decode_ms_per_GiB": -167.69402632384438,
+              "decode_tps_per_GiB": 3.105872377910429
+            },
+            "pooled": {
+              "prefill_ms_per_GiB": -20.347102540557067,
+              "prefill_tps_per_GiB": 6.949953564955606,
+              "decode_ms_per_GiB": -87.3788258340985,
+              "decode_tps_per_GiB": 0.8558844131845035
+            }
+          }
+        },
+        "host_memory": {
+          "WorkingSetSize_bytes_per_GiB": -474650909.22803795,
+          "PrivateUsage_bytes_per_GiB": 507548015.3486379
+        }
+      },
+      "repeatably_beats_control": false
+    }
+  },
+  "completed_requests": 88,
+  "unique_pair_count": 9,
+  "token_count_differences": [
+    {
+      "reference": "tuning8gib-n24-c2048-a1",
+      "run": "tuning8gib-n23-c2048-curve",
+      "phase": "simultaneous_pairs",
+      "channel": "Peer",
+      "round": 12,
+      "reference_counts": {
+        "prompt_n": 28,
+        "cache_n": 884,
+        "predicted_n": 22
+      },
+      "counts": {
+        "prompt_n": 28,
+        "cache_n": 884,
+        "predicted_n": 21
+      }
+    }
+  ],
+  "limits": "250-ms nominal whole-lifecycle PID exact-adapter samples are lower bounds; native API timings are per request, not pure GPU kernels. Independent manual quality review and Director judgment remain separate. No app/GUI/audio/physical8GiB/coexistence claims."
+}
