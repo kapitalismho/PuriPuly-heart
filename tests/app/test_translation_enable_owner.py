@@ -10,6 +10,7 @@ from puripuly_heart.app.services.translation_enable import (
     TranslationEnableOwner,
     TranslationEnableState,
 )
+from puripuly_heart.core.local_translation.provisioning import GemmaProvisioningCancelled
 
 
 def _state(
@@ -208,6 +209,182 @@ async def test_stale_enable_does_not_clear_newer_starting_flag() -> None:
     release.set()
     await enabling
     assert starting_values[-1] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("previous_enabled", [False, True])
+@pytest.mark.parametrize("failure_kind", ["startup", "cancelled", "provisioning", "cleanup"])
+async def test_warmup_failure_rolls_back_effective_state_and_preserves_retry(
+    previous_enabled: bool, failure_kind: str
+) -> None:
+    state_box = [_state(translation_enabled=previous_enabled)]
+    runtime_values: list[bool] = []
+    dashboard_values: list[bool] = []
+    starting_values: list[bool] = []
+    teardowns: list[str] = []
+    failures: dict[str, BaseException] = {
+        "startup": OSError("controlled Vulkan startup failure"),
+        "cancelled": asyncio.CancelledError("controlled task cancellation"),
+        "provisioning": GemmaProvisioningCancelled("controlled provisioning cancellation"),
+        "cleanup": BaseExceptionGroup(
+            "controlled cancellation cleanup",
+            [asyncio.CancelledError(), PermissionError("controlled cleanup failure")],
+        ),
+    }
+    failure = failures[failure_kind]
+    owner = _owner(
+        state_box,
+        runtime_values=runtime_values,
+        dashboard_values=dashboard_values,
+        starting_values=starting_values,
+        teardowns=teardowns,
+    )
+    attempts = 0
+
+    async def warmup() -> None:
+        nonlocal attempts
+        attempts += 1
+        assert state_box[0].translation_enabled is True
+        if attempts == 1:
+            raise failure
+
+    owner.warmup = warmup
+    with pytest.raises(type(failure)) as caught:
+        await owner.set_enabled(True)
+
+    assert caught.value is failure
+    assert state_box[0].translation_enabled is False
+    assert state_box[0].llm_available is True
+    assert runtime_values == [True, False]
+    assert dashboard_values == [False]
+    assert starting_values == [True, False]
+    assert teardowns == []
+    assert await owner.set_enabled(True) is True
+    assert attempts == 2
+    assert runtime_values == [True, False, True]
+    assert teardowns == []
+
+
+@pytest.mark.asyncio
+async def test_task_cancellation_rolls_back_pending_warmup() -> None:
+    state_box = [_state()]
+    dashboard_values: list[bool] = []
+    entered = asyncio.Event()
+
+    async def warmup() -> None:
+        entered.set()
+        await asyncio.Event().wait()
+
+    owner = _owner(state_box, dashboard_values=dashboard_values)
+    owner.warmup = warmup
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await entered.wait()
+    enabling.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await enabling
+    assert state_box[0].translation_enabled is False
+    assert dashboard_values == [False]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("newer_pending", [False, True])
+async def test_late_warmup_failure_does_not_disable_newer_enable(newer_pending: bool) -> None:
+    state_box = [_state()]
+    runtime_values: list[bool] = []
+    dashboard_values: list[bool] = []
+    starting_values: list[bool] = []
+    old_entered = asyncio.Event()
+    new_entered = asyncio.Event()
+    old_release = asyncio.Event()
+    new_release = asyncio.Event()
+    failure = OSError("superseded startup failure")
+    attempts = 0
+
+    async def warmup() -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            old_entered.set()
+            await old_release.wait()
+            raise failure
+        new_entered.set()
+        await new_release.wait()
+
+    owner = _owner(
+        state_box,
+        runtime_values=runtime_values,
+        dashboard_values=dashboard_values,
+        starting_values=starting_values,
+    )
+    owner.warmup = warmup
+    old_enable = asyncio.create_task(owner.set_enabled(True))
+    await old_entered.wait()
+    new_enable = asyncio.create_task(owner.set_enabled(True))
+    await new_entered.wait()
+    if not newer_pending:
+        new_release.set()
+        assert await new_enable is True
+    starting_before = list(starting_values)
+    old_release.set()
+    with pytest.raises(OSError) as caught:
+        await old_enable
+    assert caught.value is failure
+    assert state_box[0].translation_enabled is True
+    assert runtime_values == [True, True]
+    assert dashboard_values == []
+    assert starting_values == starting_before
+    if newer_pending:
+        new_release.set()
+        assert await new_enable is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("newer_intent", ["enable", "disable", "exhaustion", "stop"])
+@pytest.mark.parametrize("fails", [False, True])
+async def test_newer_intent_fences_warmup_completion(newer_intent: str, fails: bool) -> None:
+    state_box = [_state()]
+    runtime_values: list[bool] = []
+    dashboard_values: list[bool] = []
+    starting_values: list[bool] = []
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    failure = OSError("superseded startup failure")
+
+    async def warmup() -> None:
+        entered.set()
+        await release.wait()
+        if fails:
+            raise failure
+
+    owner = _owner(
+        state_box,
+        runtime_values=runtime_values,
+        dashboard_values=dashboard_values,
+        starting_values=starting_values,
+    )
+    owner.warmup = warmup
+    enabling = asyncio.create_task(owner.set_enabled(True))
+    await entered.wait()
+    if newer_intent == "enable":
+        owner.warmup = lambda: asyncio.sleep(0)
+        assert await owner.set_enabled(True) is True
+    elif newer_intent == "disable":
+        assert await owner.set_enabled(False) is False
+    elif newer_intent == "exhaustion":
+        owner.disable_for_managed_exhaustion(reopen_founder_letter=False)
+    else:
+        owner.stop_ingress()
+    values_before = (list(runtime_values), list(dashboard_values), list(starting_values))
+    release.set()
+    if fails:
+        with pytest.raises(OSError) as caught:
+            await enabling
+        assert caught.value is failure
+    else:
+        assert await enabling is False
+    assert (runtime_values, dashboard_values, starting_values) == values_before
+    if newer_intent in {"disable", "exhaustion"}:
+        assert state_box[0].translation_enabled is False
 
 
 @pytest.mark.asyncio

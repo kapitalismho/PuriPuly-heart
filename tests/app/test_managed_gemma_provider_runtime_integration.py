@@ -60,8 +60,13 @@ def _settings_owner(
 
 
 def _translation_config(*, enabled: bool) -> object:
-    return SimpleNamespace(
-        snapshot=lambda: SimpleNamespace(value=SimpleNamespace(translation_enabled=enabled))
+    from puripuly_heart.core.orchestrator.configuration import (
+        TranslationRuntimeConfig,
+        TranslationRuntimeConfigurationOwner,
+    )
+
+    return TranslationRuntimeConfigurationOwner(
+        TranslationRuntimeConfig(translation_enabled=enabled)
     )
 
 
@@ -80,6 +85,16 @@ def _components(
     async def no_op_bool(_value: bool) -> None:
         return None
 
+    peer = SimpleNamespace(
+        effective_enabled=lambda: False,
+        activation_requested=lambda **_kwargs: False,
+        last_runtime_signature=None,
+        last_provider_signature=None,
+    )
+    configuration = (
+        None if translation_enabled is None else _translation_config(enabled=translation_enabled)
+    )
+
     return compose_provider_runtime(
         config_path=Path("settings.json"),
         settings=_settings_owner(
@@ -89,14 +104,10 @@ def _components(
         llm_runtime_provider=lambda: runtime,
         http_extensions=SimpleNamespace(),
         local_asr_runtime_provider=lambda: None,
-        translation_runtime_configuration_provider=lambda: (
-            None
-            if translation_enabled is None
-            else _translation_config(enabled=translation_enabled)
-        ),
+        translation_runtime_configuration_provider=lambda: configuration,
         self_capture_provider=lambda: None,
         self_capture_owner=lambda: SimpleNamespace(),
-        peer=lambda: SimpleNamespace(effective_enabled=lambda: False),
+        peer=lambda: peer,
         peer_desired=lambda _settings: False,
         canonical_settings=lambda current: current,
         clear_local_pending=lambda: None,
@@ -296,3 +307,207 @@ async def test_provider_construction_failure_keeps_demand_owned_activation(
         ("needs-key", False),
         ("failure", "LLM provider not available"),
     ]
+
+
+def _connection(settings, backend):
+    return replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(settings.intent.translation, connection=backend),
+        ),
+    )
+
+
+async def _bound_request(handle, transport, text, *, reverse=False):
+    from uuid import uuid4
+
+    from puripuly_heart.core.translation_backend import TranslationBackendRequest
+
+    identity = uuid4()
+    task = asyncio.create_task(
+        handle.provider.translate(
+            TranslationBackendRequest(
+                utterance_id=identity,
+                text=text,
+                system_prompt="Translate {source_language} to {target_language}",
+                source_language="en" if reverse else "ko",
+                target_language="ko" if reverse else "en",
+            )
+        )
+    )
+    message, slot = await asyncio.wait_for(transport.started.get(), timeout=1)
+    assert text in message
+    return identity, task, message, slot
+
+
+async def _bound_components(tmp_path, monkeypatch):
+    from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
+    from puripuly_heart.app.services.provider.provider_runtime_apply import ProviderRuntimeState
+    from puripuly_heart.core.local_translation import runtime_profile
+    from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+    from tests.core.local_translation.test_gemma_runtime import ControlledTransport, _runtime
+
+    monkeypatch.setattr(
+        runtime_profile, "default_threads_profile_path", lambda: tmp_path / "threads.json"
+    )
+    monkeypatch.setattr(
+        wiring_provider_runtime, "create_secret_store", lambda *_args, **_kwargs: object()
+    )
+    native, commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=ControlledTransport
+    )
+    managed = ManagedGemmaTranslationOwner(runtime=native)
+    handle = ProviderRuntimeHandle(name="llm", provider=None)
+    components = _components(
+        settings=_managed_settings(),
+        runtime=handle,
+        managed_gemma=managed,
+        events=[],
+        translation_enabled=True,
+    )
+    components.runtime.state_provider = lambda _settings: ProviderRuntimeState(
+        True, handle.provider is not None, False, False, False, False
+    )
+    components.runtime.self_runtime_convergence = lambda _settings: True
+    components.runtime.peer_runtime_convergence = lambda _settings: None
+
+    async def controlled_stt():
+        return None
+
+    components.runtime.refresh_self_stt = controlled_stt
+    await components.llm_rebuild.rebuild()
+    components.sync_signatures(components.effects.settings.canonical)
+    return components, managed, handle, commands, processes, transports
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("coordinated", [False, True], ids=["channel-refresh", "gpu-recovery"])
+async def test_partial_stt_failure_retains_actual_llm_binding_and_rebuilds_return_to_gpu(
+    tmp_path,
+    monkeypatch,
+    coordinated,
+):
+    from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+    from puripuly_heart.app.services.provider.provider_runtime_apply import (
+        ProviderRuntimeApplyAdapter,
+    )
+    from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+        build_llm_provider_signature,
+    )
+
+    components, managed, handle, commands, processes, transports = await _bound_components(
+        tmp_path, monkeypatch
+    )
+    initial = components.effects.settings.canonical
+    initial_stt = components.signatures.last_self_provider
+    components.runtime.self_runtime_convergence = lambda _settings: False
+    components.runtime.gpu_restart_decision = lambda _before, _after: coordinated
+    try:
+        cpu = _connection(initial, "cpu")
+        plan = components.runtime.build_plan(cpu, force_rebuild_llm=False)
+        assert plan.should_rebuild_llm
+        result = await ProviderRuntimeApplyAdapter(components.runtime, cpu, plan).apply_runtime(
+            RuntimeApplyRequest({}, "controlled-backend-change", None)
+        )
+        assert result.status == "failed"
+        assert result.diagnostics.code == "stt_runtime_apply_not_converged"
+        assert components.signatures.last_llm_provider == build_llm_provider_signature(cpu)
+        assert components.signatures.last_self_provider == initial_stt
+        assert handle.provider.provider.backend == "cpu"
+        assert managed.runtime.readiness.effective_backend == "cpu"
+        assert processes[0].terminated
+        identity, request, message, _slot = await _bound_request(
+            handle, transports[-1], "cpu result"
+        )
+        transports[-1].gates[message].set()
+        translated = await request
+        assert (translated.utterance_id, translated.text) == (identity, message)
+
+        plan = components.runtime.build_plan(initial, force_rebuild_llm=False)
+        assert plan.should_rebuild_llm
+        result = await ProviderRuntimeApplyAdapter(components.runtime, initial, plan).apply_runtime(
+            RuntimeApplyRequest({}, "controlled-return-to-gpu", None)
+        )
+        assert result.status == "failed"
+        assert result.diagnostics.code == "stt_runtime_apply_not_converged"
+        assert components.signatures.last_llm_provider == build_llm_provider_signature(initial)
+        assert components.signatures.last_self_provider == initial_stt
+        assert handle.provider.provider.backend == "gpu"
+        assert managed.runtime.readiness.effective_backend == "vulkan"
+        assert len(commands) == 3
+        assert processes[1].terminated
+        transport = transports[-1]
+        first_id, first, first_message, first_slot = await _bound_request(handle, transport, "self")
+        second_id, second, second_message, second_slot = await _bound_request(
+            handle, transport, "peer", reverse=True
+        )
+        assert first_slot != second_slot
+        assert transport.peak_active == 2
+        transport.gates[second_message].set()
+        transport.gates[first_message].set()
+        first_result, second_result = await asyncio.gather(first, second)
+        assert (first_result.utterance_id, first_result.text) == (first_id, first_message)
+        assert (second_result.utterance_id, second_result.text) == (second_id, second_message)
+        assert len(commands) == 3
+        assert not processes[-1].terminated
+    finally:
+        await handle.replace_provider(None, start=False)
+        await managed.close()
+
+
+@pytest.mark.asyncio
+async def test_failed_llm_replacement_is_retryable_without_committing_failed_profile(
+    tmp_path,
+    monkeypatch,
+):
+    from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
+    from puripuly_heart.app.services.provider.provider_runtime_apply import (
+        ProviderRuntimeApplyAdapter,
+    )
+
+    components, managed, handle, _commands, _processes, transports = await _bound_components(
+        tmp_path, monkeypatch
+    )
+    initial = components.effects.settings.canonical
+    cpu = _connection(initial, "cpu")
+    factory = wiring_provider_runtime.create_translation_backend
+    components.signatures.last_self_provider = ("previous-stt-binding",)
+
+    def fail_factory(**_kwargs):
+        raise RuntimeError("controlled LLM construction failure")
+
+    monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", fail_factory)
+    try:
+        plan = components.runtime.build_plan(cpu, force_rebuild_llm=False)
+        result = await ProviderRuntimeApplyAdapter(components.runtime, cpu, plan).apply_runtime(
+            RuntimeApplyRequest({}, "controlled-failed-replacement", None)
+        )
+        assert result.status == "failed"
+        assert result.diagnostics.code == "provider_runtime_apply_unavailable"
+        assert handle.provider is None
+        assert components.signatures.last_llm_provider == ()
+        assert (
+            components.signatures.last_self_provider
+            == components.runtime.self_signature_builder(cpu)
+        )
+        assert components.signatures.last_self_provider != ("previous-stt-binding",)
+        retry = components.runtime.build_plan(cpu, force_rebuild_llm=False)
+        assert retry.should_rebuild_llm
+        monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", factory)
+        result = await ProviderRuntimeApplyAdapter(components.runtime, cpu, retry).apply_runtime(
+            RuntimeApplyRequest({}, "controlled-successful-retry", None)
+        )
+        assert result.status == "applied"
+        assert handle.provider.provider.backend == "cpu"
+        assert components.signatures.last_llm_provider != ()
+        assert not components.runtime.build_plan(cpu, force_rebuild_llm=False).should_rebuild_llm
+        identity, request, message, _slot = await _bound_request(
+            handle, transports[-1], "retry result"
+        )
+        transports[-1].gates[message].set()
+        translated = await request
+        assert (translated.utterance_id, translated.text) == (identity, message)
+    finally:
+        await handle.replace_provider(None, start=False)
+        await managed.close()

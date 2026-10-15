@@ -154,6 +154,8 @@ puripuly.exe overlay calibrate begin
 
 Capture/provider/output states in command receipts are runtime observations, not just persisted selections.
 
+In `app.status`, `translation_runtime_ready` means a provider is attached; it can be true while translation is disabled or a managed model has not loaded. Check the operation receipt and `models.status` for managed preparation success or failure. If the current translation-enable attempt fails or is cancelled during warmup, effective translation turns off while the selected model and failure details remain. Superseded work does not change newer intent. After correcting the cause, explicitly run `translation set on` again.
+
 ### CPU model repair
 
 To repair an outdated Qwen3-ASR 0.6B CPU installation and verify the downloaded files:

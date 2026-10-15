@@ -149,6 +149,8 @@ GUI and headless hosts share application owners and runtime resources. Presentat
   - `ApplicationControlOwner` exposes typed operations and owner-backed queries.
   - CLI, GUI, and OSC mutations share application ordering and resource-conflict boundaries.
   - Queries distinguish persisted intent from effective runtime state.
+  - `translation_runtime_ready` reports provider attachment, not successful native-model preparation. Managed readiness and failures belong to `models.status`.
+  - Translation enablement publishes preparation demand before warmup. A current-generation warmup failure or cancellation rolls effective enablement off without discarding the selected provider or its actionable failure. Later explicit enablement retries; superseded work cannot overwrite newer intent.
   - Operations belong to the application, not the requesting client connection.
 - **Local control host**
   - The host owns authenticated same-user access and instance identity.
@@ -188,6 +190,7 @@ Settings changes follow this path:
 - Settings persistence owns intent. Runtime owners own its application.
 - The provider-apply boundary coordinates capture and Local ASR owners.
 - Failed or incomplete application must not appear as successfully applied runtime state.
+- LLM applied-profile signatures and retry state follow the actual provider-replacement outcome, before usage refresh or STT convergence. STT signatures advance only after their own convergence. A successful LLM replacement therefore remains accurately tracked when an independent STT failure leaves the overall settings transaction committed but runtime-degraded.
 
 Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
 

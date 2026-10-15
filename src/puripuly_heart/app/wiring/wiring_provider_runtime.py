@@ -134,12 +134,30 @@ class ProviderRuntimeSignatures:
         peer: PeerApplicationOwner,
         peer_translation_enabled: bool = False,
     ) -> None:
-        self.last_self_runtime = build_self_stt_runtime_signature_from_vnext(canonical)
-        self.last_self_provider = build_self_stt_provider_signature_from_vnext(canonical)
+        self.sync_stt(
+            settings,
+            canonical=canonical,
+            peer=peer,
+            peer_translation_enabled=peer_translation_enabled,
+        )
+        self.sync_llm(canonical)
+
+    def sync_llm(self, canonical: AppSettingsVNext) -> None:
         self.last_llm_provider = build_llm_provider_signature(
             canonical,
             http_extensions=self.http_extensions,
         )
+
+    def sync_stt(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        canonical: AppSettingsVNext,
+        peer: PeerApplicationOwner,
+        peer_translation_enabled: bool = False,
+    ) -> None:
+        self.last_self_runtime = build_self_stt_runtime_signature_from_vnext(canonical)
+        self.last_self_provider = build_self_stt_provider_signature_from_vnext(canonical)
         peer.last_runtime_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         peer.last_provider_signature = build_peer_stt_provider_signature_from_vnext(canonical)
         peer.last_intent_enabled = bool(peer_translation_enabled)
@@ -540,6 +558,9 @@ def compose_provider_runtime(
             chatgpt_session=chatgpt_session,
         )
 
+    def sync_llm_signature(current: object) -> None:
+        signature_state.sync_llm(canonical_settings(current))
+
     llm_rebuild = LlmProviderRebuildOwner(
         context_provider=llm_context,
         provider_factory=create_llm,
@@ -547,10 +568,12 @@ def compose_provider_runtime(
         usage_refresh=usage_refresh,
         failure_sink=failure_sink,
         success_sink=success_sink,
+        signature_sink=sync_llm_signature,
+        retry_sink=signature_state.mark_llm_retry,
     )
 
     def sync_signatures(current: object) -> None:
-        signature_state.sync(
+        signature_state.sync_stt(
             current,
             canonical=canonical_settings(current),
             peer=peer(),
@@ -576,7 +599,6 @@ def compose_provider_runtime(
         refresh_peer=effects.refresh_peer,
         refresh_self_stt=effects.refresh_self_stt,
         signature_sink=sync_signatures,
-        llm_retry_sink=signature_state.mark_llm_retry,
         current_settings_provider=lambda: settings.canonical,
         signature_cache_provider=lambda: signature_state.cache(peer()),
         self_signature_builder=lambda current: build_self_stt_provider_signature_from_vnext(

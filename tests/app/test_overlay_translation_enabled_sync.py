@@ -723,6 +723,80 @@ async def test_rejected_enable_keeps_source_primary_without_republish() -> None:
     assert len(bridge.snapshots) == snapshots_before
 
 
+async def test_failed_warmup_rebuilds_existing_row_as_source_primary() -> None:
+    config_owner = TranslationRuntimeConfigurationOwner(
+        TranslationRuntimeConfig(translation_enabled=False)
+    )
+    owner = make_owner(config_owner)
+    runtime, presenter, bridge = attach_live_presenter(owner, config_owner)
+    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
+    peer_turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=peer_turn_id,
+                channel="peer",
+                text="retained peer source",
+                is_final=True,
+                created_at=10.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    await presenter.emit(
+        adapter.translation_final(
+            utterance_id=peer_turn_id,
+            channel="peer",
+            text="retained peer translation",
+            source_language="en",
+            target_language="ko",
+            applied_context_mode=None,
+            created_at=10.1,
+        )
+    )
+    enable_owner, dashboard = make_enable_owner(config_owner, owner, llm_available=True)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    failure = OSError("controlled warmup failure")
+
+    async def warmup() -> None:
+        entered.set()
+        await release.wait()
+        raise failure
+
+    enable_owner.warmup = warmup
+    enabling = asyncio.create_task(enable_owner.set_enabled(True))
+    try:
+        await entered.wait()
+        await _drain()
+        assert presenter.snapshot().blocks[0].primary_text == "retained peer translation"
+        snapshots_before_failure = len(bridge.snapshots)
+        release.set()
+        with pytest.raises(OSError) as caught:
+            await enabling
+        assert caught.value is failure
+        await _drain()
+        assert config_owner.snapshot().value.translation_enabled is False
+        assert dashboard == [False]
+        assert presenter.translation_enabled is False
+        block = presenter.snapshot().blocks[0]
+        assert block.primary_text == "retained peer source"
+        assert block.secondary_text == ""
+        assert block.secondary_enabled is False
+        assert len(bridge.snapshots) == snapshots_before_failure + 1
+    finally:
+        release.set()
+        await asyncio.gather(enabling, return_exceptions=True)
+        await runtime.close(
+            preserve_presenter_state=False,
+            overlay_sink_detach=None,
+            preview_reset=None,
+            diagnostics_detach=None,
+            emit_shutdown=False,
+        )
+
+
 async def test_managed_exhaustion_rebuilds_visible_row_as_source_primary() -> None:
     config_owner = TranslationRuntimeConfigurationOwner(
         TranslationRuntimeConfig(translation_enabled=True)

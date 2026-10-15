@@ -1742,17 +1742,18 @@ async def test_execution_receipt_preserves_approved_native_failure_carrier(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["cancelled", "failed", "interrupted"])
+@pytest.mark.parametrize("command", ["gemma.prepare", "translation.set"])
 async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
-    offline, monkeypatch, outcome
+    offline, monkeypatch, outcome, command
 ):
     import socket
 
-    from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
     from puripuly_heart.core.local_asr.local_stt_download_port import (
         HuggingFaceDownloadProgress,
         LocalSTTDownloadPortCancelled,
     )
     from puripuly_heart.core.local_translation import assets
+    from puripuly_heart.core.local_translation.provisioning import ensure_gemma_installed
     from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 
     monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-gemma-data"))
@@ -1797,28 +1798,35 @@ async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
     def reject_launch(*_args, **_kwargs):
         raise AssertionError("cancelled provisioning must not launch a model process")
 
+    async def provision(**kwargs):
+        kwargs["downloader"] = Downloader()
+        return await ensure_gemma_installed(**kwargs)
+
     install_dir = offline.parent / "gemma-models" / spec.install_dirname
     runtime = ManagedGemmaRuntimeOwner(
         install_dir=install_dir,
+        provisioner=provision,
         process_factory=reject_launch,
         transport_factory=reject_launch,
     )
-    owner = ManagedGemmaTranslationOwner(runtime=runtime, downloader=Downloader())
+    monkeypatch.setattr(
+        application_runtime, "create_managed_gemma_runtime", lambda **_kwargs: runtime
+    )
     app = compose_headless_application(offline)
     try:
         await app.start()
         control = app.control()
         control.bind_instance(f"isolated-gemma-{outcome}")
-        control.gemma = lambda: owner
-        admitted = await control.submit("gemma.prepare", {}, request_id="prepare-cancel")
+        owner = control.gemma()
+        arguments = {"enabled": True} if command == "translation.set" else {}
+        admitted = await control.submit(command, arguments, request_id="prepare-cancel")
         await asyncio.wait_for(entered.wait(), 5)
         assert owner.snapshot.state == "downloading"
         assert staging_paths and staging_paths[0].is_dir()
         assert (await control.operation(admitted["operation_id"]))["terminal"] is False
 
         if outcome == "interrupted":
-            control.freeze_ingress()
-            await asyncio.wait_for(control.drain_operations(), 5)
+            await asyncio.wait_for(app.stop(), 5)
         else:
             cancellation = await control.submit("gemma.cancel", {}, request_id="cancel-preparation")
             cancel_receipt = await control.wait(cancellation["operation_id"], timeout=5)
@@ -1827,9 +1835,21 @@ async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
         receipt = await control.wait(admitted["operation_id"], timeout=5)
         assert receipt["status"] == outcome
         assert receipt["terminal"] is True
+        if command == "translation.set" and outcome != "interrupted":
+            status = await control.query("app.status", {})
+            assert status["translation_enabled"] is False
+            assert status["translation_runtime_ready"] is True
+            assert (
+                control.pipeline.translation_runtime_configuration.snapshot().value.translation_enabled
+                is False
+            )
         assert settled.is_set()
         assert not install_dir.exists()
         assert all(not path.exists() for path in staging_paths)
+        if outcome == "interrupted":
+            assert owner.snapshot.state == "closed"
+            assert runtime.readiness is None
+            assert control.pipeline.llm_runtime is None
         if outcome == "failed":
             assert owner.snapshot.state == "failed"
             assert owner.snapshot.failure_code == "filesystem_failed"
@@ -1855,7 +1875,7 @@ async def test_gemma_prepare_cancellation_receipt_tracks_settled_provisioning(
                 "locale"
             ] == "ja"
     finally:
-        await owner.close()
+        await runtime.close()
         await app.stop()
         sink.close()
 
@@ -1962,3 +1982,229 @@ async def test_composed_gemma_notices_carry_presentation_policy_without_backend_
     finally:
         await app.stop()
         sink.close()
+
+
+@pytest.mark.asyncio
+async def test_failed_26b_enable_stays_off_without_implicit_retry_and_recovers_explicitly(
+    offline, monkeypatch
+):
+    import hashlib
+
+    from puripuly_heart.composition import headless_application
+    from puripuly_heart.core.local_asr.local_stt_download_port import HuggingFaceDownloadProgress
+    from puripuly_heart.core.local_translation import assets
+    from puripuly_heart.core.local_translation.provisioning import ensure_gemma_installed
+    from puripuly_heart.core.local_translation.runtime import (
+        ManagedGemmaMetrics,
+        ManagedGemmaResponse,
+        ManagedGemmaRuntimeOwner,
+    )
+    from puripuly_heart.core.local_translation.runtime_profile import GemmaRuntimePaths
+
+    monkeypatch.setenv("LOCALAPPDATA", str(offline.parent / "isolated-enable-data"))
+    monkeypatch.setenv("APPDATA", str(offline.parent / "isolated-enable-roaming"))
+    settings = json.loads(offline.read_text(encoding="utf-8"))
+    settings["intent"]["translation"].update(model="managed_gemma_26b", connection="gpu")
+    settings["intent"]["stt"]["provider"] = "soniox"
+    settings["intent"]["peer_stt"]["provider"] = "soniox"
+    settings["intent"]["telemetry"]["enabled"] = False
+    settings["intent"]["integrated_context"]["enabled"] = False
+    offline.write_text(json.dumps(settings), encoding="utf-8")
+    presentation = headless_application.HeadlessApplicationPresentation()
+    monkeypatch.setattr(
+        headless_application, "HeadlessApplicationPresentation", lambda: presentation
+    )
+    content = b"synthetic 26B asset"
+    spec = assets.resolve_gemma_spec(assets.GEMMA_26B_MODEL_ID)
+    spec = replace(
+        spec,
+        assets=(
+            replace(
+                spec.assets[0],
+                size_bytes=len(content),
+                sha256=hashlib.sha256(content).hexdigest(),
+            ),
+        ),
+    )
+    monkeypatch.setattr(assets, "gemma_26b_spec", lambda: spec)
+    downloads = []
+
+    class Downloader:
+        async def download(self, request, *, cancel_event, on_progress):
+            downloads.append(request.remote_path)
+            destination = request.local_dir / request.remote_path
+            destination.write_bytes(content)
+            on_progress(HuggingFaceDownloadProgress(len(content), len(content)))
+            return destination
+
+    async def provision(**kwargs):
+        kwargs["downloader"] = Downloader()
+        return await ensure_gemma_installed(**kwargs)
+
+    class Process:
+        def __init__(self):
+            self.returncode = None
+            self.exited = asyncio.Event()
+
+        def terminate(self):
+            self.returncode = 0
+            self.exited.set()
+
+        def kill(self):
+            self.returncode = -9
+            self.exited.set()
+
+        async def wait(self):
+            await self.exited.wait()
+            return self.returncode
+
+    commands = []
+    processes = []
+    translations = []
+    prefixes = []
+    closed = []
+    failure = OSError(5, "PRIVATE_CONTROLLED_VULKAN_FAILURE")
+
+    async def spawn(command, _cwd):
+        commands.append(command)
+        if len(commands) == 1:
+            raise failure
+        process = Process()
+        processes.append(process)
+        return process
+
+    class Transport:
+        async def wait_until_ready(self, *, timeout_s):
+            assert timeout_s > 0
+
+        async def prepare_prefix(self, *, system_prompt, slot_id):
+            prefixes.append((system_prompt, slot_id))
+
+        async def wait_slot_idle(self, *, slot_id):
+            assert slot_id in range(3)
+
+        async def translate(self, **kwargs):
+            translations.append(kwargs)
+            return ManagedGemmaResponse(
+                text="controlled recovered translation",
+                metrics=ManagedGemmaMetrics(24, 20, 4, 5.0, 100.0, 40.0),
+            )
+
+        async def close(self):
+            closed.append(True)
+
+    executable = offline.parent / "controlled-llama-server.exe"
+    executable.write_bytes(b"never executed")
+
+    async def validate_version(path):
+        assert path == executable
+
+    runtime = ManagedGemmaRuntimeOwner(
+        install_dir=offline.parent / "models" / spec.install_dirname,
+        runtime_paths=GemmaRuntimePaths(executable, executable),
+        provisioner=provision,
+        process_factory=spawn,
+        transport_factory=lambda _url: Transport(),
+        version_validator=validate_version,
+    )
+    monkeypatch.setattr(
+        application_runtime, "create_managed_gemma_runtime", lambda **_kwargs: runtime
+    )
+    app = compose_headless_application(offline)
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("controlled-failed-26b-enable")
+        before = await control.query("app.status", {})
+        assert before["translation_enabled"] is False
+        assert before["translation_runtime_ready"] is True
+        presentation.set_dashboard_translation_enabled(True)
+        enabled = await control.submit(
+            "translation.set", {"enabled": True}, request_id="first-enable"
+        )
+        receipt = await control.wait(enabled["operation_id"], timeout=5)
+        assert receipt["terminal"] is True
+        assert receipt["status"] == "failed"
+        assert receipt["error"]["code"] == "application_operation_failed"
+        assert "PRIVATE_" not in json.dumps(receipt)
+        status = await control.query("app.status", {})
+        assert status["translation_enabled"] is False
+        assert status["translation_runtime_ready"] is True
+        assert (
+            control.pipeline.translation_runtime_configuration.snapshot().value.translation_enabled
+            is False
+        )
+        assert presentation.dashboard_translation_enabled() is False
+        assert presentation.projections["translation_starting"] is False
+        snapshot = (await control.query("models.status", {}))["gemma"]
+        assert snapshot["state"] == "failed"
+        assert snapshot["model_id"] == spec.model_id
+        assert snapshot["backend"] == "gpu"
+        assert snapshot["failure_code"] == "filesystem_failed"
+        assert snapshot["cause_type"] == "OSError"
+        assert runtime.readiness is None
+        assert len(commands) == 1
+        assert not processes
+
+        disabled_text = await control.submit(
+            "text.submit", {"text": "synthetic input while disabled"}, request_id="off-text"
+        )
+        disabled_receipt = await control.wait(disabled_text["operation_id"], timeout=5)
+        assert disabled_receipt["terminal"] is True
+        assert disabled_receipt["admission"] == "admitted"
+        await asyncio.wait_for(control.pipeline.translation_turns.wait_for_idle(), 5)
+        assert len(commands) == 1
+        assert translations == []
+        assert (await control.query("models.status", {}))["gemma"] == snapshot
+
+        recovery = await control.submit(
+            "translation.set", {"enabled": True}, request_id="explicit-retry"
+        )
+        recovered = await control.wait(recovery["operation_id"], timeout=5)
+        assert recovered["terminal"] is True
+        assert recovered["status"] == "applied"
+        assert (await control.query("app.status", {}))["translation_enabled"] is True
+        ready = (await control.query("models.status", {}))["gemma"]
+        assert ready["state"] == "ready"
+        assert ready["model_id"] == snapshot["model_id"]
+        assert ready["backend"] == "gpu"
+        assert runtime.readiness.effective_backend == "vulkan"
+        assert len(commands) == 2
+        assert len(processes) == 1
+        assert downloads == [spec.assets[0].filename]
+        for command in commands:
+            assert command[command.index("--alias") + 1] == "puripuly-gemma-4-26b-a4b-q4"
+            assert command[command.index("--device") + 1].startswith("Vulkan")
+            assert command[command.index("--model") + 1].endswith(spec.assets[0].filename)
+        selected = (await control.query("settings.current", {}))["settings"]["intent"][
+            "translation"
+        ]
+        assert selected["model"] == "managed_gemma_26b"
+        assert selected["connection"] == "gpu"
+        stream = control.subscribe(topics=["translation"], include_translations=True)
+
+        async def translated_event():
+            async for event in stream:
+                return event
+
+        observed = asyncio.create_task(translated_event())
+        await asyncio.sleep(0)
+        text = await control.submit(
+            "text.submit", {"text": "synthetic recovered input"}, request_id="on-text"
+        )
+        text_receipt = await control.wait(text["operation_id"], timeout=5)
+        assert text_receipt["admission"] == "admitted"
+        event = await asyncio.wait_for(observed, 5)
+        await stream.aclose()
+        await asyncio.wait_for(control.pipeline.translation_turns.wait_for_idle(), 5)
+        assert event["utterance_id"] in [text_receipt["turn_id"], *text_receipt["child_turn_ids"]]
+        assert event["channel"] == "self"
+        assert event["text"] == "controlled recovered translation"
+        assert len(translations) == 1
+        assert prefixes
+        assert len(commands) == 2
+    finally:
+        await app.stop()
+        await runtime.close()
+    assert all(process.returncode == 0 for process in processes)
+    assert closed == [True]

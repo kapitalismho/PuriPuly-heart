@@ -123,7 +123,15 @@ class TranslationEnableOwner:
             self.clear_context()
             self.runtime_sink(enabled)
             if enabled:
-                await self.warmup()
+                try:
+                    await self.warmup()
+                except BaseException:
+                    if self.intent_matches(enabled=True, generation=request_generation):
+                        self.runtime_sink(False)
+                        self.dashboard_sink(False)
+                    raise
+                if not self.intent_matches(enabled=True, generation=request_generation):
+                    return False
             else:
                 await self._teardown()
             applied = self.state_provider().translation_enabled
