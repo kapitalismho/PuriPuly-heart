@@ -491,11 +491,14 @@ puripuly.exe secrets presence
 puripuly.exe secrets verify soniox_api_key
 ```
 
-- Verification reads a secret through hidden input or stdin. It is separate from storage.
+Saving the active DeepSeek, OpenAI, Gemini, or OpenRouter BYOK translation key applies it to subsequent translations without restarting, including first registration. This does not enable translation or capture. Saving an inactive key does not rebuild the active translation provider, and managed-account routes do not switch to BYOK.
+
+- Verification reads a secret through hidden input or stdin. It is separate from storage; saving a key resets its verification status to `unknown` and does not establish service health.
 - `capabilities` and `secrets presence` list the declared secret identifiers, including loaded HTTP-extension declarations.
 - A key without a supported verification protocol returns terminal `action_required` with `verification: unavailable`. It does not report verification success.
 - Secret values are never returned in settings, query results, operation receipts, or logs.
 - Delete removes the secret from local storage.
+- If a key is persisted but runtime application fails, the operation reports `degraded` with the retained failure cause. The stored key remains saved and can still be verified separately; neither a successful save nor a successful key probe claims that the live provider adopted it.
 
 Verification is a limited key/protocol probe, not proof of healthy live recognition:
 

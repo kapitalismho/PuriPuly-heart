@@ -8,16 +8,20 @@ import pytest
 from puripuly_heart.app.services.provider_runtime_apply import (
     LlmProviderRebuildContext,
     LlmProviderRebuildOwner,
+    ProviderRuntimeApplyAdapter,
     ProviderRuntimeApplyPlan,
     ProviderRuntimeOwner,
     ProviderRuntimeState,
 )
 
+from puripuly_heart.app.ports.runtime_apply import RuntimeApplyRequest
 from puripuly_heart.app.services.translation_enable import (
     ManagedTranslationPreparation,
     TranslationEnableOwner,
     TranslationEnableState,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 
 
 def _runtime_owner(
@@ -238,6 +242,101 @@ def test_provider_runtime_owner_reports_requested_runtime_unavailability(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("coordinated_gpu_restart", [False, True])
+@pytest.mark.parametrize("usage_refresh_fails", [False, True])
+@pytest.mark.parametrize("wrapped_factory_error", [False, True])
+async def test_llm_factory_failure_preserves_requested_stt_replacement(
+    coordinated_gpu_restart: bool,
+    usage_refresh_fails: bool,
+    wrapped_factory_error: bool,
+) -> None:
+    class Resource:
+        closed = False
+
+        async def close(self) -> None:
+            self.closed = True
+
+    old_stt, new_stt, old_llm = Resource(), Resource(), Resource()
+    stt = ProviderRuntimeHandle(name="self_stt", provider=old_stt)
+    llm = ProviderRuntimeHandle(name="llm", provider=old_llm)
+    diagnostic = ErrorDiagnostics(
+        component="provider.llm",
+        operation="provider_construction",
+        code="provider.auth",
+        category="auth",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=401,
+        retry_after_ms=None,
+        fields={},
+    )
+
+    def fail_factory(_settings: object) -> object:
+        error = RuntimeError("controlled provider construction failure")
+        error.failure_diagnostics = diagnostic
+        if wrapped_factory_error:
+            raise RuntimeError("controlled provider factory wrapper") from error
+        raise error
+
+    async def replace_llm(provider: object | None) -> object | None:
+        return await llm.replace_provider(provider, start=False)
+
+    async def replace_stt() -> None:
+        await stt.replace_provider(new_stt, start=False)
+
+    async def refresh_usage() -> None:
+        if usage_refresh_fails:
+            raise RuntimeError("controlled usage refresh failure")
+
+    rebuild = LlmProviderRebuildOwner(
+        context_provider=lambda: LlmProviderRebuildContext(
+            settings="settings",
+            replace_provider=replace_llm,
+            requires_secret=True,
+        ),
+        provider_factory=fail_factory,
+        availability_sink=lambda _value: None,
+        usage_refresh=refresh_usage,
+        failure_sink=lambda _message: None,
+        success_sink=lambda _message: None,
+    )
+    owner = _runtime_owner(
+        events=[],
+        state=ProviderRuntimeState(True, False, True, False, True, False),
+    )
+    owner.rebuild_llm = lambda: rebuild.rebuild(propagate_failure=True)
+    owner.refresh_self_stt = replace_stt
+    owner.recover_gpu = lambda _settings, _plan: replace_stt()
+    try:
+        result = await ProviderRuntimeApplyAdapter(
+            owner=owner,
+            settings="settings",
+            plan=ProviderRuntimeApplyPlan(
+                should_rebuild_llm=True,
+                should_refresh_peer=False,
+                should_refresh_self_stt=True,
+                coordinated_gpu_restart=coordinated_gpu_restart,
+            ),
+        ).apply_runtime(
+            RuntimeApplyRequest(settings_values={}, reason="combined_apply", correlation_id=None)
+        )
+
+        assert stt.provider is new_stt
+        assert old_stt.closed is True
+        assert new_stt.closed is False
+        assert llm.provider is None
+        assert old_llm.closed is True
+        assert result.status == "failed"
+        assert result.diagnostics is not None
+        assert result.diagnostics.diagnostic_id == diagnostic.diagnostic_id
+        assert result.diagnostics.code == diagnostic.code
+        assert result.diagnostics.status_code == 401
+    finally:
+        await stt.close()
+        await llm.close()
+
+
+@pytest.mark.asyncio
 async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_refresh() -> None:
     events: list[object] = []
     provider = object()
@@ -269,39 +368,6 @@ async def test_llm_provider_rebuild_owner_delivers_success_projection_and_usage_
         ("needs_key", False),
         "usage",
         ("success", "[Settings] LLM provider rebuilt successfully"),
-    ]
-
-
-@pytest.mark.asyncio
-async def test_llm_provider_rebuild_owner_contains_factory_failure() -> None:
-    events: list[object] = []
-
-    async def replace(value: object | None) -> None:
-        events.append(("replace", value))
-
-    def fail_factory(_settings: object) -> object:
-        raise RuntimeError("unavailable")
-
-    owner = LlmProviderRebuildOwner(
-        context_provider=lambda: LlmProviderRebuildContext(
-            settings=SimpleNamespace(),
-            replace_provider=replace,
-            requires_secret=True,
-        ),
-        provider_factory=fail_factory,
-        availability_sink=lambda value: events.append(("needs_key", value)),
-        usage_refresh=lambda: _record_async(events, "usage"),
-        failure_sink=lambda message: events.append(("failure", message)),
-        success_sink=lambda message: events.append(("success", message)),
-    )
-
-    await owner.rebuild()
-
-    assert events == [
-        ("replace", None),
-        ("needs_key", True),
-        "usage",
-        ("failure", "LLM provider not available"),
     ]
 
 

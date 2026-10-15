@@ -117,7 +117,7 @@ class LlmProviderRebuildOwner:
         default_factory=ProviderRuntimeRebuildService,
     )
 
-    async def rebuild(self) -> bool:
+    async def rebuild(self, *, propagate_failure: bool = False) -> bool:
         context = self.context_provider()
         if context is None:
             return False
@@ -127,7 +127,14 @@ class LlmProviderRebuildOwner:
         )
         provider = outcome.provider
         self.availability_sink(provider is None and context.requires_secret)
-        await self.usage_refresh()
+        try:
+            await self.usage_refresh()
+        except Exception:
+            if propagate_failure and outcome.error is not None:
+                raise outcome.error
+            raise
+        if propagate_failure and outcome.error is not None:
+            raise outcome.error
         if provider is None:
             self.failure_sink(f"{context.resource_label} not available")
             return False
@@ -209,14 +216,20 @@ class ProviderRuntimeOwner:
         plan: ProviderRuntimeApplyPlan,
     ) -> None:
         self.common_effect(settings)
+        llm_error: Exception | None = None
         if plan.should_rebuild_llm:
-            await self.rebuild_llm()
+            try:
+                await self.rebuild_llm()
+            except Exception as exc:
+                llm_error = exc
         if plan.coordinated_gpu_restart:
             await self.recover_gpu(settings, plan)
             self._require_stt_runtime_convergence(settings)
             self.signature_sink(settings)
             if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
                 self.llm_retry_sink()
+            if llm_error is not None:
+                raise llm_error
             return
         if plan.should_refresh_peer:
             await self.refresh_peer()
@@ -226,6 +239,8 @@ class ProviderRuntimeOwner:
         self.signature_sink(settings)
         if plan.should_rebuild_llm and not self.state_provider(settings).llm_available:
             self.llm_retry_sink()
+        if llm_error is not None:
+            raise llm_error
 
     def _require_stt_runtime_convergence(self, settings: object) -> None:
         if self.self_runtime_convergence(settings) is False:

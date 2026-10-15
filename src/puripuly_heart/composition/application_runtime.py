@@ -1843,6 +1843,25 @@ def compose_application_runtime(
     )
 
     def on_llm_availability_changed(needs_key: bool) -> None:
+        current = settings.canonical
+        if current is not None:
+            translation = current.intent.translation
+            provider = provider_llm_for_translation(translation.model, translation.connection)
+            verification_provider = None
+            if translation.connection == "official_byok":
+                verification_provider = {
+                    "gemini": "google",
+                    "openai": "openai",
+                    "deepseek": "deepseek",
+                }.get(provider)
+            elif (
+                translation.connection == "openrouter"
+                and translation.openrouter_selected_source == "byok"
+            ):
+                verification_provider = "openrouter"
+            if verification_provider is not None:
+                entry = getattr(current.state.provider_verification, verification_provider)
+                needs_key = needs_key or entry.status != "verified"
         presentation.set_dashboard_translation_needs_key(needs_key)
         llm_connection_readiness.sync()
 

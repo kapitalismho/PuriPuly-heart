@@ -570,7 +570,7 @@ def compose_provider_runtime(
     runtime = ProviderRuntimeOwner(
         state_provider=effects.state,
         common_effect=effects.apply_common,
-        rebuild_llm=llm_rebuild.rebuild,
+        rebuild_llm=lambda: llm_rebuild.rebuild(propagate_failure=True),
         recover_gpu=effects.gpu_recovery,
         refresh_peer=effects.refresh_peer,
         refresh_self_stt=effects.refresh_self_stt,
