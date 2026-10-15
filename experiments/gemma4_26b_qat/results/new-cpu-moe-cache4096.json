@@ -1,0 +1,151 @@
+{
+  "profile": "new-cpu-moe-cache4096",
+  "build": "b11537",
+  "baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "command": [
+    "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+    "--model",
+    "<MODEL>/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+    "--alias",
+    "issue245",
+    "--load-mode",
+    "mmap",
+    "--ctx-size",
+    "4608",
+    "--parallel",
+    "3",
+    "--batch-size",
+    "512",
+    "--ubatch-size",
+    "512",
+    "--threads",
+    "4",
+    "--threads-batch",
+    "4",
+    "--cache-type-k",
+    "f16",
+    "--cache-type-v",
+    "f16",
+    "--cache-prompt",
+    "--reasoning",
+    "off",
+    "--reasoning-budget",
+    "0",
+    "--warmup",
+    "--perf",
+    "--metrics",
+    "--no-webui",
+    "--threads-http",
+    "1",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "64540",
+    "--prio",
+    "-1",
+    "--device",
+    "Vulkan0",
+    "--flash-attn",
+    "on",
+    "--fit",
+    "off",
+    "--n-gpu-layers",
+    "99",
+    "--cpu-moe",
+    "--moe-cache-mib",
+    "4096"
+  ],
+  "status": "failed",
+  "requests": [],
+  "started_utc": "2026-10-15T03:27:00Z",
+  "counter_errors": {},
+  "gpu_adapter_luid": "luid_0x00000000_0x0000f60b_phys_0",
+  "error": "RuntimeError: Server exited before readiness: 1",
+  "process_exit_code": 1,
+  "counter_instances": {
+    "process_gpu_dedicated_bytes": [
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0"
+    ],
+    "process_gpu_shared_bytes": [
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0"
+    ],
+    "process_gpu_committed_bytes": [
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0"
+    ],
+    "device_gpu_dedicated_bytes": [
+      "luid_0x00000000_0x0000F60B_phys_0"
+    ],
+    "device_gpu_shared_bytes": [
+      "luid_0x00000000_0x0000F60B_phys_0"
+    ],
+    "device_gpu_committed_bytes": [
+      "luid_0x00000000_0x0000F60B_phys_0"
+    ],
+    "gpu_engine_percent": [
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_0_engtype_3D",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_1_engtype_Copy",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_2_engtype_Compute 0",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_3_engtype_Copy",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_4_engtype_Timer 0",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_5_engtype_Security 1",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_6_engtype_Video JPEG 0",
+      "pid_20636_luid_0x00000000_0x0000F60B_phys_0_eng_7_engtype_Video Codec Engine"
+    ],
+    "system_pages_input_per_second": [
+      ""
+    ],
+    "system_page_reads_per_second": [
+      ""
+    ]
+  },
+  "elapsed_seconds": 5.064016800002719,
+  "sample_count": 20,
+  "memory_peaks": {
+    "WorkingSetSize": 2055323648,
+    "PeakWorkingSetSize": 2077741056,
+    "PrivateUsage": 2095124480,
+    "PeakPagefileUsage": 3040747520,
+    "PageFaultCount": 544044,
+    "system_available_physical_bytes": 17635999744,
+    "system_committed_bytes": 58346803200,
+    "process_gpu_dedicated_bytes": 1495994368.0,
+    "process_gpu_shared_bytes": 420921344.0,
+    "process_gpu_committed_bytes": 2011287552.0,
+    "device_gpu_dedicated_bytes": 5448945664.0,
+    "device_gpu_shared_bytes": 850853888.0,
+    "device_gpu_committed_bytes": 6602616832.0,
+    "gpu_engine_percent": 23.902912583658388,
+    "system_pages_input_per_second": 8522561.809321936,
+    "system_page_reads_per_second": 51291.797012061026
+  },
+  "phase_memory_peaks": {
+    "load": {
+      "WorkingSetSize": 2055323648,
+      "PeakWorkingSetSize": 2077741056,
+      "PrivateUsage": 2095124480,
+      "PeakPagefileUsage": 3040747520,
+      "PageFaultCount": 544044,
+      "system_available_physical_bytes": 17635999744,
+      "system_committed_bytes": 58346803200,
+      "process_gpu_dedicated_bytes": 1495994368.0,
+      "process_gpu_shared_bytes": 420921344.0,
+      "process_gpu_committed_bytes": 2011287552.0,
+      "device_gpu_dedicated_bytes": 5448945664.0,
+      "device_gpu_shared_bytes": 850853888.0,
+      "device_gpu_committed_bytes": 6602616832.0,
+      "gpu_engine_percent": 23.902912583658388,
+      "system_pages_input_per_second": 8522561.809321936,
+      "system_page_reads_per_second": 51291.797012061026
+    }
+  },
+  "cpu_seconds": 1.96875,
+  "cpu_one_core_percent": 38.877240691597684,
+  "placement_cache_log": [
+    "0.00.673.725 W load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden",
+    "0.00.673.914 W load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden",
+    "ggml_vulkan: Requested buffer size exceeds device buffer size limit: ErrorOutOfDeviceMemory",
+    "0.03.753.359 E ggml_backend_buft_alloc_buffer_n_default: failed to allocate Vulkan0 buffer of size 2861438976",
+    "0.03.765.522 E llama_init_from_model: failed to initialize the context: failed to allocate the MoE cache buffers"
+  ],
+  "server_log_sha256": "260aeae972dc4de4d0257259153e0f1b11f25d134b4bd85f38539931437ca6c9"
+}

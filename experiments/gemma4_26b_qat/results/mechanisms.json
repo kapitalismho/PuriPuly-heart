@@ -1,0 +1,29 @@
+{
+  "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+  "cache_source": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-moe-cache.cpp",
+  "vulkan_source": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan.cpp#L16019-L16023",
+  "host_placement_without_cache": {
+    "placement": "--cpu-moe retains all expert weights in host memory; --n-cpu-moe N does so for the first N layers. Other offloaded layers/tensors still use Vulkan.",
+    "execution": "Pinned Vulkan offload_op accepts host operations when op batch size >=32 (default GGML_OP_OFFLOAD_MIN_BATCH; no GGML environment overrides observed). Thus ordinary host placement is not equivalent to all-CPU execution: single-token/small decode expert work remains CPU-scheduled, while sufficiently large prefill operations can be transferred/offloaded to Vulkan.",
+    "evidence_limit": "Source-backed scheduling interpretation plus allocation logs and measured CPU cost, not a per-kernel profiler trace. No claim that every operation or every prefill node uses the same device."
+  },
+  "dynamic_expert_cache": {
+    "placement": "Expert backing weights remain host-resident; GPU banks contain an LRU subset. Missing selected experts are uploaded; hits reuse bank slots. Cache weights are marked device weights so operations reading them execute on that device.",
+    "limits": "get_slot_map bypasses n_tokens==0, n_tokens>32, or an insufficient selected-expert slot budget. Tensor-parallel split mode is explicitly rejected by the pinned constructor.",
+    "prefill_nuance": "The >32 bypass is for slot-map/cache-routing, NOT all cache use. copy_experts can copy already-cached experts into large-batch staging without disturbing the decode LRU. Destructor counters distinguish ubatch<=8, ubatch>8 (eligible small batches), and large-batch copies.",
+    "runtime_execution_proof": {
+      "profile": "new-cpu-moe-cache1024",
+      "shutdown": "graceful console Ctrl+C, process exit 0",
+      "ubatch_le_8": {"hits":51208,"misses":128634,"hit_rate_percent":28.47,"uploaded_MiB":410397.73},
+      "ubatch_gt_8": {"hits":58,"misses":5739,"hit_rate_percent":1.00,"uploaded_MiB":18309.88},
+      "large_batch_copies": {"experts":26334,"MiB":42008.39},
+      "source_record": "results/new-cpu-moe-cache1024.json placement_cache_log and external per-run server.log"
+    }
+  },
+  "allocation_limit": {
+    "failed_profile": "new-cpu-moe-cache4096",
+    "requested_bank_bytes":2861438976,
+    "signature":"Requested buffer size exceeds device buffer size limit: ErrorOutOfDeviceMemory",
+    "interpretation":"Pinned ggml-vulkan-buffers.cpp explicitly rejects size>device.max_buffer_size before allocation. The device maximum comes from maintenance4 maxBufferSize, unless overridden. No override was observed. This failure is a bank-size/backend/device-limit result, not evidence that total 24-GiB VRAM was exhausted. No forced unsupported buffer-size override or upstream modification was attempted."
+  }
+}

@@ -1,0 +1,1265 @@
+{
+  "baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "initial_dirty_state": "clean",
+  "host": {
+    "pci": [
+      {
+        "KeyName": "DEVPKEY_Device_LocationInfo",
+        "Data": "PCI bus 3, device 0, function 0 (normalized from localized PnP output)"
+      },
+      {
+        "KeyName": "DEVPKEY_PciDevice_CurrentLinkSpeed",
+        "Data": 4
+      },
+      {
+        "KeyName": "DEVPKEY_PciDevice_CurrentLinkWidth",
+        "Data": 16
+      },
+      {
+        "KeyName": "DEVPKEY_PciDevice_MaxLinkSpeed",
+        "Data": 4
+      },
+      {
+        "KeyName": "DEVPKEY_PciDevice_MaxLinkWidth",
+        "Data": 16
+      },
+      {
+        "KeyName": "DEVPKEY_PciDevice_SupportedLinkSubState",
+        "Data": 0
+      }
+    ],
+    "cpu": {
+      "Name": "AMD Ryzen 7 9800X3D 8-Core Processor           ",
+      "NumberOfCores": 8,
+      "NumberOfLogicalProcessors": 16,
+      "MaxClockSpeed": 4700
+    },
+    "ram": [
+      {
+        "Capacity": 17179869184,
+        "ConfiguredClockSpeed": 5600,
+        "Speed": 5600,
+        "SMBIOSMemoryType": 34
+      },
+      {
+        "Capacity": 17179869184,
+        "ConfiguredClockSpeed": 5600,
+        "Speed": 5600,
+        "SMBIOSMemoryType": 34
+      }
+    ],
+    "os": {
+      "Caption": "Microsoft Windows 11 Education",
+      "Version": "10.0.22631",
+      "BuildNumber": "22631",
+      "TotalVisibleMemorySize": 33138100,
+      "FreePhysicalMemory": 7815280
+    },
+    "pagefile": {
+      "AllocatedBaseSize": 40960,
+      "CurrentUsage": 3470,
+      "PeakUsage": 4119
+    },
+    "volumes": [
+      {
+        "DriveLetter": "C",
+        "Size": 1939823652864,
+        "SizeRemaining": 294955761664
+      }
+    ],
+    "disks": [
+      {
+        "Model": "SOLIDIGM SSDPFKKW020X7",
+        "Size": 2048407280640,
+        "InterfaceType": "SCSI"
+      }
+    ],
+    "power": "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c — High performance (normalized from localized powercfg output)",
+    "gpu": [
+      {
+        "Name": "AMD Radeon RX 7900 XTX",
+        "DriverVersion": "32.0.31041.1004"
+      }
+    ]
+  },
+  "vulkan_summary": "Vulkan Instance Version: 1.4.341\nGPU0 apiVersion: 1.4.349\ndriverVersion: 2.0.395\nvendorID: 0x1002\ndeviceID: 0x744c\ndeviceType: PHYSICAL_DEVICE_TYPE_DISCRETE_GPU\ndeviceName: AMD Radeon RX 7900 XTX\ndriverID: DRIVER_ID_AMD_PROPRIETARY\ndriverName: AMD proprietary driver\ndriverInfo: 26.8.1 (LLPC)\nconformanceVersion: 1.4.3.3",
+  "publication_projection": "Unrelated display adapters, non-artifact disks/volumes, installed Vulkan layer catalogs and device UUIDs omitted. Required RX device/API/driver identity and artifact-volume observations retained; model and per-run metrics unchanged.",
+  "runtimes": {
+    "b10423": {
+      "binary": {
+        "file": "llama-server.exe",
+        "size": 9216,
+        "sha256": "c5f9d7db35cb636d93c66562d787de14189a14f5920743b326533f7c869ce2a0"
+      },
+      "version": "version: 0.1.0-dev (build 10423, commit a94d563ed); built with Clang 20.1.8 for Windows x86_64"
+    },
+    "b11537": {
+      "binary": {
+        "file": "llama-server.exe",
+        "size": 9216,
+        "sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+      },
+      "version": "version: 0.6.0-dev (build 11537, commit 8e2d31e0e); built with Clang 20.1.8 for Windows x86_64"
+    }
+  },
+  "models": {
+    "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf": {
+      "file": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "size": 14249047104,
+      "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+      "gguf_version": 3,
+      "tensor_count": 658,
+      "metadata": {
+        "general.architecture": "gemma4",
+        "general.type": "model",
+        "general.sampling.top_k": 64,
+        "general.sampling.top_p": 0.949999988079071,
+        "general.sampling.temp": 1.0,
+        "general.size_label": "128x2.6B",
+        "gemma4.block_count": 30,
+        "gemma4.context_length": 262144,
+        "gemma4.embedding_length": 2816,
+        "gemma4.feed_forward_length": 2112,
+        "gemma4.attention.head_count": 16,
+        "gemma4.attention.head_count_kv": {
+          "array_type": 5,
+          "count": 30
+        },
+        "gemma4.rope.freq_base": 1000000.0,
+        "gemma4.rope.freq_base_swa": 10000.0,
+        "gemma4.attention.layer_norm_rms_epsilon": 9.999999974752427e-07,
+        "gemma4.expert_count": 128,
+        "gemma4.expert_used_count": 8,
+        "gemma4.attention.key_length": 512,
+        "gemma4.attention.value_length": 512,
+        "gemma4.final_logit_softcapping": 30.0,
+        "gemma4.attention.sliding_window": 1024,
+        "gemma4.attention.shared_kv_layers": 0,
+        "gemma4.embedding_length_per_layer_input": 0,
+        "gemma4.attention.sliding_window_pattern": {
+          "array_type": 7,
+          "count": 30
+        },
+        "gemma4.attention.key_length_swa": 256,
+        "gemma4.attention.value_length_swa": 256,
+        "gemma4.expert_feed_forward_length": 704,
+        "gemma4.rope.dimension_count": 512,
+        "gemma4.rope.dimension_count_swa": 256,
+        "tokenizer.ggml.model": "gemma4",
+        "tokenizer.ggml.tokens": {
+          "array_type": 8,
+          "count": 262144
+        },
+        "tokenizer.ggml.scores": {
+          "array_type": 6,
+          "count": 262144
+        },
+        "tokenizer.ggml.token_type": {
+          "array_type": 5,
+          "count": 262144
+        },
+        "tokenizer.ggml.merges": {
+          "array_type": 8,
+          "count": 514906
+        },
+        "tokenizer.ggml.bos_token_id": 2,
+        "tokenizer.ggml.eos_token_id": 1,
+        "tokenizer.ggml.unknown_token_id": 3,
+        "tokenizer.ggml.padding_token_id": 0,
+        "tokenizer.ggml.mask_token_id": 4,
+        "tokenizer.ggml.add_space_prefix": false,
+        "tokenizer.ggml.add_bos_token": false,
+        "general.file_type": 2,
+        "tokenizer.ggml.eot_token_id": 106,
+        "general.quantized_by": "unsloth",
+        "general.basename": "gemma-4-26B-A4B-it",
+        "general.name": "Gemma-4 26B-A4B IT (smart Q4_0, QAT-lossless)",
+        "general.finetune": "qat-it",
+        "general.license": "gemma",
+        "general.quantization_version": 2,
+        "tokenizer.chat_template": {
+          "characters": 18922,
+          "sha256": "845f1ee48e39fc942fe190da9df6a1c5db229e17a96ea08966ad1c9274e73d1b"
+        }
+      },
+      "tensor_type_histogram_ggml_ids": {
+        "0": 392,
+        "2": 266
+      },
+      "expert_embedding_dimensions": {
+        "token_embd.weight": {
+          "shape": [
+            2816,
+            262144
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.0.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.0.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.1.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.1.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.2.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.2.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.3.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.3.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.4.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.4.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.5.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.5.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.6.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.6.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.7.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.7.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.8.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.8.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.9.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.9.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.10.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.10.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.11.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.11.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.12.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.12.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.13.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.13.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.14.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.14.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.15.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.15.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.16.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.16.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.17.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.17.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.18.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.18.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.19.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.19.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.20.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.20.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.21.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.21.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.22.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.22.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.23.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.23.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.24.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.24.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.25.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.25.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.26.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.26.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.27.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.27.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.28.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.28.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        },
+        "blk.29.ffn_down_exps.scale": {
+          "shape": [
+            128
+          ],
+          "ggml_type_id": 0
+        },
+        "blk.29.ffn_down_exps.weight": {
+          "shape": [
+            704,
+            2816,
+            128
+          ],
+          "ggml_type_id": 2
+        }
+      }
+    },
+    "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf": {
+      "file": "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf",
+      "size": 4215695776,
+      "sha256": "df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3",
+      "gguf_version": 3,
+      "tensor_count": 666,
+      "metadata": {
+        "general.architecture": "gemma4",
+        "general.type": "model",
+        "general.sampling.top_k": 64,
+        "general.sampling.top_p": 0.949999988079071,
+        "general.sampling.temp": 1.0,
+        "general.size_label": "7.5B",
+        "gemma4.block_count": 42,
+        "gemma4.context_length": 131072,
+        "gemma4.embedding_length": 2560,
+        "gemma4.feed_forward_length": 10240,
+        "gemma4.attention.head_count": 8,
+        "gemma4.attention.head_count_kv": 2,
+        "gemma4.rope.freq_base": 1000000.0,
+        "gemma4.rope.freq_base_swa": 10000.0,
+        "gemma4.attention.layer_norm_rms_epsilon": 9.999999974752427e-07,
+        "gemma4.attention.key_length": 512,
+        "gemma4.attention.value_length": 512,
+        "gemma4.final_logit_softcapping": 30.0,
+        "gemma4.attention.sliding_window": 512,
+        "gemma4.attention.shared_kv_layers": 18,
+        "gemma4.embedding_length_per_layer_input": 256,
+        "gemma4.attention.sliding_window_pattern": {
+          "array_type": 7,
+          "count": 42
+        },
+        "gemma4.attention.key_length_swa": 256,
+        "gemma4.attention.value_length_swa": 256,
+        "gemma4.rope.dimension_count": 512,
+        "gemma4.rope.dimension_count_swa": 256,
+        "tokenizer.ggml.model": "gemma4",
+        "tokenizer.ggml.tokens": {
+          "array_type": 8,
+          "count": 262144
+        },
+        "tokenizer.ggml.scores": {
+          "array_type": 6,
+          "count": 262144
+        },
+        "tokenizer.ggml.token_type": {
+          "array_type": 5,
+          "count": 262144
+        },
+        "tokenizer.ggml.merges": {
+          "array_type": 8,
+          "count": 514906
+        },
+        "tokenizer.ggml.bos_token_id": 2,
+        "tokenizer.ggml.eos_token_id": 1,
+        "tokenizer.ggml.unknown_token_id": 3,
+        "tokenizer.ggml.padding_token_id": 0,
+        "tokenizer.ggml.mask_token_id": 4,
+        "tokenizer.ggml.add_space_prefix": false,
+        "tokenizer.ggml.add_bos_token": true,
+        "general.file_type": 2,
+        "tokenizer.ggml.eot_token_id": 106,
+        "general.quantized_by": "unsloth",
+        "general.basename": "gemma-4-E4B-it",
+        "general.name": "Gemma-4 E4B IT (smart Q4_0, QAT-lossless)",
+        "general.finetune": "qat-it",
+        "general.license": "gemma",
+        "general.quantization_version": 2,
+        "tokenizer.chat_template": {
+          "characters": 18808,
+          "sha256": "241c50d86bdfe5e43307da87f559cd2416aacd67a8de46c15acc0105ef2200b7"
+        }
+      },
+      "tensor_type_histogram_ggml_ids": {
+        "0": 321,
+        "2": 345
+      },
+      "expert_embedding_dimensions": {
+        "per_layer_token_embd.weight": {
+          "shape": [
+            10752,
+            262144
+          ],
+          "ggml_type_id": 2
+        },
+        "token_embd.weight": {
+          "shape": [
+            2560,
+            262144
+          ],
+          "ggml_type_id": 2
+        }
+      }
+    }
+  },
+  "acquisition": [
+    {
+      "file": "llama-b11537-bin-win-vulkan-x64.zip",
+      "size": 33458882,
+      "sha256": "ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11537/llama-b11537-bin-win-vulkan-x64.zip",
+      "acquisition_seconds": 0.9917781352996826,
+      "build": "b11537",
+      "commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+      "origin": "official prebuilt Windows x64 Vulkan release",
+      "binaries": [
+        {
+          "file": "ggml-base.dll",
+          "size": 803840,
+          "sha256": "59421404524314e61eb9a8a607849e5cc88a7de0e99062edf57da1dd474c3fb0"
+        },
+        {
+          "file": "ggml-cpu-alderlake.dll",
+          "size": 1435136,
+          "sha256": "c689aec97dc05527e479eba0214b2d744b1697cfd742b5afad2f2185fb8052e7"
+        },
+        {
+          "file": "ggml-cpu-cannonlake.dll",
+          "size": 1614848,
+          "sha256": "2ad0228a18fc7b0bab3e64086b8155ec82dbfde44f03f0cceba27dc15b63ffc8"
+        },
+        {
+          "file": "ggml-cpu-cascadelake.dll",
+          "size": 1599488,
+          "sha256": "b1ec3acac3d957cf7adc131c68d68f0bb67a8be70606fa07325b0c1a91ce71fc"
+        },
+        {
+          "file": "ggml-cpu-cooperlake.dll",
+          "size": 1609216,
+          "sha256": "2a78bb638a58632b4b6eb0b2df67cb5103ef045016049b5ba358b47395145421"
+        },
+        {
+          "file": "ggml-cpu-haswell.dll",
+          "size": 1439744,
+          "sha256": "518e2b9662621f0d0fbf8636b63c19a30123c66f1c7f655a52e7eb819bbaa5f6"
+        },
+        {
+          "file": "ggml-cpu-icelake.dll",
+          "size": 1606656,
+          "sha256": "27883fc33ab148cb637400de6ff837b8ea1cc3a82bdc89ddade193bfac4d9424"
+        },
+        {
+          "file": "ggml-cpu-ivybridge.dll",
+          "size": 1315328,
+          "sha256": "7ea7e8a746f7281935e6a4dd472a9c3e82a66e2030f6ca39bc677dcc08e84b81"
+        },
+        {
+          "file": "ggml-cpu-piledriver.dll",
+          "size": 1308160,
+          "sha256": "3c80ffa6f8a17225461a59195862ccfc917e3069351676a42ea7efe84220d739"
+        },
+        {
+          "file": "ggml-cpu-sandybridge.dll",
+          "size": 1290240,
+          "sha256": "f257b6d890db00b3dd499026aae81d8742e1dd35960e17c8886f97d1552c1c10"
+        },
+        {
+          "file": "ggml-cpu-sapphirerapids.dll",
+          "size": 1886208,
+          "sha256": "cd69408acfc7f7c47b01f9beb0429544083f8ba46aeb40e79793574c5a089538"
+        },
+        {
+          "file": "ggml-cpu-skylakex.dll",
+          "size": 1608704,
+          "sha256": "a7ace34265a619eac6ff6f29c0139cde02dff41af3052f9376e86c8353262bea"
+        },
+        {
+          "file": "ggml-cpu-sse42.dll",
+          "size": 915968,
+          "sha256": "74165def62be2ad4a3123f91b5165cbc8d9762ec19b519dd46cb73197ce8f24d"
+        },
+        {
+          "file": "ggml-cpu-x64.dll",
+          "size": 908800,
+          "sha256": "489529191a3f672b736fd3a95ce2a8d708efa1b109c2c4893a9fde4254d33bd0"
+        },
+        {
+          "file": "ggml-cpu-zen4.dll",
+          "size": 1615872,
+          "sha256": "1dc7069506e3df813dfac17b5c68eee6ca272c8958fbb602d90157e9cc890b34"
+        },
+        {
+          "file": "ggml-rpc-server.exe",
+          "size": 117248,
+          "sha256": "f767b01f0d3ad08f1d0b0a6918f8a9c692f91d26d4bdd38a0c85884618e0e68b"
+        },
+        {
+          "file": "ggml-rpc.dll",
+          "size": 204800,
+          "sha256": "c9017870bc8487717f9176a7e9eb1e8a27a15c506306002e0cc4d862e3408a99"
+        },
+        {
+          "file": "ggml-vulkan.dll",
+          "size": 45382656,
+          "sha256": "b462577ffb090454292f4b048034629cde18db392d92e17ed3325bb778f7b356"
+        },
+        {
+          "file": "ggml.dll",
+          "size": 79872,
+          "sha256": "8ac613d6224a8b12a012c850f601aeb4eb0056599915731588a8f38956186ad8"
+        },
+        {
+          "file": "libomp.dll",
+          "size": 768000,
+          "sha256": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c"
+        },
+        {
+          "file": "llama-batched-bench-impl.dll",
+          "size": 61952,
+          "sha256": "d791b356fd0aae306eef8945debe551b81224a578909a8eaa413134f9ee31c4c"
+        },
+        {
+          "file": "llama-batched-bench.exe",
+          "size": 9216,
+          "sha256": "bf6f9d43d61735cebeb20a596b539560285e15a5b1176f05bdef168a6b2d4d32"
+        },
+        {
+          "file": "llama-bench-impl.dll",
+          "size": 404480,
+          "sha256": "ebe2cc5f1965891b60131a0d54b5b1a94bb095e2667fc0564b2eb817aa3b91e8"
+        },
+        {
+          "file": "llama-bench.exe",
+          "size": 9216,
+          "sha256": "65280d3957ef453cb4e6671cf74d929dc00134dfeed968a965a3edb6e213860f"
+        },
+        {
+          "file": "llama-cli-impl.dll",
+          "size": 3317248,
+          "sha256": "a67f60a38202231bd4a855156bb9f90636f2d425f2ebf83547b9d7880c22cdc9"
+        },
+        {
+          "file": "llama-cli.exe",
+          "size": 9216,
+          "sha256": "eb92850155db1bb322fa86d2bac74bdf5222bdeb9ccc87ccc311785340a42626"
+        },
+        {
+          "file": "llama-common.dll",
+          "size": 7976448,
+          "sha256": "81b3dc7a627983fce17a3d00a8b6b081e778fb7d7f9a2efd5538b83c26b92464"
+        },
+        {
+          "file": "llama-completion-impl.dll",
+          "size": 140288,
+          "sha256": "db3fa86b3e451ebd559987776accfc23aa2702dd28c540828c6dff154a1ca96c"
+        },
+        {
+          "file": "llama-completion.exe",
+          "size": 9216,
+          "sha256": "4aae81ce23ba027daaee5de115fc18b274a92bad3f0faeffa70eba93c6d68216"
+        },
+        {
+          "file": "llama-fit-params-impl.dll",
+          "size": 43008,
+          "sha256": "19b83f0f6615e703065670493063b0209c5cee7c606af2a17f4ba29d7a8642e6"
+        },
+        {
+          "file": "llama-fit-params.exe",
+          "size": 9216,
+          "sha256": "d2c4a73a56fc1311abc94eff3e15f1f837b159901eb7d87688f5686cd374bc84"
+        },
+        {
+          "file": "llama-gemma3-cli.exe",
+          "size": 27136,
+          "sha256": "fd432ee19d96f5cd039486f248f4f9dcb6bcf75fa830189e3e9416397f1d8e27"
+        },
+        {
+          "file": "llama-gguf-split.exe",
+          "size": 60416,
+          "sha256": "9ab3fe80dda5755ba0f52a76a6f5ce720548c029ac8524dd2fe913eb09ec7f0b"
+        },
+        {
+          "file": "llama-imatrix.exe",
+          "size": 252416,
+          "sha256": "35734b8753230900e99dc812de8b465818991d2699239809df9167787b7b7afe"
+        },
+        {
+          "file": "llama-llava-cli.exe",
+          "size": 27136,
+          "sha256": "fd432ee19d96f5cd039486f248f4f9dcb6bcf75fa830189e3e9416397f1d8e27"
+        },
+        {
+          "file": "llama-minicpmv-cli.exe",
+          "size": 27136,
+          "sha256": "fd432ee19d96f5cd039486f248f4f9dcb6bcf75fa830189e3e9416397f1d8e27"
+        },
+        {
+          "file": "llama-mtmd-cli.exe",
+          "size": 92672,
+          "sha256": "74fbdd6e892c5c6b34392503d6ecbb30c52e5f1bd137f9fcf3b44955cd5e04ba"
+        },
+        {
+          "file": "llama-mtmd-debug.exe",
+          "size": 55808,
+          "sha256": "6368372cdeb7ea2416cfa7ad8bc14897044f5d7a96cd2527d3f55a49f917440e"
+        },
+        {
+          "file": "llama-perplexity-impl.dll",
+          "size": 197632,
+          "sha256": "6f5a9523cd4848a96fc4bf4a4c5e8420066fca74433fb7de4e58a67591526d7e"
+        },
+        {
+          "file": "llama-perplexity.exe",
+          "size": 9216,
+          "sha256": "8d87d3adccb82c968dd7d76425175be92e47c2c2e8069183dc5e629157c4ebfa"
+        },
+        {
+          "file": "llama-quantize-impl.dll",
+          "size": 137216,
+          "sha256": "139799685969d1f5170152f1938dc011ba023b9328019df14de5e7a46dcbee61"
+        },
+        {
+          "file": "llama-quantize.exe",
+          "size": 9216,
+          "sha256": "9390368a8841ca395aea6d3c81429eb1e49117586d6b8570df99503e69ec990f"
+        },
+        {
+          "file": "llama-qwen2vl-cli.exe",
+          "size": 27136,
+          "sha256": "fd432ee19d96f5cd039486f248f4f9dcb6bcf75fa830189e3e9416397f1d8e27"
+        },
+        {
+          "file": "llama-results.exe",
+          "size": 46592,
+          "sha256": "c4ede47d1fddd8632f240af5a856614440c732444c0893c2749af08c7e3a4585"
+        },
+        {
+          "file": "llama-server-impl.dll",
+          "size": 9231872,
+          "sha256": "ff4efb5192f1d6fb4836ccd756eb6009dac415efb1e11b2910d77d930c0f8a5d"
+        },
+        {
+          "file": "llama-server.exe",
+          "size": 9216,
+          "sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+        },
+        {
+          "file": "llama-tokenize.exe",
+          "size": 58880,
+          "sha256": "6a292af4950306a1f3d99d5a3c2a22b5561293abc466f98e2720cfc6383ef758"
+        },
+        {
+          "file": "llama-tts.exe",
+          "size": 41984,
+          "sha256": "a4ad0377877d63210d176b80d987b33685b03a4810a2342c76116b35a65e12c3"
+        },
+        {
+          "file": "llama.dll",
+          "size": 3382784,
+          "sha256": "cc645bad77197888c13830ebf426b9ede2cc5bc31c7bb6ee8a176001064ea212"
+        },
+        {
+          "file": "llama.exe",
+          "size": 104448,
+          "sha256": "9dbd9f1acb8303bc1c38300fb8b1559c86d45d355db1a581287cb313ad13b766"
+        },
+        {
+          "file": "mtmd.dll",
+          "size": 1817600,
+          "sha256": "2ca5559115ffc815f61cbaa93b3931397c491f1868ab5ca02905dd8d1fd2c35f"
+        }
+      ]
+    },
+    {
+      "file": "llama-b10423-bin-win-vulkan-x64.zip",
+      "size": 34563676,
+      "sha256": "510447fb021c80a264b2181c885b5f2ce9cc5b66c65d447cd1f9ce7ba81dc222",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10423/llama-b10423-bin-win-vulkan-x64.zip",
+      "acquisition_seconds": 0.9512648582458496,
+      "build": "b10423",
+      "commit": "a94d563ed801d1da1b8c2432946de07d0231bb3d",
+      "origin": "official prebuilt Windows x64 Vulkan release",
+      "binaries": [
+        {
+          "file": "ggml-base.dll",
+          "size": 773632,
+          "sha256": "127769210c207c2661f94f652dbdef2d65e9ac9caea96940feb17fc0a61ffdef"
+        },
+        {
+          "file": "ggml-cpu-alderlake.dll",
+          "size": 1180672,
+          "sha256": "4bb30c6ec589d1d33ba6bca3cf10b6527ea8a0a0c2a623a435449e6173590d66"
+        },
+        {
+          "file": "ggml-cpu-cannonlake.dll",
+          "size": 1395200,
+          "sha256": "39fdf3ee04b4e82562b056bb75e2e5ce10b336a42caae18a7301980d27234546"
+        },
+        {
+          "file": "ggml-cpu-cascadelake.dll",
+          "size": 1381376,
+          "sha256": "6840e22ae21a1f406f19b8aa6f7236c31210cbd75afa74e2d793ecd8a04a6acc"
+        },
+        {
+          "file": "ggml-cpu-cooperlake.dll",
+          "size": 1382400,
+          "sha256": "cde895752d56abc10e00b72fe9839539ea3b6556df63b3988cdb3b7ca78e1fb4"
+        },
+        {
+          "file": "ggml-cpu-haswell.dll",
+          "size": 1184768,
+          "sha256": "00fdec065ff0dfe38f0fd65c039ef611f00af643b0c76dbd4cf75458f292e3e8"
+        },
+        {
+          "file": "ggml-cpu-icelake.dll",
+          "size": 1388032,
+          "sha256": "c054662b60177f1b656baa40a9c991378bcbe854a524d3aebfa133a1b2292bff"
+        },
+        {
+          "file": "ggml-cpu-ivybridge.dll",
+          "size": 1073664,
+          "sha256": "efa495d5cbd8110728befbd9eb68aeb7c63274aacc282f2c34051c7c2bd64574"
+        },
+        {
+          "file": "ggml-cpu-piledriver.dll",
+          "size": 1077248,
+          "sha256": "bb2822fab641a5b9636091e0138dfb6493895ebc7bf3c2012160271df14112aa"
+        },
+        {
+          "file": "ggml-cpu-sandybridge.dll",
+          "size": 1053696,
+          "sha256": "9e6db6521c80fb2ecc5f17d4b781888f15cdfc12b88563f92e149261d2dc685c"
+        },
+        {
+          "file": "ggml-cpu-sapphirerapids.dll",
+          "size": 1659904,
+          "sha256": "ca159640800905be2e7b8693d1e483a23e827f67345bc9b1172ac5a9203ca3db"
+        },
+        {
+          "file": "ggml-cpu-skylakex.dll",
+          "size": 1389056,
+          "sha256": "c6b02db6158c3388e33ef9e42282f6ae8e8cc0b14349fecbe60cb46136dd48e0"
+        },
+        {
+          "file": "ggml-cpu-sse42.dll",
+          "size": 876544,
+          "sha256": "d93b14bcf98a4ec29859709e7e9a825ec9c17ee6e18db4bdc1c79e4a174d54c5"
+        },
+        {
+          "file": "ggml-cpu-x64.dll",
+          "size": 869376,
+          "sha256": "0ea5e92bb35f9337b362b2878d42d598511f3f9476231a2b08a6d8fdcff81430"
+        },
+        {
+          "file": "ggml-cpu-zen4.dll",
+          "size": 1389056,
+          "sha256": "becc4a467de4c24d989b9d8876dabff5fbb5feb543008edb45e17c52d1fe158b"
+        },
+        {
+          "file": "ggml-rpc-server.exe",
+          "size": 101376,
+          "sha256": "07a908b16584f69aa3764e3058fa20f4997b55a070344e6378b74745713498e7"
+        },
+        {
+          "file": "ggml-rpc.dll",
+          "size": 137728,
+          "sha256": "ef48d1f7c76b45404171f0af3ed15b71a5d6023d476bbd5bec6b4dc34d14b8ff"
+        },
+        {
+          "file": "ggml-vulkan.dll",
+          "size": 53585920,
+          "sha256": "aa6e092f0faae7f79dbc613ae15a21ed02f8d0df523c113717befa9e7b08477d"
+        },
+        {
+          "file": "ggml.dll",
+          "size": 86016,
+          "sha256": "e56d42b60f3e1326f5bfad551669ef3a7ae96bc9df671034b7d1694582f594ca"
+        },
+        {
+          "file": "libomp140.x86_64.dll",
+          "size": 661856,
+          "sha256": "4a20c1e5c115c29771a12324513eb109badac72180f79481527ad79d996ffb33"
+        },
+        {
+          "file": "llama-batched-bench-impl.dll",
+          "size": 61440,
+          "sha256": "417974b652c48260c644dee767b05ec5693bdc39e01c85cb0ff828eb66f465bb"
+        },
+        {
+          "file": "llama-batched-bench.exe",
+          "size": 9216,
+          "sha256": "a26d2707df65f87d9c752b181119a5ebf271ce1abf9d6143d47c6972a96d276b"
+        },
+        {
+          "file": "llama-bench-impl.dll",
+          "size": 395264,
+          "sha256": "2ee9f3691186b5d5842d1e084bf0efd4e733df7ac4e8450e4cd98792cb66ddcf"
+        },
+        {
+          "file": "llama-bench.exe",
+          "size": 9216,
+          "sha256": "53649516a0a088e852d215c3f182b2e49e348bd3a0d6f58df17ac10082393467"
+        },
+        {
+          "file": "llama-cli-impl.dll",
+          "size": 3523584,
+          "sha256": "50c12cd68562dabc8e07345b397f906bd6685da7de817847b78b39b8d127983e"
+        },
+        {
+          "file": "llama-cli.exe",
+          "size": 9216,
+          "sha256": "f5f65166b1c5c63579998b1c33b3ea9e8eb3cbe69c4355f63755e5754ca00944"
+        },
+        {
+          "file": "llama-common.dll",
+          "size": 8043520,
+          "sha256": "72964b1ff407c72b0151f792985371bab176b004569779e90785eb80c55b4290"
+        },
+        {
+          "file": "llama-completion-impl.dll",
+          "size": 133120,
+          "sha256": "33804b683c0ecb5911a6541cde12aff8efe4610e8f9b88bb7c0eb1c2f6eed98e"
+        },
+        {
+          "file": "llama-completion.exe",
+          "size": 9216,
+          "sha256": "52e30d06731aad8d522f95084a8941c206c01c6f82d748d66b74857e72920390"
+        },
+        {
+          "file": "llama-fit-params-impl.dll",
+          "size": 40960,
+          "sha256": "db41174d74991c7cbe69f975cf4b0dc6fef5d98336c988cf6463e390213ba782"
+        },
+        {
+          "file": "llama-fit-params.exe",
+          "size": 9216,
+          "sha256": "08be3e7b5052b14e2807d9bb67f80b4cce3c02f8aefe73264a88a6cba9518b1e"
+        },
+        {
+          "file": "llama-gemma3-cli.exe",
+          "size": 27136,
+          "sha256": "019a532c966c1e19ce489a2b924af48c9044d47d16f7d87bb96a6060fd49e4ce"
+        },
+        {
+          "file": "llama-gguf-split.exe",
+          "size": 60416,
+          "sha256": "6e9f83ac2f2ed553fb3046b5a27245c794df6cf885a12a3d65f09145462b1e81"
+        },
+        {
+          "file": "llama-imatrix.exe",
+          "size": 253952,
+          "sha256": "59447fc06cd35ec05302c5d8bcb66a396a371f2b9589db6c8197a2b9b47d8fbb"
+        },
+        {
+          "file": "llama-llava-cli.exe",
+          "size": 27136,
+          "sha256": "8329051b9f69c398f01ed12baef7917bd5aa9b1faf14d1848cdae68226fc3568"
+        },
+        {
+          "file": "llama-minicpmv-cli.exe",
+          "size": 27136,
+          "sha256": "019a532c966c1e19ce489a2b924af48c9044d47d16f7d87bb96a6060fd49e4ce"
+        },
+        {
+          "file": "llama-mtmd-cli.exe",
+          "size": 84480,
+          "sha256": "13b71b412032ca4b90fb5bcb6a745fc1a89336145895c3f95f24540f8ba3ddc9"
+        },
+        {
+          "file": "llama-mtmd-debug.exe",
+          "size": 55296,
+          "sha256": "6fe8cfb4e3243b953533639a891e47bd0d81af86a930b9fca3dc8cdd63622623"
+        },
+        {
+          "file": "llama-perplexity-impl.dll",
+          "size": 194048,
+          "sha256": "2589f076bead4d2d7ed25dbf430e3e905a6f4fcb5820beab8b2aa5f6a6b60781"
+        },
+        {
+          "file": "llama-perplexity.exe",
+          "size": 9216,
+          "sha256": "f06fbcaf3f25e30f2c04aa6deff9cf856f980da70c498c62be17ffcb07c3d747"
+        },
+        {
+          "file": "llama-quantize-impl.dll",
+          "size": 136704,
+          "sha256": "6fc01a0cc4671be59a8b23d6a5a869d6129cba4242d52053aadb896557dbf3cb"
+        },
+        {
+          "file": "llama-quantize.exe",
+          "size": 9216,
+          "sha256": "fa62209aaeaa265209df82b400804501f916fbf36a3679308215c2349a936ecc"
+        },
+        {
+          "file": "llama-qwen2vl-cli.exe",
+          "size": 27136,
+          "sha256": "019a532c966c1e19ce489a2b924af48c9044d47d16f7d87bb96a6060fd49e4ce"
+        },
+        {
+          "file": "llama-results.exe",
+          "size": 45568,
+          "sha256": "dc5c9e8abc9aab4523ed422a409b98e9950e5d809bb8c4ee7820e69efc77de0b"
+        },
+        {
+          "file": "llama-server-impl.dll",
+          "size": 10015744,
+          "sha256": "413a59a66ed03331244c957a357fdbfc606010ab9b680f566ba1863575232309"
+        },
+        {
+          "file": "llama-server.exe",
+          "size": 9216,
+          "sha256": "c5f9d7db35cb636d93c66562d787de14189a14f5920743b326533f7c869ce2a0"
+        },
+        {
+          "file": "llama-template-analysis.exe",
+          "size": 270336,
+          "sha256": "6ecf22257e055928ac8ac7c9e44d411a71fb06e15873882e3c81e18a66003f45"
+        },
+        {
+          "file": "llama-tokenize.exe",
+          "size": 57344,
+          "sha256": "03cda90d48889b43be914b67bd2a42768514266adff626e53b3b010b9b1149e4"
+        },
+        {
+          "file": "llama-tts.exe",
+          "size": 41472,
+          "sha256": "f6af89a48912c86dec656c8f518a09d436b1b9645103bdaacabcc2223ffc6e2b"
+        },
+        {
+          "file": "llama.dll",
+          "size": 2881024,
+          "sha256": "99146ccb37a92d98847fac966ff69280967dcf0cb09acee38ed26a418d580f94"
+        },
+        {
+          "file": "llama.exe",
+          "size": 83968,
+          "sha256": "57005d5af1f3959731f747d29fed418a5485a6dd6fda65c7d1bb12636a71c984"
+        },
+        {
+          "file": "mtmd.dll",
+          "size": 1600000,
+          "sha256": "1b57dcf767ed7f3f443bb9ec14bdc2c1961341aade33355f292ae64818bec5ce"
+        }
+      ]
+    },
+    {
+      "file": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "size": 14249047104,
+      "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+      "url": "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-qat-GGUF/resolve/7b92b5b28818151e8669af2e45e88d6086f490dd/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf?download=true",
+      "acquisition_seconds": 325.7218315601349,
+      "repo": "unsloth/gemma-4-26B-A4B-it-qat-GGUF",
+      "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+      "verified": true
+    }
+  ]
+}

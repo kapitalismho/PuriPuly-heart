@@ -1,0 +1,19 @@
+{
+  "phase": "resume_before_first_model_load",
+  "observations": {
+    "total_visible_RAM_KiB": 33138100,
+    "available_physical_RAM_KiB": 11339720,
+    "pagefile_allocated_MiB": 40960,
+    "pagefile_current_MiB": 1925,
+    "other_llama_server_processes": [],
+    "rx_adapter_counter_instance": "luid_0x00000000_0x0000F60B_phys_0",
+    "rx_adapter_dedicated_bytes": 4534153216,
+    "rx_adapter_shared_bytes": 490254336,
+    "rx_adapter_committed_bytes": 5286387712,
+    "virtual_adapter_counter_instance": "luid_0x00000000_0x00011E7D_phys_0",
+    "virtual_adapter_dedicated_bytes": 0,
+    "virtual_adapter_shared_bytes": 8192
+  },
+  "policy": "Do not terminate other processes. Run one owned inference runtime at a time. Preserve whole-adapter and exact PID/LUID process counters separately. Background desktop usage remains present and is measured, not subtracted from per-process allocation or mistaken for model memory.",
+  "method": "Read-only Win32_OperatingSystem, Win32_PageFileUsage, Get-Process llama-server (no command lines), and GPUAdapterMemory CIM observation."
+}

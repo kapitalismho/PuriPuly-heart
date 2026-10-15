@@ -1,0 +1,89 @@
+{
+  "issue": 245,
+  "baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "execution_status": "complete_for_assigned_experiments",
+  "feasibility": "positive_bounded_manual_translation_on_tested_windows_vulkan_stack",
+  "selection_status": "experimental_recommendation_pending_product_owner_adoption_tradeoff",
+  "recommended_profile": {
+    "id": "new-ncpu12-cache2048-swa-nocram",
+    "runtime_tag": "b11537",
+    "runtime_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+    "model_sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
+    "placement_flags": ["--n-gpu-layers", "99", "--n-cpu-moe", "12", "--moe-cache-mib", "2048", "--swa-full", "--cache-ram", "0"],
+    "total_context": 4608,
+    "parallel_slots": 3,
+    "context_per_slot": 1536,
+    "reasoning": "off",
+    "gpu_backend": "Vulkan0",
+    "standalone": {
+      "completed": 43,
+      "cold_readiness_seconds_n1": 4.949,
+      "hot_wall_seconds_n5": {"median": 0.416174, "p95": 0.558347},
+      "alternating_wall_seconds_n20": {"median": 0.560685, "p95": 0.782531},
+      "three_slot_wall_seconds_n15": {"median": 0.791123, "p95": 1.173747},
+      "serving_cpu_one_core_percent_sampled": 7.580269743439924,
+      "cache_small_batch_hit_rate_percent": 88.71
+    },
+    "actual_app": {
+      "completed": 30,
+      "fresh_app_instances": 2,
+      "wall_seconds": {"median": 0.794667, "p95": 1.411893, "max": 3.840673},
+      "server_sampled_dedicated_gpu": {"bytes": 12780429312, "GB": 12.780429312, "GiB": 11.902702331542969},
+      "server_sampled_shared_gpu_bytes": 609263616,
+      "whole_device_sampled_dedicated_gpu_bytes": 15857037312,
+      "server_working_set_GB_rounded": 14.781,
+      "server_private_commit_GB_rounded": 13.750,
+      "minimum_available_host_ram_bytes": 7886368768,
+      "completed_event_ids_matched_to_admission": true,
+      "persisted_language_observed_in_fresh_process": true,
+      "both_app_hosts_observed_exited": true,
+      "server_graceful_exit_code": 0
+    },
+    "meets_preferred_8_decimal_GB_server_dedicated_target": false,
+    "rationale": "Short-subtitle app latency approaches maximum offload while saving 2.658 GB dedicated GPU and approximately 2.7 GB private commit. It is much faster than tested low-CPU sub-8-GB placements. No approved latency SLA is inferred."
+  },
+  "alternatives": [
+    {"profile":"new-cpu-moe-off-swa-nocram","app_server_gpu_GB":2.905038848,"app_wall_median_seconds":1.810934,"tradeoff":"Lowest GPU/private commit; substantially more CPU expert computation."},
+    {"profile":"new-cpu-moe-cache3072-swa-nocram","app_server_gpu_GB":6.129500160,"app_wall_median_seconds":1.747955,"tradeoff":"Sub-8-GB and low residual CPU; cache misses/transfers cost latency."},
+    {"profile":"new-partial14-swa-nocram","app_server_gpu_GB":7.380492288,"app_wall_median_seconds":1.388296,"tradeoff":"Faster sub-8-GB ordinary partial offload, but approximately 1.67 core-equivalents standalone serving CPU."},
+    {"profile":"new-ncpu24-cache2048-swa-nocram","app_server_gpu_GB":7.629275136,"app_wall_median_seconds":1.574054,"tradeoff":"Near preferred target, low residual CPU; materially slower than above-target n12 placement."},
+    {"profile":"new-full-swa-nocram","app_server_gpu_GB":15.438389248,"app_wall_median_seconds":0.700407,"tradeoff":"Lowest measured app latency, additional 2.658 GB dedicated GPU versus recommendation."},
+    {"profile":"e4b-product","app_server_gpu_GB":2.854756352,"app_wall_median_seconds":0.701513,"tradeoff":"Current shipped reference, not equal-quality/model evidence; substantially lower host memory."}
+  ],
+  "coverage": {
+    "standalone_successful_profiles": 27,
+    "standalone_completed_outputs": 1161,
+    "standalone_distinct_source_sentences": 12,
+    "standalone_failed_model_loads": 1,
+    "actual_app_successful_profiles": 8,
+    "actual_app_completed_outputs": 240,
+    "actual_app_distinct_source_sentences": 5,
+    "actual_app_fresh_instances": 16,
+    "actual_app_failed_attempts_before_submission": 1,
+    "actual_app_retained_stt_degraded_settings_receipts": 248,
+    "initial_independently_reviewed_outputs": 344,
+    "full_standalone_unique_input_output_pairs_reviewed_by_execution_owner": 29,
+    "qat_within_vs_in_five_minutes_occurrences": {"within":44,"total":156}
+  },
+  "failure_findings": [
+    "4096-MiB cache failed a 2861438976-byte bank/device maximum-buffer-size check before readiness; not total VRAM exhaustion or an 8-GB cutoff.",
+    "Initial cache2048 serving succeeded but required forced shutdown; destructor statistics unavailable for that record, not synthesized.",
+    "Initial app harness rejected expected keyless-STT degraded language receipt before manual text submission. Director authorized manual translation with exact provider.stt/stt.provider_not_ready boundary retained."
+  ],
+  "owner_decision": {
+    "owner": "Product owner, communicated through Director",
+    "decision": "Accept the recommended above-8-GB GPU/private-commit premium for measured latency, or prioritize headroom and choose the documented sub-8-GB frontier.",
+    "approved_latency_SLA": null,
+    "production_rollout": "Not authorized. Retain E4B until separate managed 26B integration/resource acceptance and rollout authorization."
+  },
+  "limits": [
+    "Only the measured RX 7900 XTX 24-GiB-class device; no 8-GB-card, VRChat co-render, GUI presentation or live audio/ASR claim.",
+    "Headless unmodified app uses an external user-managed endpoint, not managed 26B provisioning/prefix cache/lifecycle readiness.",
+    "App-only restart preserves the external model process; model restart persistence is not established by this probe.",
+    "Sampled GPU peaks are lower bounds; absent app GPU counter rows remain unavailable, not zero. Whole-adapter memory separately encloses background allocations.",
+    "Early default RAM-cache profiles experienced host-memory pressure; those tails are not clean cache-only causal comparisons.",
+    "Physical PCIe bytes, per-request cache counters, per-process hard-paging, power and exact lifetime GPU high-water unavailable.",
+    "Small synthetic fidelity set, unresolved name reading, minor temporal precision drift and E4B gender/noun caveats; no broad quality superiority claim."
+  ],
+  "evidence": ["../RESULTS.md", "../QUALITY.md", "identity.json", "build-provenance.json", "summary.json", "app-summary.json", "quality-unique.json", "mechanisms.json", "release.json"]
+}

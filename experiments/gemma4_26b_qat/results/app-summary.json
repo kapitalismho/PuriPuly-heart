@@ -1,0 +1,5453 @@
+[
+  {
+    "profile": "e4b-product",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b10423\\llama-server.exe",
+      "--model",
+      "<E4B_MODEL>",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "59841",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 40576,
+        "exited": true
+      },
+      {
+        "pid": 26776,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 227,
+    "resource_peaks": {
+      "server": {
+        "PageFaultCount": 1431594,
+        "process_gpu_shared_bytes": 784621568.0,
+        "process_gpu_committed_bytes": 3639377920.0,
+        "PeakPagefileUsage": 3973455872,
+        "process_gpu_dedicated_bytes": 2854756352.0,
+        "gpu_engine_percent": 97.46652550677868,
+        "PrivateUsage": 3973046272,
+        "device_gpu_shared_bytes": 1116925952.0,
+        "system_pages_input_per_second": 2026140.857471016,
+        "system_committed_bytes": 40302202880,
+        "WorkingSetSize": 3722321920,
+        "cpu_seconds": 5.921875,
+        "device_gpu_dedicated_bytes": 5924548608.0,
+        "system_page_reads_per_second": 7914.612724496156,
+        "system_available_physical_bytes": 23295729664,
+        "PeakWorkingSetSize": 3722346496,
+        "device_gpu_committed_bytes": 7191195648.0
+      },
+      "app": {
+        "PageFaultCount": 75324,
+        "PeakPagefileUsage": 609054720,
+        "PrivateUsage": 600633344,
+        "device_gpu_shared_bytes": 1116925952.0,
+        "system_pages_input_per_second": 3074.243767243855,
+        "system_committed_bytes": 40302202880,
+        "WorkingSetSize": 117231616,
+        "cpu_seconds": 1.53125,
+        "device_gpu_dedicated_bytes": 5924548608.0,
+        "system_page_reads_per_second": 461.9961207986738,
+        "system_available_physical_bytes": 19507814400,
+        "PeakWorkingSetSize": 117911552,
+        "device_gpu_committed_bytes": 7191195648.0
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3448,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.241.620 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.507.247 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.375.532 I load_tensors: offloading output layer to GPU",
+      "0.01.375.536 I load_tensors: offloading 41 repeating layers to GPU",
+      "0.01.375.536 I load_tensors: offloaded 43/43 layers to GPU",
+      "0.01.375.542 I load_tensors:   CPU_Mapped model buffer size =  1872.00 MiB",
+      "0.01.375.542 I load_tensors:      Vulkan0 model buffer size =  2493.31 MiB",
+      "0.02.171.108 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.02.176.513 I llama_kv_cache:    Vulkan0 KV buffer size =    72.00 MiB",
+      "0.02.187.355 I llama_kv_cache:    Vulkan0 KV buffer size =   120.00 MiB",
+      "0.02.233.252 I sched_reserve:    Vulkan0 compute buffer size =   124.76 MiB",
+      "0.02.233.256 I sched_reserve: Vulkan_Host compute buffer size =    33.59 MiB",
+      "0.57.636.253 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 20895 + (2810 =  2493 +     192 +     124) +         854 |"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "process_gpu_shared_bytes": {
+          "bytes": 784621568.0,
+          "GB": 0.784621568,
+          "GiB": 0.7307357788085938
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 3639377920.0,
+          "GB": 3.63937792,
+          "GiB": 3.389434814453125
+        },
+        "PeakPagefileUsage": {
+          "bytes": 3973455872,
+          "GB": 3.973455872,
+          "GiB": 3.7005691528320312
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 2854756352.0,
+          "GB": 2.854756352,
+          "GiB": 2.6586990356445312
+        },
+        "PrivateUsage": {
+          "bytes": 3973046272,
+          "GB": 3.973046272,
+          "GiB": 3.7001876831054688
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 1116925952.0,
+          "GB": 1.116925952,
+          "GiB": 1.0402183532714844
+        },
+        "system_committed_bytes": {
+          "bytes": 40302202880,
+          "GB": 40.30220288,
+          "GiB": 37.53435134887695
+        },
+        "WorkingSetSize": {
+          "bytes": 3722321920,
+          "GB": 3.72232192,
+          "GiB": 3.4666824340820312
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 5924548608.0,
+          "GB": 5.924548608,
+          "GiB": 5.517665863037109
+        },
+        "system_available_physical_bytes": {
+          "bytes": 23295729664,
+          "GB": 23.295729664,
+          "GiB": 21.695838928222656
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 3722346496,
+          "GB": 3.722346496,
+          "GiB": 3.466705322265625
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 7191195648.0,
+          "GB": 7.191195648,
+          "GiB": 6.697322845458984
+        }
+      },
+      "app": {
+        "PeakPagefileUsage": {
+          "bytes": 609054720,
+          "GB": 0.60905472,
+          "GiB": 0.5672264099121094
+        },
+        "PrivateUsage": {
+          "bytes": 600633344,
+          "GB": 0.600633344,
+          "GiB": 0.5593833923339844
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 1116925952.0,
+          "GB": 1.116925952,
+          "GiB": 1.0402183532714844
+        },
+        "system_committed_bytes": {
+          "bytes": 40302202880,
+          "GB": 40.30220288,
+          "GiB": 37.53435134887695
+        },
+        "WorkingSetSize": {
+          "bytes": 117231616,
+          "GB": 0.117231616,
+          "GiB": 0.10918045043945312
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 5924548608.0,
+          "GB": 5.924548608,
+          "GiB": 5.517665863037109
+        },
+        "system_available_physical_bytes": {
+          "bytes": 19507814400,
+          "GB": 19.5078144,
+          "GiB": 18.168067932128906
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 117911552,
+          "GB": 0.117911552,
+          "GiB": 0.10981369018554688
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 7191195648.0,
+          "GB": 7.191195648,
+          "GiB": 6.697322845458984
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 0.7015132999949856,
+      "p95": 0.774488899995049,
+      "min": 0.41779439999663737,
+      "max": 3.3277818000060506
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 0.7040998999946169,
+        "p95": 3.3277818000060506,
+        "min": 0.4210324000014225,
+        "max": 3.3277818000060506
+      },
+      "1": {
+        "n": 15,
+        "median": 0.6898547999953735,
+        "p95": 0.7605237999960082,
+        "min": 0.41779439999663737,
+        "max": 0.7605237999960082
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "d1f3369c-219d-4c40-bba3-0a9b3490382f",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:59841/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "fb6c2ed7-95aa-4724-9087-0571a81e9260",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:59841/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "d1f3369c-219d-4c40-bba3-0a9b3490382f",
+        "host_pid": 40576,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "fb6c2ed7-95aa-4724-9087-0571a81e9260",
+        "host_pid": 26776,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 2830.98,
+        "evaluated_prompt_tokens": 844,
+        "generation_ms": 270.8,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 44.31
+      },
+      {
+        "prompt_ms": 320.57,
+        "evaluated_prompt_tokens": 200,
+        "generation_ms": 206.16,
+        "generation_eval_tokens": 18,
+        "generation_tokens_per_second": 82.46
+      },
+      {
+        "prompt_ms": 310.16,
+        "evaluated_prompt_tokens": 190,
+        "generation_ms": 158.13,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 82.21
+      },
+      {
+        "prompt_ms": 332.58,
+        "evaluated_prompt_tokens": 208,
+        "generation_ms": 194.41,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 82.3
+      },
+      {
+        "prompt_ms": 358.57,
+        "evaluated_prompt_tokens": 222,
+        "generation_ms": 194.91,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 82.09
+      },
+      {
+        "prompt_ms": 128.48,
+        "evaluated_prompt_tokens": 48,
+        "generation_ms": 134.18,
+        "generation_eval_tokens": 12,
+        "generation_tokens_per_second": 81.98
+      },
+      {
+        "prompt_ms": 363.0,
+        "evaluated_prompt_tokens": 229,
+        "generation_ms": 218.84,
+        "generation_eval_tokens": 19,
+        "generation_tokens_per_second": 82.25
+      },
+      {
+        "prompt_ms": 339.72,
+        "evaluated_prompt_tokens": 215,
+        "generation_ms": 158.65,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 81.94
+      },
+      {
+        "prompt_ms": 377.76,
+        "evaluated_prompt_tokens": 236,
+        "generation_ms": 207.09,
+        "generation_eval_tokens": 18,
+        "generation_tokens_per_second": 82.09
+      },
+      {
+        "prompt_ms": 373.51,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 171.09,
+        "generation_eval_tokens": 15,
+        "generation_tokens_per_second": 81.83
+      },
+      {
+        "prompt_ms": 144.89,
+        "evaluated_prompt_tokens": 62,
+        "generation_ms": 134.43,
+        "generation_eval_tokens": 12,
+        "generation_tokens_per_second": 81.83
+      },
+      {
+        "prompt_ms": 362.86,
+        "evaluated_prompt_tokens": 229,
+        "generation_ms": 219.26,
+        "generation_eval_tokens": 19,
+        "generation_tokens_per_second": 82.09
+      },
+      {
+        "prompt_ms": 339.93,
+        "evaluated_prompt_tokens": 215,
+        "generation_ms": 158.96,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 81.78
+      },
+      {
+        "prompt_ms": 367.54,
+        "evaluated_prompt_tokens": 236,
+        "generation_ms": 206.73,
+        "generation_eval_tokens": 18,
+        "generation_tokens_per_second": 82.23
+      },
+      {
+        "prompt_ms": 375.27,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 171.03,
+        "generation_eval_tokens": 15,
+        "generation_tokens_per_second": 81.86
+      },
+      {
+        "prompt_ms": 99.94,
+        "evaluated_prompt_tokens": 25,
+        "generation_ms": 146.26,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 82.05
+      },
+      {
+        "prompt_ms": 322.47,
+        "evaluated_prompt_tokens": 200,
+        "generation_ms": 206.39,
+        "generation_eval_tokens": 18,
+        "generation_tokens_per_second": 82.37
+      },
+      {
+        "prompt_ms": 311.62,
+        "evaluated_prompt_tokens": 190,
+        "generation_ms": 158.1,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 82.22
+      },
+      {
+        "prompt_ms": 331.37,
+        "evaluated_prompt_tokens": 208,
+        "generation_ms": 194.38,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 82.31
+      },
+      {
+        "prompt_ms": 357.42,
+        "evaluated_prompt_tokens": 222,
+        "generation_ms": 194.62,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 82.21
+      },
+      {
+        "prompt_ms": 128.39,
+        "evaluated_prompt_tokens": 48,
+        "generation_ms": 134.38,
+        "generation_eval_tokens": 12,
+        "generation_tokens_per_second": 81.86
+      },
+      {
+        "prompt_ms": 363.08,
+        "evaluated_prompt_tokens": 229,
+        "generation_ms": 220.37,
+        "generation_eval_tokens": 19,
+        "generation_tokens_per_second": 81.68
+      },
+      {
+        "prompt_ms": 340.23,
+        "evaluated_prompt_tokens": 215,
+        "generation_ms": 159.26,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 81.63
+      },
+      {
+        "prompt_ms": 378.37,
+        "evaluated_prompt_tokens": 236,
+        "generation_ms": 207.49,
+        "generation_eval_tokens": 18,
+        "generation_tokens_per_second": 81.93
+      },
+      {
+        "prompt_ms": 375.43,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 171.43,
+        "generation_eval_tokens": 15,
+        "generation_tokens_per_second": 81.67
+      },
+      {
+        "prompt_ms": 146.42,
+        "evaluated_prompt_tokens": 62,
+        "generation_ms": 134.74,
+        "generation_eval_tokens": 12,
+        "generation_tokens_per_second": 81.64
+      },
+      {
+        "prompt_ms": 363.77,
+        "evaluated_prompt_tokens": 229,
+        "generation_ms": 219.45,
+        "generation_eval_tokens": 19,
+        "generation_tokens_per_second": 82.02
+      },
+      {
+        "prompt_ms": 338.07,
+        "evaluated_prompt_tokens": 215,
+        "generation_ms": 158.7,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 81.91
+      },
+      {
+        "prompt_ms": 367.91,
+        "evaluated_prompt_tokens": 236,
+        "generation_ms": 206.92,
+        "generation_eval_tokens": 18,
+        "generation_tokens_per_second": 82.16
+      },
+      {
+        "prompt_ms": 374.7,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 171.62,
+        "generation_eval_tokens": 15,
+        "generation_tokens_per_second": 81.58
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6409,
+    "generation_eval_tokens_total": 470,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 82.0,
+      "p95": 82.37,
+      "min": 44.31,
+      "max": 82.46
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.0625,
+      1.53125
+    ],
+    "app_cpu_seconds_total_sampled": 2.59375,
+    "observed_wall_seconds": 57.955272300001525,
+    "server_cpu_seconds_sampled": 5.921875,
+    "sample_cadence_seconds": {
+      "n": 226,
+      "median": 0.25640430000203196,
+      "p95": 0.25758219999988796,
+      "min": 0.2530694000015501,
+      "max": 0.26060409999627154
+    },
+    "minimum_available_physical_bytes": 19192119296
+  },
+  {
+    "profile": "new-cpu-moe-cache3072-swa",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "64461",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--cpu-moe",
+      "--moe-cache-mib",
+      "3072",
+      "--swa-full",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 45956,
+        "exited": true
+      },
+      {
+        "pid": 6944,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 366,
+    "resource_peaks": {
+      "server": {
+        "PeakPagefileUsage": 7195807744,
+        "PrivateUsage": 7195779072,
+        "cpu_seconds": 12.59375,
+        "process_gpu_committed_bytes": 6740348928.0,
+        "system_committed_bytes": 45152186368,
+        "process_gpu_shared_bytes": 610848768.0,
+        "system_pages_input_per_second": 5289.6120783095275,
+        "device_gpu_committed_bytes": 10298982400.0,
+        "PageFaultCount": 3682579,
+        "process_gpu_dedicated_bytes": 6129500160.0,
+        "device_gpu_dedicated_bytes": 9207087104.0,
+        "gpu_engine_percent": 46.13630374726616,
+        "system_available_physical_bytes": 23467888640,
+        "WorkingSetSize": 14247272448,
+        "PeakWorkingSetSize": 14250106880,
+        "device_gpu_shared_bytes": 943779840.0,
+        "system_page_reads_per_second": 794.9930176344964
+      },
+      "app": {
+        "PeakPagefileUsage": 608391168,
+        "PrivateUsage": 602152960,
+        "cpu_seconds": 1.390625,
+        "system_committed_bytes": 45149773824,
+        "system_pages_input_per_second": 5280.180548109064,
+        "device_gpu_committed_bytes": 10298982400.0,
+        "PageFaultCount": 82034,
+        "device_gpu_dedicated_bytes": 9207087104.0,
+        "system_available_physical_bytes": 18941861888,
+        "WorkingSetSize": 117960704,
+        "PeakWorkingSetSize": 118960128,
+        "device_gpu_shared_bytes": 943779840.0,
+        "system_page_reads_per_second": 793.5755222597934
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3456,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.055.273 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.282.095 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.460.194 I load_tensors: offloading output layer to GPU",
+      "0.01.460.197 I load_tensors: offloading 29 repeating layers to GPU",
+      "0.01.460.198 I load_tensors: offloaded 31/31 layers to GPU",
+      "0.01.460.202 I load_tensors:   CPU_Mapped model buffer size = 13570.59 MiB",
+      "0.01.460.203 I load_tensors:      Vulkan0 model buffer size =  1322.59 MiB",
+      "0.01.928.209 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.01.934.186 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB",
+      "0.01.959.406 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB",
+      "0.02.058.955 I impl:    Vulkan0 MoE cache size =  3069.19 MiB for 12251.25 MiB of host experts",
+      "0.02.080.485 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB",
+      "0.02.080.489 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.32.818.723 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 17914 + ( 5710 =  1322 +    4059 +     328) +         934 |",
+      "1.32.825.380 I llama_moe_cache: ubatch <= 8: hits = 82111, misses = 29703, hit rate = 73.44%, uploaded = 94765.33 MiB",
+      "1.32.825.384 I llama_moe_cache: ubatch  > 8: hits = 276, misses = 1193, hit rate = 18.79%, uploaded = 3806.18 MiB",
+      "1.32.825.387 I llama_moe_cache: large batches: 49740 experts copied from the cache, 79345.99 MiB"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "PeakPagefileUsage": {
+          "bytes": 7195807744,
+          "GB": 7.195807744,
+          "GiB": 6.701618194580078
+        },
+        "PrivateUsage": {
+          "bytes": 7195779072,
+          "GB": 7.195779072,
+          "GiB": 6.701591491699219
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 6740348928.0,
+          "GB": 6.740348928,
+          "GiB": 6.277439117431641
+        },
+        "system_committed_bytes": {
+          "bytes": 45152186368,
+          "GB": 45.152186368,
+          "GiB": 42.05125045776367
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 610848768.0,
+          "GB": 0.610848768,
+          "GiB": 0.5688972473144531
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 10298982400.0,
+          "GB": 10.2989824,
+          "GiB": 9.5916748046875
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 6129500160.0,
+          "GB": 6.12950016,
+          "GiB": 5.7085418701171875
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 9207087104.0,
+          "GB": 9.207087104,
+          "GiB": 8.57476806640625
+        },
+        "system_available_physical_bytes": {
+          "bytes": 23467888640,
+          "GB": 23.46788864,
+          "GiB": 21.85617446899414
+        },
+        "WorkingSetSize": {
+          "bytes": 14247272448,
+          "GB": 14.247272448,
+          "GiB": 13.268806457519531
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 14250106880,
+          "GB": 14.25010688,
+          "GiB": 13.271446228027344
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 943779840.0,
+          "GB": 0.94377984,
+          "GiB": 0.8789634704589844
+        }
+      },
+      "app": {
+        "PeakPagefileUsage": {
+          "bytes": 608391168,
+          "GB": 0.608391168,
+          "GiB": 0.5666084289550781
+        },
+        "PrivateUsage": {
+          "bytes": 602152960,
+          "GB": 0.60215296,
+          "GiB": 0.5607986450195312
+        },
+        "system_committed_bytes": {
+          "bytes": 45149773824,
+          "GB": 45.149773824,
+          "GiB": 42.04900360107422
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 10298982400.0,
+          "GB": 10.2989824,
+          "GiB": 9.5916748046875
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 9207087104.0,
+          "GB": 9.207087104,
+          "GiB": 8.57476806640625
+        },
+        "system_available_physical_bytes": {
+          "bytes": 18941861888,
+          "GB": 18.941861888,
+          "GiB": 17.64098358154297
+        },
+        "WorkingSetSize": {
+          "bytes": 117960704,
+          "GB": 0.117960704,
+          "GiB": 0.10985946655273438
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 118960128,
+          "GB": 0.118960128,
+          "GiB": 0.11079025268554688
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 943779840.0,
+          "GB": 0.94377984,
+          "GiB": 0.8789634704589844
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 1.7690012000020943,
+      "p95": 2.2786804999996093,
+      "min": 1.3103363000045647,
+      "max": 6.459070100005192
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 1.7502229000019724,
+        "p95": 6.459070100005192,
+        "min": 1.3103363000045647,
+        "max": 6.459070100005192
+      },
+      "1": {
+        "n": 15,
+        "median": 1.78018229999725,
+        "p95": 2.2786804999996093,
+        "min": 1.3418944000004558,
+        "max": 2.2786804999996093
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "73ae844f-a73c-4ccc-81fa-5825ac6707de",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:64461/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "1a1a85a4-ea9f-42c9-9eac-bf47319ac865",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:64461/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "73ae844f-a73c-4ccc-81fa-5825ac6707de",
+        "host_pid": 45956,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "1a1a85a4-ea9f-42c9-9eac-bf47319ac865",
+        "host_pid": 6944,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 5513.67,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 729.53,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 16.45
+      },
+      {
+        "prompt_ms": 900.3,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 698.67,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.63
+      },
+      {
+        "prompt_ms": 842.78,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 646.36,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.11
+      },
+      {
+        "prompt_ms": 858.52,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 737.86,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.68
+      },
+      {
+        "prompt_ms": 867.93,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 744.77,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.48
+      },
+      {
+        "prompt_ms": 549.41,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 607.63,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.75
+      },
+      {
+        "prompt_ms": 893.56,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 691.28,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.93
+      },
+      {
+        "prompt_ms": 851.94,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 641.77,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.26
+      },
+      {
+        "prompt_ms": 863.45,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 755.53,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.18
+      },
+      {
+        "prompt_ms": 864.41,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 746.28,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.44
+      },
+      {
+        "prompt_ms": 569.16,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 601.5,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.95
+      },
+      {
+        "prompt_ms": 892.5,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 695.5,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.76
+      },
+      {
+        "prompt_ms": 844.7,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 636.4,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.43
+      },
+      {
+        "prompt_ms": 920.64,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 816.21,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 19.6
+      },
+      {
+        "prompt_ms": 882.21,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 795.02,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 20.13
+      },
+      {
+        "prompt_ms": 1374.74,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 664.0,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 18.07
+      },
+      {
+        "prompt_ms": 891.64,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 717.04,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 27.89
+      },
+      {
+        "prompt_ms": 851.32,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 650.59,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 19.98
+      },
+      {
+        "prompt_ms": 870.91,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 789.64,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 20.26
+      },
+      {
+        "prompt_ms": 876.3,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 756.77,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.14
+      },
+      {
+        "prompt_ms": 554.2,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 627.66,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.12
+      },
+      {
+        "prompt_ms": 891.33,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 719.8,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 27.79
+      },
+      {
+        "prompt_ms": 861.2,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 644.61,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.17
+      },
+      {
+        "prompt_ms": 869.69,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 761.58,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.01
+      },
+      {
+        "prompt_ms": 872.79,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 765.09,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 20.91
+      },
+      {
+        "prompt_ms": 583.22,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 624.21,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.22
+      },
+      {
+        "prompt_ms": 911.51,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 709.61,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.18
+      },
+      {
+        "prompt_ms": 858.66,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 663.05,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 19.61
+      },
+      {
+        "prompt_ms": 889.39,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 767.02,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 20.86
+      },
+      {
+        "prompt_ms": 886.64,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 772.69,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 20.71
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 492,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 20.57,
+      "p95": 28.76,
+      "min": 16.45,
+      "max": 28.93
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.390625,
+      1.09375
+    ],
+    "app_cpu_seconds_total_sampled": 2.484375,
+    "observed_wall_seconds": 93.67804149999574,
+    "server_cpu_seconds_sampled": 12.59375,
+    "sample_cadence_seconds": {
+      "n": 365,
+      "median": 0.25647659999958705,
+      "p95": 0.25865609999891603,
+      "min": 0.2536672000060207,
+      "max": 0.27006450000044424
+    },
+    "minimum_available_physical_bytes": 7200907264
+  },
+  {
+    "profile": "new-cpu-moe-cache3072-swa-nocram",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "51679",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--cpu-moe",
+      "--moe-cache-mib",
+      "3072",
+      "--swa-full",
+      "--cache-ram",
+      "0",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 45512,
+        "exited": true
+      },
+      {
+        "pid": 13484,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 359,
+    "resource_peaks": {
+      "server": {
+        "PageFaultCount": 3678942,
+        "PrivateUsage": 7196622848,
+        "PeakWorkingSetSize": 14257819648,
+        "system_available_physical_bytes": 22950297600,
+        "device_gpu_dedicated_bytes": 9207681024.0,
+        "device_gpu_committed_bytes": 10300555264.0,
+        "system_committed_bytes": 43427328000,
+        "device_gpu_shared_bytes": 943153152.0,
+        "system_page_reads_per_second": 309.13243742318156,
+        "process_gpu_committed_bytes": 6740348928.0,
+        "process_gpu_shared_bytes": 610848768.0,
+        "cpu_seconds": 11.125,
+        "process_gpu_dedicated_bytes": 6129500160.0,
+        "gpu_engine_percent": 46.311788402911716,
+        "system_pages_input_per_second": 3765.4253405696236,
+        "PeakPagefileUsage": 7196622848,
+        "WorkingSetSize": 14253568000
+      },
+      "app": {
+        "PageFaultCount": 82094,
+        "PrivateUsage": 601354240,
+        "PeakWorkingSetSize": 118177792,
+        "system_available_physical_bytes": 18433675264,
+        "device_gpu_dedicated_bytes": 9207681024.0,
+        "device_gpu_committed_bytes": 10300555264.0,
+        "system_committed_bytes": 43445268480,
+        "device_gpu_shared_bytes": 943153152.0,
+        "system_page_reads_per_second": 309.0822448291323,
+        "cpu_seconds": 2.0625,
+        "system_pages_input_per_second": 3791.7696294513676,
+        "PeakPagefileUsage": 607612928,
+        "WorkingSetSize": 117231616
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3456,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.052.160 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.288.792 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.469.351 I load_tensors: offloading output layer to GPU",
+      "0.01.469.356 I load_tensors: offloading 29 repeating layers to GPU",
+      "0.01.469.357 I load_tensors: offloaded 31/31 layers to GPU",
+      "0.01.469.361 I load_tensors:   CPU_Mapped model buffer size = 13570.59 MiB",
+      "0.01.469.362 I load_tensors:      Vulkan0 model buffer size =  1322.59 MiB",
+      "0.01.933.458 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.01.939.391 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB",
+      "0.01.964.072 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB",
+      "0.02.063.079 I impl:    Vulkan0 MoE cache size =  3069.19 MiB for 12251.25 MiB of host experts",
+      "0.02.083.796 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB",
+      "0.02.083.799 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.31.174.045 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 17914 + ( 5710 =  1322 +    4059 +     328) +         934 |",
+      "1.31.181.055 I llama_moe_cache: ubatch <= 8: hits = 82111, misses = 29703, hit rate = 73.44%, uploaded = 94765.33 MiB",
+      "1.31.181.058 I llama_moe_cache: ubatch  > 8: hits = 276, misses = 1193, hit rate = 18.79%, uploaded = 3806.18 MiB",
+      "1.31.181.061 I llama_moe_cache: large batches: 49740 experts copied from the cache, 79345.99 MiB"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "PrivateUsage": {
+          "bytes": 7196622848,
+          "GB": 7.196622848,
+          "GiB": 6.7023773193359375
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 14257819648,
+          "GB": 14.257819648,
+          "GiB": 13.278629302978516
+        },
+        "system_available_physical_bytes": {
+          "bytes": 22950297600,
+          "GB": 22.9502976,
+          "GiB": 21.374130249023438
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 9207681024.0,
+          "GB": 9.207681024,
+          "GiB": 8.575321197509766
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 10300555264.0,
+          "GB": 10.300555264,
+          "GiB": 9.5931396484375
+        },
+        "system_committed_bytes": {
+          "bytes": 43427328000,
+          "GB": 43.427328,
+          "GiB": 40.44485092163086
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 943153152.0,
+          "GB": 0.943153152,
+          "GiB": 0.8783798217773438
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 6740348928.0,
+          "GB": 6.740348928,
+          "GiB": 6.277439117431641
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 610848768.0,
+          "GB": 0.610848768,
+          "GiB": 0.5688972473144531
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 6129500160.0,
+          "GB": 6.12950016,
+          "GiB": 5.7085418701171875
+        },
+        "PeakPagefileUsage": {
+          "bytes": 7196622848,
+          "GB": 7.196622848,
+          "GiB": 6.7023773193359375
+        },
+        "WorkingSetSize": {
+          "bytes": 14253568000,
+          "GB": 14.253568,
+          "GiB": 13.274669647216797
+        }
+      },
+      "app": {
+        "PrivateUsage": {
+          "bytes": 601354240,
+          "GB": 0.60135424,
+          "GiB": 0.5600547790527344
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 118177792,
+          "GB": 0.118177792,
+          "GiB": 0.1100616455078125
+        },
+        "system_available_physical_bytes": {
+          "bytes": 18433675264,
+          "GB": 18.433675264,
+          "GiB": 17.16769790649414
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 9207681024.0,
+          "GB": 9.207681024,
+          "GiB": 8.575321197509766
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 10300555264.0,
+          "GB": 10.300555264,
+          "GiB": 9.5931396484375
+        },
+        "system_committed_bytes": {
+          "bytes": 43445268480,
+          "GB": 43.44526848,
+          "GiB": 40.4615592956543
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 943153152.0,
+          "GB": 0.943153152,
+          "GiB": 0.8783798217773438
+        },
+        "PeakPagefileUsage": {
+          "bytes": 607612928,
+          "GB": 0.607612928,
+          "GiB": 0.5658836364746094
+        },
+        "WorkingSetSize": {
+          "bytes": 117231616,
+          "GB": 0.117231616,
+          "GiB": 0.10918045043945312
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 1.7479551500000525,
+      "p95": 2.1944531999979517,
+      "min": 1.3230314000029466,
+      "max": 6.434624300003634
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 1.7490328999992926,
+        "p95": 6.434624300003634,
+        "min": 1.3286545999944792,
+        "max": 6.434624300003634
+      },
+      "1": {
+        "n": 15,
+        "median": 1.7468774000008125,
+        "p95": 2.1944531999979517,
+        "min": 1.3230314000029466,
+        "max": 2.1944531999979517
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "321f0df7-dc72-451c-8aed-09ed6b6d3f61",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:51679/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "1e3aba34-6c5a-49f7-9628-a6f18f3dec0d",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:51679/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "321f0df7-dc72-451c-8aed-09ed6b6d3f61",
+        "host_pid": 45512,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "1e3aba34-6c5a-49f7-9628-a6f18f3dec0d",
+        "host_pid": 13484,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 5487.94,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 734.03,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 16.35
+      },
+      {
+        "prompt_ms": 891.29,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 690.93,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.95
+      },
+      {
+        "prompt_ms": 834.29,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 648.94,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.03
+      },
+      {
+        "prompt_ms": 849.15,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 743.66,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.52
+      },
+      {
+        "prompt_ms": 860.27,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 750.6,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.32
+      },
+      {
+        "prompt_ms": 549.8,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 627.75,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.12
+      },
+      {
+        "prompt_ms": 897.11,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 688.01,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 29.07
+      },
+      {
+        "prompt_ms": 846.92,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 641.31,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.27
+      },
+      {
+        "prompt_ms": 864.22,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 750.84,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.31
+      },
+      {
+        "prompt_ms": 870.29,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 747.76,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.4
+      },
+      {
+        "prompt_ms": 569.83,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 606.18,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.8
+      },
+      {
+        "prompt_ms": 890.25,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 691.41,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.93
+      },
+      {
+        "prompt_ms": 833.98,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 638.42,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.36
+      },
+      {
+        "prompt_ms": 857.45,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 747.0,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.42
+      },
+      {
+        "prompt_ms": 864.88,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 751.0,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.31
+      },
+      {
+        "prompt_ms": 1333.39,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 649.59,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 18.47
+      },
+      {
+        "prompt_ms": 886.69,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 694.82,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.78
+      },
+      {
+        "prompt_ms": 829.73,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 635.02,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.47
+      },
+      {
+        "prompt_ms": 852.93,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 740.91,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.6
+      },
+      {
+        "prompt_ms": 854.86,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 749.39,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.35
+      },
+      {
+        "prompt_ms": 549.93,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 617.67,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.43
+      },
+      {
+        "prompt_ms": 886.47,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 714.12,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.01
+      },
+      {
+        "prompt_ms": 863.04,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 642.78,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.22
+      },
+      {
+        "prompt_ms": 852.36,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 746.12,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.44
+      },
+      {
+        "prompt_ms": 873.71,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 750.97,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.31
+      },
+      {
+        "prompt_ms": 582.33,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 610.92,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 19.64
+      },
+      {
+        "prompt_ms": 890.67,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 698.29,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.64
+      },
+      {
+        "prompt_ms": 849.23,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 638.66,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 20.35
+      },
+      {
+        "prompt_ms": 860.53,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 754.44,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.21
+      },
+      {
+        "prompt_ms": 865.3,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 755.99,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 21.16
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 492,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 21.31,
+      "p95": 28.95,
+      "min": 16.35,
+      "max": 29.07
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      2.0625,
+      2.0
+    ],
+    "app_cpu_seconds_total_sampled": 4.0625,
+    "observed_wall_seconds": 91.94300050000311,
+    "server_cpu_seconds_sampled": 11.125,
+    "sample_cadence_seconds": {
+      "n": 358,
+      "median": 0.2567198999968241,
+      "p95": 0.25862519999645883,
+      "min": 0.2542799999937415,
+      "max": 0.26036890000250423
+    },
+    "minimum_available_physical_bytes": 8293892096
+  },
+  {
+    "profile": "new-cpu-moe-off-swa-nocram",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "50827",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--cpu-moe",
+      "--swa-full",
+      "--cache-ram",
+      "0",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 13256,
+        "exited": true
+      },
+      {
+        "pid": 28688,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 363,
+    "resource_peaks": {
+      "server": {
+        "system_page_reads_per_second": 360.2583365541212,
+        "process_gpu_shared_bytes": 680386560.0,
+        "device_gpu_shared_bytes": 1012690944.0,
+        "process_gpu_dedicated_bytes": 2905038848.0,
+        "WorkingSetSize": 14323892224,
+        "PageFaultCount": 3774943,
+        "PeakWorkingSetSize": 14333288448,
+        "system_available_physical_bytes": 22988365824,
+        "device_gpu_dedicated_bytes": 5983219712.0,
+        "system_pages_input_per_second": 2130.223207450456,
+        "PeakPagefileUsage": 4262301696,
+        "system_committed_bytes": 40362090496,
+        "PrivateUsage": 4262301696,
+        "process_gpu_committed_bytes": 3585425408.0,
+        "cpu_seconds": 67.875,
+        "device_gpu_committed_bytes": 7145631744.0,
+        "gpu_engine_percent": 45.998879281494915
+      },
+      "app": {
+        "system_page_reads_per_second": 360.25551513993383,
+        "device_gpu_shared_bytes": 1012690944.0,
+        "WorkingSetSize": 117755904,
+        "PageFaultCount": 81078,
+        "PeakWorkingSetSize": 118714368,
+        "system_available_physical_bytes": 18569711616,
+        "device_gpu_dedicated_bytes": 5983219712.0,
+        "system_pages_input_per_second": 2130.2065243056954,
+        "PeakPagefileUsage": 609116160,
+        "system_committed_bytes": 40362090496,
+        "PrivateUsage": 601665536,
+        "cpu_seconds": 1.984375,
+        "device_gpu_committed_bytes": 7145631744.0
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3452,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.057.210 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.289.338 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.465.481 I load_tensors: offloading output layer to GPU",
+      "0.01.465.485 I load_tensors: offloading 29 repeating layers to GPU",
+      "0.01.465.485 I load_tensors: offloaded 31/31 layers to GPU",
+      "0.01.465.491 I load_tensors:   CPU_Mapped model buffer size = 13570.59 MiB",
+      "0.01.465.492 I load_tensors:      Vulkan0 model buffer size =  1322.59 MiB",
+      "0.01.926.786 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.01.932.471 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB",
+      "0.01.954.766 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB",
+      "0.01.987.393 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB",
+      "0.01.987.397 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.32.286.846 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 20984 + ( 2641 =  1322 +     990 +     328) +         934 |"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "process_gpu_shared_bytes": {
+          "bytes": 680386560.0,
+          "GB": 0.68038656,
+          "GiB": 0.6336593627929688
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 1012690944.0,
+          "GB": 1.012690944,
+          "GiB": 0.9431419372558594
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 2905038848.0,
+          "GB": 2.905038848,
+          "GiB": 2.7055282592773438
+        },
+        "WorkingSetSize": {
+          "bytes": 14323892224,
+          "GB": 14.323892224,
+          "GiB": 13.340164184570312
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 14333288448,
+          "GB": 14.333288448,
+          "GiB": 13.348915100097656
+        },
+        "system_available_physical_bytes": {
+          "bytes": 22988365824,
+          "GB": 22.988365824,
+          "GiB": 21.409584045410156
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 5983219712.0,
+          "GB": 5.983219712,
+          "GiB": 5.572307586669922
+        },
+        "PeakPagefileUsage": {
+          "bytes": 4262301696,
+          "GB": 4.262301696,
+          "GiB": 3.9695777893066406
+        },
+        "system_committed_bytes": {
+          "bytes": 40362090496,
+          "GB": 40.362090496,
+          "GiB": 37.590126037597656
+        },
+        "PrivateUsage": {
+          "bytes": 4262301696,
+          "GB": 4.262301696,
+          "GiB": 3.9695777893066406
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 3585425408.0,
+          "GB": 3.585425408,
+          "GiB": 3.3391876220703125
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 7145631744.0,
+          "GB": 7.145631744,
+          "GiB": 6.654888153076172
+        }
+      },
+      "app": {
+        "device_gpu_shared_bytes": {
+          "bytes": 1012690944.0,
+          "GB": 1.012690944,
+          "GiB": 0.9431419372558594
+        },
+        "WorkingSetSize": {
+          "bytes": 117755904,
+          "GB": 0.117755904,
+          "GiB": 0.10966873168945312
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 118714368,
+          "GB": 0.118714368,
+          "GiB": 0.11056137084960938
+        },
+        "system_available_physical_bytes": {
+          "bytes": 18569711616,
+          "GB": 18.569711616,
+          "GiB": 17.294391632080078
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 5983219712.0,
+          "GB": 5.983219712,
+          "GiB": 5.572307586669922
+        },
+        "PeakPagefileUsage": {
+          "bytes": 609116160,
+          "GB": 0.60911616,
+          "GiB": 0.5672836303710938
+        },
+        "system_committed_bytes": {
+          "bytes": 40362090496,
+          "GB": 40.362090496,
+          "GiB": 37.590126037597656
+        },
+        "PrivateUsage": {
+          "bytes": 601665536,
+          "GB": 0.601665536,
+          "GiB": 0.5603446960449219
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 7145631744.0,
+          "GB": 7.145631744,
+          "GiB": 6.654888153076172
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 1.8109344000004057,
+      "p95": 2.0068356999981916,
+      "min": 1.3158007000020007,
+      "max": 6.41542529999424
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 1.8118678000028012,
+        "p95": 6.41542529999424,
+        "min": 1.3952950999955647,
+        "max": 6.41542529999424
+      },
+      "1": {
+        "n": 15,
+        "median": 1.8108683000027668,
+        "p95": 1.9823793999967165,
+        "min": 1.3158007000020007,
+        "max": 1.9823793999967165
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "3d1002ea-63ca-4864-b139-519763410501",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:50827/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "241a432c-61ca-4e1f-b295-4e60d0890560",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:50827/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "3d1002ea-63ca-4864-b139-519763410501",
+        "host_pid": 13256,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "241a432c-61ca-4e1f-b295-4e60d0890560",
+        "host_pid": 28688,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 5710.93,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 491.29,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 24.43
+      },
+      {
+        "prompt_ms": 1055.12,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 768.67,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 26.02
+      },
+      {
+        "prompt_ms": 999.9,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 506.09,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 25.69
+      },
+      {
+        "prompt_ms": 1019.21,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 626.31,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.55
+      },
+      {
+        "prompt_ms": 1032.27,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 631.12,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.35
+      },
+      {
+        "prompt_ms": 752.53,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 488.1,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 24.59
+      },
+      {
+        "prompt_ms": 1051.46,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 780.76,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 25.62
+      },
+      {
+        "prompt_ms": 1020.83,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 505.9,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 25.7
+      },
+      {
+        "prompt_ms": 1025.66,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 625.01,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.6
+      },
+      {
+        "prompt_ms": 1042.18,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 663.9,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.1
+      },
+      {
+        "prompt_ms": 767.56,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 480.7,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 24.96
+      },
+      {
+        "prompt_ms": 1066.34,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 786.89,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 25.42
+      },
+      {
+        "prompt_ms": 1007.92,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 510.48,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 25.47
+      },
+      {
+        "prompt_ms": 1032.58,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 625.64,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.57
+      },
+      {
+        "prompt_ms": 1051.18,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 619.29,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.84
+      },
+      {
+        "prompt_ms": 1024.54,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 479.16,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 25.04
+      },
+      {
+        "prompt_ms": 1029.91,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 786.59,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 25.43
+      },
+      {
+        "prompt_ms": 993.44,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 506.38,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 25.67
+      },
+      {
+        "prompt_ms": 1024.56,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 630.11,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.39
+      },
+      {
+        "prompt_ms": 1035.36,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 629.6,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.41
+      },
+      {
+        "prompt_ms": 732.56,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 429.89,
+        "generation_eval_tokens": 12,
+        "generation_tokens_per_second": 25.59
+      },
+      {
+        "prompt_ms": 1054.05,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 772.12,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 25.9
+      },
+      {
+        "prompt_ms": 993.29,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 506.69,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 25.66
+      },
+      {
+        "prompt_ms": 1018.66,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 638.2,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.07
+      },
+      {
+        "prompt_ms": 1037.01,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 619.38,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.83
+      },
+      {
+        "prompt_ms": 750.24,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 471.88,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 25.43
+      },
+      {
+        "prompt_ms": 1047.52,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 777.43,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 25.73
+      },
+      {
+        "prompt_ms": 1009.72,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 503.77,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 25.81
+      },
+      {
+        "prompt_ms": 1036.38,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 628.5,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.46
+      },
+      {
+        "prompt_ms": 1037.5,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 631.66,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 25.33
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 491,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 25.509999999999998,
+      "p95": 25.9,
+      "min": 24.1,
+      "max": 26.02
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.984375,
+      1.5625
+    ],
+    "app_cpu_seconds_total_sampled": 3.546875,
+    "observed_wall_seconds": 92.85358300000371,
+    "server_cpu_seconds_sampled": 67.875,
+    "sample_cadence_seconds": {
+      "n": 362,
+      "median": 0.25646724999751314,
+      "p95": 0.25779489999695215,
+      "min": 0.2508633000034024,
+      "max": 0.26129609999770764
+    },
+    "minimum_available_physical_bytes": 8336949248
+  },
+  {
+    "profile": "new-full-swa-nocram",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "56887",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--swa-full",
+      "--cache-ram",
+      "0",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 47180,
+        "exited": true
+      },
+      {
+        "pid": 2556,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 246,
+    "resource_peaks": {
+      "server": {
+        "cpu_seconds": 7.9375,
+        "device_gpu_shared_bytes": 1023029248.0,
+        "PageFaultCount": 3845036,
+        "gpu_engine_percent": 99.93403202972164,
+        "system_pages_input_per_second": 3229.9464071044763,
+        "PrivateUsage": 16444755968,
+        "system_committed_bytes": 53822267392,
+        "WorkingSetSize": 15170277376,
+        "process_gpu_committed_bytes": 16129114112.0,
+        "device_gpu_committed_bytes": 19687153664.0,
+        "system_available_physical_bytes": 22089109504,
+        "process_gpu_dedicated_bytes": 15438389248.0,
+        "device_gpu_dedicated_bytes": 18514403328.0,
+        "system_page_reads_per_second": 588.3446203287483,
+        "PeakPagefileUsage": 16444809216,
+        "process_gpu_shared_bytes": 690724864.0,
+        "PeakWorkingSetSize": 15173726208
+      },
+      "app": {
+        "cpu_seconds": 1.234375,
+        "device_gpu_shared_bytes": 1023029248.0,
+        "PageFaultCount": 75950,
+        "system_pages_input_per_second": 3232.9743050864417,
+        "PrivateUsage": 600907776,
+        "system_committed_bytes": 53822267392,
+        "WorkingSetSize": 117587968,
+        "device_gpu_committed_bytes": 19687153664.0,
+        "system_available_physical_bytes": 7840518144,
+        "device_gpu_dedicated_bytes": 18514403328.0,
+        "system_page_reads_per_second": 469.1135630113337,
+        "PeakPagefileUsage": 608657408,
+        "PeakWorkingSetSize": 117829632
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3456,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.052.316 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.291.306 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.728.713 I load_tensors: offloading output layer to GPU",
+      "0.01.728.717 I load_tensors: offloading 29 repeating layers to GPU",
+      "0.01.728.717 I load_tensors: offloaded 31/31 layers to GPU",
+      "0.01.728.723 I load_tensors:   CPU_Mapped model buffer size =   396.00 MiB",
+      "0.01.728.724 I load_tensors:      Vulkan0 model buffer size = 13573.86 MiB",
+      "0.05.805.152 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.05.811.522 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB",
+      "0.05.836.012 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB",
+      "0.05.871.635 I sched_reserve:    Vulkan0 compute buffer size =   102.22 MiB",
+      "0.05.871.639 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.02.113.881 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 8952 + (14666 = 13573 +     990 +     102) +         941 |"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "device_gpu_shared_bytes": {
+          "bytes": 1023029248.0,
+          "GB": 1.023029248,
+          "GiB": 0.9527702331542969
+        },
+        "PrivateUsage": {
+          "bytes": 16444755968,
+          "GB": 16.444755968,
+          "GiB": 15.315372467041016
+        },
+        "system_committed_bytes": {
+          "bytes": 53822267392,
+          "GB": 53.822267392,
+          "GiB": 50.125892639160156
+        },
+        "WorkingSetSize": {
+          "bytes": 15170277376,
+          "GB": 15.170277376,
+          "GiB": 14.128421783447266
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 16129114112.0,
+          "GB": 16.129114112,
+          "GiB": 15.021408081054688
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 19687153664.0,
+          "GB": 19.687153664,
+          "GiB": 18.33509063720703
+        },
+        "system_available_physical_bytes": {
+          "bytes": 22089109504,
+          "GB": 22.089109504,
+          "GiB": 20.572086334228516
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 15438389248.0,
+          "GB": 15.438389248,
+          "GiB": 14.378120422363281
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 18514403328.0,
+          "GB": 18.514403328,
+          "GiB": 17.242881774902344
+        },
+        "PeakPagefileUsage": {
+          "bytes": 16444809216,
+          "GB": 16.444809216,
+          "GiB": 15.315422058105469
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 690724864.0,
+          "GB": 0.690724864,
+          "GiB": 0.6432876586914062
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 15173726208,
+          "GB": 15.173726208,
+          "GiB": 14.131633758544922
+        }
+      },
+      "app": {
+        "device_gpu_shared_bytes": {
+          "bytes": 1023029248.0,
+          "GB": 1.023029248,
+          "GiB": 0.9527702331542969
+        },
+        "PrivateUsage": {
+          "bytes": 600907776,
+          "GB": 0.600907776,
+          "GiB": 0.5596389770507812
+        },
+        "system_committed_bytes": {
+          "bytes": 53822267392,
+          "GB": 53.822267392,
+          "GiB": 50.125892639160156
+        },
+        "WorkingSetSize": {
+          "bytes": 117587968,
+          "GB": 0.117587968,
+          "GiB": 0.1095123291015625
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 19687153664.0,
+          "GB": 19.687153664,
+          "GiB": 18.33509063720703
+        },
+        "system_available_physical_bytes": {
+          "bytes": 7840518144,
+          "GB": 7.840518144,
+          "GiB": 7.302051544189453
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 18514403328.0,
+          "GB": 18.514403328,
+          "GiB": 17.242881774902344
+        },
+        "PeakPagefileUsage": {
+          "bytes": 608657408,
+          "GB": 0.608657408,
+          "GiB": 0.5668563842773438
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 117829632,
+          "GB": 0.117829632,
+          "GiB": 0.10973739624023438
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 0.7004066000008606,
+      "p95": 1.2029086999973515,
+      "min": 0.40026709999801824,
+      "max": 2.7803857999970205
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 0.7009020000041346,
+        "p95": 2.7803857999970205,
+        "min": 0.40288040000450565,
+        "max": 2.7803857999970205
+      },
+      "1": {
+        "n": 15,
+        "median": 0.6932293999998365,
+        "p95": 1.2029086999973515,
+        "min": 0.40026709999801824,
+        "max": 1.2029086999973515
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "7728ade3-0894-47c9-bbf1-b958b4ea5bda",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:56887/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "0dd29758-bbc6-4ed6-845c-7164c597d849",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:56887/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "7728ade3-0894-47c9-bbf1-b958b4ea5bda",
+        "host_pid": 47180,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "0dd29758-bbc6-4ed6-845c-7164c597d849",
+        "host_pid": 2556,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 2427.39,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 130.35,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 92.06
+      },
+      {
+        "prompt_ms": 325.53,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 216.17,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 92.52
+      },
+      {
+        "prompt_ms": 312.79,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 140.89,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 92.27
+      },
+      {
+        "prompt_ms": 339.13,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 173.9,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.01
+      },
+      {
+        "prompt_ms": 363.97,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 173.82,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.05
+      },
+      {
+        "prompt_ms": 116.22,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 130.99,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 91.61
+      },
+      {
+        "prompt_ms": 371.98,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 216.91,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 92.2
+      },
+      {
+        "prompt_ms": 346.23,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 141.73,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 91.72
+      },
+      {
+        "prompt_ms": 375.19,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 174.21,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 91.84
+      },
+      {
+        "prompt_ms": 397.52,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 172.48,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.76
+      },
+      {
+        "prompt_ms": 131.74,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 129.67,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 92.54
+      },
+      {
+        "prompt_ms": 370.19,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 218.52,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 91.53
+      },
+      {
+        "prompt_ms": 344.0,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 140.57,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 92.48
+      },
+      {
+        "prompt_ms": 374.5,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 172.07,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.98
+      },
+      {
+        "prompt_ms": 390.38,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 172.35,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.83
+      },
+      {
+        "prompt_ms": 851.94,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 129.29,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 92.82
+      },
+      {
+        "prompt_ms": 322.13,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 213.69,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 93.59
+      },
+      {
+        "prompt_ms": 312.08,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 140.04,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 92.83
+      },
+      {
+        "prompt_ms": 336.21,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 171.65,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 93.21
+      },
+      {
+        "prompt_ms": 363.54,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 172.83,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.58
+      },
+      {
+        "prompt_ms": 114.52,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 129.32,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 92.79
+      },
+      {
+        "prompt_ms": 370.13,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 214.09,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 93.42
+      },
+      {
+        "prompt_ms": 345.13,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 143.75,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 90.44
+      },
+      {
+        "prompt_ms": 376.96,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 172.97,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.5
+      },
+      {
+        "prompt_ms": 391.41,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 172.19,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.92
+      },
+      {
+        "prompt_ms": 130.71,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 129.6,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 92.59
+      },
+      {
+        "prompt_ms": 374.01,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 214.14,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 93.4
+      },
+      {
+        "prompt_ms": 344.7,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 140.16,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 92.75
+      },
+      {
+        "prompt_ms": 373.25,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 171.84,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 93.11
+      },
+      {
+        "prompt_ms": 389.89,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 172.63,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 92.68
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 492,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 92.58500000000001,
+      "p95": 93.42,
+      "min": 90.44,
+      "max": 93.59
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.234375,
+      0.953125
+    ],
+    "app_cpu_seconds_total_sampled": 2.1875,
+    "observed_wall_seconds": 62.85995009999897,
+    "server_cpu_seconds_sampled": 7.9375,
+    "sample_cadence_seconds": {
+      "n": 245,
+      "median": 0.2565333000020473,
+      "p95": 0.25782489999983227,
+      "min": 0.25093919999926584,
+      "max": 0.261743100003514
+    },
+    "minimum_available_physical_bytes": 6690021376
+  },
+  {
+    "profile": "new-ncpu12-cache2048-swa-nocram",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "63642",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--n-cpu-moe",
+      "12",
+      "--moe-cache-mib",
+      "2048",
+      "--swa-full",
+      "--cache-ram",
+      "0",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 41048,
+        "exited": true
+      },
+      {
+        "pid": 48620,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 256,
+    "resource_peaks": {
+      "server": {
+        "device_gpu_shared_bytes": 941568000.0,
+        "process_gpu_dedicated_bytes": 12780429312.0,
+        "process_gpu_shared_bytes": 609263616.0,
+        "system_committed_bytes": 49893494784,
+        "process_gpu_committed_bytes": 13389692928.0,
+        "system_available_physical_bytes": 23227105280,
+        "PrivateUsage": 13750480896,
+        "PeakWorkingSetSize": 14780751872,
+        "PeakPagefileUsage": 13753692160,
+        "WorkingSetSize": 14780747776,
+        "system_page_reads_per_second": 41157.240635059854,
+        "PageFaultCount": 3767089,
+        "gpu_engine_percent": 65.27372016150925,
+        "device_gpu_dedicated_bytes": 15857037312.0,
+        "cpu_seconds": 9.578125,
+        "device_gpu_committed_bytes": 16948326400.0,
+        "system_pages_input_per_second": 294210.48052414716
+      },
+      "app": {
+        "device_gpu_shared_bytes": 941568000.0,
+        "system_committed_bytes": 49893494784,
+        "system_available_physical_bytes": 12303265792,
+        "PrivateUsage": 600948736,
+        "PeakWorkingSetSize": 117739520,
+        "PeakPagefileUsage": 608788480,
+        "WorkingSetSize": 117243904,
+        "system_page_reads_per_second": 41184.994503073554,
+        "PageFaultCount": 77553,
+        "device_gpu_dedicated_bytes": 15857037312.0,
+        "cpu_seconds": 1.984375,
+        "device_gpu_committed_bytes": 16948326400.0,
+        "system_pages_input_per_second": 293840.67147971323
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3456,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.052.878 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.283.168 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.629.463 I load_tensors: offloading output layer to GPU",
+      "0.01.629.467 I load_tensors: offloading 29 repeating layers to GPU",
+      "0.01.629.467 I load_tensors: offloaded 31/31 layers to GPU",
+      "0.01.629.473 I load_tensors:   CPU_Mapped model buffer size =  5663.88 MiB",
+      "0.01.629.474 I load_tensors:      Vulkan0 model buffer size =  8673.35 MiB",
+      "0.04.234.564 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.04.240.929 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB",
+      "0.04.264.938 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB",
+      "0.04.335.746 I impl:    Vulkan0 MoE cache size =  2045.07 MiB for 4900.50 MiB of host experts",
+      "0.04.354.696 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB",
+      "0.04.354.699 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.04.674.792 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 11584 + (12037 =  8673 +    3035 +     328) +         938 |",
+      "1.04.683.335 I llama_moe_cache: ubatch <= 8: hits = 39697, misses = 4915, hit rate = 88.98%, uploaded = 15680.96 MiB",
+      "1.04.683.338 I llama_moe_cache: ubatch  > 8: hits = 310, misses = 272, hit rate = 53.26%, uploaded = 867.80 MiB",
+      "1.04.683.342 I llama_moe_cache: large batches: 33334 experts copied from the cache, 53174.89 MiB"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "device_gpu_shared_bytes": {
+          "bytes": 941568000.0,
+          "GB": 0.941568,
+          "GiB": 0.8769035339355469
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 12780429312.0,
+          "GB": 12.780429312,
+          "GiB": 11.902702331542969
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 609263616.0,
+          "GB": 0.609263616,
+          "GiB": 0.5674209594726562
+        },
+        "system_committed_bytes": {
+          "bytes": 49893494784,
+          "GB": 49.893494784,
+          "GiB": 46.46693801879883
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 13389692928.0,
+          "GB": 13.389692928,
+          "GiB": 12.470123291015625
+        },
+        "system_available_physical_bytes": {
+          "bytes": 23227105280,
+          "GB": 23.22710528,
+          "GiB": 21.631927490234375
+        },
+        "PrivateUsage": {
+          "bytes": 13750480896,
+          "GB": 13.750480896,
+          "GiB": 12.806133270263672
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 14780751872,
+          "GB": 14.780751872,
+          "GiB": 13.765647888183594
+        },
+        "PeakPagefileUsage": {
+          "bytes": 13753692160,
+          "GB": 13.75369216,
+          "GiB": 12.809123992919922
+        },
+        "WorkingSetSize": {
+          "bytes": 14780747776,
+          "GB": 14.780747776,
+          "GiB": 13.765644073486328
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 15857037312.0,
+          "GB": 15.857037312,
+          "GiB": 14.768016815185547
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 16948326400.0,
+          "GB": 16.9483264,
+          "GiB": 15.784358978271484
+        }
+      },
+      "app": {
+        "device_gpu_shared_bytes": {
+          "bytes": 941568000.0,
+          "GB": 0.941568,
+          "GiB": 0.8769035339355469
+        },
+        "system_committed_bytes": {
+          "bytes": 49893494784,
+          "GB": 49.893494784,
+          "GiB": 46.46693801879883
+        },
+        "system_available_physical_bytes": {
+          "bytes": 12303265792,
+          "GB": 12.303265792,
+          "GiB": 11.458309173583984
+        },
+        "PrivateUsage": {
+          "bytes": 600948736,
+          "GB": 0.600948736,
+          "GiB": 0.5596771240234375
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 117739520,
+          "GB": 0.11773952,
+          "GiB": 0.10965347290039062
+        },
+        "PeakPagefileUsage": {
+          "bytes": 608788480,
+          "GB": 0.60878848,
+          "GiB": 0.5669784545898438
+        },
+        "WorkingSetSize": {
+          "bytes": 117243904,
+          "GB": 0.117243904,
+          "GiB": 0.10919189453125
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 15857037312.0,
+          "GB": 15.857037312,
+          "GiB": 14.768016815185547
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 16948326400.0,
+          "GB": 16.9483264,
+          "GiB": 15.784358978271484
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 0.7946670000019367,
+      "p95": 1.4118925000002491,
+      "min": 0.578333700002986,
+      "max": 3.8406729999987874
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 0.7942110000003595,
+        "p95": 3.8406729999987874,
+        "min": 0.5863568000058876,
+        "max": 3.8406729999987874
+      },
+      "1": {
+        "n": 15,
+        "median": 0.7951230000035139,
+        "p95": 1.4118925000002491,
+        "min": 0.578333700002986,
+        "max": 1.4118925000002491
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "c3ee33a5-8b03-440a-8dfc-56fa921256d0",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:63642/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "16b5104b-ae21-481c-95f4-5d2f1bea859d",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:63642/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "c3ee33a5-8b03-440a-8dfc-56fa921256d0",
+        "host_pid": 41048,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "16b5104b-ae21-481c-95f4-5d2f1bea859d",
+        "host_pid": 48620,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 3288.13,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 332.07,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 36.14
+      },
+      {
+        "prompt_ms": 375.73,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 336.92,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 59.36
+      },
+      {
+        "prompt_ms": 337.69,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 257.17,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 50.55
+      },
+      {
+        "prompt_ms": 360.07,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 275.98,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.98
+      },
+      {
+        "prompt_ms": 356.01,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 277.28,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.7
+      },
+      {
+        "prompt_ms": 221.13,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 210.1,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 57.12
+      },
+      {
+        "prompt_ms": 377.67,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 330.75,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 60.47
+      },
+      {
+        "prompt_ms": 350.67,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 257.05,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 50.57
+      },
+      {
+        "prompt_ms": 360.25,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 281.62,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 56.81
+      },
+      {
+        "prompt_ms": 365.86,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 278.42,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.47
+      },
+      {
+        "prompt_ms": 222.46,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 212.56,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 56.46
+      },
+      {
+        "prompt_ms": 371.35,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 333.2,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 60.02
+      },
+      {
+        "prompt_ms": 348.5,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 254.1,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 51.16
+      },
+      {
+        "prompt_ms": 372.38,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 286.23,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 55.9
+      },
+      {
+        "prompt_ms": 363.87,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 279.3,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.29
+      },
+      {
+        "prompt_ms": 959.04,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 239.43,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 50.12
+      },
+      {
+        "prompt_ms": 348.16,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 337.83,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 59.2
+      },
+      {
+        "prompt_ms": 338.33,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 251.62,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 51.67
+      },
+      {
+        "prompt_ms": 351.04,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 278.38,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.47
+      },
+      {
+        "prompt_ms": 358.16,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 277.99,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.56
+      },
+      {
+        "prompt_ms": 214.81,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 210.17,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 57.1
+      },
+      {
+        "prompt_ms": 374.11,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 332.99,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 60.06
+      },
+      {
+        "prompt_ms": 344.7,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 253.12,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 51.36
+      },
+      {
+        "prompt_ms": 364.93,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 285.01,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 56.14
+      },
+      {
+        "prompt_ms": 364.51,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 279.45,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.25
+      },
+      {
+        "prompt_ms": 218.69,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 209.59,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 57.25
+      },
+      {
+        "prompt_ms": 368.27,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 331.86,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 60.27
+      },
+      {
+        "prompt_ms": 345.47,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 253.68,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 51.25
+      },
+      {
+        "prompt_ms": 367.06,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 283.77,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 56.38
+      },
+      {
+        "prompt_ms": 368.89,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 280.32,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 57.08
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 492,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 57.11,
+      "p95": 60.27,
+      "min": 36.14,
+      "max": 60.47
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.6875,
+      1.984375
+    ],
+    "app_cpu_seconds_total_sampled": 3.671875,
+    "observed_wall_seconds": 65.51261760000489,
+    "server_cpu_seconds_sampled": 9.578125,
+    "sample_cadence_seconds": {
+      "n": 255,
+      "median": 0.25668730000325013,
+      "p95": 0.25897899999836227,
+      "min": 0.2546492999972543,
+      "max": 0.26109449999785284
+    },
+    "minimum_available_physical_bytes": 7886368768
+  },
+  {
+    "profile": "new-ncpu24-cache2048-swa-nocram",
+    "attempt": 1,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "62400",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "99",
+      "--n-cpu-moe",
+      "24",
+      "--moe-cache-mib",
+      "2048",
+      "--swa-full",
+      "--cache-ram",
+      "0",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 10288,
+        "exited": true
+      },
+      {
+        "pid": 13860,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 338,
+    "resource_peaks": {
+      "server": {
+        "PageFaultCount": 3693301,
+        "system_committed_bytes": 44856266752,
+        "device_gpu_dedicated_bytes": 10705883136.0,
+        "device_gpu_committed_bytes": 11799670784.0,
+        "system_page_reads_per_second": 8192.027393512462,
+        "cpu_seconds": 11.96875,
+        "PeakWorkingSetSize": 14409367552,
+        "WorkingSetSize": 14404501504,
+        "system_available_physical_bytes": 23144005632,
+        "system_pages_input_per_second": 49536.28813359354,
+        "gpu_engine_percent": 46.12590168521858,
+        "process_gpu_dedicated_bytes": 7629275136.0,
+        "process_gpu_committed_bytes": 8241037312.0,
+        "device_gpu_shared_bytes": 945152000.0,
+        "PrivateUsage": 8647495680,
+        "process_gpu_shared_bytes": 611762176.0,
+        "PeakPagefileUsage": 8647557120
+      },
+      "app": {
+        "PageFaultCount": 81321,
+        "system_committed_bytes": 44857319424,
+        "device_gpu_dedicated_bytes": 10705883136.0,
+        "device_gpu_committed_bytes": 11799670784.0,
+        "system_page_reads_per_second": 8300.668484161486,
+        "cpu_seconds": 2.03125,
+        "PeakWorkingSetSize": 118521856,
+        "WorkingSetSize": 117571584,
+        "system_available_physical_bytes": 16496807936,
+        "system_pages_input_per_second": 49631.48874469347,
+        "device_gpu_shared_bytes": 945152000.0,
+        "PrivateUsage": 601862144,
+        "PeakPagefileUsage": 609341440
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3456,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.058.769 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.283.274 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.543.497 I load_tensors: offloading output layer to GPU",
+      "0.01.543.501 I load_tensors: offloading 29 repeating layers to GPU",
+      "0.01.543.502 I load_tensors: offloaded 31/31 layers to GPU",
+      "0.01.543.506 I load_tensors:   CPU_Mapped model buffer size = 10935.02 MiB",
+      "0.01.543.507 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB",
+      "0.02.715.020 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.02.721.204 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB",
+      "0.02.746.006 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB",
+      "0.02.816.570 I impl:    Vulkan0 MoE cache size =  2045.07 MiB for 9801.00 MiB of host experts",
+      "0.02.836.764 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB",
+      "0.02.836.768 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.25.960.195 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 16487 + ( 7136 =  3772 +    3035 +     328) +         935 |",
+      "1.25.967.787 I llama_moe_cache: ubatch <= 8: hits = 63260, misses = 26000, hit rate = 70.87%, uploaded = 82951.17 MiB",
+      "1.25.967.792 I llama_moe_cache: ubatch  > 8: hits = 157, misses = 1019, hit rate = 13.35%, uploaded = 3251.05 MiB",
+      "1.25.967.795 I llama_moe_cache: large batches: 35374 experts copied from the cache, 56429.13 MiB"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "system_committed_bytes": {
+          "bytes": 44856266752,
+          "GB": 44.856266752,
+          "GiB": 41.77565383911133
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 10705883136.0,
+          "GB": 10.705883136,
+          "GiB": 9.970630645751953
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 11799670784.0,
+          "GB": 11.799670784,
+          "GiB": 10.989299774169922
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 14409367552,
+          "GB": 14.409367552,
+          "GiB": 13.419769287109375
+        },
+        "WorkingSetSize": {
+          "bytes": 14404501504,
+          "GB": 14.404501504,
+          "GiB": 13.415237426757812
+        },
+        "system_available_physical_bytes": {
+          "bytes": 23144005632,
+          "GB": 23.144005632,
+          "GiB": 21.554534912109375
+        },
+        "process_gpu_dedicated_bytes": {
+          "bytes": 7629275136.0,
+          "GB": 7.629275136,
+          "GiB": 7.105316162109375
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 8241037312.0,
+          "GB": 8.241037312,
+          "GiB": 7.6750640869140625
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 945152000.0,
+          "GB": 0.945152,
+          "GiB": 0.8802413940429688
+        },
+        "PrivateUsage": {
+          "bytes": 8647495680,
+          "GB": 8.64749568,
+          "GiB": 8.053607940673828
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 611762176.0,
+          "GB": 0.611762176,
+          "GiB": 0.5697479248046875
+        },
+        "PeakPagefileUsage": {
+          "bytes": 8647557120,
+          "GB": 8.64755712,
+          "GiB": 8.053665161132812
+        }
+      },
+      "app": {
+        "system_committed_bytes": {
+          "bytes": 44857319424,
+          "GB": 44.857319424,
+          "GiB": 41.776634216308594
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 10705883136.0,
+          "GB": 10.705883136,
+          "GiB": 9.970630645751953
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 11799670784.0,
+          "GB": 11.799670784,
+          "GiB": 10.989299774169922
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 118521856,
+          "GB": 0.118521856,
+          "GiB": 0.110382080078125
+        },
+        "WorkingSetSize": {
+          "bytes": 117571584,
+          "GB": 0.117571584,
+          "GiB": 0.1094970703125
+        },
+        "system_available_physical_bytes": {
+          "bytes": 16496807936,
+          "GB": 16.496807936,
+          "GiB": 15.363849639892578
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 945152000.0,
+          "GB": 0.945152,
+          "GiB": 0.8802413940429688
+        },
+        "PrivateUsage": {
+          "bytes": 601862144,
+          "GB": 0.601862144,
+          "GiB": 0.5605278015136719
+        },
+        "PeakPagefileUsage": {
+          "bytes": 609341440,
+          "GB": 0.60934144,
+          "GiB": 0.5674934387207031
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 1.5740541000013764,
+      "p95": 2.043635100002575,
+      "min": 1.14457609999954,
+      "max": 5.6598645999984
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 1.5718543999973917,
+        "p95": 5.6598645999984,
+        "min": 1.1625101000026916,
+        "max": 5.6598645999984
+      },
+      "1": {
+        "n": 15,
+        "median": 1.575496800003748,
+        "p95": 2.043635100002575,
+        "min": 1.14457609999954,
+        "max": 2.043635100002575
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "99108719-c0ed-4246-86d1-78824e8557cb",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:62400/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "81274ba5-243e-4d06-97a5-4e62b4747de7",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:62400/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "99108719-c0ed-4246-86d1-78824e8557cb",
+        "host_pid": 10288,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "81274ba5-243e-4d06-97a5-4e62b4747de7",
+        "host_pid": 13860,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 4852.18,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 593.14,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 20.23
+      },
+      {
+        "prompt_ms": 791.55,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 691.33,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.93
+      },
+      {
+        "prompt_ms": 722.31,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 538.41,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 24.14
+      },
+      {
+        "prompt_ms": 753.8,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 665.66,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.04
+      },
+      {
+        "prompt_ms": 749.3,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 663.07,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.13
+      },
+      {
+        "prompt_ms": 471.84,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 517.22,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 23.2
+      },
+      {
+        "prompt_ms": 776.38,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 685.17,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 29.19
+      },
+      {
+        "prompt_ms": 730.9,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 540.09,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 24.07
+      },
+      {
+        "prompt_ms": 752.32,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 668.85,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 23.92
+      },
+      {
+        "prompt_ms": 755.82,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 657.2,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.35
+      },
+      {
+        "prompt_ms": 484.86,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 521.78,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 23.0
+      },
+      {
+        "prompt_ms": 783.61,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 685.88,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 29.16
+      },
+      {
+        "prompt_ms": 736.07,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 536.87,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 24.21
+      },
+      {
+        "prompt_ms": 744.9,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 671.34,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 23.83
+      },
+      {
+        "prompt_ms": 754.28,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 664.22,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.09
+      },
+      {
+        "prompt_ms": 1261.37,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 569.91,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 21.06
+      },
+      {
+        "prompt_ms": 746.86,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 699.28,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 28.6
+      },
+      {
+        "prompt_ms": 729.5,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 536.5,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 24.23
+      },
+      {
+        "prompt_ms": 736.14,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 668.62,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 23.93
+      },
+      {
+        "prompt_ms": 750.24,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 669.02,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 23.92
+      },
+      {
+        "prompt_ms": 469.18,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 521.64,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 23.0
+      },
+      {
+        "prompt_ms": 781.68,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 685.58,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 29.17
+      },
+      {
+        "prompt_ms": 733.98,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 548.08,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 23.72
+      },
+      {
+        "prompt_ms": 752.16,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 678.28,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 23.59
+      },
+      {
+        "prompt_ms": 763.17,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 663.78,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.1
+      },
+      {
+        "prompt_ms": 486.82,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 522.25,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 22.98
+      },
+      {
+        "prompt_ms": 777.06,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 687.1,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 29.11
+      },
+      {
+        "prompt_ms": 737.51,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 544.5,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 23.88
+      },
+      {
+        "prompt_ms": 750.08,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 670.85,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 23.85
+      },
+      {
+        "prompt_ms": 755.59,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 666.02,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 24.02
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 492,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 24.03,
+      "p95": 29.17,
+      "min": 20.23,
+      "max": 29.19
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.9375,
+      2.03125
+    ],
+    "app_cpu_seconds_total_sampled": 3.96875,
+    "observed_wall_seconds": 86.5790402000057,
+    "server_cpu_seconds_sampled": 11.96875,
+    "sample_cadence_seconds": {
+      "n": 337,
+      "median": 0.2567734999975073,
+      "p95": 0.2589824000024237,
+      "min": 0.25457140000071377,
+      "max": 0.26130230000126176
+    },
+    "minimum_available_physical_bytes": 8542814208
+  },
+  {
+    "profile": "new-partial14-swa-nocram",
+    "attempt": 1,
+    "status": "failed_before_manual_submission",
+    "error": null,
+    "scope": "Actual isolated unmodified app; user-managed local endpoint; deliberately keyless inactive STT.",
+    "controlled_boundary": null,
+    "source_import_identity": null,
+    "server_command": null,
+    "host_release": null,
+    "server_shutdown": null,
+    "server_exit_code": null,
+    "resource_sample_count": null,
+    "resource_peaks": null,
+    "udp_sink": null,
+    "placement_cache_log": null,
+    "completed_translations": 0,
+    "resource_units": {},
+    "completion_wall_seconds": {
+      "n": 0,
+      "median": null,
+      "p95": null,
+      "min": null,
+      "max": null
+    },
+    "cycles": {},
+    "degraded_settings_count": 0,
+    "degraded_settings_codes": [],
+    "initial_settings_by_fresh_instance": [],
+    "instances": []
+  },
+  {
+    "profile": "new-partial14-swa-nocram",
+    "attempt": 2,
+    "status": "completed",
+    "error": null,
+    "scope": "actual unmodified source app using user-managed local_llm/ollama endpoint; not managed runtime integration",
+    "controlled_boundary": "Inactive, intentionally keyless Soniox STT may degrade language runtime application; retain exact receipts. Manual translation only, not ASR/full live-pipeline readiness.",
+    "source_import_identity": {
+      "interpreter": "<APP_PYTHON>/python.exe",
+      "package": "<CHECKOUT>\\src\\puripuly_heart\\__init__.py",
+      "layout_module": "<CHECKOUT>\\src\\puripuly_heart\\runtime_layout.py",
+      "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "launcher_sha256": "9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"
+    },
+    "server_command": [
+      "<ARTIFACT_ROOT>\\runtimes\\b11537\\llama-server.exe",
+      "--model",
+      "<ARTIFACT_ROOT>\\models\\gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+      "--alias",
+      "issue245",
+      "--load-mode",
+      "mmap",
+      "--ctx-size",
+      "4608",
+      "--parallel",
+      "3",
+      "--batch-size",
+      "512",
+      "--ubatch-size",
+      "512",
+      "--threads",
+      "4",
+      "--threads-batch",
+      "4",
+      "--cache-type-k",
+      "f16",
+      "--cache-type-v",
+      "f16",
+      "--cache-prompt",
+      "--reasoning",
+      "off",
+      "--reasoning-budget",
+      "0",
+      "--warmup",
+      "--perf",
+      "--metrics",
+      "--no-webui",
+      "--threads-http",
+      "1",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "51863",
+      "--prio",
+      "-1",
+      "--device",
+      "Vulkan0",
+      "--flash-attn",
+      "on",
+      "--fit",
+      "off",
+      "--n-gpu-layers",
+      "14",
+      "--swa-full",
+      "--cache-ram",
+      "0",
+      "--verbosity",
+      "4",
+      "--n-predict",
+      "96",
+      "--seed",
+      "42"
+    ],
+    "host_release": [
+      {
+        "pid": 23812,
+        "exited": true
+      },
+      {
+        "pid": 38132,
+        "exited": true
+      }
+    ],
+    "server_shutdown": "graceful_console_ctrl_c",
+    "server_exit_code": 0,
+    "resource_sample_count": 319,
+    "resource_peaks": {
+      "server": {
+        "process_gpu_dedicated_bytes": 7380492288.0,
+        "device_gpu_committed_bytes": 11540369408.0,
+        "system_committed_bytes": 45225787392,
+        "process_gpu_committed_bytes": 7980756992.0,
+        "device_gpu_shared_bytes": 932569088.0,
+        "system_page_reads_per_second": 4962.185060540589,
+        "WorkingSetSize": 15309418496,
+        "system_available_physical_bytes": 23641653248,
+        "system_pages_input_per_second": 29224.188277396028,
+        "PeakWorkingSetSize": 15309418496,
+        "process_gpu_shared_bytes": 600264704.0,
+        "gpu_engine_percent": 46.090241217126604,
+        "PeakPagefileUsage": 9108512768,
+        "cpu_seconds": 58.078125,
+        "PageFaultCount": 3922129,
+        "PrivateUsage": 9108447232,
+        "device_gpu_dedicated_bytes": 10458079232.0
+      },
+      "app": {
+        "device_gpu_committed_bytes": 11540369408.0,
+        "system_committed_bytes": 45225787392,
+        "device_gpu_shared_bytes": 932569088.0,
+        "system_page_reads_per_second": 4960.922600341899,
+        "WorkingSetSize": 117878784,
+        "system_available_physical_bytes": 13993668608,
+        "system_pages_input_per_second": 29253.325010038097,
+        "PeakWorkingSetSize": 118837248,
+        "PeakPagefileUsage": 608456704,
+        "cpu_seconds": 1.84375,
+        "PageFaultCount": 79855,
+        "PrivateUsage": 601231360,
+        "device_gpu_dedicated_bytes": 10458079232.0
+      }
+    },
+    "udp_sink": {
+      "datagrams": 90,
+      "bytes": 3456,
+      "destination": "owned exclusive loopback sink held through teardown"
+    },
+    "placement_cache_log": [
+      "0.00.054.819 I cmn  common_param:   - Vulkan0 : AMD Radeon RX 7900 XTX (24560 MiB, 23737 MiB free)",
+      "0.00.279.955 I llama_prepare_model_devices: using device Vulkan0 (AMD Radeon RX 7900 XTX) (unknown id) - 23737 MiB free",
+      "0.01.558.407 I load_tensors: offloading output layer to GPU",
+      "0.01.558.411 I load_tensors: offloading 13 repeating layers to GPU",
+      "0.01.558.411 I load_tensors: offloaded 14/31 layers to GPU",
+      "0.01.558.418 I load_tensors:   CPU_Mapped model buffer size =  7857.00 MiB",
+      "0.01.558.418 I load_tensors:      Vulkan0 model buffer size =  6112.86 MiB",
+      "0.03.381.976 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB",
+      "0.03.382.055 I llama_kv_cache:        CPU KV buffer size =    36.00 MiB",
+      "0.03.388.347 I llama_kv_cache:    Vulkan0 KV buffer size =    54.00 MiB",
+      "0.03.391.826 I llama_kv_cache:        CPU KV buffer size =   540.00 MiB",
+      "0.03.436.628 I llama_kv_cache:    Vulkan0 KV buffer size =   360.00 MiB",
+      "0.03.461.859 I sched_reserve:    Vulkan0 compute buffer size =   338.38 MiB",
+      "0.03.461.863 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB",
+      "1.20.984.178 I common_memory_breakdown_print: |   - Vulkan0 (RX 7900 XTX) | 24560 = 16760 + (6865 =  6112 +     414 +     338) +         934 |"
+    ],
+    "completed_translations": 30,
+    "resource_units": {
+      "server": {
+        "process_gpu_dedicated_bytes": {
+          "bytes": 7380492288.0,
+          "GB": 7.380492288,
+          "GiB": 6.873619079589844
+        },
+        "device_gpu_committed_bytes": {
+          "bytes": 11540369408.0,
+          "GB": 11.540369408,
+          "GiB": 10.747806549072266
+        },
+        "system_committed_bytes": {
+          "bytes": 45225787392,
+          "GB": 45.225787392,
+          "GiB": 42.11979675292969
+        },
+        "process_gpu_committed_bytes": {
+          "bytes": 7980756992.0,
+          "GB": 7.980756992,
+          "GiB": 7.432659149169922
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 932569088.0,
+          "GB": 0.932569088,
+          "GiB": 0.8685226440429688
+        },
+        "WorkingSetSize": {
+          "bytes": 15309418496,
+          "GB": 15.309418496,
+          "GiB": 14.258007049560547
+        },
+        "system_available_physical_bytes": {
+          "bytes": 23641653248,
+          "GB": 23.641653248,
+          "GiB": 22.01800537109375
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 15309418496,
+          "GB": 15.309418496,
+          "GiB": 14.258007049560547
+        },
+        "process_gpu_shared_bytes": {
+          "bytes": 600264704.0,
+          "GB": 0.600264704,
+          "GiB": 0.5590400695800781
+        },
+        "PeakPagefileUsage": {
+          "bytes": 9108512768,
+          "GB": 9.108512768,
+          "GiB": 8.482963562011719
+        },
+        "PrivateUsage": {
+          "bytes": 9108447232,
+          "GB": 9.108447232,
+          "GiB": 8.482902526855469
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 10458079232.0,
+          "GB": 10.458079232,
+          "GiB": 9.739845275878906
+        }
+      },
+      "app": {
+        "device_gpu_committed_bytes": {
+          "bytes": 11540369408.0,
+          "GB": 11.540369408,
+          "GiB": 10.747806549072266
+        },
+        "system_committed_bytes": {
+          "bytes": 45225787392,
+          "GB": 45.225787392,
+          "GiB": 42.11979675292969
+        },
+        "device_gpu_shared_bytes": {
+          "bytes": 932569088.0,
+          "GB": 0.932569088,
+          "GiB": 0.8685226440429688
+        },
+        "WorkingSetSize": {
+          "bytes": 117878784,
+          "GB": 0.117878784,
+          "GiB": 0.10978317260742188
+        },
+        "system_available_physical_bytes": {
+          "bytes": 13993668608,
+          "GB": 13.993668608,
+          "GiB": 13.03261947631836
+        },
+        "PeakWorkingSetSize": {
+          "bytes": 118837248,
+          "GB": 0.118837248,
+          "GiB": 0.11067581176757812
+        },
+        "PeakPagefileUsage": {
+          "bytes": 608456704,
+          "GB": 0.608456704,
+          "GiB": 0.5666694641113281
+        },
+        "PrivateUsage": {
+          "bytes": 601231360,
+          "GB": 0.60123136,
+          "GiB": 0.5599403381347656
+        },
+        "device_gpu_dedicated_bytes": {
+          "bytes": 10458079232.0,
+          "GB": 10.458079232,
+          "GiB": 9.739845275878906
+        }
+      }
+    },
+    "completion_wall_seconds": {
+      "n": 30,
+      "median": 1.3882955000008224,
+      "p95": 1.782092699999339,
+      "min": 1.0513617000033264,
+      "max": 4.945334600000933
+    },
+    "cycles": {
+      "0": {
+        "n": 15,
+        "median": 1.3900084999986575,
+        "p95": 4.945334600000933,
+        "min": 1.0513617000033264,
+        "max": 4.945334600000933
+      },
+      "1": {
+        "n": 15,
+        "median": 1.3865825000029872,
+        "p95": 1.782092699999339,
+        "min": 1.0516213000009884,
+        "max": 1.782092699999339
+      }
+    },
+    "degraded_settings_count": 31,
+    "degraded_settings_codes": [
+      "stt.provider_not_ready"
+    ],
+    "initial_settings_by_fresh_instance": [
+      {
+        "instance_id": "51a535ac-681b-4306-b275-822077121a98",
+        "revision": 1,
+        "languages": {
+          "source_language": "ko",
+          "target_language": "en",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:51863/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      },
+      {
+        "instance_id": "54488be5-184b-414d-a0f1-81d3171f68e8",
+        "revision": 1,
+        "languages": {
+          "source_language": "en",
+          "target_language": "ko",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "translation": {
+          "model": "local_llm",
+          "connection": "ollama",
+          "http_extension_id": null,
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "endpoint": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:51863/v1",
+          "model": "issue245",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        }
+      }
+    ],
+    "instances": [
+      {
+        "instance_id": "51a535ac-681b-4306-b275-822077121a98",
+        "host_pid": 23812,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      },
+      {
+        "instance_id": "54488be5-184b-414d-a0f1-81d3171f68e8",
+        "host_pid": 38132,
+        "translation_enabled": false,
+        "translation_runtime_ready": true
+      }
+    ],
+    "server_timing_records": [
+      {
+        "prompt_ms": 4238.49,
+        "evaluated_prompt_tokens": 848,
+        "generation_ms": 369.26,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 32.5
+      },
+      {
+        "prompt_ms": 757.78,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 604.95,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 33.06
+      },
+      {
+        "prompt_ms": 706.67,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 403.27,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 32.24
+      },
+      {
+        "prompt_ms": 741.54,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 485.31,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.97
+      },
+      {
+        "prompt_ms": 731.05,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 489.23,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.7
+      },
+      {
+        "prompt_ms": 529.92,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 369.0,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 32.52
+      },
+      {
+        "prompt_ms": 766.32,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 617.94,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 32.37
+      },
+      {
+        "prompt_ms": 715.25,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 398.41,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 32.63
+      },
+      {
+        "prompt_ms": 742.81,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 494.55,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.35
+      },
+      {
+        "prompt_ms": 753.3,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 487.94,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.79
+      },
+      {
+        "prompt_ms": 552.12,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 369.44,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 32.48
+      },
+      {
+        "prompt_ms": 751.26,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 615.88,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 32.47
+      },
+      {
+        "prompt_ms": 715.85,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 395.85,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 32.84
+      },
+      {
+        "prompt_ms": 756.15,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 489.92,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.66
+      },
+      {
+        "prompt_ms": 761.25,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 488.36,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.76
+      },
+      {
+        "prompt_ms": 1196.59,
+        "evaluated_prompt_tokens": 29,
+        "generation_ms": 372.94,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 32.18
+      },
+      {
+        "prompt_ms": 734.67,
+        "evaluated_prompt_tokens": 204,
+        "generation_ms": 614.55,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 32.54
+      },
+      {
+        "prompt_ms": 711.92,
+        "evaluated_prompt_tokens": 194,
+        "generation_ms": 391.6,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 33.2
+      },
+      {
+        "prompt_ms": 738.46,
+        "evaluated_prompt_tokens": 212,
+        "generation_ms": 491.23,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.57
+      },
+      {
+        "prompt_ms": 742.4,
+        "evaluated_prompt_tokens": 226,
+        "generation_ms": 485.73,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.94
+      },
+      {
+        "prompt_ms": 530.6,
+        "evaluated_prompt_tokens": 52,
+        "generation_ms": 369.66,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 32.46
+      },
+      {
+        "prompt_ms": 755.06,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 614.34,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 32.56
+      },
+      {
+        "prompt_ms": 719.18,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 397.05,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 32.74
+      },
+      {
+        "prompt_ms": 734.86,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 491.63,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.54
+      },
+      {
+        "prompt_ms": 749.0,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 492.25,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.5
+      },
+      {
+        "prompt_ms": 556.66,
+        "evaluated_prompt_tokens": 66,
+        "generation_ms": 364.37,
+        "generation_eval_tokens": 13,
+        "generation_tokens_per_second": 32.93
+      },
+      {
+        "prompt_ms": 752.5,
+        "evaluated_prompt_tokens": 233,
+        "generation_ms": 618.74,
+        "generation_eval_tokens": 21,
+        "generation_tokens_per_second": 32.32
+      },
+      {
+        "prompt_ms": 713.65,
+        "evaluated_prompt_tokens": 219,
+        "generation_ms": 399.99,
+        "generation_eval_tokens": 14,
+        "generation_tokens_per_second": 32.5
+      },
+      {
+        "prompt_ms": 744.71,
+        "evaluated_prompt_tokens": 240,
+        "generation_ms": 490.41,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.63
+      },
+      {
+        "prompt_ms": 750.95,
+        "evaluated_prompt_tokens": 244,
+        "generation_ms": 485.98,
+        "generation_eval_tokens": 17,
+        "generation_tokens_per_second": 32.92
+      }
+    ],
+    "server_timing_count_matches_completions": true,
+    "timing_attribution": "Ordered native-server timing records for sequential synthetic requests; no direct native task-ID to app turn-UUID link is claimed.",
+    "evaluated_prompt_tokens_total": 6529,
+    "generation_eval_tokens_total": 492,
+    "generation_tokens_per_second": {
+      "n": 30,
+      "median": 32.565,
+      "p95": 33.06,
+      "min": 32.18,
+      "max": 33.2
+    },
+    "app_cpu_seconds_per_observed_instance": [
+      1.671875,
+      1.84375
+    ],
+    "app_cpu_seconds_total_sampled": 3.515625,
+    "observed_wall_seconds": 81.6295420000024,
+    "server_cpu_seconds_sampled": 58.078125,
+    "sample_cadence_seconds": {
+      "n": 318,
+      "median": 0.2565985000001092,
+      "p95": 0.2580369999996037,
+      "min": 0.25476920000073733,
+      "max": 0.26084979999723146
+    },
+    "minimum_available_physical_bytes": 8080699392
+  }
+]

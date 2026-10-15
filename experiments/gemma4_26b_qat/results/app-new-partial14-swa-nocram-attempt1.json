@@ -1,0 +1,25 @@
+{
+  "profile": "new-partial14-swa-nocram",
+  "attempt": 1,
+  "status": "failed_before_manual_submission",
+  "completed_translations": 0,
+  "scope": "Actual isolated unmodified app; user-managed local endpoint; deliberately keyless inactive STT.",
+  "instance_id": "eff463e6-730f-4b5f-afb7-d8fa80e1b11d",
+  "host_pid": 46016,
+  "source_identity": {"checkout":"7a8151be6114a950f062e2430bd36f899d57e4de","package":"<CHECKOUT>/src/puripuly_heart/__init__.py","python":"3.14.7, MSC v.1944, 64-bit AMD64","launcher_sha256":"9b7bffc26240463c965a2a2a5fada1d8e741c21c25cd2e977728c339b82d9977"},
+  "observed_isolation": {"self_capture_desired":false,"self_capture_effective":false,"self_capture_has_source":false,"peer_capture_effective":false,"microphone_test_effective":false,"telemetry_enabled":false,"clipboard_enabled":false,"osc_mode":"off","udp_destination":"continuously owned exclusive loopback sink","scene_process_present":false},
+  "translation_enable_receipt": {"status":"applied","terminal":true,"revision":1,"translation_enabled":true,"operation_id":"4fb5bd0cca5e4f6dbdd5d3ce9bd3beed"},
+  "failed_settings_operation": {
+    "command":"settings apply --arguments '{\"changes\":{\"languages\":{\"source\":\"ko\",\"target\":\"en\",\"secondary_target\":\"\"}}}' --expected-revision 1",
+    "exit_code":4,
+    "operation_id":"6a36c4ec9e0349049aad965ce294db37",
+    "status":"degraded",
+    "terminal":true,
+    "revision":1,
+    "transaction_status":"settings_commit_success_runtime_degraded",
+    "diagnostic":{"component":"provider.stt","operation":"provider_build","stage":"provider_build","code":"stt.provider_not_ready","provider":"soniox","exception_class":"ValueError","channel":"self"}
+  },
+  "interpretation":"The harness initially treated any nonzero CLI status as fatal. No manual translation was attempted, so this does not establish a translation/model failure. Director subsequently authorized manual translation under this explicitly inactive-STT boundary, retaining degraded receipts and checking persisted language/effective translation/completion separately.",
+  "cleanup":{"app_stop_status":"stopped","app_stop_terminal":true,"app_cleanup_outcome":"unobserved","server_shutdown":"graceful_console_ctrl_c","server_exit_code":0,"sink_datagrams":0,"sink_bytes":0},
+  "evidence_limit":"CLI stop observed original process exit/endpoint disappearance; no separate host-release snapshot was recorded on this failed attempt. Raw full probe evidence is preserved only in the external owned artifact directory. Unrelated process/device catalogs and personal paths are intentionally omitted."
+}

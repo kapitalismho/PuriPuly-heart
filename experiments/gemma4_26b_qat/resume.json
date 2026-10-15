@@ -1,0 +1,62 @@
+{
+  "issue": 245,
+  "status": "experimental_execution_complete_awaiting_director_review",
+  "baseline_commit": "7a8151be6114a950f062e2430bd36f899d57e4de",
+  "branch": "experiment-gemma-4-26b-a4b-qat-q4-llama.cpp-upgr",
+  "publication": "No commits, pushes, GitHub mutations, product edits, or maintained-document edits performed by this worker. Director owns integration/review/publication and issue acceptance.",
+  "artifact_root": "%LOCALAPPDATA%/Temp/puripuly-issue245 (original user environment, not probe-redirected environment)",
+  "verified_artifacts": [
+    {"file":"models/gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf","size_bytes":14249047104,"sha256":"a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891","revision":"7b92b5b28818151e8669af2e45e88d6086f490dd","status":"Complete, verified, exercised."},
+    {"file":"downloads/llama-b11537-bin-win-vulkan-x64.zip","size_bytes":33458882,"sha256":"ae34d6a850c5d362cdfc0ef8f88f31fc499dab6df8853cec7887a32891aa5bbe","commit":"8e2d31e0eb658d0382d3106a61369dff81f0c080","status":"Complete official pinned archive; extracted binary/DLL identities and actual Vulkan/cache execution recorded."},
+    {"file":"downloads/llama-b10423-bin-win-vulkan-x64.zip","size_bytes":34563676,"sha256":"510447fb021c80a264b2181c885b5f2ce9cc5b66c65d447cd1f9ce7ba81dc222","commit":"a94d563ed801d1da1b8c2432946de07d0231bb3d","status":"Complete, verified against shipped contract; same-target control and E4B reference exercised."},
+    {"file":"Existing E4B QAT Q4 installation, read-only reference","size_bytes":4215695776,"sha256":"df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3","status":"Verified against #75 and exercised; no live settings/secrets/transcripts read."}
+  ],
+  "partial_downloads": [],
+  "execution": {
+    "standalone_successful_profiles": 27,
+    "standalone_completed_translations": 1161,
+    "standalone_distinct_source_sentences": 12,
+    "standalone_failed_load_profiles": 1,
+    "actual_app_successful_profiles": 8,
+    "actual_app_completed_translations": 240,
+    "actual_app_distinct_source_sentences": 5,
+    "actual_app_fresh_instances": 16,
+    "actual_app_failed_attempts_before_submission": 1,
+    "actual_app_expected_stt_degraded_settings_receipts": 248,
+    "fixed_context_total": 4608,
+    "parallel_slots": 3,
+    "context_per_slot": 1536,
+    "initial_independent_quality_review_outputs": 344,
+    "complete_standalone_unique_input_output_pairs_reviewed": 29,
+    "owned_jobs_remaining": [],
+    "owned_servers_remaining": [],
+    "successful_app_hosts_independently_observed_exited": 16,
+    "successful_app_servers_gracefully_exited": 8,
+    "final_release_observed_at_utc": "2026-10-15T04:28:00.910176+00:00"
+  },
+  "retained_failures": [
+    "4096-MiB expert cache rejected a 2861438976-byte bank above the pinned Vulkan device buffer-size limit before readiness. Not whole-device VRAM exhaustion or an 8-GB gate.",
+    "Initial cache2048 completed serving but needed forced shutdown due to inherited console Ctrl+C-ignore state; no invented destructor counters. Subsequent own launcher corrected console handling and captured graceful counters.",
+    "First app attempt treated keyless Soniox stt.provider_not_ready language-apply degradation as fatal before text submission. Director authorized controlled manual translation; all later degraded receipts and completed translation evidence retained."
+  ],
+  "recommendation": {
+    "profile": "new-ncpu12-cache2048-swa-nocram",
+    "runtime": "b11537",
+    "flags": "--n-gpu-layers 99 --n-cpu-moe 12 --moe-cache-mib 2048 --swa-full --cache-ram 0, plus frozen common4608/3 Vulkan profile",
+    "app_server_sampled_dedicated_gpu_bytes": 12780429312,
+    "app_completed_latency_seconds": {"n":30,"median":0.794667,"p95":1.411893,"max":3.840673},
+    "meets_preferred_memory_target": false,
+    "status": "Measured experimental recommendation; product-owner resource/latency acceptance remains explicit, no invented approved SLA.",
+    "rollout": "Retain shipped E4B until separately authorized managed 26B integration and adoption. Generic user endpoint probe is not managed-runtime readiness."
+  },
+  "durable_report": "RESULTS.md",
+  "quality_report": "QUALITY.md",
+  "machine_evidence": ["results/decision.json","results/identity.json","results/build-provenance.json","results/mechanisms.json","results/summary.json","results/app-summary.json","results/quality-unique.json","results/release.json","results/<profile>.json","results/<profile>.samples.jsonl","results/app-<profile>-attempt<N>.json","results/app-<profile>-attempt<N>.samples.jsonl"],
+  "preserved_external_evidence": "Verified models/archives/runtime DLLs, raw250ms samples/native logs, acquisition manifests and isolated synthetic app state. Unrelated raw capability catalogs/private path-bearing initial probe evidence remain outside the report directory.",
+  "privacy": "Public identity projected to relevant artifact storage/RX hardware; unrelated display/storage/Vulkan-layer catalogs omitted. Literal scan found no personal user path/name or known unrelated-device markers in task-local evidence. No live output destination used; exclusive worker-owned loopback UDP sink held through app teardown.",
+  "technical_blockers_remaining": [],
+  "limits": ["Sampled GPU high-water lower bounds, absent app GPU rows unavailable rather than zero, physical PCIe/per-process hard-fault/power counters unavailable.","Early default-cache rows were host-memory-pressure affected; refined finalists retained several GB free RAM.","Synthetic text-only quality spot-checks, not general quality ranking; name/time/gender caveats retained.","External endpoint/manual translation only, intentionally inactive keyless STT; no GUI, live audio, 8-GB hardware or VRChat co-render claim.","App-only restart checks persisted language and fresh host, not managed model/prefix-disk-cache persistence."],
+  "checks_exercised": "Artifact SHA256 and GGUF inspection, native runtime identity/control/device queries,27 completed standalone workloads, retained failed cache preflight,8 completed actual CLI/app workloads plus failed initial attempt, sampled Windows resource ledger, graceful cache destructor counters, output assessment and final read-only release observation. No product build/tests/linter/formatter run.",
+  "director_checks_to_run": ["Freeze/review only task-local experiment candidate and sanitized evidence; product source must remain unchanged.","Parse final JSON/JSONL and recompute aggregate counts/selected metrics; static Python syntax check after final helper edits if desired.","Independently review claimed mechanism/resource/quality boundaries and owner tradeoff before acceptance/publication. No additional inference is needed to inspect existing evidence."],
+  "exact_next_step": "Director freezes and independently audits the coherent local report/evidence, obtains the explicit product-owner resource/adoption decision as needed, and publishes the authorized English issue/Project update. No model/app job remains to resume; do not overwrite preserved records."
+}

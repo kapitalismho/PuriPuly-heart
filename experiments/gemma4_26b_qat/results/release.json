@@ -1,0 +1,22 @@
+{
+  "observed_at_utc": "2026-10-15T04:28:00.910176+00:00",
+  "method": "Read-only psutil process-name enumeration plus windows_metrics.Sampler on the collector PID, after all experiment jobs completed; no process command lines or private state read.",
+  "llama_server_processes": [],
+  "adapter_luid": "luid_0x00000000_0x0000f60b_phys_0",
+  "system_available_physical_bytes": 22765805568,
+  "system_committed_bytes": 35272003584,
+  "device_gpu_dedicated_bytes": 2987401216,
+  "device_gpu_shared_bytes": 331223040,
+  "device_gpu_committed_bytes": 3466489856,
+  "counter_errors": {},
+  "successful_app_instances_observed_exited": 16,
+  "successful_app_servers_gracefully_exited": 8,
+  "successful_app_server_exit_code": 0,
+  "standalone_cleanup_exception": "Initial new-cpu-moe-cache2048 completed 43 translations but required forced shutdown after inherited console Ctrl+C-ignore state. Later launcher correction yielded graceful cache-statistics shutdowns; original record retained.",
+  "failed_app_attempt": "Initial partial14 attempt stopped the app and gracefully released its server; no separate host-release snapshot was recorded, as explicitly retained in its failed-attempt evidence. Final process enumeration found no llama-server.",
+  "owned_background_jobs_remaining": [],
+  "owned_udp_sinks_and_event_observers": "Closed by successful/failed probe teardown; none kept running.",
+  "other_process_policy": "No unrelated process was stopped or signaled. Background adapter memory is not claimed owned or reclaimed.",
+  "preserved_assets": "Verified models, runtime archives/DLLs, complete raw synthetic logs/samples and isolated app state remain in the external owned artifact root for reproduction. No incomplete download remains.",
+  "evidence": ["summary.json", "app-summary.json", "app-new-partial14-swa-nocram-attempt1.json"]
+}

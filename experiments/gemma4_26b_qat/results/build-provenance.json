@@ -1,0 +1,19 @@
+{
+  "runtime_origin": "Official pinned Windows x64 Vulkan release archives, not locally compiled or a moving latest build.",
+  "observed_server_compiler": "Both llama-server --version outputs report Clang 20.1.8 for Windows x86_64.",
+  "release_workflow_sources": {
+    "b10423": "https://github.com/ggml-org/llama.cpp/blob/a94d563ed801d1da1b8c2432946de07d0231bb3d/.github/workflows/release.yml",
+    "b11537": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/.github/workflows/release.yml"
+  },
+  "source_backed_release_settings": {
+    "base_windows_x64": ["Ninja Multi-Config", "cmake/x64-windows-llvm.cmake", "Release", "LLAMA_BUILD_BORINGSSL=ON", "GGML_NATIVE=OFF", "GGML_BACKEND_DL=ON", "GGML_CPU_ALL_VARIANTS=ON", "GGML_OPENMP=ON"],
+    "new_base_addition": "b11537 also sets GGML_OPENMP_FETCH=ON.",
+    "vulkan_backend": ["VULKAN_VERSION=1.4.357.0", "GGML_VULKAN=ON", "GGML_NATIVE=OFF", "GGML_CPU=OFF", "GGML_BACKEND_DL=ON", "LLAMA_BUILD_BORINGSSL=ON", "cmake --build build --config Release --target ggml-vulkan"],
+    "limit": "These are pinned release-workflow settings, not a recovered CMakeCache/build log. Exact Vulkan DLL compiler patch version and release-run tool versions beyond binary-reported compiler are unavailable; DLL hashes are recorded in identity.json. No local compiler/build is claimed."
+  },
+  "runtime_cpu_feature_log": "SSE3 SSSE3 AVX AVX2 F16C FMA BMI2 AVX512 AVX512_VBMI AVX512_VNNI AVX512_BF16 LLAMAFILE OPENMP REPACK enabled in observed b11537 system_info.",
+  "gpu_capacity": {"runtime_available_MiB":24560,"runtime_available_bytes":25753026560,"advertised_family":"RX 7900 XTX, 24 GiB class","limit":"No 8-GB-card performance claim follows from this device."},
+  "artifact_volume": {"drive":"C","physical_model":"SOLIDIGM SSDPFKKW020X7","BusType":"NVMe","size_bytes":2048408248320,"logical_sector_bytes":512,"physical_sector_bytes":4096},
+  "pci": {"observed_link_speed_enum":4,"observed_link_width":16,"maximum_link_speed_enum":4,"maximum_link_width":16,"interpretation":"PCIe generation 4 / 16 GT/s, x16; enum and width retained in identity.json."},
+  "backend_environment": "Read-only Env:GGML* observation returned no variables before refinement. LLAMA_* argument overrides are removed from each server child environment."
+}

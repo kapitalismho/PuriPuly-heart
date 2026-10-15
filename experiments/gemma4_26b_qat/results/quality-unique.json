@@ -1,0 +1,5981 @@
+[
+  {
+    "input": "I thought you were joking, but I was wrong.",
+    "output": "농담인 줄 알았는데 아니었네요.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 6
+      }
+    ]
+  },
+  {
+    "input": "I thought you were joking, but I was wrong.",
+    "output": "농담인 줄 알았는데, 아니었네요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-full",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 6
+      },
+      {
+        "profile": "old-full",
+        "phase": "hot_same_pair",
+        "index": 2
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 8
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 6
+      }
+    ]
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나가 티켓을 12장 산 게 아니라, 2장 샀어요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-full",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-full",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "old-full",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 0
+      }
+    ]
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나가 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-full",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "old-full",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "old-full",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 12
+      }
+    ]
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나는 12장이 아니라 2장만 샀어.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 9
+      }
+    ]
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나는 티켓을 12장 산 게 아니라, 2장 샀어요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 0
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "first_prefix",
+        "index": 0
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "hot_same_pair",
+        "index": 3
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 0
+      }
+    ]
+  },
+  {
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나는 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 0
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "hot_same_pair",
+        "index": 0
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 12
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 9
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 9
+      }
+    ]
+  },
+  {
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 뒤에 다시 올게요.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 12
+      }
+    ]
+  },
+  {
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 뒤에 돌아올게요.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 3
+      }
+    ]
+  },
+  {
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 뒤에 올게요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-full",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "old-full",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 16
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 3
+      }
+    ]
+  },
+  {
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 안에 돌아올게요.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-full",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 12
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 3
+      },
+      {
+        "profile": "old-full",
+        "phase": "hot_same_pair",
+        "index": 4
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 12
+      }
+    ]
+  },
+  {
+    "input": "この薬は一日2回です。3回ではありません。",
+    "output": "Take this medicine twice a day. Not three times.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-full",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 11
+      },
+      {
+        "profile": "old-full",
+        "phase": "first_prefix",
+        "index": 2
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 11
+      }
+    ]
+  },
+  {
+    "input": "この薬は一日2回です。3回ではありません。",
+    "output": "This medicine is twice a day, not three times.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "first_prefix",
+        "index": 2
+      }
+    ]
+  },
+  {
+    "input": "この薬は一日2回です。3回ではありません。",
+    "output": "You take this medicine twice a day, not three times.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 2
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 14
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 2
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 11
+      }
+    ]
+  },
+  {
+    "input": "如果下雨，我们就不去公园，在家见面。",
+    "output": "If it rains, we won't go to the park and will just meet at home instead.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 19
+      }
+    ]
+  },
+  {
+    "input": "如果下雨，我们就不去公园，在家见面。",
+    "output": "If it rains, we won't go to the park, let's just meet at home.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 19
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 7
+      }
+    ]
+  },
+  {
+    "input": "如果下雨，我们就不去公园，在家见面。",
+    "output": "If it rains, we won't go to the park; we can meet at home.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 7
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 19
+      }
+    ]
+  },
+  {
+    "input": "小林没有取消预约，只是把时间改到了星期五。",
+    "output": "Kobayashi didn't cancel the appointment, he just moved it to Friday.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 15
+      }
+    ]
+  },
+  {
+    "input": "小林没有取消预约，只是把时间改到了星期五。",
+    "output": "Kobayashi didn't cancel the appointment, they just moved it to Friday.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 15
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 3
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 15
+      }
+    ]
+  },
+  {
+    "input": "小林没有取消预约，只是把时间改到了星期五。",
+    "output": "Kobayashi didn't cancel the appointment, they just moved the time to Friday.",
+    "occurrences": [
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 15
+      }
+    ]
+  },
+  {
+    "input": "我不是生你的气，我只是有点累。",
+    "output": "I'm not mad at you, I'm just a little tired.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 11
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 11
+      }
+    ]
+  },
+  {
+    "input": "料金は1500円で、飲み物は含まれていません。",
+    "output": "The fee is 1500 yen, and drinks are not included.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 8
+      }
+    ]
+  },
+  {
+    "input": "料金は1500円で、飲み物は含まれていません。",
+    "output": "The fee is 1500 yen, and drinks aren't included.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 8
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 10
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 8
+      }
+    ]
+  },
+  {
+    "input": "田中さんにはまだパスワードを送らないでください。",
+    "output": "Please don't send the password to Tanaka-san yet.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 14
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 6
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 18
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 5
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 14
+      }
+    ]
+  },
+  {
+    "input": "그 열쇠는 제 것이 아니라 민수 것이에요.",
+    "output": "That key isn't mine, it's Minsu's.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 13
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 5
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 17
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 4
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 13
+      }
+    ]
+  },
+  {
+    "input": "아까 말한 파란 문 말고 빨간 문으로 와 주세요.",
+    "output": "Please come through the red door, not the blue door I mentioned earlier.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 7
+      }
+    ]
+  },
+  {
+    "input": "아까 말한 파란 문 말고 빨간 문으로 와 주세요.",
+    "output": "Please come to the red door, not the blue one I mentioned earlier.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 7
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 9
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 7
+      }
+    ]
+  },
+  {
+    "input": "유나는 3시가 아니라 4시에 도착해요.",
+    "output": "Yuna arrives at 4, not 3.",
+    "occurrences": [
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-full",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-full",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "old-full",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "old-full",
+        "phase": "three_slots",
+        "index": 10
+      }
+    ]
+  },
+  {
+    "input": "유나는 3시가 아니라 4시에 도착해요.",
+    "output": "Yuna is arriving at 4, not 3.",
+    "occurrences": [
+      {
+        "profile": "e4b-product",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 1
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "pair_alternation",
+        "index": 13
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 1
+      },
+      {
+        "profile": "e4b-product",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache1024",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache2048",
+        "phase": "three_slots",
+        "index": 10
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-cache3072",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-cpu-moe-off",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-full-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-full-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-full",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-cache2048",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu12-off",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-cache2048",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-ncpu24-off",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa-nocram",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14-swa",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-partial14",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "new-partial20",
+        "phase": "first_prefix",
+        "index": 1
+      },
+      {
+        "profile": "old-full",
+        "phase": "first_prefix",
+        "index": 1
+      }
+    ]
+  }
+]
