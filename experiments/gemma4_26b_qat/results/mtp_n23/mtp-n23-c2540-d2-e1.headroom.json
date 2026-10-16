@@ -1,0 +1,18 @@
+{
+  "observed_utc": "2026-10-16T03:57:38.357126+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 12730351616,
+    "system_committed_bytes": 67049803776,
+    "system_commit_limit_bytes": 83581427712,
+    "system_commit_headroom_bytes": 16531623936,
+    "device_gpu_dedicated_bytes": 5737037824.0,
+    "device_gpu_shared_bytes": 614092800.0,
+    "device_gpu_committed_bytes": 6579298304.0,
+    "system_pages_input_per_second": 245.44012057080084,
+    "system_page_reads_per_second": 29.85082547482713
+  },
+  "counter_errors": {},
+  "pressure_qualified_by_explicit_override": true,
+  "pressure_boundary": "Existing constrained RAM accepted by owner; no unrelated process stops; not actual coexistence."
+}

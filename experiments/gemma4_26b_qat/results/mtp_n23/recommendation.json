@@ -1,0 +1,54 @@
+{
+  "question": "MTP for owner-selected n23, not n24",
+  "result": "Do not enable tested Q4_0 max4 profiles on this fixed short Self/Peer workload. Max2 did not qualify in retained n1 exploration.",
+  "placement_authority": "Owner selected n23;2540 is an experiment baseline,2520 a measured reduced arm, neither is an adoption decision.",
+  "matched_max4": [
+    {
+      "candidate": "c2540-mtp4",
+      "control": "c2540-off",
+      "all_repeat_standard": false,
+      "pair_median_gain_ms": -124.86079998780042,
+      "pair_p95_gain_ms": -271.0431999876164,
+      "serial_median_gain_ms": -33.621500013396144,
+      "serial_p95_gain_ms": -162.2088000003714,
+      "dedicated_delta_bytes": 2699264.0
+    },
+    {
+      "candidate": "c2520-mtp4",
+      "control": "c2520-off",
+      "all_repeat_standard": false,
+      "pair_median_gain_ms": -87.58454999770038,
+      "pair_p95_gain_ms": -336.1239999940153,
+      "serial_median_gain_ms": -60.30080000346061,
+      "serial_p95_gain_ms": -254.77040000259876,
+      "dedicated_delta_bytes": 2699264.0
+    }
+  ],
+  "band_rule": "2540/MTP4 is band across both runs and does not beat either matched target off control, so no band recommendation.",
+  "cache_tradeoff": {
+    "all_repeat_standard": false,
+    "pair_median_gain_ms": -36.98699999949895,
+    "pair_p95_gain_ms": 36.09680000226945,
+    "serial_median_gain_ms": 44.359949984936975,
+    "serial_p95_gain_ms": 27.87510000052862,
+    "dedicated_delta_bytes": -23592960.0
+  },
+  "max2": {
+    "run": "mtp-n23-c2540-d2-e1",
+    "median_seconds": 0.8670109000231605,
+    "matched_off_run_medians_seconds": [
+      0.8148709000088274,
+      0.799002699990524
+    ],
+    "off_median_spread_seconds": 0.01586820001830347,
+    "above_slowest_control_seconds": 0.052140000014333054,
+    "above_fastest_control_seconds": 0.06800820003263652,
+    "decision": "Retain negative n1 exploratory result; no rescue repeat because first median already fails strict all-run rule.",
+    "positive_progress": "Acceptance67.668% and observed serial median improved versus matched off; this does not offset worse pair median/p95 or serial p95.",
+    "reduced_max2": "Not measured. E1 also exceeds both2520/off medians; tested max4 cache change shifts pooled pair median only0.289ms within overlapping repeat ranges. No observed decision-relevant signal justifies expanding bounded refinement. This is scope rationale, NOT a proven prediction of unmeasured reducedmax2 performance.",
+    "memory_limit": "E1 target-class by its single sampled peak with0.230MiB margin; repeat variation is unmeasured and no robust target/physical-fit claim follows.",
+    "limitation": "No repeated/universal max2 conclusion; other draft settings, longer outputs, reducedmax2 and other workloads remain unmeasured."
+  },
+  "authority_remaining": "Director owns integration/pinning/publication; owner policy/settings/adoption separate. No product or settings changes.",
+  "limits": "All n23 comparisons use this cohort only. Sampled dedicated target does not establish physical8GiB fit. Two runs per primary arm;11pairs/6sources; no long-generation or universal MTP claim."
+}

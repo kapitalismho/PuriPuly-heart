@@ -35,6 +35,7 @@ def main():
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--adapter', required=True)
     parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parent / 'results/mtp/prerequisites.json')
+    parser.add_argument('--baseline', default='c451f1b04a940f8d3e297ca58d13eefc338baee8')
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError('Preserve prerequisite evidence; choose a fresh output path')
@@ -61,6 +62,7 @@ def main():
     assert server_identity['sha256'] == SERVER_SHA256, 'Pinned executable mismatch'
     version = subprocess.run([str(server), '--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', check=True)
     result = {'baseline_commit': 'c451f1b04a940f8d3e297ca58d13eefc338baee8', 'observed_utc': datetime.now(timezone.utc).isoformat(), 'cohort': 'owner_authorized_mtp_followup', 'revision': REVISION, 'target': target_identity, 'drafter': draft_identity, 'drafter_acquired_now': acquired, 'drafter_url': URL, 'root_alias_identity': 'Owner/researcher verified root mtp-gemma-4-26B-A4B-it.gguf is identical to this pinned MTP/Q4_0 object.', 'runtime': server_identity, 'runtime_version': version.stdout.strip() + version.stderr.strip(), 'runtime_source_commit': '8e2d31e0eb658d0382d3106a61369dff81f0c080', 'python_version': sys.version, 'adapter': args.adapter, 'preflight': before, 'artifact_root': '<ARTIFACT_ROOT>', 'scope': 'Native-only new cohort. Prior c451f1b0 evidence unchanged; no runtime/backend/model-target/driver/product/settings change. Draft file size is not measured VRAM.'}
+    result['baseline_commit'] = args.baseline
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2), encoding='utf-8')
     print(json.dumps(result))

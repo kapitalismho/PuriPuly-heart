@@ -1,0 +1,16 @@
+{
+  "run": "mtp-n23-c2540-d2-e1",
+  "median_seconds": 0.8670109000231605,
+  "matched_off_run_medians_seconds": [
+    0.8148709000088274,
+    0.799002699990524
+  ],
+  "off_median_spread_seconds": 0.01586820001830347,
+  "above_slowest_control_seconds": 0.052140000014333054,
+  "above_fastest_control_seconds": 0.06800820003263652,
+  "decision": "Retain negative n1 exploratory result; no rescue repeat because first median already fails strict all-run rule.",
+  "positive_progress": "Acceptance67.668% and observed serial median improved versus matched off; this does not offset worse pair median/p95 or serial p95.",
+  "reduced_max2": "Not measured. E1 also exceeds both2520/off medians; tested max4 cache change shifts pooled pair median only0.289ms within overlapping repeat ranges. No observed decision-relevant signal justifies expanding bounded refinement. This is scope rationale, NOT a proven prediction of unmeasured reducedmax2 performance.",
+  "memory_limit": "E1 target-class by its single sampled peak with0.230MiB margin; repeat variation is unmeasured and no robust target/physical-fit claim follows.",
+  "limitation": "No repeated/universal max2 conclusion; other draft settings, longer outputs, reducedmax2 and other workloads remain unmeasured."
+}

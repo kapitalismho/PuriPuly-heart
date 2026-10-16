@@ -1,0 +1,9 @@
+{
+  "scope": "One bounded n23/2540/max2 exploratory lifecycle after the8 primary counterbalanced runs",
+  "why_decision_relevant": "Both max4arms show substantial rejected proposals (~55–56% accepted); fewer proposals and smaller verification batches might reduce short-output overhead. Prior n24 measurements are not evidence for n23. No open sweep.",
+  "run": "mtp-n23-c2540-d2-e1",
+  "retain_earliest_run": true,
+  "repeat_rule": "Only repeat a plausible competitive first median; if E1 already fails every-candidate-run-below-every-matched-off-run, do not rescue it. Clearly label n1 and do not assert repeatable/universal max2 outcome.",
+  "reduced_max2": "Consider only if E1 performance/memory makes the2520 target versus2540 band tradeoff decision-relevant; preserve rationale either way.",
+  "classification": "Across all same-config clean runs, using lifecycle PID dedicated maximum. No favorable-run selection."
+}

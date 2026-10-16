@@ -25,6 +25,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--adapter', required=True)
+    parser.add_argument('--n-cpu-moe', type=int, choices=(23, 24), default=24)
+    parser.add_argument('--baseline', default=BASELINE)
     parser.add_argument('--cache-mib', type=int, required=True)
     parser.add_argument('--draft-max', type=int, choices=(0, 2, 4), required=True)
     parser.add_argument('--group', choices=('control', 'unchanged', 'reduced', 'bracket', 'repeat', 'max2'), required=True)
@@ -32,13 +34,15 @@ def main():
     parser.add_argument('--results', type=Path, default=matrix.REPO / 'experiments/gemma4_26b_qat/results/mtp')
     parser.add_argument('--allow-pressure', action='store_true')
     args = parser.parse_args()
+    if args.n_cpu_moe == 23 and args.results.name == 'mtp':
+        parser.error('The n23 cohort requires a separate results directory')
     if not 29 <= args.cache_mib <= 3072:
         parser.error('Use an enabled cache below the established Vulkan bank cap')
     if not re.fullmatch(r'mtp-[a-z0-9-]+', args.run_id):
         parser.error('Use a fresh filename-safe mtp identity')
     if not re.fullmatch(r'luid_0x[0-9a-f]+_0x[0-9a-f]+_phys_\d+', args.adapter):
         parser.error('Use the verified exact adapter instance')
-    raw = args.root / 'mtp/runs' / args.run_id
+    raw = args.root / args.results.name / 'runs' / args.run_id
     if raw.exists() or list(args.results.glob(args.run_id + '.*')):
         raise FileExistsError('Preserve all previous run identities')
     args.results.mkdir(parents=True, exist_ok=True)
@@ -55,15 +59,16 @@ def main():
     draft_identity = identity(draft_path)
     if (draft_identity['bytes'], draft_identity['sha256']) != (DRAFTER_BYTES, DRAFTER_SHA256):
         raise RuntimeError('Pinned Q4_0 drafter changed; no launch')
-    placement = ['--n-gpu-layers', '99', '--n-cpu-moe', '24', '--moe-cache-mib', str(args.cache_mib), '--swa-full', '--cache-ram', '0']
+    placement = ['--n-gpu-layers', '99', '--n-cpu-moe', str(args.n_cpu_moe), '--moe-cache-mib', str(args.cache_mib), '--swa-full', '--cache-ram', '0']
     if args.draft_max:
         placement.extend(['--model-draft', str(draft_path), '--spec-type', 'draft-mtp', '--spec-draft-n-max', str(args.draft_max)])
     matrix.PROFILES[args.run_id] = ('b11537', placement)
     matrix.request_translation = partial(matrix.request_translation, capture_completion_metadata=True)
-    record = matrix.run(SimpleNamespace(root=args.root, e4b=None, results=args.results, repetitions=5, adapter=args.adapter, runtime_names=MODEL_RUNTIMES), args.run_id, load_mode='none', output_dir=raw, environment_overrides={key: None for key in CONTROLS}, safety_policy={'minimum_available_physical_bytes': 268435456, 'minimum_commit_headroom_bytes': 536870912, 'sustained_seconds': 8}, workload=workload)
-    record.update(baseline_commit=BASELINE, experiment_baseline=BASELINE, cohort='owner_authorized_mtp_followup', historical_evidence='c451f1b0 evidence is separate, unchanged, not a matched-session control', n_cpu_moe=24, cache_mib=args.cache_mib, draft_max=args.draft_max, speculative_type='draft-mtp' if args.draft_max else 'none', measurement_group=args.group, executable_sha256=executable_sha256, drafter_identity=draft_identity if args.draft_max else None, preflight=before)
+    record = matrix.run(SimpleNamespace(root=args.root, e4b=None, results=args.results, repetitions=5, adapter=args.adapter, runtime_names=MODEL_RUNTIMES, stop_on_runtime_conflict=True), args.run_id, load_mode='none', output_dir=raw, environment_overrides={key: None for key in CONTROLS}, safety_policy={'minimum_available_physical_bytes': 268435456, 'minimum_commit_headroom_bytes': 536870912, 'sustained_seconds': 8}, workload=workload)
+    record.update(baseline_commit=args.baseline, experiment_baseline=args.baseline, cohort=f'owner_authorized_n{args.n_cpu_moe}_mtp_followup', historical_evidence='Prior experiment evidence remains separate and unchanged, not a matched-session control or placement/cache adoption.', n_cpu_moe=args.n_cpu_moe, cache_mib=args.cache_mib, draft_max=args.draft_max, speculative_type='draft-mtp' if args.draft_max else 'none', measurement_group=args.group, executable_sha256=executable_sha256, drafter_identity=draft_identity if args.draft_max else None, preflight=before)
     record['probe_command'] = ['<APP_PYTHON>', 'experiments/gemma4_26b_qat/mtp_probes.py', *[matrix.sanitize(value, args.root) for value in sys.argv[1:]]]
     record['runtime_conflict_policy'] = {'observed_names': sorted(MODEL_RUNTIMES), 'nominal_interval_seconds': 0.25, 'fields': ['pid', 'name'], 'limit': 'Known native executable names only; differently named/Python-hosted or entirely between-sample models may be missed. No unrelated command lines captured or processes stopped.'}
+    record['runtime_conflict_policy']['on_detection'] = 'Terminate only owned affected server; retain contaminated observations and stop dependent run sequence. Not OOM.'
     if record.get('contaminated_by_runtime_conflict'):
         record['cohort'] = 'contaminated_runtime_overlap'
     text = matrix.sanitize((raw / 'server.log').read_text(encoding='utf-8', errors='replace'), args.root)

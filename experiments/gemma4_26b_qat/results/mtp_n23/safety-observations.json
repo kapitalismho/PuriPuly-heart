@@ -1,0 +1,108 @@
+{
+  "policy": {
+    "minimum_available_physical_bytes": 268435456,
+    "minimum_commit_headroom_bytes": 536870912,
+    "sustained_seconds": 8,
+    "owner_process_only": true
+  },
+  "observations": [
+    {
+      "run": "mtp-n23-c2540-off-a1",
+      "minimum_available_physical_bytes": 3633152,
+      "minimum_commit_headroom_bytes": 5230436352,
+      "below_threshold_sample_episodes": [
+        {
+          "phase_start": "load",
+          "phase_end": "load",
+          "first_elapsed_seconds": 1.5138550999981817,
+          "last_elapsed_seconds": 7.001385099982144,
+          "observed_span_seconds": 5.487529999983963,
+          "next_recovered_sample_elapsed_seconds": 7.265274299978046,
+          "sample_count": 23,
+          "minimum_available_physical_bytes": 3633152,
+          "minimum_commit_headroom_bytes": 5230436352
+        },
+        {
+          "phase_start": "load",
+          "phase_end": "load",
+          "first_elapsed_seconds": 12.013480399997206,
+          "last_elapsed_seconds": 12.511922899982892,
+          "observed_span_seconds": 0.49844249998568557,
+          "next_recovered_sample_elapsed_seconds": 12.76113929998246,
+          "sample_count": 3,
+          "minimum_available_physical_bytes": 212652032,
+          "minimum_commit_headroom_bytes": 9824321536
+        },
+        {
+          "phase_start": "simultaneous_pairs",
+          "phase_end": "simultaneous_pairs",
+          "first_elapsed_seconds": 33.01405689999228,
+          "last_elapsed_seconds": 33.76011979999021,
+          "observed_span_seconds": 0.7460628999979235,
+          "next_recovered_sample_elapsed_seconds": 34.009579399978975,
+          "sample_count": 4,
+          "minimum_available_physical_bytes": 17063936,
+          "minimum_commit_headroom_bytes": 10355728384
+        }
+      ],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2540-d4-b1",
+      "minimum_available_physical_bytes": 784257024,
+      "minimum_commit_headroom_bytes": 4679245824,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2520-d4-c1",
+      "minimum_available_physical_bytes": 1022312448,
+      "minimum_commit_headroom_bytes": 3886600192,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2520-off-d1",
+      "minimum_available_physical_bytes": 1421484032,
+      "minimum_commit_headroom_bytes": 3789582336,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2520-off-d2",
+      "minimum_available_physical_bytes": 1697832960,
+      "minimum_commit_headroom_bytes": 4057661440,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2520-d4-c2",
+      "minimum_available_physical_bytes": 1510608896,
+      "minimum_commit_headroom_bytes": 3905032192,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2540-d4-b2",
+      "minimum_available_physical_bytes": 1243918336,
+      "minimum_commit_headroom_bytes": 4009488384,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2540-off-a2",
+      "minimum_available_physical_bytes": 1087369216,
+      "minimum_commit_headroom_bytes": 3786457088,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    },
+    {
+      "run": "mtp-n23-c2540-d2-e1",
+      "minimum_available_physical_bytes": 1304309760,
+      "minimum_commit_headroom_bytes": 3569692672,
+      "below_threshold_sample_episodes": [],
+      "watchdog_cutoff": null
+    }
+  ],
+  "limit": "Consecutive sampled-low spans, not a continuous hardware trace. Watchdog did not fire; brief physical pressure is preserved, not relabeled as absence of pressure or OOM. All runs retained."
+}

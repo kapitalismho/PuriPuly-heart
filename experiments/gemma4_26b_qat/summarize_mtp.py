@@ -36,8 +36,14 @@ def acceptance(requests):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--results', type=Path, default=Path(__file__).resolve().parent / 'results/mtp')
+    parser.add_argument('--n-cpu-moe', type=int, choices=(23, 24), default=24)
+    parser.add_argument('--reference-cache-mib', type=int, default=2890)
+    parser.add_argument('--baseline', default=BASELINE)
+    parser.add_argument('--markdown', type=Path, default=Path(__file__).resolve().parent / 'MTP_TIMINGS.md')
     parser.add_argument('--check', action='store_true')
     args = parser.parse_args()
+    if args.n_cpu_moe != 24 and (args.results.name == 'mtp' or args.markdown.name == 'MTP_TIMINGS.md'):
+        parser.error('A new placement requires separate results and timing-report paths')
     records = []
     for path in args.results.glob('mtp-*.json'):
         if any(part in path.name for part in ('.slots.', '.headroom.')):
@@ -45,8 +51,9 @@ def main():
         record = json.loads(path.read_text(encoding='utf-8'))
         if 'requests' in record:
             records.append(record)
+    assert all(record['n_cpu_moe'] == args.n_cpu_moe for record in records), 'Mixed placements cannot be pooled'
     records.sort(key=lambda record: (record['started_utc'], record['profile']))
-    reference = next((record for record in records if record['cache_mib'] == 2890 and record['draft_max'] == 0 and not record.get('contaminated_by_runtime_conflict')), None)
+    reference = next((record for record in records if record['cache_mib'] == args.reference_cache_mib and record['draft_max'] == 0 and not record.get('contaminated_by_runtime_conflict')), None)
     reference_requests = {signature(request): request for request in reference['requests']} if reference else {}
     runs, unique, differences = [], {}, []
     for record in records:
@@ -77,7 +84,7 @@ def main():
             'complete44': record['status'] == 'completed' and len(requests) == 44,
             'phase_counts': Counter(request['phase'] for request in requests) == {'first_prefix': 2, 'serial_pairs': 12, 'simultaneous_pairs': 30},
             'identical_inputs_and_sampling': bool(reference) and [signature(request) for request in requests] == [signature(request) for request in reference['requests']],
-            'eos_and_bounded_automated_checks': bool(requests) and all(request['stop_type'] == 'eos' and all(request['quality_checks'][key] for key in ('nonempty', 'no_reasoning', 'not_truncated')) for request in requests),
+            'eos_and_bounded_automated_checks': bool(requests) and all(request['stop_type'] == 'eos' and all(request['quality_checks'][key] for key in ('nonempty', 'numbers_present', 'no_reasoning', 'not_truncated')) for request in requests),
             'fresh_graceful_exit0': record.get('shutdown') == 'graceful_console_ctrl_c' and record.get('process_exit_code') == 0 and not record.get('safety_cutoff'),
             'exclusive_runtime_observed': record.get('runtime_conflict_observation_count', 0) > 0 and not record.get('contaminated_by_runtime_conflict'),
             'native_overlap15': overlap == 15 and slots['slot_counts'] == {'0': 22, '1': 22} and not slots['unreleased'],
@@ -92,7 +99,18 @@ def main():
             'native_api_decode_rate_formula': all((request.get('timings') or {}).get('predicted_ms', 0) > 0 and abs(request['timings']['predicted_per_second'] - (request['timings']['predicted_n'] - 1) * 1000 / request['timings']['predicted_ms']) < 0.000001 for request in requests) if requests else False,
             'requested_draft_max_effective': f"n_max={record['draft_max']}," in native if record['draft_max'] else all(not slot.get('speculative') for slot in record.get('slots', [])),
         }
+        checks['matching_prompt_and_cache_counts'] = bool(reference) and all(signature(request) in reference_requests and all((request.get('timings') or {}).get(field) == (reference_requests[signature(request)].get('timings') or {}).get(field) for field in ('prompt_n', 'cache_n')) for request in requests)
+        checks['retained_native_eos_not_truncated'] = bool(requests) and all(request.get('native_final_response', {}).get('stop') is True and request['native_final_response'].get('stop_type') == 'eos' and request['native_final_response'].get('truncated') is False for request in requests)
+        native_placement = record['command'][record['command'].index('--n-cpu-moe') + 1]
+        groups = record['cache_execution'].get('groups', [])
+        checks['native_requested_placement'] = native_placement == str(args.n_cpu_moe) and len(groups) == 1 and groups[0]['layers'] == args.n_cpu_moe
+        checks['cache_slot_granularity'] = len(groups) == 1 and groups[0]['slots'] == record['cache_mib'] * 2**20 // 3345408 - 1
+        if args.n_cpu_moe == 23:
+            checks['llama_environment_cleared'] = record.get('llama_environment_effective') == {}
+            if not record['draft_max']:
+                checks['no_drafter_off_command'] = not any(flag in record['command'] for flag in ('--model-draft', '--spec-type', '--spec-draft-n-max'))
         row = {key: record.get(key) for key in ('profile', 'started_utc', 'status', 'error', 'cohort', 'cache_mib', 'draft_max', 'measurement_group', 'cold_readiness_seconds', 'elapsed_seconds', 'cpu_seconds', 'cpu_one_core_percent', 'shutdown', 'process_exit_code', 'safety_cutoff', 'gpu_adapter_luid', 'counter_errors', 'counter_instances', 'runtime_conflict_observations', 'runtime_conflict_observation_count', 'contaminated_by_runtime_conflict', 'preflight', 'cache_execution', 'speculative_log_evidence', 'slots')}
+        row['n_cpu_moe'] = record['n_cpu_moe']
         row.update(configuration=configuration(record), completed=len(requests), checks=checks, complete_measurement=all(checks.values()), memory_class=memory_class(peak), memory_units={field: unit(life[field]['max']) for field in MEMORY_FIELDS if field in life}, lifecycle_resources=life, phase_resources={phase: resources([sample for sample in samples if sample['phase'] == phase]) for phase in ('load', *PHASES, 'shutdown')}, sample_count=len(samples), sample_cadence_seconds=distribution([right['time']-left['time'] for left, right in zip(samples, samples[1:])]), phases=grouped(requests), pairs=pair_stats(record.get('pairs', [])), first_completion_seconds=min((request['ended_seconds'] for request in requests), default=None), native_overlap_rounds=overlap, acceptance=draft, acceptance_by_phase_channel={phase: {channel: acceptance([request for request in requests if request['phase'] == phase and (channel == 'pooled' or request['channel'] == channel)]) for channel in ('Self', 'Peer', 'pooled')} for phase in PHASES})
         runs.append(row)
     configs = {}
@@ -106,6 +124,10 @@ def main():
         peaks = [run['memory_units']['process_gpu_dedicated_bytes']['bytes'] for run in selected_runs if 'process_gpu_dedicated_bytes' in run['memory_units']]
         peak, variation = (max(peaks), max(peaks)-min(peaks)) if peaks else (None, None)
         configs[key] = {'cache_mib': selected[0]['cache_mib'], 'draft_max': selected[0]['draft_max'], 'run_ids': [record['profile'] for record in selected], 'run_count': len(selected), 'complete_run_count': len(complete), 'memory_class': memory_class(peak), 'dedicated_peak': unit(peak), 'observed_peak_variation_bytes': variation, 'margins': {name: {'bytes': boundary-peak, 'MiB': (boundary-peak)/2**20, 'marginal': peak <= boundary and boundary-peak < variation} for name, boundary in (('target', TARGET), ('ceiling', CEILING))} if peak is not None else None, 'memory_peaks': {field: unit(max(run['lifecycle_resources'][field]['max'] for run in selected_runs if field in run['lifecycle_resources'])) for field in MEMORY_FIELDS if any(field in run['lifecycle_resources'] for run in selected_runs)}, 'phases': grouped(requests), 'pairs': pair_stats([pair for record in complete for pair in record.get('pairs', [])]), 'run_pair_medians': [run['pairs']['simultaneous_pairs']['release_to_both_complete_seconds']['median'] for run in selected_runs if run['complete_measurement']], 'acceptance': acceptance(requests), 'acceptance_by_phase_channel': {phase: {channel: acceptance([request for request in requests if request['phase'] == phase and (channel == 'pooled' or request['channel'] == channel)]) for channel in ('Self', 'Peer', 'pooled')} for phase in PHASES}}
+        if len(peaks) < 2:
+            configs[key]['observed_peak_variation_bytes'] = None
+            for margin in (configs[key]['margins'] or {}).values():
+                margin['marginal'] = None
     comparisons = {}
     for key, candidate in configs.items():
         comparisons[key] = {}
@@ -117,6 +139,9 @@ def main():
             current_serial, previous_serial = (config['pairs']['serial_pairs']['release_to_both_complete_seconds'] for config in (candidate, previous))
             comparisons[key][previous_key] = {'all_repeat_standard': len(medians) >= 2 and len(previous_medians) >= 2 and max(medians) < min(previous_medians), 'pair_median_gain_ms': (previous_pair['median']-current_pair['median'])*1000, 'pair_p95_gain_ms': (previous_pair['p95']-current_pair['p95'])*1000, 'serial_median_gain_ms': (previous_serial['median']-current_serial['median'])*1000, 'serial_p95_gain_ms': (previous_serial['p95']-current_serial['p95'])*1000, 'dedicated_delta_bytes': candidate['dedicated_peak']['bytes']-previous['dedicated_peak']['bytes']}
     result = {'baseline': BASELINE, 'cohort': 'owner_authorized_mtp_followup', 'runs': runs, 'configurations': configs, 'comparisons': comparisons, 'completed_requests': sum(run['completed'] for run in runs), 'unique_pair_count': len(unique), 'prompt_and_output_token_differences': differences, 'token_semantics': 'Native completion timings use server-slot statistics, not libllama destructor counters. predictedTPS=(predicted_n-1)*1000/predicted_ms; accepted/emitted output includes bonus target tokens, draft_n_accepted excludes bonus. P/C differences are disclosed, never forced. top-level tokens_evaluated is full prompt; tokens_cached is retained KV length, not prompt hits.', 'limits': 'Whole-lifecycle250ms nominal PID/exact-adapter sampled peaks are lower bounds. Native-only; no app/GUI/audio/physical8GiB/coexistence/adoption claim. Historical c451 evidence unchanged and not pooled.'}
+    result['baseline'] = args.baseline
+    result['n_cpu_moe'] = args.n_cpu_moe
+    result['cohort'] = f'owner_authorized_n{args.n_cpu_moe}_mtp_followup'
     result['token_semantics'] += ' Accepted speculative suffix may extend past EOS; never derive delivered-output TPS from draft_n_accepted. Native generated-token counts include EOS under the pinned server convention.'
     result['actual_token_totals_by_configuration'] = {key: {field: sum((request.get('timings') or {}).get(native_key, 0) for record in records if configuration(record) == key and not record.get('contaminated_by_runtime_conflict') for request in record['requests']) for field, native_key in (('P', 'prompt_n'), ('C', 'cache_n'), ('O', 'predicted_n'))} for key in configs}
     (args.results / 'summary.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -131,9 +156,9 @@ def main():
                 a = item['acceptance_by_phase_channel'][phase][channel]
                 rate = 'N/A' if a['weighted_acceptance_rate'] is None else f"{a['weighted_acceptance_rate']*100:.2f}%"
                 lines.append(f"|{name}/{phase}/{channel}|{timing['prefill_ms']['n']}|{native_cell('prefill_ms')} ;{native_cell('prefill_tps')}|{native_cell('decode_ms')} ;{native_cell('decode_tps')}|{number('prompt_evaluated_tokens')}/{number('prompt_cached_tokens')}/{number('predicted_output_tokens')}|{cell('wall_seconds_including_apply_template')}|{cell('streaming_TTFT_seconds_including_apply_template')}|{a['draft_n_sum'] if a['draft_n_sum'] is not None else 'unemitted'} /{a['draft_n_accepted_sum'] if a['draft_n_accepted_sum'] is not None else 'unemitted'} /{rate}|")
-    (Path(__file__).resolve().parent / 'MTP_TIMINGS.md').write_text('\n'.join(lines)+'\n', encoding='utf-8')
+    args.markdown.write_text('\n'.join(lines)+'\n', encoding='utf-8')
     if args.check:
-        assert records and reference, 'No fresh2890/off control collected'
+        assert records and reference, f'No fresh n{args.n_cpu_moe}/{args.reference_cache_mib} off control collected'
         assert all(run['complete_measurement'] for run in runs if run['status'] == 'completed' and not run.get('contaminated_by_runtime_conflict')), 'Completed run lacks required evidence; retain failure'
         check = {'status': 'passed', 'runs': len(runs), 'completed': result['completed_requests'], 'unique_pairs': len(unique), 'assertions': ['Unchanged44-request workload and sampling identities','EOS/bounded automated surface checks','Fresh graceful0/no watchdog and no observed named-model conflict','Exact PID/adapter load+phase observations','15native overlaps;Self0/Peer1/unused2','Native cache execution','MTP-enabled runs have actual API proposed+accepted draft tokens;off runs omit draft counters'], 'quality': 'Independent manual unique-pair and final ledger audit required separately'}
         (args.results / 'focused-check.json').write_text(json.dumps(check, indent=2), encoding='utf-8')

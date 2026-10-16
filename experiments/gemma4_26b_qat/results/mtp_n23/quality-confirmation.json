@@ -1,0 +1,253 @@
+{
+  "reviewer": "quality-review",
+  "reviewer_role": "Independent read-only semantic reviewer dispatched by Director",
+  "result": {
+    "activity": "Independent semantic review and original-request reconciliation for the corrected n23 MTP cohort",
+    "status": "Complete for all supplied immutable n23 inputs. No material evidence is missing for the requested record-level semantic and coverage audit.",
+    "scope": {
+      "authorization": "https://github.com/kapitalismho/PuriPuly-heart/issues/254#issuecomment-6207640516",
+      "source_root": "experiments/gemma4_26b_qat/results/mtp_n23/",
+      "quality_ledger": "experiments/gemma4_26b_qat/results/mtp_n23/quality-unique.json",
+      "cohort_separation": "All completion, predicate, count, and occurrence evidence below was recomputed from the n23 originals. Previous n24 measurements were neither substituted nor pooled. Only semantic judgments on ten exactly identical input/output strings were reusable.",
+      "reference_format": "File references below are relative to source_root. Fragments such as #/requests/33 are zero-based JSON pointers."
+    },
+    "confirmed_counts": {
+      "original_run_files": 9,
+      "original_completed_requests": 396,
+      "ledger_occurrences": 396,
+      "recorded_eos_requests": 396,
+      "unique_input_output_pairs": 11,
+      "unique_source_inputs": 6,
+      "exact_matches_to_prior_ten_semantic_judgments": 10,
+      "new_pairs_independently_reviewed": 1,
+      "occurrences_of_new_pair": 1,
+      "reviewed_output_occurrences": 396,
+      "unreviewed_output_occurrences": 0
+    },
+    "independent_coverage_method": {
+      "originals_read": "Read the requests arrays in all nine original mtp-n23-*.json records, not merely the derived unique-pair ledger.",
+      "comparison": "Compared complete multisets of (run, phase, channel, round, input, output, stop_type) between originals and ledger, preserving multiplicity. Also compared every original request's quality_checks with its corresponding pair record.",
+      "expected_identity_set": "For each run: one Self and one Peer request for first_prefix round 0, serial_pairs rounds 0–5, and simultaneous_pairs rounds 0–14; exactly 44 unique request identities.",
+      "completion_evidence": "Checked original request status and stop_type, plus each retained native_final_response's stop, stop_type, and truncated flags.",
+      "semantic_method": "Read all eleven exact source/output pairs against their sources. Ten match the previously reviewed strings exactly; the eleventh received a new independent judgment below."
+    },
+    "coverage_results": {
+      "missing_original_requests_from_ledger": [],
+      "extra_ledger_occurrences": [],
+      "missing_unexpected_or_duplicate_request_identities": [],
+      "original_request_status_anomalies": [],
+      "original_non_eos_or_missing_stop_type_anomalies": [],
+      "native_final_completion_anomalies": [],
+      "native_final_completion_observation": "All 396 have stop=true, stop_type=eos, and truncated=false in their retained native_final_response.",
+      "automated_predicates": "nonempty, numbers_present, no_reasoning, and not_truncated are true on all 396 original request records and all eleven pair records.",
+      "false_or_missing_predicate_anomalies": [],
+      "original_to_pair_predicate_mismatches": [],
+      "phase_totals": {
+        "first_prefix": 18,
+        "serial_pairs": 108,
+        "simultaneous_pairs": 270
+      },
+      "channel_totals": {
+        "Self": 198,
+        "Peer": 198
+      },
+      "cohort_identity_observation": "All nine original records have their expected n23 profile name and n_cpu_moe=23. This identifies the audited records; it is not a substitute for a separate native-placement execution audit."
+    },
+    "original_run_sources": [
+      {
+        "source": "mtp-n23-c2520-d4-c1.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2520-d4-c2.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2520-off-d1.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2520-off-d2.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2540-d2-e1.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2540-d4-b1.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2540-d4-b2.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2540-off-a1.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      },
+      {
+        "source": "mtp-n23-c2540-off-a2.json#/requests",
+        "original_requests": 44,
+        "ledger_occurrences": 44
+      }
+    ],
+    "per_id_semantic_findings": [
+      {
+        "id": "1351f036a4fcd63f",
+        "input": "Mina did not buy 12 tickets; she bought 2.",
+        "output": "미나가 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+        "n23_occurrences": 28,
+        "prior_exact_string_match": true,
+        "judgment": "Core meaning preserved. '미나', '12장 산 게 아니라', and '2장 ... 샀어요' preserve Mina and the two-not-twelve correction.",
+        "caveat": "'2장만' explicitly adds only-two emphasis; do not call the nuance identical to the source.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/15"
+      },
+      {
+        "id": "27ca1947fd98eff1",
+        "input": "Please wait here. I will be back in 5 minutes.",
+        "output": "여기서 기다려 주세요. 5분 뒤에 올게요.",
+        "n23_occurrences": 39,
+        "prior_exact_string_match": true,
+        "judgment": "Wait-here instruction and approximately-five-minutes-later commitment preserved through '여기서 기다려 주세요' and '5분 뒤에 올게요'.",
+        "caveat": "'올게요' literally says come rather than explicitly return; the waiting-location context conveys the return.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/4"
+      },
+      {
+        "id": "2e37d3748acd5be0",
+        "input": "유나는 3시가 아니라 4시에 도착해요.",
+        "output": "Yuna is arriving at 4, not 3.",
+        "n23_occurrences": 9,
+        "prior_exact_string_match": true,
+        "judgment": "Yuna, arrival, and corrected time 4 rather than 3 preserved.",
+        "caveat": "English naturally omits the word o'clock. No AM/PM detail is invented.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/0"
+      },
+      {
+        "id": "4e2fb418d6a53458",
+        "input": "Mina did not buy 12 tickets; she bought 2.",
+        "output": "미나가 티켓을 12장 산 게 아니라, 2장 샀어요.",
+        "n23_occurrences": 36,
+        "prior_exact_string_match": true,
+        "judgment": "Mina, both quantities, purchase, and corrective negation preserved; no extra only marker.",
+        "caveat": "Omitting the object particle after '2장' is ordinary colloquial Korean, not truncation.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/1"
+      },
+      {
+        "id": "50c90b165fa41d4a",
+        "input": "Mina did not buy 12 tickets; she bought 2.",
+        "output": "미나는 티켓을 12장 산 게 아니라, 2장 샀어요.",
+        "n23_occurrences": 7,
+        "prior_exact_string_match": true,
+        "judgment": "Buyer, rejected twelve-ticket quantity, and actual two-ticket purchase preserved.",
+        "caveat": "'미나는' uses a topic marker instead of '미나가'; mild topic/contrast emphasis does not change the core statement. There is no explicit only-two marker.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/27"
+      },
+      {
+        "id": "6b4ce7e12d25567b",
+        "input": "그 열쇠는 제 것이 아니라 민수 것이에요.",
+        "output": "That key isn't mine, it's Minsu's.",
+        "n23_occurrences": 63,
+        "prior_exact_string_match": true,
+        "judgment": "'isn't mine' and 'Minsu's' preserve the ownership correction without reversing it.",
+        "caveat": "Minsu is a reasonable rendering of 민수 in this fixture. The comma splice is minor punctuation, not semantic loss.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/5"
+      },
+      {
+        "id": "8eeb9630ba4e5b92",
+        "input": "Please wait here. I will be back in 5 minutes.",
+        "output": "여기서 기다려 주세요. 5분 안에 돌아올게요.",
+        "n23_occurrences": 24,
+        "prior_exact_string_match": true,
+        "judgment": "Wait-here instruction, return commitment, and number five preserved, with a real inherited temporal-fidelity imprecision.",
+        "caveat": "'안에' means within: an upper bound, rather than the source's ordinary approximately-five-minutes-later reading. Do not certify exact temporal equivalence.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/17"
+      },
+      {
+        "id": "97422f3e8ec0311c",
+        "input": "Mina did not buy 12 tickets; she bought 2.",
+        "output": "미나는 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+        "n23_occurrences": 1,
+        "prior_exact_string_match": false,
+        "judgment": "New independently inspected pair: core meaning preserved, with combined topic-marker and only-two emphasis nuances. '미나' preserves Mina; '12장 산 게 아니라' rejects twelve tickets; '2장만 샀어요' states the purchase of two. Negation is not incorrectly attached to two.",
+        "caveat": "'미나는' gives ordinary topic/possible contrast emphasis, and '2장만' explicitly adds only-two emphasis absent from the literal source. These do not corrupt the buyer or count correction, but prevent an unconditional exact-nuance equivalence claim. This combined string was not accepted merely because its component variants were already known.",
+        "surface_observation": "Complete sentence; no visible truncation, pathological repetition, reasoning trace, translation commentary, or instruction leakage.",
+        "representative_original": "mtp-n23-c2540-d2-e1.json#/requests/33",
+        "exact_occurrence": {
+          "run": "mtp-n23-c2540-d2-e1",
+          "phase": "simultaneous_pairs",
+          "channel": "Peer",
+          "round": 9,
+          "status": "completed",
+          "stop_type": "eos"
+        },
+        "native_final_flags": {
+          "stop": true,
+          "stop_type": "eos",
+          "truncated": false
+        },
+        "attribution": "One retained max-2 occurrence is a new wording observation, not evidence of causal configuration-specific semantic damage or a general max-2 quality result."
+      },
+      {
+        "id": "9db61efbd35b1374",
+        "input": "아까 말한 파란 문 말고 빨간 문으로 와 주세요.",
+        "output": "Please come to the red door, not the blue one I mentioned earlier.",
+        "n23_occurrences": 63,
+        "prior_exact_string_match": true,
+        "judgment": "Requested red destination, rejected blue destination, and earlier mention preserved.",
+        "caveat": "English 'I mentioned' resolves a subject left implicit by the Korean source. Preserve this small contextual-explicitation caveat.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/6"
+      },
+      {
+        "id": "ccfe38c884f599bd",
+        "input": "유나는 3시가 아니라 4시에 도착해요.",
+        "output": "Yuna arrives at 4, not 3.",
+        "n23_occurrences": 63,
+        "prior_exact_string_match": true,
+        "judgment": "Yuna and arrival at four rather than three preserved.",
+        "caveat": "'Arrives' versus 'is arriving' is a natural scheduling/aspect choice here, not a change to the corrected time.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/2"
+      },
+      {
+        "id": "ffb4415c4591f5ca",
+        "input": "I thought you were joking, but I was wrong.",
+        "output": "농담인 줄 알았는데, 아니었네요.",
+        "n23_occurrences": 63,
+        "prior_exact_string_match": true,
+        "judgment": "'농담인 줄 알았는데' preserves the initial belief; '아니었네요' preserves the subsequent correction rather than affirming joking.",
+        "caveat": "Korean naturally leaves I/you implicit and expresses being wrong as realization that it was not a joke; no identity reversal is introduced.",
+        "representative_original": "mtp-n23-c2520-d4-c1.json#/requests/7"
+      }
+    ],
+    "surface_finding": "Across all eleven manually inspected strings, no visible truncation, pathological repetition, reasoning trace, translation commentary, or instruction leakage was observed. All names, quantities, negations, and corrective contrasts retain the reviewed core meanings, subject to the explicit inherited wording caveats.",
+    "caveat_totals": {
+      "within_five_minutes": 24,
+      "five_minutes_later": 39,
+      "explicit_only_two": 29,
+      "explicit_only_two_breakdown": {
+        "1351f036a4fcd63f": 28,
+        "97422f3e8ec0311c": 1
+      },
+      "mina_without_explicit_only": 43,
+      "topic_marker_mina": 8
+    },
+    "mismatches": [],
+    "missing_material_evidence_for_requested_record_level_audit": [],
+    "limits": [
+      "This is independent n23 evidence. Prior n24 performance or memory findings cannot establish the n23 outcome and were not used here.",
+      "Original request JSON supplies accumulated output strings plus retained native completion metadata. The final native response content field is empty for all 396 streaming requests; it is not an independent second copy of the delivered translation. Raw streaming chunks were not replayed or independently reconstructed.",
+      "Completion and truncation flags were reconciled from the original records, not produced by rerunning a model. Manual repetition/reasoning checks cover the eleven exact strings; the recorded automated predicates were inspected rather than re-executed.",
+      "Eleven pairs across six synthetic inputs do not establish broad translation quality, multilingual coverage, model superiority, or causal quality effects of MTP/cache settings.",
+      "No timing, memory, MTP acceptance, effective runtime placement, repeatability, eligibility, recommendation, owner adoption, product integration, or physical-card-fit conclusion is made here.",
+      "Read-only file inspection and static in-memory comparisons only. No files edited, model runs, runtime changes, or Git/GitHub mutations."
+    ]
+  }
+}

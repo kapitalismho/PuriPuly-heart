@@ -1,0 +1,16 @@
+{
+  "baseline": "270c0a4b7dd9a8aa85612695f4ad02596452035d",
+  "scope_comment": "https://github.com/kapitalismho/PuriPuly-heart/issues/254#issuecomment-6207640516",
+  "placement": 23,
+  "owner_placement_selection_not_cache_adoption": true,
+  "unchanged_cache_mib": 2540,
+  "initial_reduced_cache_mib": 2520,
+  "cache_choice_rule": "Use fresh full-lifecycle PID dedicated maximum, not drafter file size. Keep preliminary runs. Retain2520 if target with observed margin; adapt only if observed target/margin fails, recording evidence and exact choice.",
+  "planned_order": ["A1:2540/off", "B1:2540/mtp4", "C1:2520/mtp4", "D1:reduced/off", "D2:reduced/off", "C2:reduced/mtp4", "B2:2540/mtp4", "A2:2540/off"],
+  "primary_repeats_per_arm": 2,
+  "bounded_max2": "Probe2540/max2 after matched controls if reduced rejection/overhead plausibly changes decision. Retain earliest probe. If its first median fails every-candidate-below-every-control, do not rescue with repeats. Reducedmax2 only if decision-relevant.",
+  "workload": "Unchanged44 requests:2 firstprefix+12 serial+30 simultaneous;15 barrier pairs,Self0/Peer1/unused2,temp0.6 seed42 max96.",
+  "conflict_policy": "No competing known-name model at each preflight; sampled name/PID only each250ms. Terminate only owned affected lifecycle upon conflict, preserve as contaminated, stop sequence and wait for conflict to clear. Differently named/Python/between-sample models unobservable.",
+  "safety": "Owner-only stop below256MiB physical or512MiB commit for8continuous seconds; existing pressure accepted; no unrelated processes stopped.",
+  "historical_boundary": "All tuning8gib and n24mtp evidence untouched, separate and never pooled into n23 controls/classification/performance."
+}

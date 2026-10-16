@@ -1,0 +1,46 @@
+{
+  "baseline_commit": "270c0a4b7dd9a8aa85612695f4ad02596452035d",
+  "observed_utc": "2026-10-16T03:50:10.650491+00:00",
+  "cohort": "owner_authorized_mtp_followup",
+  "revision": "7b92b5b28818151e8669af2e45e88d6086f490dd",
+  "target": {
+    "filename": "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf",
+    "bytes": 14249047104,
+    "sha256": "a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891"
+  },
+  "drafter": {
+    "filename": "mtp-gemma-4-26B-A4B-it-Q4_0.gguf",
+    "bytes": 251939328,
+    "sha256": "7272d97595f0d4c74bd7b623492b7dbdaafd8b7c72f329a8270ba4eca68f768a"
+  },
+  "drafter_acquired_now": false,
+  "drafter_url": "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-qat-GGUF/resolve/7b92b5b28818151e8669af2e45e88d6086f490dd/MTP/mtp-gemma-4-26B-A4B-it-Q4_0.gguf?download=true",
+  "root_alias_identity": "Owner/researcher verified root mtp-gemma-4-26B-A4B-it.gguf is identical to this pinned MTP/Q4_0 object.",
+  "runtime": {
+    "filename": "llama-server.exe",
+    "bytes": 9216,
+    "sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6"
+  },
+  "runtime_version": "version: 0.6.0-dev (build 11537, commit 8e2d31e0e)\nbuilt with Clang 20.1.8 for Windows x86_64",
+  "runtime_source_commit": "8e2d31e0eb658d0382d3106a61369dff81f0c080",
+  "python_version": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+  "preflight": {
+    "observed_utc": "2026-10-16T03:50:01.271673+00:00",
+    "model_runtime_processes": [],
+    "resources": {
+      "system_available_physical_bytes": 1290719232,
+      "system_committed_bytes": 69743038464,
+      "system_commit_limit_bytes": 80144736256,
+      "system_commit_headroom_bytes": 10401697792,
+      "device_gpu_dedicated_bytes": 5756317696.0,
+      "device_gpu_shared_bytes": 612270080.0,
+      "device_gpu_committed_bytes": 6585794560.0,
+      "system_pages_input_per_second": 33.156245824385294,
+      "system_page_reads_per_second": 9.946873747315587
+    },
+    "counter_errors": {}
+  },
+  "artifact_root": "<ARTIFACT_ROOT>",
+  "scope": "Native-only new cohort. Prior c451f1b0 evidence unchanged; no runtime/backend/model-target/driver/product/settings change. Draft file size is not measured VRAM."
+}

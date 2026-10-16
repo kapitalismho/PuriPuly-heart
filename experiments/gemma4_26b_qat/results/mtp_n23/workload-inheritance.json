@@ -1,0 +1,28 @@
+{
+  "scope": "Static44-request fixture inheritance only; NOT an n24 performance/memory control. No n24 measurements pooled into n23 results.",
+  "historical_source": "../mtp/mtp-n24-c2890-off-a1.json",
+  "fresh_reference": "mtp-n23-c2540-off-a1.json",
+  "request_counts": [
+    44,
+    44
+  ],
+  "compared_fields": [
+    "phase",
+    "index",
+    "round",
+    "channel",
+    "slot",
+    "case_index",
+    "prompt_sha256",
+    "system_sha256",
+    "temperature",
+    "seed",
+    "max_output_tokens",
+    "input",
+    "timings.prompt_n",
+    "timings.cache_n"
+  ],
+  "differences": [],
+  "all_n23_fresh_request_signatures_and_P_C": "Separately checked against fresh2540/off A1 in summary.json; all nine runs match.",
+  "O": "Output-token differences intentionally not forced; all20differences retained versus fresh n23 A1."
+}

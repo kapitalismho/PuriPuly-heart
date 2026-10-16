@@ -1,0 +1,2917 @@
+[
+  {
+    "id": "1351f036a4fcd63f",
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나가 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "27ca1947fd98eff1",
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 뒤에 올게요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "2e37d3748acd5be0",
+    "input": "유나는 3시가 아니라 4시에 도착해요.",
+    "output": "Yuna is arriving at 4, not 3.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "first_prefix",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "4e2fb418d6a53458",
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나가 티켓을 12장 산 게 아니라, 2장 샀어요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "first_prefix",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "50c90b165fa41d4a",
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나는 티켓을 12장 산 게 아니라, 2장 샀어요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 6,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "6b4ce7e12d25567b",
+    "input": "그 열쇠는 제 것이 아니라 민수 것이에요.",
+    "output": "That key isn't mine, it's Minsu's.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 13,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "8eeb9630ba4e5b92",
+    "input": "Please wait here. I will be back in 5 minutes.",
+    "output": "여기서 기다려 주세요. 5분 안에 돌아올게요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 10,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 13,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 1,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 4,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 7,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "97422f3e8ec0311c",
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나는 티켓을 12장 산 게 아니라, 2장만 샀어요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 9,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "9db61efbd35b1374",
+    "input": "아까 말한 파란 문 말고 빨간 문으로 와 주세요.",
+    "output": "Please come to the red door, not the blue one I mentioned earlier.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 14,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "ccfe38c884f599bd",
+    "input": "유나는 3시가 아니라 4시에 도착해요.",
+    "output": "Yuna arrives at 4, not 3.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 0,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 3,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 6,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 9,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Self",
+        "round": 12,
+        "stop_type": "eos"
+      }
+    ]
+  },
+  {
+    "id": "ffb4415c4591f5ca",
+    "input": "I thought you were joking, but I was wrong.",
+    "output": "농담인 줄 알았는데, 아니었네요.",
+    "automated_checks": {
+      "nonempty": true,
+      "numbers_present": true,
+      "no_reasoning": true,
+      "not_truncated": true
+    },
+    "occurrences": [
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-off-d2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2520-d4-c2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-off-a2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "serial_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 2,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 5,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 8,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 11,
+        "stop_type": "eos"
+      },
+      {
+        "run": "mtp-n23-c2540-d2-e1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 14,
+        "stop_type": "eos"
+      }
+    ]
+  }
+]

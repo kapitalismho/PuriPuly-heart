@@ -1,0 +1,12 @@
+{
+  "decision": "Keep2520MiB fixed for reduced arm; no adaptive change required after C1",
+  "basis": "Fresh whole-lifecycle sampled PID dedicated peak on exact adapter, not drafter file size. C1 is retained as the first final-arm lifecycle.",
+  "observations": [
+    {"run": "mtp-n23-c2540-off-a1", "peak_bytes": 8588566528, "class": "target", "target_margin_bytes": 1368064},
+    {"run": "mtp-n23-c2540-d4-b1", "peak_bytes": 8590745600, "class": "tolerance_band", "target_margin_bytes": -811008},
+    {"run": "mtp-n23-c2520-d4-c1", "peak_bytes": 8567017472, "class": "target", "target_margin_bytes": 22917120}
+  ],
+  "remaining_uncertainty": "One run per initial arm does not measure within-config peak variation; second fresh repeats must determine final all-run class/margins. Sampled peaks are lower bounds.2540 MTP band is kept descriptively and for band rule, not silently shrunk/dropped.",
+  "remaining_order": ["D1:2520/off", "D2:2520/off", "C2:2520/mtp4", "B2:2540/mtp4", "A2:2540/off"],
+  "authority": "Owner-selected n23;2540 and2520 are experiment controls, not cache adoption."
+}

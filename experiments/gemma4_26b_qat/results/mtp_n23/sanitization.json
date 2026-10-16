@@ -1,0 +1,10 @@
+{
+  "status": "passed_bounded_static_scan",
+  "surfaces": ["results/mtp_n23/", "MTP_N23.md", "MTP_N23_TIMINGS.md"],
+  "observed_result": "No matches in final supplied surfaces for Windows drive-absolute paths, known local user-path spelling, or HF credential assignment patterns.",
+  "published_aliases": ["<ARTIFACT_ROOT>", "<APP_PYTHON>", "<MODEL>", "<CHECKOUT>"],
+  "raw_data": "Unique raw path-bearing native runs remain external under <ARTIFACT_ROOT>/mtp_n23/runs/<run-id>/; no raw private transcript copied.",
+  "runtime_observation": "Only model-runtime process names/PIDs, never unrelated private command lines.",
+  "child_environment": "LLAMA_* variables and the two known HF credential variables removed; known GGML overrides removed. All nine records confirm empty effective LLAMA environment and absent backend overrides.",
+  "limit": "Bounded path/credential-pattern scan, not a general secret detector or a claim every unrelated environment variable was scrubbed."
+}

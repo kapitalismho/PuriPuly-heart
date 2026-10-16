@@ -166,6 +166,7 @@ def run(args, profile: str, *, load_mode="mmap", output_dir=None, environment_ov
             else:
                 environment[key] = str(value)
         result["allowlisted_backend_environment_effective"] = {key: environment.get(key) for key in sorted(environment_overrides)}
+    result["llama_environment_effective"] = {key: value for key, value in environment.items() if key.startswith("LLAMA_")}
     stop = threading.Event()
     samples = []
     phase = ["load"]
@@ -197,6 +198,11 @@ def run(args, profile: str, *, load_mode="mmap", output_dir=None, environment_ov
                         observations.append({"elapsed_seconds": sample["time"] - started, "phase": phase[0], "other_model_runtimes": others})
                     if others:
                         result["contaminated_by_runtime_conflict"] = True
+                        if getattr(args, "stop_on_runtime_conflict", False) and process.poll() is None:
+                            result["runtime_conflict_stop"] = {"elapsed_seconds": sample["time"] - started, "classification": "Owned validity stop after competing named runtime observation; contaminated, NOT OOM"}
+                            process.kill()
+                            process.wait(timeout=10)
+                            return
                     if safety_policy is not None:
                         low = sample.get("system_available_physical_bytes", float("inf")) < safety_policy["minimum_available_physical_bytes"] or sample.get("system_commit_headroom_bytes", float("inf")) < safety_policy["minimum_commit_headroom_bytes"]
                         low_since = (low_since if low_since is not None else sample["time"]) if low else None
