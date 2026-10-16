@@ -337,7 +337,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
 
     assert captured["show_description"] is True
     assert captured["two_column"] is True
-    assert captured["left_column_sections"] == 2
+    assert captured["left_column_sections"] == 1
     options = captured["options"]
     values = [option.value for option in options]
 
@@ -370,7 +370,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
         "settings.translation_model.managed_gemma_gpu.description"
     )
     assert managed["managed_gemma_cpu"].section == t(
-        "settings.translation_model.section.recommended_local"
+        "settings.translation_model.section.cpu_inference"
     )
     assert managed["managed_gemma_gpu"].section == t(
         "settings.translation_model.section.gpu_inference"
@@ -397,7 +397,7 @@ def test_settings_view_llm_modal_lists_logical_translation_models_once(
             sections.append(option.section)
     assert sections == [
         t("settings.translation_model.section.recommended_cloud"),
-        t("settings.translation_model.section.recommended_local"),
+        t("settings.translation_model.section.cpu_inference"),
         t("settings.translation_model.section.gpu_inference"),
         t("settings.translation_model.section.user_settings"),
         t("settings.translation_model.section.others"),
