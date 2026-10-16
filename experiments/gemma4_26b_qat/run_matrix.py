@@ -84,7 +84,7 @@ def post(base: str, path: str, body: dict) -> dict:
         return json.load(response)
 
 
-def request_translation(base: str, case: tuple, slot: int, phase: str, index: int, temperature: float) -> dict:
+def request_translation(base: str, case: tuple, slot: int, phase: str, index: int, temperature: float, *, capture_completion_metadata=False) -> dict:
     source, target, text, numbers = case
     system = render_translation_prompt_template(get_default_prompt(), source_name=source, target_name=target)
     user = build_translation_user_message(text=text, context='- [self] "Let us meet at the station."\n- [peer] "Which entrance?"\n- [self] "The east entrance."\n- [peer] "All right."\n- [self] "I will wait nearby."')
@@ -109,6 +109,8 @@ def request_translation(base: str, case: tuple, slot: int, phase: str, index: in
                     last = payload
     elapsed = time.perf_counter() - started
     quality = {"nonempty": bool(output.strip()), "numbers_present": all(n in output.replace(",", "") for n in numbers), "no_reasoning": not any(t in output.lower() for t in ("<think", "<|channel>", "analysis:", "<thought")), "not_truncated": not last.get("truncated", False) and last.get("stop_type") != "limit"}
+    if capture_completion_metadata:
+        record["native_final_response"] = last
     return {**record, "ended_perf": time.perf_counter(), "phase": phase, "index": index, "slot": slot, "pair": f"{source}->{target}", "input": text, "output": output.strip(), "wall_seconds": elapsed, "ttft_seconds": ttft, "timings": last.get("timings"), "tokens_evaluated": last.get("tokens_evaluated"), "tokens_cached": last.get("tokens_cached"), "tokens_predicted": last.get("tokens_predicted"), "stop_type": last.get("stop_type"), "quality_checks": quality, "system_sha256": hashlib.sha256(system.encode()).hexdigest(), "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(), "temperature": temperature, "seed": 42, "max_output_tokens": 96, "status": "completed"}
 
 

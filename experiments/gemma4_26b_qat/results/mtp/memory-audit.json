@@ -1,0 +1,4680 @@
+{
+  "scope": "Owned same-cache MTP/off lifecycle and phase accounting audit; all original samples/logs remain preserved.",
+  "runs": [
+    {
+      "run": "mtp-n24-c2890-off-a1",
+      "configuration": "c2890-off",
+      "server_pid": 51512,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_51512_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_51512_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_51512_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 121,
+      "sample_cadence_seconds": {
+        "n": 120,
+        "median": 0.2486098499939544,
+        "p95": 0.26370850000239443,
+        "min": 0.18991270000697114,
+        "max": 0.2658420999941882
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 119,
+          "median": 8523694080.0,
+          "p95": 8525266944.0,
+          "min": 11517952.0,
+          "max": 8525266944.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 119,
+          "median": 10839744512.0,
+          "p95": 10839875584.0,
+          "min": 335872.0,
+          "max": 10940575744.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 119,
+          "median": 19363438592.0,
+          "p95": 19363569664.0,
+          "min": 11853824.0,
+          "max": 19363569664.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 121,
+          "median": 12912136192.0,
+          "p95": 12913709056.0,
+          "min": 4385296384.0,
+          "max": 12913709056.0
+        },
+        "WorkingSetSize": {
+          "n": 121,
+          "median": 11052380160,
+          "p95": 11234336768,
+          "min": 73728,
+          "max": 11270729728
+        },
+        "PrivateUsage": {
+          "n": 121,
+          "median": 19556814848,
+          "p95": 19735973888,
+          "min": 118784,
+          "max": 19808239616
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 34,
+            "median": 4091088896.0,
+            "p95": 8473321472.0,
+            "min": 11517952.0,
+            "max": 8473321472.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 34,
+            "median": 10693095424.0,
+            "p95": 10913312768.0,
+            "min": 335872.0,
+            "max": 10940575744.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 34,
+            "median": 14784184320.0,
+            "p95": 19299938304.0,
+            "min": 11853824.0,
+            "max": 19299938304.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 35,
+            "median": 8485330944.0,
+            "p95": 12867563520.0,
+            "min": 4391096320.0,
+            "max": 12867563520.0
+          },
+          "WorkingSetSize": {
+            "n": 35,
+            "median": 11175612416,
+            "p95": 11261419520,
+            "min": 2228224,
+            "max": 11261730816
+          },
+          "PrivateUsage": {
+            "n": 35,
+            "median": 15161118720,
+            "p95": 19721699328,
+            "min": 393216,
+            "max": 19721707520
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 8525266944.0,
+            "p95": 8525266944.0,
+            "min": 8474345472.0,
+            "max": 8525266944.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 11,
+            "median": 10834214912.0,
+            "p95": 10834214912.0,
+            "min": 10831593472.0,
+            "max": 10834214912.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 11,
+            "median": 19359481856.0,
+            "p95": 19359481856.0,
+            "min": 19305938944.0,
+            "max": 19359481856.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 12913709056.0,
+            "p95": 12913709056.0,
+            "min": 12862787584.0,
+            "max": 12913709056.0
+          },
+          "WorkingSetSize": {
+            "n": 11,
+            "median": 11174764544,
+            "p95": 11270729728,
+            "min": 11143409664,
+            "max": 11270729728
+          },
+          "PrivateUsage": {
+            "n": 11,
+            "median": 19743080448,
+            "p95": 19808239616,
+            "min": 19711565824,
+            "max": 19808239616
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 23,
+            "median": 8523694080.0,
+            "p95": 8525266944.0,
+            "min": 8523694080.0,
+            "max": 8525266944.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 23,
+            "median": 10839744512.0,
+            "p95": 10839744512.0,
+            "min": 10834214912.0,
+            "max": 10839744512.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 23,
+            "median": 19363438592.0,
+            "p95": 19363438592.0,
+            "min": 19359481856.0,
+            "max": 19363438592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 23,
+            "median": 12912136192.0,
+            "p95": 12913709056.0,
+            "min": 12912136192.0,
+            "max": 12913709056.0
+          },
+          "WorkingSetSize": {
+            "n": 23,
+            "median": 11077181440,
+            "p95": 11146608640,
+            "min": 11048394752,
+            "max": 11146637312
+          },
+          "PrivateUsage": {
+            "n": 23,
+            "median": 19585101824,
+            "p95": 19710996480,
+            "min": 19556278272,
+            "max": 19714924544
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 48,
+            "median": 8523694080.0,
+            "p95": 8523694080.0,
+            "min": 8523694080.0,
+            "max": 8523694080.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 48,
+            "median": 10839875584.0,
+            "p95": 10839875584.0,
+            "min": 10839744512.0,
+            "max": 10839875584.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 48,
+            "median": 19363569664.0,
+            "p95": 19363569664.0,
+            "min": 19363438592.0,
+            "max": 19363569664.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 48,
+            "median": 12912136192.0,
+            "p95": 12912136192.0,
+            "min": 12912136192.0,
+            "max": 12912136192.0
+          },
+          "WorkingSetSize": {
+            "n": 48,
+            "median": 11048579072.0,
+            "p95": 11053117440,
+            "min": 11042340864,
+            "max": 11053481984
+          },
+          "PrivateUsage": {
+            "n": 48,
+            "median": 19556814848.0,
+            "p95": 19561201664,
+            "min": 19550507008,
+            "max": 19561807872
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 3,
+            "median": 225284096.0,
+            "p95": 4870746112.0,
+            "min": 215166976.0,
+            "max": 4870746112.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 3,
+            "median": 6426681344.0,
+            "p95": 10790219776.0,
+            "min": 1288110080.0,
+            "max": 10790219776.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 3,
+            "median": 7508393984.0,
+            "p95": 15795183616.0,
+            "min": 2359705600.0,
+            "max": 15795183616.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 4608667648.0,
+            "p95": 9259188224.0,
+            "min": 4385296384.0,
+            "max": 9259188224.0
+          },
+          "WorkingSetSize": {
+            "n": 4,
+            "median": 4397801472.0,
+            "p95": 10983796736,
+            "min": 73728,
+            "max": 10983796736
+          },
+          "PrivateUsage": {
+            "n": 4,
+            "median": 5007587328.0,
+            "p95": 16006041600,
+            "min": 118784,
+            "max": 16006041600
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.02.005.088 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.02.005.089 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.07.771.413 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.07.834.910 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.07.859.206 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.07.955.549 I impl:    Vulkan0 MoE cache size =  2887.34 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.982.048 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.982.051 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1052,
+          "text": "0.29.179.214 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2890-d4-b1",
+      "configuration": "c2890-mtp4",
+      "server_pid": 61988,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_61988_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_61988_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_61988_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 134,
+      "sample_cadence_seconds": {
+        "n": 133,
+        "median": 0.2485929000104079,
+        "p95": 0.2640030999900773,
+        "min": 0.09377130000211764,
+        "max": 0.2646807999990415
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 132,
+          "median": 8527312896.0,
+          "p95": 8529027072.0,
+          "min": 11517952.0,
+          "max": 8529027072.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 132,
+          "median": 11329601536.0,
+          "p95": 11334975488.0,
+          "min": 335872.0,
+          "max": 11334975488.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 132,
+          "median": 19855994880.0,
+          "p95": 19862421504.0,
+          "min": 11853824.0,
+          "max": 19862421504.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 134,
+          "median": 12916310016.0,
+          "p95": 12919721984.0,
+          "min": 4385296384.0,
+          "max": 12919721984.0
+        },
+        "WorkingSetSize": {
+          "n": 134,
+          "median": 11695771648.0,
+          "p95": 11709792256,
+          "min": 73728,
+          "max": 11955138560
+        },
+        "PrivateUsage": {
+          "n": 134,
+          "median": 20227391488.0,
+          "p95": 20346839040,
+          "min": 118784,
+          "max": 20435697664
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 35,
+            "median": 4091088896.0,
+            "p95": 8475234304.0,
+            "min": 11517952.0,
+            "max": 8475234304.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 35,
+            "median": 10693095424.0,
+            "p95": 11308478464.0,
+            "min": 335872.0,
+            "max": 11308478464.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 35,
+            "median": 14784184320.0,
+            "p95": 19783712768.0,
+            "min": 11853824.0,
+            "max": 19783712768.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 36,
+            "median": 8479531008.0,
+            "p95": 12863676416.0,
+            "min": 4385296384.0,
+            "max": 12863676416.0
+          },
+          "WorkingSetSize": {
+            "n": 36,
+            "median": 11180036096.0,
+            "p95": 11953868800,
+            "min": 2228224,
+            "max": 11954900992
+          },
+          "PrivateUsage": {
+            "n": 36,
+            "median": 15168065536.0,
+            "p95": 20435656704,
+            "min": 397312,
+            "max": 20435681280
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 13,
+            "median": 8529027072.0,
+            "p95": 8529027072.0,
+            "min": 8475234304.0,
+            "max": 8529027072.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 13,
+            "median": 11324071936.0,
+            "p95": 11324071936.0,
+            "min": 11308478464.0,
+            "max": 11324071936.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 13,
+            "median": 19853099008.0,
+            "p95": 19853099008.0,
+            "min": 19783712768.0,
+            "max": 19853099008.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 13,
+            "median": 12918943744.0,
+            "p95": 12918951936.0,
+            "min": 12861718528.0,
+            "max": 12918951936.0
+          },
+          "WorkingSetSize": {
+            "n": 13,
+            "median": 11687645184,
+            "p95": 11955138560,
+            "min": 11662430208,
+            "max": 11955138560
+          },
+          "PrivateUsage": {
+            "n": 13,
+            "median": 20337901568,
+            "p95": 20435697664,
+            "min": 20207013888,
+            "max": 20435697664
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 8526393344.0,
+            "p95": 8529027072.0,
+            "min": 8526393344.0,
+            "max": 8529027072.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 26,
+            "median": 11329601536.0,
+            "p95": 11329601536.0,
+            "min": 11324071936.0,
+            "max": 11329601536.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 26,
+            "median": 19855994880.0,
+            "p95": 19855994880.0,
+            "min": 19853099008.0,
+            "max": 19855994880.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 12916310016.0,
+            "p95": 12918943744.0,
+            "min": 12916310016.0,
+            "max": 12918943744.0
+          },
+          "WorkingSetSize": {
+            "n": 26,
+            "median": 11696574464.0,
+            "p95": 11707166720,
+            "min": 11692208128,
+            "max": 11707166720
+          },
+          "PrivateUsage": {
+            "n": 26,
+            "median": 20234256384.0,
+            "p95": 20240613376,
+            "min": 20222746624,
+            "max": 20289183744
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 54,
+            "median": 8527446016.0,
+            "p95": 8527446016.0,
+            "min": 8526393344.0,
+            "max": 8527446016.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 54,
+            "median": 11334975488.0,
+            "p95": 11334975488.0,
+            "min": 11329601536.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 54,
+            "median": 19862421504.0,
+            "p95": 19862421504.0,
+            "min": 19855994880.0,
+            "max": 19862421504.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 54,
+            "median": 12917362688.0,
+            "p95": 12919721984.0,
+            "min": 12916310016.0,
+            "max": 12919721984.0
+          },
+          "WorkingSetSize": {
+            "n": 54,
+            "median": 11695779840.0,
+            "p95": 11709792256,
+            "min": 11689156608,
+            "max": 11709792256
+          },
+          "PrivateUsage": {
+            "n": 54,
+            "median": 20227395584.0,
+            "p95": 20242345984,
+            "min": 20219707392,
+            "max": 20242345984
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 227147776.0,
+            "p95": 8527446016.0,
+            "min": 212504576.0,
+            "max": 8527446016.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 4,
+            "median": 7704836096.0,
+            "p95": 11334975488.0,
+            "min": 3452928.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 4,
+            "median": 7999092736.0,
+            "p95": 19862421504.0,
+            "min": 215957504.0,
+            "max": 19862421504.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 5,
+            "median": 4612235264.0,
+            "p95": 12919721984.0,
+            "min": 4389130240.0,
+            "max": 12919721984.0
+          },
+          "WorkingSetSize": {
+            "n": 5,
+            "median": 4935757824,
+            "p95": 11695779840,
+            "min": 73728,
+            "max": 11695779840
+          },
+          "PrivateUsage": {
+            "n": 5,
+            "median": 5040959488,
+            "p95": 20227395584,
+            "min": 118784,
+            "max": 20227395584
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.229.633 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.229.634 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.06.797.935 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.06.892.807 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.06.917.142 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.07.013.075 I impl:    Vulkan0 MoE cache size =  2887.34 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.070.883 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.070.888 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 198,
+          "text": "0.07.175.103 I common_speculative_init_result: loading draft model '<ARTIFACT_ROOT>\\models\\mtp-gemma-4-26B-A4B-it-Q4_0.gguf'"
+        },
+        {
+          "line": 329,
+          "text": "0.07.794.197 I load_tensors:      Vulkan0 model buffer size =   225.21 MiB"
+        },
+        {
+          "line": 330,
+          "text": "0.07.794.198 I load_tensors:  Vulkan_Host model buffer size =   144.00 MiB"
+        },
+        {
+          "line": 346,
+          "text": "0.07.896.139 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 349,
+          "text": "0.07.896.171 W llama_kv_cache: layer   3: sharing with layer 29. k = 0000000004801000, v = 0000000005101000"
+        },
+        {
+          "line": 354,
+          "text": "0.07.896.200 W llama_kv_cache: layer   0: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 355,
+          "text": "0.07.896.200 W llama_kv_cache: layer   1: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 356,
+          "text": "0.07.896.201 W llama_kv_cache: layer   2: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 365,
+          "text": "0.08.001.417 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 366,
+          "text": "0.08.001.421 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 374,
+          "text": "0.08.125.469 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 375,
+          "text": "0.08.125.473 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 416,
+          "text": "0.09.045.703 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 417,
+          "text": "0.09.045.709 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1368,
+          "text": "0.32.270.270 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-d4-c1",
+      "configuration": "c2700-mtp4",
+      "server_pid": 73948,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_73948_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_73948_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_73948_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 137,
+      "sample_cadence_seconds": {
+        "n": 136,
+        "median": 0.24860075000469806,
+        "p95": 0.26377360000333283,
+        "min": 0.1490773999976227,
+        "max": 0.2645723000023281
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 135,
+          "median": 8329519104.0,
+          "p95": 8331100160.0,
+          "min": 11517952.0,
+          "max": 8331100160.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 135,
+          "median": 11329601536.0,
+          "p95": 11334975488.0,
+          "min": 335872.0,
+          "max": 11334975488.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 135,
+          "median": 19658067968.0,
+          "p95": 19664494592.0,
+          "min": 11853824.0,
+          "max": 19664494592.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 137,
+          "median": 12642103296.0,
+          "p95": 12654944256.0,
+          "min": 4309438464.0,
+          "max": 12656791552.0
+        },
+        "WorkingSetSize": {
+          "n": 137,
+          "median": 11658469376,
+          "p95": 11684544512,
+          "min": 73728,
+          "max": 11899670528
+        },
+        "PrivateUsage": {
+          "n": 137,
+          "median": 20000026624,
+          "p95": 20110438400,
+          "min": 118784,
+          "max": 20190339072
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 34,
+            "median": 4091088896.0,
+            "p95": 8276459520.0,
+            "min": 11517952.0,
+            "max": 8277307392.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 34,
+            "median": 10693095424.0,
+            "p95": 11282063360.0,
+            "min": 335872.0,
+            "max": 11308478464.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 34,
+            "median": 14784184320.0,
+            "p95": 19558522880.0,
+            "min": 11853824.0,
+            "max": 19585785856.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 35,
+            "median": 8416780288.0,
+            "p95": 12602150912.0,
+            "min": 4322545664.0,
+            "max": 12602998784.0
+          },
+          "WorkingSetSize": {
+            "n": 35,
+            "median": 11178688512,
+            "p95": 11806281728,
+            "min": 2228224,
+            "max": 11899670528
+          },
+          "PrivateUsage": {
+            "n": 35,
+            "median": 15167266816,
+            "p95": 20097310720,
+            "min": 397312,
+            "max": 20190339072
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 13,
+            "median": 8331100160.0,
+            "p95": 8331100160.0,
+            "min": 7932325888.0,
+            "max": 8331100160.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 13,
+            "median": 11324071936.0,
+            "p95": 11324071936.0,
+            "min": 11308478464.0,
+            "max": 11324071936.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 13,
+            "median": 19655172096.0,
+            "p95": 19655172096.0,
+            "min": 19375022080.0,
+            "max": 19655172096.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 13,
+            "median": 12654944256.0,
+            "p95": 12656791552.0,
+            "min": 12258017280.0,
+            "max": 12656791552.0
+          },
+          "WorkingSetSize": {
+            "n": 13,
+            "median": 11650383872,
+            "p95": 11666673664,
+            "min": 11625086976,
+            "max": 11666673664
+          },
+          "PrivateUsage": {
+            "n": 13,
+            "median": 20104654848,
+            "p95": 20113596416,
+            "min": 19973701632,
+            "max": 20113596416
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 8328466432.0,
+            "p95": 8331100160.0,
+            "min": 8328466432.0,
+            "max": 8331100160.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 26,
+            "median": 11329601536.0,
+            "p95": 11329601536.0,
+            "min": 11324071936.0,
+            "max": 11329601536.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 26,
+            "median": 19658067968.0,
+            "p95": 19658067968.0,
+            "min": 19655172096.0,
+            "max": 19658067968.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 12641050624.0,
+            "p95": 12643684352.0,
+            "min": 12641050624.0,
+            "max": 12643684352.0
+          },
+          "WorkingSetSize": {
+            "n": 26,
+            "median": 11659304960.0,
+            "p95": 11669909504,
+            "min": 11654959104,
+            "max": 11669909504
+          },
+          "PrivateUsage": {
+            "n": 26,
+            "median": 20004173824.0,
+            "p95": 20058771456,
+            "min": 19995443200,
+            "max": 20113600512
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 58,
+            "median": 8329519104.0,
+            "p95": 8329519104.0,
+            "min": 8328466432.0,
+            "max": 8329519104.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 58,
+            "median": 11334975488.0,
+            "p95": 11334975488.0,
+            "min": 11329601536.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 58,
+            "median": 19664494592.0,
+            "p95": 19664494592.0,
+            "min": 19658067968.0,
+            "max": 19664494592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 58,
+            "median": 12642103296.0,
+            "p95": 12642103296.0,
+            "min": 12641050624.0,
+            "max": 12642103296.0
+          },
+          "WorkingSetSize": {
+            "n": 58,
+            "median": 11658606592.0,
+            "p95": 11684548608,
+            "min": 11652251648,
+            "max": 11684552704
+          },
+          "PrivateUsage": {
+            "n": 58,
+            "median": 20000061440.0,
+            "p95": 20027043840,
+            "min": 19993735168,
+            "max": 20027047936
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 1473036288.0,
+            "p95": 8329519104.0,
+            "min": 213037056.0,
+            "max": 8329519104.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 4,
+            "median": 7704836096.0,
+            "p95": 11334975488.0,
+            "min": 431681536.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 4,
+            "median": 9673195520.0,
+            "p95": 19664494592.0,
+            "min": 1501147136.0,
+            "max": 19664494592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 5,
+            "median": 4534140928.0,
+            "p95": 12642103296.0,
+            "min": 4309438464.0,
+            "max": 12642103296.0
+          },
+          "WorkingSetSize": {
+            "n": 5,
+            "median": 5714702336,
+            "p95": 11658620928,
+            "min": 73728,
+            "max": 11658620928
+          },
+          "PrivateUsage": {
+            "n": 5,
+            "median": 5870559232,
+            "p95": 20000063488,
+            "min": 118784,
+            "max": 20000063488
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.228.695 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.228.697 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.07.088.485 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.07.111.649 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.07.137.362 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.07.249.703 I impl:    Vulkan0 MoE cache size =  2699.10 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.309.646 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.309.651 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 198,
+          "text": "0.07.411.347 I common_speculative_init_result: loading draft model '<ARTIFACT_ROOT>\\models\\mtp-gemma-4-26B-A4B-it-Q4_0.gguf'"
+        },
+        {
+          "line": 329,
+          "text": "0.08.016.486 I load_tensors:      Vulkan0 model buffer size =   225.21 MiB"
+        },
+        {
+          "line": 330,
+          "text": "0.08.016.488 I load_tensors:  Vulkan_Host model buffer size =   144.00 MiB"
+        },
+        {
+          "line": 346,
+          "text": "0.08.117.084 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 349,
+          "text": "0.08.117.122 W llama_kv_cache: layer   3: sharing with layer 29. k = 0000000004801000, v = 0000000005101000"
+        },
+        {
+          "line": 354,
+          "text": "0.08.117.155 W llama_kv_cache: layer   0: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 355,
+          "text": "0.08.117.155 W llama_kv_cache: layer   1: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 356,
+          "text": "0.08.117.156 W llama_kv_cache: layer   2: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 365,
+          "text": "0.08.221.667 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 366,
+          "text": "0.08.221.672 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 374,
+          "text": "0.08.356.287 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 375,
+          "text": "0.08.356.290 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 416,
+          "text": "0.08.738.712 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 417,
+          "text": "0.08.738.717 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1368,
+          "text": "0.33.063.303 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-off-d1",
+      "configuration": "c2700-off",
+      "server_pid": 30664,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_30664_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_30664_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_30664_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 121,
+      "sample_cadence_seconds": {
+        "n": 120,
+        "median": 0.24883480000426061,
+        "p95": 0.26359790000424255,
+        "min": 0.1485160000011092,
+        "max": 0.26438800001051277
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 119,
+          "median": 8326299648.0,
+          "p95": 8327872512.0,
+          "min": 11517952.0,
+          "max": 8327872512.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 119,
+          "median": 10839744512.0,
+          "p95": 10839875584.0,
+          "min": 335872.0,
+          "max": 10927992832.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 119,
+          "median": 19166044160.0,
+          "p95": 19166175232.0,
+          "min": 11853824.0,
+          "max": 19166175232.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 121,
+          "median": 12647010304.0,
+          "p95": 12647010304.0,
+          "min": 4309438464.0,
+          "max": 12647010304.0
+        },
+        "WorkingSetSize": {
+          "n": 121,
+          "median": 11055280128,
+          "p95": 11238678528,
+          "min": 77824,
+          "max": 11271352320
+        },
+        "PrivateUsage": {
+          "n": 121,
+          "median": 19357995008,
+          "p95": 19517194240,
+          "min": 122880,
+          "max": 19608506368
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 31,
+            "median": 4091088896.0,
+            "p95": 8275394560.0,
+            "min": 11517952.0,
+            "max": 8275394560.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 31,
+            "median": 10693095424.0,
+            "p95": 10900729856.0,
+            "min": 335872.0,
+            "max": 10927992832.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 31,
+            "median": 14784184320.0,
+            "p95": 19102011392.0,
+            "min": 11853824.0,
+            "max": 19102011392.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 32,
+            "median": 8403673088.0,
+            "p95": 12587978752.0,
+            "min": 4309438464.0,
+            "max": 12587978752.0
+          },
+          "WorkingSetSize": {
+            "n": 32,
+            "median": 11179171840.0,
+            "p95": 11261452288,
+            "min": 2228224,
+            "max": 11261743104
+          },
+          "PrivateUsage": {
+            "n": 32,
+            "median": 15162253312.0,
+            "p95": 19517194240,
+            "min": 393216,
+            "max": 19517210624
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 10,
+            "median": 8327872512.0,
+            "p95": 8327872512.0,
+            "min": 8276418560.0,
+            "max": 8327872512.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 10,
+            "median": 10834214912.0,
+            "p95": 10834214912.0,
+            "min": 10831593472.0,
+            "max": 10834214912.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 10,
+            "median": 19162087424.0,
+            "p95": 19162087424.0,
+            "min": 19108012032.0,
+            "max": 19162087424.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 10,
+            "median": 12640456704.0,
+            "p95": 12640456704.0,
+            "min": 12589002752.0,
+            "max": 12640456704.0
+          },
+          "WorkingSetSize": {
+            "n": 10,
+            "median": 11190050816.0,
+            "p95": 11271352320,
+            "min": 11113267200,
+            "max": 11271352320
+          },
+          "PrivateUsage": {
+            "n": 10,
+            "median": 19520040960.0,
+            "p95": 19608506368,
+            "min": 19479482368,
+            "max": 19608506368
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 25,
+            "median": 8326299648.0,
+            "p95": 8327872512.0,
+            "min": 8326299648.0,
+            "max": 8327872512.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 25,
+            "median": 10839744512.0,
+            "p95": 10839744512.0,
+            "min": 10834214912.0,
+            "max": 10839744512.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 25,
+            "median": 19166044160.0,
+            "p95": 19166044160.0,
+            "min": 19162087424.0,
+            "max": 19166044160.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 25,
+            "median": 12647010304.0,
+            "p95": 12647010304.0,
+            "min": 12638883840.0,
+            "max": 12647010304.0
+          },
+          "WorkingSetSize": {
+            "n": 25,
+            "median": 11058036736,
+            "p95": 11113345024,
+            "min": 11049324544,
+            "max": 11113361408
+          },
+          "PrivateUsage": {
+            "n": 25,
+            "median": 19361792000,
+            "p95": 19476938752,
+            "min": 19357450240,
+            "max": 19479486464
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 50,
+            "median": 8326299648.0,
+            "p95": 8326299648.0,
+            "min": 8326299648.0,
+            "max": 8326299648.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 50,
+            "median": 10839875584.0,
+            "p95": 10839875584.0,
+            "min": 10839744512.0,
+            "max": 10839875584.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 50,
+            "median": 19166175232.0,
+            "p95": 19166175232.0,
+            "min": 19166044160.0,
+            "max": 19166175232.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 50,
+            "median": 12647010304.0,
+            "p95": 12647010304.0,
+            "min": 12647010304.0,
+            "max": 12647010304.0
+          },
+          "WorkingSetSize": {
+            "n": 50,
+            "median": 11054116864.0,
+            "p95": 11058282496,
+            "min": 11047718912,
+            "max": 11058282496
+          },
+          "PrivateUsage": {
+            "n": 50,
+            "median": 19357990912.0,
+            "p95": 19362385920,
+            "min": 19351674880,
+            "max": 19362385920
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 3,
+            "median": 224219136.0,
+            "p95": 6762713088.0,
+            "min": 213569536.0,
+            "max": 6762713088.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 3,
+            "median": 5570252800.0,
+            "p95": 10790219776.0,
+            "min": 431681536.0,
+            "max": 10790219776.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 3,
+            "median": 6650900480.0,
+            "p95": 17687150592.0,
+            "min": 1501679616.0,
+            "max": 17687150592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 4539604992.0,
+            "p95": 11083423744.0,
+            "min": 4320710656.0,
+            "max": 11083423744.0
+          },
+          "WorkingSetSize": {
+            "n": 4,
+            "median": 3853209600.0,
+            "p95": 10987728896,
+            "min": 77824,
+            "max": 10987728896
+          },
+          "PrivateUsage": {
+            "n": 4,
+            "median": 4148396032.0,
+            "p95": 17892663296,
+            "min": 122880,
+            "max": 17892663296
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.228.798 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.228.800 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.06.866.810 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.06.957.735 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.06.981.225 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.07.088.438 I impl:    Vulkan0 MoE cache size =  2699.10 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.135.034 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.135.039 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1052,
+          "text": "0.29.205.605 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-off-d2",
+      "configuration": "c2700-off",
+      "server_pid": 10792,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_10792_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_10792_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_10792_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 119,
+      "sample_cadence_seconds": {
+        "n": 118,
+        "median": 0.2485733499925118,
+        "p95": 0.26351859999704175,
+        "min": 0.14489729999331757,
+        "max": 0.2644685999985086
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 117,
+          "median": 8326299648.0,
+          "p95": 8327872512.0,
+          "min": 11517952.0,
+          "max": 8327872512.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 117,
+          "median": 10839744512.0,
+          "p95": 10839875584.0,
+          "min": 335872.0,
+          "max": 10930089984.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 117,
+          "median": 19166044160.0,
+          "p95": 19166175232.0,
+          "min": 11853824.0,
+          "max": 19166175232.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 119,
+          "median": 12641767424.0,
+          "p95": 12648845312.0,
+          "min": 4317564928.0,
+          "max": 12654612480.0
+        },
+        "WorkingSetSize": {
+          "n": 119,
+          "median": 11045302272,
+          "p95": 11220029440,
+          "min": 77824,
+          "max": 11250118656
+        },
+        "PrivateUsage": {
+          "n": 119,
+          "median": 19358892032,
+          "p95": 19530293248,
+          "min": 122880,
+          "max": 19597524992
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 29,
+            "median": 4091088896.0,
+            "p95": 8274477056.0,
+            "min": 11517952.0,
+            "max": 8275394560.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 29,
+            "median": 10693095424.0,
+            "p95": 10900729856.0,
+            "min": 335872.0,
+            "max": 10930089984.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 29,
+            "median": 14784184320.0,
+            "p95": 19098603520.0,
+            "min": 11853824.0,
+            "max": 19102011392.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 30,
+            "median": 8411799552.0,
+            "p95": 12595187712.0,
+            "min": 4317564928.0,
+            "max": 12596105216.0
+          },
+          "WorkingSetSize": {
+            "n": 30,
+            "median": 11179991040.0,
+            "p95": 11240988672,
+            "min": 2228224,
+            "max": 11248848896
+          },
+          "PrivateUsage": {
+            "n": 30,
+            "median": 15169765376.0,
+            "p95": 19505463296,
+            "min": 393216,
+            "max": 19505946624
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 8327872512.0,
+            "p95": 8327872512.0,
+            "min": 8276418560.0,
+            "max": 8327872512.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 11,
+            "median": 10834214912.0,
+            "p95": 10834214912.0,
+            "min": 10826874880.0,
+            "max": 10834214912.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 11,
+            "median": 19162087424.0,
+            "p95": 19162087424.0,
+            "min": 19106537472.0,
+            "max": 19162087424.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 12648583168.0,
+            "p95": 12648583168.0,
+            "min": 12597129216.0,
+            "max": 12648583168.0
+          },
+          "WorkingSetSize": {
+            "n": 11,
+            "median": 11219836928,
+            "p95": 11250118656,
+            "min": 11124645888,
+            "max": 11250118656
+          },
+          "PrivateUsage": {
+            "n": 11,
+            "median": 19530293248,
+            "p95": 19597524992,
+            "min": 19501785088,
+            "max": 19597524992
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 25,
+            "median": 8326299648.0,
+            "p95": 8327872512.0,
+            "min": 8326299648.0,
+            "max": 8327872512.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 25,
+            "median": 10839744512.0,
+            "p95": 10839744512.0,
+            "min": 10834214912.0,
+            "max": 10839744512.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 25,
+            "median": 19166044160.0,
+            "p95": 19166044160.0,
+            "min": 19162087424.0,
+            "max": 19166044160.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 25,
+            "median": 12647534592.0,
+            "p95": 12648583168.0,
+            "min": 12647010304.0,
+            "max": 12654612480.0
+          },
+          "WorkingSetSize": {
+            "n": 25,
+            "median": 11048144896,
+            "p95": 11073253376,
+            "min": 11042582528,
+            "max": 11073310720
+          },
+          "PrivateUsage": {
+            "n": 25,
+            "median": 19361517568,
+            "p95": 19450265600,
+            "min": 19358359552,
+            "max": 19450347520
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 49,
+            "median": 8326299648.0,
+            "p95": 8326299648.0,
+            "min": 8326299648.0,
+            "max": 8326299648.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 49,
+            "median": 10839875584.0,
+            "p95": 10839875584.0,
+            "min": 10839744512.0,
+            "max": 10839875584.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 49,
+            "median": 19166175232.0,
+            "p95": 19166175232.0,
+            "min": 19166044160.0,
+            "max": 19166175232.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 49,
+            "median": 12641767424.0,
+            "p95": 12648845312.0,
+            "min": 12641767424.0,
+            "max": 12648845312.0
+          },
+          "WorkingSetSize": {
+            "n": 49,
+            "median": 11044904960,
+            "p95": 11048214528,
+            "min": 11037413376,
+            "max": 11048493056
+          },
+          "PrivateUsage": {
+            "n": 49,
+            "median": 19358892032,
+            "p95": 19361574912,
+            "min": 19350900736,
+            "max": 19362308096
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 3,
+            "median": 225816576.0,
+            "p95": 8326299648.0,
+            "min": 213569536.0,
+            "max": 8326299648.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 3,
+            "median": 6426681344.0,
+            "p95": 10839875584.0,
+            "min": 431681536.0,
+            "max": 10839875584.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 3,
+            "median": 7508926464.0,
+            "p95": 19166175232.0,
+            "min": 1501679616.0,
+            "max": 19166175232.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 4542238720.0,
+            "p95": 12648845312.0,
+            "min": 4319399936.0,
+            "max": 12648845312.0
+          },
+          "WorkingSetSize": {
+            "n": 4,
+            "median": 4033314816.0,
+            "p95": 11045335040,
+            "min": 77824,
+            "max": 11045335040
+          },
+          "PrivateUsage": {
+            "n": 4,
+            "median": 4577740800.0,
+            "p95": 19358932992,
+            "min": 122880,
+            "max": 19358932992
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.226.376 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.226.377 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.06.732.555 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.06.755.674 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.06.791.163 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.06.883.260 I impl:    Vulkan0 MoE cache size =  2699.10 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.06.906.639 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.06.906.643 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1052,
+          "text": "0.28.733.308 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-d4-c2",
+      "configuration": "c2700-mtp4",
+      "server_pid": 63016,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_63016_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_63016_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_63016_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 135,
+      "sample_cadence_seconds": {
+        "n": 134,
+        "median": 0.24887299999682,
+        "p95": 0.26410570000007283,
+        "min": 0.09277039999142289,
+        "max": 0.2646535999956541
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 133,
+          "median": 8329519104.0,
+          "p95": 8331100160.0,
+          "min": 11517952.0,
+          "max": 8331100160.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 133,
+          "median": 11329601536.0,
+          "p95": 11334975488.0,
+          "min": 335872.0,
+          "max": 11334975488.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 133,
+          "median": 19658067968.0,
+          "p95": 19664494592.0,
+          "min": 11853824.0,
+          "max": 19664494592.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 135,
+          "median": 12659142656.0,
+          "p95": 12669628416.0,
+          "min": 4319399936.0,
+          "max": 12669628416.0
+        },
+        "WorkingSetSize": {
+          "n": 135,
+          "median": 11653722112,
+          "p95": 11681337344,
+          "min": 69632,
+          "max": 11910676480
+        },
+        "PrivateUsage": {
+          "n": 135,
+          "median": 20000174080,
+          "p95": 20116459520,
+          "min": 114688,
+          "max": 20201316352
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 34,
+            "median": 4091088896.0,
+            "p95": 8277307392.0,
+            "min": 11517952.0,
+            "max": 8277307392.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 34,
+            "median": 10693095424.0,
+            "p95": 11308478464.0,
+            "min": 335872.0,
+            "max": 11308478464.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 34,
+            "median": 14784184320.0,
+            "p95": 19585785856.0,
+            "min": 11853824.0,
+            "max": 19585785856.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 35,
+            "median": 8420712448.0,
+            "p95": 12606930944.0,
+            "min": 4319399936.0,
+            "max": 12606930944.0
+          },
+          "WorkingSetSize": {
+            "n": 35,
+            "median": 11180244992,
+            "p95": 11910397952,
+            "min": 2224128,
+            "max": 11910676480
+          },
+          "PrivateUsage": {
+            "n": 35,
+            "median": 15168172032,
+            "p95": 20201304064,
+            "min": 393216,
+            "max": 20201316352
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 12,
+            "median": 8331100160.0,
+            "p95": 8331100160.0,
+            "min": 8278331392.0,
+            "max": 8331100160.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 12,
+            "median": 11324071936.0,
+            "p95": 11324071936.0,
+            "min": 11319222272.0,
+            "max": 11324071936.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 12,
+            "median": 19655172096.0,
+            "p95": 19655172096.0,
+            "min": 19597553664.0,
+            "max": 19655172096.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 12,
+            "median": 12660723712.0,
+            "p95": 12660723712.0,
+            "min": 12607954944.0,
+            "max": 12660723712.0
+          },
+          "WorkingSetSize": {
+            "n": 12,
+            "median": 11646021632.0,
+            "p95": 11654938624,
+            "min": 11620741120,
+            "max": 11654938624
+          },
+          "PrivateUsage": {
+            "n": 12,
+            "median": 20107522048.0,
+            "p95": 20116459520,
+            "min": 19976687616,
+            "max": 20116459520
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 27,
+            "median": 8328466432.0,
+            "p95": 8331100160.0,
+            "min": 8328466432.0,
+            "max": 8331100160.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 27,
+            "median": 11329601536.0,
+            "p95": 11329601536.0,
+            "min": 11324071936.0,
+            "max": 11329601536.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 27,
+            "median": 19658067968.0,
+            "p95": 19658067968.0,
+            "min": 19655172096.0,
+            "max": 19658067968.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 27,
+            "median": 12658089984.0,
+            "p95": 12660723712.0,
+            "min": 12658089984.0,
+            "max": 12660723712.0
+          },
+          "WorkingSetSize": {
+            "n": 27,
+            "median": 11654942720,
+            "p95": 11665526784,
+            "min": 11650572288,
+            "max": 11665526784
+          },
+          "PrivateUsage": {
+            "n": 27,
+            "median": 20004737024,
+            "p95": 20116463616,
+            "min": 19995803648,
+            "max": 20116463616
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 56,
+            "median": 8329519104.0,
+            "p95": 8329519104.0,
+            "min": 8328466432.0,
+            "max": 8329519104.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 56,
+            "median": 11334975488.0,
+            "p95": 11334975488.0,
+            "min": 11329601536.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 56,
+            "median": 19664494592.0,
+            "p95": 19664494592.0,
+            "min": 19658067968.0,
+            "max": 19664494592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 56,
+            "median": 12669628416.0,
+            "p95": 12669628416.0,
+            "min": 12658089984.0,
+            "max": 12669628416.0
+          },
+          "WorkingSetSize": {
+            "n": 56,
+            "median": 11654248448.0,
+            "p95": 11681374208,
+            "min": 11647930368,
+            "max": 11681415168
+          },
+          "PrivateUsage": {
+            "n": 56,
+            "median": 20000184320.0,
+            "p95": 20027412480,
+            "min": 19993862144,
+            "max": 20027432960
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 1472237568.0,
+            "p95": 8329519104.0,
+            "min": 212504576.0,
+            "max": 8329519104.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 4,
+            "median": 7276621824.0,
+            "p95": 11334975488.0,
+            "min": 3452928.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 4,
+            "median": 9244182528.0,
+            "p95": 19664494592.0,
+            "min": 215957504.0,
+            "max": 19664494592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 5,
+            "median": 4560068608.0,
+            "p95": 12669628416.0,
+            "min": 4340109312.0,
+            "max": 12669628416.0
+          },
+          "WorkingSetSize": {
+            "n": 5,
+            "median": 4568137728,
+            "p95": 11654242304,
+            "min": 69632,
+            "max": 11654242304
+          },
+          "PrivateUsage": {
+            "n": 5,
+            "median": 5012611072,
+            "p95": 20000178176,
+            "min": 114688,
+            "max": 20000178176
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.194.632 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.194.633 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.06.815.057 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.06.881.167 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.06.904.998 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.06.996.657 I impl:    Vulkan0 MoE cache size =  2699.10 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.020.698 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.020.703 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 198,
+          "text": "0.07.125.931 I common_speculative_init_result: loading draft model '<ARTIFACT_ROOT>\\models\\mtp-gemma-4-26B-A4B-it-Q4_0.gguf'"
+        },
+        {
+          "line": 329,
+          "text": "0.07.762.216 I load_tensors:      Vulkan0 model buffer size =   225.21 MiB"
+        },
+        {
+          "line": 330,
+          "text": "0.07.762.218 I load_tensors:  Vulkan_Host model buffer size =   144.00 MiB"
+        },
+        {
+          "line": 346,
+          "text": "0.07.865.219 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 349,
+          "text": "0.07.865.255 W llama_kv_cache: layer   3: sharing with layer 29. k = 0000000004801000, v = 0000000005101000"
+        },
+        {
+          "line": 354,
+          "text": "0.07.865.287 W llama_kv_cache: layer   0: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 355,
+          "text": "0.07.865.288 W llama_kv_cache: layer   1: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 356,
+          "text": "0.07.865.289 W llama_kv_cache: layer   2: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 365,
+          "text": "0.07.917.378 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 366,
+          "text": "0.07.917.382 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 374,
+          "text": "0.08.071.281 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 375,
+          "text": "0.08.071.286 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 416,
+          "text": "0.08.604.212 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 417,
+          "text": "0.08.604.218 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1368,
+          "text": "0.32.543.047 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2890-d4-b2",
+      "configuration": "c2890-mtp4",
+      "server_pid": 66828,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_66828_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_66828_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_66828_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 135,
+      "sample_cadence_seconds": {
+        "n": 134,
+        "median": 0.24859875000402099,
+        "p95": 0.26362240000162274,
+        "min": 0.15951440000208095,
+        "max": 0.2645487999980105
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 133,
+          "median": 8527446016.0,
+          "p95": 8529027072.0,
+          "min": 11517952.0,
+          "max": 8529027072.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 133,
+          "median": 11329601536.0,
+          "p95": 11334975488.0,
+          "min": 335872.0,
+          "max": 11334975488.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 133,
+          "median": 19855994880.0,
+          "p95": 19862421504.0,
+          "min": 11853824.0,
+          "max": 19862421504.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 135,
+          "median": 12891934720.0,
+          "p95": 12974772224.0,
+          "min": 4336963584.0,
+          "max": 13015928832.0
+        },
+        "WorkingSetSize": {
+          "n": 135,
+          "median": 11659907072,
+          "p95": 11688353792,
+          "min": 77824,
+          "max": 11855765504
+        },
+        "PrivateUsage": {
+          "n": 135,
+          "median": 20197912576,
+          "p95": 20314243072,
+          "min": 122880,
+          "max": 20340350976
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 34,
+            "median": 4091088896.0,
+            "p95": 8475234304.0,
+            "min": 11517952.0,
+            "max": 8475234304.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 34,
+            "median": 10693095424.0,
+            "p95": 11308478464.0,
+            "min": 335872.0,
+            "max": 11308478464.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 34,
+            "median": 14784184320.0,
+            "p95": 19783712768.0,
+            "min": 11853824.0,
+            "max": 19783712768.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 35,
+            "median": 8431730688.0,
+            "p95": 12827926528.0,
+            "min": 4336963584.0,
+            "max": 12827926528.0
+          },
+          "WorkingSetSize": {
+            "n": 35,
+            "median": 11180535808,
+            "p95": 11855495168,
+            "min": 2228224,
+            "max": 11855765504
+          },
+          "PrivateUsage": {
+            "n": 35,
+            "median": 15167832064,
+            "p95": 20340342784,
+            "min": 397312,
+            "max": 20340350976
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 12,
+            "median": 8529027072.0,
+            "p95": 8529027072.0,
+            "min": 8476258304.0,
+            "max": 8529027072.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 12,
+            "median": 11324071936.0,
+            "p95": 11324071936.0,
+            "min": 11314503680.0,
+            "max": 11324071936.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 12,
+            "median": 19853099008.0,
+            "p95": 19853099008.0,
+            "min": 19794006016.0,
+            "max": 19853099008.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 12,
+            "median": 12881719296.0,
+            "p95": 12899282944.0,
+            "min": 12828950528.0,
+            "max": 12899282944.0
+          },
+          "WorkingSetSize": {
+            "n": 12,
+            "median": 11654129664.0,
+            "p95": 11663060992,
+            "min": 11624087552,
+            "max": 11663060992
+          },
+          "PrivateUsage": {
+            "n": 12,
+            "median": 20305362944.0,
+            "p95": 20314308608,
+            "min": 20172718080,
+            "max": 20314308608
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 8526393344.0,
+            "p95": 8529027072.0,
+            "min": 8526393344.0,
+            "max": 8529027072.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 26,
+            "median": 11329601536.0,
+            "p95": 11329601536.0,
+            "min": 11324071936.0,
+            "max": 11329601536.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 26,
+            "median": 19855994880.0,
+            "p95": 19855994880.0,
+            "min": 19853099008.0,
+            "max": 19855994880.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 26,
+            "median": 12896649216.0,
+            "p95": 12899282944.0,
+            "min": 12896649216.0,
+            "max": 12899282944.0
+          },
+          "WorkingSetSize": {
+            "n": 26,
+            "median": 11663060992.0,
+            "p95": 11673751552,
+            "min": 11658797056,
+            "max": 11673751552
+          },
+          "PrivateUsage": {
+            "n": 26,
+            "median": 20205559808.0,
+            "p95": 20314243072,
+            "min": 20193480704,
+            "max": 20314308608
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 57,
+            "median": 8527446016.0,
+            "p95": 8527446016.0,
+            "min": 8526393344.0,
+            "max": 8527446016.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 57,
+            "median": 11334975488.0,
+            "p95": 11334975488.0,
+            "min": 11329601536.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 57,
+            "median": 19862421504.0,
+            "p95": 19862421504.0,
+            "min": 19855994880.0,
+            "max": 19862421504.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 57,
+            "median": 12897701888.0,
+            "p95": 12995481600.0,
+            "min": 12874895360.0,
+            "max": 13015928832.0
+          },
+          "WorkingSetSize": {
+            "n": 57,
+            "median": 11662503936,
+            "p95": 11688353792,
+            "min": 11652694016,
+            "max": 11688570880
+          },
+          "PrivateUsage": {
+            "n": 57,
+            "median": 20197916672,
+            "p95": 20225077248,
+            "min": 20191596544,
+            "max": 20225150976
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 4375619584.0,
+            "p95": 8527446016.0,
+            "min": 213037056.0,
+            "max": 8527446016.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 4,
+            "median": 9068046336.0,
+            "p95": 11334975488.0,
+            "min": 1288110080.0,
+            "max": 11334975488.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 4,
+            "median": 13871880192.0,
+            "p95": 19862421504.0,
+            "min": 1501147136.0,
+            "max": 19862421504.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 5,
+            "median": 4638556160.0,
+            "p95": 12946460672.0,
+            "min": 4408528896.0,
+            "max": 12946460672.0
+          },
+          "WorkingSetSize": {
+            "n": 5,
+            "median": 7516168192,
+            "p95": 11655847936,
+            "min": 77824,
+            "max": 11655847936
+          },
+          "PrivateUsage": {
+            "n": 5,
+            "median": 8443084800,
+            "p95": 20197912576,
+            "min": 122880,
+            "max": 20197912576
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.196.256 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.196.257 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.06.947.543 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.07.032.931 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.07.057.154 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.07.153.066 I impl:    Vulkan0 MoE cache size =  2887.34 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.176.864 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.176.871 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 198,
+          "text": "0.07.277.851 I common_speculative_init_result: loading draft model '<ARTIFACT_ROOT>\\models\\mtp-gemma-4-26B-A4B-it-Q4_0.gguf'"
+        },
+        {
+          "line": 329,
+          "text": "0.07.899.530 I load_tensors:      Vulkan0 model buffer size =   225.21 MiB"
+        },
+        {
+          "line": 330,
+          "text": "0.07.899.531 I load_tensors:  Vulkan_Host model buffer size =   144.00 MiB"
+        },
+        {
+          "line": 346,
+          "text": "0.08.001.562 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 349,
+          "text": "0.08.001.601 W llama_kv_cache: layer   3: sharing with layer 29. k = 0000000004801000, v = 0000000005101000"
+        },
+        {
+          "line": 354,
+          "text": "0.08.001.645 W llama_kv_cache: layer   0: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 355,
+          "text": "0.08.001.646 W llama_kv_cache: layer   1: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 356,
+          "text": "0.08.001.647 W llama_kv_cache: layer   2: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 365,
+          "text": "0.08.034.745 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 366,
+          "text": "0.08.034.750 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 374,
+          "text": "0.08.112.786 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 375,
+          "text": "0.08.112.789 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 416,
+          "text": "0.08.628.497 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 417,
+          "text": "0.08.628.500 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1368,
+          "text": "0.32.638.922 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2890-off-a2",
+      "configuration": "c2890-off",
+      "server_pid": 75508,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_75508_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_75508_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_75508_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 119,
+      "sample_cadence_seconds": {
+        "n": 118,
+        "median": 0.24876574999507284,
+        "p95": 0.26359729999967385,
+        "min": 0.11285049999423791,
+        "max": 0.2646787999983644
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 117,
+          "median": 8523694080.0,
+          "p95": 8525266944.0,
+          "min": 11517952.0,
+          "max": 8525266944.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 117,
+          "median": 10839744512.0,
+          "p95": 10839875584.0,
+          "min": 335872.0,
+          "max": 10934284288.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 117,
+          "median": 19363438592.0,
+          "p95": 19363569664.0,
+          "min": 11853824.0,
+          "max": 19363569664.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 119,
+          "median": 12853055488.0,
+          "p95": 12855939072.0,
+          "min": 4329099264.0,
+          "max": 12893818880.0
+        },
+        "WorkingSetSize": {
+          "n": 119,
+          "median": 11046690816,
+          "p95": 11224645632,
+          "min": 73728,
+          "max": 11254988800
+        },
+        "PrivateUsage": {
+          "n": 119,
+          "median": 19553239040,
+          "p95": 19730886656,
+          "min": 118784,
+          "max": 19798114304
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 31,
+            "median": 4091088896.0,
+            "p95": 8473321472.0,
+            "min": 11517952.0,
+            "max": 8473321472.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 31,
+            "median": 10693095424.0,
+            "p95": 10902827008.0,
+            "min": 335872.0,
+            "max": 10934284288.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 31,
+            "median": 14784184320.0,
+            "p95": 19299938304.0,
+            "min": 11853824.0,
+            "max": 19299938304.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 32,
+            "median": 8436965376.0,
+            "p95": 12848295936.0,
+            "min": 4375236608.0,
+            "max": 12848295936.0
+          },
+          "WorkingSetSize": {
+            "n": 32,
+            "median": 11178899456.0,
+            "p95": 11249336320,
+            "min": 2228224,
+            "max": 11249430528
+          },
+          "PrivateUsage": {
+            "n": 32,
+            "median": 15163691008.0,
+            "p95": 19708764160,
+            "min": 393216,
+            "max": 19708796928
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 8525266944.0,
+            "p95": 8525266944.0,
+            "min": 8474345472.0,
+            "max": 8525266944.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 11,
+            "median": 10834214912.0,
+            "p95": 10834214912.0,
+            "min": 10826874880.0,
+            "max": 10834214912.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 11,
+            "median": 19359481856.0,
+            "p95": 19359481856.0,
+            "min": 19304464384.0,
+            "max": 19359481856.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 12854628352.0,
+            "p95": 12893818880.0,
+            "min": 12843028480.0,
+            "max": 12893818880.0
+          },
+          "WorkingSetSize": {
+            "n": 11,
+            "median": 11159203840,
+            "p95": 11254988800,
+            "min": 11099688960,
+            "max": 11254988800
+          },
+          "PrivateUsage": {
+            "n": 11,
+            "median": 19730886656,
+            "p95": 19798114304,
+            "min": 19671130112,
+            "max": 19798114304
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 24,
+            "median": 8523694080.0,
+            "p95": 8525266944.0,
+            "min": 8523694080.0,
+            "max": 8525266944.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 24,
+            "median": 10839744512.0,
+            "p95": 10839744512.0,
+            "min": 10834214912.0,
+            "max": 10839744512.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 24,
+            "median": 19363438592.0,
+            "p95": 19363438592.0,
+            "min": 19359481856.0,
+            "max": 19363438592.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 24,
+            "median": 12853055488.0,
+            "p95": 12854628352.0,
+            "min": 12853055488.0,
+            "max": 12854628352.0
+          },
+          "WorkingSetSize": {
+            "n": 24,
+            "median": 11045363712.0,
+            "p95": 11099721728,
+            "min": 11042213888,
+            "max": 11099750400
+          },
+          "PrivateUsage": {
+            "n": 24,
+            "median": 19555479552.0,
+            "p95": 19670540288,
+            "min": 19550081024,
+            "max": 19671130112
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 48,
+            "median": 8523694080.0,
+            "p95": 8523694080.0,
+            "min": 8523694080.0,
+            "max": 8523694080.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 48,
+            "median": 10839875584.0,
+            "p95": 10839875584.0,
+            "min": 10839744512.0,
+            "max": 10839875584.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 48,
+            "median": 19363569664.0,
+            "p95": 19363569664.0,
+            "min": 19363438592.0,
+            "max": 19363569664.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 48,
+            "median": 12853055488.0,
+            "p95": 12855939072.0,
+            "min": 12853055488.0,
+            "max": 12855939072.0
+          },
+          "WorkingSetSize": {
+            "n": 48,
+            "median": 11046641664.0,
+            "p95": 11047174144,
+            "min": 11039580160,
+            "max": 11047251968
+          },
+          "PrivateUsage": {
+            "n": 48,
+            "median": 19554574336.0,
+            "p95": 19555143680,
+            "min": 19547570176,
+            "max": 19555155968
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 3,
+            "median": 225284096.0,
+            "p95": 8176996352.0,
+            "min": 212504576.0,
+            "max": 8176996352.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 3,
+            "median": 6426681344.0,
+            "p95": 10816516096.0,
+            "min": 3452928.0,
+            "max": 10816516096.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 3,
+            "median": 7508393984.0,
+            "p95": 19133235200.0,
+            "min": 644186112.0,
+            "max": 19133235200.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 4551139328.0,
+            "p95": 12509241344.0,
+            "min": 4329099264.0,
+            "max": 12509241344.0
+          },
+          "WorkingSetSize": {
+            "n": 4,
+            "median": 3560992768.0,
+            "p95": 11040542720,
+            "min": 73728,
+            "max": 11040542720
+          },
+          "PrivateUsage": {
+            "n": 4,
+            "median": 4147292160.0,
+            "p95": 19548278784,
+            "min": 118784,
+            "max": 19548278784
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.221.387 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.221.388 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.07.043.287 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.07.093.324 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.07.119.672 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.07.240.754 I impl:    Vulkan0 MoE cache size =  2887.34 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.07.265.140 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.07.265.145 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1052,
+          "text": "0.28.710.970 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    },
+    {
+      "run": "mtp-n24-c2890-d2-e1",
+      "configuration": "c2890-mtp2",
+      "server_pid": 49460,
+      "adapter": "luid_0x00000000_0x0000f60b_phys_0",
+      "counter_errors": {},
+      "counter_instances": {
+        "process_gpu_dedicated_bytes": [
+          "pid_49460_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_shared_bytes": [
+          "pid_49460_luid_0x00000000_0x0000F60B_phys_0"
+        ],
+        "process_gpu_committed_bytes": [
+          "pid_49460_luid_0x00000000_0x0000F60B_phys_0"
+        ]
+      },
+      "sample_count": 124,
+      "sample_cadence_seconds": {
+        "n": 123,
+        "median": 0.24859119999746326,
+        "p95": 0.26372050000645686,
+        "min": 0.1940887999953702,
+        "max": 0.26519019999250304
+      },
+      "lifecycle": {
+        "process_gpu_dedicated_bytes": {
+          "n": 122,
+          "median": 8527446016.0,
+          "p95": 8529551360.0,
+          "min": 11517952.0,
+          "max": 8529551360.0
+        },
+        "process_gpu_shared_bytes": {
+          "n": 122,
+          "median": 11327504384.0,
+          "p95": 11330781184.0,
+          "min": 335872.0,
+          "max": 11330781184.0
+        },
+        "process_gpu_committed_bytes": {
+          "n": 122,
+          "median": 19853897728.0,
+          "p95": 19859275776.0,
+          "min": 11853824.0,
+          "max": 19859275776.0
+        },
+        "device_gpu_dedicated_bytes": {
+          "n": 124,
+          "median": 12853891072.0,
+          "p95": 12876959744.0,
+          "min": 4330409984.0,
+          "max": 12881178624.0
+        },
+        "WorkingSetSize": {
+          "n": 124,
+          "median": 11655493632.0,
+          "p95": 11669684224,
+          "min": 77824,
+          "max": 11920904192
+        },
+        "PrivateUsage": {
+          "n": 124,
+          "median": 20194344960.0,
+          "p95": 20302950400,
+          "min": 122880,
+          "max": 20405727232
+        }
+      },
+      "phases": {
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "n": 33,
+            "median": 4091088896.0,
+            "p95": 8475234304.0,
+            "min": 11517952.0,
+            "max": 8475234304.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 33,
+            "median": 10693095424.0,
+            "p95": 11308478464.0,
+            "min": 335872.0,
+            "max": 11308478464.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 33,
+            "median": 14784184320.0,
+            "p95": 19783712768.0,
+            "min": 11853824.0,
+            "max": 19783712768.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 34,
+            "median": 8425177088.0,
+            "p95": 12820062208.0,
+            "min": 4330409984.0,
+            "max": 12820062208.0
+          },
+          "WorkingSetSize": {
+            "n": 34,
+            "median": 11180154880.0,
+            "p95": 11920560128,
+            "min": 2228224,
+            "max": 11920904192
+          },
+          "PrivateUsage": {
+            "n": 34,
+            "median": 15166746624.0,
+            "p95": 20405719040,
+            "min": 397312,
+            "max": 20405727232
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 8529551360.0,
+            "p95": 8529551360.0,
+            "min": 8476258304.0,
+            "max": 8529551360.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 11,
+            "median": 11321974784.0,
+            "p95": 11321974784.0,
+            "min": 11319222272.0,
+            "max": 11321974784.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 11,
+            "median": 19851526144.0,
+            "p95": 19851526144.0,
+            "min": 19795480576.0,
+            "max": 19851526144.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 11,
+            "median": 12855996416.0,
+            "p95": 12855996416.0,
+            "min": 12802703360.0,
+            "max": 12855996416.0
+          },
+          "WorkingSetSize": {
+            "n": 11,
+            "median": 11642769408,
+            "p95": 11651686400,
+            "min": 11628605440,
+            "max": 11651686400
+          },
+          "PrivateUsage": {
+            "n": 11,
+            "median": 20297166848,
+            "p95": 20306108416,
+            "min": 20176781312,
+            "max": 20306108416
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 23,
+            "median": 8526393344.0,
+            "p95": 8529551360.0,
+            "min": 8526393344.0,
+            "max": 8529551360.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 23,
+            "median": 11327504384.0,
+            "p95": 11327504384.0,
+            "min": 11321974784.0,
+            "max": 11327504384.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 23,
+            "median": 19853897728.0,
+            "p95": 19853897728.0,
+            "min": 19851526144.0,
+            "max": 19853897728.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 23,
+            "median": 12852838400.0,
+            "p95": 12855996416.0,
+            "min": 12852838400.0,
+            "max": 12855996416.0
+          },
+          "WorkingSetSize": {
+            "n": 23,
+            "median": 11659423744,
+            "p95": 11662315520,
+            "min": 11651698688,
+            "max": 11662315520
+          },
+          "PrivateUsage": {
+            "n": 23,
+            "median": 20194160640,
+            "p95": 20248379392,
+            "min": 20190744576,
+            "max": 20306108416
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "n": 52,
+            "median": 8527446016.0,
+            "p95": 8528494592.0,
+            "min": 8526393344.0,
+            "max": 8528494592.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 52,
+            "median": 11330781184.0,
+            "p95": 11330781184.0,
+            "min": 11327504384.0,
+            "max": 11330781184.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 52,
+            "median": 19858227200.0,
+            "p95": 19859275776.0,
+            "min": 19853897728.0,
+            "max": 19859275776.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 52,
+            "median": 12875911168.0,
+            "p95": 12881178624.0,
+            "min": 12852838400.0,
+            "max": 12881178624.0
+          },
+          "WorkingSetSize": {
+            "n": 52,
+            "median": 11657863168.0,
+            "p95": 11669684224,
+            "min": 11651534848,
+            "max": 11669688320
+          },
+          "PrivateUsage": {
+            "n": 52,
+            "median": 20194349056.0,
+            "p95": 20206071808,
+            "min": 20186951680,
+            "max": 20206071808
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "n": 3,
+            "median": 229527552.0,
+            "p95": 8525406208.0,
+            "min": 216215552.0,
+            "max": 8525406208.0
+          },
+          "process_gpu_shared_bytes": {
+            "n": 3,
+            "median": 8139538432.0,
+            "p95": 10848788480.0,
+            "min": 2144538624.0,
+            "max": 10848788480.0
+          },
+          "process_gpu_committed_bytes": {
+            "n": 3,
+            "median": 9225494528.0,
+            "p95": 19374194688.0,
+            "min": 2360754176.0,
+            "max": 19374194688.0
+          },
+          "device_gpu_dedicated_bytes": {
+            "n": 4,
+            "median": 4575555584.0,
+            "p95": 12878090240.0,
+            "min": 4352684032.0,
+            "max": 12878090240.0
+          },
+          "WorkingSetSize": {
+            "n": 4,
+            "median": 5647171584.0,
+            "p95": 11305451520,
+            "min": 77824,
+            "max": 11305451520
+          },
+          "PrivateUsage": {
+            "n": 4,
+            "median": 5868945408.0,
+            "p95": 19817623552,
+            "min": 122880,
+            "max": 19817623552
+          }
+        }
+      },
+      "native_allocation_and_alias_lines": [
+        {
+          "line": 153,
+          "text": "0.01.204.160 I load_tensors:      Vulkan0 model buffer size =  3772.85 MiB"
+        },
+        {
+          "line": 154,
+          "text": "0.01.204.161 I load_tensors:  Vulkan_Host model buffer size = 10197.01 MiB"
+        },
+        {
+          "line": 173,
+          "text": "0.06.692.725 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 176,
+          "text": "0.06.781.687 I llama_kv_cache:    Vulkan0 KV buffer size =    90.00 MiB"
+        },
+        {
+          "line": 181,
+          "text": "0.06.810.387 I llama_kv_cache:    Vulkan0 KV buffer size =   900.00 MiB"
+        },
+        {
+          "line": 185,
+          "text": "0.06.914.689 I impl:    Vulkan0 MoE cache size =  2887.34 MiB for 9801.00 MiB of host experts"
+        },
+        {
+          "line": 192,
+          "text": "0.06.939.459 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 193,
+          "text": "0.06.939.463 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 198,
+          "text": "0.07.039.811 I common_speculative_init_result: loading draft model '<ARTIFACT_ROOT>\\models\\mtp-gemma-4-26B-A4B-it-Q4_0.gguf'"
+        },
+        {
+          "line": 329,
+          "text": "0.07.641.213 I load_tensors:      Vulkan0 model buffer size =   225.21 MiB"
+        },
+        {
+          "line": 330,
+          "text": "0.07.641.214 I load_tensors:  Vulkan_Host model buffer size =   144.00 MiB"
+        },
+        {
+          "line": 346,
+          "text": "0.07.745.393 I llama_context: Vulkan_Host  output buffer size =     3.00 MiB"
+        },
+        {
+          "line": 349,
+          "text": "0.07.745.429 W llama_kv_cache: layer   3: sharing with layer 29. k = 0000000004801000, v = 0000000005101000"
+        },
+        {
+          "line": 354,
+          "text": "0.07.745.461 W llama_kv_cache: layer   0: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 355,
+          "text": "0.07.745.462 W llama_kv_cache: layer   1: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 356,
+          "text": "0.07.745.462 W llama_kv_cache: layer   2: sharing with layer 28. k = 0000000036001000, v = 0000000037201000"
+        },
+        {
+          "line": 365,
+          "text": "0.07.779.750 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 366,
+          "text": "0.07.779.755 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 374,
+          "text": "0.07.905.747 I sched_reserve:    Vulkan0 compute buffer size =    62.12 MiB"
+        },
+        {
+          "line": 375,
+          "text": "0.07.905.752 I sched_reserve: Vulkan_Host compute buffer size =    14.03 MiB"
+        },
+        {
+          "line": 416,
+          "text": "0.08.301.358 I sched_reserve:    Vulkan0 compute buffer size =   328.88 MiB"
+        },
+        {
+          "line": 417,
+          "text": "0.08.301.367 I sched_reserve: Vulkan_Host compute buffer size =    25.08 MiB"
+        },
+        {
+          "line": 1368,
+          "text": "0.29.943.088 I common_memory_breakdown_print: | memory breakdown [MiB]    | total    free     self   model   context   compute    unaccounted |"
+        }
+      ]
+    }
+  ],
+  "comparisons": {
+    "c2700-mtp4": {
+      "control": "c2700-off",
+      "phases": {
+        "lifecycle": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8331100160.0,
+              8331100160.0
+            ],
+            "off_run_peaks_bytes": [
+              8327872512.0,
+              8327872512.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3227648.0,
+            "delta_MiB": 3.078125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11334975488.0,
+              11334975488.0
+            ],
+            "off_run_peaks_bytes": [
+              10927992832.0,
+              10930089984.0
+            ],
+            "mtp_max_minus_off_max_bytes": 404885504.0,
+            "delta_MiB": 386.12890625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19664494592.0,
+              19664494592.0
+            ],
+            "off_run_peaks_bytes": [
+              19166175232.0,
+              19166175232.0
+            ],
+            "mtp_max_minus_off_max_bytes": 498319360.0,
+            "delta_MiB": 475.234375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12656791552.0,
+              12669628416.0
+            ],
+            "off_run_peaks_bytes": [
+              12647010304.0,
+              12654612480.0
+            ],
+            "mtp_max_minus_off_max_bytes": 15015936.0,
+            "delta_MiB": 14.3203125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11899670528,
+              11910676480
+            ],
+            "off_run_peaks_bytes": [
+              11271352320,
+              11250118656
+            ],
+            "mtp_max_minus_off_max_bytes": 639324160,
+            "delta_MiB": 609.70703125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20190339072,
+              20201316352
+            ],
+            "off_run_peaks_bytes": [
+              19608506368,
+              19597524992
+            ],
+            "mtp_max_minus_off_max_bytes": 592809984,
+            "delta_MiB": 565.34765625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8277307392.0,
+              8277307392.0
+            ],
+            "off_run_peaks_bytes": [
+              8275394560.0,
+              8275394560.0
+            ],
+            "mtp_max_minus_off_max_bytes": 1912832.0,
+            "delta_MiB": 1.82421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11308478464.0,
+              11308478464.0
+            ],
+            "off_run_peaks_bytes": [
+              10927992832.0,
+              10930089984.0
+            ],
+            "mtp_max_minus_off_max_bytes": 378388480.0,
+            "delta_MiB": 360.859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19585785856.0,
+              19585785856.0
+            ],
+            "off_run_peaks_bytes": [
+              19102011392.0,
+              19102011392.0
+            ],
+            "mtp_max_minus_off_max_bytes": 483774464.0,
+            "delta_MiB": 461.36328125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12602998784.0,
+              12606930944.0
+            ],
+            "off_run_peaks_bytes": [
+              12587978752.0,
+              12596105216.0
+            ],
+            "mtp_max_minus_off_max_bytes": 10825728.0,
+            "delta_MiB": 10.32421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11899670528,
+              11910676480
+            ],
+            "off_run_peaks_bytes": [
+              11261743104,
+              11248848896
+            ],
+            "mtp_max_minus_off_max_bytes": 648933376,
+            "delta_MiB": 618.87109375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20190339072,
+              20201316352
+            ],
+            "off_run_peaks_bytes": [
+              19517210624,
+              19505946624
+            ],
+            "mtp_max_minus_off_max_bytes": 684105728,
+            "delta_MiB": 652.4140625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8331100160.0,
+              8331100160.0
+            ],
+            "off_run_peaks_bytes": [
+              8327872512.0,
+              8327872512.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3227648.0,
+            "delta_MiB": 3.078125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11324071936.0,
+              11324071936.0
+            ],
+            "off_run_peaks_bytes": [
+              10834214912.0,
+              10834214912.0
+            ],
+            "mtp_max_minus_off_max_bytes": 489857024.0,
+            "delta_MiB": 467.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19655172096.0,
+              19655172096.0
+            ],
+            "off_run_peaks_bytes": [
+              19162087424.0,
+              19162087424.0
+            ],
+            "mtp_max_minus_off_max_bytes": 493084672.0,
+            "delta_MiB": 470.2421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12656791552.0,
+              12660723712.0
+            ],
+            "off_run_peaks_bytes": [
+              12640456704.0,
+              12648583168.0
+            ],
+            "mtp_max_minus_off_max_bytes": 12140544.0,
+            "delta_MiB": 11.578125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11666673664,
+              11654938624
+            ],
+            "off_run_peaks_bytes": [
+              11271352320,
+              11250118656
+            ],
+            "mtp_max_minus_off_max_bytes": 395321344,
+            "delta_MiB": 377.0078125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20113596416,
+              20116459520
+            ],
+            "off_run_peaks_bytes": [
+              19608506368,
+              19597524992
+            ],
+            "mtp_max_minus_off_max_bytes": 507953152,
+            "delta_MiB": 484.421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8331100160.0,
+              8331100160.0
+            ],
+            "off_run_peaks_bytes": [
+              8327872512.0,
+              8327872512.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3227648.0,
+            "delta_MiB": 3.078125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11329601536.0,
+              11329601536.0
+            ],
+            "off_run_peaks_bytes": [
+              10839744512.0,
+              10839744512.0
+            ],
+            "mtp_max_minus_off_max_bytes": 489857024.0,
+            "delta_MiB": 467.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19658067968.0,
+              19658067968.0
+            ],
+            "off_run_peaks_bytes": [
+              19166044160.0,
+              19166044160.0
+            ],
+            "mtp_max_minus_off_max_bytes": 492023808.0,
+            "delta_MiB": 469.23046875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12643684352.0,
+              12660723712.0
+            ],
+            "off_run_peaks_bytes": [
+              12647010304.0,
+              12654612480.0
+            ],
+            "mtp_max_minus_off_max_bytes": 6111232.0,
+            "delta_MiB": 5.828125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11669909504,
+              11665526784
+            ],
+            "off_run_peaks_bytes": [
+              11113361408,
+              11073310720
+            ],
+            "mtp_max_minus_off_max_bytes": 556548096,
+            "delta_MiB": 530.765625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20113600512,
+              20116463616
+            ],
+            "off_run_peaks_bytes": [
+              19479486464,
+              19450347520
+            ],
+            "mtp_max_minus_off_max_bytes": 636977152,
+            "delta_MiB": 607.46875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8329519104.0,
+              8329519104.0
+            ],
+            "off_run_peaks_bytes": [
+              8326299648.0,
+              8326299648.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3219456.0,
+            "delta_MiB": 3.0703125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11334975488.0,
+              11334975488.0
+            ],
+            "off_run_peaks_bytes": [
+              10839875584.0,
+              10839875584.0
+            ],
+            "mtp_max_minus_off_max_bytes": 495099904.0,
+            "delta_MiB": 472.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19664494592.0,
+              19664494592.0
+            ],
+            "off_run_peaks_bytes": [
+              19166175232.0,
+              19166175232.0
+            ],
+            "mtp_max_minus_off_max_bytes": 498319360.0,
+            "delta_MiB": 475.234375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12642103296.0,
+              12669628416.0
+            ],
+            "off_run_peaks_bytes": [
+              12647010304.0,
+              12648845312.0
+            ],
+            "mtp_max_minus_off_max_bytes": 20783104.0,
+            "delta_MiB": 19.8203125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11684552704,
+              11681415168
+            ],
+            "off_run_peaks_bytes": [
+              11058282496,
+              11048493056
+            ],
+            "mtp_max_minus_off_max_bytes": 626270208,
+            "delta_MiB": 597.2578125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20027047936,
+              20027432960
+            ],
+            "off_run_peaks_bytes": [
+              19362385920,
+              19362308096
+            ],
+            "mtp_max_minus_off_max_bytes": 665047040,
+            "delta_MiB": 634.23828125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8329519104.0,
+              8329519104.0
+            ],
+            "off_run_peaks_bytes": [
+              6762713088.0,
+              8326299648.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3219456.0,
+            "delta_MiB": 3.0703125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11334975488.0,
+              11334975488.0
+            ],
+            "off_run_peaks_bytes": [
+              10790219776.0,
+              10839875584.0
+            ],
+            "mtp_max_minus_off_max_bytes": 495099904.0,
+            "delta_MiB": 472.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19664494592.0,
+              19664494592.0
+            ],
+            "off_run_peaks_bytes": [
+              17687150592.0,
+              19166175232.0
+            ],
+            "mtp_max_minus_off_max_bytes": 498319360.0,
+            "delta_MiB": 475.234375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12642103296.0,
+              12669628416.0
+            ],
+            "off_run_peaks_bytes": [
+              11083423744.0,
+              12648845312.0
+            ],
+            "mtp_max_minus_off_max_bytes": 20783104.0,
+            "delta_MiB": 19.8203125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11658620928,
+              11654242304
+            ],
+            "off_run_peaks_bytes": [
+              10987728896,
+              11045335040
+            ],
+            "mtp_max_minus_off_max_bytes": 613285888,
+            "delta_MiB": 584.875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20000063488,
+              20000178176
+            ],
+            "off_run_peaks_bytes": [
+              17892663296,
+              19358932992
+            ],
+            "mtp_max_minus_off_max_bytes": 641245184,
+            "delta_MiB": 611.5390625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        }
+      }
+    },
+    "c2890-mtp2": {
+      "control": "c2890-off",
+      "phases": {
+        "lifecycle": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8529551360.0
+            ],
+            "off_run_peaks_bytes": [
+              8525266944.0,
+              8525266944.0
+            ],
+            "mtp_max_minus_off_max_bytes": 4284416.0,
+            "delta_MiB": 4.0859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11330781184.0
+            ],
+            "off_run_peaks_bytes": [
+              10940575744.0,
+              10934284288.0
+            ],
+            "mtp_max_minus_off_max_bytes": 390205440.0,
+            "delta_MiB": 372.12890625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19859275776.0
+            ],
+            "off_run_peaks_bytes": [
+              19363569664.0,
+              19363569664.0
+            ],
+            "mtp_max_minus_off_max_bytes": 495706112.0,
+            "delta_MiB": 472.7421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12881178624.0
+            ],
+            "off_run_peaks_bytes": [
+              12913709056.0,
+              12893818880.0
+            ],
+            "mtp_max_minus_off_max_bytes": -32530432.0,
+            "delta_MiB": -31.0234375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11920904192
+            ],
+            "off_run_peaks_bytes": [
+              11270729728,
+              11254988800
+            ],
+            "mtp_max_minus_off_max_bytes": 650174464,
+            "delta_MiB": 620.0546875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20405727232
+            ],
+            "off_run_peaks_bytes": [
+              19808239616,
+              19798114304
+            ],
+            "mtp_max_minus_off_max_bytes": 597487616,
+            "delta_MiB": 569.80859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8475234304.0
+            ],
+            "off_run_peaks_bytes": [
+              8473321472.0,
+              8473321472.0
+            ],
+            "mtp_max_minus_off_max_bytes": 1912832.0,
+            "delta_MiB": 1.82421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11308478464.0
+            ],
+            "off_run_peaks_bytes": [
+              10940575744.0,
+              10934284288.0
+            ],
+            "mtp_max_minus_off_max_bytes": 367902720.0,
+            "delta_MiB": 350.859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19783712768.0
+            ],
+            "off_run_peaks_bytes": [
+              19299938304.0,
+              19299938304.0
+            ],
+            "mtp_max_minus_off_max_bytes": 483774464.0,
+            "delta_MiB": 461.36328125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12820062208.0
+            ],
+            "off_run_peaks_bytes": [
+              12867563520.0,
+              12848295936.0
+            ],
+            "mtp_max_minus_off_max_bytes": -47501312.0,
+            "delta_MiB": -45.30078125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11920904192
+            ],
+            "off_run_peaks_bytes": [
+              11261730816,
+              11249430528
+            ],
+            "mtp_max_minus_off_max_bytes": 659173376,
+            "delta_MiB": 628.63671875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20405727232
+            ],
+            "off_run_peaks_bytes": [
+              19721707520,
+              19708796928
+            ],
+            "mtp_max_minus_off_max_bytes": 684019712,
+            "delta_MiB": 652.33203125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8529551360.0
+            ],
+            "off_run_peaks_bytes": [
+              8525266944.0,
+              8525266944.0
+            ],
+            "mtp_max_minus_off_max_bytes": 4284416.0,
+            "delta_MiB": 4.0859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11321974784.0
+            ],
+            "off_run_peaks_bytes": [
+              10834214912.0,
+              10834214912.0
+            ],
+            "mtp_max_minus_off_max_bytes": 487759872.0,
+            "delta_MiB": 465.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19851526144.0
+            ],
+            "off_run_peaks_bytes": [
+              19359481856.0,
+              19359481856.0
+            ],
+            "mtp_max_minus_off_max_bytes": 492044288.0,
+            "delta_MiB": 469.25,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12855996416.0
+            ],
+            "off_run_peaks_bytes": [
+              12913709056.0,
+              12893818880.0
+            ],
+            "mtp_max_minus_off_max_bytes": -57712640.0,
+            "delta_MiB": -55.0390625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11651686400
+            ],
+            "off_run_peaks_bytes": [
+              11270729728,
+              11254988800
+            ],
+            "mtp_max_minus_off_max_bytes": 380956672,
+            "delta_MiB": 363.30859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20306108416
+            ],
+            "off_run_peaks_bytes": [
+              19808239616,
+              19798114304
+            ],
+            "mtp_max_minus_off_max_bytes": 497868800,
+            "delta_MiB": 474.8046875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8529551360.0
+            ],
+            "off_run_peaks_bytes": [
+              8525266944.0,
+              8525266944.0
+            ],
+            "mtp_max_minus_off_max_bytes": 4284416.0,
+            "delta_MiB": 4.0859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11327504384.0
+            ],
+            "off_run_peaks_bytes": [
+              10839744512.0,
+              10839744512.0
+            ],
+            "mtp_max_minus_off_max_bytes": 487759872.0,
+            "delta_MiB": 465.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19853897728.0
+            ],
+            "off_run_peaks_bytes": [
+              19363438592.0,
+              19363438592.0
+            ],
+            "mtp_max_minus_off_max_bytes": 490459136.0,
+            "delta_MiB": 467.73828125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12855996416.0
+            ],
+            "off_run_peaks_bytes": [
+              12913709056.0,
+              12854628352.0
+            ],
+            "mtp_max_minus_off_max_bytes": -57712640.0,
+            "delta_MiB": -55.0390625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11662315520
+            ],
+            "off_run_peaks_bytes": [
+              11146637312,
+              11099750400
+            ],
+            "mtp_max_minus_off_max_bytes": 515678208,
+            "delta_MiB": 491.7890625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20306108416
+            ],
+            "off_run_peaks_bytes": [
+              19714924544,
+              19671130112
+            ],
+            "mtp_max_minus_off_max_bytes": 591183872,
+            "delta_MiB": 563.796875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8528494592.0
+            ],
+            "off_run_peaks_bytes": [
+              8523694080.0,
+              8523694080.0
+            ],
+            "mtp_max_minus_off_max_bytes": 4800512.0,
+            "delta_MiB": 4.578125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11330781184.0
+            ],
+            "off_run_peaks_bytes": [
+              10839875584.0,
+              10839875584.0
+            ],
+            "mtp_max_minus_off_max_bytes": 490905600.0,
+            "delta_MiB": 468.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19859275776.0
+            ],
+            "off_run_peaks_bytes": [
+              19363569664.0,
+              19363569664.0
+            ],
+            "mtp_max_minus_off_max_bytes": 495706112.0,
+            "delta_MiB": 472.7421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12881178624.0
+            ],
+            "off_run_peaks_bytes": [
+              12912136192.0,
+              12855939072.0
+            ],
+            "mtp_max_minus_off_max_bytes": -30957568.0,
+            "delta_MiB": -29.5234375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11669688320
+            ],
+            "off_run_peaks_bytes": [
+              11053481984,
+              11047251968
+            ],
+            "mtp_max_minus_off_max_bytes": 616206336,
+            "delta_MiB": 587.66015625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20206071808
+            ],
+            "off_run_peaks_bytes": [
+              19561807872,
+              19555155968
+            ],
+            "mtp_max_minus_off_max_bytes": 644263936,
+            "delta_MiB": 614.41796875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8525406208.0
+            ],
+            "off_run_peaks_bytes": [
+              4870746112.0,
+              8176996352.0
+            ],
+            "mtp_max_minus_off_max_bytes": 348409856.0,
+            "delta_MiB": 332.26953125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              10848788480.0
+            ],
+            "off_run_peaks_bytes": [
+              10790219776.0,
+              10816516096.0
+            ],
+            "mtp_max_minus_off_max_bytes": 32272384.0,
+            "delta_MiB": 30.77734375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19374194688.0
+            ],
+            "off_run_peaks_bytes": [
+              15795183616.0,
+              19133235200.0
+            ],
+            "mtp_max_minus_off_max_bytes": 240959488.0,
+            "delta_MiB": 229.796875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12878090240.0
+            ],
+            "off_run_peaks_bytes": [
+              9259188224.0,
+              12509241344.0
+            ],
+            "mtp_max_minus_off_max_bytes": 368848896.0,
+            "delta_MiB": 351.76171875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11305451520
+            ],
+            "off_run_peaks_bytes": [
+              10983796736,
+              11040542720
+            ],
+            "mtp_max_minus_off_max_bytes": 264908800,
+            "delta_MiB": 252.63671875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              19817623552
+            ],
+            "off_run_peaks_bytes": [
+              16006041600,
+              19548278784
+            ],
+            "mtp_max_minus_off_max_bytes": 269344768,
+            "delta_MiB": 256.8671875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        }
+      }
+    },
+    "c2890-mtp4": {
+      "control": "c2890-off",
+      "phases": {
+        "lifecycle": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8529027072.0,
+              8529027072.0
+            ],
+            "off_run_peaks_bytes": [
+              8525266944.0,
+              8525266944.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3760128.0,
+            "delta_MiB": 3.5859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11334975488.0,
+              11334975488.0
+            ],
+            "off_run_peaks_bytes": [
+              10940575744.0,
+              10934284288.0
+            ],
+            "mtp_max_minus_off_max_bytes": 394399744.0,
+            "delta_MiB": 376.12890625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19862421504.0,
+              19862421504.0
+            ],
+            "off_run_peaks_bytes": [
+              19363569664.0,
+              19363569664.0
+            ],
+            "mtp_max_minus_off_max_bytes": 498851840.0,
+            "delta_MiB": 475.7421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12919721984.0,
+              13015928832.0
+            ],
+            "off_run_peaks_bytes": [
+              12913709056.0,
+              12893818880.0
+            ],
+            "mtp_max_minus_off_max_bytes": 102219776.0,
+            "delta_MiB": 97.484375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11955138560,
+              11855765504
+            ],
+            "off_run_peaks_bytes": [
+              11270729728,
+              11254988800
+            ],
+            "mtp_max_minus_off_max_bytes": 684408832,
+            "delta_MiB": 652.703125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20435697664,
+              20340350976
+            ],
+            "off_run_peaks_bytes": [
+              19808239616,
+              19798114304
+            ],
+            "mtp_max_minus_off_max_bytes": 627458048,
+            "delta_MiB": 598.390625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "load": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8475234304.0,
+              8475234304.0
+            ],
+            "off_run_peaks_bytes": [
+              8473321472.0,
+              8473321472.0
+            ],
+            "mtp_max_minus_off_max_bytes": 1912832.0,
+            "delta_MiB": 1.82421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11308478464.0,
+              11308478464.0
+            ],
+            "off_run_peaks_bytes": [
+              10940575744.0,
+              10934284288.0
+            ],
+            "mtp_max_minus_off_max_bytes": 367902720.0,
+            "delta_MiB": 350.859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19783712768.0,
+              19783712768.0
+            ],
+            "off_run_peaks_bytes": [
+              19299938304.0,
+              19299938304.0
+            ],
+            "mtp_max_minus_off_max_bytes": 483774464.0,
+            "delta_MiB": 461.36328125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12863676416.0,
+              12827926528.0
+            ],
+            "off_run_peaks_bytes": [
+              12867563520.0,
+              12848295936.0
+            ],
+            "mtp_max_minus_off_max_bytes": -3887104.0,
+            "delta_MiB": -3.70703125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11954900992,
+              11855765504
+            ],
+            "off_run_peaks_bytes": [
+              11261730816,
+              11249430528
+            ],
+            "mtp_max_minus_off_max_bytes": 693170176,
+            "delta_MiB": 661.05859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20435681280,
+              20340350976
+            ],
+            "off_run_peaks_bytes": [
+              19721707520,
+              19708796928
+            ],
+            "mtp_max_minus_off_max_bytes": 713973760,
+            "delta_MiB": 680.8984375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "first_prefix": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8529027072.0,
+              8529027072.0
+            ],
+            "off_run_peaks_bytes": [
+              8525266944.0,
+              8525266944.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3760128.0,
+            "delta_MiB": 3.5859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11324071936.0,
+              11324071936.0
+            ],
+            "off_run_peaks_bytes": [
+              10834214912.0,
+              10834214912.0
+            ],
+            "mtp_max_minus_off_max_bytes": 489857024.0,
+            "delta_MiB": 467.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19853099008.0,
+              19853099008.0
+            ],
+            "off_run_peaks_bytes": [
+              19359481856.0,
+              19359481856.0
+            ],
+            "mtp_max_minus_off_max_bytes": 493617152.0,
+            "delta_MiB": 470.75,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12918951936.0,
+              12899282944.0
+            ],
+            "off_run_peaks_bytes": [
+              12913709056.0,
+              12893818880.0
+            ],
+            "mtp_max_minus_off_max_bytes": 5242880.0,
+            "delta_MiB": 5.0,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11955138560,
+              11663060992
+            ],
+            "off_run_peaks_bytes": [
+              11270729728,
+              11254988800
+            ],
+            "mtp_max_minus_off_max_bytes": 684408832,
+            "delta_MiB": 652.703125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20435697664,
+              20314308608
+            ],
+            "off_run_peaks_bytes": [
+              19808239616,
+              19798114304
+            ],
+            "mtp_max_minus_off_max_bytes": 627458048,
+            "delta_MiB": 598.390625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "serial_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8529027072.0,
+              8529027072.0
+            ],
+            "off_run_peaks_bytes": [
+              8525266944.0,
+              8525266944.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3760128.0,
+            "delta_MiB": 3.5859375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11329601536.0,
+              11329601536.0
+            ],
+            "off_run_peaks_bytes": [
+              10839744512.0,
+              10839744512.0
+            ],
+            "mtp_max_minus_off_max_bytes": 489857024.0,
+            "delta_MiB": 467.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19855994880.0,
+              19855994880.0
+            ],
+            "off_run_peaks_bytes": [
+              19363438592.0,
+              19363438592.0
+            ],
+            "mtp_max_minus_off_max_bytes": 492556288.0,
+            "delta_MiB": 469.73828125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12918943744.0,
+              12899282944.0
+            ],
+            "off_run_peaks_bytes": [
+              12913709056.0,
+              12854628352.0
+            ],
+            "mtp_max_minus_off_max_bytes": 5234688.0,
+            "delta_MiB": 4.9921875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11707166720,
+              11673751552
+            ],
+            "off_run_peaks_bytes": [
+              11146637312,
+              11099750400
+            ],
+            "mtp_max_minus_off_max_bytes": 560529408,
+            "delta_MiB": 534.5625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20289183744,
+              20314308608
+            ],
+            "off_run_peaks_bytes": [
+              19714924544,
+              19671130112
+            ],
+            "mtp_max_minus_off_max_bytes": 599384064,
+            "delta_MiB": 571.6171875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "simultaneous_pairs": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8527446016.0,
+              8527446016.0
+            ],
+            "off_run_peaks_bytes": [
+              8523694080.0,
+              8523694080.0
+            ],
+            "mtp_max_minus_off_max_bytes": 3751936.0,
+            "delta_MiB": 3.578125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11334975488.0,
+              11334975488.0
+            ],
+            "off_run_peaks_bytes": [
+              10839875584.0,
+              10839875584.0
+            ],
+            "mtp_max_minus_off_max_bytes": 495099904.0,
+            "delta_MiB": 472.1640625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19862421504.0,
+              19862421504.0
+            ],
+            "off_run_peaks_bytes": [
+              19363569664.0,
+              19363569664.0
+            ],
+            "mtp_max_minus_off_max_bytes": 498851840.0,
+            "delta_MiB": 475.7421875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12919721984.0,
+              13015928832.0
+            ],
+            "off_run_peaks_bytes": [
+              12912136192.0,
+              12855939072.0
+            ],
+            "mtp_max_minus_off_max_bytes": 103792640.0,
+            "delta_MiB": 98.984375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11709792256,
+              11688570880
+            ],
+            "off_run_peaks_bytes": [
+              11053481984,
+              11047251968
+            ],
+            "mtp_max_minus_off_max_bytes": 656310272,
+            "delta_MiB": 625.90625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20242345984,
+              20225150976
+            ],
+            "off_run_peaks_bytes": [
+              19561807872,
+              19555155968
+            ],
+            "mtp_max_minus_off_max_bytes": 680538112,
+            "delta_MiB": 649.01171875,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        },
+        "shutdown": {
+          "process_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              8527446016.0,
+              8527446016.0
+            ],
+            "off_run_peaks_bytes": [
+              4870746112.0,
+              8176996352.0
+            ],
+            "mtp_max_minus_off_max_bytes": 350449664.0,
+            "delta_MiB": 334.21484375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_shared_bytes": {
+            "mtp_run_peaks_bytes": [
+              11334975488.0,
+              11334975488.0
+            ],
+            "off_run_peaks_bytes": [
+              10790219776.0,
+              10816516096.0
+            ],
+            "mtp_max_minus_off_max_bytes": 518459392.0,
+            "delta_MiB": 494.44140625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "process_gpu_committed_bytes": {
+            "mtp_run_peaks_bytes": [
+              19862421504.0,
+              19862421504.0
+            ],
+            "off_run_peaks_bytes": [
+              15795183616.0,
+              19133235200.0
+            ],
+            "mtp_max_minus_off_max_bytes": 729186304.0,
+            "delta_MiB": 695.40625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "device_gpu_dedicated_bytes": {
+            "mtp_run_peaks_bytes": [
+              12919721984.0,
+              12946460672.0
+            ],
+            "off_run_peaks_bytes": [
+              9259188224.0,
+              12509241344.0
+            ],
+            "mtp_max_minus_off_max_bytes": 437219328.0,
+            "delta_MiB": 416.96484375,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "WorkingSetSize": {
+            "mtp_run_peaks_bytes": [
+              11695779840,
+              11655847936
+            ],
+            "off_run_peaks_bytes": [
+              10983796736,
+              11040542720
+            ],
+            "mtp_max_minus_off_max_bytes": 655237120,
+            "delta_MiB": 624.8828125,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          },
+          "PrivateUsage": {
+            "mtp_run_peaks_bytes": [
+              20227395584,
+              20197912576
+            ],
+            "off_run_peaks_bytes": [
+              16006041600,
+              19548278784
+            ],
+            "mtp_max_minus_off_max_bytes": 679116800,
+            "delta_MiB": 647.65625,
+            "comparison": "Independent same-phase maxima across all runs, not a time-coincident sum or per-allocation residency attribution."
+          }
+        }
+      }
+    }
+  },
+  "observed_native_allocations": "Q4_0 draft Vulkan0 model225.21MiB, Vulkan_Host model144.00MiB, draft Vulkan0 compute62.12MiB; target model/cache/KV/compute controls unchanged. Native layer-sharing lines prove aliases of targetKV; logical18+108MiB KV size reports are not extra allocations.",
+  "source_interpretation": "Pinned Vulkan allocator tries DEVICE_LOCAL|HOST_VISIBLE|HOST_COHERENT then DEVICE_LOCAL. HOST_VISIBLE does not mean systemRAM. Drafter embedding may be duplicated for CPU input/GPU output; sharedKV avoids a second targetKV allocation but does not eliminate real drafter model/compute/output costs. See runtime-research.json citations.",
+  "conclusion": "The file-size-as-added-PID-dedicated proxy is contradicted by measured counter deltas. Exact PID/adapter counters and phase observations distinguish that result from a selected steady snapshot or simple baseline-lifecycle/active-phase mismatch. Dedicated, shared, committed, working set and logical Vulkan buffer sizes do not reconcile per allocation from these observations. This is not proof of zero memory cost, CPU fallback, physical residency, duplicate systemRAM, or uncontrolled WDDM spill.",
+  "limits": "250ms nominal sampled lower bounds; independent maxima can occur at different times. No driver allocation tracing or physical8GiB/card-coexistence test. Never add the overlapping accounting views."
+}

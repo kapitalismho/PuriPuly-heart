@@ -1,0 +1,20 @@
+{
+  "rationale_before_launch": "Max4 repeated negative at both caches; max2 could reduce proposal rejection/verification overhead. Director authorized testing unchanged2890 first and no open sweep.",
+  "run": "mtp-n24-c2890-d2-e1",
+  "cache_mib": 2890,
+  "draft_max": 2,
+  "proposed": 568,
+  "accepted_prefix": 380,
+  "acceptance_rate": 0.6690140845070423,
+  "pair_median_ms": 815.0409000081709,
+  "pair_p95_ms": 1075.5235999968136,
+  "matched_off_run_medians_ms": [
+    745.3648999944562,
+    768.3262999926228
+  ],
+  "off_run_median_spread_ms": 22.9613999981666,
+  "decision": "Stop after retained n1exploratory negative. Earliest E1 exceeds both controls and cannot satisfy every-candidate-below-every-control by adding favorable repeats; Director approved noE2/no reduced-max2 arm. This is not repeated max2 proof or universal inferiority.",
+  "positive_observation": "Acceptance improves versusmax4 and observed serial median is50.772ms lower than pooledoff, but n1serialp95 is15.890ms worse and primarypairmedian/p95 are worse.",
+  "earliest_run_preserved": true,
+  "model_process_release": "release.json"
+}

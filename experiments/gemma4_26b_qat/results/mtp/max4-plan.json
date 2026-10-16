@@ -1,0 +1,155 @@
+{
+  "arms": {
+    "A": "2890/off",
+    "B": "2890/MTP4",
+    "C": "2700/MTP4",
+    "D": "2700/off"
+  },
+  "order": "A1 B1 C1 D1 D2 C2 B2 A2",
+  "already_completed": [
+    "mtp-n24-c2890-off-a1",
+    "mtp-n24-c2890-d4-b1"
+  ],
+  "remaining_order": [
+    {
+      "run": "mtp-n24-c2700-d4-c1",
+      "cache_mib": 2700,
+      "draft_max": 4,
+      "group": "reduced",
+      "command": [
+        "<APP_PYTHON>",
+        "experiments/gemma4_26b_qat/mtp_probes.py",
+        "--root",
+        "<ARTIFACT_ROOT>",
+        "--adapter",
+        "luid_0x00000000_0x0000f60b_phys_0",
+        "--cache-mib",
+        "2700",
+        "--draft-max",
+        "4",
+        "--group",
+        "reduced",
+        "--run-id",
+        "mtp-n24-c2700-d4-c1",
+        "--allow-pressure"
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-off-d1",
+      "cache_mib": 2700,
+      "draft_max": 0,
+      "group": "control",
+      "command": [
+        "<APP_PYTHON>",
+        "experiments/gemma4_26b_qat/mtp_probes.py",
+        "--root",
+        "<ARTIFACT_ROOT>",
+        "--adapter",
+        "luid_0x00000000_0x0000f60b_phys_0",
+        "--cache-mib",
+        "2700",
+        "--draft-max",
+        "0",
+        "--group",
+        "control",
+        "--run-id",
+        "mtp-n24-c2700-off-d1",
+        "--allow-pressure"
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-off-d2",
+      "cache_mib": 2700,
+      "draft_max": 0,
+      "group": "control",
+      "command": [
+        "<APP_PYTHON>",
+        "experiments/gemma4_26b_qat/mtp_probes.py",
+        "--root",
+        "<ARTIFACT_ROOT>",
+        "--adapter",
+        "luid_0x00000000_0x0000f60b_phys_0",
+        "--cache-mib",
+        "2700",
+        "--draft-max",
+        "0",
+        "--group",
+        "control",
+        "--run-id",
+        "mtp-n24-c2700-off-d2",
+        "--allow-pressure"
+      ]
+    },
+    {
+      "run": "mtp-n24-c2700-d4-c2",
+      "cache_mib": 2700,
+      "draft_max": 4,
+      "group": "repeat",
+      "command": [
+        "<APP_PYTHON>",
+        "experiments/gemma4_26b_qat/mtp_probes.py",
+        "--root",
+        "<ARTIFACT_ROOT>",
+        "--adapter",
+        "luid_0x00000000_0x0000f60b_phys_0",
+        "--cache-mib",
+        "2700",
+        "--draft-max",
+        "4",
+        "--group",
+        "repeat",
+        "--run-id",
+        "mtp-n24-c2700-d4-c2",
+        "--allow-pressure"
+      ]
+    },
+    {
+      "run": "mtp-n24-c2890-d4-b2",
+      "cache_mib": 2890,
+      "draft_max": 4,
+      "group": "repeat",
+      "command": [
+        "<APP_PYTHON>",
+        "experiments/gemma4_26b_qat/mtp_probes.py",
+        "--root",
+        "<ARTIFACT_ROOT>",
+        "--adapter",
+        "luid_0x00000000_0x0000f60b_phys_0",
+        "--cache-mib",
+        "2890",
+        "--draft-max",
+        "4",
+        "--group",
+        "repeat",
+        "--run-id",
+        "mtp-n24-c2890-d4-b2",
+        "--allow-pressure"
+      ]
+    },
+    {
+      "run": "mtp-n24-c2890-off-a2",
+      "cache_mib": 2890,
+      "draft_max": 0,
+      "group": "control",
+      "command": [
+        "<APP_PYTHON>",
+        "experiments/gemma4_26b_qat/mtp_probes.py",
+        "--root",
+        "<ARTIFACT_ROOT>",
+        "--adapter",
+        "luid_0x00000000_0x0000f60b_phys_0",
+        "--cache-mib",
+        "2890",
+        "--draft-max",
+        "0",
+        "--group",
+        "control",
+        "--run-id",
+        "mtp-n24-c2890-off-a2",
+        "--allow-pressure"
+      ]
+    }
+  ],
+  "decision": "Director keeps2700 as distinctly reduced arm if targetclass; no unnecessary back-fill because unchanged2890 alreadyfits.",
+  "invariants": "44requestworkload/sampling/context/slots/nativecontrols unchanged. One owned modelserver; runtimeconflict observation and owner-only watchdog retained."
+}

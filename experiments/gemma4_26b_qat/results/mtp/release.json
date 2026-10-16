@@ -1,0 +1,65 @@
+{
+  "observed_utc": "2026-10-16T00:33:11.667950+00:00",
+  "model_runtime_processes": [],
+  "resources": {
+    "system_available_physical_bytes": 16389345280,
+    "system_committed_bytes": 57474813952,
+    "system_commit_limit_bytes": 76883087360,
+    "system_commit_headroom_bytes": 19408273408,
+    "device_gpu_dedicated_bytes": 4302352384.0,
+    "device_gpu_shared_bytes": 542408704.0,
+    "device_gpu_committed_bytes": 5333680128.0,
+    "system_pages_input_per_second": 0.0,
+    "system_page_reads_per_second": 0.0
+  },
+  "counter_errors": {},
+  "owned_exits": [
+    {
+      "profile": "mtp-n24-c2890-off-a1",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2890-d4-b1",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2700-d4-c1",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2700-off-d1",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2700-off-d2",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2700-d4-c2",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2890-d4-b2",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2890-off-a2",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    },
+    {
+      "profile": "mtp-n24-c2890-d2-e1",
+      "process_exit_code": 0,
+      "shutdown": "graceful_console_ctrl_c"
+    }
+  ],
+  "observers": "All per-run sampler threads and Windows handles closed in native lifecycle finally blocks; no long-lived service created.",
+  "cleanup": "No owned modelserver remains. Unique raw evidence retained externally; no unrelated process stopped, no app/GUI/audio/UDP/provider service created."
+}

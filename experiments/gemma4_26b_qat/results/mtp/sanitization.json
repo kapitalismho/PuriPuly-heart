@@ -1,0 +1,9 @@
+{
+  "status": "no_matches",
+  "scope": ["results/mtp/", "MTP.md", "MTP_TIMINGS.md"],
+  "method": "Specialized regex/literal scan for explicit Windows drive paths, the known local username path, and HF credential assignment patterns.",
+  "observed_result": "No matches found.",
+  "published_boundaries": "Private roots/checkouts/model/Python paths use explicit placeholders. Original path-bearing logs and raw samples stay external. Inputs/history/translations are the fixed synthetic fixture. Lifecycle conflict observations capture names/PIDs only, not unrelated command lines.",
+  "environment_policy": "Owned model child environments omit HF_TOKEN, HUGGING_FACE_HUB_TOKEN and LLAMA_* variables; the existing source-known GGML control allowlist is removed. This is not an all-environment-secret removal claim.",
+  "limits": "Bounded path/credential-pattern scan, not comprehensive secret detection. Native addresses/PIDs/adapter IDs required for experimental evidence remain; no personal local paths are published."
+}

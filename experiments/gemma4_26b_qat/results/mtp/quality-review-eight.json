@@ -1,0 +1,131 @@
+{
+  "activity": "MTP bounded quality continuation: new tenth pair and eight-run coverage",
+  "status": "Complete for the observed 8-run/352-output snapshot; not final frozen coverage.",
+  "source": "experiments/gemma4_26b_qat/results/mtp/quality-unique.json",
+  "snapshot": {
+    "recorded_runs": 8,
+    "recorded_output_occurrences": 352,
+    "unique_pairs": 10,
+    "unique_source_inputs": 6,
+    "identical_previously_reviewed_pairs": 9,
+    "occurrences_covered_by_original_nine_judgments": 350,
+    "new_pairs_reviewed_now": 1,
+    "new_pair_occurrences_reviewed_now": 2,
+    "reviewed_occurrences_total": 352,
+    "unreviewed_occurrences": 0
+  },
+  "new_per_id_judgments": [
+    {
+      "id": "50c90b165fa41d4a",
+      "input": "Mina did not buy 12 tickets; she bought 2.",
+      "output": "미나는 티켓을 12장 산 게 아니라, 2장 샀어요.",
+      "judgment": "Core meaning preserved; natural Korean topic-particle variant, not material translation degradation.",
+      "concrete_evidence": "'Mina' remains '미나'; '12 tickets' and its rejection remain '티켓을 12장 산 게 아니라'; the actual purchase remains '2장 샀어요'. The negative correction rejects twelve rather than two. The complete sentence contains no visible truncation, pathological repetition, reasoning trace, or explanatory leakage.",
+      "caveat": "This is NOT an identical string to the original '미나가 ...' variant, so it was independently reviewed. '미나는' uses the topic marker '는' instead of nominative '가', potentially giving mild topic/contrast emphasis. That ordinary discourse choice does not change the buyer, quantities, purchase, or negation. Unlike '2장만', this variant does not explicitly add 'only two'.",
+      "configuration_attribution": "The new wording is observed in two max-4 MTP-enabled runs, one at each cache size, and not in the MTP-off records in this snapshot. It is a configuration-associated wording difference in the retained observations, not observed configuration-specific semantic damage or proof that MTP caused a quality change.",
+      "recorded_occurrences": 2,
+      "recorded_occurrences_all_eos": true,
+      "automated_checks": {
+        "nonempty": true,
+        "numbers_present": true,
+        "no_reasoning": true,
+        "not_truncated": true
+      },
+      "occurrences": [
+        {
+          "run": "mtp-n24-c2700-d4-c1",
+          "phase": "simultaneous_pairs",
+          "channel": "Peer",
+          "round": 12,
+          "stop_type": "eos"
+        },
+        {
+          "run": "mtp-n24-c2890-d4-b2",
+          "phase": "simultaneous_pairs",
+          "channel": "Peer",
+          "round": 0,
+          "stop_type": "eos"
+        }
+      ]
+    }
+  ],
+  "per_id_snapshot_counts": [
+    {
+      "id": "1351f036a4fcd63f",
+      "occurrences": 31,
+      "review": "Exact original source/output; original judgment retained."
+    },
+    {
+      "id": "27ca1947fd98eff1",
+      "occurrences": 30,
+      "review": "Exact original source/output; original judgment retained."
+    },
+    {
+      "id": "2e37d3748acd5be0",
+      "occurrences": 8,
+      "review": "Exact original source/output; original judgment retained."
+    },
+    {
+      "id": "4e2fb418d6a53458",
+      "occurrences": 31,
+      "review": "Exact original source/output; original judgment retained."
+    },
+    {
+      "id": "50c90b165fa41d4a",
+      "occurrences": 2,
+      "review": "New independent judgment above."
+    },
+    {
+      "id": "6b4ce7e12d25567b",
+      "occurrences": 56,
+      "review": "Exact original source/output; original judgment retained."
+    },
+    {
+      "id": "8eeb9630ba4e5b92",
+      "occurrences": 26,
+      "review": "Exact original source/output; original temporal caveat retained."
+    },
+    {
+      "id": "9db61efbd35b1374",
+      "occurrences": 56,
+      "review": "Exact original source/output; original judgment and implicit-subject caveat retained."
+    },
+    {
+      "id": "ccfe38c884f599bd",
+      "occurrences": 56,
+      "review": "Exact original source/output; original judgment retained."
+    },
+    {
+      "id": "ffb4415c4591f5ca",
+      "occurrences": 56,
+      "review": "Exact original source/output; original judgment retained."
+    }
+  ],
+  "coverage_observations": {
+    "recorded_eos_occurrences": 352,
+    "non_eos_or_missing_stop_type_anomalies": [],
+    "required_automated_predicates": "nonempty, numbers_present, no_reasoning, and not_truncated are true on all ten pair records.",
+    "predicate_anomalies": [],
+    "per_run": "Each of the eight recorded runs contains exactly the expected 44 unique phase/channel/round identities, with no missing, unexpected, or duplicate identities.",
+    "phase_totals": {
+      "first_prefix": 16,
+      "serial_pairs": 96,
+      "simultaneous_pairs": 240
+    },
+    "channel_totals": {
+      "Self": 176,
+      "Peer": 176
+    }
+  },
+  "retained_shared_caveats": {
+    "within_five_minutes": "26 outputs use '5분 안에' (within five minutes), versus 30 using '5분 뒤에' (five minutes later). The upper-bound wording remains an inherited temporal-fidelity imprecision.",
+    "only_two": "31 outputs use '2장만', adding only-two emphasis. The other 33 Mina outputs, including the new topic-particle variant, lack that explicit marker.",
+    "other": "The original minor contextual, aspect, and punctuation caveats remain unchanged."
+  },
+  "limitations": [
+    "This is the read snapshot containing the eight main lifecycles. A possible max-2 probe is not included; later final aggregation requires fresh coverage confirmation.",
+    "Recorded EOS and automated predicates were inspected in the quality ledger, not rerun or independently reconciled with raw runtime logs.",
+    "No broad model-quality, causal MTP-quality, performance, memory, eligibility, or recommendation conclusion follows from this bounded synthetic review. Original tuning conclusions remain unchanged.",
+    "Read-only inspection only; no files, model/runtime state, or Git/GitHub state changed."
+  ]
+}

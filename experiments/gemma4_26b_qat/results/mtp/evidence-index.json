@@ -1,0 +1,128 @@
+{
+  "issue": 254,
+  "baseline_commit": "c451f1b04a940f8d3e297ca58d13eefc338baee8",
+  "report": "../../MTP.md",
+  "all_timings": "../../MTP_TIMINGS.md",
+  "cohort": "Separate owner-authorized MTP followup; prior tuning8gib evidence unchanged and not pooled.",
+  "runs": 9,
+  "completed_requests": 396,
+  "configurations": 5,
+  "unique_pairs": 10,
+  "entrypoints": {
+    "prerequisites": "prerequisites.json",
+    "source_interpretation": "runtime-research.json",
+    "summary": "summary.json",
+    "memory_audit": "memory-audit.json",
+    "counterbalanced_plan": "max4-plan.json",
+    "bounded_refinement": "max2-decision.json",
+    "workload_inheritance": "workload-inheritance.json",
+    "new_pair_independent_judgment": "quality-review-eight.json",
+    "final_original_request_quality_audit": "quality-confirmation.json",
+    "prior_nine_exact_pair_judgments": "../tuning8gib/quality-review-initial.json",
+    "focused_checks": "focused-check.json",
+    "release": "release.json",
+    "recommendation": "recommendation.json",
+    "sanitization": "sanitization.json"
+  },
+  "per_run": [
+    {
+      "id": "mtp-n24-c2890-off-a1",
+      "configuration": "c2890-off",
+      "result": "mtp-n24-c2890-off-a1.json",
+      "preflight": "mtp-n24-c2890-off-a1.headroom.json",
+      "native_log": "mtp-n24-c2890-off-a1.native.log",
+      "slot_evidence": "mtp-n24-c2890-off-a1.slots.json",
+      "samples": "mtp-n24-c2890-off-a1.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2890-d4-b1",
+      "configuration": "c2890-mtp4",
+      "result": "mtp-n24-c2890-d4-b1.json",
+      "preflight": "mtp-n24-c2890-d4-b1.headroom.json",
+      "native_log": "mtp-n24-c2890-d4-b1.native.log",
+      "slot_evidence": "mtp-n24-c2890-d4-b1.slots.json",
+      "samples": "mtp-n24-c2890-d4-b1.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2700-d4-c1",
+      "configuration": "c2700-mtp4",
+      "result": "mtp-n24-c2700-d4-c1.json",
+      "preflight": "mtp-n24-c2700-d4-c1.headroom.json",
+      "native_log": "mtp-n24-c2700-d4-c1.native.log",
+      "slot_evidence": "mtp-n24-c2700-d4-c1.slots.json",
+      "samples": "mtp-n24-c2700-d4-c1.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2700-off-d1",
+      "configuration": "c2700-off",
+      "result": "mtp-n24-c2700-off-d1.json",
+      "preflight": "mtp-n24-c2700-off-d1.headroom.json",
+      "native_log": "mtp-n24-c2700-off-d1.native.log",
+      "slot_evidence": "mtp-n24-c2700-off-d1.slots.json",
+      "samples": "mtp-n24-c2700-off-d1.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2700-off-d2",
+      "configuration": "c2700-off",
+      "result": "mtp-n24-c2700-off-d2.json",
+      "preflight": "mtp-n24-c2700-off-d2.headroom.json",
+      "native_log": "mtp-n24-c2700-off-d2.native.log",
+      "slot_evidence": "mtp-n24-c2700-off-d2.slots.json",
+      "samples": "mtp-n24-c2700-off-d2.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2700-d4-c2",
+      "configuration": "c2700-mtp4",
+      "result": "mtp-n24-c2700-d4-c2.json",
+      "preflight": "mtp-n24-c2700-d4-c2.headroom.json",
+      "native_log": "mtp-n24-c2700-d4-c2.native.log",
+      "slot_evidence": "mtp-n24-c2700-d4-c2.slots.json",
+      "samples": "mtp-n24-c2700-d4-c2.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2890-d4-b2",
+      "configuration": "c2890-mtp4",
+      "result": "mtp-n24-c2890-d4-b2.json",
+      "preflight": "mtp-n24-c2890-d4-b2.headroom.json",
+      "native_log": "mtp-n24-c2890-d4-b2.native.log",
+      "slot_evidence": "mtp-n24-c2890-d4-b2.slots.json",
+      "samples": "mtp-n24-c2890-d4-b2.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2890-off-a2",
+      "configuration": "c2890-off",
+      "result": "mtp-n24-c2890-off-a2.json",
+      "preflight": "mtp-n24-c2890-off-a2.headroom.json",
+      "native_log": "mtp-n24-c2890-off-a2.native.log",
+      "slot_evidence": "mtp-n24-c2890-off-a2.slots.json",
+      "samples": "mtp-n24-c2890-off-a2.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    },
+    {
+      "id": "mtp-n24-c2890-d2-e1",
+      "configuration": "c2890-mtp2",
+      "result": "mtp-n24-c2890-d2-e1.json",
+      "preflight": "mtp-n24-c2890-d2-e1.headroom.json",
+      "native_log": "mtp-n24-c2890-d2-e1.native.log",
+      "slot_evidence": "mtp-n24-c2890-d2-e1.slots.json",
+      "samples": "mtp-n24-c2890-d2-e1.samples.jsonl",
+      "commands": "Exact sanitized command/probe_command token arrays in resultJSON; full final native response metadata retained per request."
+    }
+  ],
+  "owned_source_changes": [
+    "run_matrix.py optional final-response metadata capture; default request behavior retained",
+    "mtp_acquire.py",
+    "mtp_probes.py",
+    "summarize_mtp.py",
+    "mtp_memory_audit.py"
+  ],
+  "raw_evidence": "<ARTIFACT_ROOT>/mtp/runs/<run-id>/; target and pinned drafter under external models/; no path-bearing originals imported.",
+  "limits": "Sampled PIDdedicated lower bounds on24GiB-class7900XTX, not physical8GiBfit. Separate memory views not additive. Independent quality audit reads originalJSON/ledger, not raw nativeEOS reproduction. Director owns pin/review/publication; owner adoption pending."
+}

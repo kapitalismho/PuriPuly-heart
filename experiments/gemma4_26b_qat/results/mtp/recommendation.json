@@ -1,0 +1,341 @@
+{
+  "status": "supported_negative_MTP_followup_not_owner_adoption",
+  "baseline_commit": "c451f1b04a940f8d3e297ca58d13eefc338baee8",
+  "cohort": "owner_authorized_mtp_followup_only",
+  "recommendation": "Do not enable the tested Q4_0MTP configurations for this fixed short Self/Peer workload; retain the prior experimental n24/cache2890/MTPoff recommendation. Official owner disposition remains pending.",
+  "requested_arms": {
+    "c2890-off": 2,
+    "c2890-mtp4": 2,
+    "c2700-off": 2,
+    "c2700-mtp4": 2
+  },
+  "max2_refinement": {
+    "configuration": "c2890-mtp2",
+    "runs": 1,
+    "purpose": "Bounded test of reduced drafting/rejection overhead",
+    "median_ms": 815.0409000081709,
+    "decision": "Retained exploratory negative. It exceeds both fresh off medians and their observed spread; earliest E1 cannot be removed or rescued by more repeats. Not a repeated or universal max2 inferiority claim. Reduced max2 not decision-relevant; Director approved stopping."
+  },
+  "comparisons": {
+    "c2700-mtp4": {
+      "c2700-mtp4": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 0.0,
+        "pair_p95_gain_ms": 0.0,
+        "serial_median_gain_ms": 0.0,
+        "serial_p95_gain_ms": 0.0,
+        "dedicated_delta_bytes": 0.0
+      },
+      "c2700-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -99.78410000621807,
+        "pair_p95_gain_ms": -312.9633999924408,
+        "serial_median_gain_ms": -24.042299992288463,
+        "serial_p95_gain_ms": -180.61779999698047,
+        "dedicated_delta_bytes": 3227648.0
+      },
+      "c2890-mtp2": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -102.84349998983089,
+        "pair_p95_gain_ms": -208.17189999797847,
+        "serial_median_gain_ms": -114.4572999983211,
+        "serial_p95_gain_ms": -195.2065999939805,
+        "dedicated_delta_bytes": -198451200.0
+      },
+      "c2890-mtp4": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -22.25479999469826,
+        "pair_p95_gain_ms": -36.777699991944246,
+        "serial_median_gain_ms": -26.862599996093195,
+        "serial_p95_gain_ms": 0.604800006840378,
+        "dedicated_delta_bytes": -197926912.0
+      },
+      "c2890-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -156.1514499990153,
+        "pair_p95_gain_ms": -330.5164000048535,
+        "serial_median_gain_ms": -63.684999993711244,
+        "serial_p95_gain_ms": -211.09679999062791,
+        "dedicated_delta_bytes": -194166784.0
+      }
+    },
+    "c2700-off": {
+      "c2700-mtp4": {
+        "all_repeat_standard": true,
+        "pair_median_gain_ms": 99.78410000621807,
+        "pair_p95_gain_ms": 312.9633999924408,
+        "serial_median_gain_ms": 24.042299992288463,
+        "serial_p95_gain_ms": 180.61779999698047,
+        "dedicated_delta_bytes": -3227648.0
+      },
+      "c2700-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 0.0,
+        "pair_p95_gain_ms": 0.0,
+        "serial_median_gain_ms": 0.0,
+        "serial_p95_gain_ms": 0.0,
+        "dedicated_delta_bytes": 0.0
+      },
+      "c2890-mtp2": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -3.0593999836128205,
+        "pair_p95_gain_ms": 104.79149999446236,
+        "serial_median_gain_ms": -90.41500000603264,
+        "serial_p95_gain_ms": -14.588799997000024,
+        "dedicated_delta_bytes": -201678848.0
+      },
+      "c2890-mtp4": {
+        "all_repeat_standard": true,
+        "pair_median_gain_ms": 77.52930001151981,
+        "pair_p95_gain_ms": 276.1857000004966,
+        "serial_median_gain_ms": -2.820300003804732,
+        "serial_p95_gain_ms": 181.22260000382084,
+        "dedicated_delta_bytes": -201154560.0
+      },
+      "c2890-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -56.367349992797244,
+        "pair_p95_gain_ms": -17.553000012412667,
+        "serial_median_gain_ms": -39.64270000142278,
+        "serial_p95_gain_ms": -30.47899999364745,
+        "dedicated_delta_bytes": -197394432.0
+      }
+    },
+    "c2890-mtp2": {
+      "c2700-mtp4": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 102.84349998983089,
+        "pair_p95_gain_ms": 208.17189999797847,
+        "serial_median_gain_ms": 114.4572999983211,
+        "serial_p95_gain_ms": 195.2065999939805,
+        "dedicated_delta_bytes": 198451200.0
+      },
+      "c2700-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 3.0593999836128205,
+        "pair_p95_gain_ms": -104.79149999446236,
+        "serial_median_gain_ms": 90.41500000603264,
+        "serial_p95_gain_ms": 14.588799997000024,
+        "dedicated_delta_bytes": 201678848.0
+      },
+      "c2890-mtp2": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 0.0,
+        "pair_p95_gain_ms": 0.0,
+        "serial_median_gain_ms": 0.0,
+        "serial_p95_gain_ms": 0.0,
+        "dedicated_delta_bytes": 0.0
+      },
+      "c2890-mtp4": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 80.58869999513263,
+        "pair_p95_gain_ms": 171.39420000603423,
+        "serial_median_gain_ms": 87.59470000222791,
+        "serial_p95_gain_ms": 195.81140000082087,
+        "dedicated_delta_bytes": 524288.0
+      },
+      "c2890-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -53.307950009184424,
+        "pair_p95_gain_ms": -122.34450000687502,
+        "serial_median_gain_ms": 50.77230000460986,
+        "serial_p95_gain_ms": -15.890199996647425,
+        "dedicated_delta_bytes": 4284416.0
+      }
+    },
+    "c2890-mtp4": {
+      "c2700-mtp4": {
+        "all_repeat_standard": true,
+        "pair_median_gain_ms": 22.25479999469826,
+        "pair_p95_gain_ms": 36.777699991944246,
+        "serial_median_gain_ms": 26.862599996093195,
+        "serial_p95_gain_ms": -0.604800006840378,
+        "dedicated_delta_bytes": 197926912.0
+      },
+      "c2700-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -77.52930001151981,
+        "pair_p95_gain_ms": -276.1857000004966,
+        "serial_median_gain_ms": 2.820300003804732,
+        "serial_p95_gain_ms": -181.22260000382084,
+        "dedicated_delta_bytes": 201154560.0
+      },
+      "c2890-mtp2": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -80.58869999513263,
+        "pair_p95_gain_ms": -171.39420000603423,
+        "serial_median_gain_ms": -87.59470000222791,
+        "serial_p95_gain_ms": -195.81140000082087,
+        "dedicated_delta_bytes": -524288.0
+      },
+      "c2890-mtp4": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 0.0,
+        "pair_p95_gain_ms": 0.0,
+        "serial_median_gain_ms": 0.0,
+        "serial_p95_gain_ms": 0.0,
+        "dedicated_delta_bytes": 0.0
+      },
+      "c2890-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": -133.89665000431705,
+        "pair_p95_gain_ms": -293.73870001290925,
+        "serial_median_gain_ms": -36.82239999761805,
+        "serial_p95_gain_ms": -211.7015999974683,
+        "dedicated_delta_bytes": 3760128.0
+      }
+    },
+    "c2890-off": {
+      "c2700-mtp4": {
+        "all_repeat_standard": true,
+        "pair_median_gain_ms": 156.1514499990153,
+        "pair_p95_gain_ms": 330.5164000048535,
+        "serial_median_gain_ms": 63.684999993711244,
+        "serial_p95_gain_ms": 211.09679999062791,
+        "dedicated_delta_bytes": 194166784.0
+      },
+      "c2700-off": {
+        "all_repeat_standard": true,
+        "pair_median_gain_ms": 56.367349992797244,
+        "pair_p95_gain_ms": 17.553000012412667,
+        "serial_median_gain_ms": 39.64270000142278,
+        "serial_p95_gain_ms": 30.47899999364745,
+        "dedicated_delta_bytes": 197394432.0
+      },
+      "c2890-mtp2": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 53.307950009184424,
+        "pair_p95_gain_ms": 122.34450000687502,
+        "serial_median_gain_ms": -50.77230000460986,
+        "serial_p95_gain_ms": 15.890199996647425,
+        "dedicated_delta_bytes": -4284416.0
+      },
+      "c2890-mtp4": {
+        "all_repeat_standard": true,
+        "pair_median_gain_ms": 133.89665000431705,
+        "pair_p95_gain_ms": 293.73870001290925,
+        "serial_median_gain_ms": 36.82239999761805,
+        "serial_p95_gain_ms": 211.7015999974683,
+        "dedicated_delta_bytes": -3760128.0
+      },
+      "c2890-off": {
+        "all_repeat_standard": false,
+        "pair_median_gain_ms": 0.0,
+        "pair_p95_gain_ms": 0.0,
+        "serial_median_gain_ms": 0.0,
+        "serial_p95_gain_ms": 0.0,
+        "dedicated_delta_bytes": 0.0
+      }
+    }
+  },
+  "memory": {
+    "c2890-off": {
+      "class": "target",
+      "peak": {
+        "bytes": 8525266944.0,
+        "GiB": 7.9397735595703125,
+        "GB": 8.525266944
+      },
+      "margins": {
+        "target": {
+          "bytes": 64667648.0,
+          "MiB": 61.671875,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 172041830.0,
+          "MiB": 164.07187461853027,
+          "marginal": false
+        }
+      },
+      "observed_peak_variation_bytes": 0.0
+    },
+    "c2890-mtp4": {
+      "class": "target",
+      "peak": {
+        "bytes": 8529027072.0,
+        "GiB": 7.943275451660156,
+        "GB": 8.529027072
+      },
+      "margins": {
+        "target": {
+          "bytes": 60907520.0,
+          "MiB": 58.0859375,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 168281702.0,
+          "MiB": 160.48593711853027,
+          "marginal": false
+        }
+      },
+      "observed_peak_variation_bytes": 0.0
+    },
+    "c2700-off": {
+      "class": "target",
+      "peak": {
+        "bytes": 8327872512.0,
+        "GiB": 7.7559356689453125,
+        "GB": 8.327872512
+      },
+      "margins": {
+        "target": {
+          "bytes": 262062080.0,
+          "MiB": 249.921875,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 369436262.0,
+          "MiB": 352.3218746185303,
+          "marginal": false
+        }
+      },
+      "observed_peak_variation_bytes": 0.0
+    },
+    "c2700-mtp4": {
+      "class": "target",
+      "peak": {
+        "bytes": 8331100160.0,
+        "GiB": 7.758941650390625,
+        "GB": 8.33110016
+      },
+      "margins": {
+        "target": {
+          "bytes": 258834432.0,
+          "MiB": 246.84375,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 366208614.0,
+          "MiB": 349.2437496185303,
+          "marginal": false
+        }
+      },
+      "observed_peak_variation_bytes": 0.0
+    },
+    "c2890-mtp2": {
+      "class": "target",
+      "peak": {
+        "bytes": 8529551360.0,
+        "GiB": 7.943763732910156,
+        "GB": 8.52955136
+      },
+      "margins": {
+        "target": {
+          "bytes": 60383232.0,
+          "MiB": 57.5859375,
+          "marginal": false
+        },
+        "ceiling": {
+          "bytes": 167757414.0,
+          "MiB": 159.98593711853027,
+          "marginal": false
+        }
+      },
+      "observed_peak_variation_bytes": 0.0
+    }
+  },
+  "file_size_estimate_correction": "The initial ~2700MiB cache estimate subtracted drafter file size from headroom. Both2890/MTP4 repeats already satisfy the WindowsPIDdedicated target. This corrects that planning proxy, NOT establishes zero drafter cost or physicalMTPcost≈4MiB. Real225.21MiB Vulkan0 model/144MiB host/62.12MiB compute buffers and higher other accounting views remain; per-buffer physical backing/residency unmeasured.",
+  "quality": "396EOS outputs/10exact pairs/6sources, independently reviewed and original-request/ledger matched. Inherited temporal/emphasis/grammar caveats retained; not full-model quality certification.",
+  "scope": "No product/settings/runtime/backend/driver/targetmodel change, no app/GUI/audio/physical8GiB/coexistence or adoption claim. Prior c451 evidence unmodified."
+}

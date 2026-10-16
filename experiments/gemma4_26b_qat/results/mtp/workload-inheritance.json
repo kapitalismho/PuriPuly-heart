@@ -1,0 +1,16 @@
+{
+  "historical_commit": "c451f1b04a940f8d3e297ca58d13eefc338baee8",
+  "historical_run": "tuning8gib-clean-n24-c2890-refine-r1",
+  "fresh_run": "mtp-n24-c2890-off-a1",
+  "request_count": 44,
+  "all_input_sampling_identities_equal": true,
+  "all_prompt_evaluated_cache_counts_equal": true,
+  "output_token_differences": [
+    {
+      "ordinal": 21,
+      "historical_O": 21,
+      "fresh_O": 22
+    }
+  ],
+  "limit": "Fixture/prompt identity comparison only. Historical timing/memory is not pooled or used as a fresh MTP control."
+}

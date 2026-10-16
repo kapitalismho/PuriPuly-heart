@@ -1,0 +1,197 @@
+{
+  "activity": "Final independent bounded MTP quality and occurrence-coverage confirmation",
+  "status": "Complete for the frozen nine-run MTP set.",
+  "final_counts": {
+    "recorded_runs": 9,
+    "original_completed_request_records": 396,
+    "unique_pair_ledger_occurrences": 396,
+    "recorded_eos_outputs": 396,
+    "unique_input_output_pairs": 10,
+    "unique_source_inputs": 6,
+    "exact_pairs_matching_prior_ten_judgments": 10,
+    "new_or_changed_pairs_since_last_review": 0,
+    "reviewed_output_occurrences": 396,
+    "unreviewed_output_occurrences": 0
+  },
+  "sources_and_method": {
+    "sources": [
+      "experiments/gemma4_26b_qat/results/mtp/quality-unique.json",
+      "experiments/gemma4_26b_qat/results/mtp/summary.json",
+      "All nine corresponding original results/mtp/<profile>.json request records"
+    ],
+    "concrete_ledger_relationship": "summarize_mtp.py:52–64 groups original requests by exact (input, output), copies quality_checks into each pair record, and appends run/phase/channel/round/stop_type to its occurrence ledger.",
+    "independent_reconciliation": "Compared the complete multiset of (run, phase, channel, round, input, output, stop_type) from all original requests against the final unique-pair ledger. They match exactly, including multiplicity. Also checked every original request's four required quality predicates and their equality with its corresponding pair record.",
+    "judgment_reuse": "Read the final strings and confirmed exact source AND output equality with the prior ten judgments. The ten IDs alone were not treated as sufficient evidence.",
+    "quality_review_assembly": "This confirmation does not depend on the still-assembling quality-review artifact."
+  },
+  "per_id_final_coverage": [
+    {
+      "id": "1351f036a4fcd63f",
+      "occurrences": 33,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "27ca1947fd98eff1",
+      "occurrences": 34,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "2e37d3748acd5be0",
+      "occurrences": 9,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "4e2fb418d6a53458",
+      "occurrences": 37,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "50c90b165fa41d4a",
+      "occurrences": 2,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "6b4ce7e12d25567b",
+      "occurrences": 63,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "8eeb9630ba4e5b92",
+      "occurrences": 29,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "9db61efbd35b1374",
+      "occurrences": 63,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "ccfe38c884f599bd",
+      "occurrences": 63,
+      "exact_prior_judgment_string_match": true
+    },
+    {
+      "id": "ffb4415c4591f5ca",
+      "occurrences": 63,
+      "exact_prior_judgment_string_match": true
+    }
+  ],
+  "run_coverage": [
+    {
+      "run": "mtp-n24-c2700-d4-c1",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2700-d4-c2",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2700-off-d1",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2700-off-d2",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2890-d2-e1",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2890-d4-b1",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2890-d4-b2",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2890-off-a1",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    },
+    {
+      "run": "mtp-n24-c2890-off-a2",
+      "original_requests": 44,
+      "ledger_occurrences": 44
+    }
+  ],
+  "every_occurrence_confirmation": {
+    "expected_request_identities": "Every run has exactly one Self and one Peer request for first_prefix round 0, serial_pairs rounds 0–5, and simultaneous_pairs rounds 0–14.",
+    "missing_unexpected_or_duplicate_request_identities": [],
+    "original_requests_missing_from_ledger": [],
+    "ledger_occurrences_without_matching_original_requests": [],
+    "original_request_statuses": "All 396 original request records have status completed.",
+    "original_non_eos_or_missing_stop_type_records": [],
+    "required_predicates": "nonempty, numbers_present, no_reasoning, and not_truncated are true for every one of the 396 original requests and all ten pair records.",
+    "false_or_missing_predicate_anomalies": [],
+    "original_request_to_pair_predicate_mismatches": [],
+    "summary_counts_and_run_set": "The summary's 396 completed requests, ten unique pairs, and nine profile names agree with both original records and the final ledger.",
+    "phase_totals": {
+      "first_prefix": 18,
+      "serial_pairs": 108,
+      "simultaneous_pairs": 270
+    },
+    "channel_totals": {
+      "Self": 198,
+      "Peer": 198
+    }
+  },
+  "new_tenth_pair_final_judgment": {
+    "id": "50c90b165fa41d4a",
+    "input": "Mina did not buy 12 tickets; she bought 2.",
+    "output": "미나는 티켓을 12장 산 게 아니라, 2장 샀어요.",
+    "final_occurrences": 2,
+    "judgment": "Previously reviewed judgment remains applicable: Mina, the rejected twelve-ticket quantity, actual two-ticket purchase, and corrective negation are preserved. '미나는' uses a natural topic marker instead of the original variant's '미나가'; mild discourse emphasis does not create material semantic damage. This variant has no explicit only-two marker.",
+    "surface": "Complete sentence, with no visible truncation, pathological repetition, reasoning trace, or explanatory leakage; both original occurrence records end with eos.",
+    "occurrences": [
+      {
+        "run": "mtp-n24-c2700-d4-c1",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 12
+      },
+      {
+        "run": "mtp-n24-c2890-d4-b2",
+        "phase": "simultaneous_pairs",
+        "channel": "Peer",
+        "round": 0
+      }
+    ],
+    "max2_extension": "The final max-2 run adds no previously unreviewed input/output string and no occurrence of this tenth pair."
+  },
+  "preserved_caveats": {
+    "temporal": {
+      "id": "8eeb9630ba4e5b92",
+      "occurrences": 29,
+      "finding": "'5분 안에 돌아올게요' means within five minutes, not precisely the source's ordinary approximately-five-minutes-later meaning. The other 34 waiting-source outputs say '5분 뒤에'. Preserve the inherited temporal-fidelity distinction."
+    },
+    "only_two": {
+      "id": "1351f036a4fcd63f",
+      "occurrences": 33,
+      "finding": "'2장만' adds explicit only-two emphasis. The other 39 Mina outputs lack that explicit marker, including the two topic-particle variants."
+    },
+    "implicit_subject": {
+      "id": "9db61efbd35b1374",
+      "occurrences": 63,
+      "finding": "'I mentioned earlier' resolves a subject left implicit by the Korean source. The original contextual-explicitation caveat remains."
+    },
+    "other": "All original minor aspect, contextual omission, and punctuation caveats remain attached to their exact strings; the review is not an unconditional word-for-word fidelity pass."
+  },
+  "semantic_result": "All 396 final outputs are covered by the ten bounded judgments. The fixture's names, quantities, negations, ownership correction, red-versus-blue destination, and joking correction retain their reviewed core meanings. No new configuration-specific material semantic damage, visible truncation, pathological repetition, or reasoning leakage is observed. The tenth wording variant remains a disclosed MTP-enabled observation, not evidence of a causal quality loss or gain.",
+  "mismatches": [],
+  "boundaries": [
+    "This is final coverage for the supplied frozen native MTP records, not a provisional eight-run snapshot.",
+    "Original request JSON was reconciled directly; raw HTTP streams and native completion logs were not independently audited or replayed.",
+    "Ten unique pairs across six synthetic sources do not establish broad model quality, full multilingual fidelity, or superiority.",
+    "No MTP execution/acceptance, timing, memory, repeatability, eligibility, recommendation, product integration, or owner-adoption conclusion is made here. The original tuning conclusions remain unchanged.",
+    "Read-only inspection and static in-memory comparisons only. No file edits, model runs, product/runtime changes, or Git/GitHub mutations."
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "status": "complete_read_only_research",
+  "scope": "Read current #254 and owner-authorized separate MTP follow-up, Director conversation and applicable AGENTS.md. Inspected pinned upstream/HF sources, existing tooling, and retained first matched off/MTP evidence. Executed only the explicitly permitted local llama-server --help; no model/server/GPU launch, product edits, Git mutations, or new measurements.",
+  "decisive_timing_answer": {
+    "conclusion": "The pinned native /completion API decode TPS IS comparable as accepted/generated-output rate, with its documented first-token exclusion. It is NOT the same as libllama's global eval counter. A replacement derived accepted-output rate is not necessary to repair the API TPS numerator. Keep pair latency, HTTP wall and TTFT as the decision metrics; optionally add explicitly labeled whole-request output_tokens/client_wall_seconds.",
+    "formula": "timings.predicted_per_second = 1000 * max(predicted_n - 1, 0) / predicted_ms. predicted_n is generation tokens actually processed into the response, including EOS; it is not proposed draft tokens or verified target positions. The first generated token comes from prompt logits, so it is excluded from the rate numerator.",
+    "source": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-common.h#L394-L474",
+    "counting_proof": "server-context.cpp increments n_gen once per normal generated token and once per accepted-result token until process_token stops; speculative proposals and accepted draft counts use separate fields. It updates prompt-last after the first token and generation-last after subsequent generation/verification. Therefore predicted_ms covers the elapsed post-first-token generation interval, including drafting, verification, synchronization and scheduling, not pure GPU kernels.",
+    "counting_sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L4339-L4385",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L4474-L4528"
+    ],
+    "actual_observation": "First MTP B1 request retained predicted_n=13, predicted_ms=311.487 and predicted_per_second=38.5248822583: exactly 12/0.311487, not 13/0.311487 or 12 draft proposals/verification-run time. Native slot log shows 13 tokens but its per-token denominator is 12.",
+    "prefill_semantics": "timings.prompt_n is newly processed prompt tokens; timings.cache_n is cached prompt tokens. prompt_per_second = 1000*prompt_n/prompt_ms. The prompt interval runs from starting slot prompt processing through first-token sampling; it is elapsed server processing/scheduling time. Top-level tokens_evaluated is the FULL task prompt length, not newly evaluated tokens. Top-level tokens_cached is the retained slot prompt/KV length at completion, not prompt-cache hits. Preserve those raw fields but use timings.prompt_n/cache_n for matched prompt accounting.",
+    "serialization_sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-common.cpp#L84-L105",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-task.cpp#L332-L354",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L2220-L2255"
+    ],
+    "do_not_use": "libllama llama_perf_context_print's global prompt/eval TPS does not provide the same guarantee: synchronize() classifies one queued token as eval and more than one queued token as prompt work, so speculative verification and concurrent batches change those categories. Do not substitute these destructor counters for per-request API TPS.",
+    "libllama_source": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-context.cpp#L781-L802"
+  },
+  "exact_flags": {
+    "on_delta": "--model-draft <verified-local-Q4_0-file> --spec-type draft-mtp --spec-draft-n-max 4",
+    "offload": "--spec-draft-device Vulkan0 and --spec-draft-ngl 99 (or all) are supported if explicit placement is desired. They are not necessary to repair B1: its retained native log already proves 5/5 drafter layers offloaded to Vulkan0. Defaults are device follows target, draft ngl auto (-1), not inherited target ngl99.",
+    "preserved_controls": "common_base_params_to_speculative copies target common_params, including load-mode/threads/context/batch/flash settings, replaces draft model/device/ngl/tensor overrides, and explicitly sets draft moe_cache_size=0. It does not allocate a second MoE expert cache.",
+    "off_control_pitfall": "Use separate MTP-off commands omitting the draft model/HF path and all MTP flags. Appending --spec-type none after draft-mtp does not override it: the parser appends types. A supplied local draft with otherwise default/none types may also trigger GGUF-based type inference. A loaded draft alone is enough to enter server draft loading. Current off A1 retained /slots speculative:false and native 'no implementations specified', so this actual control is off.",
+    "sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/arg.cpp#L4160-L4176",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/arg.cpp#L4247-L4293",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/arg.cpp#L568-L574",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L2526-L2568"
+    ],
+    "model_readme": "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-qat-GGUF/blob/7b92b5b28818151e8669af2e45e88d6086f490dd/MTP/README.md",
+    "defaults": "Draft max defaults3, so max4 must be explicit. Draft minimum0, p_min0, greedy drafting, backend draft sampling enabled. Greedy draft sampling does not change target temperature0.6 into greedy target sampling. Do not add probabilistic-draft or synthetic-acceptance flags to this cohort silently."
+  },
+  "effective_mtp_proof": {
+    "per_request_api": "Native final timings always serialize draft_n and draft_n_accepted when proposals>0. These are per-request counters. Require actual nonzero proposals and accepted tokens, not only a model path or /slots flag.",
+    "native_logs": "At verbosity4: 'adding speculative implementation draft-mtp', n_max/n_min/p_min/embedding/backend-sampling configuration, 'speculative decoding context initialized', and each slot's 'draft acceptance = R ( A accepted / G generated), mean len = L'. Native common statistics also expose #gen tokens/#acc tokens and positional rates.",
+    "counter_cautions": [
+      "Common speculative statistics belong to the shared speculative object and are cumulative across slots/lifecycle, printed repeatedly at request boundaries. Do not sum every snapshot as independent per-request totals.",
+      "draft_n_accepted excludes the extra target-generated bonus token. Acceptance counters are updated before EOS/stop processing of the accepted block, so an accepted suffix past a stop can be counted without being delivered. Use predicted_n, not draft_n_accepted, for generated-output throughput.",
+      "Configured max4 is an upper bound. Context capacity and remaining prediction budget can clamp actual drafts. /slots speculative:true proves initialization, not successful proposal/acceptance."
+    ],
+    "sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L675-L721",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L3021-L3064",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L517-L536"
+    ],
+    "observed_b1": "Retained B1 log lines370–378 prove draft-mtp/max4 initialization; lines326–330 prove 5/5 drafter layers/Vulkan0 model225.21MiB and host144MiB; final cumulative log836 proposed/459 accepted agrees with the worker's result. Actual MTP execution is established, not inferred from flags."
+  },
+  "genuine_kv_sharing": {
+    "conclusion": "Yes, Gemma4 assistant aliases the target K/V tensors and cell state. This is real sharing, not a second full target-sized KV allocation.",
+    "mechanism": "Draft context receives ctx_other=target. For assistant layers, model memory creation selects target last SWA/full layers; llama_kv_cache copies the target layer tensor references and continues without creating fresh K/V tensors. The MTP driver detects shared memory and skips catch-up draft prefill.",
+    "sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L2607-L2639",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-model.cpp#L2857-L2885",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-kv-cache.cpp#L80-L99",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-kv-cache.cpp#L177-L191",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L1477-L1500"
+    ],
+    "actual_b1": "Native B1 lines349–357 explicitly show assistant layer3 sharing target29 and assistant0/1/2 sharing target28, with identical target K/V addresses. Its logical 18MiB and108MiB KV summaries are aliases, not126MiB fresh allocation.",
+    "size_reporting_pitfall": "size_k_bytes/size_v_bytes sum layer tensor sizes, including aliased references. Do not add assistant logical KV summaries to target KV to estimate incremental allocation.",
+    "size_source": "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-kv-cache.cpp#L1920-L1938"
+  },
+  "additional_allocations": {
+    "conclusion": "Shared KV does not mean zero memory cost. Drafter weights, compute/output/backend-sampling buffers, target nextn hidden-state outputs and CPU per-sequence carry/verification buffers remain. Target permitted output positions increase from3 to15 for parallel3/max4; separate drafter context/backends also exist.",
+    "duplicated_embedding": "Assistant loads its own token embedding table and a TENSOR_DUPLICATED output table. Input weights normally stay on CPU; a tied output on another buffer type becomes a second allocation. This explains a source-supported host144MiB component alongside the GPU225.21MiB model buffer, rather than requiring an invented host-only replacement for the drafter.",
+    "sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/models/gemma4-assistant.cpp#L28-L40",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-model.cpp#L1632-L1642",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-model-loader.cpp#L1160-L1166",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-model-loader.cpp#L1368-L1388",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/src/llama-context.cpp#L2131-L2187",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L2669-L2678"
+    ]
+  },
+  "memory_accounting_reconciliation": {
+    "bottom_line": "The observed +3,760,128-byte lifecycle dedicated difference is valid evidence for this Windows PID counter on this host, NOT evidence that the225.21MiB GPU model buffer is absent or costs zero. Native logical/device allocation and Windows dedicated/shared/commit accounting are different observations. Allocation backing/residency of the individual drafter buffers is UNMEASURED. This limit does not block paired measurements or the Director-approved fixed2700 arm.",
+    "observed_records": [
+      "B1 PID61988 and off A1 PID51512 both match the exact same recorded adapter LUID. counter_errors={} for both; all first-prefix/serial/simultaneous dedicated samples are present. The sampler selects exact pid_..._ plus adapter and ignores invalid counter items; no obvious wrong-PID or wrong-adapter explanation is supported.",
+      "Both first-prefix and serial dedicated peaks differ by exactly3,760,128B. Simultaneous peaks differ by4,751,936B. This rejects a simple different-lifecycle-phase maximum explanation for the small delta; it is not just comparing one arm's load peak to the other's active peak.",
+      "Retained MTP samples are particularly informative: at7.511s dedicated8080.789MiB/shared10325.066MiB/committed18405.855MiB. At7.760s, while drafter loading logs its225.21MiB model buffer at7.794s, committed becomes18631.070MiB (+225.215MiB) while dedicated/shared stay unchanged. By8.259s dedicated8081.934MiB/shared10784.480MiB/committed18866.414MiB. This establishes a contemporaneous additional commitment and later shared-accounting increase; it does not map those pages to a specific physical heap.",
+      "Native target model3772.85MiB, KV990MiB, MoE cache2887.34MiB and compute328.88MiB match off. Native drafter adds Vulkan0 model225.21MiB plus compute62.12MiB and host model144MiB plus compute14.03MiB. Repeated reserve log lines are not separate62MiB allocations to sum."
+    ],
+    "source_backed_allocation_policy": "ggml_backend_vk_buffer_type_alloc_buffer calls ggml_vk_create_buffer_device. On a discrete device with the recorded PREFER_HOST_MEMORY, ALLOW_SYSMEM_FALLBACK and DISABLE_HOST_VISIBLE_VIDMEM all unset, the allocator tries DEVICE_LOCAL|HOST_VISIBLE|HOST_COHERENT, then DEVICE_LOCAL. Thus explicit source-level host-only fallback is NOT the supported explanation for B1. Host-visible VRAM/ReBAR is still device-local; 'host visible' alone is not 'shared system RAM'.",
+    "allocation_sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan.cpp#L13062-L13075",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan.cpp#L4016-L4023",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp#L16-L27",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan-buffers.cpp#L195-L240"
+    ],
+    "plausible_but_unproven": "[INFERENCE] WDDM residency/backing/host-mapped allocation accounting or replacement of other resident pages can reconcile device-local Vulkan allocations with little change in dedicated usage and higher shared/commit usage. The existing logs/counters cannot identify which individual allocation is physically resident, paged, migrated or reflected in shared usage. Do not assert actual drafter spill, an AMD bug, or zero VRAM cost.",
+    "windows_reference": "Microsoft's GPU memory-manager explanation distinguishes current dedicated consumption, shared system memory, fully virtualized video-memory allocation and per-process accounting: https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/ (Video Memory and Details Tab). This provides context, not a per-allocation residency diagnosis.",
+    "report_wording": "The unchanged-cache MTP run retained a225.21-MiB Vulkan0 drafter model buffer and62.12-MiB compute buffer with target-KV aliases, but its sampled Windows PID dedicated peak increased only3.58MiB. Shared GPU accounting, process commitment and working set increased separately. Per-buffer physical residency/backing was not measured; neither the file-size estimate nor the small dedicated delta establishes fit on a physical8GiB card.",
+    "evidence_paths": [
+      "experiments/gemma4_26b_qat/results/mtp/mtp-n24-c2890-d4-b1.native.log:326-378",
+      "experiments/gemma4_26b_qat/results/mtp/mtp-n24-c2890-d4-b1.samples.jsonl",
+      "experiments/gemma4_26b_qat/results/mtp/mtp-n24-c2890-d4-b1.json",
+      "experiments/gemma4_26b_qat/results/mtp/mtp-n24-c2890-off-a1.json",
+      "experiments/gemma4_26b_qat/windows_metrics.py:85-113"
+    ]
+  },
+  "vulkan_and_parallel3": {
+    "source_support": "The MTP driver uses generic llama graph/backend calls, with no CUDA-only gate. Pinned Vulkan supports Q4_0 matrix multiplication, Q4_0/target embedding gather, GELU/normalization/RoPE and f16 flash attention under device capability checks. Actual B1 now establishes the promised Vulkan path for this host more decisively than source capability inspection alone.",
+    "vulkan_sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan.cpp#L15407-L15495",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/ggml/src/ggml-vulkan/ggml-vulkan.cpp#L15497-L15543"
+    ],
+    "parallel": "There is no source restriction to parallel1 or slot0: spec context initializes with n_parallel, per-sequence state is sized accordingly, and the MTP driver loops sequence IDs. B1 logs/slots confirm n_seq_max3, context4608,1536 per slot, kv_unifiedfalse, speculative true on0/1/2. Keep requests pinned0/1 and slot2 unused; do not silently switch to auto/unified layout.",
+    "pitfalls": [
+      "Explicit id_slot selection wraps modulo slot count, so record returned id_slot and the actual3-slot layout, rather than trusting request text alone.",
+      "MTP verify hidden-state grouping uses each sequence's first-to-last row range, assuming that rows for one sequence are contiguous. Existing server batch construction groups each slot's tokens; retain native overlap and task/slot evidence for simultaneous requests rather than substituting a different client batching scheme.",
+      "Backend draft sampler can fall back to CPU with a warning. That changes execution placement but does not mean MTP itself is off; retain warnings and native placement evidence.",
+      "Same seed does not authorize forcing token equality. Batch arithmetic/sampling paths can change output/counts; review resulting outputs and use actual counts."
+    ],
+    "sources": [
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L1387-L1430",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/tools/server/server-context.cpp#L1652-L1688",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L1452-L1500",
+      "https://github.com/ggml-org/llama.cpp/blob/8e2d31e0eb658d0382d3106a61369dff81f0c080/common/speculative.cpp#L1550-L1641"
+    ]
+  },
+  "remaining_limits_and_director_hand_off": "No implementation or execution prerequisite remains from this source research. Continue the already approved matched counterbalanced lifecycles, fixed2700 arm and quality review. Do not require extended driver tracing or a max-fill search. Integrate the timing distinction, raw API draft counters, aliases-versus-allocations caveat, and unmeasured per-buffer residency limit into the separate follow-up report. Acceptance, publication and adoption remain with the Director/owner.",
+  "final_supplement": {
+    "supplement": "Measurement-owner subsequently confirms independent off commands omit all draft model/HF flags and have one explicit --spec-type none; /slots, native logs and absent API draft counters prove off. B1 per-request API proposals/accepted sum836/459 matches only the final cumulative native snapshot. API(O−1)/decode_ms and separately labeled whole-HTTP output rate are already being applied. No repair is needed for those potential pitfalls.",
+    "execution_coordination": "No additional executable, help/version, model or GPU launch will be performed. Source research is complete; the measurement worker retains exclusive launch ownership.",
+    "remaining_limit": "Per-buffer physical residency/backing remains unmeasured. This does not block the authorized paired measurements."
+  }
+}

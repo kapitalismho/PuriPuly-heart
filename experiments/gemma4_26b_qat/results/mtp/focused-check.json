@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "runs": 9,
+  "completed": 396,
+  "unique_pairs": 10,
+  "assertions": [
+    "Unchanged44-request workload and sampling identities",
+    "EOS/bounded automated surface checks",
+    "Fresh graceful0/no watchdog and no observed named-model conflict",
+    "Exact PID/adapter load+phase observations",
+    "15native overlaps;Self0/Peer1/unused2",
+    "Native cache execution",
+    "MTP-enabled runs have actual API proposed+accepted draft tokens;off runs omit draft counters"
+  ],
+  "quality": "Independent manual unique-pair and final ledger audit required separately"
+}
