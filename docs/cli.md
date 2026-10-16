@@ -389,7 +389,7 @@ These are fixed deployment profiles, not CLI tuning settings:
 | Target / batch threads | Persisted detected profile | 4 / 4 | 4 / 4 |
 | Flash attention | Off | On | On |
 | MTP | E4B drafter, on | Off | Off |
-| Expert placement / cache | Not applied | Not applied | `--n-cpu-moe 24 --moe-cache-mib 2048` |
+| Expert placement / cache | Not applied | Not applied | `--n-cpu-moe 22 --moe-cache-mib 2132` |
 | Additional placement controls | Unchanged | Unchanged | `--swa-full --cache-ram 0 --fit off` |
 | Active translations | 1 | Up to 2 | Up to 2 |
 
