@@ -182,6 +182,7 @@ class _ActiveTurn:
     retention_allocations: list[object] = field(default_factory=list)
     final_wait_started_at_s: float | None = None
     independent_recognition: bool = False
+    pending_update: STTProviderTurnUpdate | None = None
 
 
 @dataclass(slots=True)
@@ -543,9 +544,6 @@ class ScopedRecognitionEngine:
                     session,
                     session.end_stream(reason=owned.event.boundary_reason),
                     watchdogs.write_timeout_s + watchdogs.drain_timeout_s,
-                    lifetime_drain=(
-                        self.channel == "peer" and owned.settings.provider_id == "qwen_audio"
-                    ),
                 )
                 await self._await_event_drain(self.event_drain_timeout_s)
 
@@ -619,13 +617,10 @@ class ScopedRecognitionEngine:
         timeout: float,
         *,
         recovery: _StreamRecovery | None = None,
-        lifetime_drain: bool = False,
     ) -> bool:
         deadline = (
             self._session_opened_at_s + self._session_max_age_s
-            if not lifetime_drain
-            and self._session_opened_at_s is not None
-            and self._session_max_age_s is not None
+            if self._session_opened_at_s is not None and self._session_max_age_s is not None
             else None
         )
         if deadline is not None:
@@ -882,6 +877,11 @@ class ScopedRecognitionEngine:
         if self._closed:
             return
         self._closing = True
+        if self._session_scope is not None and self._session_scope[0] == "qwen_audio":
+            pending = tuple(self._terminal_wait_tasks)
+            if pending and all(turn.local_sealed for turn in self._turns.values()):
+                await asyncio.gather(*pending)
+                await self._drain_completed_turns()
         await self.abort(reason="closed")
         self._closed = True
         self._cancel_lifetime_check()
@@ -988,6 +988,7 @@ class ScopedRecognitionEngine:
             normalizer=STTScopedTurnNormalizer(
                 identity,
                 diagnostic_sink=self._normalization_diagnostic,
+                preserve_text=settings.provider_id == "qwen_audio",
             ),
             retention_profile=(
                 self.retention_profile_resolver(settings)
@@ -1311,8 +1312,6 @@ class ScopedRecognitionEngine:
             elif self._session_scope == scope:
                 if not self._session_near_ceiling():
                     return
-                if not await self._drain_peer_qwen("provider_session_lifetime_exceeded"):
-                    raise RuntimeError("provider_session_retirement_failed")
                 self._retire_current_session(
                     reason="provider_session_lifetime_exceeded", resume_stream=True
                 )
@@ -1620,6 +1619,13 @@ class ScopedRecognitionEngine:
                     await self._drain_completed_turns()
                     continue
                 if isinstance(event, STTProviderTurnUpdate):
+                    if (
+                        turn.settings.provider_id == "qwen_audio"
+                        and self._turn_order
+                        and self._turn_order[0] != turn.identity
+                    ):
+                        turn.pending_update = event
+                        continue
                     try:
                         normalized = turn.normalizer.apply_update(event)
                     except STTNormalizationError as exc:
@@ -1630,6 +1636,10 @@ class ScopedRecognitionEngine:
                     continue
                 if isinstance(event, STTProviderTurnTerminal):
                     if turn.terminal_ready.done():
+                        continue
+                    if turn.settings.provider_id == "qwen_audio":
+                        turn.terminal_ready.set_result(event)
+                        await self._drain_completed_turns()
                         continue
                     try:
                         terminal = turn.normalizer.apply_terminal(event)
@@ -1842,6 +1852,15 @@ class ScopedRecognitionEngine:
     ) -> None:
         if turn.terminal_ready.done():
             return
+        if (
+            turn.pending_update is not None
+            and turn.authority_generation == self._authority_generation
+        ):
+            update, turn.pending_update = turn.pending_update, None
+            try:
+                turn.normalizer.apply_update(update)
+            except STTNormalizationError as exc:
+                reason = exc.reason
         diagnostics = recognition_failure_diagnostics(
             exception if recovery_pending else failure_diagnostics or exception,
             provider=turn.settings.provider_id,
@@ -1904,10 +1923,34 @@ class ScopedRecognitionEngine:
                 if turn is None:
                     self._turn_order.popleft()
                     continue
+                update, turn.pending_update = turn.pending_update, None
+                if update is not None and turn.authority_generation == self._authority_generation:
+                    try:
+                        normalized = turn.normalizer.apply_update(update)
+                    except STTNormalizationError as exc:
+                        self._set_turn_failure(turn, exc.reason)
+                    else:
+                        if normalized is not None:
+                            await self._emit(normalized)
                 if not turn.local_sealed or not turn.terminal_ready.done():
                     break
                 self._turn_order.popleft()
-                await self._finish_turn(turn, turn.terminal_ready.result())
+                terminal = turn.terminal_ready.result()
+                if (
+                    turn.settings.provider_id == "qwen_audio"
+                    and isinstance(terminal, STTProviderTurnTerminal)
+                    and turn.normalizer.terminal is None
+                ):
+                    try:
+                        terminal = turn.normalizer.apply_terminal(terminal)
+                    except STTNormalizationError as exc:
+                        terminal = STTProviderTurnTerminal(
+                            identity=turn.identity,
+                            outcome="failed",
+                            failure_reason=exc.reason,
+                            epoch_disposition="retire",
+                        )
+                await self._finish_turn(turn, terminal)
 
     async def _finish_turn(
         self,
@@ -2018,15 +2061,8 @@ class ScopedRecognitionEngine:
             self._session_retirement_requested = True
         if self._session_near_ceiling():
             self._session_retirement_requested = True
-        defer_qwen_drain = (
-            turn.independent_recognition
-            and self.channel == "peer"
-            and turn.settings.provider_id == "qwen_audio"
-            and terminal.outcome == "submitted"
-        )
         if (
             turn.independent_recognition
-            and not defer_qwen_drain
             and self._session_retirement_requested
             and turn.authority_generation == self._authority_generation
             and terminal.outcome != "cancelled"
@@ -2128,7 +2164,7 @@ class ScopedRecognitionEngine:
                 and turn.authority_generation == self._authority_generation
             ):
                 self._notify_terminal_failure(terminal.failure_diagnostics)
-        if self._session_retirement_requested and not self._turns and not defer_qwen_drain:
+        if self._session_retirement_requested and not self._turns:
             self._retire_current_session(turn.watchdogs)
         self._schedule_lifetime_check()
 
@@ -2144,6 +2180,7 @@ class ScopedRecognitionEngine:
         allowed = (
             session is not None
             and self._session_allows_sealed_turn_overlap(session)
+            and len(self._turns) < getattr(session, "max_inflight_turns", float("inf"))
             and not self._session_retirement_requested
             and self._ended_provider_epoch_id != self._provider_epoch_id
             and self._session_scope == self._settings_scope(settings)
@@ -2271,13 +2308,6 @@ class ScopedRecognitionEngine:
         watchdogs = self._session_watchdogs
         if self._closed or self._session is None or opened_at is None or watchdogs is None:
             return
-        if (
-            self._session_retirement_requested
-            and self.channel == "peer"
-            and self._session_scope is not None
-            and self._session_scope[0] == "qwen_audio"
-        ):
-            return
         now = self.monotonic_clock()
         cap_due_at = (
             opened_at + self._session_max_age_s if self._session_max_age_s is not None else None
@@ -2315,30 +2345,6 @@ class ScopedRecognitionEngine:
             name="scoped-stt-session-lifetime",
         )
 
-    async def _drain_peer_qwen(self, reason: str) -> bool:
-        session = self._session
-        watchdogs = self._session_watchdogs
-        if not (
-            self.channel == "peer"
-            and self._session_scope is not None
-            and self._session_scope[0] == "qwen_audio"
-            and isinstance(session, STTIndependentRecognitionSession)
-            and session.independent_recognition_units
-            and watchdogs is not None
-        ):
-            return True
-        self._session_retirement_requested = True
-        if not await self._run_stream_write(
-            session,
-            session.end_stream(reason=reason),
-            watchdogs.write_timeout_s,
-            lifetime_drain=True,
-        ):
-            return False
-        await asyncio.sleep(0)
-        await self._await_event_drain(self.event_drain_timeout_s)
-        return self._session is session
-
     async def _end_current_session(
         self,
         *,
@@ -2349,8 +2355,6 @@ class ScopedRecognitionEngine:
     ) -> None:
         session = self._session
         if session is None:
-            return
-        if not failed and not await self._drain_peer_qwen(reason):
             return
         if failed:
             failure_diagnostics = self._failure_diagnostics(failure_diagnostics, reason, "receive")
@@ -2425,8 +2429,6 @@ class ScopedRecognitionEngine:
                         + watchdogs.idle_timeout_s
                     )
                 ):
-                    if not await self._drain_peer_qwen("provider_idle_timeout"):
-                        return
                     self._retire_current_session(
                         watchdogs,
                         reason="provider_idle_timeout",

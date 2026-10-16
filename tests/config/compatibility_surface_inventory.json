@@ -881,9 +881,6 @@
       "exports": [
         {"name": "QWEN_AUDIO_DEFAULT_ENDPOINT", "kind": "attribute"},
         {"name": "QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT", "kind": "attribute"},
-        {"name": "QWEN_AUDIO_KEEPALIVE_INTERVAL_S", "kind": "attribute"},
-        {"name": "QWEN_AUDIO_KEEPALIVE_SILENCE_MS", "kind": "attribute"},
-        {"name": "QWEN_AUDIO_KEEPALIVE_TICK_S", "kind": "attribute"},
         {"name": "QWEN_AUDIO_MODEL", "kind": "attribute"},
         {"name": "QwenAudioProtocolError", "kind": "attribute"},
         {"name": "QwenAudioSessionState", "kind": "attribute"},

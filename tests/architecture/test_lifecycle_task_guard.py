@@ -442,16 +442,10 @@ TASK_CREATION_REVIEWS = (
     *_reviews(
         "providers/stt/qwen_audio.py",
         {
-            "_QwenAudioSession.start": 2,
-            "_QwenAudioSession._begin_task": 1,
-            "_QwenAudioSession._send_value": 1,
-            "_QwenAudioSession._handle_task_started": 1,
-            "_QwenAudioSession._handle_task_finished": 1,
-            "_QwenAudioSession._finish_active_task_locked": 1,
-            "_QwenPeerAudioSession._handle_task_started": 1,
-            "_QwenPeerAudioSession._request_rotation": 1,
+            "_QwenAudioSession._ready": 1,
+            "_QwenAudioSession._seal": 1,
         },
-        "Qwen Audio sessions retain transport and timeout tasks; Peer additionally retains one task-age timer and one serialized rotation, cancelled and joined by socket cleanup",
+        "Each Qwen channel owns two slot receivers and per-task final watchdogs, cancelled and joined on slot reuse, stop, or abort",
     ),
     *_reviews(
         "providers/stt/sdk_network.py",

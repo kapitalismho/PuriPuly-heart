@@ -9,6 +9,7 @@ from uuid import UUID
 
 from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
 from puripuly_heart.domain.models import ChannelId, UtteranceBundle
+from puripuly_heart.domain.recognition import RecognitionTextOrigin
 
 if TYPE_CHECKING:
     from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnProcessResult
@@ -68,6 +69,7 @@ class _MergeBuffer:
     merge_id: UUID
     parts: list[str] = field(default_factory=list)
     utterance_ids: list[UUID] = field(default_factory=list)
+    recognition_origins: dict[UUID, tuple[RecognitionTextOrigin, ...]] = field(default_factory=dict)
     start_time: float | None = None
     last_end_time: float | None = None
     last_final_at: float = 0.0

@@ -82,6 +82,7 @@ from puripuly_heart.domain.events import (
     UIEventType,
 )
 from puripuly_heart.domain.models import Transcript, Translation
+from puripuly_heart.domain.recognition import RecognitionTextOrigin
 
 _PROMO_INTERVAL_SEC = 300.0
 
@@ -136,6 +137,9 @@ class SelfTranslationChannelOwner:
     )
     _scoped_publication_ids: dict[STTProviderTurnIdentity, UUID] = field(default_factory=dict)
     _scoped_publication_text: dict[STTProviderTurnIdentity, str] = field(default_factory=dict)
+    _scoped_publication_origins: dict[
+        STTProviderTurnIdentity, tuple[RecognitionTextOrigin, ...]
+    ] = field(default_factory=dict)
     _scoped_endpoint_publication_ids: dict[UUID, UUID] = field(default_factory=dict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
     _scoped_terminal_reports: OrderedDict[STTProviderTurnIdentity, None] = field(
@@ -482,18 +486,18 @@ class SelfTranslationChannelOwner:
         if isinstance(event, STTProviderTurnUpdate):
             if event.stability != "stable":
                 return
-            text = self._stt_consumption.consume(event)
+            text, origins = self._stt_consumption.consume_with_origins(event)
             if not text:
                 return
             if low_latency_mode:
-                await self._apply_scoped_contribution(event.identity, text)
+                await self._apply_scoped_contribution(event.identity, text, origins)
             return
 
-        text = self._stt_consumption.consume(event)
+        text, origins = self._stt_consumption.consume_with_origins(event)
         try:
             if low_latency_mode:
                 if text:
-                    await self._apply_scoped_contribution(event.identity, text)
+                    await self._apply_scoped_contribution(event.identity, text, origins)
                 await self._settle_scoped_terminal(event.identity)
             elif event.text and event.text_authority != "none":
                 utterance_id = event.identity.segment.segment_id
@@ -505,6 +509,7 @@ class SelfTranslationChannelOwner:
                     channel="self",
                     final_language_runs=event.final_language_runs,
                     final_speaker_runs=event.final_speaker_runs,
+                    recognition_origins=event.recognition_origins,
                 )
                 self._record_latency_stage(utterance_id=utterance_id, stage="stt_final")
                 await self._handle_transcript(transcript, is_final=True, source="Mic")
@@ -567,11 +572,13 @@ class SelfTranslationChannelOwner:
             self._stt_consumption.retire(event.identity)
             self._scoped_publication_ids.pop(event.identity, None)
             self._scoped_publication_text.pop(event.identity, None)
+            self._scoped_publication_origins.pop(event.identity, None)
 
     async def _apply_scoped_contribution(
         self,
         identity: STTProviderTurnIdentity,
         text: str,
+        origins: tuple[RecognitionTextOrigin, ...] = (),
     ) -> None:
         recognition_scope = self._recognition_scope(identity)
         buffer = self.merge_buffer
@@ -591,9 +598,19 @@ class SelfTranslationChannelOwner:
             publication_id = identity.segment.segment_id if publication_id is None else uuid4()
             self._scoped_publication_ids[identity] = publication_id
             self._scoped_publication_text[identity] = ""
+            self._scoped_publication_origins[identity] = ()
         acoustic_id = identity.segment.segment_id
         self._scoped_endpoint_publication_ids[acoustic_id] = publication_id
         cumulative = self._scoped_publication_text.get(identity, "") + text
+        offset = len(self._scoped_publication_text.get(identity, ""))
+        self._scoped_publication_origins[identity] = self._scoped_publication_origins.get(
+            identity, ()
+        ) + tuple(
+            replace(
+                origin, text_start=origin.text_start + offset, text_end=origin.text_end + offset
+            )
+            for origin in origins
+        )
         self._scoped_publication_text[identity] = cumulative
         self._inherit_latency_for_output(
             output_utterance_id=publication_id,
@@ -611,6 +628,7 @@ class SelfTranslationChannelOwner:
                 is_final=True,
                 created_at=self.clock.now(),
                 channel="self",
+                recognition_origins=self._scoped_publication_origins[identity],
             ),
             recognition_scope=recognition_scope,
         )
@@ -691,6 +709,7 @@ class SelfTranslationChannelOwner:
             self._stt_consumption.retire(identity)
         self._scoped_publication_ids.clear()
         self._scoped_publication_text.clear()
+        self._scoped_publication_origins.clear()
         self._scoped_endpoint_publication_ids.clear()
 
     async def handle_retired_stt_event(self, event: object) -> None:
@@ -1247,10 +1266,10 @@ class SelfTranslationChannelOwner:
             return UserErrorReport(message=event.message, diagnostics=event.diagnostics)
         return event.message
 
-    def _merge_text(self, parts: list[str]) -> str:
+    def _merge_text(self, parts: list[str], *, preserve_text: bool = False) -> str:
         merged = ""
         for part in parts:
-            addition = part.strip()
+            addition = part if preserve_text else part.strip()
             if not addition:
                 continue
             if not merged:
@@ -1260,6 +1279,22 @@ class SelfTranslationChannelOwner:
             else:
                 merged = f"{merged}{addition}"
         return merged
+
+    def _merged_origins(self, buffer: _MergeBuffer) -> tuple[RecognitionTextOrigin, ...]:
+        text = ""
+        origins: tuple[RecognitionTextOrigin, ...] = ()
+        for utterance_id, part in zip(buffer.utterance_ids, buffer.parts, strict=True):
+            if text and self._needs_space(text, part):
+                text += " "
+            offset = len(text)
+            origins += tuple(
+                replace(
+                    origin, text_start=origin.text_start + offset, text_end=origin.text_end + offset
+                )
+                for origin in buffer.recognition_origins.get(utterance_id, ())
+            )
+            text += part
+        return origins
 
     @staticmethod
     def _needs_space(left: str, right: str) -> bool:
@@ -1618,7 +1653,7 @@ class SelfTranslationChannelOwner:
         *,
         recognition_scope: tuple[object, ...] | None = None,
     ) -> None:
-        text = transcript.text.strip()
+        text = transcript.text if transcript.recognition_origins else transcript.text.strip()
         if not text:
             return
         if transcript.utterance_id in self.runtime.low_latency_committed_utterance_ids:
@@ -1647,6 +1682,8 @@ class SelfTranslationChannelOwner:
         if buffer.resume_pending or buffer.resume_confirmed:
             self._clear_resume_state(buffer)
         self._upsert_merge_part(buffer, transcript.utterance_id, text)
+        if transcript.recognition_origins:
+            buffer.recognition_origins[transcript.utterance_id] = transcript.recognition_origins
         buffer.last_final_at = now
         await self._sync_overlay_active_self(buffer, created_at=transcript.created_at)
 
@@ -1702,7 +1739,7 @@ class SelfTranslationChannelOwner:
         if self.merge_buffer is buffer:
             self.merge_buffer = None
 
-        final_text = self._merge_text(buffer.parts)
+        final_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
         if not final_text:
             await self.output_projection.reset_overlay_preview()
             return
@@ -1774,6 +1811,7 @@ class SelfTranslationChannelOwner:
             text=final_text,
             is_final=True,
             created_at=self.clock.now(),
+            recognition_origins=self._merged_origins(buffer),
         )
         await self._handle_transcript(transcript, is_final=True, source="Mic")
         config_snapshot = (
@@ -1925,7 +1963,7 @@ class SelfTranslationChannelOwner:
         ):
             return
 
-        merged_text = self._merge_text(buffer.parts)
+        merged_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
         if not merged_text:
             return
 
@@ -2153,7 +2191,7 @@ class SelfTranslationChannelOwner:
         if self.merge_buffer is None or self.merge_buffer is not buffer:
             return
         attempt = buffer.speculative_attempt
-        final_text = self._merge_text(buffer.parts)
+        final_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
         if not final_text:
             return
 
@@ -2315,7 +2353,7 @@ class SelfTranslationChannelOwner:
         *,
         created_at: float | None = None,
     ) -> None:
-        active_text = self._merge_text(buffer.parts)
+        active_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
         if not active_text:
             return
         attempt = buffer.speculative_attempt

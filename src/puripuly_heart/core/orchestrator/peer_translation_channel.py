@@ -503,6 +503,7 @@ class PeerTranslationChannelOwner:
             channel="peer",
             final_language_runs=terminal.final_language_runs,
             final_speaker_runs=terminal.final_speaker_runs,
+            recognition_origins=terminal.recognition_origins,
             publication_generation=receipt.identity.activation_generation,
             source_order=self._allocate_publication_order(
                 receipt.identity.activation_generation,

@@ -102,8 +102,8 @@ class RecognitionTextOrigin:
     text_start: int
     text_end: int
     native: NativeTranscriptionEvidence | None = None
-    source_binding: Literal["stream_scoped"] = "stream_scoped"
-    order_basis: Literal["provider_receipt"] = "provider_receipt"
+    source_binding: Literal["stream_scoped", "local_segment"] = "stream_scoped"
+    order_basis: Literal["provider_receipt", "source_order"] = "provider_receipt"
 
 
 def slice_recognition_origins(

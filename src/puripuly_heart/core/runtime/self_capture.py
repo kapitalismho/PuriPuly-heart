@@ -801,6 +801,13 @@ class SelfCaptureSessionOwner:
             if self._closed:
                 raise RuntimeError("SelfCaptureSessionOwner is closed")
             if (
+                self._config is not None
+                and self._config.provider_id == "qwen_audio"
+                and self._config.runtime_signature != config.runtime_signature
+            ):
+                restart = True
+                force_immediate = True
+            if (
                 enabled
                 and not restart
                 and self._desired_active
@@ -885,6 +892,11 @@ class SelfCaptureSessionOwner:
         async with self._state_lock:
             if self._closed:
                 raise RuntimeError("SelfCaptureSessionOwner is closed")
+            invalidate_qwen = (
+                self._config is not None
+                and self._config.provider_id == "qwen_audio"
+                and self._config.runtime_signature != config.runtime_signature
+            )
             self._generation += 1
             generation = self._generation
             self._generation_operation = (generation, current_diagnostic_operation())
@@ -897,6 +909,8 @@ class SelfCaptureSessionOwner:
         async with self._activation_lock:
             if self._is_superseded(generation):
                 return self.snapshot
+            if invalidate_qwen:
+                await self._release_provider(mode="abort")
             attachment_token = self._provider_attachment_token
             result: SelfCaptureProviderMutation | None = None
             failure_exception: Exception | None = None
@@ -1144,7 +1158,16 @@ class SelfCaptureSessionOwner:
                 if self._config.capture_signature == config.capture_signature:
                     await self._transition_provider(generation, config)
                     return
-            if self._source is not None or self._loop_task is not None or self._vad is not None:
+            if (
+                self._source is not None
+                or self._loop_task is not None
+                or self._vad is not None
+                or (
+                    self._config is not None
+                    and self._config.provider_id == "qwen_audio"
+                    and self._config.runtime_signature != config.runtime_signature
+                )
+            ):
                 mode, release_backend_after = self._release_plan(
                     self._config or config,
                     force_immediate=force_immediate,
