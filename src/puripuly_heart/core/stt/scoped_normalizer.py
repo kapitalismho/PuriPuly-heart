@@ -193,6 +193,7 @@ class STTScopedTurnNormalizer:
             runs = ()
             speaker_runs = ()
             self._recognition_origins = ()
+            self._contributions.clear()
             authority = "none"
         elif outcome == "final":
             authority = "authoritative"

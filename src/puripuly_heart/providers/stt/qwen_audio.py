@@ -221,6 +221,7 @@ class _QwenAudioSession(STTBackendSession):
     allows_sealed_turn_overlap = True
     max_inflight_turns = 2
     bridge_reset_preserves_vad = True
+    readiness_retry_safe = True
 
     def __init__(self, backend: QwenAudioStreamingSTTBackend, projection: STTSessionProjection):
         self.backend = backend
@@ -304,7 +305,13 @@ class _QwenAudioSession(STTBackendSession):
             task.readiness_owned = False
 
     async def _discard_readiness_attempt(self, task: _QwenTask) -> None:
-        await self._close_slot(task.slot)
+        try:
+            await self._close_slot(task.slot)
+        except BaseException:
+            self._closing = True
+            task.sealed = True
+            task.done.set()
+            raise
         task.done.set()
         identity = task.identity
         if (
@@ -836,9 +843,27 @@ class _QwenAudioSession(STTBackendSession):
             receiver.cancel()
             await asyncio.gather(receiver, return_exceptions=True)
         if websocket is not None:
-            async with asyncio.timeout(self.backend.send_timeout_s):
-                await websocket.close()
-            slot.websocket = None
+            try:
+                async with asyncio.timeout(self.backend.send_timeout_s):
+                    await websocket.close()
+            except Exception:
+                abort = getattr(getattr(websocket, "transport", None), "abort", None)
+                wait_closed = getattr(websocket, "wait_closed", None)
+                if not callable(abort) or not callable(wait_closed):
+                    self.readiness_retry_safe = False
+                    raise
+                try:
+                    abort()
+                    async with asyncio.timeout(self.backend.send_timeout_s):
+                        await wait_closed()
+                except BaseException:
+                    self.readiness_retry_safe = False
+                    raise
+            except BaseException:
+                self.readiness_retry_safe = False
+                raise
+            if slot.websocket is websocket:
+                slot.websocket = None
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         await self.abort_for_toggle_off()

@@ -133,6 +133,7 @@ class STTProviderEventBuffer:
                 text_authority="none",
                 failure_reason="provider_event_buffer_overflow",
                 epoch_disposition="retire",
+                is_current=event.is_current,
             ),
             identity.provider_epoch_id,
         )

@@ -6,6 +6,8 @@ import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
+from puripuly_heart.core.stt.backend import scoped_event_for_delivery
+
 ProviderEventHandler = Callable[[object], Awaitable[None]]
 ProviderExceptionHandler = Callable[[Exception], Awaitable[None] | None]
 ProviderStateChanged = Callable[["ProviderRuntimeHandle"], None]
@@ -419,6 +421,9 @@ class ProviderRuntimeHandle:
             return
 
         async def dispatch(event: object) -> None:
+            event = scoped_event_for_delivery(event)
+            if event is None:
+                return
             handler = self._event_handler_for(provider=provider, generation=generation)
             if handler is not None:
                 await handler(event)

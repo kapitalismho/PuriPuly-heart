@@ -26,6 +26,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTRecognitionUnitTerminal,
+    scoped_event_for_delivery,
 )
 from puripuly_heart.core.stt.recognition_units import RecognitionConsumptionLedger
 from puripuly_heart.domain.events import STTSessionState, STTSessionStateEvent
@@ -79,6 +80,9 @@ class TranslationChannelOwnerCallbacks:
         self._self_capture = owner
 
     async def self_event_handler(self, event: object) -> None:
+        event = scoped_event_for_delivery(event)
+        if event is None:
+            return
         if isinstance(event, STTProviderInputTerminal):
             if event.channel != "self":
                 raise ValueError("Self input terminal belongs to another channel")
@@ -94,6 +98,9 @@ class TranslationChannelOwnerCallbacks:
             await self._admit_recognition_unit(event, channel="self")
             return
         await self._before_self_event(event)
+        event = scoped_event_for_delivery(event)
+        if event is None:
+            return
         self._stt_sessions.record(event)
         await self._require_self().handle_stt_event(event)
         await self._after_self_event(event)

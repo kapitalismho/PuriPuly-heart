@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass, replace
-from typing import AsyncIterator, Literal, Protocol, runtime_checkable
+from collections.abc import Callable
+from dataclasses import dataclass, field, replace
+from typing import AsyncIterator, Literal, Protocol, TypeVar, runtime_checkable
 
 import numpy as np
 
@@ -99,6 +100,7 @@ class STTProviderTurnUpdate:
     provenance: STTNativeProvenance = STTNativeProvenance()
     contribution: STTTextContribution | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
+    is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,6 +119,34 @@ class STTProviderTurnTerminal:
     included_contributions: tuple[STTTextContribution, ...] = ()
     failure_diagnostics: ErrorDiagnostics | None = None
     recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
+    is_current: Callable[[], bool] | None = field(default=None, compare=False, repr=False)
+
+
+_ProviderEvent = TypeVar("_ProviderEvent")
+
+
+def scoped_event_for_delivery(
+    event: _ProviderEvent,
+) -> _ProviderEvent | STTProviderTurnTerminal | None:
+    if not isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal):
+        return event
+    if event.is_current is None or event.is_current():
+        return event
+    if isinstance(event, STTProviderTurnUpdate):
+        return None
+    return replace(
+        event,
+        outcome="cancelled",
+        text="",
+        final_language_runs=(),
+        final_speaker_runs=(),
+        text_authority="none",
+        failure_reason="cancelled",
+        epoch_disposition="retire",
+        included_contributions=(),
+        recognition_origins=(),
+        is_current=None,
+    )
 
 
 class STTContributionConsumptionLedger:

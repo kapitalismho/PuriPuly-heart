@@ -68,6 +68,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTRecognitionUnit,
+    scoped_event_for_delivery,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
 from puripuly_heart.core.stt.recognition_units import recognition_transcript
@@ -405,6 +406,9 @@ class SelfTranslationChannelOwner:
             utterance_id=None if utterance_id is None else str(utterance_id),
         )
         low_latency_mode = self.config_snapshot().value.low_latency_mode
+        event = scoped_event_for_delivery(event)
+        if event is None:
+            return
         if isinstance(event, STTProviderTurnUpdate | STTProviderTurnTerminal):
             await self._handle_scoped_stt_event(event, low_latency_mode=low_latency_mode)
             return
