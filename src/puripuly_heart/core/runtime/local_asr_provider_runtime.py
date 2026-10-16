@@ -569,6 +569,12 @@ class LocalASRProviderRuntimeOwner:
                     provider,
                     start=start,
                 )
+                if (
+                    request.provider_id == "qwen_audio"
+                    and self._handles[channel].provider is not provider
+                ):
+                    await self._handles[channel].reclaim_qwen_resources()
+                    raise RuntimeError("provider_handoff_not_admitted")
             except asyncio.CancelledError as exc:
                 primary = self._record_interrupted_operation(channel, exc, "provider_handoff")
                 try:
@@ -625,8 +631,11 @@ class LocalASRProviderRuntimeOwner:
         self._require_open("commit provider handoff")
         self._validate_channel(channel)
         request = self._pending_requests.get(channel)
+        candidate = self._pending_candidates.get(channel)
         await self._handles[channel].commit_pending_handoff()
-        if request is not None:
+        if request is not None and (
+            request.provider_id != "qwen_audio" or self._handles[channel].provider is candidate
+        ):
             self._provider_ids[channel] = request.provider_id
             self._model_ids[channel] = request.model_id
         await self._publish_state()
@@ -1249,6 +1258,10 @@ class LocalASRProviderRuntimeOwner:
         provider: object | None = None
         failure_stage = "provider_build"
         try:
+            if request.provider_id == "qwen_audio":
+                failure_stage = "provider_reclaim"
+                await self._handles[channel].reclaim_qwen_resources()
+            failure_stage = "provider_build"
             result = self._provider_factory.create(
                 request,
                 gpu_runtime=self._gpu_runtime,

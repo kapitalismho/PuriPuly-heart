@@ -103,8 +103,9 @@ class BoundaryRuntimeSink(RuntimeSink):
 
 
 class RecoveryFactory:
-    def __init__(self, transport):
+    def __init__(self, transport, *, task_start_timeout_s=0.03):
         self.transport = transport
+        self.task_start_timeout_s = task_start_timeout_s
         self.clock = ControlledMonotonicClock()
         self.engines = []
         self.delays = []
@@ -122,7 +123,7 @@ class RecoveryFactory:
             channel=request.channel,
             language_hints=("en",),
             websocket_factory=self.transport,
-            task_start_timeout_s=0.03,
+            task_start_timeout_s=self.task_start_timeout_s,
             task_finish_timeout_s=2,
         )
         engine = ScopedRecognitionEngine(

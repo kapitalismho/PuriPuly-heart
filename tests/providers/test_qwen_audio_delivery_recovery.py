@@ -72,7 +72,7 @@ class BoundRuntimeFactory:
             gpu_runtime_factory=FakeGpuRuntimeFactory(),
             provisioning=FakeProvisioningPort(),
             self_event_handler=receive,
-            peer_event_handler=callbacks.peer_event_handler,
+            peer_event_handler=self.callbacks.peer_event_handler,
             retired_event_handler=callbacks.retired_event_handler,
         )
         return self.runtime
@@ -92,7 +92,9 @@ class HeldManualProvider(FakeLLMProvider):
 
 
 @asynccontextmanager
-async def self_capture_pipeline(transport, llm=None):
+async def self_capture_pipeline(
+    transport, llm=None, *, provider_factory=None, peer_translation_enabled=False
+):
     base = AppSettingsVNext()
     settings = replace(
         base,
@@ -102,7 +104,8 @@ async def self_capture_pipeline(transport, llm=None):
             languages=replace(base.intent.languages, source_language="en", target_language="ko"),
         ),
     )
-    factory = RecoveryFactory(transport)
+    factory = provider_factory or RecoveryFactory(transport)
+    settings_box = [settings]
     bound = BoundRuntimeFactory(factory)
     llm = llm or FakeLLMProvider(delay_s=0)
     harness = compose_translation_test_harness(
@@ -112,6 +115,7 @@ async def self_capture_pipeline(transport, llm=None):
         low_latency_mode=True,
         source_language="en",
         target_language="ko",
+        peer_translation_enabled=peer_translation_enabled,
         local_asr_provider_runtime_factory=bound,
     )
     sink = SelfCaptureVadSinkAdapter(runtime_provider=lambda: harness.self_owner)
@@ -119,7 +123,9 @@ async def self_capture_pipeline(transport, llm=None):
     adapter = SelfCaptureProviderAdapter(bound.runtime, harness)
     owner, *_ = build_owner(provider=adapter, sink=sink, loop=loop)
     owner._provider_request_factory = (
-        lambda _config, warmup: build_self_stt_provider_request_from_vnext(settings, warmup=warmup)
+        lambda _config, warmup: build_self_stt_provider_request_from_vnext(
+            settings_box[0], warmup=warmup
+        )
     )
     bound.callbacks.bind_self_capture(owner)
     env = SimpleNamespace(
@@ -131,6 +137,7 @@ async def self_capture_pipeline(transport, llm=None):
         llm=llm,
         events=bound.events,
         callbacks=bound.callbacks,
+        settings_box=settings_box,
         cursors={},
         sequence=0,
     )
