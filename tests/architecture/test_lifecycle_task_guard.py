@@ -360,6 +360,7 @@ TASK_CREATION_REVIEWS = (
             "ScopedRecognitionEngine.close_backend": 1,
             "ScopedRecognitionEngine._handle_end": 1,
             "ScopedRecognitionEngine._ensure_session": 2,
+            "ScopedRecognitionEngine._prepare_qwen_turn_audio": 1,
             "ScopedRecognitionEngine._run_write": 1,
             "ScopedRecognitionEngine._retire_current_session": 1,
             "ScopedRecognitionEngine._schedule_lifetime_check": 1,

@@ -196,6 +196,7 @@ class _QwenTask:
     started: bool = False
     sealed: bool = False
     failure: Exception | None = None
+    readiness_owned: bool = False
     samples: int = 0
     captures: list[_QwenTaskCapture] = field(default_factory=list)
     sentence_ids: set[int] = field(default_factory=set)
@@ -293,7 +294,30 @@ class _QwenAudioSession(STTBackendSession):
             self._event_projection.begin(request)
             self._tasks[request.identity] = await self._begin(request.identity)
 
-    async def _ready(self, task: _QwenTask) -> None:
+    async def prepare_turn_audio(self, identity: STTProviderTurnIdentity) -> None:
+        self._event_projection.require_open(identity)
+        task = self._tasks[identity]
+        task.readiness_owned = True
+        try:
+            await self._ready(task, publish_failure=False)
+        finally:
+            task.readiness_owned = False
+
+    async def _discard_readiness_attempt(self, task: _QwenTask) -> None:
+        await self._close_slot(task.slot)
+        task.done.set()
+        identity = task.identity
+        if (
+            not self._aborted
+            and not self._closing
+            and identity is not None
+            and self._tasks.get(identity) is task
+        ):
+            replacement = _QwenTask(uuid.uuid4().hex, identity, task.slot)
+            task.slot.task = replacement
+            self._tasks[identity] = replacement
+
+    async def _ready(self, task: _QwenTask, *, publish_failure: bool = True) -> None:
         if task.started:
             return
         try:
@@ -362,14 +386,20 @@ class _QwenAudioSession(STTBackendSession):
                 if task.failure is not None:
                     raise task.failure
         except asyncio.CancelledError:
-            await self._fail(
-                task,
-                QwenAudioProtocolError("Qwen Audio readiness cancelled"),
-                "qwen_readiness_cancelled",
-            )
+            if publish_failure:
+                await self._fail(
+                    task,
+                    QwenAudioProtocolError("Qwen Audio readiness cancelled"),
+                    "qwen_readiness_cancelled",
+                )
+            else:
+                await self._discard_readiness_attempt(task)
             raise
         except Exception as exc:
-            await self._fail(task, exc, "qwen_readiness_failed")
+            if publish_failure:
+                await self._fail(task, exc, "qwen_readiness_failed")
+            else:
+                await self._discard_readiness_attempt(task)
             raise
 
     async def _send(self, slot: _QwenSlot, value: str | bytes) -> None:
@@ -784,6 +814,9 @@ class _QwenAudioSession(STTBackendSession):
         if task.done.is_set():
             return
         task.failure = exc
+        if task.readiness_owned:
+            task.ready.set()
+            return
         self._closing = True
         logger.warning(
             "[QwenAudio] task failed channel=%s reason=%s cause_class=%s",

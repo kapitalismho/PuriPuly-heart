@@ -198,18 +198,20 @@ The finite fallback is equivalent only when it carries the same explicit consent
   - Each channel has at most two connections and two in-flight local turns; using both channels can use four connections. Their queues, settings and result authority are separate. If both slots are occupied, subsequent input waits within the existing bounded capture queue and operation/retention limits.
   - Qwen receives locally selected speech/context/tail audio rather than an all-capture stream between local segments. Capture permission, source selection and mute/activation gates still apply. Selected context and tails can contain background audio or pauses.
   - Existing onset context and applicable 300 ms Peer continuation context are retained. Context can overlap preceding input, but handover adds no second replay, whole-stream copy or fabricated keepalive audio. Normal recognition starts tasks on demand, not empty standby tasks. Explicit key verification retains a bounded no-PCM permission probe.
-  - Each task retains at most 256 native sentences, 4096 source-map records and 256 KiB of text/identity/timing/map evidence. Readiness, writes and final completion use the existing five-second defaults; these are failure bounds, not added healthy-path delays. Source/VAD-idle retirement remains 60 seconds. Failure or expiry is not successful empty recognition, and uncertain writes are not replayed.
+  - Each task retains at most 256 native sentences, 4096 source-map records and 256 KiB of text/identity/timing/map evidence. A native readiness attempt, PCM/finish write and final completion each retain their five-second defaults. Peer readiness retries have a separate existing budget, described below; five seconds is not an aggregate retry guarantee. These are failure bounds, not added healthy-path delays. Source/VAD-idle retirement remains 60 seconds. Failure or expiry is not successful empty recognition, and uncertain writes are not replayed.
   - Equal locally selected PCM and task/request counts do not establish equal token charges. The restored local boundaries/context differ from the previous continuous Peer candidate; real-service concurrency, latency and billing require separate qualification.
   - Other providers retain their own policies. Peer output remains excluded from the VRChat chatbox.
 
 - **Transient connection failures**
   - Peer capture remains enabled when temporary connection timeouts, network failures, service unavailability, or rate limits exhaust its three short connection attempts.
+  - Before sending a new Qwen task's PCM, the existing readiness owner allows up to three native readiness attempts within its 30-second budget, with 0.8/1.6-second retry backoffs. Only safe pre-PCM admission is retried; actual audio/finish writes retain their separate limits. Capture queue/expiry limits remain active during readiness.
   - It waits 30 seconds before allowing another bounded attempt sequence on the next utterance.
   - Silence does not trigger background reconnects.
   - Failed or expired utterances are not replayed after recovery.
 - **Stopping and invalidation**
   - Authentication, configuration, certificate, and unclassified failures stop the channel rather than enter this recovery loop.
   - Turning capture off or applying an invalidating provider configuration revokes the affected channel's old Qwen authority, including both slots and queued updates. Late old-task text cannot publish under the replacement scope. Drain-intended EOF/idle completion remains distinct from abort.
+  - A capture discontinuity also cancels pre-gap queued input and revokes both old slots. Its control notification is delivered independently of blocked audio dispatch; this does not enable all-capture PCM submission for Qwen. Fresh post-gap input uses new recognition authority.
 - **Recovery observations**
   - During the wait, `capture status` can report active audio capture without implying that recognition is available.
   - Retained recognition diagnostics expose `recovery_pending` and `retry_after_ms`.

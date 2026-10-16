@@ -157,13 +157,23 @@ class _GenerationGuardedVadSink:
     async def handle_stream_input(self, event: CaptureStreamInput) -> None:
         if not self.owner.is_current_generation(self.capture_generation.value):
             return
+        qwen_discontinuity = (
+            self.ledger.settings.provider_id == "qwen_audio"
+            and event.boundary_reason == "source_discontinuity"
+        )
         if self.ledger.settings.provider_id not in {"gemini_transcribe", "rolling_free"}:
-            return
-        if self._worker is None:
-            self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
-        elif self._worker.done():
-            await self._worker
-            raise RuntimeError("self VAD dispatch worker stopped")
+            if not qwen_discontinuity:
+                return
+            event = replace(event, chunk=event.chunk[:0], capture=())
+            self._closing = True
+            if self._worker is not None and not self._worker.done():
+                self._worker.cancel()
+        if not qwen_discontinuity:
+            if self._worker is None:
+                self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
+            elif self._worker.done():
+                await self._worker
+                raise RuntimeError("self VAD dispatch worker stopped")
         if event.capture:
             self.owner._current_stream_capture_epoch = event.capture[-1].capture_epoch
         elif event.boundary_reason == "source_discontinuity":
@@ -186,6 +196,14 @@ class _GenerationGuardedVadSink:
                 )
             ),
         )
+        if qwen_discontinuity:
+            try:
+                await cast(_VadSink, self.sink).handle_stream_input(owned)
+            finally:
+                await self.abort()
+                self._worker = None
+                self._closing = False
+            return
         samples = int(event.chunk.size)
         if samples and self._stream_drop_pending:
             return

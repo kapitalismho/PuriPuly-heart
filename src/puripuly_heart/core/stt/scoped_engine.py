@@ -391,6 +391,16 @@ class ScopedRecognitionEngine:
         await self._event_drained.wait()
 
     async def handle_stream_input(self, owned: OwnedStreamInput) -> None:
+        if (
+            owned.settings.provider_id == "qwen_audio"
+            and owned.event.boundary_reason == "source_discontinuity"
+        ):
+            if not self._closed and (owned.is_current is None or owned.is_current()):
+                await self.abort(reason="source_discontinuity")
+                if self.channel == "peer":
+                    self._episode_failures = 0
+                    self._recovery_backoff_pending = False
+            return
         authority_generation = self._authority_generation
         async with self._input_lock:
             if (
@@ -1138,7 +1148,7 @@ class ScopedRecognitionEngine:
         *,
         context_only: bool,
     ) -> None:
-        if not self._has_write_authority(session, turn):
+        if turn.write_failed or not self._has_write_authority(session, turn):
             return
         if turn.independent_recognition and self._stream_recovery is not None:
             recovery = self._stream_recovery
@@ -1170,6 +1180,15 @@ class ScopedRecognitionEngine:
             or turn.retained_bytes + retained_bytes > profile.max_retained_bytes
         ):
             await self._fail_for_retention(turn)
+            return
+        if (
+            self.channel == "peer"
+            and turn.settings.provider_id == "qwen_audio"
+            and not turn.successful_payloads
+            and callable(getattr(session, "prepare_turn_audio", None))
+            and not await self._prepare_qwen_turn_audio(session, turn)
+        ):
+            await self._finish_failed_turn_immediately(turn)
             return
         transient_owner = object()
         native_owner = object()
@@ -1430,50 +1449,165 @@ class ScopedRecognitionEngine:
                 await self.sleep(delay)
                 if self._closed or authority_generation != self._authority_generation:
                     return
+        if last_error is not None and self._start_connection_cooldown(
+            settings, watchdogs, last_error
+        ):
+            return
+        raise RuntimeError("provider_recovery_exhausted") from last_error
+
+    def _retryable_connection_error(self, error: BaseException, provider_id: str) -> bool:
+        diagnostics = recognition_failure_diagnostics(
+            error,
+            provider=provider_id,
+            channel=self.channel,
+            operation="readiness",
+            reason="provider_not_ready",
+        )
+        configuration_failure = any(
+            isinstance(
+                cause,
+                (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError),
+            )
+            for cause in transport_exception_chain(error)
+        )
+        return not configuration_failure and (
+            diagnostics.category in {"timeout", "service_unavailable", "rate_limit"}
+            or (diagnostics.category == "network" and classify_transport_error(error) == "network")
+        )
+
+    def _start_connection_cooldown(
+        self,
+        settings: AudioSegmentSettingsSnapshot,
+        watchdogs: STTRecognitionWatchdogs,
+        error: BaseException,
+    ) -> bool:
         cooldown_s = watchdogs.connect_recovery_cooldown_s
-        if cooldown_s is not None and last_error is not None:
-            diagnostics = recognition_failure_diagnostics(
-                last_error,
-                provider=settings.provider_id,
-                channel=self.channel,
-                operation="readiness",
-                reason="provider_not_ready",
+        if cooldown_s is None or not self._retryable_connection_error(error, settings.provider_id):
+            return False
+        diagnostics = recognition_failure_diagnostics(
+            error,
+            provider=settings.provider_id,
+            channel=self.channel,
+            operation="readiness",
+            reason="provider_not_ready",
+        )
+        self._connection_retry_at_s = self.monotonic_clock() + cooldown_s
+        emit_failure(
+            logger,
+            replace(
+                diagnostics,
+                cause_id=self._episode_cause.diagnostic_id if self._episode_cause else None,
+                retry_after_ms=int(cooldown_s * 1000),
+                fields={
+                    **diagnostics.fields,
+                    "attempts": self._episode_failures,
+                    "recovery_pending": True,
+                },
+            ),
+            severity="warning",
+            disposition="degraded",
+            stage="recovery",
+        )
+        return True
+
+    async def _prepare_qwen_turn_audio(
+        self, session: STTScopedTurnSession, turn: _ActiveTurn
+    ) -> bool:
+        watchdogs = turn.watchdogs
+        prepare = getattr(session, "prepare_turn_audio")
+        deadline = self.monotonic_clock() + watchdogs.readiness_timeout_s
+        if self._session_opened_at_s is not None and self._session_max_age_s is not None:
+            deadline = min(deadline, self._session_opened_at_s + self._session_max_age_s)
+        first_cause = self._episode_cause
+        last_error: BaseException = TimeoutError("provider_readiness_timeout")
+        base_failures = self._episode_failures
+        for attempt in range(base_failures, watchdogs.connect_attempts):
+            if not self._has_write_authority(session, turn):
+                return False
+            remaining = deadline - self.monotonic_clock()
+            if remaining <= 0:
+                break
+            task = asyncio.create_task(
+                prepare(turn.identity),
+                name=f"scoped-stt-readiness:{turn.identity.provider_turn_id}",
             )
-            configuration_failure = any(
-                isinstance(
-                    cause,
-                    (FileNotFoundError, IsADirectoryError, NotADirectoryError, PermissionError),
+            operations = self._operation_tasks.setdefault(id(session), set())
+            operations.add(task)
+            try:
+                done, _pending = await asyncio.wait(
+                    {task}, timeout=min(watchdogs.write_timeout_s, remaining)
                 )
-                for cause in transport_exception_chain(last_error)
-            )
-            if not configuration_failure and (
-                diagnostics.category in {"timeout", "service_unavailable", "rate_limit"}
-                or (
-                    diagnostics.category == "network"
-                    and classify_transport_error(last_error) == "network"
+            except asyncio.CancelledError:
+                task.cancel()
+                raise
+            retry_safe = True
+            if task not in done:
+                task.cancel()
+                done, _pending = await asyncio.wait({task}, timeout=watchdogs.drain_timeout_s)
+                retry_safe = task in done
+                last_error = TimeoutError("provider_readiness_timeout")
+            else:
+                try:
+                    task.result()
+                except BaseException as exc:
+                    last_error = exc
+                else:
+                    operations.discard(task)
+                    if not operations:
+                        self._operation_tasks.pop(id(session), None)
+                    return self._has_write_authority(session, turn)
+            if task.done():
+                operations.discard(task)
+                self._consume_task_result(task)
+                if not operations:
+                    self._operation_tasks.pop(id(session), None)
+            if not self._has_write_authority(session, turn):
+                return False
+            self._episode_failures = attempt + 1
+            if first_cause is None:
+                first_cause = recognition_failure_diagnostics(
+                    last_error,
+                    provider=turn.settings.provider_id,
+                    channel=self.channel,
+                    operation="readiness",
+                    reason="provider_not_ready",
+                    identity=turn.identity,
                 )
-            ):
-                self._connection_retry_at_s = self.monotonic_clock() + cooldown_s
                 emit_failure(
                     logger,
-                    replace(
-                        diagnostics,
-                        cause_id=(
-                            self._episode_cause.diagnostic_id if self._episode_cause else None
-                        ),
-                        retry_after_ms=int(cooldown_s * 1000),
-                        fields={
-                            **diagnostics.fields,
-                            "attempts": self._episode_failures,
-                            "recovery_pending": True,
-                        },
-                    ),
+                    first_cause,
                     severity="warning",
                     disposition="degraded",
-                    stage="recovery",
+                    stage="readiness",
                 )
-                return
-        raise RuntimeError("provider_recovery_exhausted") from last_error
+            self._episode_cause = first_cause
+            if not self._retryable_connection_error(last_error, turn.settings.provider_id):
+                self._episode_failures = watchdogs.connect_attempts
+                break
+            if not retry_safe:
+                break
+            if attempt + 1 < watchdogs.connect_attempts:
+                delay = min(
+                    watchdogs.connect_retry_base_s * (2**attempt),
+                    watchdogs.connect_retry_max_s,
+                )
+                await self.sleep(min(delay, max(0.0, deadline - self.monotonic_clock())))
+        if not self._has_write_authority(session, turn):
+            return False
+        self._episode_cause = first_cause
+        recovery_pending = self._start_connection_cooldown(turn.settings, watchdogs, last_error)
+        self._set_turn_failure(
+            turn,
+            "provider_not_ready",
+            exception=last_error,
+            operation="readiness",
+            recovery_pending=recovery_pending,
+            failure_diagnostics=first_cause,
+        )
+        turn.write_failed = True
+        if not recovery_pending:
+            self._notify_terminal_failure(last_error)
+        return False
 
     async def _consume_session_events(
         self,
@@ -2011,7 +2145,11 @@ class ScopedRecognitionEngine:
                     epoch_disposition="retire",
                 )
             )
-        if terminal.outcome in ("final", "empty", "submitted"):
+        older_than_pending_recovery = self._connection_retry_at_s is not None and any(
+            pending.terminal_ready.done() and pending.terminal_ready.result().recovery_pending
+            for pending in self._turns.values()
+        )
+        if terminal.outcome in ("final", "empty", "submitted") and not older_than_pending_recovery:
             if self._episode_cause is not None:
                 recovered = recognition_failure_diagnostics(
                     None,
@@ -2035,10 +2173,14 @@ class ScopedRecognitionEngine:
             self._recovery_backoff_pending = False
             self._terminal_failure_notified = False
             self._connection_retry_at_s = None
-        elif not (terminal.recovery_pending and self._connection_retry_at_s is not None) and not (
-            turn.independent_recognition
-            and self._stream_recovery is not None
-            and self._stream_recovery.pending
+        elif (
+            terminal.outcome not in ("final", "empty", "submitted")
+            and not (terminal.recovery_pending and self._connection_retry_at_s is not None)
+            and not (
+                turn.independent_recognition
+                and self._stream_recovery is not None
+                and self._stream_recovery.pending
+            )
         ):
             self._episode_failures += 1
             if turn.settings.provider_id == "soniox" and terminal.outcome in ("failed", "degraded"):

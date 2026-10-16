@@ -241,8 +241,17 @@ class _GenerationGuardedVadSink:
         ledger = self.runtime.segment_ledger
         if ledger is None:
             return
+        qwen_discontinuity = (
+            ledger.settings.provider_id == "qwen_audio"
+            and event.boundary_reason == "source_discontinuity"
+        )
         if ledger.settings.provider_id not in {"gemini_transcribe", "rolling_free"}:
-            return
+            if not qwen_discontinuity:
+                return
+            event = replace(event, chunk=event.chunk[:0], capture=())
+            self._closing = True
+            if self._worker is not None and not self._worker.done():
+                self._worker.cancel()
         if event.capture:
             self.runtime._current_stream_capture_epoch = event.capture[-1].capture_epoch
         elif event.boundary_reason == "source_discontinuity":
@@ -266,6 +275,15 @@ class _GenerationGuardedVadSink:
                 )
             ),
         )
+        if qwen_discontinuity:
+            try:
+                await cast(_VadSink, self.sink).handle_stream_input(owned)
+            finally:
+                await self.abort()
+                self._worker = None
+                self._closing = False
+                self.runtime._cancel_segment_ledger(ledger)
+            return
         await self._submit(owned)
 
     async def observe_source_activity(
