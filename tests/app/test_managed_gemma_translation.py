@@ -27,7 +27,12 @@ from puripuly_heart.core.local_translation.provisioning import (
     GemmaProvisioningCancelled,
     GemmaProvisioningUpdate,
 )
-from puripuly_heart.core.local_translation.runtime import ManagedGemmaReadiness
+from puripuly_heart.core.local_translation.runtime import (
+    ManagedGemmaReadiness,
+    ManagedGemmaRuntimeError,
+    ManagedGemmaRuntimeMissingError,
+    ManagedGemmaRuntimeVersionError,
+)
 
 
 def _selection(backend: str = "cpu") -> ManagedGemmaTranslationSelection:
@@ -179,6 +184,31 @@ async def test_failed_prepare_exposes_bounded_download_diagnostics() -> None:
     assert owner.snapshot.worker_exit_code == 1
     assert owner.snapshot.status_code == 503
     assert "sensitive worker detail" not in repr(owner.snapshot)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure", "phase", "code"),
+    [
+        (ManagedGemmaRuntimeMissingError("server is missing"), "runtime_files", "runtime_missing"),
+        (ManagedGemmaRuntimeVersionError("incompatible"), "runtime_files", "runtime_incompatible"),
+        (ManagedGemmaRuntimeError("exited during startup"), "runtime", "runtime_failed"),
+    ],
+)
+async def test_runtime_file_failures_are_distinguished_from_native_load_failures(
+    failure: ManagedGemmaRuntimeError, phase: str, code: str
+) -> None:
+    def prepare(**_kwargs: object) -> ManagedGemmaReadiness:
+        raise failure
+
+    owner = ManagedGemmaTranslationOwner(runtime=RecordingRuntime(prepare))
+
+    with pytest.raises(ManagedGemmaRuntimeError):
+        await owner.prepare(_selection("gpu"))
+
+    assert owner.snapshot.state == "failed"
+    assert owner.snapshot.failure_phase == phase
+    assert owner.snapshot.failure_code == code
 
 
 @pytest.mark.asyncio

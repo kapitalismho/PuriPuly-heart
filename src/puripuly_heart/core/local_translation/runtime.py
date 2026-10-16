@@ -79,6 +79,10 @@ class ManagedGemmaRuntimeVersionError(ManagedGemmaRuntimeError):
     pass
 
 
+class ManagedGemmaRuntimeMissingError(ManagedGemmaRuntimeError):
+    pass
+
+
 class ManagedGemmaRuntimeProcess(Protocol):
     @property
     def returncode(self) -> int | None: ...
@@ -770,7 +774,9 @@ class ManagedGemmaRuntimeOwner:
             else self._runtime_paths.cpu_server
         )
         if not executable.is_file():
-            raise ManagedGemmaRuntimeError(f"managed llama.cpp server is missing: {executable}")
+            raise ManagedGemmaRuntimeMissingError(
+                f"managed llama.cpp server is missing: {executable}"
+            )
         await self._version_validator(executable)
         port = self._port_allocator()
         process_cwd = self._install_dir
@@ -967,6 +973,7 @@ __all__ = [
     "ManagedGemmaResponse",
     "ManagedGemmaRuntimeClosedError",
     "ManagedGemmaRuntimeError",
+    "ManagedGemmaRuntimeMissingError",
     "ManagedGemmaRuntimeVersionError",
     "ManagedGemmaRuntimeOwner",
     "ManagedGemmaRuntimeProcess",
