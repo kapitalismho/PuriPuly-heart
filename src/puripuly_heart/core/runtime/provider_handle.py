@@ -784,4 +784,4 @@ def _raise_close_failures(failures: list[Exception], message: str) -> None:
     raise ExceptionGroup(message, failures)
 
 
-__all__ = ["ProviderResourceQuarantinedError", "ProviderRuntimeHandle"]
+__all__ = ["ProviderRuntimeHandle"]
