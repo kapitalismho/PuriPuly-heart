@@ -223,9 +223,9 @@ def build_gemma_server_command(
         if is_26b:
             command += (
                 "--n-cpu-moe",
-                "24",
+                "22",
                 "--moe-cache-mib",
-                "2048",
+                "2132",
                 "--swa-full",
                 "--cache-ram",
                 "0",

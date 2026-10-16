@@ -23,7 +23,9 @@ from puripuly_heart.core.local_translation.provisioning import (
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaReadiness,
     ManagedGemmaRuntimeError,
+    ManagedGemmaRuntimeMissingError,
     ManagedGemmaRuntimeOwner,
+    ManagedGemmaRuntimeVersionError,
 )
 from puripuly_heart.core.observability import DiagnosticEvent
 
@@ -398,6 +400,27 @@ def _failure_metadata(exception: BaseException) -> dict[str, str | int | None]:
             "worker_exit_code": download_failure.worker_exit_code,
             "status_code": download_failure.status_code,
             "os_error_code": download_failure.os_error_code,
+        }
+    runtime_files_failure = next(
+        (
+            item
+            for item in chain
+            if isinstance(item, ManagedGemmaRuntimeMissingError | ManagedGemmaRuntimeVersionError)
+        ),
+        None,
+    )
+    if runtime_files_failure is not None:
+        return {
+            "phase": "runtime_files",
+            "code": (
+                "runtime_missing"
+                if isinstance(runtime_files_failure, ManagedGemmaRuntimeMissingError)
+                else "runtime_incompatible"
+            ),
+            "cause_type": type(runtime_files_failure).__name__,
+            "worker_exit_code": None,
+            "status_code": None,
+            "os_error_code": None,
         }
     if isinstance(exception, GemmaProvisioningError):
         phase = "provisioning"

@@ -327,13 +327,13 @@ _TRANSLATION_MODELS = (
 )
 _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.recommended_cloud",
-    "settings.translation_model.section.recommended_local",
+    "settings.translation_model.section.cpu_inference",
     "settings.translation_model.section.gpu_inference",
     "settings.translation_model.section.user_settings",
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
-    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.recommended_local",
+    TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.cpu_inference",
     TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.gpu_inference",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.DEEPSEEK_V4_FLASH: "settings.translation_model.section.others",
@@ -4794,7 +4794,7 @@ class SettingsView(ft.Column):
         for section_key in _TRANSLATION_MODEL_SECTION_ORDER:
             for model in _TRANSLATION_MODELS:
                 if model == TranslationModel.MANAGED_GEMMA:
-                    if section_key == "settings.translation_model.section.recommended_local":
+                    if section_key == "settings.translation_model.section.cpu_inference":
                         options.append(
                             OptionItem(
                                 value="managed_gemma_cpu",
@@ -4845,7 +4845,7 @@ class SettingsView(ft.Column):
             self._on_llm_selected,
             show_description=True,
             two_column=True,
-            left_column_sections=2,
+            left_column_sections=1,
         )
         modal.open(current)
 

@@ -165,9 +165,16 @@ def test_26b_spec_is_distinct_pinned_text_only_artifact():
             sha256="a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891",
         ),
     )
-    assert tuple(spec.sources) == ("huggingface",)
+    assert tuple(spec.sources) == ("huggingface", "modelscope")
     assert spec.sources["huggingface"].repo_id == spec.repo_id
     assert spec.sources["huggingface"].revision == spec.revision
+    mirror = spec.sources["modelscope"]
+    assert mirror.repo_id == spec.repo_id
+    assert mirror.revision == assets.GEMMA_26B_MODELSCOPE_REVISION
+    assert mirror.download_url_template == (
+        "https://www.modelscope.cn/api/v1/models/unsloth/gemma-4-26B-A4B-it-qat-GGUF/repo"
+        "?Revision=f5f82bed79bc0bc49b01e0e577bb3dc949ebc564&FilePath={path}"
+    )
     assert assets.resolve_gemma_spec().model_id == assets.GEMMA_MODEL_ID
     assert assets.default_gemma_install_dir(spec) != assets.default_gemma_install_dir()
     assert assets.InstalledGemmaManifest.expected(spec).files == (spec.model_filename,)

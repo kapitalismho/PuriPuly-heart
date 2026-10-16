@@ -128,6 +128,8 @@ def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
         (False, "runtime", "dashboard.managed_gemma_notice.failed"),
         (True, "download", "dashboard.managed_gemma_notice.failed"),
         (False, "download", "dashboard.managed_gemma_notice.failed"),
+        (True, "runtime_files", "dashboard.managed_gemma_notice.runtime_files_failed"),
+        (False, "runtime_files", "dashboard.managed_gemma_notice.runtime_files_failed"),
     ],
 )
 def test_managed_failure_notice_uses_application_presentation_hint(

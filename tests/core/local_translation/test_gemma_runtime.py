@@ -1294,6 +1294,24 @@ async def test_incompatible_runtime_override_is_rejected_without_cpu_substitutio
 
 
 @pytest.mark.asyncio
+async def test_missing_runtime_executable_fails_before_launch_with_distinct_error(tmp_path):
+    owner, commands, _processes, _transports, _calls, _logs = _runtime(tmp_path)
+    (tmp_path / "cpu" / "llama-server.exe").unlink()
+    (tmp_path / "gpu" / "llama-server.exe").unlink()
+
+    with pytest.raises(ManagedGemmaRuntimeError) as caught:
+        await owner.prepare(
+            backend="cpu",
+            source_language="ko",
+            target_language="en",
+            system_prompt="translate",
+        )
+    assert isinstance(caught.value.__cause__, runtime_module.ManagedGemmaRuntimeMissingError)
+    assert commands == []
+    assert owner.readiness is None
+
+
+@pytest.mark.asyncio
 async def test_prefix_identity_separates_effective_backend_and_fixed_profile(tmp_path, monkeypatch):
     owner, _commands, _processes, _transports, _calls, _logs = _runtime(tmp_path)
     arguments = dict(source_language="ko", target_language="en", system_prompt="translate")
