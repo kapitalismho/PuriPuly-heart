@@ -886,3 +886,50 @@ async def test_26b_provisioning_installs_only_selected_target_and_reuses_valid_i
     }
     assert not (tmp_path / assets.e4b_gemma_spec().install_dirname).exists()
     assert not tuple(tmp_path.glob("*.staging-*"))
+
+
+@pytest.mark.asyncio
+async def test_26b_chinese_install_downloads_modelscope_and_keeps_hf_revision(
+    tmp_path, modelscope_server
+) -> None:
+    content = b"isolated-26b-modelscope"
+    pinned = assets.gemma_26b_spec()
+    source = pinned.sources["modelscope"]
+    spec = replace(
+        pinned,
+        assets=(
+            assets.GemmaAsset(
+                filename=pinned.model_filename,
+                size_bytes=len(content),
+                sha256=hashlib.sha256(content).hexdigest(),
+            ),
+        ),
+        sources={
+            **pinned.sources,
+            "modelscope": replace(
+                source,
+                download_url_template=source.download_url_template.replace(
+                    "https://www.modelscope.cn", modelscope_server.url
+                ),
+            ),
+        },
+    )
+    modelscope_server.responses[pinned.model_filename] = (200, content)
+    downloader = FailedDownloader(
+        {pinned.model_filename: content},
+        AssertionError("Hugging Face must not be used"),
+    )
+    install_dir = tmp_path / spec.install_dirname
+
+    installed = await provisioning.ensure_gemma_installed(
+        downloader=downloader,
+        install_dir=install_dir,
+        spec=spec,
+        locale="zh-CN",
+    )
+
+    assert installed.revision == pinned.revision
+    assert downloader.requests == []
+    assert modelscope_server.requests[0][1]["Revision"] == [assets.GEMMA_26B_MODELSCOPE_REVISION]
+    assert modelscope_server.requests[0][1]["FilePath"] == [pinned.model_filename]
+    assert (install_dir / pinned.model_filename).read_bytes() == content

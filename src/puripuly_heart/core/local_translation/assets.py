@@ -25,6 +25,7 @@ GEMMA_LICENSE_URL = "https://www.apache.org/licenses/LICENSE-2.0"
 GEMMA_26B_MODEL_ID = "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"
 GEMMA_26B_REPO_ID = "unsloth/gemma-4-26B-A4B-it-qat-GGUF"
 GEMMA_26B_REVISION = "7b92b5b28818151e8669af2e45e88d6086f490dd"
+GEMMA_26B_MODELSCOPE_REVISION = "f5f82bed79bc0bc49b01e0e577bb3dc949ebc564"
 GEMMA_26B_MODEL_FILENAME = "gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf"
 
 
@@ -138,6 +139,15 @@ def gemma_26b_spec() -> GemmaModelSpec:
                 name="huggingface",
                 repo_id=GEMMA_26B_REPO_ID,
                 revision=GEMMA_26B_REVISION,
+            ),
+            "modelscope": GemmaAssetSource(
+                name="modelscope",
+                repo_id=GEMMA_26B_REPO_ID,
+                revision=GEMMA_26B_MODELSCOPE_REVISION,
+                download_url_template=(
+                    f"https://www.modelscope.cn/api/v1/models/{GEMMA_26B_REPO_ID}/repo"
+                    f"?Revision={GEMMA_26B_MODELSCOPE_REVISION}&FilePath={{path}}"
+                ),
             ),
         },
     )
@@ -373,6 +383,7 @@ __all__ = [
     "GEMMA_26B_MODEL_ID",
     "GEMMA_26B_REPO_ID",
     "GEMMA_26B_REVISION",
+    "GEMMA_26B_MODELSCOPE_REVISION",
     "GEMMA_26B_MODEL_FILENAME",
     "GEMMA_ASSETS",
     "GEMMA_DRAFT_FILENAME",
