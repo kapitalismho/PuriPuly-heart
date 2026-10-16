@@ -230,18 +230,7 @@ class STTRecognitionUnit:
         size = len(self.text.encode("utf-8"))
         native = self.provenance.transcription
         if native is not None:
-            size += len(native.words) * 64
-            size += sum(
-                len(value.encode("utf-8"))
-                for value in (native.language_code, native.speaker_label)
-                if value is not None
-            )
-            size += sum(
-                len(value.encode("utf-8"))
-                for word in native.words
-                for value in word
-                if value is not None
-            )
+            size += native.retained_bytes
         return size
 
 

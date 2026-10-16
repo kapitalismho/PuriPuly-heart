@@ -187,7 +187,18 @@ The finite fallback is equivalent only when it carries the same explicit consent
 - `accept_terms` is invalid for self capture or a peer-off request.
 - Inspect the terms first. Pass `true` only for the user's explicit informed choice.
 
-### Qwen Audio Peer recovery
+### Qwen Audio Peer input and recovery
+
+- **Sentence publication**
+  - Directly selected Peer Qwen Audio admits each native final sentence without waiting for native task completion. Local natural ends and six-second source rollovers account for input; they no longer guarantee a Qwen final or end its task.
+  - Later permitted audio continues while earlier sentence results arrive. Sentence/translation grouping can therefore differ from local speech segments, and a short reply may share a server sentence with later speech.
+  - The adapter uses `max_sentence_silence=800` ms for Peer, rather than SELF's existing 6000 ms task-oriented setting. This is not a measured latency guarantee or a claim that 800 ms is optimal for every endpoint or recording.
+- **Audio scope and limits**
+  - Opening remains speech-demand-driven. While the stream is active, permitted real capture includes pauses/background audio; this can increase transmitted audio and service usage compared with VAD-segment-only input. Capture permission, source selection and mute/activation gates still apply.
+  - Local rollover does not replay audio already submitted to the same stream. The Peer adapter adds no fabricated silence for keepalive.
+  - Bounded recovery rotates a task after 12 seconds of additional submitted PCM without a new authoritative final. Independent task-age, audio, identity and source-map bounds also apply. A bounded rotation can still wait for task completion/readiness; ordinary local segment closure does not.
+  - Existing source/VAD-idle retirement remains 60 seconds. Missing completion and transport loss are failures, not successful empty recognition.
+  - SELF and other providers keep their existing contracts. Peer output remains excluded from the VRChat chatbox.
 
 - **Transient connection failures**
   - Peer capture remains enabled when temporary connection timeouts, network failures, service unavailability, or rate limits exhaust its three short connection attempts.

@@ -207,6 +207,9 @@ Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `te
   - Local audio completion and transcript delivery are distinct.
   - Capture scope and provider lifetime authorize recognition results.
   - Provider recovery stays inside the recognition boundary.
+  - Direct Peer Qwen Audio uses the existing independent-recognition boundary: local natural ends and six-second rollovers complete input accounting, while native sentence finals independently enter the existing translation/output admission path. They do not finish the native task. SELF Qwen and other routes retain their own input/finality policies.
+  - Peer Qwen admits only successfully written, permitted capture in source order, including real pauses after demand-driven opening. Already-submitted rollover context is not replayed, and the adapter does not synthesize keepalive audio. Task rotation and source-idle retirement bound input maps and native identities without an ordinary per-segment result wait.
+  - Qwen evidence retains native task/sentence identity, exact text, task-relative estimated timing and actual capture coverage through recognition origins. Missing or out-of-coverage timing remains explicit; neither receipt proximity nor a native speaker label establishes speaker attribution. Drain-intended retirement consumes remaining authoritative sentence contributions before retiring their authority; abort and replacement reject late old results.
 - **Failure identity**
   - Typed turn/input/epoch results and provider-mutation results retain the original safe cause before reduction to a terminal reason.
   - Capture generation, provider generation/epoch, and turn identity remain distinct.

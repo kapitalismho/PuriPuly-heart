@@ -33,10 +33,12 @@ from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     STTContributionConsumptionLedger,
+    STTProviderInputTerminal,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionUnitTerminal,
     STTSessionProjection,
 )
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine, STTRecognitionWatchdogs
@@ -1456,6 +1458,8 @@ async def test_real_qwen_audio_shared_engine_uses_one_sentence_join_projection(
 async def test_peer_language_handoff_finishes_backend_cleanup_before_new_recognition(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from tests.core.test_stt_scoped_engine import span
+
     class ServerSocket(FakeWebSocket):
         def __init__(self, text: str, *, gated: bool) -> None:
             super().__init__()
@@ -1469,22 +1473,15 @@ async def test_peer_language_handoff_finishes_backend_cleanup_before_new_recogni
         async def send(self, value: str | bytes) -> None:
             await super().send(value)
             if isinstance(value, bytes):
-                self.has_audio = True
-                return
-            header = json.loads(value)["header"]
-            task_id = header["task_id"]
-            if header["action"] == "run-task":
-                self.has_audio = False
-                await self.push({"header": {"event": "task-started", "task_id": task_id}})
-            elif header["action"] == "finish-task":
-                if self.has_audio:
+                if not self.has_audio:
+                    self.has_audio = True
                     await self.push(
                         {
-                            "header": {"event": "result-generated", "task_id": task_id},
+                            "header": {"event": "result-generated", "task_id": self.task_id},
                             "payload": {
                                 "output": {
                                     "sentence": {
-                                        "sentence_id": "sentence-1",
+                                        "sentence_id": 1,
                                         "sentence_end": True,
                                         "text": self.text,
                                     }
@@ -1492,6 +1489,14 @@ async def test_peer_language_handoff_finishes_backend_cleanup_before_new_recogni
                             },
                         }
                     )
+                return
+            header = json.loads(value)["header"]
+            task_id = header["task_id"]
+            self.task_id = task_id
+            if header["action"] == "run-task":
+                self.has_audio = False
+                await self.push({"header": {"event": "task-started", "task_id": task_id}})
+            elif header["action"] == "finish-task":
                 await self.push({"header": {"event": "task-finished", "task_id": task_id}})
 
         async def close(self) -> None:
@@ -1568,6 +1573,7 @@ async def test_peer_language_handoff_finishes_backend_cleanup_before_new_recogni
                 segment_id,
                 pre_roll=np.empty((0,), dtype=np.float32),
                 chunk=np.ones((8,), dtype=np.float32),
+                chunk_capture=(span(0, 0, 8),),
             ),
             now_monotonic_s=0.0,
         )
@@ -1588,7 +1594,8 @@ async def test_peer_language_handoff_finishes_backend_cleanup_before_new_recogni
         await owner.handle_owned_vad_event("peer", old_start)
         await owner.handle_owned_vad_event("peer", old_end)
         await wait_for_condition(
-            lambda: any(isinstance(event, STTProviderTurnTerminal) for event in events)
+            lambda: any(isinstance(event, STTRecognitionUnitTerminal) for event in events)
+            and any(isinstance(event, STTProviderInputTerminal) for event in events)
             and old_engine._session.state is QwenAudioSessionState.TASK_ACTIVE
         )
         new_request, new_start, new_end = configuration("auto")
@@ -1605,17 +1612,24 @@ async def test_peer_language_handoff_finishes_backend_cleanup_before_new_recogni
         await asyncio.wait_for(admission, timeout=1)
         await owner.handle_owned_vad_event("peer", new_end)
         await wait_for_condition(
-            lambda: len([event for event in events if isinstance(event, STTProviderTurnTerminal)])
+            lambda: len(
+                [event for event in events if isinstance(event, STTRecognitionUnitTerminal)]
+            )
             == 2
         )
 
-        terminals = [event for event in events if isinstance(event, STTProviderTurnTerminal)]
-        assert [(event.outcome, event.text) for event in terminals] == [
+        terminals = [event for event in events if isinstance(event, STTRecognitionUnitTerminal)]
+        assert [(event.outcome, event.unit.text) for event in terminals] == [
             ("final", "你好"),
             ("final", "こんにちは"),
         ]
-        assert terminals[0].identity.settings_scope == old_engine.scoped_settings_scope
-        assert terminals[1].identity.settings_scope != terminals[0].identity.settings_scope
+        assert terminals[0].unit.identity.stream.settings_scope == old_engine.scoped_settings_scope
+        assert (
+            terminals[1].unit.identity.stream.settings_scope
+            != terminals[0].unit.identity.stream.settings_scope
+        )
+        submitted = [event for event in events if isinstance(event, STTProviderInputTerminal)]
+        assert len(submitted) == 2 and all(event.outcome == "submitted" for event in submitted)
         assert old_socket.closed
         assert old_engine.cleanup_debt == 0
         assert owner.snapshot.channel_for("peer").phase == "running"

@@ -4,13 +4,14 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import time
 import uuid
 from collections import deque
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any
+from typing import Any, ClassVar, Literal
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
@@ -25,14 +26,24 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTNativeProvenance,
+    STTProviderInputTerminal,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTRecognitionUnit,
     STTSessionProjection,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
+from puripuly_heart.core.stt.stream_input import STTStreamInputMap, STTStreamWrite
+from puripuly_heart.domain.recognition import (
+    NativeAudioCoverage,
+    NativeTranscriptionEvidence,
+    NativeWordEvidence,
+    RecognitionStreamIdentity,
+    RecognitionUnitIdentity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +78,12 @@ QWEN_AUDIO_LANGUAGE_HINTS_LIMIT = 4
 QWEN_AUDIO_KEEPALIVE_INTERVAL_S = 15.0
 QWEN_AUDIO_KEEPALIVE_SILENCE_MS = 100
 QWEN_AUDIO_KEEPALIVE_TICK_S = 1.0
+QWEN_PEER_SENTENCE_SILENCE_MS = 800
+QWEN_PEER_NO_FINAL_S = 12
+QWEN_PEER_TASK_MAX_S = 60
+QWEN_PEER_MAX_SENTENCES = 256
+QWEN_PEER_MAX_MAP_RECORDS = 4096
+QWEN_PEER_MAX_METADATA_BYTES = 256 * 1024
 
 
 class QwenAudioSessionState(str, Enum):
@@ -165,6 +182,7 @@ class QwenAudioStreamingSTTBackend(STTBackend):
     hotwords: HotwordInput = ()
     hotword_weight: int = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
     websocket_factory: WebSocketFactory | None = None
+    channel: Literal["self", "peer"] = "self"
 
     async def open_session(
         self,
@@ -191,7 +209,10 @@ class QwenAudioStreamingSTTBackend(STTBackend):
                 raise ValueError(f"{name} must be > 0")
         if int(self.sample_rate_hz * self.keepalive_silence_ms / 1000) * 2 <= 0:
             raise ValueError("keepalive_silence_ms must produce at least one audio frame")
-        session = _QwenAudioSession(
+        if self.channel == "peer" and projection.mode != "scoped":
+            raise ValueError("Peer Qwen Audio requires scoped source ownership")
+        session_type = _QwenPeerAudioSession if self.channel == "peer" else _QwenAudioSession
+        session = session_type(
             api_key=self.api_key,
             language_hints=self.language_hints,
             model=self.model,
@@ -280,6 +301,8 @@ class _QwenAudioSession(STTBackendSession):
     hotword_weight: int = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
     websocket_factory: WebSocketFactory | None = None
     projection: STTSessionProjection = LEGACY_STT_SESSION_PROJECTION
+    sentence_silence_ms: ClassVar[int] = 6000
+    synthetic_keepalive: ClassVar[bool] = True
 
     _event_projection: STTSessionEventProjection = field(init=False, repr=False)
     _ws: Any = field(init=False, default=None, repr=False)
@@ -402,9 +425,10 @@ class _QwenAudioSession(STTBackendSession):
             self._state = QwenAudioSessionState.FAILED
             raise QwenAudioProtocolError("Qwen Audio connection failed") from exc
         self._recv_task = asyncio.create_task(self._recv_loop(), name="qwen-audio-recv")
-        self._keepalive_task = asyncio.create_task(
-            self._keepalive_loop(), name="qwen-audio-keepalive"
-        )
+        if self.synthetic_keepalive:
+            self._keepalive_task = asyncio.create_task(
+                self._keepalive_loop(), name="qwen-audio-keepalive"
+            )
         try:
             await self._begin_task(initial=True)
         except BaseException:
@@ -447,7 +471,7 @@ class _QwenAudioSession(STTBackendSession):
             "format": "pcm",
             "sample_rate": self.sample_rate_hz,
             "semantic_punctuation_enabled": False,
-            "max_sentence_silence": 6000,
+            "max_sentence_silence": self.sentence_silence_ms,
             "multi_threshold_mode_enabled": False,
             "heartbeat": True,
         }
@@ -1415,6 +1439,569 @@ class _QwenAudioSession(STTBackendSession):
     async def events(self):
         async for event in self._event_projection.events():
             yield event
+
+
+@dataclass(frozen=True, slots=True)
+class _QwenTaskCapture:
+    input_start: int
+    input_end: int
+    capture: AudioCaptureSpan
+    context_only: bool
+
+
+@dataclass(slots=True)
+class _QwenPeerAudioSession(_QwenAudioSession):
+    sentence_silence_ms: ClassVar[int] = QWEN_PEER_SENTENCE_SILENCE_MS
+    synthetic_keepalive: ClassVar[bool] = False
+    accepts_stream_input: ClassVar[bool] = True
+    independent_recognition_units: ClassVar[bool] = True
+    _stream: RecognitionStreamIdentity | None = field(init=False, default=None)
+    _input_map: STTStreamInputMap = field(init=False, default_factory=STTStreamInputMap)
+    _task_capture: list[_QwenTaskCapture] = field(init=False, default_factory=list)
+    _task_samples: int = field(init=False, default=0)
+    _last_final_samples: int = field(init=False, default=0)
+    _last_sentence_id: int = field(init=False, default=0)
+    _metadata_bytes: int = field(init=False, default=0)
+    _receipt_sequence: int = field(init=False, default=0)
+    _task_terminal: asyncio.Future[None] | None = field(init=False, default=None)
+    _rotation_task: asyncio.Task[None] | None = field(init=False, default=None)
+    _age_task: asyncio.Task[None] | None = field(init=False, default=None)
+    _stream_write_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock)
+    _ending: bool = field(init=False, default=False)
+
+    async def _begin_task(self, *, initial: bool = False) -> None:
+        self._task_capture.clear()
+        self._task_samples = 0
+        self._last_final_samples = 0
+        self._last_sentence_id = 0
+        self._metadata_bytes = 0
+        self._task_terminal = asyncio.get_running_loop().create_future()
+        await _QwenAudioSession._begin_task(self, initial=initial)
+
+    async def _handle_task_started(self, event_task_id: str) -> None:
+        starting = self._state in (
+            QwenAudioSessionState.CONNECTING,
+            QwenAudioSessionState.STARTING_NEXT_TASK,
+        )
+        await _QwenAudioSession._handle_task_started(self, event_task_id)
+        if (
+            starting
+            and event_task_id == self._task_id
+            and self._state is QwenAudioSessionState.TASK_ACTIVE
+        ):
+            await self._cancel_peer_task(self._age_task)
+            self._age_task = asyncio.create_task(self._task_age_limit(), name="qwen-peer-task-age")
+
+    async def _task_age_limit(self) -> None:
+        try:
+            await asyncio.sleep(QWEN_PEER_TASK_MAX_S)
+            self._request_rotation()
+        except asyncio.CancelledError:
+            return
+        finally:
+            if self._age_task is asyncio.current_task():
+                self._age_task = None
+
+    def _request_rotation(self) -> None:
+        if (
+            self._ending
+            or not self._accept_terminals
+            or self._state is QwenAudioSessionState.FAILED
+        ):
+            return
+        if self._rotation_task is None:
+            self._rotation_task = asyncio.create_task(
+                self._rotate_task(), name="qwen-peer-task-rotation"
+            )
+
+    async def _rotate_task(self) -> None:
+        try:
+            async with self._stream_write_lock:
+                await self._finish_peer_task()
+                if not self._ending and self._accept_terminals:
+                    await self._begin_task()
+                    future = self._start_future
+                    if future is None:
+                        raise QwenAudioProtocolError("Qwen Audio task readiness is missing")
+                    await asyncio.wait_for(asyncio.shield(future), self.task_start_timeout_s)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio task rotation failed"),
+                reason="session_failed",
+                cause=exc,
+            )
+        finally:
+            if self._rotation_task is asyncio.current_task():
+                self._rotation_task = None
+
+    async def _finish_peer_task(self) -> None:
+        terminal = self._task_terminal
+        if self._state is QwenAudioSessionState.TASK_ACTIVE:
+            async with self._admission_lock:
+                async with self._send_lock:
+                    self._active_boundary = _QwenAudioBoundary(self._next_boundary_sequence)
+                    self._next_boundary_sequence += 1
+                    self._boundary_requested = True
+                    await self._finish_active_task_locked()
+        if self._failure is not None:
+            raise self._failure
+        if terminal is not None and not terminal.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(terminal), self.task_finish_timeout_s)
+            except asyncio.TimeoutError as exc:
+                await self._fail(
+                    QwenAudioProtocolError("Qwen Audio task-finished timeout"),
+                    reason="task_finish_timeout",
+                    cause=exc,
+                )
+                raise QwenAudioProtocolError("Qwen Audio task-finished timeout") from exc
+        if self._failure is not None:
+            raise self._failure
+
+    async def _handle_task_finished(self, event_task_id: str) -> None:
+        if event_task_id != self._task_id:
+            return
+        if self._state is not QwenAudioSessionState.FINISHING_TASK:
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio task ended without input closure"),
+                reason="session_failed",
+            )
+            return
+        self._task_finished_count += 1
+        self._cancel_finish_timeout()
+        self._active_boundary = None
+        self._boundary_requested = False
+        self._task_id = None
+        self._state = QwenAudioSessionState.STARTING_NEXT_TASK
+        terminal = self._task_terminal
+        if terminal is not None and not terminal.done():
+            terminal.set_result(None)
+
+    async def begin_stream(self, stream: RecognitionStreamIdentity) -> None:
+        if (
+            self._ending
+            or not self._accept_terminals
+            or stream.provider_epoch_id != self._event_projection.provider_epoch_id
+            or stream.channel != "peer"
+            or (self._stream is not None and self._stream != stream)
+        ):
+            raise QwenAudioProtocolError("Qwen Audio stream ownership is unavailable")
+        self._stream = stream
+
+    async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        identity = request.identity
+        await self.begin_stream(
+            RecognitionStreamIdentity(
+                request.channel,
+                identity.segment.activation_generation,
+                identity.segment.capture_epoch,
+                identity.provider_epoch_id,
+                identity.settings_scope,
+            )
+        )
+        self._event_projection.begin(request)
+
+    async def send_turn_audio(
+        self,
+        identity: STTProviderTurnIdentity,
+        pcm16le: bytes,
+        *,
+        payload_sequence: int,
+        source_ranges: tuple[AudioCaptureSpan, ...],
+        context_only: bool,
+    ) -> None:
+        self._event_projection.validate_payload(identity, payload_sequence)
+        await self._submit_peer_audio(pcm16le, source_ranges, context_only)
+        self._event_projection.payload_written(identity, payload_sequence)
+
+    async def send_stream_audio(
+        self, pcm16le: bytes, *, source_ranges: tuple[AudioCaptureSpan, ...]
+    ) -> None:
+        await self._submit_peer_audio(pcm16le, source_ranges, False)
+
+    async def send_audio(self, pcm16le: bytes) -> None:
+        raise RuntimeError("Peer Qwen Audio requires owned source coverage")
+
+    async def on_speech_end(
+        self,
+        *,
+        trailing_silence_ms: int | None = None,
+        reason: SpeechBoundaryReason | None = None,
+    ) -> None:
+        raise RuntimeError("Peer Qwen Audio local input closes through seal_turn")
+
+    async def _submit_peer_audio(
+        self, pcm16le: bytes, ranges: tuple[AudioCaptureSpan, ...], context_only: bool
+    ) -> None:
+        if self._stream is None:
+            raise QwenAudioProtocolError("Qwen Audio stream has no source owner")
+        _, write = self._input_map.prepare(pcm16le, ranges)
+        if write is None:
+            return
+        cursor = 0
+        for span in ranges:
+            start, end = span.normalized_start_sample, span.normalized_end_sample
+            assert start is not None and end is not None
+            left = max(start, write.source_start)
+            while left < end:
+                rotation = self._rotation_task
+                if rotation is not None:
+                    await rotation
+                async with self._stream_write_lock:
+                    if self._rotation_task is not None:
+                        continue
+                    if self._ending or self._state is not QwenAudioSessionState.TASK_ACTIVE:
+                        raise QwenAudioProtocolError("Qwen Audio task cannot accept input")
+                    room = min(
+                        QWEN_PEER_NO_FINAL_S * self.sample_rate_hz
+                        - (self._task_samples - self._last_final_samples),
+                        QWEN_PEER_TASK_MAX_S * self.sample_rate_hz - self._task_samples,
+                    )
+                    right = min(end, left + room)
+                    if room <= 0:
+                        self._request_rotation()
+                        continue
+                    capture = span.slice_normalized(left, right)
+                    merged = self._can_merge_capture(capture, context_only)
+                    if not merged and (
+                        len(self._task_capture) >= QWEN_PEER_MAX_MAP_RECORDS
+                        or self._metadata_bytes + 192 > QWEN_PEER_MAX_METADATA_BYTES
+                    ):
+                        self._request_rotation()
+                        continue
+                    offset = (cursor + left - start) * 2
+                    selected = pcm16le[offset : offset + (right - left) * 2]
+                    async with self._admission_lock:
+                        if self._ending or self._state is not QwenAudioSessionState.TASK_ACTIVE:
+                            raise QwenAudioProtocolError("Qwen Audio task cannot accept input")
+                        if not merged and self._metadata_bytes + 192 > QWEN_PEER_MAX_METADATA_BYTES:
+                            self._request_rotation()
+                            continue
+                        async with self._send_lock:
+                            try:
+                                await self._send_audio_now(selected)
+                            except Exception as exc:
+                                await self._fail(
+                                    QwenAudioProtocolError("Qwen Audio audio send failed"),
+                                    reason="qwen_write_failed",
+                                    cause=exc,
+                                )
+                                raise QwenAudioProtocolError(
+                                    "Qwen Audio audio send failed"
+                                ) from exc
+                        self._append_capture(capture, context_only, merged)
+                        self._input_map.commit(
+                            STTStreamWrite(capture.capture_epoch, left, right, right - left)
+                        )
+                    left = right
+                    if (
+                        self._task_samples - self._last_final_samples
+                        >= QWEN_PEER_NO_FINAL_S * self.sample_rate_hz
+                        or self._task_samples >= QWEN_PEER_TASK_MAX_S * self.sample_rate_hz
+                    ):
+                        self._request_rotation()
+            cursor += end - start
+
+    def _can_merge_capture(self, capture: AudioCaptureSpan, context_only: bool) -> bool:
+        if not self._task_capture:
+            return False
+        previous = self._task_capture[-1].capture
+        return (
+            self._task_capture[-1].context_only == context_only
+            and previous.capture_epoch == capture.capture_epoch
+            and previous.source_sample_rate_hz == capture.source_sample_rate_hz
+            and previous.normalized_sample_rate_hz == capture.normalized_sample_rate_hz
+            and previous.source_end_sample == capture.source_start_sample
+            and previous.normalized_end_sample == capture.normalized_start_sample
+            and previous.source_end_monotonic_s == capture.source_start_monotonic_s
+            and capture.discontinuity_before is None
+        )
+
+    def _append_capture(self, capture: AudioCaptureSpan, context_only: bool, merged: bool) -> None:
+        count = capture.normalized_sample_count
+        if merged:
+            previous = self._task_capture[-1]
+            self._task_capture[-1] = replace(
+                previous,
+                input_end=self._task_samples + count,
+                capture=replace(
+                    previous.capture,
+                    source_end_sample=capture.source_end_sample,
+                    normalized_end_sample=capture.normalized_end_sample,
+                    source_end_monotonic_s=capture.source_end_monotonic_s,
+                ),
+            )
+        else:
+            self._task_capture.append(
+                _QwenTaskCapture(
+                    self._task_samples, self._task_samples + count, capture, context_only
+                )
+            )
+            self._metadata_bytes += 192
+        self._task_samples += count
+
+    def recognition_source_covers(self, ranges: tuple[AudioCaptureSpan, ...]) -> bool:
+        return self._input_map.covers(ranges)
+
+    async def seal_turn(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        sealed_content_ranges: tuple[AudioCaptureSpan, ...],
+        seal_reason: str,
+        observed_trailing_silence_ms: int | None,
+    ) -> None:
+        if sealed_content_ranges and not self._input_map.covers(sealed_content_ranges):
+            raise QwenAudioProtocolError("Qwen Audio sealed input is not fully submitted")
+        self._event_projection.seal(identity)
+        self._event_projection.terminal(STTProviderInputTerminal(identity, "submitted", "peer"))
+
+    async def _handle_server_message(self, message: object) -> None:
+        response = self._message_dict(message)
+        if response is None:
+            return
+        header = response.get("header") or {}
+        if header.get("event") != "result-generated":
+            await _QwenAudioSession._handle_server_message(self, response)
+            return
+        async with self._admission_lock:
+            await self._admit_peer_sentence(response, header)
+
+    async def _admit_peer_sentence(
+        self, response: Mapping[str, object], header: Mapping[str, object]
+    ) -> None:
+        task_id = str(header.get("task_id") or "")
+        if task_id != self._task_id or self._state not in (
+            QwenAudioSessionState.TASK_ACTIVE,
+            QwenAudioSessionState.FINISHING_TASK,
+        ):
+            return
+        sentence = response.get("payload", {}).get("output", {}).get("sentence", {})
+        if sentence.get("heartbeat") or not sentence.get("sentence_end"):
+            return
+        raw_id = sentence.get("sentence_id")
+        if raw_id == 0 or raw_id == "0":
+            return
+        try:
+            sentence_number = int(str(raw_id))
+        except ValueError:
+            sentence_number = -1
+        sentence_id = str(sentence_number)
+        if sentence_id in self._sentence_ids:
+            return
+        if sentence_number <= self._last_sentence_id:
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio final sentence order is inconsistent"),
+                reason="session_failed",
+            )
+            return
+        text = sentence.get("text")
+        if not isinstance(text, str) or self._stream is None:
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio final sentence has no admitted identity"),
+                reason="session_failed",
+            )
+            return
+        identity_bytes = len(sentence_id.encode("utf-8")) + 64
+        if (
+            len(self._sentence_ids) >= QWEN_PEER_MAX_SENTENCES
+            or self._metadata_bytes + identity_bytes > QWEN_PEER_MAX_METADATA_BYTES
+        ):
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio task evidence capacity exceeded"),
+                reason="session_failed",
+            )
+            return
+        self._sentence_ids.add(sentence_id)
+        self._last_sentence_id = sentence_number
+        self._metadata_bytes += identity_bytes
+        self._last_final_samples = self._task_samples
+        begin = self._native_time(sentence.get("begin_time"))
+        end = self._native_time(sentence.get("end_time"))
+        words = tuple(
+            NativeWordEvidence(
+                word.get("text") if isinstance(word.get("text"), str) else None,
+                word.get("punctuation") if isinstance(word.get("punctuation"), str) else None,
+                self._native_time(word.get("begin_time")),
+                self._native_time(word.get("end_time")),
+            )
+            for word in (sentence.get("words") or ())
+            if isinstance(word, Mapping)
+        )
+        native = NativeTranscriptionEvidence(
+            native_task_id=task_id,
+            native_sentence_id=sentence_id,
+            timestamp_basis="task_relative_estimated",
+            begin_time_ms=begin,
+            end_time_ms=end,
+            input_sample_rate_hz=self.sample_rate_hz,
+            task_input_samples=self._task_samples,
+            timed_words=words,
+            audio_coverage=self._sentence_coverage(begin, end),
+        )
+        self._receipt_sequence += 1
+        unit = STTRecognitionUnit(
+            RecognitionUnitIdentity(
+                self._stream,
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL, f"{self._stream.provider_epoch_id}/{task_id}/{sentence_id}"
+                ),
+                self._receipt_sequence,
+            ),
+            text,
+            STTNativeProvenance(
+                native_event_id=sentence_id,
+                native_task_id=task_id,
+                barrier="sentence_end",
+                transcription=native,
+            ),
+        )
+        if not self._event_projection.put_recognition(unit):
+            await self._fail(
+                QwenAudioProtocolError("Qwen Audio recognition capacity exceeded"),
+                reason="session_failed",
+            )
+            return
+        if (
+            len(self._sentence_ids) >= QWEN_PEER_MAX_SENTENCES
+            or self._metadata_bytes >= QWEN_PEER_MAX_METADATA_BYTES
+        ):
+            self._request_rotation()
+
+    @staticmethod
+    def _native_time(value: object) -> float | None:
+        return float(value) if type(value) in (int, float) and math.isfinite(value) else None
+
+    def _sentence_coverage(
+        self, begin_ms: float | None, end_ms: float | None
+    ) -> tuple[NativeAudioCoverage, ...]:
+        left = math.floor(begin_ms * self.sample_rate_hz / 1000) if begin_ms is not None else 0
+        right = (
+            math.ceil(end_ms * self.sample_rate_hz / 1000)
+            if end_ms is not None
+            else self._task_samples
+        )
+        coverage = []
+        for entry in self._task_capture:
+            start, end = max(left, entry.input_start), min(right, entry.input_end)
+            if start >= end:
+                continue
+            source_start = entry.capture.normalized_start_sample
+            assert source_start is not None
+            capture = entry.capture.slice_normalized(
+                source_start + start - entry.input_start,
+                source_start + end - entry.input_start,
+            )
+            coverage.append(
+                NativeAudioCoverage(
+                    start,
+                    end,
+                    capture.capture_epoch,
+                    capture.source_sample_rate_hz,
+                    capture.source_start_sample,
+                    capture.source_end_sample,
+                    capture.normalized_sample_rate_hz,
+                    capture.normalized_start_sample,
+                    capture.normalized_end_sample,
+                    capture.source_start_monotonic_s,
+                    capture.source_end_monotonic_s,
+                    entry.context_only,
+                    discontinuity_kind=(
+                        capture.discontinuity_before.kind if capture.discontinuity_before else None
+                    ),
+                    discontinuity_observed_at_monotonic_s=(
+                        capture.discontinuity_before.observed_at_monotonic_s
+                        if capture.discontinuity_before
+                        else None
+                    ),
+                    lost_source_samples=(
+                        capture.discontinuity_before.lost_source_samples
+                        if capture.discontinuity_before
+                        else None
+                    ),
+                )
+            )
+        return tuple(coverage)
+
+    def _terminalize_scoped(
+        self,
+        identity: STTProviderTurnIdentity,
+        *,
+        outcome: SegmentTerminalOutcome,
+        text: str = "",
+        failure_reason: str | None = None,
+        retire: bool = False,
+        provenance: STTNativeProvenance,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+    ) -> None:
+        self._event_projection.terminal(
+            STTProviderInputTerminal(
+                identity,
+                outcome if outcome in ("failed", "expired", "cancelled") else "failed",
+                "peer",
+                failure_reason,
+                "retire" if retire else "reuse",
+                failure_diagnostics=failure_diagnostics,
+            )
+        )
+
+    async def end_stream(self, *, reason: str) -> None:
+        self._ending = True
+        await self._cancel_peer_task(self._age_task)
+        rotation = self._rotation_task
+        if rotation is not None:
+            await rotation
+        try:
+            async with self._stream_write_lock:
+                await self._finish_peer_task()
+                await asyncio.sleep(0)
+                self._closing_requested = True
+                self._state = QwenAudioSessionState.CLOSING
+                await self._close_socket()
+        except asyncio.CancelledError:
+            await self.abort_for_toggle_off()
+            raise
+
+    async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
+        self._terminalize_scoped(
+            identity,
+            outcome="cancelled",
+            failure_reason=reason,
+            retire=True,
+            provenance=STTNativeProvenance(barrier="abort"),
+        )
+        await self.abort_for_toggle_off()
+
+    async def stop(self) -> None:
+        await self.abort_for_toggle_off()
+
+    async def abort_for_toggle_off(self) -> None:
+        self._ending = True
+        await _QwenAudioSession.abort_for_toggle_off(self)
+
+    async def _close_socket(self, *, cancel_receiver: bool = False) -> None:
+        await self._cancel_peer_task(self._age_task)
+        await self._cancel_peer_task(self._rotation_task)
+        self._age_task = None
+        self._rotation_task = None
+        self._cancel_start_timeout()
+        self._cancel_finish_timeout()
+        await _QwenAudioSession._close_socket(self, cancel_receiver=cancel_receiver)
+        self._task_capture.clear()
+        self._sentence_ids.clear()
+        self._metadata_bytes = 0
+        terminal = self._task_terminal
+        if terminal is not None and not terminal.done():
+            terminal.set_result(None)
+
+    @staticmethod
+    async def _cancel_peer_task(task: asyncio.Task[None] | None) -> None:
+        if task is not None and task is not asyncio.current_task():
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
 
 __all__ = [

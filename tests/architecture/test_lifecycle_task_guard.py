@@ -448,8 +448,10 @@ TASK_CREATION_REVIEWS = (
             "_QwenAudioSession._handle_task_started": 1,
             "_QwenAudioSession._handle_task_finished": 1,
             "_QwenAudioSession._finish_active_task_locked": 1,
+            "_QwenPeerAudioSession._handle_task_started": 1,
+            "_QwenPeerAudioSession._request_rotation": 1,
         },
-        "Qwen Audio session owns send, receive, timeout, queued-audio, and keepalive tasks; session close cancels and drains keepalive work",
+        "Qwen Audio sessions retain transport and timeout tasks; Peer additionally retains one task-age timer and one serialized rotation, cancelled and joined by socket cleanup",
     ),
     *_reviews(
         "providers/stt/sdk_network.py",

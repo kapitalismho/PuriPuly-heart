@@ -14,6 +14,8 @@ Turning statistics off stops subsequent statistics transmission and removes the 
 
 Local models process data on your device. External speech recognition sends audio to the selected service; external translation sends source text and the necessary context. API keys authenticate with the service. Custom servers also receive the audio or text and authentication information configured for them.
 
+When Qwen Audio is selected for Peer recognition, a speech-demand-opened stream can send real pauses and background audio from the permitted capture source until bounded retirement or capture stops. Local speech-segment boundaries do not themselves stop that stream. This can transmit more audio than sending only locally detected speech segments and can change external service usage. Capture permission, source selection and activation/mute controls continue to apply.
+
 Managed translation is processed by OpenRouter and the actual inference provider and includes a user reference. The project’s authentication server does not ordinarily relay translation content. External retention and training use depend on the service’s policies and settings; we do not guarantee zero retention or no training use for every request. To avoid external processing, choose local models or turn the relevant feature off.
 
 VRChat integration may include participant counts in translation context, but does not send participant names or raw logs. OSC sends subtitles and control information to the configured destination; automatic connection discovers and advertises services on the local network. The default destination is on your device, and you can change or disable the connection mode in Settings.

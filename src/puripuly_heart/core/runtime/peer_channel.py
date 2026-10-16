@@ -241,7 +241,7 @@ class _GenerationGuardedVadSink:
         ledger = self.runtime.segment_ledger
         if ledger is None:
             return
-        if ledger.settings.provider_id not in {"gemini_transcribe", "rolling_free"}:
+        if ledger.settings.provider_id not in {"gemini_transcribe", "rolling_free", "qwen_audio"}:
             return
         if event.capture:
             self.runtime._current_stream_capture_epoch = event.capture[-1].capture_epoch
