@@ -921,12 +921,12 @@ class LocalASRProviderRuntimeOwner:
         settings: AudioSegmentSettingsSnapshot,
     ) -> _ScopedRecognitionProvider:
         handle = self._handles[channel]
-        current, _generation = handle.current_provider_generation()
         scope = (
             settings.provider_id,
             settings.provider_signature,
             settings.runtime_signature,
         )
+        current, _generation = handle.current_provider_generation()
         target = next(
             (
                 provider
@@ -943,6 +943,8 @@ class LocalASRProviderRuntimeOwner:
                 target = current
         if target is None:
             raise RuntimeError(f"no {channel} provider accepts the segment configuration scope")
+        if settings.provider_id == "qwen_audio":
+            await handle.reclaim_qwen_resources(settings_scope=scope, admitted_provider=target)
         return cast(_ScopedRecognitionProvider, target)
 
     async def recover_gpu(
@@ -1260,7 +1262,13 @@ class LocalASRProviderRuntimeOwner:
         try:
             if request.provider_id == "qwen_audio":
                 failure_stage = "provider_reclaim"
-                await self._handles[channel].reclaim_qwen_resources()
+                await self._handles[channel].reclaim_qwen_resources(
+                    settings_scope=(
+                        request.provider_id,
+                        request.provider_signature,
+                        request.runtime_signature,
+                    )
+                )
             failure_stage = "provider_build"
             result = self._provider_factory.create(
                 request,
