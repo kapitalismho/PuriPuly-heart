@@ -54,6 +54,7 @@ from puripuly_heart.providers.stt.gemini_transcribe import (
     GEMINI_TRANSCRIBE_MAX_SESSION_AGE_S,
 )
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
+from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SONIOX_MAX_SESSION_AGE_S
 
 from .wiring_stt_factory import create_stt_backend_from_resolved_config
@@ -156,6 +157,8 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 )
             ),
         )
+        if isinstance(backend, QwenAudioStreamingSTTBackend):
+            backend.monotonic_clock = self.clock.now
         if isinstance(backend, LocalGpuSTTBackend):
             backend.operation_id = request.operation_id
             backend.request_id = request.request_id

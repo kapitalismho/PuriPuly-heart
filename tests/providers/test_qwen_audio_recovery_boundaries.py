@@ -125,6 +125,7 @@ class RecoveryFactory:
             websocket_factory=self.transport,
             task_start_timeout_s=self.task_start_timeout_s,
             task_finish_timeout_s=2,
+            monotonic_clock=self.clock.now,
         )
         engine = ScopedRecognitionEngine(
             channel=request.channel,

@@ -31,6 +31,49 @@ from puripuly_heart.core.network_diagnostics import (
     TRANSPORT_NUMERIC_FIELDS,
 )
 
+QWEN_FAILURE_ENUM_FIELDS: Final = MappingProxyType(
+    {
+        "qwen_failure_kind": frozenset(
+            {
+                "native",
+                "websocket_close",
+                "websocket_handshake",
+                "websocket_protocol",
+                "configuration",
+                "tls",
+                "proxy",
+                "transport",
+                "unknown",
+            }
+        ),
+        "qwen_native_code": frozenset(
+            {
+                "unknown",
+                "CLIENT_ERROR",
+                "InvalidApiKey",
+                "AccessDenied",
+                "AccessDenied.Unpurchased",
+                "InvalidParameter",
+                "DataInspectionFailed",
+                "ModelNotFound",
+                "Throttling",
+                "Throttling.RateQuota",
+                "Throttling.BurstRate",
+                "Throttling.AllocationQuota",
+                "Throttling.ServiceOverloaded",
+                "Throttling.ResourceExhausted",
+                "InternalError",
+                "InternalError.Timeout",
+                "SystemError",
+                "RequestTimeOut",
+                "ServiceUnavailable",
+                "ModelUnavailable",
+            }
+        ),
+    }
+)
+QWEN_FAILURE_NUMERIC_FIELDS: Final = ("ws_close_code", "idle_ms")
+
 DiagnosticSink: TypeAlias = Literal[
     "dashboard",
     "snackbar",
@@ -852,8 +895,16 @@ def _field_shape_reasons(
         if key in TRANSPORT_ENUM_FIELDS:
             if type(value) is not str or value not in TRANSPORT_ENUM_FIELDS[key]:
                 reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
+        elif key in QWEN_FAILURE_ENUM_FIELDS:
+            if type(value) is not str or value not in QWEN_FAILURE_ENUM_FIELDS[key]:
+                reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
         elif key in TRANSPORT_NUMERIC_FIELDS and type(value) is not int:
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
+        elif key in QWEN_FAILURE_NUMERIC_FIELDS:
+            if type(value) is not int or not 0 <= value < (
+                5000 if key == "ws_close_code" else 2**64
+            ):
+                reasons.append(DIAGNOSTIC_VALIDATION_REASON_UNSUPPORTED_FIELD_TYPE)
         if _max_depth(value) > DIAGNOSTIC_FIELD_MAX_DEPTH:
             reasons.append(DIAGNOSTIC_VALIDATION_REASON_EXCESSIVE_DEPTH)
         if not _is_supported_diagnostic_value(value):

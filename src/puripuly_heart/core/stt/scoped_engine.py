@@ -177,6 +177,7 @@ class _ActiveTurn:
     local_sealed: bool = False
     terminal_emitted: bool = False
     write_failed: bool = False
+    readiness_failure_counted: bool = False
     retained_samples: int = 0
     retained_bytes: int = 0
     retention_budget: AudioRetentionBudget | None = None
@@ -1033,6 +1034,7 @@ class ScopedRecognitionEngine:
         self._turn_order.append(identity)
         self._turn_resolved.clear()
         if open_failure is not None or session is None or self._provider_epoch_id is None:
+            turn.readiness_failure_counted = settings.provider_id == "qwen_audio"
             self._set_turn_failure(
                 turn,
                 "provider_not_ready",
@@ -1411,7 +1413,11 @@ class ScopedRecognitionEngine:
                         self._episode_cause,
                         fields={**self._episode_cause.fields, "provider_epoch_id": epoch_id},
                     )
-                    self._episode_failures = watchdogs.connect_attempts
+                    self._episode_failures = (
+                        self._episode_failures + 1
+                        if settings.provider_id == "qwen_audio"
+                        else watchdogs.connect_attempts
+                    )
                     raise
                 except Exception as exc:
                     self._episode_failures += 1
@@ -1489,6 +1495,13 @@ class ScopedRecognitionEngine:
             )
             for cause in transport_exception_chain(error)
         )
+        explicit_retryable = getattr(error, "readiness_retryable", None)
+        if provider_id == "qwen_audio" and type(explicit_retryable) is bool:
+            return (
+                not configuration_failure
+                and classify_transport_error(error) not in {"tls", "proxy"}
+                and explicit_retryable
+            )
         return not configuration_failure and (
             diagnostics.category in {"timeout", "service_unavailable", "rate_limit"}
             or (diagnostics.category == "network" and classify_transport_error(error) == "network")
@@ -1605,7 +1618,6 @@ class ScopedRecognitionEngine:
                 )
             self._episode_cause = first_cause
             if not self._retryable_connection_error(last_error, turn.settings.provider_id):
-                self._episode_failures = watchdogs.connect_attempts
                 break
             if not retry_safe:
                 break
@@ -1619,6 +1631,7 @@ class ScopedRecognitionEngine:
             return False
         self._episode_cause = first_cause
         recovery_pending = self._start_connection_cooldown(turn.settings, watchdogs, last_error)
+        turn.readiness_failure_counted = True
         self._set_turn_failure(
             turn,
             "provider_not_ready",
@@ -2205,7 +2218,8 @@ class ScopedRecognitionEngine:
                 and self._stream_recovery.pending
             )
         ):
-            self._episode_failures += 1
+            if not turn.readiness_failure_counted:
+                self._episode_failures += 1
             if turn.settings.provider_id == "soniox" and terminal.outcome in ("failed", "degraded"):
                 if not terminal.failure_retryable:
                     self._episode_failures = turn.watchdogs.connect_attempts

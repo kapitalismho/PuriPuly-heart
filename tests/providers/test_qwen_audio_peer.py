@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 
@@ -22,7 +23,7 @@ from tests.core.test_stt_scoped_engine import (
 )
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
-from tests.providers.test_qwen_audio import SocketFactory, control, native
+from tests.providers.test_qwen_audio import ScriptedSocket, SocketFactory, control, native
 
 
 async def make_engine(channel, *, sink=None, factory=None, clock=None):
@@ -39,6 +40,8 @@ async def make_engine(channel, *, sink=None, factory=None, clock=None):
             task_finish_timeout_s=0.5,
             send_timeout_s=0.2,
         )
+        if clock is not None:
+            backend.monotonic_clock = clock.now
         session = await backend.open_session(projection=STTSessionProjection("scoped", epoch))
         sessions.append(session)
         return session
@@ -348,6 +351,91 @@ async def test_source_idle_retires_without_empty_tasks_or_filler_audio(channel):
         assert [value for value in socket.sent if isinstance(value, bytes)] == pcm
         assert len(socket.task_ids) == 1
     finally:
+        await engine.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+@pytest.mark.parametrize("confirm_abort", [True, False])
+async def test_idle_close_cancellation_requires_confirmed_release_before_fresh_recognition(
+    channel, confirm_abort
+):
+    class RetiringSocket(ScriptedSocket):
+        def __init__(self):
+            super().__init__()
+            self.abort_requested = asyncio.Event()
+            self.release = asyncio.Event()
+            self.transport = SimpleNamespace(abort=self.abort_requested.set)
+
+        async def close(self):
+            if not self.closed:
+                await self.release.wait()
+                await super().close()
+
+        async def wait_closed(self):
+            if confirm_abort:
+                await self.abort_requested.wait()
+            else:
+                await self.release.wait()
+            await super().close()
+
+    sockets = [RetiringSocket(), RetiringSocket()]
+    factory = SocketFactory(sockets)
+    clock = ControlledMonotonicClock()
+    events = []
+    engine, _, _ = await make_engine(channel, sink=events.append, factory=factory, clock=clock)
+    ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+    try:
+        await engine.observe_source_activity(speech_observed=True, observed_at_monotonic_s=0)
+        for index, socket in enumerate(sockets):
+            start, _, end = segment_events(ledger, start_sample=index * 100, now=0)
+            await engine.handle_owned_vad_event(start)
+            await engine.handle_owned_vad_event(end)
+            await socket.push(native(socket.task_ids[0], text=f"Before {index}."))
+            await socket.push(control(socket.task_ids[0], "task-finished"))
+        await wait_until(lambda: len(events) >= 2 and not engine._turns)
+        await engine.observe_source_activity(speech_observed=False, observed_at_monotonic_s=0)
+        await clock.advance_to(60)
+        await wait_until(lambda: all(socket.abort_requested.is_set() for socket in sockets))
+        await wait_until(lambda: not engine._cleanup_tasks, timeout=2)
+        if confirm_abort:
+            assert all(socket.closed for socket in sockets)
+            assert engine.cleanup_debt == 0
+        else:
+            assert not any(socket.closed for socket in sockets)
+            assert engine.cleanup_debt == 1
+            blocked, _, blocked_end = segment_events(ledger, start_sample=200, now=60)
+            await engine.handle_owned_vad_event(blocked)
+            await engine.handle_owned_vad_event(blocked_end)
+            assert len(factory.sockets) == 2
+            assert any(
+                isinstance(event, STTProviderTurnTerminal) and event.outcome == "failed"
+                for event in events
+            )
+            for socket in sockets:
+                socket.release.set()
+        fresh_start, _, fresh_end = segment_events(ledger, start_sample=300, now=60)
+        await engine.handle_owned_vad_event(fresh_start)
+        await engine.handle_owned_vad_event(fresh_end)
+        fresh = factory.sockets[-1]
+        assert len(factory.sockets) == 3 and all(socket.closed for socket in sockets)
+        await fresh.push(native(fresh.task_ids[0], text="Fresh source."))
+        await fresh.push(control(fresh.task_ids[0], "task-finished"))
+        await wait_until(
+            lambda: any(
+                isinstance(event, STTProviderTurnTerminal) and event.text == "Fresh source."
+                for event in events
+            )
+        )
+        assert [
+            event.text
+            for event in events
+            if isinstance(event, STTProviderTurnTerminal) and event.outcome == "final"
+        ] == ["Before 0.", "Before 1.", "Fresh source."]
+        assert engine.cleanup_debt == 0
+    finally:
+        for socket in sockets:
+            socket.release.set()
         await engine.close()
 
 

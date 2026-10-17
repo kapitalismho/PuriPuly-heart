@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import math
+import time
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -12,6 +13,7 @@ from typing import Any, Literal
 
 from puripuly_heart.core import network_clients
 from puripuly_heart.core.audio.format import AudioCaptureSpan
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
@@ -36,6 +38,7 @@ from puripuly_heart.domain.recognition import (
     RecognitionTextOrigin,
     RecognitionUnitIdentity,
 )
+from puripuly_heart.providers.stt.qwen_audio_diagnostics import annotate_qwen_failure
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +49,7 @@ QWEN_AUDIO_LANGUAGE_HINTS_LIMIT = 4
 QWEN_AUDIO_MAX_SENTENCES = 256
 QWEN_AUDIO_MAX_MAP_RECORDS = 4096
 QWEN_AUDIO_MAX_METADATA_BYTES = 256 * 1024
+QWEN_AUDIO_IDLE_REUSE_TIMEOUT_S = 55.0
 
 
 class QwenAudioSessionState(str, Enum):
@@ -126,6 +130,7 @@ class QwenAudioStreamingSTTBackend(STTBackend):
     hotword_weight: int = QWEN_AUDIO_DEFAULT_HOTWORD_WEIGHT
     websocket_factory: WebSocketFactory | None = None
     channel: Literal["self", "peer"] = "self"
+    monotonic_clock: Callable[[], float] = time.monotonic
 
     async def open_session(
         self,
@@ -197,6 +202,7 @@ class _QwenTask:
     sealed: bool = False
     failure: Exception | None = None
     readiness_owned: bool = False
+    connection_idle_ms: int | None = None
     samples: int = 0
     captures: list[_QwenTaskCapture] = field(default_factory=list)
     sentence_ids: set[int] = field(default_factory=set)
@@ -214,6 +220,7 @@ class _QwenSlot:
     websocket: Any = None
     receiver: asyncio.Task[None] | None = None
     task: _QwenTask | None = None
+    finished_at_s: float | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -228,7 +235,9 @@ class _QwenAudioSession(STTBackendSession):
         self._event_projection = STTSessionEventProjection(
             projection, allows_sealed_turn_overlap=True
         )
-        self._slots = (_QwenSlot(0), _QwenSlot(1))
+        self._slots = [_QwenSlot(0), _QwenSlot(1)]
+        self._retiring_slots: dict[int, _QwenSlot] = {}
+        self._retirement_tasks: dict[int, asyncio.Task[None]] = {}
         self._next_slot = 0
         self._tasks: dict[STTProviderTurnIdentity, _QwenTask] = {}
         self._legacy_current: _QwenTask | None = None
@@ -281,7 +290,20 @@ class _QwenAudioSession(STTBackendSession):
             await asyncio.gather(previous.final_wait, return_exceptions=True)
         if self._closing:
             raise QwenAudioProtocolError("Qwen Audio session is closed")
+        idle_s = (
+            max(0.0, self.backend.monotonic_clock() - slot.finished_at_s)
+            if slot.websocket is not None and slot.finished_at_s is not None
+            else None
+        )
+        if idle_s is not None and idle_s >= QWEN_AUDIO_IDLE_REUSE_TIMEOUT_S:
+            await self._reclaim_retiring_slot(slot.number)
+            if self._closing:
+                raise QwenAudioProtocolError("Qwen Audio session is closed")
+            self._retiring_slots[slot.number] = slot
+            slot = _QwenSlot(slot.number)
+            self._slots[slot.number] = slot
         task = _QwenTask(uuid.uuid4().hex, identity, slot)
+        task.connection_idle_ms = int(idle_s * 1000) if idle_s is not None else None
         slot.task = task
         self._next_slot = 1 - self._next_slot
         return task
@@ -392,6 +414,7 @@ class _QwenAudioSession(STTBackendSession):
                 await task.ready.wait()
                 if task.failure is not None:
                     raise task.failure
+                self._schedule_slot_retirement(task.slot.number)
         except asyncio.CancelledError:
             if publish_failure:
                 await self._fail(
@@ -403,11 +426,23 @@ class _QwenAudioSession(STTBackendSession):
                 await self._discard_readiness_attempt(task)
             raise
         except Exception as exc:
+            exc = annotate_qwen_failure(
+                exc,
+                channel=self.backend.channel,
+                operation="readiness",
+                reason="provider_not_ready",
+                identity=task.identity,
+                idle_ms=task.connection_idle_ms,
+            )
             if publish_failure:
                 await self._fail(task, exc, "qwen_readiness_failed")
             else:
-                await self._discard_readiness_attempt(task)
-            raise
+                try:
+                    await self._discard_readiness_attempt(task)
+                except Exception as cleanup_failure:
+                    cleanup_failure.failure_diagnostics = exc.failure_diagnostics
+                    raise cleanup_failure from exc
+            raise exc
 
     async def _send(self, slot: _QwenSlot, value: str | bytes) -> None:
         if self._aborted or slot.websocket is None:
@@ -542,7 +577,11 @@ class _QwenAudioSession(STTBackendSession):
 
     async def _receive(self, slot: _QwenSlot) -> None:
         try:
-            while slot.websocket is not None and not self._aborted:
+            while (
+                slot.websocket is not None
+                and self._slots[slot.number] is slot
+                and not self._aborted
+            ):
                 message = await slot.websocket.recv()
                 if message is None:
                     raise QwenAudioProtocolError("Qwen Audio socket closed")
@@ -550,6 +589,8 @@ class _QwenAudioSession(STTBackendSession):
         except asyncio.CancelledError:
             raise
         except Exception as exc:
+            if self._slots[slot.number] is not slot:
+                return
             task = slot.task
             if task is not None and not task.done.is_set() and not self._aborted:
                 await self._fail(task, exc, "qwen_socket_failed")
@@ -557,6 +598,8 @@ class _QwenAudioSession(STTBackendSession):
                 await self._close_slot(slot)
 
     async def _handle_message(self, slot: _QwenSlot, message: object) -> None:
+        if self._slots[slot.number] is not slot:
+            return
         if isinstance(message, (bytes, str)):
             if len(message) > QWEN_AUDIO_MAX_METADATA_BYTES:
                 raise QwenAudioProtocolError("Qwen Audio event capacity exceeded")
@@ -604,7 +647,15 @@ class _QwenAudioSession(STTBackendSession):
                 )
                 await self._fail(
                     task,
-                    QwenAudioTaskFailedError(code, detail, hotwords_rejected=rejected),
+                    annotate_qwen_failure(
+                        QwenAudioTaskFailedError(code, detail, hotwords_rejected=rejected),
+                        channel=self.backend.channel,
+                        operation="readiness" if task.readiness_owned else "receive",
+                        reason="provider_task_failed",
+                        identity=task.identity,
+                        native_code=code,
+                        idle_ms=task.connection_idle_ms,
+                    ),
                     "provider_task_failed",
                 )
 
@@ -809,6 +860,8 @@ class _QwenAudioSession(STTBackendSession):
                     ),
                 )
             )
+        if task.failure is None:
+            task.slot.finished_at_s = self.backend.monotonic_clock()
         task.done.set()
         task.ready.set()
         final_wait = task.final_wait
@@ -820,7 +873,16 @@ class _QwenAudioSession(STTBackendSession):
     async def _fail(self, task: _QwenTask, exc: Exception, reason: str) -> None:
         if task.done.is_set():
             return
-        task.failure = exc
+        if task.failure is None:
+            task.failure = annotate_qwen_failure(
+                exc,
+                channel=self.backend.channel,
+                operation="readiness" if task.readiness_owned else "receive",
+                reason=reason,
+                identity=task.identity,
+                idle_ms=task.connection_idle_ms,
+            )
+        exc = task.failure
         if task.readiness_owned:
             task.ready.set()
             return
@@ -846,24 +908,99 @@ class _QwenAudioSession(STTBackendSession):
             try:
                 async with asyncio.timeout(self.backend.send_timeout_s):
                     await websocket.close()
-            except Exception:
+            except BaseException as exc:
                 abort = getattr(getattr(websocket, "transport", None), "abort", None)
                 wait_closed = getattr(websocket, "wait_closed", None)
                 if not callable(abort) or not callable(wait_closed):
-                    self.readiness_retry_safe = False
+                    if self._slots[slot.number] is slot or self._closing:
+                        self.readiness_retry_safe = False
                     raise
                 try:
                     abort()
                     async with asyncio.timeout(self.backend.send_timeout_s):
                         await wait_closed()
                 except BaseException:
-                    self.readiness_retry_safe = False
+                    if self._slots[slot.number] is slot or self._closing:
+                        self.readiness_retry_safe = False
                     raise
-            except BaseException:
+                if slot.websocket is websocket:
+                    slot.websocket = None
+                if not isinstance(exc, Exception):
+                    raise
+            else:
+                if slot.websocket is websocket:
+                    slot.websocket = None
+
+    def _schedule_slot_retirement(self, number: int) -> None:
+        slot = self._retiring_slots.get(number)
+        if slot is None or number in self._retirement_tasks:
+            return
+        task = asyncio.create_task(self._retire_slot(slot), name=f"qwen-audio-retire:{number}")
+        self._retirement_tasks[number] = task
+        task.add_done_callback(lambda done: self._retirement_done(number, done))
+
+    def _retirement_done(self, number: int, task: asyncio.Task[None]) -> None:
+        if self._retirement_tasks.get(number) is task:
+            self._retirement_tasks.pop(number)
+        if not task.cancelled():
+            task.exception()
+
+    async def _retire_slot(self, slot: _QwenSlot) -> None:
+        try:
+            await self._close_slot(slot)
+        except Exception as exc:
+            exc = annotate_qwen_failure(
+                exc,
+                channel=self.backend.channel,
+                operation="cleanup",
+                reason="provider_cleanup_failed",
+            )
+            emit_failure(
+                logger,
+                exc.failure_diagnostics,
+                severity="warning",
+                disposition="degraded",
+                stage="cleanup",
+            )
+            raise
+        finally:
+            if slot.websocket is None and self._retiring_slots.get(slot.number) is slot:
+                self._retiring_slots.pop(slot.number)
+
+    async def _reclaim_retiring_slot(self, number: int) -> None:
+        task = self._retirement_tasks.get(number)
+        if task is not None:
+            done, _pending = await asyncio.wait({task}, timeout=self.backend.send_timeout_s)
+            if not done:
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        slot = self._retiring_slots.get(number)
+        if slot is not None:
+            await self._retire_slot(slot)
+
+    async def _close_slots(self) -> None:
+        try:
+            results = await asyncio.gather(
+                *(self._close_slot(slot) for slot in self._slots),
+                *(self._reclaim_retiring_slot(number) for number in tuple(self._retiring_slots)),
+                return_exceptions=True,
+            )
+        except asyncio.CancelledError:
+            retiring = tuple(self._retirement_tasks.values())
+            for task in retiring:
+                task.cancel()
+            if retiring:
+                await asyncio.gather(*retiring, return_exceptions=True)
+            if self._retiring_slots or any(slot.websocket is not None for slot in self._slots):
                 self.readiness_retry_safe = False
-                raise
-            if slot.websocket is websocket:
-                slot.websocket = None
+            raise
+        failures = [result for result in results if isinstance(result, BaseException)]
+        if failures:
+            if self._retiring_slots or any(slot.websocket is not None for slot in self._slots):
+                self.readiness_retry_safe = False
+            if len(failures) == 1:
+                raise failures[0]
+            raise BaseExceptionGroup("Qwen Audio connection cleanup failed", failures)
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         await self.abort_for_toggle_off()
@@ -879,7 +1016,7 @@ class _QwenAudioSession(STTBackendSession):
                 task.ready.set()
                 if task.final_wait is not None:
                     task.final_wait.cancel()
-        await asyncio.gather(*(self._close_slot(slot) for slot in self._slots))
+        await self._close_slots()
         timers = [
             slot.task.final_wait
             for slot in self._slots
@@ -966,7 +1103,7 @@ class _QwenAudioSession(STTBackendSession):
         ]
         if timers:
             await asyncio.gather(*timers, return_exceptions=True)
-        await asyncio.gather(*(self._close_slot(slot) for slot in self._slots))
+        await self._close_slots()
         self._event_projection.close()
         if self._event_projection.is_legacy:
             await self._legacy_events.put(None)

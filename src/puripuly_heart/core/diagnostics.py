@@ -17,7 +17,11 @@ from uuid import uuid4
 
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.diagnostic_codes import is_supported_diagnostic_code
-from puripuly_heart.core.diagnostic_validation import stt_startup_failure_code
+from puripuly_heart.core.diagnostic_validation import (
+    QWEN_FAILURE_ENUM_FIELDS,
+    QWEN_FAILURE_NUMERIC_FIELDS,
+    stt_startup_failure_code,
+)
 from puripuly_heart.core.lifecycle import LIFECYCLE_SHUTDOWN_PHASE_ORDER
 from puripuly_heart.core.local_stt_assets import (
     LOCAL_QWEN_GPU_MODEL_ID,
@@ -59,32 +63,36 @@ _EXCEPTION_CLASSES = frozenset(
     if isinstance(getattr(builtins, name), type)
     and issubclass(getattr(builtins, name), BaseException)
 )
-_NUMERIC_FIELDS = frozenset(
-    {
-        "errno",
-        "winerror",
-        "exit_code",
-        "attempts",
-        "count",
-        "generation",
-        "runtime_generation",
-        "activation_generation",
-        "turn_generation",
-        "target_index",
-        "provider_epoch",
-        "process_generation",
-        "diagnostic_dropped",
-        "reliable_delivery_failures",
-        "rejected_records",
-        "local_send_completed",
-        "local_send_requested",
-        "status_code",
-        "retry_after_ms",
-        "cleanup_failure_count",
-        "secondary_count",
-        "task_sequence",
-    }
-) | frozenset(TRANSPORT_NUMERIC_FIELDS)
+_NUMERIC_FIELDS = (
+    frozenset(
+        {
+            "errno",
+            "winerror",
+            "exit_code",
+            "attempts",
+            "count",
+            "generation",
+            "runtime_generation",
+            "activation_generation",
+            "turn_generation",
+            "target_index",
+            "provider_epoch",
+            "process_generation",
+            "diagnostic_dropped",
+            "reliable_delivery_failures",
+            "rejected_records",
+            "local_send_completed",
+            "local_send_requested",
+            "status_code",
+            "retry_after_ms",
+            "cleanup_failure_count",
+            "secondary_count",
+            "task_sequence",
+        }
+    )
+    | frozenset(TRANSPORT_NUMERIC_FIELDS)
+    | frozenset(QWEN_FAILURE_NUMERIC_FIELDS)
+)
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"pending_startups", "process_id", "monotonic_ns"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"queue_capacity", "dropped_count"})
 _NUMERIC_FIELDS = _NUMERIC_FIELDS | frozenset({"status_polls"})
@@ -145,6 +153,7 @@ _ID_FIELDS = frozenset(
 )
 _ENUM_FIELDS = {
     **TRANSPORT_ENUM_FIELDS,
+    **QWEN_FAILURE_ENUM_FIELDS,
     **{key: frozenset(values) for key, values in QQ_ENUM_FIELDS.items()},
     "channel": frozenset({"self", "peer"}),
     "model_id": frozenset((*REQUIRED_CPU_LOCAL_STT_MODEL_IDS, LOCAL_QWEN_GPU_MODEL_ID)),
