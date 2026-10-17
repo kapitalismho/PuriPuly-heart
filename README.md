@@ -104,7 +104,8 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
+| **Index-Translate 35B** | Unlimited | Unlimited | 5,000 | 7,260 |
+| **Gemma 4 E4B & 26B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 4,770 |
 | **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 5,070 |
 | **GPT 6 Luna** | 8,680 | 8,680 | 3,170 | 3,950 |
@@ -123,7 +124,8 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
+| **Index-Translate 35B** | $0 | $0 | ~$0.0002 | ~$0.00014 |
+| **Gemma 4 E4B & 26B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
 | **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **GPT 6 Luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
@@ -142,7 +144,7 @@ It works in many environments, including VRChat and Discord.
 *   *DeepSeek V4.1 Flash assumes a 70% cache hit rate; V4 Flash (OpenRouter) assumes 60%.*
 *   *GPT 6 Luna uses OpenAI API pricing with no cache discount assumed; when connected through ChatGPT, it uses your Codex limits instead of API charges.*
 *   *Qwen API costs are based on the Beijing region.*
-*   *Pricing as of September 25, 2026.*
+*   *Pricing as of October 17, 2026.*
 
 ### Free Credits
 
@@ -193,7 +195,7 @@ Self and Peer can translate concurrently on one managed GPU runtime, with at mos
 1. Download the latest version from the [Download page](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
 2. Install PuriPuly.
 3. Click the **TALK** button.
-4. Click the **TRANS** button. New installations use **Index-Translate 35B · Public API**, without an API key.
+4. Click the **TRANS** button, then authenticate via Discord.
 5. Click the **CAPTIONS** button to turn on VR subtitles.
 6. (Optional) Click the **LISTEN** button to enable translation of the other person's voice.
 
@@ -202,10 +204,6 @@ Self and Peer can translate concurrently on one managed GPU runtime, with at mos
 7. Enable OSC in VRChat: Action menu → Settings → OSC → Enable.
 
 For bidirectional control setup and the stable parameter ABI, see [VRChat OSC controls](docs/vrchat-osc.md).
-
-Index is the first-run translation default in every UI language; upgrades preserve your existing selection. Selecting Index or starting with it selected runs one background check with synthetic text. TRANS reuses a successful check. Index sends translation text and context to Bilibili's public API; free availability is not guaranteed.
-
-If the check or a completed translation fails because the service is unavailable, the app saves a switch to **Gemma 4 · Managed**. It selects **Gemma 4 · OpenRouter** instead only when the applicable Managed key's allowance is confirmed exhausted. Missing keys or unknown allowance select Managed. A short notice says the free API *may* have ended; it does not confirm a shutdown. Complete the selected connection's normal authentication/setup when prompted. Index remains selectable, and the saved Gemma selection persists until you change it.
 
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
@@ -231,7 +229,7 @@ If Soniox/Gemini/Deepgram are blocked in your region, please use the following c
 
 Follow the guide that matches the service you want to use.
 
-To use your own key instead of the default no-key Index connection, select **Gemma 4 26B A4B + 31B** with the **OpenRouter** connection.
+For the translation LLM, we recommend selecting **Gemma 4 26B A4B + 31B** with the **OpenRouter** connection.
 
 By the way, while you're setting things up, why not configure ASR too?
 PuriPuly delivers the best experience when paired with a cloud STT.
