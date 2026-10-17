@@ -1567,12 +1567,17 @@ class ApplicationControlOwner:
                             _validate_command_args(
                                 command, arguments, locale_choices=self.locale_choices
                             )
-                            if not isinstance(arguments["text"], str) or not arguments["text"].strip():
+                            if (
+                                not isinstance(arguments["text"], str)
+                                or not arguments["text"].strip()
+                            ):
                                 raise InvalidArgumentsError("text must be non-empty")
                             deferred = ("text", arguments["text"])
                         elif preparation is not None:
                             result = await self._dispatch(
-                                command, arguments, operation_id=operation_id,
+                                command,
+                                arguments,
+                                operation_id=operation_id,
                                 translation_preparation=preparation,
                             )
                         else:

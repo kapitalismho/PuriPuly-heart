@@ -534,10 +534,7 @@ class UiApplicationBoundary:
             return False
         current = self.compatibility_settings()
         return bool(
-            (
-                current is not None
-                and current.intent.translation.model == "index_translate_35b"
-            )
+            (current is not None and current.intent.translation.model == "index_translate_35b")
             or not selection.ready_for_enable
         )
 
@@ -570,11 +567,7 @@ class UiApplicationBoundary:
         generation = selection.generation if selection is not None else None
         return bool(
             preparation.selection_generation != generation
-            or (
-                preparation.ready
-                and selection is not None
-                and not selection.ready_for_enable
-            )
+            or (preparation.ready and selection is not None and not selection.ready_for_enable)
         )
 
     async def set_translation_enabled(

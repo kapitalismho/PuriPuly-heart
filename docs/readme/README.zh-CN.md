@@ -193,7 +193,7 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 1. 从[下载页面](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)下载最新版本
 2. 安装 PuriPuly
 3. 点击 **TALK** 按钮
-4. 点击 **TRANS** 按钮后通过 Discord 验证
+4. 点击 **TRANS**。新安装默认使用无需 API 密钥的 Index；如有提示，请完成认证或设置。
 5. 点击 **CAPTIONS** 按钮开启 VR 字幕
 6. （可选）点击 **LISTEN** 按钮开启对方语音翻译
 

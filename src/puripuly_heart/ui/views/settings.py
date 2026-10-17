@@ -3990,9 +3990,7 @@ class SettingsView(ft.Column):
             self._prompt_snapshot = replace(prompt, system_prompt=self._prompt_editor.value)
 
         _ = preserve_custom_vocab_draft
-        self._sync_custom_vocabulary_editor_from_settings(
-            preserve_input=preserve_vocabulary_input
-        )
+        self._sync_custom_vocabulary_editor_from_settings(preserve_input=preserve_vocabulary_input)
         self._sync_peer_auto_languages_editor()
         self._sync_prompt_tab_copy()
         self._overlay_peer_contract = None

@@ -129,10 +129,15 @@ async def test_start_selection_refresh_and_concurrent_trans_share_one_probe(tmp_
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("allowance,connection", [
-    ("missing", "managed"), ("remaining", "managed"),
-    ("unknown", "managed"), ("exhausted", "openrouter"),
-])
+@pytest.mark.parametrize(
+    "allowance,connection",
+    [
+        ("missing", "managed"),
+        ("remaining", "managed"),
+        ("unknown", "managed"),
+        ("exhausted", "openrouter"),
+    ],
+)
 async def test_failure_commits_materialized_selection_and_toasts_once(
     tmp_path, allowance, connection
 ):
@@ -151,7 +156,10 @@ async def test_failure_commits_materialized_selection_and_toasts_once(
     assert translation.openrouter_selected_source == (
         "byok" if connection == "openrouter" else "managed"
     )
-    assert translation.openrouter_selection_alias == f"gemma4_26b_31b_{translation.openrouter_selected_source}"
+    assert (
+        translation.openrouter_selection_alias
+        == f"gemma4_26b_31b_{translation.openrouter_selected_source}"
+    )
     assert translation.openrouter_provider_routing == "gemma4_26b_31b_latency"
     assert harness.owner.failure_diagnostics.fields["reason"] == "transport"
     await harness.owner.close()
@@ -215,7 +223,9 @@ async def test_late_probe_cannot_mutate_after_retirement_or_shutdown(tmp_path, s
     if shutdown:
         harness.owner.stop_ingress()
     else:
-        harness.settings.canonical = wiring.gemma_fallback_settings(harness.settings.canonical, "managed")
+        harness.settings.canonical = wiring.gemma_fallback_settings(
+            harness.settings.canonical, "managed"
+        )
         harness.owner.selection_changed(harness.settings.canonical)
     release.set()
     await settled.wait()
@@ -308,18 +318,26 @@ async def test_reselection_creates_new_probe_and_only_settled_service_failure_tr
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("secrets,remaining,expected,lookup", [
-    ({}, None, "missing", False),
-    ({"openrouter_api_key": "personal"}, 0, "missing", False),
-    ({"openrouter_managed_qq_api_key": "qq"}, 0, "unknown", False),
-    ({"openrouter_managed_api_key": "standard"}, 0.1, "remaining", True),
-    ({"openrouter_managed_api_key": "standard"}, 0.0007, "exhausted", True),
-    ({"openrouter_managed_api_key": "standard"}, 0.00071, "remaining", True),
-    ({"openrouter_managed_api_key": "standard"}, None, "unknown", True),
-    ({"openrouter_managed_api_key": "standard"}, float("nan"), "unknown", True),
-    ({"openrouter_managed_api_key": "standard"}, float("inf"), "unknown", True),
-    ({"openrouter_managed_api_key": "standard", "openrouter_managed_qq_api_key": "qq"}, 0, "unknown", False),
-])
+@pytest.mark.parametrize(
+    "secrets,remaining,expected,lookup",
+    [
+        ({}, None, "missing", False),
+        ({"openrouter_api_key": "personal"}, 0, "missing", False),
+        ({"openrouter_managed_qq_api_key": "qq"}, 0, "unknown", False),
+        ({"openrouter_managed_api_key": "standard"}, 0.1, "remaining", True),
+        ({"openrouter_managed_api_key": "standard"}, 0.0007, "exhausted", True),
+        ({"openrouter_managed_api_key": "standard"}, 0.00071, "remaining", True),
+        ({"openrouter_managed_api_key": "standard"}, None, "unknown", True),
+        ({"openrouter_managed_api_key": "standard"}, float("nan"), "unknown", True),
+        ({"openrouter_managed_api_key": "standard"}, float("inf"), "unknown", True),
+        (
+            {"openrouter_managed_api_key": "standard", "openrouter_managed_qq_api_key": "qq"},
+            0,
+            "unknown",
+            False,
+        ),
+    ],
+)
 async def test_allowance_observes_gemma_standard_credential_independent_of_index_ui(
     tmp_path, monkeypatch, secrets, remaining, expected, lookup
 ):
@@ -334,7 +352,10 @@ async def test_allowance_observes_gemma_standard_credential_independent_of_index
         return OpenRouterKeyMetadata(1, remaining, 0)
 
     observer = wiring.IndexManagedAllowanceObserver(
-        settings, settings.path, SimpleNamespace(fetch_openrouter_key_metadata=metadata), lambda: False
+        settings,
+        settings.path,
+        SimpleNamespace(fetch_openrouter_key_metadata=metadata),
+        lambda: False,
     )
     observation = await observer.observe()
     assert observation.state == expected
@@ -374,7 +395,10 @@ async def test_allowance_unknown_retains_diagnostic_when_lookup_or_identity_not_
         return OpenRouterKeyMetadata(1, 0, 1)
 
     observer = wiring.IndexManagedAllowanceObserver(
-        settings, settings.path, SimpleNamespace(fetch_openrouter_key_metadata=metadata), lambda: False
+        settings,
+        settings.path,
+        SimpleNamespace(fetch_openrouter_key_metadata=metadata),
+        lambda: False,
     )
     result = await observer.observe()
     assert result.state == "unknown"
@@ -382,7 +406,9 @@ async def test_allowance_unknown_retains_diagnostic_when_lookup_or_identity_not_
 
 
 @pytest.mark.asyncio
-async def test_owned_blocking_credential_observation_does_not_block_event_loop(tmp_path, monkeypatch):
+async def test_owned_blocking_credential_observation_does_not_block_event_loop(
+    tmp_path, monkeypatch
+):
     entered = threading.Event()
     release = threading.Event()
 
@@ -421,7 +447,10 @@ async def test_exhaustion_evidence_revalidates_key_before_commit(tmp_path, monke
         return OpenRouterKeyMetadata(1, 0, 1)
 
     observer = wiring.IndexManagedAllowanceObserver(
-        settings, settings.path, SimpleNamespace(fetch_openrouter_key_metadata=metadata), lambda: False
+        settings,
+        settings.path,
+        SimpleNamespace(fetch_openrouter_key_metadata=metadata),
+        lambda: False,
     )
     observation = await observer.observe()
     assert observation.state == "exhausted"

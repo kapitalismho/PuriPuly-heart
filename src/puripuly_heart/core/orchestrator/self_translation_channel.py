@@ -821,11 +821,7 @@ class SelfTranslationChannelOwner:
             )
             if prestart_matches and result.terminal_failure is not None:
                 request = replace(request, terminal_failure=result.terminal_failure)
-            if (
-                result.outcome != "translated"
-                or result.output is None
-                or not prestart_matches
-            ):
+            if result.outcome != "translated" or result.output is None or not prestart_matches:
                 self._clear_latency_timeline(child.utterance_id)
                 result = await self.translation_requests.process(
                     request,

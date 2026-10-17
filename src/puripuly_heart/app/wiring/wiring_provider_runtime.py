@@ -554,10 +554,7 @@ def compose_provider_runtime(
                 )
             )
             current = settings.canonical
-            if (
-                current is None
-                or current.intent.translation != canonical.intent.translation
-            ):
+            if current is None or current.intent.translation != canonical.intent.translation:
                 if backend is not None:
                     await cast(TranslationBackend, backend).close()
                 raise asyncio.CancelledError

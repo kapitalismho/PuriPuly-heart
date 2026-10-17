@@ -195,7 +195,7 @@ Self and Peer can translate concurrently on one managed GPU runtime, with at mos
 1. Download the latest version from the [Download page](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
 2. Install PuriPuly.
 3. Click the **TALK** button.
-4. Click the **TRANS** button, then authenticate via Discord.
+4. Click **TRANS**. New installations use Index without an API key; complete authentication or setup if prompted.
 5. Click the **CAPTIONS** button to turn on VR subtitles.
 6. (Optional) Click the **LISTEN** button to enable translation of the other person's voice.
 

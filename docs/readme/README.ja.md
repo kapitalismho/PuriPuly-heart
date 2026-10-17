@@ -192,7 +192,7 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 1. [ダウンロードページ](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)から最新バージョンをダウンロード
 2. PuriPulyをインストール
 3. **TALK** ボタンをクリック
-4. **TRANS** ボタンをクリックしてDiscord認証
+4. **TRANS** をクリック。新規インストールではAPIキー不要のIndexを使います。認証・設定を求められた場合は完了してください。
 5. **CAPTIONS** ボタンを押してVR字幕をオン
 6. （任意）**LISTEN** ボタンを押して相手の音声翻訳をオン
 

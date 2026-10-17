@@ -169,7 +169,14 @@ async def test_default_budget_probe_and_translation_share_one_owned_client(trans
         _completion("Hola.", finish_reason="tool_calls"),
         _completion("Hola.", finish_reason="content_filter"),
         {"choices": [{"finish_reason": "stop", "message": {"role": "user", "content": "x"}}]},
-        {"choices": [{"finish_reason": "stop", "message": {"role": "assistant", "reasoning_content": "private"}}]},
+        {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"role": "assistant", "reasoning_content": "private"},
+                }
+            ]
+        },
     ],
 )
 async def test_invalid_terminal_responses_never_become_subtitles(transport_factory, data):
@@ -231,7 +238,12 @@ async def test_http_service_failure_is_typed_without_retry_or_response_text(
         (413, {}, IndexRequestLimitError, "input_limit"),
         (400, {}, IndexTranslateError, "invalid_request"),
         (422, {}, IndexTranslateError, "invalid_request"),
-        (200, _completion("partial", finish_reason="length"), IndexRequestLimitError, "output_limit"),
+        (
+            200,
+            _completion("partial", finish_reason="length"),
+            IndexRequestLimitError,
+            "output_limit",
+        ),
     ],
 )
 async def test_request_limits_do_not_establish_service_failure(

@@ -52,16 +52,32 @@ class ControlledHttp:
                 return httpx.Response(self.index_status, json={"error": "synthetic outage"})
         elif request.url.host == "openrouter.ai" and request.url.path.endswith("/key"):
             if self.metadata_status != 200:
-                return httpx.Response(self.metadata_status, json={"error": "synthetic metadata failure"})
-            return httpx.Response(200, json={"data": {
-                "limit": 1, "limit_remaining": self.remaining, "usage": 1 - self.remaining
-            }})
+                return httpx.Response(
+                    self.metadata_status, json={"error": "synthetic metadata failure"}
+                )
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "limit": 1,
+                        "limit_remaining": self.remaining,
+                        "usage": 1 - self.remaining,
+                    }
+                },
+            )
         elif request.url.host != "openrouter.ai":
             raise AssertionError(f"unexpected external request: {request.url.host}")
-        return httpx.Response(200, json={"choices": [{
-            "finish_reason": "stop",
-            "message": {"role": "assistant", "content": "Synthetic translation"},
-        }]})
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {"role": "assistant", "content": "Synthetic translation"},
+                    }
+                ]
+            },
+        )
 
     def client(self, **kwargs):
         return httpx.AsyncClient(
@@ -74,7 +90,9 @@ class ControlledHttp:
 
     @property
     def index_requests(self):
-        return [request for request in self.requests if request[0] == "index-translate.bilibili.com"]
+        return [
+            request for request in self.requests if request[0] == "index-translate.bilibili.com"
+        ]
 
 
 @pytest.fixture
@@ -84,7 +102,9 @@ async def composed(tmp_path, monkeypatch):
     monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "synthetic-index-test-passphrase")
     for name in tuple(os.environ):
         if name.endswith(("_API_KEY", "_TOKEN")) or name in {
-            "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+            "HTTP_PROXY",
+            "HTTPS_PROXY",
+            "ALL_PROXY",
         }:
             monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr(
@@ -107,21 +127,27 @@ async def composed(tmp_path, monkeypatch):
     udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp.bind(("127.0.0.1", 0))
     settings = index_settings(AppSettingsVNext())
-    settings = replace(settings, intent=replace(
-        settings.intent,
-        secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
-        stt=replace(settings.intent.stt, provider="soniox"),
-        peer_stt=replace(settings.intent.peer_stt, provider="soniox"),
-        osc=replace(
-            settings.intent.osc, connection_mode="off", host="127.0.0.1",
-            port=udp.getsockname()[1], send_port=udp.getsockname()[1],
-            activation_notice_enabled=False,
-            chatbox_send=False,
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
+            stt=replace(settings.intent.stt, provider="soniox"),
+            peer_stt=replace(settings.intent.peer_stt, provider="soniox"),
+            osc=replace(
+                settings.intent.osc,
+                connection_mode="off",
+                host="127.0.0.1",
+                port=udp.getsockname()[1],
+                send_port=udp.getsockname()[1],
+                activation_notice_enabled=False,
+                chatbox_send=False,
+            ),
+            telemetry=replace(settings.intent.telemetry, enabled=False),
+            integrated_context=replace(settings.intent.integrated_context, enabled=False),
+            clipboard=replace(settings.intent.clipboard, auto_translate_enabled=False),
         ),
-        telemetry=replace(settings.intent.telemetry, enabled=False),
-        integrated_context=replace(settings.intent.integrated_context, enabled=False),
-        clipboard=replace(settings.intent.clipboard, auto_translate_enabled=False),
-    ))
+    )
     path = tmp_path / "settings.json"
     path.write_text(json.dumps(to_dict(settings)), encoding="utf-8")
     http = ControlledHttp()
@@ -145,7 +171,9 @@ async def composed(tmp_path, monkeypatch):
             log_file,
         )
         application = compose_application_runtime(
-            presentation=presentation, config_path=path, runtime_logging_sinks=sink,
+            presentation=presentation,
+            config_path=path,
+            runtime_logging_sinks=sink,
         )
         presentation.application = application
         application.control().bind_instance(f"index-synthetic-{len(apps)}")
@@ -193,7 +221,9 @@ async def test_normal_controls_share_probe_and_newer_off_fences_waiting_on(compo
     assert app.state().translation_enabled is False
     assert len(http.index_requests) == 1
     assert (await control.operation(on["operation_id"]))["terminal"] is False
-    locale = await operation(app, "settings.apply", {"changes": {"locale": "ja"}}, "responsive-locale")
+    locale = await operation(
+        app, "settings.apply", {"changes": {"locale": "ja"}}, "responsive-locale"
+    )
     assert locale["terminal"] is True
     assert app.compatibility_settings().intent.ui.locale == "ja"
     http.index_release.set()
@@ -205,9 +235,14 @@ async def test_normal_controls_share_probe_and_newer_off_fences_waiting_on(compo
     assert app.state().translation_enabled is True
     assert len(http.index_requests) == 1
     assert presentation.messages == []
-    assert json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["model"] == "index_translate_35b"
+    assert (
+        json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["model"]
+        == "index_translate_35b"
+    )
     assert presentation.dashboard.translation is None
-    submitted = await operation(app, "text.submit", {"text": "synthetic successful text"}, "successful-turn")
+    submitted = await operation(
+        app, "text.submit", {"text": "synthetic successful text"}, "successful-turn"
+    )
     assert submitted["status"] == "applied"
     await wait_until(lambda: presentation.dashboard.translation == "Synthetic translation")
     assert len(http.index_requests) == 2
@@ -223,7 +258,9 @@ async def test_background_failure_persists_managed_and_waiting_trans_requires_no
     await asyncio.wait_for(http.index_entered.wait(), 5)
     assert presentation.messages == []
     assert app.state().translation_enabled is False
-    waiting = asyncio.create_task(operation(app, "translation.set", {"enabled": True}, "join-fallback"))
+    waiting = asyncio.create_task(
+        operation(app, "translation.set", {"enabled": True}, "join-fallback")
+    )
     await asyncio.sleep(0)
     http.index_release.set()
     receipt = await waiting
@@ -231,12 +268,18 @@ async def test_background_failure_persists_managed_and_waiting_trans_requires_no
     assert any(key == "discord_auth.error.action_required" for key, _ in presentation.messages)
     current = app.compatibility_settings().intent.translation
     assert (current.model, current.connection, current.openrouter_selected_source) == (
-        "gemma4_26b_31b", "managed", "managed"
+        "gemma4_26b_31b",
+        "managed",
+        "managed",
     )
     assert app.state().translation_enabled is False
-    assert [key for key, _ in presentation.messages].count("messages.index_api_fallback_managed") == 1
+    assert [key for key, _ in presentation.messages].count(
+        "messages.index_api_fallback_managed"
+    ) == 1
     assert len(http.index_requests) == 1
-    assert not [request for request in http.requests if request[0] != "index-translate.bilibili.com"]
+    assert not [
+        request for request in http.requests if request[0] != "index-translate.bilibili.com"
+    ]
     persisted = json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]
     assert persisted["model"] == "gemma4_26b_31b"
     assert persisted["connection"] == "managed"
@@ -251,7 +294,9 @@ async def test_background_failure_persists_managed_and_waiting_trans_requires_no
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("credential_available,metadata_status", [(False, 200), (True, 200), (True, 503)])
+@pytest.mark.parametrize(
+    "credential_available,metadata_status", [(False, 200), (True, 200), (True, 503)]
+)
 async def test_settled_real_request_failure_switches_once_without_replaying_failed_turn(
     composed, credential_available, metadata_status
 ):
@@ -273,12 +318,24 @@ async def test_settled_real_request_failure_switches_once_without_replaying_fail
     http.index_status = 503
     admitted = await operation(app, "text.submit", {"text": "synthetic user text"}, "failed-turn")
     assert admitted["status"] == "applied"
-    await wait_until(lambda: app.compatibility_settings().intent.translation.model == "gemma4_26b_31b")
-    await wait_until(lambda: any(key == "messages.index_api_fallback_managed" for key, _ in presentation.messages))
+    await wait_until(
+        lambda: app.compatibility_settings().intent.translation.model == "gemma4_26b_31b"
+    )
+    await wait_until(
+        lambda: any(
+            key == "messages.index_api_fallback_managed" for key, _ in presentation.messages
+        )
+    )
     assert len(http.index_requests) == 3
-    assert not [request for request in http.requests if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")]
+    assert not [
+        request
+        for request in http.requests
+        if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")
+    ]
     assert presentation.dashboard.translation is None
-    assert [key for key, _ in presentation.messages].count("messages.index_api_fallback_managed") == 1
+    assert [key for key, _ in presentation.messages].count(
+        "messages.index_api_fallback_managed"
+    ) == 1
     assert app.state().translation_enabled is credential_available
     status = await app.control().query("app.status", {})
     for channel in ("self", "peer"):
@@ -291,11 +348,14 @@ async def test_settled_real_request_failure_switches_once_without_replaying_fail
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("remaining,metadata_status,connection,credential", [
-    (0.01, 200, "managed", "synthetic-managed-key"),
-    (0.0007, 200, "openrouter", "synthetic-personal-key"),
-    (0, 503, "managed", "synthetic-managed-key"),
-])
+@pytest.mark.parametrize(
+    "remaining,metadata_status,connection,credential",
+    [
+        (0.01, 200, "managed", "synthetic-managed-key"),
+        (0.0007, 200, "openrouter", "synthetic-personal-key"),
+        (0, 503, "managed", "synthetic-managed-key"),
+    ],
+)
 async def test_committed_fallback_provider_consumes_the_selected_credential(
     composed, remaining, metadata_status, connection, credential
 ):
@@ -324,18 +384,27 @@ async def test_committed_fallback_provider_consumes_the_selected_credential(
     metadata = [request for request in http.requests if request[1].endswith("/key")]
     assert metadata
     assert metadata[0][2]["authorization"] == "Bearer synthetic-managed-key"
-    translations = [request for request in http.requests if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")]
+    translations = [
+        request
+        for request in http.requests
+        if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")
+    ]
     assert translations
     assert all(request[2]["authorization"] == f"Bearer {credential}" for request in translations)
     assert all(request[3]["models"][0] == "google/gemma-4-26b-a4b-it" for request in translations)
     assert len(http.index_requests) == 1
     assert "authorization" not in http.index_requests[0][2]
-    assert [key for key, _ in presentation.messages].count(f"messages.index_api_fallback_{connection}") == 1
+    assert [key for key, _ in presentation.messages].count(
+        f"messages.index_api_fallback_{connection}"
+    ) == 1
     persisted = load_vnext_settings(path).settings.intent.translation
     assert (persisted.model, persisted.connection) == (selected.model, selected.connection)
     if metadata_status != 200:
         assert app._index_selection.allowance_observation.state == "unknown"
-        assert app._index_selection.allowance_observation.diagnostics.code == "index_managed_allowance_unknown"
+        assert (
+            app._index_selection.allowance_observation.diagnostics.code
+            == "index_managed_allowance_unknown"
+        )
 
 
 @pytest.mark.asyncio
@@ -361,11 +430,20 @@ async def test_degraded_runtime_commit_blocks_waiting_trans_until_explicit_provi
         receipt = await operation(app, "translation.set", {"enabled": True}, "degraded-fallback")
     assert receipt["status"] != "applied"
     assert app.state().translation_enabled is False
-    assert app._index_selection.transition_result.status == "settings_commit_success_runtime_degraded"
-    assert json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["connection"] == "managed"
-    assert [key for key, _ in presentation.messages].count("messages.index_api_fallback_managed") == 1
+    assert (
+        app._index_selection.transition_result.status == "settings_commit_success_runtime_degraded"
+    )
+    assert (
+        json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["connection"]
+        == "managed"
+    )
+    assert [key for key, _ in presentation.messages].count(
+        "messages.index_api_fallback_managed"
+    ) == 1
     await app.apply_providers(force_rebuild_llm=True)
-    retried = await operation(app, "translation.set", {"enabled": True}, "normal-auth-after-recovery")
+    retried = await operation(
+        app, "translation.set", {"enabled": True}, "normal-auth-after-recovery"
+    )
     assert retried["status"] == "action_required"
     assert app.state().translation_enabled is False
 
@@ -381,6 +459,7 @@ async def test_failed_fallback_write_does_not_claim_a_switch(composed, monkeypat
 
     writing = threading.Event()
     release = threading.Event()
+
     def fail_write(*_args):
         writing.set()
         assert release.wait(5)
@@ -388,13 +467,15 @@ async def test_failed_fallback_write_does_not_claim_a_switch(composed, monkeypat
 
     with monkeypatch.context() as patch:
         patch.setattr(type(app.control().settings.persistence), "persist", fail_write)
-        waiting = asyncio.create_task(operation(app, "translation.set", {"enabled": True}, "failed-write"))
+        waiting = asyncio.create_task(
+            operation(app, "translation.set", {"enabled": True}, "failed-write")
+        )
         http.index_status = 503
         http.index_release.set()
         await wait_until(writing.is_set)
-        repeated = asyncio.create_task(operation(
-            app, "translation.set", {"enabled": True}, "join-staged-write"
-        ))
+        repeated = asyncio.create_task(
+            operation(app, "translation.set", {"enabled": True}, "join-staged-write")
+        )
         await asyncio.sleep(0)
         current = await app.control().query("settings.current", {})
         assert current["settings"]["intent"]["translation"]["model"] == "index_translate_35b"
@@ -409,8 +490,13 @@ async def test_failed_fallback_write_does_not_claim_a_switch(composed, monkeypat
     assert len(http.index_requests) == 1
     assert app.state().translation_enabled is False
     assert app.compatibility_settings().intent.translation.model == "index_translate_35b"
-    assert json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["model"] == "index_translate_35b"
-    assert not [key for key, _ in presentation.messages if key.startswith("messages.index_api_fallback_")]
+    assert (
+        json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["model"]
+        == "index_translate_35b"
+    )
+    assert not [
+        key for key, _ in presentation.messages if key.startswith("messages.index_api_fallback_")
+    ]
 
 
 @pytest.mark.asyncio
@@ -425,12 +511,16 @@ async def test_later_explicit_auth_completion_activates_the_persisted_managed_de
 
     path, http, create = composed
     seed = load_vnext_settings(path).settings
-    seed = replace(seed, intent=replace(
-        seed.intent,
-        translation=replace(
-            seed.intent.translation, openrouter_broker_base_url="https://broker.index259.invalid"
+    seed = replace(
+        seed,
+        intent=replace(
+            seed.intent,
+            translation=replace(
+                seed.intent.translation,
+                openrouter_broker_base_url="https://broker.index259.invalid",
+            ),
         ),
-    ))
+    )
     path.write_text(json.dumps(to_dict(seed)), encoding="utf-8")
     reservation = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     reservation.bind(("127.0.0.1", 0))
@@ -451,30 +541,37 @@ async def test_later_explicit_auth_completion_activates_the_persisted_managed_de
         broker_calls.append(request.url.path)
         if request.url.path == "/v1/auth/discord/start":
             redirect.append(body["redirect_uri"])
-            return httpx.Response(200, json={
-                "authorization_url": "https://synthetic.invalid/authorize?state=synthetic-state",
-                "redirect_uri": body["redirect_uri"],
-                "oauth_session_expires_at": "2099-01-01T00:00:00Z",
-                "issue_nonce": "synthetic-nonce",
-                "fingerprint_salt": {"version": 1, "salt": "synthetic-fingerprint-salt"},
-                "fingerprint_salt_version": 1,
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "authorization_url": "https://synthetic.invalid/authorize?state=synthetic-state",
+                    "redirect_uri": body["redirect_uri"],
+                    "oauth_session_expires_at": "2099-01-01T00:00:00Z",
+                    "issue_nonce": "synthetic-nonce",
+                    "fingerprint_salt": {"version": 1, "salt": "synthetic-fingerprint-salt"},
+                    "fingerprint_salt_version": 1,
+                },
+            )
         if request.url.path == "/v1/providers/openrouter/discord/issue":
             assert "synthetic-code" in json.dumps(body)
             assert "synthetic-state" in json.dumps(body)
             assert body["model"] == "google/gemma-4-26b-a4b-it"
             assert body["delivery_ack_supported"] is True
-            return httpx.Response(200, json={
-                "openrouter_api_key": "synthetic-later-managed-key",
-                "managed_credential_ref": "synthetic-managed-reference",
-                "expires_at": "2099-01-01T00:00:00Z",
-                "openrouter_user_id": "synthetic-managed-user",
-                "delivery_ack_required": True,
-                "delivery_id": "synthetic-delivery",
-                "delivery_ack_token": "synthetic-ack-token",
-                "delivery_ack_expires_at": "2099-01-01T00:00:00Z",
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "openrouter_api_key": "synthetic-later-managed-key",
+                    "managed_credential_ref": "synthetic-managed-reference",
+                    "expires_at": "2099-01-01T00:00:00Z",
+                    "openrouter_user_id": "synthetic-managed-user",
+                    "delivery_ack_required": True,
+                    "delivery_id": "synthetic-delivery",
+                    "delivery_ack_token": "synthetic-ack-token",
+                    "delivery_ack_expires_at": "2099-01-01T00:00:00Z",
+                },
+            )
         if request.url.path == "/v1/providers/openrouter/managed-key-delivery/ack":
+
             def stored_key():
                 current = load_vnext_settings(path).settings
                 store = create_secret_store(current.intent.secrets, config_path=path)
@@ -495,7 +592,8 @@ async def test_later_explicit_auth_completion_activates_the_persisted_managed_de
     assert broker_calls == []
     assert app.state().translation_enabled is False
     accepted = await app.control().submit(
-        "auth.login", {"provider": "discord", "open_browser": False},
+        "auth.login",
+        {"provider": "discord", "open_browser": False},
         request_id="explicit-managed-auth",
     )
     await wait_until(lambda: bool(redirect))
@@ -515,15 +613,24 @@ async def test_later_explicit_auth_completion_activates_the_persisted_managed_de
     assert app.state().translation_enabled is False
     resumed = await operation(app, "translation.set", {"enabled": True}, "after-normal-auth")
     assert resumed["status"] == "applied"
-    submitted = await operation(app, "text.submit", {"text": "synthetic after auth"}, "authenticated-turn")
+    submitted = await operation(
+        app, "text.submit", {"text": "synthetic after auth"}, "authenticated-turn"
+    )
     assert submitted["status"] == "applied"
     await wait_until(lambda: presentation.dashboard.translation == "Synthetic translation")
-    requests = [request for request in http.requests if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")]
+    requests = [
+        request
+        for request in http.requests
+        if request[0] == "openrouter.ai" and request[1].endswith("/chat/completions")
+    ]
     assert requests and requests[-1][2]["authorization"] == "Bearer synthetic-later-managed-key"
     assert len(http.index_requests) == 1
     persisted = load_vnext_settings(path).settings
     assert persisted.intent.translation.connection == "managed"
-    assert persisted.state.managed_connection.active_managed_credential_ref == "synthetic-managed-reference"
+    assert (
+        persisted.state.managed_connection.active_managed_credential_ref
+        == "synthetic-managed-reference"
+    )
     assert persisted.state.managed_connection.pending_delivery_ack_source is None
 
 
@@ -552,9 +659,9 @@ async def test_timeout_after_atomic_write_admission_retains_commit_but_fences_ru
         patch.setattr(persistence, "persist", admitted_write)
         http.index_status = 503
         http.index_release.set()
-        waiting = asyncio.create_task(operation(
-            app, "translation.set", {"enabled": True}, "atomic-write-deadline"
-        ))
+        waiting = asyncio.create_task(
+            operation(app, "translation.set", {"enabled": True}, "atomic-write-deadline")
+        )
         try:
             await wait_until(writing.is_set)
             receipt = await asyncio.wait_for(waiting, 3)
@@ -562,7 +669,10 @@ async def test_timeout_after_atomic_write_admission_retains_commit_but_fences_ru
             assert not release.is_set()
             assert app.state().translation_enabled is False
             assert app._index_selection.failure_diagnostics.code == "index_selection_deadline"
-            assert json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["model"] == "index_translate_35b"
+            assert (
+                json.loads(path.read_text(encoding="utf-8"))["intent"]["translation"]["model"]
+                == "index_translate_35b"
+            )
         finally:
             release.set()
         await wait_until(lambda: app._index_selection._work_task.done())
@@ -571,7 +681,9 @@ async def test_timeout_after_atomic_write_admission_retains_commit_but_fences_ru
     assert app.control().results.current.status == "settings_commit_success_runtime_interrupted"
     assert not app._index_selection.selected_runtime_applied()
     assert app.state().translation_enabled is False
-    assert not [key for key, _ in presentation.messages if key.startswith("messages.index_api_fallback_")]
+    assert not [
+        key for key, _ in presentation.messages if key.startswith("messages.index_api_fallback_")
+    ]
     await app.apply_providers(force_rebuild_llm=True)
     recovered = await operation(
         app, "translation.set", {"enabled": True}, "explicit-after-interrupted-apply"
@@ -586,13 +698,17 @@ async def test_real_translation_revision_is_checked_after_shared_resource_wait(c
     http.index_release.set()
     app, _presentation = create()
     await app.start()
-    assert (await operation(app, "translation.set", {"enabled": True}, "enable-before-stale"))["status"] == "applied"
+    assert (await operation(app, "translation.set", {"enabled": True}, "enable-before-stale"))[
+        "status"
+    ] == "applied"
     control = app.control()
     expected = (await control.query("settings.current", {}))["revision"]
     await control._resource_lock.acquire()
     try:
         stale = await control.submit(
-            "translation.set", {"enabled": False}, request_id="real-stale-off",
+            "translation.set",
+            {"enabled": False},
+            request_id="real-stale-off",
             expected_revision=expected,
         )
         await asyncio.sleep(0)
@@ -619,15 +735,15 @@ async def test_rejected_index_enable_does_not_invalidate_a_pending_gui_enable(co
     control = app.control()
     expected = (await control.query("settings.current", {}))["revision"]
     stale = await control.submit(
-        "translation.set", {"enabled": True}, request_id="stale-pending-on",
+        "translation.set",
+        {"enabled": True},
+        request_id="stale-pending-on",
         expected_revision=expected,
     )
     await asyncio.sleep(0)
     gui = asyncio.create_task(app.set_translation_enabled(True, allow_authorization=False))
     await asyncio.sleep(0)
-    changed = await operation(
-        app, "settings.apply", {"changes": {"locale": "ja"}}, "newer-locale"
-    )
+    changed = await operation(app, "settings.apply", {"changes": {"locale": "ja"}}, "newer-locale")
     assert changed["terminal"] is True
     current = (await control.query("settings.current", {}))["revision"]
     assert current > expected
@@ -670,7 +786,9 @@ async def test_failed_preflight_with_stale_revision_never_advances_pending_inten
 
     monkeypatch.setattr(app, "prepare_translation_enable", controlled_preparation)
     failed = await control.submit(
-        "translation.set", {"enabled": True}, request_id="failed-before-admission",
+        "translation.set",
+        {"enabled": True},
+        request_id="failed-before-admission",
         expected_revision=expected,
     )
     await first.wait()
@@ -701,17 +819,35 @@ async def test_changed_selection_rejoins_current_probe_outside_final_admission(c
     http.index_release.set()
     app, presentation = create()
     await app.start()
-    assert (await operation(app, "translation.set", {"enabled": True}, "first-activation"))["status"] == "applied"
-    assert (await operation(app, "translation.set", {"enabled": False}, "before-reselection"))["status"] == "applied"
+    assert (await operation(app, "translation.set", {"enabled": True}, "first-activation"))[
+        "status"
+    ] == "applied"
+    assert (await operation(app, "translation.set", {"enabled": False}, "before-reselection"))[
+        "status"
+    ] == "applied"
     control = app.control()
     await control._resource_lock.acquire()
     try:
-        away = await control.submit("settings.apply", {"changes": {
-            "translation.model": "gemma4_26b_31b", "translation.connection": "managed",
-        }}, request_id="queued-away")
-        back = await control.submit("settings.apply", {"changes": {
-            "translation.model": "index_translate_35b", "translation.connection": "public_api",
-        }}, request_id="queued-back")
+        away = await control.submit(
+            "settings.apply",
+            {
+                "changes": {
+                    "translation.model": "gemma4_26b_31b",
+                    "translation.connection": "managed",
+                }
+            },
+            request_id="queued-away",
+        )
+        back = await control.submit(
+            "settings.apply",
+            {
+                "changes": {
+                    "translation.model": "index_translate_35b",
+                    "translation.connection": "public_api",
+                }
+            },
+            request_id="queued-back",
+        )
         on = await control.submit(
             "translation.set", {"enabled": True}, request_id="prepared-before-reselection"
         )
@@ -735,7 +871,9 @@ async def test_changed_selection_rejoins_current_probe_outside_final_admission(c
     assert app.compatibility_settings().intent.translation.connection == "managed"
     assert app.state().translation_enabled is False
     assert len(http.index_requests) == 2
-    assert [key for key, _ in presentation.messages].count("messages.index_api_fallback_managed") == 1
+    assert [key for key, _ in presentation.messages].count(
+        "messages.index_api_fallback_managed"
+    ) == 1
 
 
 @pytest.mark.asyncio
@@ -795,7 +933,9 @@ async def test_successful_index_preparation_still_orders_activation_after_manual
 
     monkeypatch.setattr(app, "submit_text", held_output)
     control = app.control()
-    manual = await control.submit("text.submit", {"text": "synthetic hold"}, request_id="manual-hold")
+    manual = await control.submit(
+        "text.submit", {"text": "synthetic hold"}, request_id="manual-hold"
+    )
     try:
         await asyncio.wait_for(entered.wait(), 5)
         on = await control.submit(

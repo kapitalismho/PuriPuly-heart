@@ -244,7 +244,9 @@ async def test_failed_close_retains_client_and_observed_terminal_failure_without
     assert not client.close_finished.is_set()
 
 
-async def test_close_without_client_is_idempotent_and_does_not_create_transport(install_probe_client):
+async def test_close_without_client_is_idempotent_and_does_not_create_transport(
+    install_probe_client,
+):
     _, creations = install_probe_client(HeldCloseClient())
     provider = index_translate.IndexTranslateProvider()
     await provider.close()

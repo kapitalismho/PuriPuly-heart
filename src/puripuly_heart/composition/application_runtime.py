@@ -2026,9 +2026,8 @@ def compose_application_runtime(
             current is not None
             and pipeline.llm_runtime is not None
             and pipeline.llm_runtime.provider is not None
-            and signatures.last_llm_provider == build_llm_provider_signature(
-                current, http_extensions=http_extensions
-            )
+            and signatures.last_llm_provider
+            == build_llm_provider_signature(current, http_extensions=http_extensions)
         )
 
     async def commit_index_fallback(
@@ -2056,7 +2055,8 @@ def compose_application_runtime(
                             )
                 current = settings.canonical
                 if current is None or translation_selection(current) != (
-                    "index_translate_35b", "public_api"
+                    "index_translate_35b",
+                    "public_api",
                 ):
                     return None
                 result = await provider_application.apply_translation_selection(
@@ -2071,7 +2071,8 @@ def compose_application_runtime(
                 )
                 if (
                     result is not None
-                    and result.status in {
+                    and result.status
+                    in {
                         "settings_commit_success_runtime_applied",
                         "settings_commit_success_runtime_degraded",
                         "settings_commit_success_runtime_interrupted",
@@ -2102,7 +2103,6 @@ def compose_application_runtime(
         selected_runtime_applied=selected_translation_runtime_applied,
         timeout_sink=managed_account.translation.disable_for_provider_transition,
     )
-
 
     def install_pipeline(components: RuntimePipelineComponents) -> None:
         replace_translation_runtime_enabled(components.translation_runtime_configuration, False)

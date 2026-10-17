@@ -184,7 +184,12 @@ def _active_prompt_key(settings: AppSettingsVNext) -> str:
     if provider == "chatgpt":
         return "openai"
     if provider in {
-        "gemini", "openrouter", "openai", "deepseek", "local_llm", "managed_gemma",
+        "gemini",
+        "openrouter",
+        "openai",
+        "deepseek",
+        "local_llm",
+        "managed_gemma",
         "index_translate",
     }:
         return provider

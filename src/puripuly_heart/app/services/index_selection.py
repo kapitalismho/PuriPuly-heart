@@ -77,7 +77,8 @@ class IndexSelectionOwner:
         self._selection = selection
         previous = self._task
         own_commit = self._committing and selection in {
-            ("gemma4_26b_31b", "managed"), ("gemma4_26b_31b", "openrouter")
+            ("gemma4_26b_31b", "managed"),
+            ("gemma4_26b_31b", "openrouter"),
         }
         if previous is not None and not previous.done() and not own_commit:
             previous.cancel()
@@ -144,17 +145,19 @@ class IndexSelectionOwner:
         if not work.cancelled():
             exception = work.exception()
             if exception is not None:
-                self.diagnostic_sink(ErrorDiagnostics(
-                    component="index_selection",
-                    operation="owned_work_cleanup",
-                    code="index_selection_cleanup_failed",
-                    category="lifecycle",
-                    visibility="basic",
-                    content_policy="metadata_only",
-                    status_code=None,
-                    retry_after_ms=None,
-                    fields={"reason": "owned_work_failed"},
-                ))
+                self.diagnostic_sink(
+                    ErrorDiagnostics(
+                        component="index_selection",
+                        operation="owned_work_cleanup",
+                        code="index_selection_cleanup_failed",
+                        category="lifecycle",
+                        visibility="basic",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={"reason": "owned_work_failed"},
+                    )
+                )
 
     def _authorized(self, generation: int) -> bool:
         return not self._stopped and generation == self._authority_generation
@@ -171,26 +174,17 @@ class IndexSelectionOwner:
         if self._stopped or self._timed_out:
             return False
         if translation_selection(self.settings_provider()) != _INDEX_SELECTION:
-            return (
-                (self._task is None or self._task.done())
-                and (
-                    self.transition_result is None
-                    or self.transition_result.status == "settings_commit_success_runtime_applied"
-                    or (
-                        self.selected_runtime_applied is not None
-                        and self.selected_runtime_applied()
-                    )
-                )
+            return (self._task is None or self._task.done()) and (
+                self.transition_result is None
+                or self.transition_result.status == "settings_commit_success_runtime_applied"
+                or (self.selected_runtime_applied is not None and self.selected_runtime_applied())
             )
         return (
             self._selection == _INDEX_SELECTION
             and self._task is not None
             and self._task.done()
             and self.availability == "available"
-            and (
-                self.selected_runtime_applied is None
-                or self.selected_runtime_applied()
-            )
+            and (self.selected_runtime_applied is None or self.selected_runtime_applied())
         )
 
     async def prepare_enable(self) -> bool:

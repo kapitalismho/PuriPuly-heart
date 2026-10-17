@@ -214,7 +214,7 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 1. [다운로드 페이지](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)에서 최신 버전 다운로드
 2. PuriPuly 설치
 3. **TALK** 버튼 클릭
-4. **TRANS** 버튼 클릭 후 디스코드 인증
+4. **TRANS** 버튼 클릭. 신규 설치는 API 키 없이 Index를 사용해요. 인증·설정 안내가 나오면 완료해주세요.
 5. **CAPTIONS** 버튼을 눌러 자막 켜기
 6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.

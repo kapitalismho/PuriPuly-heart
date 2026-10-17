@@ -177,9 +177,7 @@ async def test_unchanged_speculative_result_keeps_one_index_request_budget(
             assert error_events(harness) == []
         else:
             assert len(failures) == 1
-            assert is_index_service_failure(failures[0]) == (
-                duplicate_outcome == "service_failure"
-            )
+            assert is_index_service_failure(failures[0]) == (duplicate_outcome == "service_failure")
             assert osc.messages == []
             assert len(error_events(harness)) == 1
         assert [entry.text for entry in harness.self_runtime.translation_history] == [
@@ -211,9 +209,7 @@ async def test_secondary_prestarted_failure_keeps_its_index_budget_until_final_a
         finally:
             active[target] -= 1
 
-    harness, _, _, delay, osc, clients = build_owner(
-        handler, self_target_languages=("es", "ja")
-    )
+    harness, _, _, delay, osc, clients = build_owner(handler, self_target_languages=("es", "ja"))
     failures = []
 
     def settled(exception):
@@ -253,7 +249,9 @@ async def test_secondary_prestarted_failure_keeps_its_index_budget_until_final_a
         await close_owner(harness, clients)
 
 
-@pytest.mark.parametrize("change", ["source", "soft_source", "configuration", "generation", "new_turn"])
+@pytest.mark.parametrize(
+    "change", ["source", "soft_source", "configuration", "generation", "new_turn"]
+)
 async def test_changed_request_or_new_turn_gets_its_own_index_budget(build_owner, change):
     sent = []
     primary_started = asyncio.Event()
