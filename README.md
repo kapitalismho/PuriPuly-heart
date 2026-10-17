@@ -193,7 +193,7 @@ Self and Peer can translate concurrently on one managed GPU runtime, with at mos
 1. Download the latest version from the [Download page](https://github.com/kapitalismho/PuriPuly-heart/releases/latest).
 2. Install PuriPuly.
 3. Click the **TALK** button.
-4. Click the **TRANS** button, then authenticate via Discord.
+4. Click the **TRANS** button. New installations use **Index-Translate 35B · Public API**, without an API key.
 5. Click the **CAPTIONS** button to turn on VR subtitles.
 6. (Optional) Click the **LISTEN** button to enable translation of the other person's voice.
 
@@ -202,6 +202,10 @@ Self and Peer can translate concurrently on one managed GPU runtime, with at mos
 7. Enable OSC in VRChat: Action menu → Settings → OSC → Enable.
 
 For bidirectional control setup and the stable parameter ABI, see [VRChat OSC controls](docs/vrchat-osc.md).
+
+Index is the first-run translation default in every UI language; upgrades preserve your existing selection. Selecting Index or starting with it selected runs one background check with synthetic text. TRANS reuses a successful check. Index sends translation text and context to Bilibili's public API; free availability is not guaranteed.
+
+If the check or a completed translation fails because the service is unavailable, the app saves a switch to **Gemma 4 · Managed**. It selects **Gemma 4 · OpenRouter** instead only when the applicable Managed key's allowance is confirmed exhausted. Missing keys or unknown allowance select Managed. A short notice says the free API *may* have ended; it does not confirm a shutdown. Complete the selected connection's normal authentication/setup when prompted. Index remains selectable, and the saved Gemma selection persists until you change it.
 
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
@@ -227,7 +231,7 @@ If Soniox/Gemini/Deepgram are blocked in your region, please use the following c
 
 Follow the guide that matches the service you want to use.
 
-For the translation LLM, we recommend selecting **Gemma 4 26B A4B + 31B** with the **OpenRouter** connection.
+To use your own key instead of the default no-key Index connection, select **Gemma 4 26B A4B + 31B** with the **OpenRouter** connection.
 
 By the way, while you're setting things up, why not configure ASR too?
 PuriPuly delivers the best experience when paired with a cloud STT.

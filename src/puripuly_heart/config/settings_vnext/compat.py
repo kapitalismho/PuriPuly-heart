@@ -148,7 +148,7 @@ def load_vnext_settings(
         settings = (
             migration.from_dict(raw)
             if source_shape == "canonical"
-            else defaults.new_settings_for_first_run()
+            else defaults.new_settings_for_reset()
         )
     except Exception as exc:
         _log_migration_failure(source_shape, SettingsPersistenceStatus.MIGRATION_FAILED)

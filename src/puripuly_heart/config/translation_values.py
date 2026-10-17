@@ -4,6 +4,7 @@ from enum import Enum
 
 
 class TranslationModel(str, Enum):
+    INDEX_TRANSLATE_35B = "index_translate_35b"
     GEMMA4_26B_31B = "gemma4_26b_31b"
     DEEPSEEK_V4_FLASH = "deepseek_v4_flash"
     DEEPSEEK_V4_FLASH_41 = "deepseek_v4_flash_41"
@@ -20,6 +21,7 @@ MANAGED_GEMMA_MODELS = (TranslationModel.MANAGED_GEMMA, TranslationModel.MANAGED
 
 
 class TranslationConnection(str, Enum):
+    PUBLIC_API = "public_api"
     MANAGED = "managed"
     MANAGED_CHINA = "managed_china"
     CHATGPT = "chatgpt"
@@ -35,6 +37,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: dict[
     TranslationModel,
     tuple[TranslationConnection, ...],
 ] = {
+    TranslationModel.INDEX_TRANSLATE_35B: (TranslationConnection.PUBLIC_API,),
     TranslationModel.GEMMA4_26B_31B: (
         TranslationConnection.MANAGED,
         TranslationConnection.OPENROUTER,
@@ -92,6 +95,8 @@ def default_translation_connection(model: TranslationModel) -> TranslationConnec
 
 
 def provider_llm_for_translation(model: str, connection: str) -> str:
+    if model == "index_translate_35b":
+        return "index_translate"
     if model in MANAGED_GEMMA_MODELS:
         return "managed_gemma"
     if model == "local_llm":

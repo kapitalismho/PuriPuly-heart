@@ -295,7 +295,31 @@ class ProviderApplicationOwner:
                 self._set_result(degraded)
         return True
 
-    async def _apply_translation(self, next_settings: ProviderCompatibilityProjection) -> bool:
+    async def apply_translation_selection(
+        self,
+        next_settings: ProviderCompatibilityProjection,
+        *,
+        commit_guard: Callable[[], bool],
+        runtime_guard: Callable[[], bool] | None = None,
+    ) -> TransactionResult | None:
+        if not commit_guard():
+            return None
+        try:
+            if not await self._apply_translation(
+                next_settings, commit_guard=commit_guard, runtime_guard=runtime_guard
+            ):
+                return None
+            return self.results.current
+        finally:
+            self.sync_ui()
+
+    async def _apply_translation(
+        self,
+        next_settings: ProviderCompatibilityProjection,
+        *,
+        commit_guard: Callable[[], bool] | None = None,
+        runtime_guard: Callable[[], bool] | None = None,
+    ) -> bool:
         base_settings = self.settings.canonical
         if base_settings is None:
             return False
@@ -321,11 +345,13 @@ class ProviderApplicationOwner:
         repository = self.settings.create_canonical_patch_repository(
             base_settings=base_settings,
             committed_settings=committed_settings,
+            commit_guard=commit_guard,
         )
         runtime_apply = ProviderRuntimeApplyAdapter(
             owner=self.runtime,
             settings=committed_settings,
             plan=plan,
+            authority_guard=runtime_guard,
         )
         command = TranslationProviderSettingsMutation(values=patch_values)
         service = self.mutation_service_provider() or SettingsMutationService(

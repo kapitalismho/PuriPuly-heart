@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from puripuly_heart.app.ports.translation_runtime_configuration import (
     TranslationRuntimeSettingsValues,
@@ -30,9 +32,11 @@ from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
+from puripuly_heart.core.translation_backend import TranslationBackend
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_llm_factory import (
@@ -497,7 +501,12 @@ def compose_provider_runtime(
     async def create_llm(settings_value: object) -> object | None:
         canonical = canonical_settings(settings_value)
         translation = canonical.intent.translation
-        secrets = create_secret_store(canonical.intent.secrets, config_path=config_path)
+        if translation.model == "gemma4_26b_31b":
+            secrets = await run_owned_thread_call(
+                lambda: create_secret_store(canonical.intent.secrets, config_path=config_path)
+            )
+        else:
+            secrets = create_secret_store(canonical.intent.secrets, config_path=config_path)
         if translation.model in MANAGED_GEMMA_MODELS:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
@@ -533,6 +542,26 @@ def compose_provider_runtime(
             )
         release = managed_release()
         await release.rebuild(secrets=secrets)
+        if translation.model == "gemma4_26b_31b":
+            backend = await run_owned_thread_call(
+                lambda: _translation_backend_from_canonical(
+                    settings_value,
+                    secrets=secrets,
+                    managed_release_service=release.service,
+                    managed_delegate_ready=managed_delegate_ready,
+                    runtime_logging=runtime_logging,
+                    chatgpt_session=chatgpt_session,
+                )
+            )
+            current = settings.canonical
+            if (
+                current is None
+                or current.intent.translation != canonical.intent.translation
+            ):
+                if backend is not None:
+                    await cast(TranslationBackend, backend).close()
+                raise asyncio.CancelledError
+            return backend
         return _translation_backend_from_canonical(
             settings_value,
             secrets=secrets,

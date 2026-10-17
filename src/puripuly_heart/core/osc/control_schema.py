@@ -101,6 +101,7 @@ TRANSLATION_MODEL_IDS: Final[Mapping[int, str]] = MappingProxyType(
         13: "deepseek_v4_flash_41",
         14: "gpt_6_luna",
         15: "managed_gemma_26b",
+        16: "index_translate_35b",
     }
 )
 
@@ -109,6 +110,7 @@ TRANSLATION_CONNECTION_BY_MODEL_ID: Final[Mapping[int, str]] = MappingProxyType(
         10: "cpu",
         11: "gpu",
         15: "gpu",
+        16: "public_api",
     }
 )
 
@@ -178,6 +180,7 @@ TRANSLATION_MODEL_ID_BY_SELECTION: Final[Mapping[tuple[str, str], int]] = Mappin
         ("managed_gemma", "cpu"): 10,
         ("managed_gemma", "gpu"): 11,
         ("managed_gemma_26b", "gpu"): 15,
+        ("index_translate_35b", "public_api"): 16,
     }
 )
 LANGUAGE_ID_BY_CODE: Final[Mapping[str, int]] = MappingProxyType(

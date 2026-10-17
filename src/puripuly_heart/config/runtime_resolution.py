@@ -45,6 +45,7 @@ from puripuly_heart.config.resolved import (
     normalize_legacy_vad_onset_threshold,
 )
 
+TRANSLATION_MODEL_INDEX_TRANSLATE_35B: Final = "index_translate_35b"
 TRANSLATION_MODEL_GEMMA4_26B_31B: Final = "gemma4_26b_31b"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH: Final = "deepseek_v4_flash"
 TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41: Final = "deepseek_v4_flash_41"
@@ -62,6 +63,7 @@ _EMERGENCY_HEDGE_DELAY_MS: Final = 4400
 _LOSER_GRACE_MS: Final = 50
 
 TranslationModelName: TypeAlias = Literal[
+    "index_translate_35b",
     "gemma4_26b_31b",
     "deepseek_v4_flash",
     "deepseek_v4_flash_41",
@@ -75,6 +77,7 @@ TranslationModelName: TypeAlias = Literal[
     "custom_http",
 ]
 TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
+    TRANSLATION_MODEL_INDEX_TRANSLATE_35B,
     TRANSLATION_MODEL_GEMMA4_26B_31B,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH,
     TRANSLATION_MODEL_DEEPSEEK_V4_FLASH_41,
@@ -88,6 +91,7 @@ TRANSLATION_MODELS: Final[tuple[TranslationModelName, ...]] = (
     TRANSLATION_MODEL_CUSTOM_HTTP,
 )
 
+TRANSLATION_CONNECTION_PUBLIC_API: Final = "public_api"
 TRANSLATION_CONNECTION_MANAGED: Final = "managed"
 TRANSLATION_CONNECTION_MANAGED_CHINA: Final = "managed_china"
 TRANSLATION_CONNECTION_CHATGPT: Final = "chatgpt"
@@ -99,6 +103,7 @@ TRANSLATION_CONNECTION_GPU: Final = "gpu"
 TRANSLATION_CONNECTION_CUSTOM_HTTP: Final = "custom_http"
 
 TranslationConnectionName: TypeAlias = Literal[
+    "public_api",
     "managed",
     "managed_china",
     "chatgpt",
@@ -110,6 +115,7 @@ TranslationConnectionName: TypeAlias = Literal[
     "custom_http",
 ]
 TRANSLATION_CONNECTIONS: Final[tuple[TranslationConnectionName, ...]] = (
+    TRANSLATION_CONNECTION_PUBLIC_API,
     TRANSLATION_CONNECTION_MANAGED,
     TRANSLATION_CONNECTION_MANAGED_CHINA,
     TRANSLATION_CONNECTION_CHATGPT,
@@ -124,6 +130,7 @@ TRANSLATION_CONNECTIONS_BY_MODEL: Final[
     Mapping[TranslationModelName, tuple[TranslationConnectionName, ...]]
 ] = MappingProxyType(
     {
+        TRANSLATION_MODEL_INDEX_TRANSLATE_35B: (TRANSLATION_CONNECTION_PUBLIC_API,),
         TRANSLATION_MODEL_GEMMA4_26B_31B: (
             TRANSLATION_CONNECTION_MANAGED,
             TRANSLATION_CONNECTION_OPENROUTER,
@@ -182,6 +189,7 @@ OPENROUTER_MANAGED_CREDENTIAL_KINDS: Final[tuple[OpenRouterManagedCredentialKind
     OPENROUTER_MANAGED_CREDENTIAL_QQ,
 )
 
+PROVIDER_INDEX_TRANSLATE: Final = "index_translate"
 PROVIDER_OPENROUTER: Final = "openrouter"
 PROVIDER_DEEPSEEK: Final = "deepseek"
 PROVIDER_OPENAI: Final = "openai"
@@ -192,6 +200,7 @@ PROVIDER_MANAGED_GEMMA: Final = "managed_gemma"
 PROVIDER_LOCAL_LLM: Final = "local_llm"
 PROVIDER_CUSTOM_HTTP: Final = "custom_http"
 LLM_PROVIDERS: Final[tuple[str, ...]] = (
+    PROVIDER_INDEX_TRANSLATE,
     PROVIDER_GEMINI,
     PROVIDER_OPENAI,
     PROVIDER_OPENROUTER,
@@ -201,6 +210,7 @@ LLM_PROVIDERS: Final[tuple[str, ...]] = (
     PROVIDER_LOCAL_LLM,
 )
 
+INDEX_TRANSLATE_MODEL: Final = "Index-Translate-35B-A3B"
 OPENAI_MODEL_GPT_6_LUNA: Final = "gpt-6-luna"
 GEMINI_MODEL_FLASH: Final = "gemini-3.8-flash"
 LEGACY_GEMINI_MODEL_31_FLASH_LITE: Final = "gemini-3.1-flash-lite"
@@ -1068,6 +1078,12 @@ def derive_translation_runtime_intent_from_compatibility(
     provider_routing = _normalize_openrouter_provider_routing(openrouter_provider_routing)
     concurrency = _normalize_positive_int(concurrency_limit, default=10)
 
+    if provider == PROVIDER_INDEX_TRANSLATE:
+        return TranslationRuntimeIntent(
+            model=TRANSLATION_MODEL_INDEX_TRANSLATE_35B,
+            connection=TRANSLATION_CONNECTION_PUBLIC_API,
+            concurrency_limit=concurrency,
+        )
     if provider == PROVIDER_OPENROUTER:
         if provider_routing == "gemma4_26b_31b_latency":
             return TranslationRuntimeIntent(
@@ -1472,6 +1488,13 @@ def _resolve_translation_target(
     openrouter: OpenRouterRuntimeIntent,
     direct: DirectProviderRuntimeIntent,
 ) -> ResolvedLLMTarget:
+    if translation.model == TRANSLATION_MODEL_INDEX_TRANSLATE_35B:
+        return _resolved_direct_provider_target(
+            provider=PROVIDER_INDEX_TRANSLATE,
+            model=INDEX_TRANSLATE_MODEL,
+            credential=_no_credential(),
+        )
+
     if translation.model == TRANSLATION_MODEL_CUSTOM_HTTP:
         return _resolved_direct_provider_target(
             provider=PROVIDER_CUSTOM_HTTP,
@@ -1641,7 +1664,7 @@ def _fallback_plan_for_target(
             target.provider == PROVIDER_OPENROUTER
             and target.credential.source == CREDENTIAL_SOURCE_MANAGED
         ),
-        start_on_primary_error=True,
+        start_on_primary_error=target.provider != PROVIDER_INDEX_TRANSLATE,
     )
 
 
@@ -1715,6 +1738,10 @@ def resolve_llm_config(runtime_input: RuntimeResolutionInput) -> ResolvedLLMConf
 
 
 __all__ = [
+    "INDEX_TRANSLATE_MODEL",
+    "PROVIDER_INDEX_TRANSLATE",
+    "TRANSLATION_CONNECTION_PUBLIC_API",
+    "TRANSLATION_MODEL_INDEX_TRANSLATE_35B",
     "CREDENTIAL_REF_DEEPSEEK_BYOK",
     "CREDENTIAL_REF_CHATGPT_OAUTH",
     "CREDENTIAL_REF_OPENAI_BYOK",

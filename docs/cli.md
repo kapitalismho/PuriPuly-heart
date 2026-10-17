@@ -374,6 +374,19 @@ A file-based command can also express both channels explicitly:
 - A successful persistence receipt does not prove that a provider is attached or active.
 - Inspect `asr status` / `providers.status` and its selected, runtime, capture-attached, activity, pending-handoff, and failure fields.
 
+### Index public translation
+
+New installations select `translation.model: index_translate_35b` with `translation.connection: public_api`, regardless of UI locale. Supported existing settings keep their model and connection. Archival/reset of unsupported flat settings retains its established regional defaults; it is not a new-installation migration to Index. Index uses Bilibili's public API without a user key; it is not a Managed or BYOK connection.
+
+- Startup with Index selected and each applied re-selection start one background synthetic availability request. GUI, CLI and OSC share the same selection owner.
+- `translation set on` joins a pending check and reuses success; it does not send an additional probe. Selecting another model retires the result. There is no periodic polling.
+- A terminal service-availability failure saves `gemma4_26b_31b` / `managed`, or `gemma4_26b_31b` / `openrouter` only when the applicable Managed key's allowance is confirmed effectively exhausted. Missing keys and unknown allowance select Managed.
+- The short notice says the free API *may* have ended. The failure is not proof of a shutdown, and Index remains selectable. The saved destination survives restart; the app does not automatically return to Index.
+- Background checking does not authenticate or enable translation/capture. A waiting enable request continues through the destination's existing readiness/authentication path. Noninteractive callers can receive the normal action-required outcome. A committed selection is not proof of usable credentials or successful runtime application.
+- Ordinary Index translations permit one duplicate at 1,300 ms if no valid result has won. There is no immediate error retry or third attempt. A settled service failure changes subsequent work; the failed utterance is not replayed through Gemma.
+
+Inspect `settings current`, `providers.status` and the terminal operation result separately to distinguish persisted choice, attached provider and effective translation state.
+
 ### Translation request parameters
 
 GPT 6 Luna (`translation.model: gpt_6_luna`) uses fixed request parameters:
@@ -381,6 +394,8 @@ GPT 6 Luna (`translation.model: gpt_6_luna`) uses fixed request parameters:
 - On `openrouter` and `official_byok`, it sends `temperature: 0.6` with reasoning effort `none`.
 - The `chatgpt` connection omits `temperature`.
 - These parameters are not editable CLI settings.
+
+Index uses the existing translation prompt and context with `temperature: 0`, `chat_template_kwargs: {"enable_thinking": false}`, and a finite output limit. Availability requests do not contain conversation text and do not enter conversation history. See [Privacy Policy](../PRIVACY.md) for text/context destinations.
 
 ### Managed local translation
 

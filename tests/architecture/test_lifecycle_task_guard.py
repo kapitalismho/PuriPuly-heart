@@ -77,6 +77,11 @@ TASK_CREATION_REVIEWS = (
         "SettingsOwner locally shield-awaits the thread persistence task, including after cancellation, before releasing the call boundary",
     ),
     *_reviews(
+        "app/services/index_selection.py",
+        {"IndexSelectionOwner._schedule": 1, "IndexSelectionOwner._run_owned": 1},
+        "IndexSelectionOwner shares one bounded selection result, fences and cancels timed-out work while retaining its owned blocking cleanup, and drains supervisor plus worker tasks on close",
+    ),
+    *_reviews(
         "app/services/llm_connection_readiness.py",
         {"LlmConnectionReadinessOwner._start_mode": 1},
         "LlmConnectionReadinessOwner retains mode transition tasks and gathers the remaining set on close",

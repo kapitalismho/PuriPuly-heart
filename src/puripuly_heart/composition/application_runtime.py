@@ -86,6 +86,11 @@ from puripuly_heart.app.services.gpu_runtime_interaction import (
 from puripuly_heart.app.services.http_extension_registry import (
     HttpExtensionRegistryService,
 )
+from puripuly_heart.app.services.index_selection import (
+    IndexManagedAllowanceObservation,
+    IndexSelectionOwner,
+    translation_selection,
+)
 from puripuly_heart.app.services.llm_connection_readiness import LlmConnectionReadinessOwner
 from puripuly_heart.app.services.local_asr_diagnostics import LocalASRDiagnosticsOwner
 from puripuly_heart.app.services.local_asr_gpu_provisioning import (
@@ -157,6 +162,12 @@ from puripuly_heart.app.wiring import (
     resolve_overlay_config_from_vnext,
     runtime_pipeline_inputs_from_vnext,
 )
+from puripuly_heart.app.wiring.wiring_index_selection import (
+    IndexManagedAllowanceObserver,
+    check_index_availability,
+    gemma_fallback_settings,
+    unknown_managed_allowance,
+)
 from puripuly_heart.app.wiring.wiring_managed_gemma import (
     create_managed_gemma_runtime,
     managed_gemma_selection,
@@ -164,6 +175,7 @@ from puripuly_heart.app.wiring.wiring_managed_gemma import (
     sync_managed_gemma_demand,
 )
 from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
+    build_llm_provider_signature,
     provider_llm_for_translation,
 )
 from puripuly_heart.app.wiring_application_runtime_logging import (
@@ -2008,9 +2020,95 @@ def compose_application_runtime(
         rolling_stt_secret_rebind=provider_runtime.effects.rebind_rolling_stt_secret,
     )
 
+    def selected_translation_runtime_applied() -> bool:
+        current = settings.canonical
+        return bool(
+            current is not None
+            and pipeline.llm_runtime is not None
+            and pipeline.llm_runtime.provider is not None
+            and signatures.last_llm_provider == build_llm_provider_signature(
+                current, http_extensions=http_extensions
+            )
+        )
+
+    async def commit_index_fallback(
+        observation: IndexManagedAllowanceObservation,
+        guard: Callable[[], bool],
+        transition_guard: Callable[[], bool],
+    ):
+        async with control._resource_lock:
+            async with control._lock:
+                if ingress.frozen or not guard():
+                    return None
+                connection = "managed"
+                if observation.state == "exhausted":
+                    if (
+                        observation.confirm_current is not None
+                        and await observation.confirm_current()
+                    ):
+                        connection = "openrouter"
+                    else:
+                        unknown = unknown_managed_allowance("credential_not_current")
+                        index_selection.allowance_observation = unknown
+                        if unknown.diagnostics is not None:
+                            runtime_logging.emit_failure(
+                                unknown.diagnostics, severity="warning", disposition="degraded"
+                            )
+                current = settings.canonical
+                if current is None or translation_selection(current) != (
+                    "index_translate_35b", "public_api"
+                ):
+                    return None
+                result = await provider_application.apply_translation_selection(
+                    gemma_fallback_settings(current, connection),
+                    commit_guard=lambda: (
+                        not ingress.frozen
+                        and guard()
+                        and translation_selection(settings.canonical)
+                        == ("index_translate_35b", "public_api")
+                    ),
+                    runtime_guard=lambda: not ingress.frozen and transition_guard(),
+                )
+                if (
+                    result is not None
+                    and result.status in {
+                        "settings_commit_success_runtime_applied",
+                        "settings_commit_success_runtime_degraded",
+                        "settings_commit_success_runtime_interrupted",
+                    }
+                    and (
+                        not selected_translation_runtime_applied()
+                        or not await index_allowance.destination_credential_available()
+                    )
+                ):
+                    managed_account.translation.disable_for_provider_transition()
+                return result
+
+    index_allowance = IndexManagedAllowanceObserver(
+        settings=settings,
+        config_path=config_path,
+        verifier=require_provider_verifier(),
+        ingress_frozen=lambda: ingress.frozen,
+    )
+    index_selection = IndexSelectionOwner(
+        settings_provider=lambda: settings.committed_settings or settings.canonical,
+        probe=check_index_availability,
+        observe_allowance=index_allowance.observe,
+        commit_fallback=commit_index_fallback,
+        message_sink=show_short_message,
+        diagnostic_sink=lambda diagnostic: runtime_logging.emit_failure(
+            diagnostic, severity="warning", disposition="degraded"
+        ),
+        selected_runtime_applied=selected_translation_runtime_applied,
+        timeout_sink=managed_account.translation.disable_for_provider_transition,
+    )
+
+
     def install_pipeline(components: RuntimePipelineComponents) -> None:
         replace_translation_runtime_enabled(components.translation_runtime_configuration, False)
         pipeline.install(components)
+        components.translation_requests.settled_failure_sink = index_selection.request_failed
+        index_selection.start()
         llm_connection_readiness.sync()
 
     pipeline_launcher = RuntimePipelineLauncher(
@@ -2256,6 +2354,7 @@ def compose_application_runtime(
         settings_secrets=SettingsSecretsOwner(
             secret_store_factory=create_settings_secret_store,
         ),
+        index_selection=index_selection,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
         output_status_provider=lambda: {
             "overlay": {
@@ -2290,6 +2389,7 @@ def compose_application_runtime(
         locale_choices=presentation.available_locales(),
         localize=presentation.localize,
         gemma_selection=managed_gemma_selection,
+        selection_committed=index_selection.selection_changed,
     )
     application.attach_control(control)
     settings.observe_commits(control._publish_committed)
@@ -2300,6 +2400,18 @@ def compose_application_runtime(
                 owner_name="ApplicationControlOwner",
                 callback_name="freeze_ingress",
                 callback=control.freeze_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="IndexSelectionOwner",
+                callback_name="stop_ingress",
+                callback=index_selection.stop_ingress,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
+                owner_name="IndexSelectionOwner",
+                callback_name="close",
+                callback=index_selection.close,
             ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,

@@ -1,4 +1,11 @@
 {
+  "provider.index_translate_35b": "Index-Translate 35B",
+  "settings.translation_model.index_translate_35b.description": "キー不要の無料公開翻訳 API",
+  "settings.translation_connection.public_api": "公開 API",
+  "settings.translation_connection.public_api.description": "無料の公開 API です。API キーは不要です。",
+  "provider.index_translate": "Index-Translate 35B",
+  "messages.index_api_fallback_managed": "Index の無料 API は終了した可能性があります。Gemma 4 · Managed に切り替えました。",
+  "messages.index_api_fallback_openrouter": "Index の無料 API は終了した可能性があります。Gemma 4 · OpenRouter に切り替えました。",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Overlay",
   "dashboard.stt_label": "TALK",

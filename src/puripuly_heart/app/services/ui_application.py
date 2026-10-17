@@ -64,6 +64,7 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.app.services.index_selection import IndexSelectionOwner
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import provider_llm_for_translation
@@ -172,6 +173,26 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
         async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
             self._admit_application_intent(method.__name__)
             control = self._control
+            if method.__name__ == "set_translation_enabled":
+                self._translation_selection_intent += 1
+                intent = self._translation_selection_intent
+                enabled = args[0] if args else kwargs.get("enabled")
+                selection = self._index_selection
+                if enabled and selection is not None:
+                    while True:
+                        if not await selection.prepare_enable():
+                            return False
+                        if intent != self._translation_selection_intent:
+                            return False
+                        self._admit_application_intent(method.__name__)
+                        if control is None or control.lock_owned_by_current_task():
+                            return await method(self, *args, **kwargs)
+                        async with control._resource_lock:
+                            async with control._lock:
+                                if intent != self._translation_selection_intent:
+                                    return False
+                                if selection.ready_for_enable:
+                                    return await method(self, *args, **kwargs)
             if (
                 method.__name__ not in _ORDERED_INTENTS
                 or control is None
@@ -221,6 +242,7 @@ class UiApplicationBoundary:
         output_status_provider: Callable[[], dict[str, dict[str, object]]] | None = None,
         http_extension_registry: object | None = None,
         scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
+        index_selection: IndexSelectionOwner | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -240,6 +262,8 @@ class UiApplicationBoundary:
         self._osc_state_publisher = osc_state_publisher
         self._output_status_provider = output_status_provider
         self._scene_observation_provider = scene_observation_provider
+        self._index_selection = index_selection
+        self._translation_selection_intent = 0
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )

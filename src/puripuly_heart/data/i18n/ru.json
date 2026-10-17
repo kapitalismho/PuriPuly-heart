@@ -1,4 +1,11 @@
 {
+  "provider.index_translate_35b": "Index-Translate 35B",
+  "settings.translation_model.index_translate_35b.description": "Бесплатный публичный API перевода без ключа",
+  "settings.translation_connection.public_api": "Публичный API",
+  "settings.translation_connection.public_api.description": "Бесплатный публичный API. Ключ API не нужен.",
+  "provider.index_translate": "Index-Translate 35B",
+  "messages.index_api_fallback_managed": "Бесплатный API Index, возможно, завершил работу. Выбран Gemma 4 · Managed.",
+  "messages.index_api_fallback_openrouter": "Бесплатный API Index, возможно, завершил работу. Выбран Gemma 4 · OpenRouter.",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Оверлей",
   "dashboard.stt_label": "TALK",

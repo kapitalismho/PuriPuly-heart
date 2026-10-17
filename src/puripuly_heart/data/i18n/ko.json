@@ -1,4 +1,11 @@
 {
+  "provider.index_translate_35b": "Index-Translate 35B",
+  "settings.translation_model.index_translate_35b.description": "키 없이 사용하는 무료 공개 번역 API",
+  "settings.translation_connection.public_api": "공개 API",
+  "settings.translation_connection.public_api.description": "무료 공개 API예요. API 키가 필요 없어요.",
+  "provider.index_translate": "Index-Translate 35B",
+  "messages.index_api_fallback_managed": "Index 무료 API가 종료되었을 수 있어요. Gemma 4 · Managed로 전환했어요.",
+  "messages.index_api_fallback_openrouter": "Index 무료 API가 종료되었을 수 있어요. Gemma 4 · OpenRouter로 전환했어요.",
   "app.title": "PuriPuly <3",
   "desktop_overlay.window.title": "PuriPuly Overlay",
   "dashboard.stt_label": "TALK",

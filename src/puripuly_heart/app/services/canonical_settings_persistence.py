@@ -72,6 +72,7 @@ class CanonicalSettingsPatchRepository:
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
     commit_sink: Callable[[], None] | None = None
+    commit_guard: Callable[[], bool] | None = None
     commit_succeeded: bool = False
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
     secondary_omitted_count: int = 0
@@ -85,6 +86,23 @@ class CanonicalSettingsPatchRepository:
 
     async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
         self.commit_succeeded = False
+        if self.commit_guard is not None and not self.commit_guard():
+            return SettingsCommitResult(
+                succeeded=False,
+                snapshot=None,
+                message=None,
+                diagnostics=ErrorDiagnostics(
+                    component="settings_repository",
+                    operation="save",
+                    code="settings_selection_superseded",
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"surface": self.surface},
+                ),
+            )
         base_settings = self.base_settings
         source = base_settings or self.committed_settings
         if (
@@ -616,6 +634,7 @@ class SettingsOwner:
         surface: str = "translation_provider",
         provider_verification_binding: ProviderVerificationBinding | None = None,
         commit_sink: Callable[[], None] | None = None,
+        commit_guard: Callable[[], bool] | None = None,
     ) -> CanonicalSettingsPatchRepository:
         return CanonicalSettingsPatchRepository(
             owner=self,
@@ -624,6 +643,7 @@ class SettingsOwner:
             surface=surface,
             provider_verification_binding=provider_verification_binding,
             commit_sink=commit_sink,
+            commit_guard=commit_guard,
         )
 
     def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettingsVNext:
@@ -760,6 +780,20 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
     )
 
     translation = settings.intent.translation
+    if translation.model == "index_translate_35b":
+        return replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(
+                    translation,
+                    connection="public_api",
+                    openrouter_selected_source="none",
+                    openrouter_selection_alias=None,
+                    openrouter_provider_routing="default",
+                ),
+            ),
+        )
     model = "gemma4_26b_31b" if translation.model in {"gemma4", "gemma4_31b"} else translation.model
     if model != translation.model:
         translation = replace(translation, model=model)

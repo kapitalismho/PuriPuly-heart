@@ -289,6 +289,7 @@ _STT_SECTION_BY_PROVIDER: dict[STTProviderName, str] = {
     STTProviderName.LOCAL_QWEN: "settings.stt.section.cpu_inference",
 }
 _TRANSLATION_MODEL_LABEL_KEYS = {
+    TranslationModel.INDEX_TRANSLATE_35B: "provider.index_translate_35b",
     TranslationModel.MANAGED_GEMMA: "provider.managed_gemma",
     TranslationModel.MANAGED_GEMMA_26B: "provider.managed_gemma_26b",
     TranslationModel.GEMMA4_26B_31B: "provider.gemma4_26b_31b",
@@ -301,6 +302,7 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
+    TranslationConnection.PUBLIC_API: "settings.translation_connection.public_api",
     TranslationConnection.CPU: "settings.translation_connection.cpu",
     TranslationConnection.GPU: "settings.translation_connection.gpu",
     TranslationConnection.MANAGED: "settings.translation_connection.managed",
@@ -312,9 +314,11 @@ _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
 }
 _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
+    TranslationConnection.PUBLIC_API: "settings.translation_connection.public_api.description",
     TranslationConnection.CHATGPT: "settings.translation_connection.chatgpt.description",
 }
 _TRANSLATION_MODELS = (
+    TranslationModel.INDEX_TRANSLATE_35B,
     TranslationModel.MANAGED_GEMMA,
     TranslationModel.MANAGED_GEMMA_26B,
     TranslationModel.GEMMA4_26B_31B,
@@ -334,6 +338,7 @@ _TRANSLATION_MODEL_SECTION_ORDER = (
     "settings.translation_model.section.others",
 )
 _TRANSLATION_MODEL_SECTION_BY_MODEL: dict[TranslationModel, str] = {
+    TranslationModel.INDEX_TRANSLATE_35B: "settings.translation_model.section.recommended_cloud",
     TranslationModel.MANAGED_GEMMA: "settings.translation_model.section.cpu_inference",
     TranslationModel.MANAGED_GEMMA_26B: "settings.translation_model.section.gpu_inference",
     TranslationModel.GEMMA4_26B_31B: "settings.translation_model.section.recommended_cloud",
@@ -493,6 +498,7 @@ class SettingsView(ft.Column):
         self._http_extension_snapshot = self._http_extensions.snapshot
         self._http_extension_runtime_reload_pending = False
         self._pending_alibaba_key_verification: QwenRegion | None = None
+        self._immediate_provider_apply_intent: ProviderApplyIntent | None = None
 
         # State
         self._provider_snapshot: ProviderSettingsSnapshot | None = None
@@ -3158,6 +3164,8 @@ class SettingsView(ft.Column):
     ) -> str:
         if settings is None:
             return "gemini"
+        if settings.llm_provider == LLMProviderName.INDEX_TRANSLATE:
+            return "index_translate"
         if settings.llm_provider == LLMProviderName.GEMINI:
             return "gemini"
         if settings.llm_provider == LLMProviderName.OPENROUTER:
@@ -3210,14 +3218,15 @@ class SettingsView(ft.Column):
                     with contextlib.suppress(Exception):
                         control.update()
 
-    def _sync_custom_vocabulary_editor_from_settings(self) -> None:
+    def _sync_custom_vocabulary_editor_from_settings(self, *, preserve_input: bool = False) -> None:
         if self._prompt_snapshot is None:
             self._custom_vocab_tag_editor.set_terms([])
             self._custom_vocab_tag_editor.clear_input()
             return
 
         self._custom_vocab_tag_editor.set_terms(list(self._prompt_snapshot.custom_vocabulary_terms))
-        self._custom_vocab_tag_editor.clear_input()
+        if not preserve_input:
+            self._custom_vocab_tag_editor.clear_input()
 
     def bind_recent_language_queue(self, dashboard: object) -> None:
         """Point the hint editor at the dashboard's shared recent-language queue."""
@@ -3760,6 +3769,11 @@ class SettingsView(ft.Column):
             return None
         return ProviderApplyIntent(tuple(self._provider_edits.values()))
 
+    def consume_immediate_provider_apply_settings(self) -> ProviderApplyIntent | None:
+        intent = self._immediate_provider_apply_intent
+        self._immediate_provider_apply_intent = None
+        return intent
+
     def build_provider_apply_settings(self) -> ProviderApplyIntent | None:
         return self._build_provider_apply_intent()
 
@@ -3855,6 +3869,28 @@ class SettingsView(ft.Column):
         preserve_custom_vocab_draft: bool = False,
     ) -> None:
         """Load current settings into the UI."""
+        previous = self._build_settings_with_provider_draft()
+        selection_changed = (
+            self._provider_snapshot is not None
+            and self._provider_snapshot.translation != provider.translation
+        )
+        raw_drafts = []
+        if selection_changed and previous is not None:
+            for control, field_name in (
+                (self._local_llm_base_url, "local_llm_base_url"),
+                (self._local_llm_model, "local_llm_model"),
+                (self._local_llm_extra_body, "local_llm_extra_body_json"),
+                (self._custom_stt_endpoint, "custom_stt_endpoint"),
+                (self._custom_stt_model, "custom_stt_model"),
+                (self._custom_stt_extra, "custom_stt_extra_json"),
+            ):
+                if control.value != getattr(previous, field_name):
+                    raw_drafts.append((control, control.value, control.error))
+        preserve_vocabulary_input = (
+            selection_changed
+            and self._prompt_snapshot is not None
+            and self._prompt_snapshot.source_language == prompt.source_language
+        )
         self._rebase_provider_draft(provider)
         draft = self._provider_draft
         prompt_draft = self._prompt_editor.value if self.has_pending_prompt_changes else None
@@ -3954,7 +3990,9 @@ class SettingsView(ft.Column):
             self._prompt_snapshot = replace(prompt, system_prompt=self._prompt_editor.value)
 
         _ = preserve_custom_vocab_draft
-        self._sync_custom_vocabulary_editor_from_settings()
+        self._sync_custom_vocabulary_editor_from_settings(
+            preserve_input=preserve_vocabulary_input
+        )
         self._sync_peer_auto_languages_editor()
         self._sync_prompt_tab_copy()
         self._overlay_peer_contract = None
@@ -3972,6 +4010,9 @@ class SettingsView(ft.Column):
 
         # Load secrets
         self._load_secrets(provider, config_path)
+        for control, value, error in raw_drafts:
+            control.value = value
+            control.error = error
 
         if is_control_mounted(self):
             self.update()
@@ -4897,7 +4938,11 @@ class SettingsView(ft.Column):
         openrouter_model = settings.openrouter_llm_model
         openrouter_source = settings.openrouter_selected_source
         openrouter_alias = settings.openrouter_selection_alias
-        if model == TranslationModel.GPT_6_LUNA:
+        if model == TranslationModel.INDEX_TRANSLATE_35B:
+            llm_provider = LLMProviderName.INDEX_TRANSLATE
+            openrouter_source = OpenRouterCredentialSource.NONE
+            openrouter_alias = None
+        elif model == TranslationModel.GPT_6_LUNA:
             if connection == TranslationConnection.OFFICIAL_BYOK:
                 llm_provider = LLMProviderName.OPENAI
                 openrouter_source = OpenRouterCredentialSource.NONE
@@ -5039,10 +5084,19 @@ class SettingsView(ft.Column):
         self._sync_gpu_device_card()
 
         if (
-            connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
+            model == TranslationModel.INDEX_TRANSLATE_35B
+            or old_model == TranslationModel.INDEX_TRANSLATE_35B
+            or connection in (TranslationConnection.MANAGED, TranslationConnection.MANAGED_CHINA)
             or model in MANAGED_GEMMA_MODELS
             or old_model in MANAGED_GEMMA_MODELS
         ) and getattr(self, "on_providers_changed", None) is not None:
+            if (
+                model == TranslationModel.INDEX_TRANSLATE_35B
+                or old_model == TranslationModel.INDEX_TRANSLATE_35B
+            ):
+                self._immediate_provider_apply_intent = ProviderApplyIntent(
+                    (self._translation_selection_edit(selection),)
+                )
             self.on_providers_changed()
 
         display_settings = self._build_settings_with_provider_draft()

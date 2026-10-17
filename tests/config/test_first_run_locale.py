@@ -126,20 +126,20 @@ def test_first_run_settings_preserve_provider_defaults() -> None:
 
     translation = settings.intent.translation
     assert settings.intent.stt.provider == "local_cpu_auto"
-    assert translation.model == "deepseek_v4_flash_41"
-    assert translation.connection == "managed_china"
-    assert translation.openrouter_selected_source == "managed"
+    assert translation.model == "index_translate_35b"
+    assert translation.connection == "public_api"
+    assert translation.openrouter_selected_source == "none"
 
 
-@pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", None])
-def test_first_run_settings_use_managed_gemma_primary_default(
+@pytest.mark.parametrize("system_locale", ["en_US", "ko_KR", "ja_JP", "zh_CN", "ru_RU", None])
+def test_first_run_settings_use_public_index_default(
     system_locale: str | None,
 ) -> None:
     settings = _new_first_run_settings(system_locale)
 
     translation = settings.intent.translation
-    assert translation.model == "gemma4_26b_31b"
-    assert translation.connection == "managed"
+    assert translation.model == "index_translate_35b"
+    assert translation.connection == "public_api"
 
 
 def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
@@ -151,7 +151,9 @@ def test_first_run_settings_roundtrip_through_dict_serialization() -> None:
 
     assert restored.intent.ui.locale == "ko"
     assert restored.intent.stt.provider == "local_cpu_auto"
-    assert restored.intent.translation.openrouter_selected_source == "managed"
+    assert restored.intent.translation.model == "index_translate_35b"
+    assert restored.intent.translation.connection == "public_api"
+    assert restored.intent.translation.openrouter_selected_source == "none"
     assert restored.intent.prompts.system_prompt_override is None
 
 
@@ -188,14 +190,14 @@ def test_main_first_run_uses_detected_system_locale(
     loaded = _load_settings_or_default(path)
 
     assert loaded.intent.ui.locale == "zh-CN"
-    assert loaded.intent.translation.model == "deepseek_v4_flash_41"
-    assert loaded.intent.translation.connection == "managed_china"
-    assert loaded.intent.translation.openrouter_selection_alias == "deepseek_v4_flash_41_managed"
-    assert loaded.intent.translation.openrouter_provider_routing == "deepseek_v4_flash_41_strict"
+    assert loaded.intent.translation.model == "index_translate_35b"
+    assert loaded.intent.translation.connection == "public_api"
+    assert loaded.intent.translation.openrouter_selection_alias is None
+    assert loaded.intent.translation.openrouter_provider_routing == "default"
     assert not path.exists()
 
 
-def test_main_first_run_non_china_uses_managed_gemma_primary_default(
+def test_main_first_run_non_china_uses_public_index_default(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -205,33 +207,14 @@ def test_main_first_run_non_china_uses_managed_gemma_primary_default(
     loaded = _load_settings_or_default(path)
 
     assert loaded.intent.ui.locale == "ko"
-    assert loaded.intent.translation.model == "gemma4_26b_31b"
-    assert loaded.intent.translation.connection == "managed"
+    assert loaded.intent.translation.model == "index_translate_35b"
+    assert loaded.intent.translation.connection == "public_api"
     assert not path.exists()
 
 
-@pytest.mark.parametrize(
-    ("system_locale", "model", "connection", "credential"),
-    [
-        (
-            "zh_CN",
-            "deepseek_v4_flash_41",
-            "managed_china",
-            "openrouter:managed_qq",
-        ),
-        (
-            "en_US",
-            "gemma4_26b_31b",
-            "managed",
-            "openrouter:managed",
-        ),
-    ],
-)
-def test_first_run_locale_resolves_primary_and_identity_hedge_without_byok(
+@pytest.mark.parametrize("system_locale", ["zh_CN", "en_US", "ko_KR", "ja_JP", "ru_RU"])
+def test_first_run_locale_resolves_public_index_and_only_delayed_duplicate(
     system_locale: str,
-    model: str,
-    connection: str,
-    credential: str,
 ) -> None:
     from puripuly_heart.app.wiring.wiring_llm_factory import runtime_resolution_input_from_vnext
     from puripuly_heart.config.runtime_resolution import resolve_llm_config
@@ -240,13 +223,17 @@ def test_first_run_locale_resolves_primary_and_identity_hedge_without_byok(
         runtime_resolution_input_from_vnext(_new_first_run_settings(system_locale))
     )
 
-    assert config.primary.provider == "openrouter"
-    assert config.primary.credential.reference == credential
+    assert config.primary.provider == "index_translate"
+    assert config.primary.model == "Index-Translate-35B-A3B"
+    assert config.primary.credential.source == "none"
+    assert config.primary.credential.reference is None
+    assert not config.primary.credential.required
     assert config.fallback is not None
     assert config.fallback.target == config.primary
-    settings = _new_first_run_settings(system_locale)
-    assert settings.intent.translation.model == model
-    assert settings.intent.translation.connection == connection
+    assert not config.fallback.start_on_primary_error
+    assert len(config.attempts) == 2
+    assert [attempt.start_after_ms for attempt in config.attempts] == [0, 1300]
+    assert not any(attempt.start_on_primary_error for attempt in config.attempts)
 
 
 def test_main_first_run_populates_default_system_prompt(
@@ -289,3 +276,50 @@ def test_settings_owner_existing_invalid_settings_are_not_replaced_with_defaults
         compose_settings_owner(stable_path).start()
 
     assert stable_path.read_text(encoding="utf-8") == "not-json"
+
+
+@pytest.mark.parametrize(
+    ("system_locale", "ui_locale", "model", "connection", "alias"),
+    [
+        ("en_US", "en", "gemma4_26b_31b", "managed", "gemma4_26b_31b_managed"),
+        ("ko_KR", "ko", "gemma4_26b_31b", "managed", "gemma4_26b_31b_managed"),
+        ("ja_JP", "ja", "gemma4_26b_31b", "managed", "gemma4_26b_31b_managed"),
+        ("ru_RU", "ru", "gemma4_26b_31b", "managed", "gemma4_26b_31b_managed"),
+        (
+            "zh_CN",
+            "zh-CN",
+            "deepseek_v4_flash_41",
+            "managed_china",
+            "deepseek_v4_flash_41_managed",
+        ),
+    ],
+)
+def test_existing_flat_settings_reset_retains_previous_regional_defaults(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    system_locale: str,
+    ui_locale: str,
+    model: str,
+    connection: str,
+    alias: str,
+) -> None:
+    monkeypatch.setattr(canonical_defaults, "detect_system_locale", lambda: system_locale)
+    path = tmp_path / "settings.json"
+    original_bytes = b'{"settings_version":30,"provider":{"llm":"qwen"}}'
+    path.write_bytes(original_bytes)
+
+    result = compose_settings_owner(path).start()
+
+    translation = result.settings.intent.translation
+    assert result.migrated
+    assert result.backup_path is not None
+    assert result.backup_path.read_bytes() == original_bytes
+    assert result.settings.intent.ui.locale == ui_locale
+    assert translation.model == model
+    assert translation.connection == connection
+    assert translation.openrouter_selection_alias == alias
+    assert translation.openrouter_selected_source == "managed"
+    assert translation.connection_history[model] == connection
+    assert "index_translate_35b" not in translation.connection_history
+    assert compose_settings_owner(path).start().settings.intent.translation == translation
+    assert _new_first_run_settings(system_locale).intent.translation.model == "index_translate_35b"

@@ -191,13 +191,17 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 1. 从[下载页面](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)下载最新版本
 2. 安装 PuriPuly
 3. 点击 **TALK** 按钮
-4. 点击 **TRANS** 按钮后通过 Discord 验证
+4. 点击 **TRANS** 按钮。新安装默认使用无需 API 密钥的 **Index-Translate 35B · 公共 API**。
 5. 点击 **CAPTIONS** 按钮开启 VR 字幕
 6. （可选）点击 **LISTEN** 按钮开启对方语音翻译
 
    > 对方语音翻译功能正常工作需要噪音较少的环境。若在 VRChat 中使用，请通过 Earmuff 功能控制环境。
 
 7. 在 VRChat 中启用 OSC：Action menu → Settings → OSC → Enable
+
+所有界面语言的新安装均默认选择 Index；升级会保留原有选择。选择 Index 或在已选中 Index 时启动应用，会用合成文本进行一次后台检查，TRANS 会复用成功结果。待翻译的原文和上下文会发送至 Bilibili 公共 API；不保证永久免费。
+
+如果检查或已结束的翻译请求确认服务不可用，应用会切换并保存为 **Gemma 4 · Managed**。只有确认适用的 Managed 密钥额度耗尽时，才选择 **Gemma 4 · OpenRouter**；没有密钥或额度未知时选择 Managed。简短提示中的免费 API“可能已结束”并非确认服务关闭。请按需完成所选连接的正常认证或设置。Index 仍可再次选择，保存的 Gemma 选择会一直保留，直到您主动更改。
 
 ### 如果无法捕获音频
 如果无法捕获音频，请在 **设置 > 常规** 中按以下步骤操作。
@@ -223,7 +227,7 @@ GPU 推理基于 Vulkan。无论是 Radeon 还是 Arc，都不受厂商限制。
 
 请根据您要使用的服务，参考对应指南操作。
 
-翻译用 LLM 建议通过 OpenRouter 使用 Gemma 4 模型。
+如需使用个人 API 密钥而非默认的免密钥 Index 连接，请选择 **Gemma 4 26B A4B + 31B** 和 **OpenRouter** 连接。
 
 如果方便的话，既然要设置，何不顺便把 ASR 也一起配置好呢？
 PuriPuly 与云端 STT 结合时能提供最佳体验。

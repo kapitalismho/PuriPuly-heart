@@ -28,7 +28,7 @@
 | `PuriPuly_PeerDstLang` | Peer target language | Int | 17 | Off | Off |
 | `PuriPuly_SelfASR` | Self ASR provider | Int | 0 | Off | Off |
 | `PuriPuly_PeerASR` | Peer ASR provider | Int | 0 | Off | Off |
-| `PuriPuly_Translator` | Translation model | Int | 0 | Off | Off |
+| `PuriPuly_Translator` | Translation model | Int | 16 | Off | Off |
 
 - Default: PuriPuly fresh runtime value
 - Saved: Off; PuriPuly owns persistence and republishes its current state
@@ -107,6 +107,8 @@
 | 13 | DeepSeek V4.1 Flash |
 | 14 | GPT 6 Luna |
 | 15 | Gemma 4 26B A4B QAT GPU (local, Vulkan only) |
+| 16 | Index-Translate 35B (public API, no key) |
 
 - Used by: `PuriPuly_Translator`
+- Selecting Index applies the same background availability check and persisted Gemma fallback as GUI and CLI controls. Existing model IDs retain their meaning.
 

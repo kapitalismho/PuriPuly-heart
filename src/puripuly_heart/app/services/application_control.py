@@ -447,6 +447,7 @@ class ApplicationControlOwner:
     localize: Callable[[str], str]
     gemma_selection: Callable[[AppSettingsVNext], ManagedGemmaTranslationSelection]
     instance_id: str | None = None
+    selection_committed: Callable[[AppSettingsVNext], None] | None = None
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _resource_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     _stop_requested: asyncio.Event = field(default_factory=asyncio.Event)
@@ -502,6 +503,8 @@ class ApplicationControlOwner:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     def _publish_committed(self, canonical: object) -> None:
+        if self.selection_committed is not None:
+            self.selection_committed(canonical)
         fingerprint = hashlib.sha256(
             json.dumps(canonical_snapshot_values(canonical), sort_keys=True, default=str).encode()
         ).hexdigest()
@@ -1496,6 +1499,7 @@ class ApplicationControlOwner:
                 or safe_capture_off
                 or safe_locale
                 or command == "secrets.verify"
+                or command == "translation.set"
                 else self._resource_lock
             )
             if resource_lock is not None:
@@ -1535,6 +1539,11 @@ class ApplicationControlOwner:
                         if not isinstance(arguments["text"], str) or not arguments["text"].strip():
                             raise InvalidArgumentsError("text must be non-empty")
                         deferred = ("text", arguments["text"])
+                    elif command == "translation.set":
+                        _validate_command_args(
+                            command, arguments, locale_choices=self.locale_choices
+                        )
+                        deferred = ("translation", arguments)
                     else:
                         result = await self._dispatch(command, arguments, operation_id=operation_id)
                     if self._lock_owner is asyncio.current_task():
@@ -1545,6 +1554,10 @@ class ApplicationControlOwner:
                             raise asyncio.CancelledError
                         if deferred[0] == "install":
                             result = await self._install_result(deferred[1])
+                        elif deferred[0] == "translation":
+                            result = await self._dispatch(
+                                command, deferred[1], operation_id=operation_id
+                            )
                         else:
                             result = self._text_admission_data(
                                 await self.application.submit_text(deferred[1])

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -608,9 +609,12 @@ class ProviderRuntimeApplyAdapter:
     plan: ProviderRuntimeApplyPlan
     surface: str = "translation_provider"
     operation: str = "apply_provider_runtime"
+    authority_guard: Callable[[], bool] | None = None
 
     async def apply_runtime(self, request: RuntimeApplyRequest) -> RuntimeApplyResult:
         _ = request
+        if self.authority_guard is not None and not self.authority_guard():
+            raise asyncio.CancelledError
         try:
             await self.owner.apply(self.settings, self.plan)
         except Exception as exc:

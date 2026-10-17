@@ -880,3 +880,73 @@ async def test_process_contains_provider_failure_and_publishes_safe_error() -> N
     assert result.output.failure_code == "provider_error"
     assert len(fixture.presentation.messages) == 1
     assert fixture.presentation.messages[0].runtime_log_handled is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("channel", ["self", "peer"])
+async def test_service_failure_hook_runs_after_provider_call_settles(channel) -> None:
+    from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
+
+    active = False
+    failure = IndexServiceUnavailableError("transport")
+
+    class Provider(RecordingProvider):
+        async def translate(self, **kwargs):
+            nonlocal active
+            active = True
+            try:
+                raise failure
+            finally:
+                active = False
+
+    fixture = build_owner(Provider())
+    observed = []
+
+    def settled(exception):
+        assert active is False
+        observed.append(exception)
+
+    fixture.owner.settled_failure_sink = settled
+    result = await fixture.owner.process(process_request(fixture, channel=channel))
+    assert result.outcome == "failed"
+    assert result.output.channel == channel
+    assert observed == [failure]
+
+
+@pytest.mark.asyncio
+async def test_cancelled_or_retired_request_does_not_notify_service_failure() -> None:
+    from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
+
+    failure = IndexServiceUnavailableError("transport")
+    fixture = build_owner(RecordingProvider(failure=failure))
+    observed = []
+    fixture.owner.settled_failure_sink = observed.append
+    result = await fixture.owner.process(
+        process_request(fixture), cancellation_requested=lambda: True
+    )
+    assert result.outcome == "failed"
+    assert observed == []
+
+    async def retire_while_presenting(_message):
+        await fixture.provider_runtime.replace_provider(
+            LlmTranslationBackend(RecordingProvider()), start=False
+        )
+
+    fixture.presentation.publish_ui = retire_while_presenting
+    result = await fixture.owner.process(process_request(fixture))
+    assert result.outcome == "failed"
+    assert observed == []
+
+
+@pytest.mark.asyncio
+async def test_speculative_direct_failure_does_not_authorize_fallback() -> None:
+    from puripuly_heart.core.llm.index_translate import IndexServiceUnavailableError
+
+    fixture = build_owner(RecordingProvider(failure=IndexServiceUnavailableError("timeout")))
+    observed = []
+    fixture.owner.settled_failure_sink = observed.append
+    with pytest.raises(IndexServiceUnavailableError):
+        await fixture.owner.translate(
+            DirectTranslationRequest(utterance_id=uuid4(), text="synthetic", record_latency=False)
+        )
+    assert observed == []

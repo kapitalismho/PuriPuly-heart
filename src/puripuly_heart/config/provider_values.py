@@ -143,6 +143,7 @@ def custom_stt_selection_for_provider(
 
 
 class LLMProviderName(str, Enum):
+    INDEX_TRANSLATE = "index_translate"
     GEMINI = "gemini"
     OPENAI = "openai"
     CHATGPT = "chatgpt"

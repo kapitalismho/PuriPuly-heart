@@ -190,6 +190,10 @@ class TranslationEnableOwner:
             return
         await self.teardown()
 
+    def disable_for_provider_transition(self) -> None:
+        self.runtime_sink(False)
+        self.dashboard_sink(False)
+
     def disable_for_managed_exhaustion(self, *, reopen_founder_letter: bool) -> None:
         self.record_intent(False)
         self.pending_sink(False)

@@ -24,6 +24,7 @@ from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
     OpenRouterPkceTarget,
     PromptApplyIntent,
+    TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_application import (
     UiApplicationFactoryPort,
@@ -1533,14 +1534,22 @@ class TranslatorApp:
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)
+        consume_immediate = getattr(
+            view_settings, "consume_immediate_provider_apply_settings", None
+        )
+        pending_intent = consume_immediate() if callable(consume_immediate) else None
+        focused_intent = pending_intent
         consume_http_extension_runtime_reload = getattr(
             view_settings,
             "consume_http_extension_runtime_reload",
             None,
         )
-        if callable(consume_http_extension_runtime_reload) and (
+        runtime_reload = (
             consume_http_extension_runtime_reload()
-        ):
+            if callable(consume_http_extension_runtime_reload)
+            else False
+        )
+        if pending_intent is None and runtime_reload:
 
             async def _runtime_only_task():
                 await self.application.apply_providers(
@@ -1551,12 +1560,13 @@ class TranslatorApp:
             self._queue_settings_mutation_task(_runtime_only_task)
             return
 
-        pending_intent = None
         build_provider_apply_settings = getattr(
             view_settings, "build_provider_apply_settings", None
         )
-        if callable(build_provider_apply_settings) and getattr(
-            view_settings, "has_provider_changes", False
+        if (
+            pending_intent is None
+            and callable(build_provider_apply_settings)
+            and getattr(view_settings, "has_provider_changes", False)
         ):
             pending_intent = build_provider_apply_settings()
         if pending_intent is not None:
@@ -1567,6 +1577,25 @@ class TranslatorApp:
                 await self.application.apply_providers()
                 return
             result = await self.application.apply_provider_intent(pending_intent)
+            if not result and focused_intent is not None:
+                committed = self.application.compatibility_settings()
+                selection_edit = next(
+                    (
+                        edit
+                        for edit in focused_intent.edits
+                        if isinstance(edit, TranslationSelectionEdit)
+                    ),
+                    None,
+                )
+                if (
+                    committed is not None
+                    and selection_edit is not None
+                    and committed.intent.translation.model == selection_edit.selection.model.value
+                    and committed.intent.translation.connection
+                    == selection_edit.selection.connection.value
+                ):
+                    view_settings.acknowledge_provider_apply_settings(focused_intent)
+                    self.application.refresh_settings_projection()
             if result:
                 view_settings.acknowledge_provider_apply_settings(pending_intent)
                 self.application.refresh_settings_projection()

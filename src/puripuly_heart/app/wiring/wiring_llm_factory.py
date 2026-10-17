@@ -46,6 +46,7 @@ from puripuly_heart.config.runtime_resolution import (
     PROVIDER_CHATGPT,
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
+    PROVIDER_INDEX_TRANSLATE,
     PROVIDER_LOCAL_LLM,
     PROVIDER_MANAGED_GEMMA,
     PROVIDER_OPENAI,
@@ -92,6 +93,7 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
+from puripuly_heart.providers.llm.index_translate import IndexTranslateProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
 from puripuly_heart.providers.llm.openai import OpenAILLMProvider
@@ -695,6 +697,9 @@ def _provider_from_resolved_target(
     include_selection_alias: bool = True,
     chatgpt_session: ChatGptAccessTokenPort | None = None,
 ) -> LLMProvider:
+    if target.provider == PROVIDER_INDEX_TRANSLATE:
+        return IndexTranslateProvider(model=target.model, runtime_logging=runtime_logging)
+
     if target.provider == PROVIDER_CHATGPT:
         if target.credential.reference != CREDENTIAL_REF_CHATGPT_OAUTH:
             raise ValueError("ChatGPT plan requires its OAuth credential")

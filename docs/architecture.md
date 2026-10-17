@@ -62,6 +62,7 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_runtime.py`         |
 | Managed local translation | Local model provisioning and runtime lifecycle | `app/services/managed_gemma_translation.py` and `core/local_translation/runtime.py` |
 | Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_turn.py`                 |
+| Index selection owner | Selection-scoped availability, fenced persisted Gemma transition | `app/services/index_selection.py`, `app/wiring/wiring_index_selection.py` |
 | Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/output.py`                              |
 | Overlay owners          | Overlay selection, process lifecycle, state, calibration   | `app/services/overlay/overlay_application.py`            |
 | Managed-account runtime | Authentication, entitlement, usage, credential release     | `app/wiring/wiring_managed_account.py`                      |
@@ -231,6 +232,10 @@ Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. B
   - `TranslationRequestOwner` owns request preparation and provider authority.
   - Runtime owners manage provider replacement.
   - Managed local Gemma stays behind the same `LLMProvider` boundary.
+  - `IndexSelectionOwner` owns one public-API availability task/result per applied Index selection. Shared activation joins that work before authentication; background work never enables capture or starts authentication.
+  - Index service failure is classified only after the logical translation settles. The application owner, not the failing provider, observes the applicable Gemma Managed credential and commits a fenced focused selection change through normal settings/provider ownership. Unknown allowance is not exhaustion.
+  - Selection identity and shutdown fence late probe results and transition notifications. Provider adapters remain responsible only for transport, response validation and owned-client cleanup; unrelated Settings drafts remain presentation-owned.
+  - Index's shared activation result has a bounded deadline. Cancelled blocking work remains owned and drains separately; cleanup may outlive that deadline. A settings write already admitted to atomic persistence may complete, but a post-commit authority guard prevents stale runtime application, toast or enablement and retains the existing committed/interrupted recovery outcome.
 - **Channel ordering**
   - Self and Peer have separate channel admission while sharing provider capacity.
   - Peer execution may be concurrent. Context preparation and publication preserve admitted order.

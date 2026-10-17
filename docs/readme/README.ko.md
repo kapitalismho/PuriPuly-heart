@@ -212,11 +212,15 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 1. [다운로드 페이지](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)에서 최신 버전 다운로드
 2. PuriPuly 설치
 3. **TALK** 버튼 클릭
-4. **TRANS** 버튼 클릭 후 디스코드 인증
+4. **TRANS** 버튼 클릭. 신규 설치는 API 키가 필요 없는 **Index-Translate 35B · 공개 API**를 사용해요.
 5. **CAPTIONS** 버튼을 눌러 자막 켜기
 6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.
 7. VRChat에서 OSC 활성화: Action menu → Settings → OSC → Enable
+
+모든 UI 언어에서 신규 설치의 기본 번역 모델은 Index이며, 업그레이드에서는 기존 선택을 유지해요. Index를 선택하거나 선택된 상태로 앱을 시작하면 합성 문장으로 백그라운드 검사를 한 번 수행하고, TRANS는 성공한 결과를 재사용해요. 번역할 원문과 문맥은 Bilibili의 공개 API로 전송되며, 무료 제공이 계속된다고 보장하지는 않아요.
+
+검사 또는 완료된 번역 요청에서 서비스 이용 불가가 확인되면 **Gemma 4 · Managed**로 선택을 변경하고 저장해요. 해당 관리형 키의 잔여량 소진이 확인된 경우에만 **Gemma 4 · OpenRouter**로 전환하며, 키가 없거나 잔여량을 알 수 없으면 Managed를 선택해요. 짧은 알림의 “무료 API가 종료되었을 수 있다”는 표현은 서비스 종료 확정이 아니에요. 필요하면 선택된 연결의 기존 인증·설정 절차를 완료해주세요. Index는 계속 선택할 수 있으며, 저장된 Gemma 선택은 직접 변경할 때까지 유지돼요.
 
 ### 오디오 캡쳐가 되지 않는다면
 
@@ -242,7 +246,7 @@ Soniox/Gemini/Deepgram이 차단된 지역이라면 아래와 같은 조합으�
 
 사용하려는 서비스에 따라 알맞은 가이드를 보고 따라해주세요.
 
-번역용 LLM은 Openrouter를 통해서 Gemma 4 모델을 사용하는 것을 추천해요.
+기본 Index 연결 대신 개인 API 키를 사용하려면 **Gemma 4 26B A4B + 31B**와 **OpenRouter** 연결을 선택해주세요.
 
 혹시 이왕 설정하는 김에 ASR 쪽도 같이 설정하면 어떨까요?
 PuriPuly는 클라우드 ASR와 결합했을 때 최상의 경험을 제공해요.
