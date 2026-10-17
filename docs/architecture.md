@@ -248,18 +248,12 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 
 ### Progressive Self turns
 
-- `SelfTranslationChannelOwner` owns recognized source contributions, acoustic continuation obligations, grace/watchdogs, and source closure. Continuation obligations exist independently of a publication buffer and settle only through their matching source lifecycle.
-  - Recoverable capture discontinuities forward exact source-cancellation receipts from the existing audio ledger through the capture sink. They settle only the matching acoustic obligation, not provider/native cleanup or recognition-request terminality. Destructive shutdown does not use this recovery path.
-  - PCM-input release alone does not settle scoped speech. Independent recognition input carries producer-authored route provenance so its input retirement can bypass merge bookkeeping without pretending recognition has finished.
-- `TranslationTurnLifecycleOwner` owns translation work from the first eligible source revision through final completion. Closing source preserves compatible running primary/secondary work; it does not cancel and reissue the request.
-- Source closure, recognition-request terminality, translation completion, and destination completion are separate facts. An early published prefix does not consume the remainder of an open recognition request.
-- Draft request preparation snapshots context without adding speculative source to accepted context. Ordered canonical admission remembers source once. Adopted work retains the preparation metadata that actually produced its result.
-- Draft work, canonical speech parents, and physical provider occupancy retain separate bounded accounting. Logical cancellation or source closure does not release a still-running provider permit.
-  - Once failed speculative work and its cleanup have physically finished, any required canonical fallback enters ordinary bounded waiting under the original source-close admission deadline. Live work retains its separate occupancy; completed failure does not gain an indefinite waiting exemption.
-- `SelfTurnPresentation` carries a stable turn identity, ordered revisions, source closure, and target-specific result/status information. It projects authoritative work state rather than reading the overlay's sticky display cache.
+- `SelfTranslationChannelOwner` owns source reconciliation, acoustic continuation, grace, and source closure independently of translation completion.
+- `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests when source closes.
+- Speculative context is not accepted history. Canonical source is admitted once; logical cancellation does not release occupied provider capacity.
+- `SelfTurnPresentation` carries authoritative turn identity, revisions, and per-target status independently of overlay display state.
 
 Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestrator/translation_turn.py`, `domain/events.py`. Behavior: `tests/core/test_self_stream_233.py`.
-
 
 ### Managed local translation
 
@@ -312,18 +306,12 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
   - Publication/turn identities and explicitly admitted operation/request identities cross each destination boundary unchanged.
   - Optional observer failure is separate delivery-health evidence, not a new translation failure.
 - **Progressive Self publication**
-  - Valid speculative translations can reach the chatbox before source closure, independently of overlay enablement.
-  - Within one turn, obsolete unsent snapshots can be replaced. Separate speech units remain distinct even when their text repeats.
-  - A newer speculative speech packet waits for an older required sealed-source result's normal emission opportunity or explicit terminal disposition. This destination-local guard does not delay successor translation execution.
-  - Manual bypass and existing pagination supersession remain separate policy. The guard neither creates global speech/manual FIFO nor guarantees every page is transmitted.
-  - Final promotion reuses an identical successfully emitted compatible payload without another packet or restarting its page cursor. Queue acceptance and failed sends do not establish that prior emission.
-  - Chatbox eligibility is independent of which turn is currently visible in the overlay or dashboard. Local first-page transmission is observable; remote receipt and physical display require separate evidence.
+  - Chatbox updates are independent of the overlay; newer revisions can replace unsent updates within the same turn.
+  - Earlier required corrections retain a sending opportunity without blocking successor translation. Manual bypass and normal pagination supersession remain.
+  - Identical successfully sent compatible previews are promoted to final without resending or restarting pagination.
 - **Application turn presentation**
-  - Dashboard and conversation views update provisional turns by identity and revision. Shared SELF presentation authority covers both speech and manual turns; an old result can update its retained conversation row without replacing the current dashboard turn.
-  - Current-slot authority is checked when a queued event is consumed. A newly published legacy source claims its parent before translation admission; its own admission preserves that claim. An explicitly parented child does not claim a fresh slot. Older source events and completions cannot retake the slot, including while local overlay publication is pending.
-  - Same-text final promotion changes status without creating another row. A valid current-source target remains visible if another target fails; conversation rows identify each target and distinguish its successful completion from the aggregate failure. Cancellation and expiry retain their terminal disposition.
-  - Legacy source and translation setters clear managed-turn status independently, so a timed-out source delivery cannot leave an unrelated status attached to its later valid translation.
-  - Preview rendering does not create accepted conversation records or context entries. Accepted logging remains final-only with its original child identities; existing parent/target metadata correlates those records with provisional conversation rows.
+  - Views update turns by identity, revision, and target status. Older results may update their history without replacing the current dashboard turn.
+  - Preview rendering is separate from final-only accepted logging and context admission.
 - **OSC recovery**
   - OSC owners retain a failed publication obligation until actual local sends complete it.
   - An empty or unrelated delta and old cache equality cannot establish recovery.
