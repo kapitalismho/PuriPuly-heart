@@ -24,7 +24,6 @@ from puripuly_heart.app.services.gpu_provider_recovery import (
 )
 from puripuly_heart.app.services.gpu_provider_recovery_application import (
     GpuProviderRecoveryApplicationOwner,
-    GpuProviderRecoveryAsyncEffect,
     GpuProviderRecoveryFailureSink,
     GpuProviderRecoveryPeerOwnerProvider,
     GpuProviderRecoveryPendingClear,
@@ -200,9 +199,6 @@ def create_gpu_provider_recovery_application_owner(
     self_owner_factory: GpuProviderRecoverySelfOwnerFactory,
     peer_owner_provider: GpuProviderRecoveryPeerOwnerProvider,
     self_state_sink: GpuProviderRecoverySelfStateSink,
-    ensure_self_switch: GpuProviderRecoveryAsyncEffect,
-    refresh_self: GpuProviderRecoveryAsyncEffect,
-    refresh_peer: GpuProviderRecoveryAsyncEffect,
     diagnostic_sink: GpuProviderRecoveryDiagnosticSink,
 ) -> GpuProviderRecoveryApplicationOwner:
     return GpuProviderRecoveryApplicationOwner(
@@ -218,9 +214,6 @@ def create_gpu_provider_recovery_application_owner(
         self_owner_factory=self_owner_factory,
         peer_owner_provider=peer_owner_provider,
         self_state_sink=self_state_sink,
-        ensure_self_switch=ensure_self_switch,
-        refresh_self=refresh_self,
-        refresh_peer=refresh_peer,
     )
 
 

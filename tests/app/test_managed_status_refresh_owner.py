@@ -7,7 +7,7 @@ from puripuly_heart.app.services.managed_status_refresh import ManagedStatusRefr
 
 
 @pytest.mark.asyncio
-async def test_owner_names_both_refresh_kinds_and_cancels_them_on_close() -> None:
+async def test_owner_cancels_all_usage_refresh_work_on_close() -> None:
     entered = 0
     both_entered = asyncio.Event()
     cancelled: list[str] = []
@@ -25,15 +25,13 @@ async def test_owner_names_both_refresh_kinds_and_cancels_them_on_close() -> Non
 
     owner = ManagedStatusRefreshOwner()
 
-    assert owner.schedule_status_refresh(lambda: blocked("status")) is True
-    assert owner.schedule_trial_usage_refresh(lambda: blocked("trial_usage")) is True
+    assert owner.schedule_trial_usage_refresh(lambda: blocked("first")) is True
+    assert owner.schedule_trial_usage_refresh(lambda: blocked("second")) is True
     await both_entered.wait()
-
-    assert owner.active_task_names == ("status-1", "trial_usage-2")
 
     await owner.close()
 
-    assert sorted(cancelled) == ["status", "trial_usage"]
+    assert sorted(cancelled) == ["first", "second"]
     assert owner.active_task_names == ()
 
 
@@ -53,7 +51,7 @@ async def test_owner_contains_refresh_failure_and_reports_diagnostics() -> None:
         )
     )
 
-    assert owner.schedule_status_refresh(fail) is True
+    assert owner.schedule_trial_usage_refresh(fail) is True
     await failed.wait()
     for _ in range(20):
         if diagnostics and not owner.active_task_names:
@@ -63,7 +61,7 @@ async def test_owner_contains_refresh_failure_and_reports_diagnostics() -> None:
     assert diagnostics == [
         (
             "managed_status_refresh_failed",
-            {"kind": "status", "error_type": "RuntimeError"},
+            {"kind": "trial_usage", "error_type": "RuntimeError"},
             error,
         )
     ]
@@ -109,7 +107,7 @@ async def test_refresh_keeps_admission_identity_and_secondary_notification_cause
 
     owner = ManagedStatusRefreshOwner(diagnostics_sink=fail_notification)
     with diagnostic_operation(instance_id, operation_id, request_id):
-        assert owner.schedule_status_refresh(fail)
+        assert owner.schedule_trial_usage_refresh(fail)
     await finished.wait()
     await asyncio.sleep(0)
     await owner.close()

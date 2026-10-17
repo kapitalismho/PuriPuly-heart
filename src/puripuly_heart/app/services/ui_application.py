@@ -759,6 +759,8 @@ class UiApplicationBoundary:
         return self._peer_capture.overlay_peer_presentation_state()
 
     def dashboard_managed_auth_action(self) -> str:
+        if self._managed_auth_runtime.external_task_names:
+            return "in_progress"
         return str(self._managed.dashboard_managed_auth_action())
 
     def dashboard_managed_auth_prompt_kind(self) -> str:
@@ -770,6 +772,9 @@ class UiApplicationBoundary:
             return "failed"
         kind = accessor()
         return kind if isinstance(kind, str) else "failed"
+
+    def managed_auth_last_message_key(self) -> str | None:
+        return self._managed.managed_auth_last_message_key()
 
     async def apply_telemetry_enabled(self, enabled: bool) -> Any | None:
         return await self._settings.apply_telemetry_enabled(enabled)
@@ -1050,6 +1055,8 @@ class UiApplicationBoundary:
         task_name: str,
         generation: int,
     ) -> object:
+        if self.dashboard_managed_auth_action() == "in_progress":
+            raise RuntimeError("Managed authentication is already in progress")
         return self._managed_auth_runtime.start_external_task(
             task_runner=task_runner,
             task_factory=task_factory,

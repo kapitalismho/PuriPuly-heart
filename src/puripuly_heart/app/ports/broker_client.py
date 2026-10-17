@@ -48,9 +48,6 @@ class BrokerIssueResult:
     managed_credential_ref: str | None = None
     expires_at: str | None = None
     openrouter_user_id: str | None = None
-    referral_id: str | None = None
-    referral_bonus_applied: bool = False
-    pass_status: object | None = field(default=None, repr=False)
     delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
     unknown_outcome: bool = False
 
@@ -77,11 +74,6 @@ class ManagedKeyDeliveryAckResult:
     status: str
     message: UserMessageRef | None = None
     diagnostics: ErrorDiagnostics | None = None
-    referral_bonus_applied: bool = False
-    referral_id: str | None = None
-    pass_status: object | None = field(default=None, repr=False)
-    referral_status: str | None = None
-    referral_settlement: str | None = None
 
 
 QqManagedAssertionFailureSubcode = Literal[
@@ -100,7 +92,6 @@ class QqManagedAssertionRequest:
     credential: str = field(repr=False)
     asserted_at: str
     metadata: Mapping[str, DiagnosticFieldValue]
-    referral_id: str | None = None
     installation_id: str | None = None
     operation_id: str | None = None
     resume_token: str | None = field(default=None, repr=False)
@@ -126,23 +117,7 @@ class QqManagedAssertionResult:
     retry_after_ms: int | None
     message: UserMessageRef | None
     diagnostics: ErrorDiagnostics | None
-    referral_bonus_applied: bool = False
-    referral_id: str | None = None
-    pass_status: object | None = field(default=None, repr=False)
     delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
-
-
-@dataclass(frozen=True, slots=True)
-class QqManagedStatusRequest:
-    qq_identity: str = field(repr=False)
-    credential: str = field(repr=False)
-    installation_id: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class QqManagedStatusResult:
-    referral_id: str | None
-    pass_status: object | None = field(default=None, repr=False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,12 +133,6 @@ class ManagedOperationDeliverySnapshot:
     delivery_id: str | None = None
     status: str | None = None
     expires_at: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ManagedOperationReferralSnapshot:
-    status: str | None = None
-    settlement: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -191,16 +160,12 @@ class ManagedOperationStatusResult:
     diagnostics: ErrorDiagnostics | None = None
     attempt: ManagedOperationAttemptSnapshot | None = None
     delivery: ManagedOperationDeliverySnapshot | None = None
-    referral: ManagedOperationReferralSnapshot | None = None
     failed_reason: str | None = None
     qq_subject_ref: str | None = None
     managed_secret_key: str | None = field(default=None, repr=False)
     managed_credential_ref: str | None = None
     expires_at: str | None = None
     openrouter_user_id: str | None = None
-    referral_id: str | None = None
-    referral_bonus_applied: bool = False
-    pass_status: object | None = field(default=None, repr=False)
     delivery_ack: ManagedKeyDeliveryAckMetadata | None = field(default=None, repr=False)
 
 
@@ -214,11 +179,6 @@ class BrokerClientPort(Protocol):
         self,
         request: QqManagedAssertionRequest,
     ) -> QqManagedAssertionResult: ...
-
-    async def get_qq_managed_status(
-        self,
-        request: QqManagedStatusRequest,
-    ) -> QqManagedStatusResult: ...
 
     async def acknowledge_managed_key_delivery(
         self,
@@ -245,7 +205,6 @@ __all__ = [
     "ManagedKeyDeliveryAckResult",
     "ManagedOperationAttemptSnapshot",
     "ManagedOperationDeliverySnapshot",
-    "ManagedOperationReferralSnapshot",
     "ManagedOperationResumeRequest",
     "ManagedOperationStatusRequest",
     "ManagedOperationStatusResult",
@@ -253,6 +212,4 @@ __all__ = [
     "QqManagedAssertionRequest",
     "QqManagedAssertionResult",
     "QqManagedEntitlementSnapshot",
-    "QqManagedStatusRequest",
-    "QqManagedStatusResult",
 ]

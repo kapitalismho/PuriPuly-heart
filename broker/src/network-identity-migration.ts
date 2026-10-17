@@ -14,12 +14,7 @@ export const NETWORK_IDENTITY_WINDOW_CONFIG_PATHS = [
   'openrouterIssue',
   'trialStatus',
   'qqAuthAssertIp',
-  'qqAuthStatusIp',
   'pendingDiscordOAuthSessions',
-  'referralAttempts.validShaped',
-  'referralAttempts.unknown',
-  'referralAttempts.perReferralIdVelocity',
-  'referralAttempts.perReferrerRewardVelocity',
   'managedOperationStatusIp',
   'managedOperationStatusInstallation',
   'managedOperationResumeIp',
@@ -74,7 +69,6 @@ export interface NetworkIdentityBackfillResult {
   mode: NetworkIdentityWriteMode;
   requestEventsBackfilled: number;
   pendingRequestEvents: number;
-  pendingReferralEvents: number;
   hooksConverted: number;
   pendingHooks: number;
   unparseableHooks: number;
@@ -130,7 +124,7 @@ export async function runNetworkIdentityBackfill(
   const rawHooks = await countActiveRawHooks(db);
   const mode = await resolveNetworkIdentityWriteMode(db);
   if (mode !== 'dual' || !secrets) {
-    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, pendingReferralEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized: mode === 'keyed' && rawHooks.count === 0 };
+    return { mode, requestEventsBackfilled: 0, pendingRequestEvents: 0, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized: mode === 'keyed' && rawHooks.count === 0 };
   }
   const maxWindowMinutes = await resolveNetworkIdentityMaxWindowMinutes(db);
   const windowStartIso = new Date(now.getTime() - maxWindowMinutes * 60_000).toISOString();
@@ -170,12 +164,11 @@ export async function runNetworkIdentityBackfill(
     backfilled += Number(updated.meta.changes ?? 0);
   }
   const pendingRequestEvents = await countPendingLegacyRequestEvents(db, windowStartIso);
-  const pendingReferralEvents = await countPendingLegacyReferralEvents(db, windowStartIso);
   let finalized = false;
-  if (pendingRequestEvents === 0 && pendingReferralEvents === 0 && hooks.pending === 0 && rawHooks.count === 0) {
+  if (pendingRequestEvents === 0 && hooks.pending === 0 && rawHooks.count === 0) {
     finalized = await finalizeNetworkIdentityMigration(db, now);
   }
-  return { mode, requestEventsBackfilled: backfilled, pendingRequestEvents, pendingReferralEvents, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized };
+  return { mode, requestEventsBackfilled: backfilled, pendingRequestEvents, hooksConverted: hooks.converted, pendingHooks: hooks.pending, unparseableHooks: hooks.unparseable, rawHooks: rawHooks.count, rawHookSampleIds: rawHooks.sampleIds, finalized };
 }
 
 export async function runNetworkIdentityHookBackfill(
@@ -253,23 +246,11 @@ async function countPendingLegacyRequestEvents(db: D1Database, windowStartIso: s
     .catch(() => ({ count: 0 }));
   return Number(row?.count ?? 0);
 }
-async function countPendingLegacyReferralEvents(db: D1Database, windowStartIso: string): Promise<number> {
-  const row = await db
-    .prepare(
-      `SELECT COUNT(*) AS count FROM referral_rewards
-        WHERE attempt_ip_hash IS NOT NULL AND attempt_ip_digest IS NULL AND created_at >= ?`,
-    )
-    .bind(windowStartIso)
-    .first<{ count: number }>()
-    .catch(() => ({ count: 0 }));
-  return Number(row?.count ?? 0);
-}
 async function countForbiddenLegacyValues(db: D1Database): Promise<number> {
   const queries = [
     `SELECT COUNT(*) AS count FROM broker_request_events WHERE ip IS NOT NULL`,
     `SELECT COUNT(*) AS count FROM broker_request_events WHERE ip_digest IS NULL AND ip_epoch = '${UNPARSEABLE_IP_EPOCH_SENTINEL}'`,
     `SELECT COUNT(*) AS count FROM broker_issue_success_events WHERE ip_hash IS NOT NULL OR ip_prefix_hash IS NOT NULL`,
-    `SELECT COUNT(*) AS count FROM referral_rewards WHERE attempt_ip_hash IS NOT NULL`,
   ];
   let total = 0;
   for (const sql of queries) {
@@ -307,9 +288,6 @@ export async function finalizeNetworkIdentityMigration(db: D1Database, now: Date
       .run();
     await db
       .prepare(`UPDATE broker_issue_success_events SET ip_hash = NULL, ip_prefix_hash = NULL WHERE ip_hash IS NOT NULL OR ip_prefix_hash IS NOT NULL`)
-      .run();
-    await db
-      .prepare(`UPDATE referral_rewards SET attempt_ip_hash = NULL WHERE attempt_ip_hash IS NOT NULL`)
       .run();
   } catch {
     return false;

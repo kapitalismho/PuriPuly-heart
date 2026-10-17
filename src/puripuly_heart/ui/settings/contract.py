@@ -122,9 +122,6 @@ class SettingsProviderStateSink(Protocol):
         *,
         visible: bool,
         remaining_percent: int | None = None,
-        referral_id: str | None = None,
-        pass_status: object | None = None,
-        remember_referral_id: bool = True,
     ) -> None: ...
 
     def set_managed_trial_usage_state(

@@ -419,32 +419,11 @@ class FletUiPresentationAdapter:
         *,
         visible: bool,
         remaining_percent: int | None,
-        referral_id: str | None,
-        pass_status: object | None,
     ) -> None:
         settings_view = getattr(self._app, "view_settings", None)
         setter = getattr(settings_view, "set_managed_key_state", None)
         if callable(setter):
-            try:
-                inspect.signature(setter).bind(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=referral_id,
-                    pass_status=pass_status,
-                )
-            except TypeError, ValueError:
-                setter(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=referral_id,
-                )
-            else:
-                setter(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=referral_id,
-                    pass_status=pass_status,
-                )
+            setter(visible=visible, remaining_percent=remaining_percent)
             return
         usage_setter = getattr(settings_view, "set_managed_trial_usage_state", None)
         if callable(usage_setter):

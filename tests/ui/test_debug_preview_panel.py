@@ -28,7 +28,6 @@ PRIMARY_ACTION_KEYS = [
     "founder_letter",
     "local_qwen_hallucination_modal",
     "github_star_snackbar",
-    "talk_together_pass_invite_progress",
     "foundation_primitives",
     "http_extension_form",
 ]

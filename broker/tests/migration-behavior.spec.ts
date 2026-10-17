@@ -65,7 +65,6 @@ describe('broker migration behavior', () => {
         'abuse_runtime_state',
         'fingerprint_salt',
         'network_identity_migration',
-        'qq_talk_together_pass',
       ]);
       expect(rows.map(({ value }) => JSON.parse(value))).toEqual([
         {
@@ -74,12 +73,6 @@ describe('broker migration behavior', () => {
             endpoint: 'POST /v1/telemetry/translation-success-day',
             scope: 'ip',
             maxRequests: 60,
-            windowMinutes: 15,
-          },
-          qqAuthStatusIp: {
-            endpoint: 'POST /v1/auth/qq/status',
-            scope: 'ip',
-            maxRequests: 30,
             windowMinutes: 15,
           },
           immediateAlerts: {
@@ -125,12 +118,6 @@ describe('broker migration behavior', () => {
         {
           phase: 'keyed_only',
           purged_at: 'finalized',
-        },
-        {
-          enabled: false,
-          rewards_enabled: false,
-          daily_warning_count: 30,
-          daily_max_count: 50,
         },
       ]);
 

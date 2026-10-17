@@ -230,6 +230,10 @@ class UiApplicationRuntimeStub:
         prompt = getattr(self._backend, "dashboard_managed_auth_prompt_kind", None)
         return str(prompt()) if callable(prompt) else "discord"
 
+    def managed_auth_last_message_key(self) -> str | None:
+        accessor = getattr(self._backend, "managed_auth_last_message_key", None)
+        return accessor() if callable(accessor) else None
+
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
         apply = getattr(self._backend, "apply_telemetry_enabled", None)
         return await apply(enabled) if callable(apply) else None
@@ -356,17 +360,6 @@ class UiApplicationStateRuntimeStub:
     @property
     def desktop_overlay_captions_locked(self) -> bool:
         return bool(getattr(self._backend, "desktop_overlay_captions_locked", False))
-
-    @property
-    def managed_auth_referral_bonus_applied(self) -> bool:
-        return (
-            getattr(
-                self._backend,
-                "last_discord_managed_auth_referral_bonus_applied",
-                False,
-            )
-            is True
-        )
 
     @property
     def overlay_calibration(self) -> object:

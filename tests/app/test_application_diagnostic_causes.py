@@ -533,7 +533,7 @@ async def test_existing_account_flow_respects_no_browser_and_preserves_notificat
 
 
 @pytest.mark.asyncio
-async def test_settings_resync_and_memory_restore_preserve_save_primary(monkeypatch):
+async def test_settings_resync_and_memory_restore_preserve_save_primary(tmp_path, monkeypatch):
     from puripuly_heart.app.services.settings.settings_application import SettingsApplicationOwner
     from puripuly_heart.app.services.settings.settings_transaction_result import (
         SettingsTransactionResultOwner,
@@ -556,10 +556,22 @@ async def test_settings_resync_and_memory_restore_preserve_save_primary(monkeypa
             raise PermissionError(errno.EACCES, FORBIDDEN)
 
     async def fail_apply(self, settings, **kwargs):
+        assert settings.intent.ui.locale == "ja"
         raise TypeError(FORBIDDEN)
+
+    current = AppSettingsVNext()
+    current = replace(
+        current, intent=replace(current.intent, ui=replace(current.intent.ui, locale="ja"))
+    )
+    path = tmp_path / "settings.json"
+    persistence = SettingsVNextCanonicalPersistenceAdapter()
+    persistence.persist(path, current)
+    settings = SettingsOwner(path, persistence)
+    settings.start()
 
     monkeypatch.setattr(SettingsApplicationOwner, "apply_direct", fail_apply)
     owner = SettingsApplicationOwner.__new__(SettingsApplicationOwner)
+    owner.settings = settings
     owner.runtime_effects = SimpleNamespace(restore_memory=restore)
     owner.results = SettingsTransactionResultOwner()
     await owner._resync_committed_runtime(
@@ -576,6 +588,8 @@ async def test_settings_resync_and_memory_restore_preserve_save_primary(monkeypa
     assert resync.fields["exception_class"] == "TypeError"
     assert memory.cause_id == resync.diagnostic_id
     assert memory.fields["errno"] == errno.EACCES
+    assert restores == [settings.require_committed(), settings.require_committed()]
+    assert persistence.load_active(path).canonical_settings.intent.ui.locale == "ja"
     assert FORBIDDEN not in repr(result)
 
 

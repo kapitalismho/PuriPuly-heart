@@ -104,12 +104,28 @@ class SelfCaptureApplicationOwner:
         return snapshot
 
     async def replace_provider(self, *, smooth_local: bool = False) -> None:
-        owner = self.capture_owner_if_created()
         settings = self.settings_provider()
         if settings is None or not self.runtime_available():
             return
+        await self._replace_provider(
+            settings.config, smooth_local=smooth_local, allow_superseded=True
+        )
+
+    async def replace_provider_with_config(
+        self, config: SelfCaptureSessionConfig, *, smooth_local: bool = False
+    ) -> None:
+        if not self.runtime_available():
+            return
+        await self._replace_provider(config, smooth_local=smooth_local, allow_superseded=False)
+
+    async def _replace_provider(
+        self,
+        config: SelfCaptureSessionConfig,
+        *,
+        smooth_local: bool,
+        allow_superseded: bool,
+    ) -> None:
         owner = self.capture_owner()
-        config = settings.config
         if owner.snapshot.desired_active:
             snapshot = await owner.apply_intent(
                 config,
@@ -125,7 +141,11 @@ class SelfCaptureApplicationOwner:
         failure_reason = snapshot.failure_reason
         signature_mismatch = snapshot.runtime_signature != config.runtime_signature
         if failure_reason is not None or signature_mismatch:
-            required = signature_mismatch and self._replacement_required(config, snapshot)
+            required = signature_mismatch and (
+                self._replacement_required(config, snapshot)
+                if allow_superseded
+                else snapshot.desired_active
+            )
             self.log_basic(
                 "[STT] Provider replacement not applied: "
                 f"failure_reason={failure_reason.value if failure_reason is not None else 'none'} "

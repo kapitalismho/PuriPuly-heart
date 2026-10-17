@@ -252,20 +252,15 @@ class UiManagedRuntimeAdapter:
         return await self.managed.auth.start_qq(
             qq_identity=str(kwargs.get("qq_identity", "")),
             credential=str(kwargs.get("credential", "")),
-            referral_id=(
-                str(kwargs["referral_id"]) if kwargs.get("referral_id") is not None else None
-            ),
         )
 
     async def start_discord_managed_auth_from_dialog(self, **kwargs: object) -> object:
         callback = kwargs.get("on_callback_received")
         recovery_hook = kwargs.get("on_recovery_started")
-        referral_id = kwargs.get("referral_id")
         url_sink = kwargs.get("authorization_url_sink")
         return await self.managed.auth.start_discord(
             on_callback_received=callback if callable(callback) else None,
             on_recovery_started=recovery_hook if callable(recovery_hook) else None,
-            referral_id=str(referral_id) if referral_id is not None else None,
             authorization_url_sink=url_sink if callable(url_sink) else None,
             open_browser=kwargs.get("open_browser", True) is True,
         )
@@ -276,6 +271,9 @@ class UiManagedRuntimeAdapter:
     def managed_auth_last_failure_kind(self) -> str:
         kind = getattr(self.managed.auth, "last_failure_kind", "failed")
         return kind if isinstance(kind, str) else "failed"
+
+    def managed_auth_last_message_key(self) -> str | None:
+        return self.managed.auth.last_message_key
 
     def clear_managed_auth_pending_state(self) -> None:
         self.managed.auth.clear_pending()

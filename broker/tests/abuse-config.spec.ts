@@ -298,37 +298,6 @@ describe('broker abuse-controls runtime config validation', () => {
     );
   });
 
-  it('seeds referral attempt, velocity, and retention defaults', async () => {
-    const env = createTestBrokerEnv();
-    const controls = await getBrokerAbuseControlsConfig(env.BROKER_DB);
-
-    expect(controls.retention).toEqual(
-      expect.objectContaining({
-        referralSkippedDays: 7,
-        referralFailedDays: 30,
-      }),
-    );
-    expect(controls.referralAttempts).toEqual({
-      validShaped: {
-        maxPerInstallation: 8,
-        maxPerIp: 30,
-        windowMinutes: 15,
-      },
-      unknown: {
-        maxPerInstallation: 3,
-        maxPerIp: 10,
-        windowMinutes: 15,
-      },
-      perReferralIdVelocity: {
-        maxAttempts: 25,
-        windowMinutes: 60,
-      },
-      perReferrerRewardVelocity: {
-        maxRewards: 5,
-        windowMinutes: 1440,
-      },
-    });
-  });
 
   it('normalizes issue-success retention to the completed-day report minimum', async () => {
     const env = createTestBrokerEnv();

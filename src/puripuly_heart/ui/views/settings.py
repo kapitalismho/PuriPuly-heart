@@ -16,7 +16,6 @@ from typing import Awaitable, Callable, Mapping
 
 import flet as ft
 from puripuly_heart.app.services.local_asr_selection import resolve_local_asr_selection
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretKey,
@@ -48,7 +47,6 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     LocalLlmExtraBodyEdit,
     LocalLlmModelEdit,
-    ManagedReferralEdit,
     OpenRouterPkceTarget,
     OscConnectionSettingsIntent,
     OverlayCalibrationSettingsIntent,
@@ -112,7 +110,6 @@ from puripuly_heart.config.provider_values import (
     is_qwen_cloud_stt_provider,
     normalize_cloud_free_tier_providers,
     normalize_local_llm_base_url,
-    normalize_owned_referral_id,
     parse_openrouter_llm_model,
 )
 from puripuly_heart.config.resolved import (
@@ -211,7 +208,6 @@ _DRAFT_PROVIDER_FIELDS: dict[type, str] = {
     CustomSttEndpointEdit: "custom_stt_endpoint",
     CustomSttModelEdit: "custom_stt_model",
     CustomSttExtraEdit: "custom_stt_extra_json",
-    ManagedReferralEdit: "managed_referral_id",
     TranslationSelectionEdit: "translation",
 }
 _DRAFT_TRANSLATION_FIELDS: dict[type, str] = {
@@ -524,8 +520,6 @@ class SettingsView(ft.Column):
         self._overlay_calibration_session_active = False
         self._managed_trial_usage_visible = False
         self._managed_trial_usage_remaining_percent: int | None = None
-        self._managed_key_referral_id: str | None = None
-        self._managed_key_pass_status: TalkTogetherPassStatus | None = None
         self._overlay_peer_contract: OverlayPeerConsumerContract | None = None
         self._gpu_devices: tuple[GpuDeviceOption, ...] = ()
         self._llm_gpu_devices: tuple[GpuDeviceOption, ...] = ()
@@ -1304,63 +1298,12 @@ class SettingsView(ft.Column):
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._managed_key_referral_id_label = ft.Text(
-            t("settings.managed_key.referral_id.label"),
-            size=16,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._managed_key_referral_id_value = ft.Text(
-            t("settings.managed_key.referral_id.empty"),
-            size=22,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-            selectable=True,
-        )
-        self._managed_key_invite_progress_label = ft.Text(
-            t("settings.managed_key.invite_progress.label"),
-            size=16,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._managed_key_invite_progress_value = ft.Text(
-            "",
-            size=20,
-            weight=ft.FontWeight.BOLD,
-            color=COLOR_ON_BACKGROUND,
-        )
-        self._managed_key_invite_progress_row = ft.Row(
-            [
-                self._managed_key_invite_progress_label,
-                ft.Container(expand=True),
-                self._managed_key_invite_progress_value,
-            ],
-            spacing=8,
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-            visible=False,
-        )
         self._managed_key_card = self._wrap_card(
             ft.Column(
                 [
                     self._managed_key_title,
                     ft.Container(height=4),
                     self._managed_trial_usage_bar,
-                    ft.Container(height=8),
-                    ft.Column(
-                        [
-                            ft.Row(
-                                [
-                                    self._managed_key_referral_id_label,
-                                    ft.Container(expand=True),
-                                    self._managed_key_referral_id_value,
-                                ],
-                                spacing=8,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            self._managed_key_invite_progress_row,
-                        ],
-                        spacing=4,
-                    ),
                 ],
                 spacing=0,
             ),
@@ -3326,78 +3269,6 @@ class SettingsView(ft.Column):
     ) -> bool:
         return self._is_managed_translation_connection_selected(settings)
 
-    def _sync_managed_key_referral_row_value(self, referral_id: str | None) -> None:
-        referral_id = normalize_owned_referral_id(referral_id)
-        self._managed_key_referral_id = referral_id
-
-        self._managed_key_referral_id_value.value = referral_id or t(
-            "settings.managed_key.referral_id.empty"
-        )
-
-    def _remember_managed_key_referral_id(self, referral_id: str | None) -> str | None:
-        referral_id = normalize_owned_referral_id(referral_id)
-        if referral_id is None:
-            return None
-
-        referral_changed = (
-            self._provider_snapshot is not None
-            and self._provider_snapshot.managed_referral_id != referral_id
-        )
-        if self._provider_snapshot is not None:
-            self._provider_snapshot = replace(
-                self._provider_snapshot,
-                managed_referral_id=referral_id,
-            )
-        if self._provider_draft is not None:
-            self._provider_draft = replace(
-                self._provider_draft,
-                managed_referral_id=referral_id,
-            )
-        if referral_changed:
-            self._record_provider_edit(ManagedReferralEdit(referral_id))
-            self.has_provider_changes = True
-        return referral_id
-
-    def _sync_managed_key_invite_progress_row(
-        self,
-        referral_id: str | None,
-        pass_status: TalkTogetherPassStatus | None,
-    ) -> None:
-        normalized_referral_id = normalize_owned_referral_id(referral_id)
-        if (
-            normalized_referral_id is None
-            or pass_status is None
-            or pass_status.pass_id != normalized_referral_id
-            or pass_status.invite_limit <= 0
-            or pass_status.invite_count < 0
-        ):
-            self._managed_key_pass_status = None
-            self._managed_key_invite_progress_label.value = t(
-                "settings.managed_key.invite_progress.label"
-            )
-            self._managed_key_invite_progress_row.visible = normalized_referral_id is not None
-            self._managed_key_invite_progress_value.value = "- / -"
-            return
-
-        self._managed_key_pass_status = pass_status
-        displayed_count = min(pass_status.invite_count, pass_status.invite_limit)
-        self._managed_key_invite_progress_label.value = t(
-            "settings.managed_key.invite_progress.label"
-        )
-        self._managed_key_invite_progress_value.value = (
-            f"{displayed_count} / {pass_status.invite_limit}"
-        )
-        self._managed_key_invite_progress_row.visible = True
-
-    def _sync_managed_key_referral_row(
-        self,
-        settings: ProviderSettingsSnapshot | None,
-    ) -> None:
-        referral_id = (
-            None if settings is None else normalize_owned_referral_id(settings.managed_referral_id)
-        )
-        self._sync_managed_key_referral_row_value(referral_id)
-
     def _sync_managed_key_card(
         self,
         settings: ProviderSettingsSnapshot | None = None,
@@ -3406,11 +3277,6 @@ class SettingsView(ft.Column):
             settings = self._build_settings_with_provider_draft()
         visible = self._managed_key_card_visible_for(settings)
         self._managed_key_card.visible = visible
-        self._sync_managed_key_referral_row(settings)
-        self._sync_managed_key_invite_progress_row(
-            self._managed_key_referral_id,
-            self._managed_key_pass_status if visible else None,
-        )
         self._sync_managed_trial_usage_bar(settings)
 
     def _repaint_managed_key_card(self) -> None:
@@ -3431,14 +3297,7 @@ class SettingsView(ft.Column):
                 control = getattr(self._managed_trial_usage_bar, control_name, None)
                 if control is not None:
                     _update_control_if_mounted(control)
-        for control in (
-            self._managed_trial_usage_bar,
-            self._managed_key_referral_id_value,
-            self._managed_key_invite_progress_label,
-            self._managed_key_invite_progress_value,
-            self._managed_key_invite_progress_row,
-        ):
-            _update_control_if_mounted(control)
+        _update_control_if_mounted(self._managed_trial_usage_bar)
 
     def set_managed_trial_usage_state(
         self, *, visible: bool, remaining_percent: int | None = None
@@ -3458,15 +3317,7 @@ class SettingsView(ft.Column):
         *,
         visible: bool,
         remaining_percent: int | None = None,
-        referral_id: str | None = None,
-        pass_status: TalkTogetherPassStatus | None = None,
-        remember_referral_id: bool = True,
     ) -> None:
-        referral_id = (
-            self._remember_managed_key_referral_id(referral_id)
-            if remember_referral_id
-            else normalize_owned_referral_id(referral_id)
-        )
         usage_visible = bool(visible)
         card_visible = self._managed_key_card_visible_for(
             self._build_settings_with_provider_draft()
@@ -3481,11 +3332,6 @@ class SettingsView(ft.Column):
         self._managed_trial_usage_bar.visible = card_visible
         self._managed_trial_usage_bar.set_percent(
             self._managed_trial_usage_remaining_percent if card_visible else None
-        )
-        self._sync_managed_key_referral_row_value(referral_id)
-        self._sync_managed_key_invite_progress_row(
-            referral_id,
-            pass_status if card_visible else None,
         )
         self._repaint_managed_key_card()
 
@@ -6880,10 +6726,6 @@ class SettingsView(ft.Column):
         self._trans_title.value = t("settings.section.translation")
         self._api_title.value = t("settings.section.api_keys")
         self._managed_key_title.value = t("settings.managed_key.title")
-        self._managed_key_referral_id_label.value = t("settings.managed_key.referral_id.label")
-        self._managed_key_invite_progress_label.value = t(
-            "settings.managed_key.invite_progress.label"
-        )
         self._ui_title.value = t("settings.section.ui")
         self._audio_host_api_title.value = t("settings.audio_host_api")
         self._mic_audio_title.value = t("settings.section.microphone_audio")
@@ -7019,10 +6861,6 @@ class SettingsView(ft.Column):
             self._sync_translation_connection_title(display_settings)
             self._sync_http_extension_card(display_settings, force_credentials=True)
             self._sync_managed_key_card(display_settings)
-            self._sync_managed_key_invite_progress_row(
-                self._managed_key_referral_id,
-                self._managed_key_pass_status,
-            )
             if self._general_snapshot is not None:
                 self._ui_text.content.value = locale_label(self._general_snapshot.locale)
             self._vrc_mic_text.content.value = t(

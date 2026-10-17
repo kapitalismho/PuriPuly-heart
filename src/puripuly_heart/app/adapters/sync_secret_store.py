@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
+from functools import partial
 from typing import Protocol
 
 from puripuly_heart.app.ports.secret_store import (
@@ -9,6 +9,7 @@ from puripuly_heart.app.ports.secret_store import (
     SecretSnapshot,
     SecretWriteResult,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 
 class SyncSecretStore(Protocol):
@@ -24,7 +25,7 @@ class SyncSecretStoreAdapter:
     store: SyncSecretStore
 
     async def get_secret(self, key: str) -> SecretReadResult:
-        value = await asyncio.to_thread(self.store.get, key)
+        value = await run_owned_thread_call(lambda: self.store.get(key))
         return SecretReadResult(
             key=key,
             value=value,
@@ -34,7 +35,7 @@ class SyncSecretStoreAdapter:
         )
 
     async def set_secret(self, key: str, value: str) -> SecretWriteResult:
-        await asyncio.to_thread(self.store.set, key, value)
+        await run_owned_thread_call(lambda: self.store.set(key, value))
         return SecretWriteResult(
             succeeded=True,
             key=key,
@@ -44,7 +45,7 @@ class SyncSecretStoreAdapter:
         )
 
     async def clear_secret(self, key: str) -> SecretWriteResult:
-        await asyncio.to_thread(self.store.delete, key)
+        await run_owned_thread_call(lambda: self.store.delete(key))
         return SecretWriteResult(
             succeeded=True,
             key=key,
@@ -54,7 +55,7 @@ class SyncSecretStoreAdapter:
         )
 
     async def snapshot_secret(self, key: str) -> SecretSnapshot:
-        value = await asyncio.to_thread(self.store.get, key)
+        value = await run_owned_thread_call(lambda: self.store.get(key))
         return SecretSnapshot(
             key=key,
             value=value,
@@ -64,9 +65,9 @@ class SyncSecretStoreAdapter:
 
     async def restore_secret(self, snapshot: SecretSnapshot) -> SecretWriteResult:
         if snapshot.existed and snapshot.value is not None:
-            await asyncio.to_thread(self.store.set, snapshot.key, snapshot.value)
+            await run_owned_thread_call(partial(self.store.set, snapshot.key, snapshot.value))
         else:
-            await asyncio.to_thread(self.store.delete, snapshot.key)
+            await run_owned_thread_call(lambda: self.store.delete(snapshot.key))
         return SecretWriteResult(
             succeeded=True,
             key=snapshot.key,

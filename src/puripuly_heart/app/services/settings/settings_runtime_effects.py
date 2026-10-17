@@ -401,7 +401,6 @@ class SettingsRuntimeEffectsAdapter:
 
     def restore_memory(self, settings: AppSettingsVNext) -> None:
         restored_settings = copy.deepcopy(settings)
-        self._settings.canonical = restored_settings
         self.apply_activation_notice(restored_settings)
         self._calibration.sync_from_settings(restored_settings)
         config_owner = self._pipeline.translation_runtime_configuration

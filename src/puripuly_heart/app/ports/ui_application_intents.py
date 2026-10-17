@@ -234,6 +234,8 @@ class UiManagedRuntimePort(Protocol):
 
     def managed_auth_last_failure_kind(self) -> str: ...
 
+    def managed_auth_last_message_key(self) -> str | None: ...
+
     async def start_qq_managed_auth_from_dialog(
         self,
         **kwargs: object,

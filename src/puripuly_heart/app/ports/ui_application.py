@@ -59,7 +59,6 @@ class UiApplicationState:
     provider_name: str | None
     overlay_target: str | None
     desktop_overlay_captions_locked: bool
-    managed_auth_referral_bonus_applied: bool
     translation_runtime_ready: bool | None = None
 
 
@@ -226,6 +225,8 @@ class UiApplicationPort(Protocol):
     def dashboard_managed_auth_prompt_kind(self) -> str: ...
 
     def managed_auth_last_failure_kind(self) -> str: ...
+
+    def managed_auth_last_message_key(self) -> str | None: ...
 
     async def apply_telemetry_enabled(self, enabled: bool) -> Any | None: ...
 

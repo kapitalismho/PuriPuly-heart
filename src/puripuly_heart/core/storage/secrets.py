@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import base64
+import errno
 import json
 import os
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
@@ -77,51 +81,87 @@ def mask_secret(value: str, *, unmasked_prefix: int = 3) -> str:
 class EncryptedFileSecretStore:
     path: Path
     _fernet: Fernet
-    _items: dict[str, str]
+    _salt_b64: str
 
     def __init__(self, path: Path, *, passphrase: str) -> None:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-        if path.exists():
-            raw = json.loads(path.read_text(encoding="utf-8"))
-            salt_b64 = raw["salt"]
-            items = raw.get("items", {})
-        else:
-            salt = os.urandom(16)
-            salt_b64 = base64.b64encode(salt).decode("ascii")
-            items = {}
-            _atomic_write_json(path, {"version": 1, "salt": salt_b64, "items": items})
-
-        salt = base64.b64decode(salt_b64)
-        key = _derive_key(passphrase=passphrase, salt=salt)
-        self._fernet = Fernet(key)
-        self._items = dict(items)
+        with _secret_file_lock(path):
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                salt_b64 = base64.b64encode(os.urandom(16)).decode("ascii")
+                raw = {"version": 1, "salt": salt_b64, "items": {}}
+                _atomic_write_json(path, raw)
+            self._salt_b64 = raw["salt"]
+            salt = base64.b64decode(self._salt_b64)
+            self._fernet = Fernet(_derive_key(passphrase=passphrase, salt=salt))
 
     def get(self, key: str) -> str | None:
-        token = self._items.get(key)
-        if token is None:
-            return None
-        try:
-            plaintext = self._fernet.decrypt(token.encode("ascii"))
-        except InvalidToken as exc:
-            raise ValueError("invalid passphrase or corrupted secrets file") from exc
-        return plaintext.decode("utf-8")
+        with _secret_file_lock(self.path):
+            token = self._read()["items"].get(key)
+            if token is None:
+                return None
+            try:
+                plaintext = self._fernet.decrypt(token.encode("ascii"))
+            except InvalidToken as exc:
+                raise ValueError("invalid passphrase or corrupted secrets file") from exc
+            return plaintext.decode("utf-8")
 
     def set(self, key: str, value: str) -> None:
         token = self._fernet.encrypt(value.encode("utf-8")).decode("ascii")
-        self._items[key] = token
-        self._save()
+        with _secret_file_lock(self.path):
+            raw = self._read()
+            raw["items"][key] = token
+            _atomic_write_json(self.path, raw)
 
     def delete(self, key: str) -> None:
-        if key in self._items:
-            del self._items[key]
-            self._save()
+        with _secret_file_lock(self.path):
+            raw = self._read()
+            if key in raw["items"]:
+                del raw["items"][key]
+                _atomic_write_json(self.path, raw)
 
-    def _save(self) -> None:
+    def _read(self) -> dict[str, Any]:
         raw = json.loads(self.path.read_text(encoding="utf-8"))
-        raw["items"] = self._items
-        _atomic_write_json(self.path, raw)
+        if raw["salt"] != self._salt_b64:
+            raise ValueError("secrets file salt changed")
+        return raw
+
+
+@contextmanager
+def _secret_file_lock(path: Path) -> Iterator[None]:
+    with path.with_suffix(path.suffix + ".lock").open("a+b") as handle:
+        handle.seek(0, os.SEEK_END)
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        if os.name == "nt":
+            import msvcrt
+
+            while True:
+                try:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except OSError as exc:
+                    if exc.errno not in {errno.EACCES, errno.EAGAIN, errno.EDEADLK}:
+                        raise
+                    time.sleep(0.05)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _derive_key(*, passphrase: str, salt: bytes) -> bytes:
@@ -132,5 +172,11 @@ def _derive_key(*, passphrase: str, salt: bytes) -> bytes:
 
 def _atomic_write_json(path: Path, data: object) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    try:
+        with tmp.open("w", encoding="utf-8") as stream:
+            json.dump(data, stream, ensure_ascii=False, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)

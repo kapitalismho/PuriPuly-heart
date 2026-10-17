@@ -11,7 +11,6 @@ const REGISTERED_REDIRECT_URIS = [
   'http://127.0.0.1:62188/discord/callback',
   'http://127.0.0.1:62189/discord/callback',
 ];
-const VALID_REFERRAL_ID = '7KQ9M2';
 
 describe('Discord OAuth start route', () => {
   afterEach(() => {
@@ -90,51 +89,7 @@ describe('Discord OAuth start route', () => {
     expect(rows[0]?.pkce_code_verifier).toHaveLength(86);
   });
 
-  it('normalizes valid referral input before session persistence', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-04-30T06:00:00Z'));
 
-    const env = createTestBrokerEnv();
-    const keyPair = await createDeviceKeyPair();
-
-    const response = await postDiscordAuthStart({
-      env,
-      installationId: 'install-discord-referral-valid',
-      devicePublicKey: keyPair.devicePublicKey,
-      redirectUri: REGISTERED_REDIRECT_URIS[0],
-      appVersion: '1.2.3',
-      referralId: ' 7kq9m2 ',
-    });
-
-    expect(response.status).toBe(200);
-    expect(readSessionReferralId(env, 'install-discord-referral-valid')).toBe(
-      VALID_REFERRAL_ID,
-    );
-  });
-
-  it.each([
-    ['', 'install-discord-referral-empty'],
-    ['not-a-referral-id', 'install-discord-referral-malformed'],
-    [null, 'install-discord-referral-null'],
-  ])(
-    'stores nullable referral session state for non-persistable input %s',
-    async (referralId, installationId) => {
-      const env = createTestBrokerEnv();
-      const keyPair = await createDeviceKeyPair();
-
-      const response = await postDiscordAuthStart({
-        env,
-        installationId,
-        devicePublicKey: keyPair.devicePublicKey,
-        redirectUri: REGISTERED_REDIRECT_URIS[0],
-        appVersion: '1.2.3',
-        referralId,
-      });
-
-      expect(response.status).toBe(200);
-      expect(readSessionReferralId(env, installationId)).toBeNull();
-    },
-  );
 
   it('rejects a localhost redirect URI', async () => {
     const env = createTestBrokerEnv();
@@ -322,7 +277,6 @@ async function postDiscordAuthStart(options: {
   devicePublicKey: string;
   redirectUri: string;
   appVersion: string;
-  referralId?: unknown;
 }): Promise<Response> {
   const body: Record<string, unknown> = {
     installation_id: options.installationId,
@@ -330,9 +284,6 @@ async function postDiscordAuthStart(options: {
     redirect_uri: options.redirectUri,
     app_version: options.appVersion,
   };
-  if ('referralId' in options) {
-    body.referral_id = options.referralId;
-  }
 
   return app.request(
     'http://broker.test/v1/auth/discord/start',
@@ -348,19 +299,6 @@ async function postDiscordAuthStart(options: {
   );
 }
 
-function readSessionReferralId(
-  env: ReturnType<typeof createTestBrokerEnv>,
-  installationId: string,
-): string | null {
-  const row = env.__db
-    .prepare(
-      `SELECT referral_id
-         FROM discord_oauth_sessions
-        WHERE installation_id = ?`,
-    )
-    .get(installationId) as { referral_id: string | null } | undefined;
-  return row?.referral_id ?? null;
-}
 
 function insertInstallation(
   env: ReturnType<typeof createTestBrokerEnv>,

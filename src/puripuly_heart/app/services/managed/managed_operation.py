@@ -68,6 +68,12 @@ class ManagedOperationTokenStoreError(Exception):
         super().__init__(message)
 
 
+class ManagedOperationTokenReadError(Exception):
+    def __init__(self, diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.diagnostics = diagnostics
+        super().__init__("managed operation token observation failed")
+
+
 class ManagedOperationTokenClearError(Exception):
     def __init__(self, message: str, diagnostics: ErrorDiagnostics | None = None) -> None:
         self.diagnostics = diagnostics
@@ -213,15 +219,21 @@ async def read_resume_token(secret_store: SecretStorePort) -> str | None:
     try:
         result = await secret_store.get_secret(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
     except Exception as exc:
-        _observe_operation_failure("secret_observation", exc)
-        return None
+        raise ManagedOperationTokenReadError(
+            ErrorDiagnostics(
+                component="managed_connection_auth",
+                operation="read_resume_token",
+                code="managed_operation_token_read_failed",
+                category="transaction",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields=safe_exception_fields(exc),
+            )
+        ) from exc
     if result.diagnostics is not None:
-        emit_failure(
-            logging.getLogger(__name__),
-            result.diagnostics,
-            severity="warning",
-            disposition="degraded",
-        )
+        raise ManagedOperationTokenReadError(result.diagnostics)
     value = result.value
     return value if is_valid_resume_token(value) else None
 

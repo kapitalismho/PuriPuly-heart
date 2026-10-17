@@ -11,6 +11,8 @@ type BindValue = string | number | bigint | null;
 interface SqliteD1Hooks {
   beforeFirst?: (input: { sql: string; params: BindValue[] }) => Promise<void> | void;
   beforeRun?: (input: { sql: string; params: BindValue[] }) => Promise<void> | void;
+  afterFirst?: (input: { sql: string; params: BindValue[]; row: unknown }) => Promise<void> | void;
+  afterAll?: (input: { sql: string; params: BindValue[]; rows: unknown[] }) => Promise<void> | void;
 }
 
 class SqliteD1PreparedStatement {
@@ -36,6 +38,7 @@ class SqliteD1PreparedStatement {
     const row = this.db.prepare(this.sql).get(...this.params) as
       | Record<string, unknown>
       | undefined;
+    await this.hooks.afterFirst?.({ sql: this.sql, params: this.params, row });
 
     if (!row) {
       return null;
@@ -74,6 +77,7 @@ class SqliteD1PreparedStatement {
 
   async all<T = Record<string, unknown>>(): Promise<D1Result<T>> {
     const results = this.db.prepare(this.sql).all(...this.params) as T[];
+    await this.hooks.afterAll?.({ sql: this.sql, params: this.params, rows: results });
 
     return {
       success: true,
@@ -140,9 +144,9 @@ export interface TestBrokerEnv extends Record<string, unknown> {
   __db: DatabaseSync;
 }
 
-export function createTestBrokerEnv(options: SqliteD1Hooks = {}): TestBrokerEnv {
+export function createTestBrokerEnv(options: SqliteD1Hooks & { throughMigration?: string } = {}): TestBrokerEnv {
   const db = new DatabaseSync(':memory:');
-  applyBrokerMigrations(db);
+  applyBrokerMigrations(db, { through: options.throughMigration });
   db.prepare('UPDATE broker_config SET value = ? WHERE key = ?').run(
     JSON.stringify({
       current: {

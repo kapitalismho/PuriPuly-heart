@@ -310,7 +310,6 @@ def _auth_input(args: argparse.Namespace) -> dict[str, Any]:
         if not isinstance(fields, dict) or fields.keys() - {
             "qq_identity",
             "credential",
-            "referral_id",
         }:
             raise ValueError(
                 "Authorization stdin must be a JSON object of supported protected fields"
@@ -330,12 +329,8 @@ def _auth_input(args: argparse.Namespace) -> dict[str, Any]:
             for key in ("qq_identity", "credential")
         ):
             raise ValueError("QQ login requires nonempty qq_identity and credential")
-    elif fields.keys() - {"referral_id"}:
-        raise ValueError("Only QQ login accepts an identity or credential")
-    if "referral_id" in fields and (
-        not isinstance(fields["referral_id"], str) or not fields["referral_id"]
-    ):
-        raise ValueError("Referral ID must be a nonempty string")
+    elif fields:
+        raise ValueError("Only QQ login accepts protected account input")
     return fields
 
 

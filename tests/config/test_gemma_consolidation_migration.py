@@ -32,13 +32,34 @@ def test_v48_consolidates_active_pair_without_trusting_stale_alias(
         openrouter_selected_source="byok" if connection == "managed" else "managed",
         openrouter_selection_alias=alias,
     )
-    raw["state"]["managed_connection"]["referral_id"] = "kept-referral"
+    managed = raw["state"]["managed_connection"]
+    managed.update(
+        installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
+        release_token="kept-release",
+        release_token_expires_at="2099-10-17T12:34:56Z",
+        verified_hardware_hash="kept-hardware-hash",
+        verified_hardware_hash_salt_version=7,
+        active_managed_credential_ref="kept-managed-ref",
+        active_managed_expires_at="2099-10-17T12:34:56Z",
+        founder_letter_seen_credential_ref="kept-managed-ref",
+        local_managed_claim_sources=("discord", "qq"),
+        pending_delivery_ack_source="discord",
+        pending_delivery_ack_delivery_id="kept-delivery",
+        pending_delivery_ack_managed_credential_ref="kept-managed-ref",
+        pending_delivery_ack_expires_at="2099-10-17T12:34:56Z",
+        pending_managed_operation_id="ph-mop-v1_0123456789abcdef0123456789abcdef",
+        pending_managed_operation_source="discord",
+        pending_managed_operation_installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
+        pending_managed_operation_state="DELIVERY_PENDING",
+    )
+    preserved_authority = managed.copy()
+    managed.update(referral_id="kept-referral", referral_source="discord")
     migrated = migration.from_dict(raw)
     result = serialization.to_dict(migrated)
     translation = result["intent"]["translation"]
     assert result["settings_version"] == VNEXT_SETTINGS_SCHEMA_VERSION
     assert result["intent"]["ui"]["locale"] == "ja"
-    assert result["state"]["managed_connection"]["referral_id"] == "kept-referral"
+    assert result["state"]["managed_connection"] == preserved_authority
     assert translation["connection"] == connection
     assert translation["connection_history"]["gpt_6_luna"] == "official_byok"
     target = resolve_llm_config(runtime_resolution_input_from_vnext(migrated)).primary

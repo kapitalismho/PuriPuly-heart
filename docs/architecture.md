@@ -102,6 +102,16 @@ Implementation: `core/audio/ownership.py`, `core/audio/listen_delivery.py`.
 
 Managed authentication → Broker entitlement or credential release → provider activation → normal translation request path.
 
+Referral codes and Talk Together Pass are not part of this path. Ordinary usage and exhaustion presentation remains; retiring referral state does not revoke existing credentials or lower previously applied provider allowances.
+
+- `SettingsOwner` is the canonical managed-identity authority. Complete canonical commits serialize current-state rebasing, focused mutation, physical persistence and canonical/committed-state finalization. Failed writes settle their rollback before another commit enters; a retained service or factory bag cannot replace newer settings.
+- Observer publication follows commit order outside the commit critical section. A notification failure is secondary to an already durable commit. Runtime restoration does not assign canonical state; compensation is another owner-controlled commit.
+- The encrypted credential receipt binds source, installation, logical operation, delivery, credential reference and the exact stored key digest. ACK and ACTIVE recovery require this proof, not merely a nonempty source-specific key slot. Modern issuance must provide the complete delivery contract before replacing credentials.
+- Unknown secret reads retain authority. An unusable pending ACK reaches the same logical operation's status/resume path; it does not authorize a new operation or destructive identity regeneration.
+- Authentication completion and provider activation are separate outcomes. Saved resumable authority is also distinct from an actively owned task or a usable local credential.
+
+Implementation: `app/services/managed/`, `app/services/qq_managed_auth.py`, `app/wiring/wiring_managed_auth_factory.py`, `core/managed_credential.py`, `core/openrouter/managed_openrouter_release.py`.
+
 ### VRChat scene context
 
 VRChat logs → trusted scene snapshot → sanitized translation request context.
@@ -191,11 +201,22 @@ Settings changes follow this path:
 3. The result proceeds to persistence and runtime application.
 
 - Settings persistence owns intent. Runtime owners own its application.
+- Transactional runtime application admits the settings owner's current committed snapshot, not a bag captured before persistence. Runtime effects never assign canonical settings.
+- Explicit runtime-only overrides remain ephemeral. Their admitted configuration flows through LLM construction, self/peer capture requests and GPU recovery; factories must not substitute a different canonical selection. Applied-resource identity and availability describe that same admitted configuration.
 - The provider-apply boundary coordinates capture and Local ASR owners.
 - Failed or incomplete application must not appear as successfully applied runtime state.
 - LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.
 
 Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
+
+### Secret persistence
+
+- Secret-store instances are views of the current backend, not independent credential snapshots.
+- The encrypted-file backend serializes initialization and read/modify/replace across instances and processes. Each mutation preserves unrelated entries; retained readers observe the latest committed file.
+- Its adjacent `.lock` file has a stable lifetime so separate processes coordinate on the same lock. A missing, corrupt, unreadable or replaced-salt document is an observation failure, not proof that credentials are absent.
+- The asynchronous adapter retains ownership until a started synchronous operation settles, including caller cancellation. Identity and authentication owners remain responsible for their multi-step durable transitions.
+
+Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, `core/owned_thread.py`. Behavior: `tests/core/test_encrypted_secret_store.py`, `tests/app/test_sync_secret_store_adapter.py`, `tests/core/test_chatgpt_session.py`.
 
 ## Provider Boundaries
 
@@ -446,6 +467,8 @@ Every task, process, source, and provider session has an owner. That owner is re
 - Replacement revokes retired authority before it can affect the new runtime.
 - Retired resources remain owned until cleanup completes.
 - Source-ordered recognition handoff evaluates cleanup debt after backend shutdown, not after channel-only close.
+- Managed authentication admits one source-owned task before changing the GUI generation or waiting state. A rejected duplicate does not supersede that task.
+- `OAuthRuntime` retains external authentication work until the actual asyncio task settles; cancellation of its outer future is not completion. Bounded shutdown failure retains visible cleanup debt and prevents replacement under the same task identity.
 
 ### Shutdown
 

@@ -34,7 +34,6 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     LocalLlmExtraBodyEdit,
     LocalLlmModelEdit,
-    ManagedReferralEdit,
     OscConnectionSettingsIntent,
     OverlayCalibrationSettingsIntent,
     OverlayCalibrationSnapshot,
@@ -306,7 +305,6 @@ def settings_view_surface_snapshots(
             alibaba_beijing=_verified(verification.alibaba_beijing),
             alibaba_singapore=_verified(verification.alibaba_singapore),
         ),
-        managed_referral_id=settings.state.managed_connection.referral_id,
         qwen_api_host_beijing=_dedicated_api_host(translation.qwen.beijing),
         qwen_api_host_singapore=_dedicated_api_host(translation.qwen.singapore),
     )
@@ -829,17 +827,6 @@ def materialize_provider_apply_intent(
                     ),
                 ),
             )
-        elif isinstance(edit, ManagedReferralEdit):
-            updated = replace(
-                updated,
-                state=replace(
-                    updated.state,
-                    managed_connection=replace(
-                        updated.state.managed_connection,
-                        referral_id=edit.referral_id,
-                    ),
-                ),
-            )
         elif isinstance(edit, SystemPromptEdit):
             updated = _with_intent(
                 updated,
@@ -1068,9 +1055,9 @@ class SettingsApplicationOwner:
         if not plan.changed:
             return True
         normalized = self.manual_fallback.apply(previous, plan)
-        self.settings.canonical = normalized
-        if not self.settings.save_current():
-            self.settings.canonical = previous
+        try:
+            normalized = self.settings.commit_delta(previous, normalized)
+        except Exception:
             self._set_result(
                 TransactionResult(
                     status="settings_commit_failed",
@@ -1105,26 +1092,27 @@ class SettingsApplicationOwner:
         strict_persistence_errors: bool = False,
         reload_settings_view: bool = True,
     ) -> bool:
-        next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
-        if persist:
-            baseline = self.settings.projection_snapshot or self.settings.canonical
-            self.settings.begin(snapshot=baseline)
+        baseline = self.settings.projection_snapshot or self.settings.canonical
+        runtime_flags = (
+            self.settings.overlay_enabled(),
+            self.settings.peer_translation_enabled(),
+            self.settings.overlay_desktop_locked(),
+        )
         committed = not persist
         try:
+            next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
             if persist:
                 self.runtime_effects.capture_runtime_signatures()
-                self.settings.apply_canonical_delta(baseline, next_settings)
             transition = await self.runtime_effects.prepare(
                 self.settings.canonical,
                 next_settings,
             )
-            self.settings.canonical = transition.settings
             self.runtime_effects.activate_before_persist(transition)
             if persist:
-                if strict_persistence_errors:
-                    try:
-                        self.settings.persist()
-                    except Exception as exc:
+                try:
+                    committed_settings = self.settings.commit_delta(baseline, transition.settings)
+                except Exception as exc:
+                    if strict_persistence_errors:
                         raise StrictSettingsSaveFailed(
                             self.settings.last_failure
                             or _settings_mutation_diagnostics(
@@ -1134,9 +1122,6 @@ class SettingsApplicationOwner:
                                 exception=exc,
                             )
                         ) from exc
-                    self.results.mark_settings_committed()
-                    self.settings.remember_projection(transition.settings)
-                elif not self.settings.save_current():
                     self._set_result(
                         TransactionResult(
                             status="settings_commit_failed",
@@ -1145,6 +1130,7 @@ class SettingsApplicationOwner:
                         )
                     )
                     return False
+                transition = replace(transition, settings=committed_settings)
                 self.results.mark_settings_committed()
                 committed = True
             try:
@@ -1174,11 +1160,10 @@ class SettingsApplicationOwner:
             self.projection.remember_all(self.settings.canonical)
             return True
         finally:
-            if persist:
-                if committed:
-                    self.settings.complete()
-                else:
-                    self.settings.rollback()
+            if not committed:
+                self.settings.set_overlay_enabled(runtime_flags[0])
+                self.settings.set_peer_translation_enabled(runtime_flags[1])
+                self.settings.set_overlay_desktop_locked(runtime_flags[2])
 
     async def _apply_runtime_effect(
         self,
@@ -1227,28 +1212,13 @@ class SettingsApplicationOwner:
         committed_settings: AppSettingsVNext,
         reload_settings_view: bool = True,
     ) -> None:
-        self.settings.begin(snapshot=committed_settings)
-        committed = False
-        try:
-            self.settings.apply_canonical_delta(
-                committed_settings,
-                base_settings,
-            )
-            await self.settings.persist_async()
-            self.settings.remember_projection(base_settings)
-            committed = True
-        finally:
-            if committed:
-                self.settings.complete()
-            else:
-                self.settings.rollback()
+        restored = await self.settings.commit_delta_async(committed_settings, base_settings)
         await self.apply_direct(
-            copy.deepcopy(base_settings),
+            restored,
             persist=False,
             strict_runtime_errors=False,
             reload_settings_view=reload_settings_view,
         )
-        self.settings.canonical = copy.deepcopy(base_settings)
         if reload_settings_view:
             self.projection.render(
                 self.settings.canonical,
@@ -1410,7 +1380,6 @@ class SettingsApplicationOwner:
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order22(self.settings.canonical)
             return True
         if self.consume_superseded_settings(committed_settings):
@@ -1489,9 +1458,8 @@ class SettingsApplicationOwner:
                 if unavailable is not None:
                     self._set_result(_runtime_apply_result_as_degraded_transaction(unavailable))
         else:
-            self.settings.canonical = committed_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.runtime_effects.sync_stt_signatures(committed_settings)
+                self.runtime_effects.sync_stt_signatures(self.settings.require_committed())
         self.projection.remember_order22(self.settings.canonical)
         return True
 
@@ -1519,10 +1487,10 @@ class SettingsApplicationOwner:
         ) != self.settings.snapshot_values(next_settings)
 
         async def apply_notice(_settings: object, reload_settings_view: bool) -> None:
-            self.runtime_effects.apply_activation_notice(committed_settings)
-            self.settings.canonical = committed_settings
+            current = self.settings.require_committed()
+            self.runtime_effects.apply_activation_notice(current)
             if reload_settings_view:
-                self.projection.render(committed_settings, preserve_custom_vocab_draft=True)
+                self.projection.render(current, preserve_custom_vocab_draft=True)
             self.sync_ui()
 
         runtime_apply = (
@@ -1541,7 +1509,6 @@ class SettingsApplicationOwner:
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order23(self.settings.canonical)
             if notice_only:
                 self.projection.render(
@@ -1576,8 +1543,6 @@ class SettingsApplicationOwner:
                         exception=exc,
                     )
                 )
-        elif self.settings.canonical is None or self.settings.canonical is base_settings:
-            self.settings.canonical = committed_settings
         self.projection.remember_order23(self.settings.canonical)
         return True
 
@@ -1606,13 +1571,12 @@ class SettingsApplicationOwner:
         )
         result = await self._mutate(
             command=UiPromptClipboardStateSettingsMutation(values=patch_values),
-            base_settings=self.settings.canonical or committed_settings,
+            base_settings=base_settings,
             committed_settings=committed_settings,
             surface="ui_prompt_clipboard_state",
             runtime_apply=runtime_apply,
         )
         if not _settings_mutation_committed(result):
-            self.settings.canonical = copy.deepcopy(base_settings)
             self.projection.remember_order24(self.settings.canonical)
             return True
         if has_out_of_scope_draft:
@@ -1642,9 +1606,8 @@ class SettingsApplicationOwner:
                     )
                 )
         else:
-            self.settings.canonical = runtime_settings
             if result.status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                self.runtime_effects.sync_stt_signatures(runtime_settings)
+                self.runtime_effects.sync_stt_signatures(self.settings.require_committed())
         self.projection.remember_order24(self.settings.canonical)
         return True
 
@@ -1680,13 +1643,6 @@ class SettingsApplicationOwner:
             result = exc.transaction_result
             self._set_result(result)
             raise
-        finally:
-            if getattr(repository, "commit_succeeded", False) or (
-                result is not None and _settings_mutation_committed(result)
-            ):
-                self.settings.complete()
-            else:
-                self.settings.rollback()
         if result is None:
             raise RuntimeError("settings mutation completed without a result")
         self._set_result(result)
@@ -1701,10 +1657,11 @@ class SettingsApplicationOwner:
     ) -> None:
         phase = "restore_memory"
         try:
-            self.runtime_effects.restore_memory(base_settings)
+            current = self.settings.require_committed()
+            self.runtime_effects.restore_memory(current)
             phase = "resync_committed_runtime"
             await self.apply_direct(
-                copy.deepcopy(committed_settings),
+                copy.deepcopy(current),
                 persist=False,
                 strict_runtime_errors=True,
             )
@@ -1717,7 +1674,7 @@ class SettingsApplicationOwner:
             )
             restoration_failure = None
             try:
-                self.runtime_effects.restore_memory(committed_settings)
+                self.runtime_effects.restore_memory(self.settings.require_committed())
             except Exception as restore_exc:
                 restoration_failure = replace(
                     _settings_mutation_diagnostics(

@@ -534,23 +534,34 @@ def build_self_stt_provider_request_from_vnext(
     *,
     warmup: bool = False,
 ) -> ProviderRuntimeBuildRequest:
-    config = resolve_self_stt_runtime_config_from_vnext(settings)
-    transition = build_self_local_asr_transition_request_from_vnext(settings, trigger="runtime")
+    return build_self_stt_provider_request_from_config(
+        build_self_capture_session_config_from_vnext(settings), warmup=warmup
+    )
+
+
+def build_self_stt_provider_request_from_config(
+    config: SelfCaptureSessionConfig,
+    *,
+    warmup: bool = False,
+) -> ProviderRuntimeBuildRequest:
+    backend = config.provider_context
+    if not isinstance(backend, ResolvedSTTConfig):
+        raise TypeError("Self capture config requires a resolved STT provider context")
     return ProviderRuntimeBuildRequest(
-        config=config,
-        gpu_device_id=settings.intent.stt.gpu_device_id,
+        config=backend,
+        gpu_device_id=config.gpu_device_id,
         warmup=warmup,
-        model_id=transition.model_id if transition is not None else config.model,
+        model_id=config.model_id or backend.model,
         session_options=(
-            transition.session_options
-            if transition is not None
+            config.session_options
+            if config.session_options is not None
             else build_local_asr_session_options(
-                source_language=config.source_language,
-                source_mode=config.source_mode,
+                source_language=backend.source_language,
+                source_mode=backend.source_mode,
             )
         ),
-        provider_signature=build_self_stt_provider_signature_from_vnext(settings),
-        runtime_signature=build_self_stt_runtime_signature_from_vnext(settings),
+        provider_signature=config.provider_signature,
+        runtime_signature=config.runtime_signature,
         recognition_projection="scoped",
     )
 
@@ -589,6 +600,9 @@ def build_self_capture_session_config_from_vnext(
             LOCAL_QWEN_IDLE_RELEASE_SECONDS if runtime_provider in LOCAL_CPU_PROVIDERS else None
         ),
         warmup=runtime_provider != STTProviderName.LOCAL_QWEN.value,
+        provider_context=resolved,
+        model_id=transition.model_id if transition is not None else resolved.model,
+        gpu_device_id=stt.gpu_device_id,
     )
 
 
@@ -1520,6 +1534,7 @@ def build_peer_capture_session_config_from_vnext(
             else None
         ),
         warmup=backend.provider != STTProviderName.LOCAL_QWEN.value,
+        gpu_device_id=settings.intent.stt.gpu_device_id,
     )
 
 

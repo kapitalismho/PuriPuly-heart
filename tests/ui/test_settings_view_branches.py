@@ -14,12 +14,10 @@ import pytest
 pytest.importorskip("flet")
 
 from puripuly_heart.app.services.settings_application import settings_view_surface_snapshots
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.ports.chatgpt_account import ChatGptAccountSnapshot
 from puripuly_heart.app.ports.settings_view import (
     CustomSttEndpointEdit,
-    ManagedReferralEdit,
     PeerSttProviderEdit,
     SelfSttProviderEdit,
     SystemPromptEdit,
@@ -361,7 +359,6 @@ def _vnext(
     local_llm: LocalLLMIntent | None = None,
     connection_history: dict[str, str] | None = None,
     managed_credential_ref: str | None = None,
-    referral_id: str | None = None,
     verified_hardware_hash: str | None = None,
     verified_hardware_hash_salt_version: int | None = None,
     verified_providers: tuple[str, ...] | None = None,
@@ -516,7 +513,6 @@ def _vnext(
     managed = state.managed_connection
     if (
         managed_credential_ref is not None
-        or referral_id is not None
         or verified_hardware_hash is not None
         or verified_hardware_hash_salt_version is not None
     ):
@@ -527,7 +523,6 @@ def _vnext(
                 if managed_credential_ref is None
                 else managed_credential_ref
             ),
-            referral_id=managed.referral_id if referral_id is None else referral_id,
             verified_hardware_hash=(
                 managed.verified_hardware_hash
                 if verified_hardware_hash is None
@@ -646,13 +641,6 @@ def _make_llm_selection_view(
     view._managed_key_card = SimpleNamespace(visible=False, update=lambda: None)
     view._managed_key_title = SimpleNamespace(value="")
     view._managed_key_free_usage_label = SimpleNamespace(value="")
-    view._managed_key_referral_id = None
-    view._managed_key_referral_id_label = SimpleNamespace(value="")
-    view._managed_key_referral_id_value = SimpleNamespace(value="")
-    view._managed_key_pass_status = None
-    view._managed_key_invite_progress_label = SimpleNamespace(value="", update=lambda: None)
-    view._managed_key_invite_progress_value = SimpleNamespace(value="", update=lambda: None)
-    view._managed_key_invite_progress_row = SimpleNamespace(visible=False, update=lambda: None)
     view._qwen_region_btn = SimpleNamespace(visible=False, update=lambda: None)
     view._api_keys_column = SimpleNamespace(update=lambda: None)
     view._deepgram_key = SimpleNamespace(visible=False)
@@ -1190,10 +1178,6 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
     assert view._managed_trial_usage_bar not in view._api_keys_column.controls
     assert _card_title(view._managed_key_card) == t("settings.managed_key.title")
 
-    labels = _control_labels(view._managed_key_card)
-    assert t("settings.managed_key.referral_id.label") in labels
-    assert "무료 사용량" not in labels
-    assert "Free usage" not in labels
     assert _tree_contains_control(view._managed_key_card, view._managed_trial_usage_bar)
 
 
@@ -1203,7 +1187,6 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
         "connection",
         "selected_source",
         "active_ref",
-        "referral_id",
         "expected_visible",
     ),
     [
@@ -1212,14 +1195,12 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
             TranslationConnection.MANAGED,
             OpenRouterCredentialSource.MANAGED,
             None,
-            None,
             True,
         ),
         (
             TranslationModel.DEEPSEEK_V4_FLASH,
             TranslationConnection.MANAGED_CHINA,
             OpenRouterCredentialSource.MANAGED,
-            None,
             None,
             True,
         ),
@@ -1228,15 +1209,6 @@ def test_load_from_settings_places_managed_key_card_above_provider_fields(
             TranslationConnection.OPENROUTER,
             OpenRouterCredentialSource.BYOK,
             "managed-ref",
-            None,
-            False,
-        ),
-        (
-            TranslationModel.GEMMA4_26B_31B,
-            TranslationConnection.OPENROUTER,
-            OpenRouterCredentialSource.BYOK,
-            None,
-            "7KQ9M2",
             False,
         ),
     ],
@@ -1247,7 +1219,6 @@ def test_managed_key_card_visibility_follows_translation_connection(
     connection: TranslationConnection,
     selected_source: OpenRouterCredentialSource,
     active_ref: str | None,
-    referral_id: str | None,
     expected_visible: bool,
 ) -> None:
     settings = _vnext(
@@ -1257,43 +1228,12 @@ def test_managed_key_card_visibility_follows_translation_connection(
         openrouter_source=_enum_value(selected_source),
         connection_history={_enum_value(model): _enum_value(connection)},
         managed_credential_ref=active_ref,
-        referral_id=referral_id,
     )
 
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
 
     assert view._managed_key_card.visible is expected_visible
-
-
-def test_managed_key_referral_row_shows_empty_state_without_copy_button(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._managed_key_referral_id_value.value == t("settings.managed_key.referral_id.empty")
-    referral_row = _wrapped_card_column(view._managed_key_card).controls[4].controls[0]
-    assert view._managed_key_referral_id_value in referral_row.controls
-    assert not any(isinstance(control, ft.IconButton) for control in referral_row.controls)
-
-
-def test_managed_key_referral_row_shows_owned_id_without_copy_button(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    settings = _vnext(settings, referral_id="7kq9m2")
-
-    view, _ = _make_settings_view(monkeypatch)
-    view.load_from_settings(settings, config_path=Path("settings.json"))
-
-    assert view._managed_key_card.visible is True
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    referral_row = _wrapped_card_column(view._managed_key_card).controls[4].controls[0]
-    assert view._managed_key_referral_id_value in referral_row.controls
-    assert not any(isinstance(control, ft.IconButton) for control in referral_row.controls)
 
 
 def test_set_managed_trial_usage_state_tracks_visible_and_remaining_percent(
@@ -1345,16 +1285,11 @@ def test_set_managed_key_state_updates_card_controls_and_api_section_repaint(
     view.set_managed_key_state(
         visible=True,
         remaining_percent=64,
-        referral_id="7kq9m2",
     )
 
     assert view._managed_key_card.visible is True
     assert view._managed_trial_usage_bar.visible is True
     assert view._managed_trial_usage_bar.percent == 64
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    assert view._provider_edits[ManagedReferralEdit] == ManagedReferralEdit("7KQ9M2")
-    assert view.has_provider_changes is True
     assert "api_keys_column" in updates
 
 
@@ -1379,13 +1314,11 @@ def test_set_managed_key_state_hides_card_for_openrouter_connection(
     view.set_managed_key_state(
         visible=True,
         remaining_percent=64,
-        referral_id="7kq9m2",
     )
 
     assert view._managed_key_card.visible is False
     assert view._managed_trial_usage_bar.visible is False
     assert view._managed_trial_usage_bar.percent is None
-    assert view._managed_key_referral_id == "7KQ9M2"
 
 
 def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_usage_hidden(
@@ -1408,13 +1341,11 @@ def test_set_managed_key_state_keeps_card_visible_for_managed_connection_when_us
     view.set_managed_key_state(
         visible=False,
         remaining_percent=64,
-        referral_id="7kq9m2",
     )
 
     assert view._managed_key_card.visible is True
     assert view._managed_trial_usage_bar.visible is True
     assert view._managed_trial_usage_bar.percent is None
-    assert view._managed_key_referral_id == "7KQ9M2"
 
 
 @pytest.mark.parametrize(
@@ -1485,253 +1416,6 @@ def test_translation_connection_selected_repaints_managed_key_card_immediately(
     assert view._managed_key_card.visible is expected_visible
     assert "managed_key_card" in updates
     assert "api_body" in updates
-
-
-def test_set_managed_key_state_empty_referral_disables_copy_and_repaints_parent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    attach_dummy_page(monkeypatch, view)
-    updates: list[str] = []
-    mounted_page = object()
-    view._managed_key_card = SimpleNamespace(
-        visible=True,
-        page=mounted_page,
-        update=lambda: updates.append("managed_key_card"),
-    )
-    view._api_keys_column = SimpleNamespace(
-        page=mounted_page,
-        update=lambda: updates.append("api_keys_column"),
-    )
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=None,
-        referral_id=None,
-    )
-
-    assert view._managed_key_card.visible is True
-    assert view._managed_trial_usage_bar.visible is True
-    assert view._managed_trial_usage_bar.percent is None
-    assert view._managed_key_referral_id is None
-    assert view._managed_key_referral_id_value.value == t("settings.managed_key.referral_id.empty")
-    assert "api_keys_column" in updates
-
-
-def test_set_managed_key_state_shows_talk_together_pass_invite_progress(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=64,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_label.value == t(
-        "settings.managed_key.invite_progress.label"
-    )
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-
-def test_set_managed_key_state_repaints_mounted_pass_id_usage_and_invite_controls(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    view = _make_llm_selection_view(monkeypatch, settings)
-    updates: list[str] = []
-    mounted_page = object()
-
-    view._managed_trial_usage_bar.page = mounted_page
-    view._managed_trial_usage_bar.update = lambda: updates.append("usage_bar")
-    view._managed_trial_usage_bar._remaining_text.page = mounted_page  # noqa: SLF001
-    view._managed_trial_usage_bar._remaining_text.update = lambda: updates.append(  # noqa: SLF001
-        "usage_remaining_text"
-    )
-    view._managed_trial_usage_bar._fill_segments.page = mounted_page  # noqa: SLF001
-    view._managed_trial_usage_bar._fill_segments.update = lambda: updates.append(  # noqa: SLF001
-        "usage_fill_segments"
-    )
-    view._managed_key_referral_id_value.page = mounted_page
-    view._managed_key_referral_id_value.update = lambda: updates.append("referral_value")
-    view._managed_key_invite_progress_label.page = mounted_page
-    view._managed_key_invite_progress_label.update = lambda: updates.append("invite_label")
-    view._managed_key_invite_progress_value.page = mounted_page
-    view._managed_key_invite_progress_value.update = lambda: updates.append("invite_value")
-    view._managed_key_invite_progress_row.page = mounted_page
-    view._managed_key_invite_progress_row.update = lambda: updates.append("invite_row")
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=64,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    assert view._managed_trial_usage_bar.percent == 64
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-    assert {
-        "usage_bar",
-        "usage_remaining_text",
-        "usage_fill_segments",
-        "referral_value",
-        "invite_label",
-        "invite_value",
-        "invite_row",
-    }.issubset(updates)
-
-
-def test_managed_key_invite_progress_survives_managed_china_round_trip_before_settings_save(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(
-        llm="openrouter",
-        model=TranslationModel.DEEPSEEK_V4_FLASH,
-        connection=TranslationConnection.MANAGED,
-        openrouter_source=OpenRouterCredentialSource.MANAGED,
-        connection_history={
-            TranslationModel.DEEPSEEK_V4_FLASH.value: TranslationConnection.MANAGED,
-            TranslationModel.GEMMA4_26B_31B.value: TranslationConnection.MANAGED,
-        },
-    )
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=64,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    view._on_translation_connection_selected(TranslationConnection.MANAGED_CHINA.value)
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-    view._on_translation_connection_selected(TranslationConnection.MANAGED.value)
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-    view._on_llm_selected(TranslationModel.GEMMA4_26B_31B.value)
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-
-def test_set_managed_key_state_can_display_preview_referral_without_remembering(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=100,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-        remember_referral_id=False,
-    )
-
-    assert settings.state.managed_connection.referral_id is None
-    assert view._managed_key_referral_id == "7KQ9M2"
-    assert view._managed_key_referral_id_value.value == "7KQ9M2"
-    assert view._managed_key_invite_progress_row.visible is True
-    assert ManagedReferralEdit not in view._provider_edits
-
-
-def test_managed_key_invite_progress_row_appears_below_talk_together_pass_id(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    view, _ = _make_settings_view(monkeypatch)
-
-    managed_key_content = _wrapped_card_column(view._managed_key_card)
-    details_column = managed_key_content.controls[4]
-    referral_id_row = details_column.controls[0]
-
-    assert view._managed_key_referral_id_label in referral_id_row.controls
-    assert details_column.controls[1] is view._managed_key_invite_progress_row
-    assert len(details_column.controls) == 2
-
-
-def test_set_managed_key_state_shows_invite_progress_placeholder_when_absent(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=None,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=1,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_invite_progress_value.value == "1 / 3"
-
-    view.set_managed_key_state(
-        visible=True,
-        remaining_percent=None,
-        referral_id="7KQ9M2",
-        pass_status=None,
-    )
-
-    assert view._managed_key_invite_progress_row.visible is True
-    assert view._managed_key_pass_status is None
-    assert view._managed_key_invite_progress_value.value == "- / -"
-
-
-def test_set_managed_key_state_clamps_over_limit_invite_progress(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = _vnext(llm="openrouter", openrouter_source="managed")
-    view, _ = _make_settings_view(monkeypatch, settings=settings)
-
-    view.set_managed_key_state(
-        visible=True,
-        referral_id="7KQ9M2",
-        pass_status=TalkTogetherPassStatus(
-            pass_id="7KQ9M2",
-            invite_count=7,
-            invite_limit=3,
-            bonus_translations_per_friend=200,
-        ),
-    )
-
-    assert view._managed_key_invite_progress_value.value == "3 / 3"
 
 
 def test_update_api_visibility_treats_peer_local_qwen_as_local_provider(

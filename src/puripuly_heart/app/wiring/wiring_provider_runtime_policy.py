@@ -150,7 +150,6 @@ def _managed_openrouter_identity_signature(
         identity.verified_hardware_hash_salt_version,
         identity.active_managed_credential_ref,
         identity.active_managed_expires_at,
-        identity.referral_id,
     )
 
 

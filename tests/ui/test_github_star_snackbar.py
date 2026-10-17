@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -12,7 +13,9 @@ pytest.importorskip("flet")
 import flet as ft
 from puripuly_heart.app.services.managed_usage import ManagedUsageOwner
 
-from puripuly_heart.app.services import canonical_settings_persistence as settings_module
+from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
+    SettingsVNextCanonicalPersistenceAdapter,
+)
 from puripuly_heart.app.services.canonical_settings_persistence import (
     compose_settings_owner,
     materialize_canonical_translation_settings,
@@ -20,6 +23,7 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 from puripuly_heart.app.services.github_star_prompt_settings import (
     compose_github_star_prompt_owner,
 )
+from puripuly_heart.config.llm_profiles import OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.settings_vnext.serialization import to_dict as canonical_to_dict
 from puripuly_heart.providers.llm.openrouter import OpenRouterKeyMetadata
@@ -28,6 +32,11 @@ from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from tests.helpers.ui_application import compose_test_ui_application_boundary
+
+
+@pytest.fixture(autouse=True)
+def _isolated_prompt_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
 
 
 class DummyPage:
@@ -59,30 +68,43 @@ class DummyPage:
         self.updated += 1
 
 
-def _patch_settings_save(monkeypatch: pytest.MonkeyPatch, callback) -> None:
-    def persist(owner) -> None:
-        callback(owner.path, owner.canonical)
+def _patch_settings_save(
+    monkeypatch: pytest.MonkeyPatch, controller: PromptBackend, callback
+) -> None:
+    persistence = controller.settings_owner.persistence
+    original = persistence.persist
 
-    monkeypatch.setattr(settings_module.SettingsOwner, "persist", persist)
+    def persist(path: Path, updated: AppSettingsVNext) -> None:
+        callback(path, updated)
+        original(path, updated)
+
+    monkeypatch.setattr(persistence, "persist", persist)
 
 
 def _star(controller: PromptBackend):
     return controller.settings.state.github_star_prompt
 
 
-def _set_star(controller: PromptBackend, **changes: object) -> None:
-    current = controller.settings
-    controller.settings_owner.canonical = replace(
-        current,
+def _with_star(settings: AppSettingsVNext, **changes: object) -> AppSettingsVNext:
+    return replace(
+        settings,
         state=replace(
-            current.state,
-            github_star_prompt=replace(current.state.github_star_prompt, **changes),
+            settings.state,
+            github_star_prompt=replace(settings.state.github_star_prompt, **changes),
         ),
     )
 
 
 def _payload_star(payload: dict[str, object]) -> dict[str, object]:
     return payload["state"]["github_star_prompt"]
+
+
+def _persisted_settings(controller: PromptBackend) -> AppSettingsVNext:
+    return (
+        SettingsVNextCanonicalPersistenceAdapter()
+        .load_active(controller.config_path)
+        .canonical_settings
+    )
 
 
 def _settings_for_connection(connection: str) -> AppSettingsVNext:
@@ -106,6 +128,11 @@ def _settings_for_connection(connection: str) -> AppSettingsVNext:
                     model=model,
                     connection=connection,
                     connection_history=history,
+                    openrouter_model=(
+                        OPENROUTER_MODEL_DEEPSEEK_V4_FLASH_41
+                        if connection == "official_byok"
+                        else settings.intent.translation.openrouter_model
+                    ),
                 ),
             ),
         )
@@ -114,9 +141,11 @@ def _settings_for_connection(connection: str) -> AppSettingsVNext:
 
 class PromptBackend:
     def __init__(self, settings: AppSettingsVNext) -> None:
-        self.config_path = Path("settings.json")
+        self.config_path = Path("settings.json").resolve()
+        SettingsVNextCanonicalPersistenceAdapter().persist(self.config_path, settings)
         self.settings_owner = compose_settings_owner(self.config_path)
-        self.settings_owner.canonical = settings
+        self.settings_owner.start()
+        self.settings_owner.remember_projection(self.settings_owner.require_canonical())
         self.usage = SimpleNamespace(usage_metadata=None)
         self.owner = compose_github_star_prompt_owner(
             settings=self.settings_owner,
@@ -152,8 +181,8 @@ class PromptBackend:
         return await self.owner.persist_clicked()
 
 
-def _eligible_managed_backend() -> PromptBackend:
-    backend = PromptBackend(_settings_for_connection("managed"))
+def _eligible_managed_backend(settings: AppSettingsVNext | None = None) -> PromptBackend:
+    backend = PromptBackend(settings or _settings_for_connection("managed"))
     backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
@@ -169,11 +198,16 @@ def _utc_z(value: datetime) -> str:
 def _eligible_app(
     page: DummyPage | None = None,
     settings: AppSettingsVNext | None = None,
+    *,
+    eligible_launch_count: int | None = None,
 ) -> tuple[TranslatorApp, DummyPage, PromptBackend]:
     page = page or DummyPage()
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = page
-    backend = PromptBackend(settings or _settings_for_connection("managed"))
+    initial = settings or _settings_for_connection("managed")
+    if eligible_launch_count is not None:
+        initial = _with_star(initial, eligible_launch_count=eligible_launch_count)
+    backend = PromptBackend(initial)
     backend._get_managed_usage_owner().usage_metadata = OpenRouterKeyMetadata(
         limit_usd=100.0,
         remaining_usd=50.0,
@@ -187,23 +221,28 @@ async def _async_noop(*_args: object, **_kwargs: object) -> None:
     return None
 
 
-def test_github_star_prompt_state_blocks_clicked_and_recent_shows() -> None:
-    controller = _eligible_managed_backend()
+@pytest.mark.parametrize(
+    ("changes", "expected"),
+    [
+        ({}, False),
+        ({"eligible_launch_count": 3}, True),
+        ({"eligible_launch_count": 3, "clicked": True}, False),
+        ({"eligible_launch_count": 3, "days_since_show": 13}, False),
+        ({"eligible_launch_count": 3, "days_since_show": 14}, True),
+    ],
+)
+def test_github_star_prompt_state_blocks_clicked_and_recent_shows(changes, expected) -> None:
     now = datetime(2026, 5, 24, 12, 0, tzinfo=timezone.utc)
+    prompt = dict(changes)
+    days = prompt.pop("days_since_show", None)
+    if days is not None:
+        prompt["last_shown_at"] = _utc_z(now - timedelta(days=days))
+    controller = _eligible_managed_backend(
+        _with_star(_settings_for_connection("managed"), **prompt)
+    )
 
-    assert controller.should_show_github_star_prompt(now=now) is False
-
-    _set_star(controller, eligible_launch_count=3)
-    assert controller.should_show_github_star_prompt(now=now) is True
-
-    _set_star(controller, clicked=True)
-    assert controller.should_show_github_star_prompt(now=now) is False
-
-    _set_star(controller, clicked=False, last_shown_at=_utc_z(now - timedelta(days=13)))
-    assert controller.should_show_github_star_prompt(now=now) is False
-
-    _set_star(controller, last_shown_at=_utc_z(now - timedelta(days=14)))
-    assert controller.should_show_github_star_prompt(now=now) is True
+    assert controller.should_show_github_star_prompt(now=now) is expected
+    assert _persisted_settings(controller).state.github_star_prompt == _star(controller)
 
 
 @pytest.mark.asyncio
@@ -218,12 +257,13 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
         sleeps.append(seconds)
 
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
+    first_app, first_page, first_controller = _eligible_app(settings=settings)
     _patch_settings_save(
         monkeypatch,
+        first_controller,
         lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
     )
 
-    first_app, first_page, first_controller = _eligible_app(settings=settings)
     first_shown = await first_app.maybe_show_github_star_prompt_after_launch()
 
     assert first_shown is False
@@ -232,7 +272,14 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
     assert _star(first_controller).eligible_launch_count == 1
     assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 1
 
-    second_app, second_page, second_controller = _eligible_app(settings=first_controller.settings)
+    second_app, second_page, second_controller = _eligible_app(
+        settings=_persisted_settings(first_controller)
+    )
+    _patch_settings_save(
+        monkeypatch,
+        second_controller,
+        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
+    )
     second_shown = await second_app.maybe_show_github_star_prompt_after_launch()
 
     assert second_shown is False
@@ -241,7 +288,14 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
     assert _star(second_controller).eligible_launch_count == 2
     assert _payload_star(saved_payloads[-1])["eligible_launch_count"] == 2
 
-    third_app, third_page, third_controller = _eligible_app(settings=second_controller.settings)
+    third_app, third_page, third_controller = _eligible_app(
+        settings=_persisted_settings(second_controller)
+    )
+    _patch_settings_save(
+        monkeypatch,
+        third_controller,
+        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
+    )
     third_shown = await third_app.maybe_show_github_star_prompt_after_launch()
 
     assert third_shown is True
@@ -252,6 +306,7 @@ async def test_launch_github_star_snackbar_counts_eligible_launches_before_first
     assert _payload_star(saved_payloads[-2])["eligible_launch_count"] == 3
     assert _payload_star(saved_payloads[-2])["show_count"] == 0
     assert _payload_star(saved_payloads[-1])["show_count"] == 1
+    assert _persisted_settings(third_controller).state.github_star_prompt == _star(third_controller)
 
 
 @pytest.mark.asyncio
@@ -268,6 +323,7 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
     monkeypatch.setattr(app_module.asyncio, "sleep", fail_sleep)
     _patch_settings_save(
         monkeypatch,
+        controller,
         lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
     )
 
@@ -280,43 +336,53 @@ async def test_launch_github_star_snackbar_does_not_count_ineligible_launch(
 
 
 @pytest.mark.asyncio
-async def test_prompt_open_persistence_uses_async_save_before_display(
+async def test_prompt_open_persists_durably_before_display(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    _set_star(controller, eligible_launch_count=3)
-    saved_payloads: list[dict[str, object]] = []
-    to_thread_calls = 0
+    app, page, controller = _eligible_app(eligible_launch_count=3)
+    entered = threading.Event()
+    release = threading.Event()
+    displayed_states = []
+    show_dialog = page.show_dialog
 
-    async def fake_sleep(_seconds: float) -> None:
-        return None
+    def gate_save(_path: Path, updated: AppSettingsVNext) -> None:
+        assert updated.state.github_star_prompt.show_count == 1
+        entered.set()
+        if not release.wait(5):
+            raise TimeoutError("physical settings gate was not released")
 
-    async def fake_to_thread(func, /, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        nonlocal to_thread_calls
-        to_thread_calls += 1
-        return func(*args, **kwargs)
+    def show_after_save(control) -> None:
+        displayed_states.append(_persisted_settings(controller).state.github_star_prompt)
+        show_dialog(control)
 
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(asyncio, "to_thread", fake_to_thread)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
-    )
-
-    shown = await app.maybe_show_github_star_prompt_after_launch()
+    _patch_settings_save(monkeypatch, controller, gate_save)
+    monkeypatch.setattr(page, "show_dialog", show_after_save)
+    task = asyncio.create_task(app.maybe_show_github_star_prompt_after_launch(delay_s=0))
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        assert not task.done()
+        assert page.opened == []
+        assert _persisted_settings(controller).state.github_star_prompt.show_count == 0
+        assert (
+            controller.settings_owner.require_committed().state.github_star_prompt.show_count == 0
+        )
+    finally:
+        release.set()
+        shown = await asyncio.wait_for(task, 1)
 
     assert shown is True
-    assert to_thread_calls >= 1
     assert len(page.opened) == 1
-    assert _payload_star(saved_payloads[0])["show_count"] == 1
+    assert len(displayed_states) == 1
+    assert displayed_states[0].show_count == 1
+    assert displayed_states[0].last_shown_at is not None
+    assert _persisted_settings(controller).state.github_star_prompt == displayed_states[0]
 
 
 @pytest.mark.asyncio
 async def test_prompt_open_refuses_display_and_restores_state_when_persistence_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    _set_star(controller, eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=3)
 
     async def fake_sleep(_seconds: float) -> None:
         return None
@@ -326,7 +392,8 @@ async def test_prompt_open_refuses_display_and_restores_state_when_persistence_f
     def fail_save_settings(*_args: object, **_kwargs: object) -> None:
         raise OSError("settings write failed")
 
-    _patch_settings_save(monkeypatch, fail_save_settings)
+    before = controller.config_path.read_bytes()
+    _patch_settings_save(monkeypatch, controller, fail_save_settings)
 
     shown = await app.maybe_show_github_star_prompt_after_launch()
 
@@ -335,14 +402,20 @@ async def test_prompt_open_refuses_display_and_restores_state_when_persistence_f
     assert _star(controller).last_shown_at is None
     assert _star(controller).show_count == 0
     assert _star(controller).clicked is False
+    assert controller.config_path.read_bytes() == before
+    assert _persisted_settings(controller).state.github_star_prompt == _star(controller)
+    assert controller.settings_owner.require_committed().state.github_star_prompt == _star(
+        controller
+    )
+    assert controller.settings_owner.mutation_depth == 0
+    assert controller.settings_owner.rollback_pending is False
 
 
 @pytest.mark.asyncio
 async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_suppresses(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    _set_star(controller, eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=3)
     saved_payloads: list[dict[str, object]] = []
     sleeps: list[float] = []
     opened_urls: list[str] = []
@@ -354,6 +427,7 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
     _patch_settings_save(
         monkeypatch,
+        controller,
         lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
     )
     monkeypatch.setattr(app_module.webbrowser, "open", lambda url: opened_urls.append(url) or True)
@@ -394,7 +468,7 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
             return
         saved_payloads.append(canonical_to_dict(updated))
 
-    _patch_settings_save(monkeypatch, capture_click_save)
+    _patch_settings_save(monkeypatch, controller, capture_click_save)
 
     action.on_click(None)
     in_click_callback = False
@@ -409,16 +483,23 @@ async def test_launch_github_star_snackbar_waits_opens_records_and_action_click_
 
     assert _star(controller).clicked is True
     assert _payload_star(saved_payloads[-1])["clicked"] is True
+    assert _persisted_settings(controller).state.github_star_prompt.clicked is True
+    assert (
+        controller.should_show_github_star_prompt(
+            now=datetime.now(timezone.utc) + timedelta(days=30)
+        )
+        is False
+    )
 
 
 @pytest.mark.asyncio
 async def test_github_star_action_pops_visible_snackbar(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, _controller = _eligible_app()
+    app, page, controller = _eligible_app()
     opened_urls: list[str] = []
 
-    _patch_settings_save(monkeypatch, lambda _path, _updated: None)
+    _patch_settings_save(monkeypatch, controller, lambda _path, _updated: None)
     monkeypatch.setattr(app_module.webbrowser, "open", lambda url: opened_urls.append(url) or True)
 
     shown = await app._open_github_star_prompt_snackbar()  # noqa: SLF001
@@ -448,6 +529,7 @@ async def test_launch_github_star_snackbar_skips_if_higher_priority_feedback_was
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
     _patch_settings_save(
         monkeypatch,
+        controller,
         lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
     )
     app._mark_launch_high_priority_feedback_shown("update")
@@ -465,8 +547,7 @@ async def test_launch_github_star_snackbar_skips_if_higher_priority_feedback_was
 async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_delay(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    _set_star(controller, eligible_launch_count=2)
+    app, page, controller = _eligible_app(eligible_launch_count=2)
     saved_payloads: list[dict[str, object]] = []
 
     async def fake_sleep(_seconds: float) -> None:
@@ -475,6 +556,7 @@ async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_dela
     monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
     _patch_settings_save(
         monkeypatch,
+        controller,
         lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
     )
 
@@ -492,8 +574,7 @@ async def test_launch_github_star_snackbar_skips_if_feedback_appears_during_dela
 async def test_launch_github_star_prompt_runtime_close_cancels_delay_and_prevents_late_open(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    _set_star(controller, eligible_launch_count=2)
+    app, page, controller = _eligible_app(eligible_launch_count=2)
     sleep_started = asyncio.Event()
     sleep_cancelled = asyncio.Event()
     original_sleep = asyncio.sleep
@@ -507,7 +588,7 @@ async def test_launch_github_star_prompt_runtime_close_cancels_delay_and_prevent
             raise
 
     monkeypatch.setattr(app_module.asyncio, "sleep", cancellable_sleep)
-    _patch_settings_save(monkeypatch, lambda _path, _updated: None)
+    _patch_settings_save(monkeypatch, controller, lambda _path, _updated: None)
 
     prompt_task = asyncio.create_task(app.maybe_show_github_star_prompt_after_launch())
     await sleep_started.wait()
@@ -524,31 +605,29 @@ async def test_launch_github_star_prompt_runtime_close_cancels_delay_and_prevent
 async def test_launch_github_star_snackbar_skips_and_restores_if_feedback_appears_during_open_save(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, page, controller = _eligible_app()
-    _set_star(controller, eligible_launch_count=3)
+    app, page, controller = _eligible_app(eligible_launch_count=3)
     saved_payloads: list[dict[str, object]] = []
-    to_thread_calls = 0
+    entered = threading.Event()
+    release = threading.Event()
 
-    async def fake_sleep(_seconds: float) -> None:
-        return None
+    def gate_save(_path: Path, updated: AppSettingsVNext) -> None:
+        saved_payloads.append(canonical_to_dict(updated))
+        if updated.state.github_star_prompt.show_count == 1:
+            entered.set()
+            if not release.wait(5):
+                raise TimeoutError("physical settings gate was not released")
 
-    async def feedback_during_first_to_thread(
-        func, /, *args, **kwargs
-    ):  # noqa: ANN001, ANN002, ANN003
-        nonlocal to_thread_calls
-        to_thread_calls += 1
-        if to_thread_calls == 1:
-            app._mark_launch_high_priority_feedback_shown("connection_failure")
-        return func(*args, **kwargs)
-
-    monkeypatch.setattr(app_module.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(asyncio, "to_thread", feedback_during_first_to_thread)
-    _patch_settings_save(
-        monkeypatch,
-        lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
-    )
-
-    shown = await app.maybe_show_github_star_prompt_after_launch()
+    _patch_settings_save(monkeypatch, controller, gate_save)
+    task = asyncio.create_task(app.maybe_show_github_star_prompt_after_launch(delay_s=0))
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        app._mark_launch_high_priority_feedback_shown("connection_failure")
+        assert not task.done()
+        assert page.opened == []
+        assert _persisted_settings(controller).state.github_star_prompt.show_count == 0
+    finally:
+        release.set()
+        shown = await asyncio.wait_for(task, 1)
 
     assert shown is False
     assert page.opened == []
@@ -556,6 +635,56 @@ async def test_launch_github_star_snackbar_skips_and_restores_if_feedback_appear
     assert _star(controller).show_count == 0
     assert _payload_star(saved_payloads[0])["show_count"] == 1
     assert _payload_star(saved_payloads[-1])["show_count"] == 0
+    assert _persisted_settings(controller).state.github_star_prompt == _star(controller)
+    assert controller.settings_owner.require_committed().state.github_star_prompt == _star(
+        controller
+    )
+
+
+@pytest.mark.asyncio
+async def test_prompt_close_joins_physical_open_save_without_late_display(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, page, controller = _eligible_app(eligible_launch_count=3)
+    entered = threading.Event()
+    release = threading.Event()
+    settled = threading.Event()
+    persistence = controller.settings_owner.persistence
+    persist = persistence.persist
+
+    def gate_save(path: Path, updated: AppSettingsVNext) -> None:
+        entered.set()
+        if not release.wait(5):
+            raise TimeoutError("physical settings gate was not released")
+        persist(path, updated)
+        settled.set()
+
+    monkeypatch.setattr(persistence, "persist", gate_save)
+    prompt = asyncio.create_task(app.maybe_show_github_star_prompt_after_launch(delay_s=0))
+    closing = None
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        closing = asyncio.create_task(app.close_github_star_prompt_runtime())
+        await asyncio.sleep(0)
+        assert not closing.done()
+        assert not prompt.done()
+        assert not settled.is_set()
+        assert page.opened == []
+    finally:
+        release.set()
+        if closing is not None:
+            await asyncio.wait_for(closing, 1)
+        shown = await asyncio.wait_for(prompt, 1)
+
+    assert shown is False
+    assert settled.is_set()
+    assert page.opened == []
+    durable = _persisted_settings(controller).state.github_star_prompt
+    assert durable.show_count == 1
+    assert durable == _star(controller)
+    assert durable == controller.settings_owner.require_committed().state.github_star_prompt
+    assert controller.settings_owner.mutation_depth == 0
+    assert controller.settings_owner.rollback_pending is False
 
 
 @pytest.mark.asyncio
@@ -583,6 +712,7 @@ async def test_named_higher_priority_launch_feedback_categories_suppress_prompt(
     monkeypatch.setattr(app_module.asyncio, "sleep", fail_sleep)
     _patch_settings_save(
         monkeypatch,
+        controller,
         lambda _path, updated: saved_payloads.append(canonical_to_dict(updated)),
     )
     app._mark_launch_high_priority_feedback_shown(reason)
@@ -926,7 +1056,6 @@ def test_debug_preview_panel_includes_github_star_snackbar_action() -> None:
         on_qq_auth_translation_gated=noop,
         on_peer_translation_eula=noop,
         on_local_qwen_hallucination_modal=noop,
-        on_talk_together_pass_invite_progress=noop,
         on_foundation_primitives=noop,
         on_display_turn_cycle=noop,
         on_github_star_snackbar=lambda: invoked.append("github-star"),

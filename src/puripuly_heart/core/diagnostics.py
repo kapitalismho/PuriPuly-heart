@@ -692,6 +692,7 @@ _BOUNDARIES = (
     )
     | frozenset(LIFECYCLE_SHUTDOWN_PHASE_ORDER)
     | QQ_STAGES
+    | TRANSPORT_ENUM_FIELDS["stage"]
 )
 _NATIVE_REASONS = frozenset(
     {

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
+from concurrent.futures import Future
 from dataclasses import replace
 from datetime import datetime as real_datetime
 from pathlib import Path
@@ -14,7 +15,6 @@ import pytest
 pytest.importorskip("flet")
 
 import flet as ft
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
@@ -230,8 +230,18 @@ class DummyPage:
         self.dialog = None
         return control
 
-    def run_task(self, coro_fn) -> None:
-        self.tasks.append(coro_fn)
+    def run_task(self, coro_fn) -> Future:
+        handle = Future()
+
+        async def run():
+            try:
+                return await coro_fn()
+            finally:
+                if not handle.done():
+                    handle.set_result(None)
+
+        self.tasks.append(run)
+        return handle
 
     def update(self) -> None:
         self.updated += 1
@@ -1399,7 +1409,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_founder_letter",
         "on_local_qwen_hallucination_modal",
         "on_github_star_snackbar",
-        "on_talk_together_pass_invite_progress",
         "on_foundation_primitives",
         "on_http_extension_form",
         "on_brake_notice",
@@ -1434,12 +1443,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     assert (
         getattr(local_qwen_modal, "__func__", None)
         is TranslatorApp._preview_local_qwen_hallucination_modal
-    )
-    pass_progress = seen["callbacks"]["on_talk_together_pass_invite_progress"]
-    assert getattr(pass_progress, "__self__", None) is app
-    assert (
-        getattr(pass_progress, "__func__", None)
-        is TranslatorApp._preview_talk_together_pass_invite_progress
     )
     preview_calls: list[bool] = []
     monkeypatch.setattr(
@@ -1699,40 +1702,6 @@ def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
     assert app.bottom_nav.visual_updates == 0
     assert page.tasks == []
     assert forbidden_calls == []
-
-
-def test_debug_preview_talk_together_pass_invite_progress_sets_settings_state_only(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    managed_key_calls: list[dict[str, object]] = []
-    app.view_settings = SimpleNamespace(
-        set_managed_key_state=lambda **kwargs: managed_key_calls.append(kwargs)
-    )
-    forbidden_calls: list[str] = []
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda *args, **kwargs: forbidden_calls.append("webbrowser.open"),
-    )
-
-    app._preview_talk_together_pass_invite_progress()
-
-    assert forbidden_calls == []
-    assert managed_key_calls == [
-        {
-            "visible": True,
-            "remaining_percent": 100,
-            "referral_id": "7KQ9M2",
-            "remember_referral_id": False,
-            "pass_status": TalkTogetherPassStatus(
-                pass_id="7KQ9M2",
-                invite_count=1,
-                invite_limit=3,
-                bonus_translations_per_friend=200,
-            ),
-        }
-    ]
 
 
 def test_debug_preview_discord_callback_page_opens_local_preview_without_oauth(
@@ -2770,7 +2739,7 @@ async def test_start_qq_managed_auth_exception_uses_safe_bounded_log() -> None:
 def test_start_discord_managed_auth_registers_page_task_with_oauth_runtime() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app._discord_managed_auth_dialog = SimpleNamespace(referral_id="", set_waiting=lambda: None)
+    app._discord_managed_auth_dialog = SimpleNamespace(set_waiting=lambda: None)
     app._show_snackbar = lambda *_args, **_kwargs: None
     app.view_dashboard = SimpleNamespace(set_translation_enabled=lambda _enabled: None)
     controller = SimpleNamespace(
@@ -2789,7 +2758,7 @@ def test_start_discord_managed_auth_registers_page_task_with_oauth_runtime() -> 
 async def test_start_discord_managed_auth_skips_controller_start_for_stale_generation() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app._discord_managed_auth_dialog = SimpleNamespace(referral_id="", set_waiting=lambda: None)
+    app._discord_managed_auth_dialog = SimpleNamespace(set_waiting=lambda: None)
     start_calls: list[str] = []
 
     async def fake_start_discord_managed_auth_from_dialog(**_kwargs) -> bool:
@@ -2812,7 +2781,7 @@ async def test_start_discord_managed_auth_skips_controller_start_for_stale_gener
 async def test_close_oauth_runtime_blocks_late_discord_auth_ui_mutation() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    dialog = SimpleNamespace(referral_id="", close_calls=0, set_waiting=lambda: None)
+    dialog = SimpleNamespace(close_calls=0, set_waiting=lambda: None)
     dialog.close = lambda: setattr(dialog, "close_calls", dialog.close_calls + 1)
     app._discord_managed_auth_dialog = dialog
     app._discord_managed_auth_generation = 0
@@ -2895,8 +2864,10 @@ async def test_start_discord_managed_auth_no_success_when_enable_fails() -> None
     await app.page.tasks[0]()
 
     assert enable_calls == [True]
-    assert snackbar_calls == []
-    assert dashboard_translation_calls == []
+    assert snackbar_calls == [
+        (app_module.t("discord_auth.error.translation_start_failed"), app_module.COLOR_WARNING)
+    ]
+    assert dashboard_translation_calls == [False]
 
 
 @pytest.mark.asyncio
@@ -2933,8 +2904,10 @@ async def test_start_discord_managed_auth_no_success_when_llm_unavailable_after_
     await app.page.tasks[0]()
 
     assert enable_calls == [True]
-    assert snackbar_calls == []
-    assert dashboard_translation_calls == []
+    assert snackbar_calls == [
+        (app_module.t("discord_auth.error.translation_start_failed"), app_module.COLOR_WARNING)
+    ]
+    assert dashboard_translation_calls == [False]
 
 
 @pytest.mark.asyncio
@@ -4067,3 +4040,208 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
 
     assert lifecycle_events == ["started", "stop_started", "stop_completed"]
     assert page.tasks == []
+
+
+def _managed_dialog_app(source, login, *, activation=True, failure_key=None, prompt=None):
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._mark_launch_high_priority_feedback_shown = lambda *_args: None
+    notifications = []
+    visuals = []
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+
+    async def enable(enabled, *, allow_authorization=True):
+        hub.translation_enabled = bool(enabled and activation)
+        return activation
+
+    backend = SimpleNamespace(
+        hub=hub,
+        start_qq_managed_auth_from_dialog=login,
+        start_discord_managed_auth_from_dialog=login,
+        set_translation_enabled=enable,
+        dashboard_managed_auth_prompt_kind=lambda: prompt[0] if prompt else source,
+        managed_auth_last_failure_kind=lambda: (
+            "idle_resumable"
+            if failure_key and failure_key.endswith("recovery_pending")
+            else "failed"
+        ),
+        managed_auth_last_message_key=lambda: failure_key,
+    )
+    app._ui_application = compose_test_ui_application_boundary(backend)
+    app._show_snackbar = lambda message, color: notifications.append((message, color))
+    app._set_dashboard_translation_visual_state = visuals.append
+    if source == "qq":
+        app.show_qq_managed_auth_dialog()
+        dialog = app._qq_managed_auth_dialog
+        dialog._qq_identity_field.value = "qq-user"
+        dialog._credential_field.value = "a" * 64
+    else:
+        app.show_discord_managed_auth_dialog()
+        dialog = app._discord_managed_auth_dialog
+    return app, dialog, notifications, visuals
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_repeated_submit_cannot_supersede_admitted_generation(source) -> None:
+    calls = []
+
+    async def login(**kwargs):
+        calls.append(kwargs)
+        return True
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login)
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    generation = getattr(app, f"_{source}_managed_auth_generation")
+    assert dialog.is_waiting is True
+    assert app.application.dashboard_managed_auth_action() == "in_progress"
+    start()
+    assert getattr(app, f"_{source}_managed_auth_generation") == generation
+    assert len(app.page.tasks) == 1
+    await app.page.tasks[0]()
+    assert len(calls) == 1
+    assert app.application.managed_auth_task_names() == ()
+    assert dialog.is_open is False
+    assert visuals == [True]
+    assert notifications == [(app_module.t(f"{source}_auth.success"), app_module.COLOR_SUCCESS)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+@pytest.mark.parametrize("outcome", ["exhausted", "terminal", "exception"])
+async def test_finished_auth_task_exposes_action_and_can_retry(source, outcome) -> None:
+    calls = []
+    failure_key = (
+        f"{source}_auth.error.recovery_pending"
+        if outcome == "exhausted"
+        else f"{source}_auth.error.authorization_expired"
+    )
+
+    async def login(**kwargs):
+        calls.append(kwargs)
+        if len(calls) > 1:
+            return True
+        if outcome == "exception":
+            raise RuntimeError("private response")
+        return (failure_key, {}) if source == "qq" else False
+
+    app, dialog, notifications, visuals = _managed_dialog_app(
+        source, login, failure_key=failure_key
+    )
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    await app.page.tasks[0]()
+    assert dialog.is_open is True
+    assert dialog.is_waiting is False
+    assert dialog._dialog.modal is False
+    assert app.application.managed_auth_task_names() == ()
+    assert app.application.dashboard_managed_auth_action() != "in_progress"
+    assert visuals == []
+    assert notifications == []
+    assert dialog._continue_button is not None
+    dialog._continue_button.on_click(None)
+    assert dialog.is_waiting is True
+    assert len(app.page.tasks) == 2
+    await app.page.tasks[1]()
+    assert len(calls) == 2
+    assert dialog.is_open is False
+    assert visuals == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_auth_success_with_failed_activation_is_not_auth_failure_or_spinner(source) -> None:
+    async def login(**_kwargs):
+        return True
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login, activation=False)
+    getattr(app, f"_start_{source}_managed_auth")()
+    await app.page.tasks[0]()
+    assert dialog.is_open is False
+    assert dialog.is_waiting is False
+    assert visuals == [False]
+    assert notifications == [
+        (app_module.t(f"{source}_auth.error.translation_start_failed"), app_module.COLOR_WARNING)
+    ]
+    assert app.application.managed_auth_task_names() == ()
+
+
+@pytest.mark.asyncio
+async def test_source_switch_keeps_admitted_task_and_rejects_other_source_submission() -> None:
+    calls = []
+    prompt = ["qq"]
+
+    async def login(**kwargs):
+        calls.append(kwargs)
+        return True
+
+    app, qq_dialog, notifications, visuals = _managed_dialog_app("qq", login, prompt=prompt)
+    app._start_qq_managed_auth()
+    prompt[0] = "discord"
+    app.show_discord_managed_auth_dialog()
+    discord_dialog = app._discord_managed_auth_dialog
+    app._start_discord_managed_auth()
+    assert discord_dialog.is_waiting is False
+    assert not hasattr(app, "_discord_managed_auth_generation")
+    assert app.application.managed_auth_task_names() == ("qq-managed-auth-dialog",)
+    await app.page.tasks[0]()
+    assert len(calls) == 1
+    assert visuals == []
+    assert notifications == []
+    assert qq_dialog.is_waiting is False
+    assert app.application.managed_auth_task_names() == ()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_ui_cancel_keeps_settlement_owned_and_blocks_repeated_submit(source) -> None:
+    entered = asyncio.Event()
+    cancelling = asyncio.Event()
+    release = asyncio.Event()
+
+    async def login(**_kwargs):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelling.set()
+            await release.wait()
+            return True
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login)
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    task = asyncio.create_task(app.page.tasks[0]())
+    await entered.wait()
+    getattr(app, f"_cancel_{source}_managed_auth")()
+    await cancelling.wait()
+    assert dialog.is_open is False
+    assert app.application.managed_auth_task_names() == (f"{source}-managed-auth-dialog",)
+    generation = getattr(app, f"_{source}_managed_auth_generation")
+    start()
+    assert getattr(app, f"_{source}_managed_auth_generation") == generation
+    assert len(app.page.tasks) == 1
+    assert not task.done()
+    release.set()
+    await task
+    assert app.application.managed_auth_task_names() == ()
+    assert notifications == []
+    assert visuals == []
+
+
+@pytest.mark.parametrize("source", ["qq", "discord"])
+def test_rejected_page_task_admission_restores_actionable_dialog(source) -> None:
+    async def login(**_kwargs):
+        pytest.fail("Unadmitted auth must never execute")
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login)
+    app._run_page_task = lambda _factory: None
+    getattr(app, f"_start_{source}_managed_auth")()
+    assert getattr(app, f"_{source}_managed_auth_generation") == 0
+    assert dialog.is_open is True
+    assert dialog.is_waiting is False
+    assert dialog._continue_button is not None
+    assert app.application.managed_auth_task_names() == ()
+    assert notifications == []
+    assert visuals == []

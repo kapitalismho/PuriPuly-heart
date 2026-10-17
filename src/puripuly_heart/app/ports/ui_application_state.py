@@ -39,9 +39,6 @@ class UiApplicationStateRuntimePort(Protocol):
     def desktop_overlay_captions_locked(self) -> bool: ...
 
     @property
-    def managed_auth_referral_bonus_applied(self) -> bool: ...
-
-    @property
     def overlay_calibration(self) -> object: ...
 
 

@@ -1528,22 +1528,6 @@ def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -
         assert "puripuly_heart.config.settings" not in imported_modules
 
 
-def test_a07_managed_broker_uses_the_pure_provider_value_owner() -> None:
-    broker_path = (
-        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_broker_client.py"
-    )
-    imported_modules = set(
-        _imported_modules(
-            _module_name_for_path(broker_path),
-            broker_path,
-            _internal_module_names(),
-        )
-    )
-
-    assert "puripuly_heart.config.settings" not in imported_modules
-    assert "puripuly_heart.config.provider_values" in imported_modules
-
-
 def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:
     owned_paths = (
         SOURCE_PACKAGE_ROOT / "ui" / "desktop_overlay.py",
