@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -64,10 +65,12 @@ from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedST
 from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
     CanonicalManagedIdentityStateAdapter,
 )
+from puripuly_heart.app.wiring.wiring_provider_runtime_policy import build_llm_provider_signature
 from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_peer_capture_session_config_from_vnext,
     build_self_capture_session_config_from_vnext,
 )
+from puripuly_heart.app.wiring.wiring_translation_backend import create_translation_backend
 from puripuly_heart.config.provider_values import OpenRouterSelectionAlias, STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
@@ -85,6 +88,7 @@ from puripuly_heart.core.peer_capture import (
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 from tests.core.runtime.test_local_asr_provider_runtime import (
     GPU_DEVICE,
@@ -735,6 +739,110 @@ async def test_explicit_runtime_only_gpu_restart_preserves_authority_through_con
     assert context.owner.require_canonical() is context.initial_canonical
     assert context.owner.require_committed() is snapshot
     assert context.owner.path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("superseded", [False, True], ids=["ephemeral", "retired-selection"])
+async def test_actual_gemma_factory_admits_override_but_disposes_retired_construction(
+    composed, monkeypatch, superseded
+):
+    context = composed
+    initial = context.owner.require_committed()
+    selected = replace(
+        initial,
+        intent=replace(
+            initial.intent,
+            translation=replace(
+                initial.intent.translation,
+                model="gemma4_26b_31b",
+                connection="openrouter",
+                openrouter_selected_source="byok",
+                openrouter_selection_alias="gemma4_26b_31b_byok",
+                connection_history={
+                    **initial.intent.translation.connection_history,
+                    "gemma4_26b_31b": "openrouter",
+                },
+            ),
+        ),
+    )
+    await context.owner.commit_delta_async(initial, selected)
+    selected = context.owner.require_committed()
+    before = context.owner.path.read_bytes()
+    requested = replace(
+        selected,
+        intent=replace(
+            selected.intent,
+            translation=replace(selected.intent.translation, concurrency_limit=3),
+        ),
+    )
+    context.secrets.set("openrouter_api_key", "synthetic-admitted-gemma-key")
+    entered, release = threading.Event(), threading.Event()
+    context.release_gates.append(release)
+    created, closed, construction_threads = [], [], []
+    original_close = LlmTranslationBackend.close
+
+    def construct(**kwargs):
+        construction_threads.append(threading.get_ident())
+        backend = create_translation_backend(**kwargs)
+        created.append(backend)
+        entered.set()
+        assert release.wait(8)
+        return backend
+
+    async def close(backend):
+        await original_close(backend)
+        closed.append(backend)
+
+    monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", construct)
+    monkeypatch.setattr(LlmTranslationBackend, "close", close)
+    loop_thread = threading.get_ident()
+    operation = asyncio.create_task(
+        context.application.apply(requested, force_rebuild_llm=True, persist_settings=False)
+    )
+    context.operations.append(operation)
+    assert await asyncio.to_thread(entered.wait, 5)
+    assert not operation.done()
+    assert context.owner.require_canonical() is selected
+    assert context.owner.path.read_bytes() == before
+    assert len(construction_threads) == 1
+    assert construction_threads[0] != loop_thread
+    if superseded:
+        await context.owner.commit_delta_async(selected, initial)
+    release.set()
+    if superseded:
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(operation, 5)
+        assert closed == created
+        assert context.llm.provider is context.old_llm
+        assert not context.old_llm.closed
+        assert context.components.signatures.last_llm_provider == ()
+        assert await context.application.apply(
+            context.owner.require_committed(), force_rebuild_llm=True, persist_settings=False
+        )
+        assert context.llm.provider is created[-1]
+        assert created[-1] not in closed
+        assert context.components.signatures.last_llm_provider == build_llm_provider_signature(
+            context.owner.require_committed()
+        )
+    else:
+        assert await asyncio.wait_for(operation, 5)
+        assert context.llm.provider is created[0]
+        assert closed == []
+        assert context.components.signatures.last_llm_provider == build_llm_provider_signature(
+            requested
+        )
+        assert context.components.signatures.last_llm_provider != build_llm_provider_signature(
+            selected
+        )
+        semaphore = context.llm.provider.provider.semaphore
+        for _ in range(3):
+            await asyncio.wait_for(semaphore.acquire(), 1)
+        assert semaphore.locked()
+        for _ in range(3):
+            semaphore.release()
+        assert context.owner.require_canonical() is selected
+        assert context.owner.require_committed() is selected
+        assert context.owner.path.read_bytes() == before
 
 
 @pytest.mark.asyncio

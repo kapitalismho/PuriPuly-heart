@@ -202,7 +202,9 @@ Settings changes follow this path:
 
 - Settings persistence owns intent. Runtime owners own its application.
 - Transactional runtime application admits the settings owner's current committed snapshot, not a bag captured before persistence. Runtime effects never assign canonical settings.
+- Selection guards are checked at atomic commit admission. If cancellation arrives after an admitted physical save, settle the save and report committed intent with interrupted runtime application; do not undo the durable commit or start cancelled runtime work.
 - Explicit runtime-only overrides remain ephemeral. Their admitted configuration flows through LLM construction, self/peer capture requests and GPU recovery; factories must not substitute a different canonical selection. Applied-resource identity and availability describe that same admitted configuration.
+- Asynchronous Gemma construction rejects a canonical translation selection changed since admission, not an intentional difference between canonical intent and an admitted runtime-only override. Dispose obsolete completed backends without replacing the current provider.
 - The provider-apply boundary coordinates capture and Local ASR owners.
 - Failed or incomplete application must not appear as successfully applied runtime state.
 - LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.

@@ -497,6 +497,7 @@ def compose_provider_runtime(
         canonical = canonical_settings(settings_value)
         translation = canonical.intent.translation
         if translation.model == "gemma4_26b_31b":
+            selection_at_admission = settings.canonical
             secrets = await run_owned_thread_call(
                 lambda: create_secret_store(canonical.intent.secrets, config_path=config_path)
             )
@@ -549,7 +550,11 @@ def compose_provider_runtime(
                 )
             )
             current = settings.canonical
-            if current is None or current.intent.translation != canonical.intent.translation:
+            if (
+                current is None
+                or selection_at_admission is None
+                or current.intent.translation != selection_at_admission.intent.translation
+            ):
                 if backend is not None:
                     await cast(TranslationBackend, backend).close()
                 raise asyncio.CancelledError

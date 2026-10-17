@@ -14,7 +14,7 @@ from puripuly_heart.app.wiring.wiring_managed_auth_factory import (
     managed_identity_state_port_from_vnext,
 )
 from puripuly_heart.app.wiring.wiring_secrets_factory import create_secret_store
-from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
+from puripuly_heart.config.settings_vnext.defaults import new_settings_for_reset
 from puripuly_heart.core.managed_credential import (
     ManagedCredentialBinding,
     credential_binding_secret,
@@ -114,7 +114,7 @@ def _native_callback_dashboard(app, monkeypatch):
 async def test_one_native_enable_retries_failed_runtime_with_retained_managed_credential(
     composed, monkeypatch, source
 ):
-    profile = new_settings_for_first_run("zh-CN" if source == "qq" else "en").intent.translation
+    profile = new_settings_for_reset("zh-CN" if source == "qq" else "en").intent.translation
     route = replace(
         ROUTES[-1],
         model=profile.model,
@@ -175,7 +175,7 @@ async def test_native_retry_retains_managed_credential_admission_guards(
     composed, monkeypatch, failure
 ):
     source = "discord"
-    profile = new_settings_for_first_run("en").intent.translation
+    profile = new_settings_for_reset("en").intent.translation
     route = replace(
         ROUTES[-1],
         model=profile.model,
