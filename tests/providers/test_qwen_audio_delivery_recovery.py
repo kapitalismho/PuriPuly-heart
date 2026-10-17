@@ -93,17 +93,20 @@ class HeldManualProvider(FakeLLMProvider):
 
 @asynccontextmanager
 async def self_capture_pipeline(
-    transport, llm=None, *, provider_factory=None, peer_translation_enabled=False
+    transport, llm=None, *, provider_factory=None, peer_translation_enabled=False, settings=None
 ):
-    base = AppSettingsVNext()
-    settings = replace(
-        base,
-        intent=replace(
-            base.intent,
-            stt=replace(base.intent.stt, provider="qwen_audio"),
-            languages=replace(base.intent.languages, source_language="en", target_language="ko"),
-        ),
-    )
+    if settings is None:
+        base = AppSettingsVNext()
+        settings = replace(
+            base,
+            intent=replace(
+                base.intent,
+                stt=replace(base.intent.stt, provider="qwen_audio"),
+                languages=replace(
+                    base.intent.languages, source_language="en", target_language="ko"
+                ),
+            ),
+        )
     factory = provider_factory or RecoveryFactory(transport)
     settings_box = [settings]
     bound = BoundRuntimeFactory(factory)

@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, Literal, cast
+from urllib.parse import parse_qs, urlsplit
 
+import numpy as np
 import pytest
 from puripuly_heart.app.services.self_capture_application import (
     SelfCaptureApplicationOwner,
@@ -17,9 +21,16 @@ from puripuly_heart.app.wiring_stt_factory import (
     build_self_stt_provider_signature,
     build_self_stt_runtime_signature,
 )
+from websockets.asyncio.client import connect
+from websockets.asyncio.server import serve
+from websockets.exceptions import ConnectionClosed
 
+from puripuly_heart.app.wiring.wiring_local_asr_provider_runtime import SharedSTTProviderFactory
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core import network_clients
+from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
+from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmission,
@@ -29,6 +40,17 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureProviderStatus,
     SelfCaptureSessionConfig,
     SelfCaptureSessionState,
+)
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.domain.events import UIEventType
+from tests.core.test_stt_scoped_engine import wait_until
+from tests.providers.test_deepgram_reuse import _installed_callback_payload
+from tests.providers.test_qwen_audio import control, native
+from tests.providers.test_qwen_audio_delivery_recovery import (
+    final_sources,
+    require_final_source,
+    self_capture_pipeline,
+    spoken_turn,
 )
 
 _CLOUD_PROVIDERS = (
@@ -328,27 +350,174 @@ def test_custom_vocabulary_does_not_change_unsupported_provider_signature() -> N
         STTProviderName.QWEN_AUDIO,
     ),
 )
-async def test_custom_vocabulary_change_handoffs_supported_provider_with_new_terms(
-    provider: STTProviderName,
+async def test_custom_vocabulary_change_reaches_native_tasks_and_fresh_consumer(
+    provider: STTProviderName, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    initial = _settings(provider, "ko")
-    initial = _with_custom_terms(initial, {"ko": ["Puripuly"]})
-    updated = _with_custom_terms(initial, {"ko": ["Puripuly", "VRChat"]})
-    settings_holder = {"settings": initial}
-    recording_provider = _RecordingProvider()
-    owner = _build_owner(recording_provider, settings_holder)
+    initial = _with_custom_terms(_settings(provider, "en"), {"en": ["Puripuly"]})
+    updated = _with_custom_terms(initial, {"en": ["Puripuly", "VRChat"]})
+    connections = []
 
-    await owner.apply_intent(build_self_capture_session_config(initial), enabled=True)
-    settings_holder["settings"] = updated
-    snapshot = await owner.apply_intent(build_self_capture_session_config(updated), enabled=True)
+    async def handle(socket):
+        record = {
+            "socket": socket,
+            "terms": parse_qs(urlsplit(socket.request.path).query).get("keyterm", []),
+            "pcm": bytearray(),
+            "finished": False,
+            "task_id": None,
+        }
+        connections.append(record)
+        async for message in socket:
+            if isinstance(message, bytes):
+                record["pcm"].extend(message)
+                continue
+            packet = json.loads(message)
+            if provider is STTProviderName.QWEN_AUDIO:
+                if packet["header"]["action"] == "run-task":
+                    record["task_id"] = packet["header"]["task_id"]
+                    record["terms"] = list(packet["payload"]["parameters"].get("vocabulary", {}))
+                    await socket.send(json.dumps(control(record["task_id"], "task-started")))
+                else:
+                    record["finished"] = True
+            elif provider is STTProviderName.SONIOX:
+                if "model" in packet:
+                    record["terms"] = packet.get("context", {}).get("terms", [])
+                elif packet.get("type") == "finalize":
+                    record["finished"] = True
+            elif packet["type"] == "Finalize":
+                record["finished"] = True
+            elif packet["type"] == "CloseStream":
+                await socket.close()
 
-    assert snapshot.state is SelfCaptureSessionState.RUNNING
-    assert len(recording_provider.handoff_calls) == 1
-    request, started = recording_provider.handoff_calls[0]
-    assert started is True
-    assert request.config.custom_vocabulary_enabled is True
-    assert request.config.custom_terms == {"ko": ("Puripuly", "VRChat")}
-    await owner.close()
+    async def complete(record, text, tail=""):
+        socket = record["socket"]
+        if provider is STTProviderName.QWEN_AUDIO:
+            await socket.send(json.dumps(native(record["task_id"], 1, text)))
+            await socket.send(json.dumps(native(record["task_id"], 2, tail)))
+            await socket.send(json.dumps(control(record["task_id"], "task-finished")))
+        elif provider is STTProviderName.SONIOX:
+            await socket.send(
+                json.dumps(
+                    {
+                        "tokens": [
+                            {"text": text, "is_final": True, "end_ms": 40},
+                            {"text": "<fin>", "is_final": True},
+                        ]
+                    }
+                )
+            )
+        else:
+            await socket.send(
+                _installed_callback_payload(
+                    {"alternatives": [{"transcript": text, "confidence": 1.0, "words": []}]},
+                    finalize=True,
+                )
+            )
+
+    secrets = InMemorySecretStore()
+    for key in ("deepgram_api_key", "soniox_api_key", "alibaba_api_key_beijing"):
+        secrets.set(key, "offline")
+    factory = SharedSTTProviderFactory(
+        secrets=secrets, clock=SystemClock(), reset_deadline_s=1, gpu_model_path=tmp_path
+    )
+    async with serve(handle, "127.0.0.1", 0) as server:
+        endpoint = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+
+        def loopback_connect(uri, **kwargs):
+            return connect(endpoint + "/?" + urlsplit(uri).query, **{**kwargs, "proxy": None})
+
+        monkeypatch.setattr(network_clients, "external_websocket_connect", loopback_connect)
+        async with self_capture_pipeline(None, provider_factory=factory, settings=initial) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(connections) == 1 and connections[0]["finished"])
+            assert connections[0]["terms"] == ["Puripuly"]
+            assert connections[0]["pcm"] == float32_to_pcm16le_bytes(
+                np.full(640, 0.1, dtype=np.float32)
+            )
+            old_dispatch = env.guarded
+            if provider is STTProviderName.QWEN_AUDIO:
+                await spoken_turn(env, 0.2)
+                await wait_until(lambda: len(connections) == 2 and connections[1]["finished"])
+                second = connections[1]
+                await second["socket"].send(
+                    json.dumps(native(second["task_id"], 1, "RETIRED PENDING SOURCE"))
+                )
+                engine = env.harness.self_owner.local_asr_runtime.current_provider("self")
+                await wait_until(
+                    lambda: any(turn.pending_update is not None for turn in engine._turns.values())
+                )
+                await spoken_turn(env, 0.25)
+            else:
+                await complete(connections[0], "Initial source.")
+                await require_final_source(env, "Initial source.")
+            old_connections = list(connections)
+            env.settings_box[0] = updated
+            applied = await env.owner.apply_intent(
+                build_self_capture_session_config(updated), enabled=True
+            )
+            assert applied.state is SelfCaptureSessionState.RUNNING
+            assert applied.effective_active
+            env.guarded = env.owner._vad_dispatch
+            if provider is STTProviderName.QWEN_AUDIO:
+                for record in old_connections:
+                    await asyncio.wait_for(record["socket"].wait_closed(), timeout=1)
+                    with pytest.raises(ConnectionClosed):
+                        await complete(record, "RETIRED LATE SOURCE")
+                assert old_dispatch.retention_budget.used_bytes == 0
+                assert len(connections) == 2
+            offset = len(connections)
+            await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(connections) == offset + 1 and connections[-1]["finished"])
+            first = connections[-1]
+            if provider is STTProviderName.QWEN_AUDIO:
+                await spoken_turn(env, 0.4, epoch=2)
+                await wait_until(
+                    lambda: len(connections) == offset + 2 and connections[-1]["finished"]
+                )
+                await complete(connections[-1], " Fresh B.", " Tail B.")
+                await complete(first, "Fresh A.", " Tail A.")
+                expected = "Fresh A. Tail A. Fresh B. Tail B."
+            else:
+                await complete(first, "Fresh source.")
+                expected = "Fresh source."
+            transcript = await require_final_source(env, expected)
+            completed = [
+                event
+                for event in env.harness.ui_events._queue
+                if event.type is UIEventType.TRANSLATION_DONE
+                and event.utterance_id == transcript.utterance_id
+            ]
+            assert len(completed) == 1
+            assert completed[0].payload.text == env.llm.response_text
+            assert all(record["terms"] == ["Puripuly", "VRChat"] for record in connections[offset:])
+            values = (0.3, 0.4) if provider is STTProviderName.QWEN_AUDIO else (0.3,)
+            assert [record["pcm"] for record in connections[offset:]] == [
+                float32_to_pcm16le_bytes(np.full(640, value, dtype=np.float32)) for value in values
+            ]
+            assert all("RETIRED" not in item.text for item in final_sources(env))
+            assert all("RETIRED" not in call["text"] for call in env.llm.calls)
+            if provider is STTProviderName.QWEN_AUDIO:
+                assert len(transcript.recognition_origins) == 4
+                assert len(connections) == 4
+        for record in connections:
+            await asyncio.wait_for(record["socket"].wait_closed(), timeout=1)
+        print(
+            "STT_CUSTOM_VOCABULARY_REPLACEMENT "
+            + json.dumps(
+                {
+                    "provider": provider.value,
+                    "native_terms": [record["terms"] for record in connections],
+                    "pcm_bytes": [len(record["pcm"]) for record in connections],
+                    "fresh_source": transcript.text,
+                    "completed_translation": completed[0].payload.text,
+                    "recognition_origins": len(transcript.recognition_origins),
+                    "old_pending_and_late_source_rejected": provider is STTProviderName.QWEN_AUDIO,
+                    "all_connections_closed": all(
+                        record["socket"].close_code is not None for record in connections
+                    ),
+                },
+                sort_keys=True,
+            )
+        )
 
 
 @pytest.mark.asyncio
