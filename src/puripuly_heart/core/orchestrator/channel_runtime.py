@@ -12,7 +12,10 @@ from puripuly_heart.domain.models import ChannelId, UtteranceBundle
 from puripuly_heart.domain.recognition import RecognitionTextOrigin
 
 if TYPE_CHECKING:
-    from puripuly_heart.core.orchestrator.translation_turn import TranslationTurnProcessResult
+    from puripuly_heart.core.orchestrator.translation_turn import (
+        TerminalTranslationFailure,
+        TranslationTurnProcessResult,
+    )
 
 _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT = 1024
 
@@ -55,6 +58,7 @@ class _SpeculativeAttempt:
     status: _SpeculativeAttemptStatus = _SpeculativeAttemptStatus.RUNNING
     task: asyncio.Task[None] | None = None
     result: object | None = None
+    terminal_failure: TerminalTranslationFailure | None = None
     started_at: float | None = None
     completed_at: float | None = None
     terminal_action_started: bool = False
@@ -196,6 +200,7 @@ class ChannelRuntime:
             attempt = merge_buffer.speculative_attempt
             if attempt is not None:
                 attempt.status = _SpeculativeAttemptStatus.CANCELLED
+                attempt.terminal_failure = None
             tasks = (
                 attempt.task if attempt is not None else None,
                 merge_buffer.finalize_wait_task,
@@ -258,6 +263,7 @@ class ChannelRuntime:
         spec_attempt = merge_buffer.speculative_attempt
         if spec_attempt is not None:
             spec_attempt.status = _SpeculativeAttemptStatus.CANCELLED
+            spec_attempt.terminal_failure = None
         merge_tasks = [
             spec_attempt.task if spec_attempt is not None else None,
             spec_attempt.secondary_task if spec_attempt is not None else None,

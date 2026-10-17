@@ -398,6 +398,11 @@ TASK_CREATION_REVIEWS = (
         "ChatGPT plan provider retains maintenance, opening, request and auth tasks; shielded close drains those sets before closing the connection pool",
     ),
     *_reviews(
+        "providers/llm/index_translate.py",
+        {"IndexTranslateProvider.close": 1},
+        "Index provider retains one client-close task, shields and drains it despite repeated caller cancellation, and releases its client reference only after terminal cleanup",
+    ),
+    *_reviews(
         "providers/stt/custom.py",
         {
             "_OfflineOpenAITranscriptionSession.seal_turn": 1,

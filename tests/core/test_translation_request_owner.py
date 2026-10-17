@@ -12,6 +12,7 @@ import pytest
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.http_extensions import parse_http_extension
+from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
 from puripuly_heart.core.orchestrator.channel_runtime import ChannelRuntime
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -949,4 +950,130 @@ async def test_speculative_direct_failure_does_not_authorize_fallback() -> None:
         await fixture.owner.translate(
             DirectTranslationRequest(utterance_id=uuid4(), text="synthetic", record_latency=False)
         )
+    assert observed == []
+
+
+@pytest.mark.asyncio
+async def test_index_prestarted_failure_is_consumed_once_at_final_admission() -> None:
+    failure = RuntimeError("terminal Index request")
+    provider = RecordingProvider(failure=failure)
+    fixture = build_owner(
+        SemaphoreLLMProvider(provider, asyncio.Semaphore(1), provider_name="index_translate")
+    )
+    observed = []
+    fixture.owner.settled_failure_sink = observed.append
+    request = process_request(fixture)
+
+    prestarted = await fixture.owner.process(
+        replace(
+            request, prestarted=True, expected_provider_generation=fixture.owner.provider_generation
+        )
+    )
+
+    assert prestarted.outcome == "failed"
+    assert prestarted.terminal_failure is not None
+    assert observed == []
+    assert fixture.presentation.messages == []
+
+    final = await fixture.owner.process(
+        replace(request, terminal_failure=prestarted.terminal_failure)
+    )
+
+    assert final.outcome == "failed"
+    assert final.output.failure_code == "provider_error"
+    assert final.terminal_failure is None
+    assert len(provider.calls) == 1
+    assert observed == [failure]
+    assert len(fixture.presentation.messages) == 1
+    assert [entry.text for entry in fixture.self_runtime.translation_history] == [
+        "request",
+        "request",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "change",
+    [
+        "utterance_id",
+        "text",
+        "channel",
+        "source_language",
+        "target_language",
+        "configuration",
+        "generation",
+    ],
+)
+async def test_terminal_index_failure_does_not_consume_changed_request(change) -> None:
+    provider = RecordingProvider(failure=RuntimeError("old request"))
+    fixture = build_owner(
+        SemaphoreLLMProvider(provider, asyncio.Semaphore(1), provider_name="index_translate")
+    )
+    observed = []
+    fixture.owner.settled_failure_sink = observed.append
+    request = process_request(fixture)
+    prestarted = await fixture.owner.process(
+        replace(
+            request, prestarted=True, expected_provider_generation=fixture.owner.provider_generation
+        )
+    )
+    assert prestarted.terminal_failure is not None
+    provider.failure = None
+    final_request = replace(request, terminal_failure=prestarted.terminal_failure)
+    if change == "utterance_id":
+        final_request = replace(final_request, utterance_id=uuid4())
+    elif change == "text":
+        final_request = replace(final_request, text="different request")
+    elif change == "channel":
+        final_request = replace(
+            final_request, channel="peer", publication_generation=0, source_order=1
+        )
+    elif change == "source_language":
+        final_request = replace(final_request, detected_language="en")
+    elif change == "target_language":
+        final_request = replace(final_request, target_language="es")
+    elif change == "configuration":
+        fixture.configuration.transform(lambda current: replace(current, system_prompt="new"))
+        final_request = replace(final_request, config_snapshot=fixture.configuration.snapshot())
+    else:
+        await fixture.provider_runtime.replace_provider(
+            LlmTranslationBackend(
+                SemaphoreLLMProvider(
+                    provider, asyncio.Semaphore(1), provider_name="index_translate"
+                )
+            ),
+            start=False,
+        )
+
+    result = await fixture.owner.process(final_request)
+
+    assert result.outcome == "translated"
+    assert result.output.translation.text == "translated"
+    assert len(provider.calls) == 2
+    assert observed == []
+    assert fixture.presentation.messages == []
+
+
+@pytest.mark.asyncio
+async def test_cancelled_final_index_failure_does_not_notify_fallback() -> None:
+    provider = RecordingProvider(failure=RuntimeError("terminal request"))
+    fixture = build_owner(
+        SemaphoreLLMProvider(provider, asyncio.Semaphore(1), provider_name="index_translate")
+    )
+    observed = []
+    fixture.owner.settled_failure_sink = observed.append
+    request = process_request(fixture)
+    prestarted = await fixture.owner.process(
+        replace(
+            request, prestarted=True, expected_provider_generation=fixture.owner.provider_generation
+        )
+    )
+
+    result = await fixture.owner.process(
+        replace(request, terminal_failure=prestarted.terminal_failure),
+        cancellation_requested=lambda: True,
+    )
+
+    assert result.outcome == "failed"
+    assert len(provider.calls) == 1
     assert observed == []

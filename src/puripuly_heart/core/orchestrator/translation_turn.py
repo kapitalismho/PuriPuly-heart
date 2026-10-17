@@ -177,6 +177,18 @@ def _final_transcript_segments(
 
 
 @dataclass(frozen=True, slots=True)
+class TerminalTranslationFailure:
+    exception: Exception
+    provider_generation: int
+    utterance_id: UUID
+    text: str
+    channel: ChannelId
+    source_language: str
+    target_language: str
+    configuration: TranslationRuntimeConfig
+
+
+@dataclass(frozen=True, slots=True)
 class _PrestartedTranslation:
     task: asyncio.Task[TranslationTurnProcessResult]
     child_utterance_id: UUID
@@ -192,6 +204,9 @@ class TranslationTurnRequest:
     target_languages: tuple[str, ...]
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    precomputed_failure: TerminalTranslationFailure | None = field(
+        default=None, repr=False, compare=False
+    )
     prestarted_secondary_translation: _PrestartedTranslation | None = field(
         default=None,
         repr=False,
@@ -271,6 +286,9 @@ class TranslationTurnChild:
     context_policy: TranslationContextPolicy
     config_snapshot: TranslationRuntimeConfigSnapshot
     precomputed_translation: Translation | None = None
+    precomputed_failure: TerminalTranslationFailure | None = field(
+        default=None, repr=False, compare=False
+    )
     parent_output_count: int = 1
     prestarted_translation: _PrestartedTranslation | None = field(
         default=None,
@@ -348,6 +366,9 @@ class TranslationTurnProcessResult:
     outcome: TranslationTurnOutcome
     output: TranslationOutputSubmission | None = None
     failure_diagnostics: ErrorDiagnostics | None = None
+    terminal_failure: TerminalTranslationFailure | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if self.output is not None and self.output.outcome != self.outcome:
@@ -891,6 +912,9 @@ class TranslationTurnLifecycleOwner:
                         )
                         if request.precomputed_translation is not None and target_index == 0
                         else None
+                    ),
+                    precomputed_failure=(
+                        request.precomputed_failure if target_index == 0 else None
                     ),
                     parent_output_count=len(child_specs),
                     prestarted_translation=(
@@ -1630,6 +1654,7 @@ class TranslationTurnLifecycleOwner:
 
 
 __all__ = [
+    "TerminalTranslationFailure",
     "TranslationContextPolicy",
     "TranslationOutputSubmission",
     "TranslationOutputSubmissionPort",

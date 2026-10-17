@@ -227,9 +227,14 @@ async def test_osc_same_model_repairs_invalid_connection_from_saved_history() ->
 
 @pytest.mark.asyncio
 async def test_osc_model_only_restores_regional_managed_connection_history() -> None:
-    from puripuly_heart.config.settings_vnext.defaults import new_settings_for_first_run
-
-    current = new_settings_for_first_run("zh-CN")
+    current = materialize_canonical_translation_settings(
+        _with_translation(
+            AppSettingsVNext(),
+            model="deepseek_v4_flash_41",
+            connection="managed_china",
+            connection_history={"deepseek_v4_flash_41": "managed_china"},
+        )
+    )
 
     async def apply_settings(settings: object) -> object:
         nonlocal current

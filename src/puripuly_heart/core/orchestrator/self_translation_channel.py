@@ -50,6 +50,7 @@ from puripuly_heart.core.orchestrator.translation_request import (
     TranslationRequestPort,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
+    TerminalTranslationFailure,
     TranslationOutputSubmission,
     TranslationTurnChild,
     TranslationTurnKind,
@@ -811,14 +812,19 @@ class SelfTranslationChannelOwner:
             result = await prestarted.task
             if cancellation_requested():
                 raise asyncio.CancelledError
-            if (
-                result.outcome != "translated"
-                or result.output is None
-                or prestarted.provider_generation != self.translation_requests.provider_generation
-                or not self._translation_config_matches(
+            prestart_matches = (
+                prestarted.provider_generation == self.translation_requests.provider_generation
+                and self._translation_config_matches(
                     prestarted.config_snapshot.value,
                     child.config_snapshot.value,
                 )
+            )
+            if prestart_matches and result.terminal_failure is not None:
+                request = replace(request, terminal_failure=result.terminal_failure)
+            if (
+                result.outcome != "translated"
+                or result.output is None
+                or not prestart_matches
             ):
                 self._clear_latency_timeline(child.utterance_id)
                 result = await self.translation_requests.process(
@@ -1082,6 +1088,7 @@ class SelfTranslationChannelOwner:
         *,
         turn_kind: TranslationTurnKind = "self",
         precomputed_translation: Translation | None = None,
+        precomputed_failure: TerminalTranslationFailure | None = None,
         prestarted_secondary_translation: _PrestartedTranslation | None = None,
         wait_for_parent: bool = False,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
@@ -1097,6 +1104,7 @@ class SelfTranslationChannelOwner:
                 turn_kind=turn_kind,
                 target_languages=config_snapshot.value.self_target_languages,
                 precomputed_translation=precomputed_translation,
+                precomputed_failure=precomputed_failure,
                 prestarted_secondary_translation=prestarted_secondary_translation,
                 config_snapshot=config_snapshot,
                 operation_id=operation_id,
@@ -1135,6 +1143,7 @@ class SelfTranslationChannelOwner:
             turn_order=child.turn_order,
             turn_kind=child.turn_kind,
             parent_output_count=child.parent_output_count,
+            terminal_failure=child.precomputed_failure,
             operation_id=child.operation_id,
             request_id=child.request_id,
         )
@@ -1382,6 +1391,7 @@ class SelfTranslationChannelOwner:
         if attempt is None:
             return False
         attempt.status = _SpeculativeAttemptStatus.CANCELLED
+        attempt.terminal_failure = None
         if (
             attempt.task is not None
             and not attempt.task.done()
@@ -1754,6 +1764,17 @@ class SelfTranslationChannelOwner:
             final_text=final_text,
             config_snapshot=current_config_snapshot,
         )
+        precomputed_failure = (
+            attempt.terminal_failure
+            if attempt is not None
+            and attempt.status is _SpeculativeAttemptStatus.FAILED
+            and attempt.source_text == final_text
+            and attempt.provider_generation == self.translation_requests.provider_generation
+            and attempt.config_snapshot.value == current_config_snapshot.value
+            else None
+        )
+        if attempt is not None:
+            attempt.terminal_failure = None
         reuse_mode = None
         if (
             attempt is not None
@@ -1879,6 +1900,7 @@ class SelfTranslationChannelOwner:
         await self._ensure_translation(
             transcript,
             turn_kind="self",
+            precomputed_failure=precomputed_failure,
             prestarted_secondary_translation=prestarted_secondary_translation,
             config_snapshot=config_snapshot,
         )
@@ -2122,6 +2144,20 @@ class SelfTranslationChannelOwner:
             ):
                 return
             self._clear_spec_latency_state(buffer)
+            current_attempt.terminal_failure = self.translation_requests.capture_terminal_failure(
+                exc,
+                provider_generation=current_attempt.provider_generation,
+                utterance_id=merge_id,
+                text=text,
+                channel="self",
+                source_language=self.translation_requests.source_language_for(
+                    "self", config_snapshot.value
+                ),
+                target_language=self.translation_requests.target_language_for(
+                    "self", config_snapshot.value
+                ),
+                configuration=config_snapshot.value,
+            )
             current_attempt.status = _SpeculativeAttemptStatus.FAILED
             current_attempt.completed_at = self.clock.now()
             await self._evaluate_speculative_next_action(
@@ -2179,6 +2215,7 @@ class SelfTranslationChannelOwner:
             return
         self._clear_spec_latency_state(buffer)
         current_attempt.result = None
+        current_attempt.terminal_failure = None
         current_attempt.status = _SpeculativeAttemptStatus.STALE
         current_attempt.completed_at = self.clock.now()
         await self._evaluate_speculative_next_action(

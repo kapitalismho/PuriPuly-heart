@@ -186,7 +186,8 @@ async def test_normal_controls_share_probe_and_newer_off_fences_waiting_on(compo
     await asyncio.wait_for(http.index_entered.wait(), 5)
     control = app.control()
     on = await control.submit("translation.set", {"enabled": True}, request_id="waiting-on")
-    await wait_until(lambda: app._translation_selection_intent == 1)
+    await asyncio.sleep(0)
+    assert (await control.operation(on["operation_id"]))["status"] == "running"
     off = await operation(app, "translation.set", {"enabled": False}, "newer-off")
     assert off["status"] == "applied"
     assert app.state().translation_enabled is False
@@ -577,3 +578,239 @@ async def test_timeout_after_atomic_write_admission_retains_commit_but_fences_ru
     )
     assert recovered["status"] == "action_required"
     assert app.state().translation_enabled is False
+
+
+@pytest.mark.asyncio
+async def test_real_translation_revision_is_checked_after_shared_resource_wait(composed):
+    _path, http, create = composed
+    http.index_release.set()
+    app, _presentation = create()
+    await app.start()
+    assert (await operation(app, "translation.set", {"enabled": True}, "enable-before-stale"))["status"] == "applied"
+    control = app.control()
+    expected = (await control.query("settings.current", {}))["revision"]
+    await control._resource_lock.acquire()
+    try:
+        stale = await control.submit(
+            "translation.set", {"enabled": False}, request_id="real-stale-off",
+            expected_revision=expected,
+        )
+        await asyncio.sleep(0)
+        assert (await control.operation(stale["operation_id"]))["terminal"] is False
+        locale = await operation(
+            app, "settings.apply", {"changes": {"locale": "ja"}}, "revision-during-wait"
+        )
+        current = (await control.query("settings.current", {}))["revision"]
+        assert locale["terminal"] is True and current > expected
+    finally:
+        control._resource_lock.release()
+    rejected = await control.wait(stale["operation_id"], timeout=5)
+    assert rejected["status"] == "rejected"
+    assert rejected["error"] == {"code": "revision_conflict", "current_revision": current}
+    assert app.state().translation_enabled is True
+
+
+@pytest.mark.asyncio
+async def test_rejected_index_enable_does_not_invalidate_a_pending_gui_enable(composed):
+    _path, http, create = composed
+    app, _presentation = create()
+    await app.start()
+    await asyncio.wait_for(http.index_entered.wait(), 5)
+    control = app.control()
+    expected = (await control.query("settings.current", {}))["revision"]
+    stale = await control.submit(
+        "translation.set", {"enabled": True}, request_id="stale-pending-on",
+        expected_revision=expected,
+    )
+    await asyncio.sleep(0)
+    gui = asyncio.create_task(app.set_translation_enabled(True, allow_authorization=False))
+    await asyncio.sleep(0)
+    changed = await operation(
+        app, "settings.apply", {"changes": {"locale": "ja"}}, "newer-locale"
+    )
+    assert changed["terminal"] is True
+    current = (await control.query("settings.current", {}))["revision"]
+    assert current > expected
+    http.index_release.set()
+    rejected = await control.wait(stale["operation_id"], timeout=5)
+    assert rejected["status"] == "rejected"
+    assert rejected["error"] == {"code": "revision_conflict", "current_revision": current}
+    assert await asyncio.wait_for(gui, 5) is True
+    assert app.state().translation_enabled is True
+    assert len(http.index_requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_failed_preflight_with_stale_revision_never_advances_pending_intent(
+    composed, monkeypatch
+):
+    from puripuly_heart.app.services.ui_application import TranslationEnablePreparation
+
+    _path, http, create = composed
+    app, _presentation = create()
+    await app.start()
+    await asyncio.wait_for(http.index_entered.wait(), 5)
+    control = app.control()
+    expected = (await control.query("settings.current", {}))["revision"]
+    first = asyncio.Event()
+    fail = asyncio.Event()
+    original = app.prepare_translation_enable
+
+    async def controlled_preparation(intent_revision=None):
+        if not first.is_set():
+            first.set()
+            captured = app._translation_selection_intent
+            await fail.wait()
+            return TranslationEnablePreparation(
+                intent_revision=captured,
+                selection_generation=app._index_selection.generation,
+                ready=False,
+            )
+        return await original(intent_revision)
+
+    monkeypatch.setattr(app, "prepare_translation_enable", controlled_preparation)
+    failed = await control.submit(
+        "translation.set", {"enabled": True}, request_id="failed-before-admission",
+        expected_revision=expected,
+    )
+    await first.wait()
+    gui = asyncio.create_task(app.set_translation_enabled(True, allow_authorization=False))
+    await asyncio.sleep(0)
+    pending_intent = app._translation_selection_intent
+    changed = await operation(
+        app, "settings.apply", {"changes": {"locale": "ja"}}, "stale-before-failure"
+    )
+    assert changed["terminal"] is True
+    assert (await control.query("settings.current", {}))["revision"] > expected
+    fail.set()
+    receipt = await control.wait(failed["operation_id"], timeout=5)
+    assert receipt["status"] == "degraded"
+    assert receipt["reason"] == "translation_preparation_failed"
+    assert app._translation_selection_intent == pending_intent
+    assert not gui.done()
+    assert app.state().translation_enabled is False
+    http.index_release.set()
+    assert await asyncio.wait_for(gui, 5) is True
+    assert app.state().translation_enabled is True
+    assert len(http.index_requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_changed_selection_rejoins_current_probe_outside_final_admission(composed):
+    _path, http, create = composed
+    http.index_release.set()
+    app, presentation = create()
+    await app.start()
+    assert (await operation(app, "translation.set", {"enabled": True}, "first-activation"))["status"] == "applied"
+    assert (await operation(app, "translation.set", {"enabled": False}, "before-reselection"))["status"] == "applied"
+    control = app.control()
+    await control._resource_lock.acquire()
+    try:
+        away = await control.submit("settings.apply", {"changes": {
+            "translation.model": "gemma4_26b_31b", "translation.connection": "managed",
+        }}, request_id="queued-away")
+        back = await control.submit("settings.apply", {"changes": {
+            "translation.model": "index_translate_35b", "translation.connection": "public_api",
+        }}, request_id="queued-back")
+        on = await control.submit(
+            "translation.set", {"enabled": True}, request_id="prepared-before-reselection"
+        )
+        await asyncio.sleep(0)
+        assert (await control.operation(on["operation_id"]))["terminal"] is False
+        http.index_release.clear()
+        http.index_status = 503
+    finally:
+        control._resource_lock.release()
+    assert (await control.wait(away["operation_id"], timeout=5))["terminal"] is True
+    assert (await control.wait(back["operation_id"], timeout=5))["terminal"] is True
+    await wait_until(lambda: len(http.index_requests) == 2)
+    assert (await control.operation(on["operation_id"]))["terminal"] is False
+    changed = await operation(
+        app, "settings.apply", {"changes": {"locale": "ja"}}, "responsive-after-reselection"
+    )
+    assert changed["terminal"] is True
+    http.index_release.set()
+    result = await control.wait(on["operation_id"], timeout=5)
+    assert result["status"] == "action_required"
+    assert app.compatibility_settings().intent.translation.connection == "managed"
+    assert app.state().translation_enabled is False
+    assert len(http.index_requests) == 2
+    assert [key for key, _ in presentation.messages].count("messages.index_api_fallback_managed") == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["probe", "resource"])
+async def test_freeze_fences_real_index_activation_in_preparation_or_resource_wait(composed, phase):
+    _path, http, create = composed
+    if phase == "resource":
+        http.index_release.set()
+    app, _presentation = create()
+    await app.start()
+    await asyncio.wait_for(http.index_entered.wait(), 5)
+    control = app.control()
+    if phase == "resource":
+        prepared = await app.prepare_translation_enable()
+        assert prepared.ready is True
+        await control._resource_lock.acquire()
+    try:
+        on = await control.submit(
+            "translation.set", {"enabled": True}, request_id=f"freeze-at-{phase}"
+        )
+        await asyncio.sleep(0)
+        assert (await control.operation(on["operation_id"]))["terminal"] is False
+        control.freeze_ingress()
+        await asyncio.wait_for(control.drain_operations(), 5)
+        assert (await control.operation(on["operation_id"]))["status"] == "interrupted"
+        assert app.state().translation_enabled is False
+    finally:
+        if phase == "resource":
+            control._resource_lock.release()
+        http.index_release.set()
+    await app._index_selection.prepare_enable()
+    assert app.state().translation_enabled is False
+    assert len(http.index_requests) == 1
+
+
+@pytest.mark.asyncio
+async def test_successful_index_preparation_still_orders_activation_after_manual_output(
+    composed, monkeypatch
+):
+    from uuid import uuid4
+
+    from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+
+    _path, http, create = composed
+    http.index_release.set()
+    app, _presentation = create()
+    await app.start()
+    prepared = await app.prepare_translation_enable()
+    assert prepared.ready is True
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def held_output(_text):
+        entered.set()
+        await release.wait()
+        return TextSubmissionAdmission("admitted", uuid4(), ())
+
+    monkeypatch.setattr(app, "submit_text", held_output)
+    control = app.control()
+    manual = await control.submit("text.submit", {"text": "synthetic hold"}, request_id="manual-hold")
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        on = await control.submit(
+            "translation.set", {"enabled": True}, request_id="ordered-index-on"
+        )
+        await asyncio.sleep(0)
+        assert (await control.wait(on["operation_id"], timeout=0.01))["terminal"] is False
+        assert app.state().translation_enabled is False
+        locale = await operation(
+            app, "settings.apply", {"changes": {"locale": "ja"}}, "safe-during-manual"
+        )
+        assert locale["terminal"] is True
+    finally:
+        release.set()
+    assert (await control.wait(manual["operation_id"], timeout=5))["status"] == "applied"
+    assert (await control.wait(on["operation_id"], timeout=5))["status"] == "applied"
+    assert app.state().translation_enabled is True
+    assert len(http.index_requests) == 1

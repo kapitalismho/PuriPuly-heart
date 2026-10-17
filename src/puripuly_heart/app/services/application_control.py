@@ -88,7 +88,10 @@ from puripuly_heart.core.messages import (
 )
 
 if TYPE_CHECKING:
-    from puripuly_heart.app.services.ui_application import UiApplicationBoundary
+    from puripuly_heart.app.services.ui_application import (
+        TranslationEnablePreparation,
+        UiApplicationBoundary,
+    )
 
 TERMINAL = frozenset(
     {
@@ -1473,6 +1476,17 @@ class ApplicationControlOwner:
         data["secondary_truncated"] = data["secondary_omitted_count"] > 0
         return data
 
+    def _fail_translation_preparation(self, operation: _Operation) -> None:
+        if not self._open or operation.interrupt_requested:
+            raise asyncio.CancelledError
+        state = self.application.state()
+        operation.receipt.update(
+            status="degraded",
+            reason="translation_preparation_failed",
+            translation_enabled=state.translation_enabled,
+            runtime_ready=state.translation_runtime_ready,
+        )
+
     async def _execute_owned(
         self, command: str, arguments: dict, expected_revision: int | None, operation_id: str
     ) -> None:
@@ -1482,6 +1496,20 @@ class ApplicationControlOwner:
         acquired = False
         try:
             operation.receipt["status"] = "running"
+            translation_enable = (
+                command == "translation.set"
+                and len(arguments) == 1
+                and arguments.get("enabled") is True
+            )
+            preparation = None
+            if translation_enable:
+                if not self._open:
+                    raise asyncio.CancelledError
+                preparation = await self.application.prepare_translation_enable()
+                if preparation is not None and not preparation.ready:
+                    self._fail_translation_preparation(operation)
+                    completed = True
+                    return
             changes = arguments.get("changes", arguments) if command == "settings.apply" else None
             safe_capture_off = command == "capture.set" and arguments.get("enabled") is False
             safe_locale = (
@@ -1499,7 +1527,6 @@ class ApplicationControlOwner:
                 or safe_capture_off
                 or safe_locale
                 or command == "secrets.verify"
-                or command == "translation.set"
                 else self._resource_lock
             )
             if resource_lock is not None:
@@ -1507,57 +1534,76 @@ class ApplicationControlOwner:
                 acquired = True
             with self.results.capture(revision=self._current_revision) as captured:
                 deferred = None
-                async with asyncio.Lock() if independent_stop else self._lock:
-                    if not self._open and command != "app.stop":
-                        raise asyncio.CancelledError
-                    if not independent_stop:
-                        self._lock_owner = asyncio.current_task()
-                    revision = self._current_revision()
-                    if expected_revision is not None and expected_revision != revision:
-                        operation.receipt.update(
-                            status="rejected",
-                            error={"code": "revision_conflict", "current_revision": revision},
-                        )
-                    elif command == "models.install":
-                        _validate_command_args(
-                            command, arguments, locale_choices=self.locale_choices
-                        )
-                        if self.provisioning() is None:
-                            result = {
-                                "status": "failed",
-                                "error": {"code": "model_owner_unavailable"},
-                            }
-                        else:
-                            deferred = (
-                                "install",
-                                self._start_model_install(arguments, operation_id),
+                while True:
+                    refresh_preparation = False
+                    async with asyncio.Lock() if independent_stop else self._lock:
+                        if not self._open and command != "app.stop":
+                            raise asyncio.CancelledError
+                        if not independent_stop:
+                            self._lock_owner = asyncio.current_task()
+                        revision = self._current_revision()
+                        if expected_revision is not None and expected_revision != revision:
+                            operation.receipt.update(
+                                status="rejected",
+                                error={"code": "revision_conflict", "current_revision": revision},
                             )
-                    elif command == "text.submit":
-                        _validate_command_args(
-                            command, arguments, locale_choices=self.locale_choices
-                        )
-                        if not isinstance(arguments["text"], str) or not arguments["text"].strip():
-                            raise InvalidArgumentsError("text must be non-empty")
-                        deferred = ("text", arguments["text"])
-                    elif command == "translation.set":
-                        _validate_command_args(
-                            command, arguments, locale_choices=self.locale_choices
-                        )
-                        deferred = ("translation", arguments)
-                    else:
-                        result = await self._dispatch(command, arguments, operation_id=operation_id)
-                    if self._lock_owner is asyncio.current_task():
-                        self._lock_owner = None
+                        elif translation_enable and (
+                            self.application.translation_preparation_needs_refresh(preparation)
+                        ):
+                            refresh_preparation = True
+                        elif command == "models.install":
+                            _validate_command_args(
+                                command, arguments, locale_choices=self.locale_choices
+                            )
+                            if self.provisioning() is None:
+                                result = {
+                                    "status": "failed",
+                                    "error": {"code": "model_owner_unavailable"},
+                                }
+                            else:
+                                deferred = (
+                                    "install",
+                                    self._start_model_install(arguments, operation_id),
+                                )
+                        elif command == "text.submit":
+                            _validate_command_args(
+                                command, arguments, locale_choices=self.locale_choices
+                            )
+                            if not isinstance(arguments["text"], str) or not arguments["text"].strip():
+                                raise InvalidArgumentsError("text must be non-empty")
+                            deferred = ("text", arguments["text"])
+                        elif preparation is not None:
+                            result = await self._dispatch(
+                                command, arguments, operation_id=operation_id,
+                                translation_preparation=preparation,
+                            )
+                        else:
+                            result = await self._dispatch(
+                                command, arguments, operation_id=operation_id
+                            )
+                        if self._lock_owner is asyncio.current_task():
+                            self._lock_owner = None
+                    if not refresh_preparation:
+                        break
+                    if acquired:
+                        resource_lock.release()
+                        acquired = False
+                    preparation = await self.application.prepare_translation_enable(
+                        preparation.intent_revision if preparation is not None else None
+                    )
+                    if preparation is not None and not preparation.ready:
+                        self._fail_translation_preparation(operation)
+                        completed = True
+                        return
+                    if resource_lock is not None:
+                        await resource_lock.acquire()
+                        acquired = True
                 if operation.receipt["status"] != "rejected":
                     if deferred is not None:
                         if not self._open:
                             raise asyncio.CancelledError
                         if deferred[0] == "install":
                             result = await self._install_result(deferred[1])
-                        elif deferred[0] == "translation":
-                            result = await self._dispatch(
-                                command, deferred[1], operation_id=operation_id
-                            )
                         else:
                             result = self._text_admission_data(
                                 await self.application.submit_text(deferred[1])
@@ -1770,7 +1816,14 @@ class ApplicationControlOwner:
             "failed_model_ids": list(result.failed_model_ids),
         }
 
-    async def _dispatch(self, command: str, args: dict, *, operation_id: str) -> object:
+    async def _dispatch(
+        self,
+        command: str,
+        args: dict,
+        *,
+        operation_id: str,
+        translation_preparation: TranslationEnablePreparation | None = None,
+    ) -> object:
         app = self.application
         _validate_command_args(command, args, locale_choices=self.locale_choices)
         if command == "app.stop":
@@ -1855,7 +1908,12 @@ class ApplicationControlOwner:
                     continue
         if command == "translation.set":
             enabled = _boolean(args, "enabled")
-            await app.set_translation_enabled(enabled, allow_authorization=False)
+            if translation_preparation is None:
+                await app.set_translation_enabled(enabled, allow_authorization=False)
+            else:
+                await app.set_translation_enabled(
+                    enabled, allow_authorization=False, preparation=translation_preparation
+                )
             state = app.state()
             matched = state.translation_enabled == enabled and (
                 not enabled or state.translation_runtime_ready is True

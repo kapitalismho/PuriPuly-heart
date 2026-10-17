@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 from dataclasses import dataclass, field
 from uuid import UUID
@@ -67,6 +68,7 @@ class IndexTranslateProvider(LLMProvider):
     _client: httpx.AsyncClient | None = field(init=False, default=None, repr=False)
     _client_lock: asyncio.Lock = field(init=False, default_factory=asyncio.Lock, repr=False)
     _closed: bool = field(init=False, default=False, repr=False)
+    _close_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
 
     async def _get_http_client(self) -> httpx.AsyncClient:
         async with self._client_lock:
@@ -168,9 +170,29 @@ class IndexTranslateProvider(LLMProvider):
         )
 
     async def close(self) -> None:
-        async with self._client_lock:
+        if self._close_task is None:
             self._closed = True
-            client = self._client
-            self._client = None
-        if client is not None:
-            await client.aclose()
+            self._close_task = asyncio.create_task(
+                self._close_owned_client(), name="index-translate-client-close"
+            )
+        try:
+            await asyncio.shield(self._close_task)
+        except asyncio.CancelledError:
+            while not self._close_task.done():
+                try:
+                    await asyncio.shield(self._close_task)
+                except asyncio.CancelledError:
+                    current_task = asyncio.current_task()
+                    if current_task is None or not current_task.cancelling():
+                        raise
+                except BaseException:
+                    break
+            with contextlib.suppress(BaseException):
+                self._close_task.result()
+            raise asyncio.CancelledError
+
+    async def _close_owned_client(self) -> None:
+        async with self._client_lock:
+            if self._client is not None:
+                await self._client.aclose()
+                self._client = None
