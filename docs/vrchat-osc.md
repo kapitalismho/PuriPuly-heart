@@ -106,9 +106,8 @@
 | 11 | Gemma 4 E4B GPU |
 | 13 | DeepSeek V4.1 Flash |
 | 14 | GPT 6 Luna |
-| 15 | Gemma 4 26B A4B QAT GPU (local, Vulkan only) |
-| 16 | Index-Translate 35B (public API, no key) |
+| 15 | Gemma 4 26B A4B GPU |
+| 16 | Index-Translate 35B |
 
 - Used by: `PuriPuly_Translator`
-- Selecting Index applies the same background availability check and persisted Gemma fallback as GUI and CLI controls. Existing model IDs retain their meaning.
 
