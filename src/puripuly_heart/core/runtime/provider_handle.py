@@ -616,7 +616,7 @@ class ProviderRuntimeHandle:
         *,
         event_task: asyncio.Task[None] | None,
     ) -> None:
-        if self._is_qwen_provider(provider) and bool(getattr(provider, "cleanup_debt", 0)):
+        if self._is_qwen_provider(provider):
             self._retain_retired_provider(provider)
         task = self._create_task(
             self._retire_handed_off_provider(provider, event_task=event_task),

@@ -531,3 +531,98 @@ async def test_qwen_return_blocks_while_its_previous_owned_retirement_is_still_i
             unsafe.allow_close = True
             unsafe.hold = False
             unsafe.release.set()
+
+
+async def expire_healthy_qwen_owner(env):
+    runtime = env.harness.self_owner.local_asr_runtime
+    handle = runtime._handles["self"]
+    old = env.factory.engines[0]
+    qwen = env.settings_box[0]
+    other = replace(
+        qwen,
+        intent=replace(qwen.intent, stt=replace(qwen.intent.stt, provider="soniox")),
+    )
+    request = build_self_stt_provider_request_from_vnext(other, warmup=False)
+    switching = asyncio.create_task(runtime.handoff_provider(request, start=True))
+    await wait_until(lambda: handle._pending_handoff is not None)
+    await runtime.commit_handoff("self")
+    assert (await switching).status == "applied"
+    for _ in range(handle.max_retained_scoped_providers):
+        assert (await runtime.handoff_provider(request, start=True)).status == "applied"
+    await wait_until(lambda: old._closing)
+    assert old not in handle.retained_scoped_providers
+    assert old.cleanup_debt == 0
+    assert old in handle._retired_providers
+    assert any(not task.done() for task in handle._retirement_tasks)
+    return runtime, handle, old, build_self_stt_provider_request_from_vnext(qwen, warmup=False)
+
+
+@pytest.mark.asyncio
+async def test_healthy_qwen_retained_expiry_stays_owned_until_native_drain_then_two_fresh_turns():
+    transport = FaultTransport([])
+    factory = RequestFactory(transport)
+    async with self_capture_pipeline(transport, provider_factory=factory) as env:
+        returning = None
+        completed = set()
+        try:
+            await spoken_turn(env)
+            await wait_until(
+                lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0])
+            )
+            old_socket = transport.sockets[0]
+            await old_socket.push(native(old_socket.task_ids[0], 1, "Already admitted old."))
+            await wait_until(
+                lambda: env.harness.self_owner.merge_buffer is not None
+                and env.harness.self_owner.merge_buffer.parts == ["Already admitted old."]
+            )
+            runtime, handle, old, request = await expire_healthy_qwen_owner(env)
+            assert not old_socket.closed
+            assert handle._event_handler_for(provider=old, generation=0) is None
+            before = len(factory.requests)
+            returning = asyncio.create_task(runtime.handoff_provider(request, start=True))
+            await wait_until(lambda: runtime.snapshot.channel_for("self").phase == "building")
+            assert not returning.done()
+            assert len(factory.requests) == before and transport.attempts == 1
+            assert old in handle._retired_providers and old.cleanup_debt == 0
+            assert not old_socket.closed
+            await old_socket.push(native(old_socket.task_ids[0], 2, " EXPIRED OLD TAIL."))
+            await old_socket.push(control(old_socket.task_ids[0], "task-finished"))
+            completed.add(old_socket)
+            assert (await returning).status == "applied"
+            assert old_socket.closed and old.cleanup_debt == 0
+            assert old not in handle._retired_providers
+            await spoken_turn(env, 0.2)
+            await wait_until(
+                lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1])
+            )
+            first = transport.sockets[-1]
+            await spoken_turn(env, 0.3)
+            await wait_until(
+                lambda: len(transport.sockets) == 3 and finish_sent(transport.sockets[-1])
+            )
+            second = transport.sockets[-1]
+            assert sum(not socket.closed for socket in transport.sockets) == 2
+            for socket, text, tail in (
+                (second, " Fresh B.", " Tail B."),
+                (first, " Fresh A.", " Tail A."),
+            ):
+                await socket.push(native(socket.task_ids[0], 1, text))
+                await socket.push(native(socket.task_ids[0], 2, tail))
+                await socket.push(control(socket.task_ids[0], "task-finished"))
+                completed.add(socket)
+            source = await require_final_source(
+                env, "Already admitted old. Fresh A. Tail A. Fresh B. Tail B."
+            )
+            assert len(source.recognition_origins) == 5
+            assert not any("EXPIRED" in call["text"] for call in env.llm.calls)
+            assert not any(
+                event.type is UIEventType.TRANSCRIPT_FINAL and "EXPIRED" in event.payload.text
+                for event in env.harness.ui_events._queue
+            )
+            assert env.owner.snapshot.effective_active
+        finally:
+            for socket in transport.sockets:
+                if socket not in completed and not socket.closed:
+                    await finish(socket, "Owned fixture cleanup.")
+            if returning is not None:
+                await returning
