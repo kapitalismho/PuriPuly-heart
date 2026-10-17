@@ -12,6 +12,10 @@ from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import UIEventType
 from puripuly_heart.domain.models import OSCMessage, Translation
+from tests.core.test_self_stream_owned_ingress_233 import (
+    ControlledRecognitionProvider,
+    OwnedIngress,
+)
 from tests.fixtures.self_grace_233.stream2.run import Provider, Sender, begin, contribution, until
 from tests.helpers.translation_owners import compose_translation_test_harness
 
@@ -84,6 +88,14 @@ def drain(harness):
     while not harness.ui_events.empty():
         events.append(harness.ui_events.get_nowait())
     return events
+
+
+async def owned_source(ingress, text, *, ended=True):
+    identity, request = await ingress.start()
+    if ended:
+        await ingress.vad(SpeechEnd(identity))
+    await ingress.terminal(request, "final", text)
+    return identity
 
 
 @pytest.mark.asyncio
@@ -666,7 +678,14 @@ async def test_retiring_native_cleanup_retains_live_exception_until_failed_repla
         chatbox_include_source=False,
     )
     harness.translation_turns.self_speech_waiting_ttl_s = 0.1
-    texts = ["canonical one", "canonical two", "obsolete running", provider.failure_text, "waiter"]
+    texts = [
+        "canonical one",
+        "canonical two",
+        "obsolete running",
+        provider.failure_text,
+        "waiter",
+        "cleanup successor",
+    ]
     try:
         for text in texts[:2]:
             await begin(harness, text, ended=True)
@@ -684,10 +703,25 @@ async def test_retiring_native_cleanup_retains_live_exception_until_failed_repla
         assert harness.translation_turns.is_parent_active(failed_id)
         assert any(item.source_text == "waiter" and item.status == "expired" for item in observed)
         assert provider.active == 3 and len(provider.calls) == 3
+        successor = await begin(harness, texts[5])
+        successor_id = harness.self_owner.merge_buffer.merge_id
+        assert len(provider.calls) == 3
+        provider.release(texts[5])
         provider.release(texts[2])
         await until(lambda: len(provider.calls) == 4)
         provider.release(provider.failure_text)
         await asyncio.wait_for(harness.translation_turns.wait_for_parent(failed_id), 0.05)
+        await until(lambda: any(call["text"] == texts[5] for call in provider.calls))
+        assert harness.self_owner.merge_buffer is not None
+        assert [entry.text for entry in harness.self_runtime.translation_history].count(
+            texts[5]
+        ) == 0
+        await harness.self_owner.handle_vad_event(SpeechEnd(successor))
+        await asyncio.wait_for(harness.translation_turns.wait_for_parent(successor_id), 1)
+        assert [call["text"] for call in provider.calls].count(texts[5]) == 1
+        assert [entry.text for entry in harness.self_runtime.translation_history].count(
+            texts[5]
+        ) == 1
         assert provider.active == 2 and provider.peak == 3
         assert [call["text"] for call in provider.calls].count(provider.failure_text) == 1
         assert provider.cancelled == [(texts[2], "en")]
@@ -698,4 +732,222 @@ async def test_retiring_native_cleanup_retains_live_exception_until_failed_repla
     finally:
         for text in texts:
             provider.release(text)
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failed", [False, True])
+async def test_existing_open_draft_wakes_after_speculative_physical_completion(failed):
+    provider = FailureAfterReleaseProvider(
+        failure_text="speculative predecessor" if failed else "unused failure"
+    )
+    semaphore = asyncio.Semaphore(3)
+    harness = compose_translation_test_harness(
+        stt=ControlledRecognitionProvider(),
+        llm=SemaphoreLLMProvider(provider, semaphore),
+        osc=ChatboxPaginator(sender=Sender(), clock=SystemClock()),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        self_target_languages=("en",),
+    )
+    harness.translation_turns.self_speech_waiting_ttl_s = 1
+    ingress = OwnedIngress(harness)
+    texts = ["canonical one", "canonical two", "speculative predecessor", "open successor"]
+    try:
+        for text in texts[:3]:
+            await owned_source(ingress, text)
+        await until(lambda: len(provider.calls) == 3)
+        successor = await owned_source(ingress, texts[3], ended=False)
+        successor_id = harness.self_owner.merge_buffer.merge_id
+        assert len(provider.calls) == 3 and provider.active == 3
+        provider.release(texts[2])
+        await until(lambda: len(provider.calls) == 4)
+        assert harness.self_owner.merge_buffer is not None
+        assert provider.active == 3 and provider.peak == 3 and semaphore._value == 0
+        assert texts[3] not in [entry.text for entry in harness.self_runtime.translation_history]
+        provider.release(texts[3])
+        await until(
+            lambda: any(
+                item.utterance_id == successor_id
+                and not item.source_closed
+                and item.targets[0].status == "ready"
+                for item in snapshots(harness)
+            )
+        )
+        await ingress.vad(SpeechEnd(successor))
+        await asyncio.wait_for(harness.translation_turns.wait_for_parent(successor_id), 1)
+        terminal = [item for item in snapshots(harness) if item.utterance_id == successor_id][-1]
+        assert terminal.source_closed and terminal.status == "complete"
+        assert terminal.targets[0].status == "ready"
+        assert [call["text"] for call in provider.calls].count(texts[3]) == 1
+        assert [entry.text for entry in harness.self_runtime.translation_history].count(
+            texts[3]
+        ) == 1
+        assert provider.active == 2 and semaphore._value == 1
+        for text in texts:
+            provider.release(text)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 2)
+        assert [call["text"] for call in provider.calls].count(texts[2]) == (2 if failed else 1)
+        assert [entry.text for entry in harness.self_runtime.translation_history].count(
+            texts[2]
+        ) == 1
+        assert provider.cancelled == [] and provider.peak == 3 and provider.active == 0
+    finally:
+        for text in texts:
+            provider.release(text)
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("eligible_before_release", [False, True])
+async def test_open_draft_wakeup_preserves_only_existing_secondary_eligibility(
+    eligible_before_release,
+):
+    provider = PhysicalProvider()
+    semaphore = asyncio.Semaphore(6)
+    harness = compose_translation_test_harness(
+        stt=ControlledRecognitionProvider(),
+        llm=SemaphoreLLMProvider(provider, semaphore),
+        osc=ChatboxPaginator(sender=Sender(), clock=SystemClock()),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        self_target_languages=("en", "ja"),
+    )
+    harness.translation_turns.self_speech_waiting_ttl_s = 0.1
+    ingress = OwnedIngress(harness)
+    texts = ["canonical one", "canonical two", "speculative predecessor", "open successor"]
+    try:
+        for text in texts[:3]:
+            await owned_source(ingress, text)
+        await until(lambda: len(provider.calls) == 6)
+        if eligible_before_release:
+            harness.replace_configuration(low_latency_finalize_wait_ms=200)
+        successor = await owned_source(ingress, texts[3], ended=eligible_before_release)
+        successor_id = harness.self_owner.merge_buffer.merge_id
+        assert len(provider.calls) == 6
+        for target in ("en", "ja"):
+            provider.release(texts[2], target)
+        await until(
+            lambda: sum(call["text"] == texts[3] for call in provider.calls)
+            == (2 if eligible_before_release else 1)
+        )
+        assert harness.self_owner.merge_buffer is not None
+        assert texts[3] not in [entry.text for entry in harness.self_runtime.translation_history]
+        if not eligible_before_release:
+            await asyncio.sleep(0.02)
+            assert [call["target"] for call in provider.calls if call["text"] == texts[3]] == ["en"]
+            await ingress.vad(SpeechEnd(successor))
+            await until(lambda: len(provider.calls) == 8)
+        for target in ("en", "ja"):
+            provider.release(texts[3], target)
+        await asyncio.wait_for(harness.translation_turns.wait_for_parent(successor_id), 1)
+        terminal = [item for item in snapshots(harness) if item.utterance_id == successor_id][-1]
+        assert terminal.source_closed and terminal.status == "complete"
+        assert all(target.status == "ready" for target in terminal.targets)
+        assert [call["target"] for call in provider.calls if call["text"] == texts[3]] == [
+            "en",
+            "ja",
+        ]
+        assert [entry.text for entry in harness.self_runtime.translation_history].count(
+            texts[3]
+        ) == 2
+        assert provider.active == 4 and semaphore._value == 2 and provider.peak == 6
+        assert provider.cancelled == []
+    finally:
+        for text in texts:
+            for target in ("en", "ja"):
+                provider.release(text, target)
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+async def test_freed_speculation_does_not_bypass_sealed_waiter_expiry():
+    provider = PhysicalProvider()
+    semaphore = asyncio.Semaphore(3)
+    harness = compose_translation_test_harness(
+        stt=ControlledRecognitionProvider(),
+        llm=SemaphoreLLMProvider(provider, semaphore),
+        osc=ChatboxPaginator(sender=Sender(), clock=SystemClock()),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        self_target_languages=("en",),
+    )
+    harness.translation_turns.self_speech_waiting_ttl_s = 0.1
+    ingress = OwnedIngress(harness)
+    texts = ["canonical one", "canonical two", "speculative predecessor", "sealed waiter"]
+    try:
+        for text in texts:
+            await owned_source(ingress, text)
+        await until(lambda: len(provider.calls) == 3)
+        observed = snapshots(harness)
+        waiter_id = next(item.utterance_id for item in observed if item.source_text == texts[3])
+        predecessor_id = next(
+            item.utterance_id for item in observed if item.source_text == texts[2]
+        )
+        provider.release(texts[2])
+        await asyncio.wait_for(harness.translation_turns.wait_for_parent(predecessor_id), 1)
+        await asyncio.wait_for(harness.translation_turns.wait_for_parent(waiter_id), 1)
+        terminal = [item for item in snapshots(harness) if item.utterance_id == waiter_id][-1]
+        assert terminal.status == "expired" and terminal.source_closed
+        assert all(target.status == "source_only" for target in terminal.targets)
+        assert [call["text"] for call in provider.calls] == texts[:3]
+        assert provider.active == 2 and provider.peak == 3 and semaphore._value == 1
+        assert [entry.text for entry in harness.self_runtime.translation_history].count(
+            texts[3]
+        ) == 1
+    finally:
+        for text in texts:
+            provider.release(text)
+        await harness.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("generation_close", [False, True])
+async def test_speculation_cleanup_never_wakes_cancelled_open_draft(generation_close):
+    provider = PhysicalProvider(ignore_cancellation=True)
+    semaphore = asyncio.Semaphore(3)
+    sender = Sender()
+    harness = compose_translation_test_harness(
+        stt=ControlledRecognitionProvider(),
+        llm=SemaphoreLLMProvider(provider, semaphore),
+        osc=ChatboxPaginator(sender=sender, clock=SystemClock()),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        self_target_languages=("en",),
+        chatbox_include_source=False,
+    )
+    ingress = OwnedIngress(harness)
+    texts = ["canonical one", "canonical two", "speculative predecessor", "open successor"]
+    reset = None
+    try:
+        for text in texts[:3]:
+            await owned_source(ingress, text)
+        await until(lambda: len(provider.calls) == 3)
+        await owned_source(ingress, texts[3], ended=False)
+        reset = asyncio.create_task(
+            harness.translation_turns.close_channel_ingress("self")
+            if generation_close
+            else harness.self_owner.reset_provider_channel()
+        )
+        await until(lambda: len(provider.cancelled) == 3)
+        assert not reset.done()
+        assert provider.active == 3 and semaphore._value == 0
+        assert [call["text"] for call in provider.calls] == texts[:3]
+        for text in texts:
+            provider.release(text)
+        await asyncio.wait_for(reset, 1)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1)
+        terminal = [item for item in snapshots(harness) if item.source_text == texts[3]][-1]
+        assert terminal.status == "cancelled"
+        assert all(target.status == "cancelled" for target in terminal.targets)
+        assert [call["text"] for call in provider.calls] == texts[:3]
+        assert provider.active == 0 and provider.peak == 3 and semaphore._value == 3
+        assert texts[3] not in [entry.text for entry in harness.self_runtime.translation_history]
+        assert harness.translation_turns.channel_ingress_open("self") is not generation_close
+        assert sender.packets == []
+    finally:
+        for text in texts:
+            provider.release(text)
+        if reset is not None:
+            await asyncio.gather(reset, return_exceptions=True)
         await harness.stop()

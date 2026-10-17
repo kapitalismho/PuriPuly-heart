@@ -626,17 +626,20 @@ class TranslationTurnLifecycleOwner:
         parent.children = children
         parent.draft_request = request
         await self._publish_draft(parent)
-        if self._speculative_parent_id in (None, parent_id):
-            self._speculative_parent_id = parent_id
-            parent.speculative_occupancy = True
-            self._start_draft_operations(parent, secondary=parent.secondary_eligible)
+        self._start_current_draft()
 
     def prestart_draft_secondary(self, parent_id: UUID) -> None:
         parent = self._parents.get(parent_id)
-        if parent is None or parent.source_closed or not parent.speculative_occupancy:
+        if (
+            parent is None
+            or parent.source_closed
+            or parent.turn_generation != self._channel_turn_generations["self"]
+            or self._parent_cancellation_requested(parent)
+        ):
             return
         parent.secondary_eligible = True
-        self._start_draft_operations(parent, secondary=True)
+        if parent.speculative_occupancy:
+            self._start_draft_operations(parent, secondary=True)
 
     async def seal_draft(self, parent_id: UUID) -> tuple[UUID, ...]:
         parent = self._parents.get(parent_id)
@@ -659,9 +662,7 @@ class TranslationTurnLifecycleOwner:
             await self._self_speech_slots.acquire()
             parent.canonical_slot = True
             self._mark_parent_execution_started(parent)
-            parent.speculative_occupancy = False
-            if self._speculative_parent_id == parent_id:
-                self._speculative_parent_id = None
+            self._release_speculative_occupancy(parent)
         else:
             parent.waiting_expiry_task = start_lifecycle_task(
                 self._scope,
@@ -677,6 +678,40 @@ class TranslationTurnLifecycleOwner:
         await self._publish_draft(parent)
         parent.source_closed_event.set()
         return parent.child_ids
+
+    def _start_current_draft(self) -> None:
+        if not self.channel_ingress_open("self"):
+            return
+        parent = max(
+            (
+                candidate
+                for candidate in self._parents.values()
+                if candidate.channel == "self"
+                and candidate.draft_request is not None
+                and candidate.draft_request.turn_kind == "self"
+                and candidate.children
+                and not candidate.closed
+                and candidate.turn_generation == self._channel_turn_generations["self"]
+            ),
+            key=lambda candidate: candidate.turn_order,
+            default=None,
+        )
+        if (
+            parent is None
+            or parent.source_closed
+            or self._parent_cancellation_requested(parent)
+            or self._speculative_parent_id not in (None, parent.parent_utterance_id)
+        ):
+            return
+        self._speculative_parent_id = parent.parent_utterance_id
+        parent.speculative_occupancy = True
+        self._start_draft_operations(parent, secondary=parent.secondary_eligible)
+
+    def _release_speculative_occupancy(self, parent: _TranslationTurnParent) -> None:
+        parent.speculative_occupancy = False
+        if self._speculative_parent_id == parent.parent_utterance_id:
+            self._speculative_parent_id = None
+            self._start_current_draft()
 
     def _start_draft_operations(self, parent: _TranslationTurnParent, *, secondary: bool) -> None:
         for child in parent.children:
@@ -820,9 +855,7 @@ class TranslationTurnLifecycleOwner:
                     and not parent.retiring_operations
                     and all(task.done() for task in parent.operations.values())
                 ):
-                    parent.speculative_occupancy = False
-                    if self._speculative_parent_id == parent.parent_utterance_id:
-                        self._speculative_parent_id = None
+                    self._release_speculative_occupancy(parent)
                     for waiting in self._self_speech_waiting_parents()[
                         : -self.self_speech_waiting_capacity
                     ]:
@@ -878,9 +911,7 @@ class TranslationTurnLifecycleOwner:
             if parent.closed:
                 return
             self._mark_parent_execution_started(parent)
-            parent.speculative_occupancy = False
-            if self._speculative_parent_id == parent.parent_utterance_id:
-                self._speculative_parent_id = None
+            self._release_speculative_occupancy(parent)
             self._start_draft_operations(parent, secondary=True)
 
             async def finish(child: TranslationTurnChild) -> None:
@@ -925,9 +956,7 @@ class TranslationTurnLifecycleOwner:
                 if not task.done():
                     task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
-            parent.speculative_occupancy = False
-            if self._speculative_parent_id == parent.parent_utterance_id:
-                self._speculative_parent_id = None
+            self._release_speculative_occupancy(parent)
             if parent.canonical_slot:
                 parent.canonical_slot = False
                 self._self_speech_slots.release()

@@ -250,6 +250,7 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 
 - `SelfTranslationChannelOwner` owns source reconciliation, acoustic continuation, grace, and source closure independently of translation completion.
 - `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests when source closes.
+- Freed speculative capacity resumes only the current open draft; sealed turns retain normal bounded admission.
 - Speculative context is not accepted history. Canonical source is admitted once; logical cancellation does not release occupied provider capacity.
 - `SelfTurnPresentation` carries authoritative turn identity, revisions, and per-target status independently of overlay display state.
 
