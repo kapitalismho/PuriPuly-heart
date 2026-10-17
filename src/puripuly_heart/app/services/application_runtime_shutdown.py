@@ -101,9 +101,9 @@ def compose_application_runtime_shutdown_callbacks(
         ),
         application_shutdown_callback(
             phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,
-            owner_name="MicrophoneTestSessionOwner",
+            owner_name="AudioTestSessionOwner",
             callback_name="close",
-            callback=runtime.close_microphone_test_runtime,
+            callback=runtime.close_audio_test_runtime,
         ),
         application_shutdown_callback(
             phase=SHUTDOWN_PHASE_OWNER_DRAIN_CANCEL,

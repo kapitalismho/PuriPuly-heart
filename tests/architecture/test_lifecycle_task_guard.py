@@ -171,9 +171,22 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
+        "core/local_asr/local_stt_runtime_installer.py",
+        {"_owned_io": 1},
+        "The ASR installation call shield-awaits its I/O worker; cancellation signals and drains it before staging cleanup and provisioning lease release",
+    ),
+    *_reviews(
         "core/local_translation/provisioning.py",
         {"_await_download_cleanup": 1},
         "Gemma download boundary signals cancellation or cancels the download and waits until it settles before releasing staging ownership",
+    ),
+    *_reviews(
+        "core/local_translation/provisioning.py",
+        {
+            "LocalGemmaDownloadAdapter.validate_inputs": 1,
+            "LocalGemmaDownloadAdapter.download": 1,
+        },
+        "The local Gemma adapter shield-awaits each validation or copy worker; cancellation signals and gathers it before the owning installation releases staging resources",
     ),
     *_reviews(
         "core/local_translation/runtime.py",
@@ -294,9 +307,9 @@ TASK_CREATION_REVIEWS = (
         "LocalSTTDownloadRuntime is the named lifecycle owner for download tasks",
     ),
     *_reviews(
-        "core/runtime/mic_test.py",
-        {"MicTestRuntime.start": 1, "MicTestRuntime.create_frame_task": 1},
-        "MicTestRuntime is the named lifecycle owner for microphone test tasks",
+        "core/runtime/audio_test.py",
+        {"AudioTestCaptureRuntime.start": 1, "AudioTestCaptureRuntime.create_frame_task": 1},
+        "AudioTestCaptureRuntime is the named lifecycle owner for each audio test channel's tasks",
     ),
     *_reviews(
         "core/runtime/oauth.py",
@@ -658,7 +671,7 @@ def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() ->
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
-        "src/puripuly_heart/core/runtime/mic_test.py",
+        "src/puripuly_heart/core/runtime/audio_test.py",
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 

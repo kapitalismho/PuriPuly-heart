@@ -179,7 +179,7 @@ async def test_gpu_huggingface_failure_preserves_http_source_fallback(
     installed = await ensure_local_stt_installed(
         manifest=manifest,
         model_root=tmp_path,
-        preferred_source="huggingface",
+        locale="en",
         huggingface_downloader=downloader,
     )
 

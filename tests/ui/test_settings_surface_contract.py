@@ -39,7 +39,7 @@ class _SlotProvider:
                 "soniox_speaker_diarization",
                 "gpu_device",
                 "gpu_llm",
-                "gpu_refresh",
+                "model_assets",
                 "local_llm_connection",
                 "custom_stt_connection",
                 "managed_key",
@@ -71,8 +71,8 @@ class _SlotProvider:
     def gpu_llm_control(self) -> ft.Control:
         return self.controls["gpu_llm"]
 
-    def gpu_refresh_control(self) -> ft.Control:
-        return self.controls["gpu_refresh"]
+    def model_assets_control(self) -> ft.Control:
+        return self.controls["model_assets"]
 
     def local_llm_connection_control(self) -> ft.Control:
         return self.controls["local_llm_connection"]
@@ -138,7 +138,7 @@ def test_settings_api_surface_places_every_slot_in_the_accepted_position() -> No
     assert surface.gpu_device_controls.controls == [
         provider.controls["gpu_device"],
         provider.controls["gpu_llm"],
-        provider.controls["gpu_refresh"],
+        provider.controls["model_assets"],
     ]
 
 
@@ -179,10 +179,11 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
         secret_cleared=make("secret_cleared"),
         local_llm_secret_changed=make("local_llm_secret_changed"),
         gpu_discovery_requested=make("gpu_discovery_requested"),
+        open_model_assets=make("open_model_assets"),
         settings_secrets=SettingsSecretsOwner(secret_store_factory=lambda: None),
     )
     general = SettingsGeneralIntents(
-        start_microphone_test=make("start_microphone_test"),
+        start_audio_test=make("start_audio_test"),
         telemetry_enabled_change=make("telemetry_enabled_change"),
         list_loopback_capture_options=make("list_loopback_capture_options"),
         list_loopback_process_options=make("list_loopback_process_options"),
@@ -222,8 +223,9 @@ def test_bind_settings_intents_carries_every_previously_ad_hoc_g14_callback(
     assert view.on_secret_cleared is provider.secret_cleared
     assert view.on_local_llm_secret_changed is provider.local_llm_secret_changed
     assert view.on_gpu_discovery_requested is provider.gpu_discovery_requested
+    assert view.on_open_model_assets is provider.open_model_assets
     assert view._settings_secrets is provider.settings_secrets
-    assert view.on_start_microphone_test is general.start_microphone_test
+    assert view.on_start_audio_test is general.start_audio_test
     assert view.on_telemetry_enabled_change is general.telemetry_enabled_change
     assert view.on_list_loopback_capture_options is general.list_loopback_capture_options
     assert view.on_list_loopback_process_options is general.list_loopback_process_options
@@ -271,7 +273,7 @@ def test_bind_settings_intents_keeps_optional_presentation_sinks_untouched(
             settings_secrets=SettingsSecretsOwner(secret_store_factory=lambda: None),
         ),
         general=SettingsGeneralIntents(
-            start_microphone_test=lambda *_a, **_k: None,
+            start_audio_test=lambda *_a, **_k: None,
             telemetry_enabled_change=lambda *_a, **_k: None,
             list_loopback_capture_options=lambda *_a, **_k: None,
             list_loopback_process_options=lambda *_a, **_k: None,

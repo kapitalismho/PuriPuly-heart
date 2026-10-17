@@ -52,7 +52,7 @@ class RecordingBackend:
             llm=object(),
             stt_session_state=lambda channel: f"{channel}-listening",
         )
-        self.microphone_test_active = True
+        self.audio_test_active = True
         self.desktop_overlay_captions_locked = True
         self.last_discord_managed_auth_referral_bonus_applied = True
         self.peer_retry_result = True
@@ -96,7 +96,7 @@ class RecordingBackend:
         self.events.append(("peer-retry",))
         return self.peer_retry_result
 
-    async def apply_settings(self, settings: object) -> None:
+    async def apply_settings(self, settings: object, *, provider_requested: bool = False) -> None:
         self.settings = settings
         self.events.append(("settings", settings))
 
@@ -242,7 +242,7 @@ def test_state_is_a_semantic_snapshot_without_exposing_backend_objects() -> None
     assert state.translation_enabled is True
     assert state.stt_state == "self-listening"
     assert state.peer_translation_eula_accepted is False
-    assert state.microphone_test_active is True
+    assert state.audio_test_active is True
     assert state.provider_name == "local_llm"
     assert state.overlay_target == "desktop"
     assert state.desktop_overlay_captions_locked is True
@@ -301,6 +301,7 @@ async def test_start_failure_runs_owned_shutdown_and_preserves_original_error() 
 @pytest.mark.asyncio
 async def test_eula_acceptance_is_owned_at_the_boundary_before_peer_enable() -> None:
     backend = RecordingBackend()
+    backend.audio_test_active = False
     boundary = UiApplicationBoundary(backend)
 
     result = await boundary.accept_peer_translation_eula_and_enable()
@@ -309,6 +310,35 @@ async def test_eula_acceptance_is_owned_at_the_boundary_before_peer_enable() -> 
     assert backend.events[0][0] == "settings"
     assert backend.settings.state.peer_translation.eula_accepted is True
     assert backend.events[1] == ("peer", True)
+
+
+@pytest.mark.asyncio
+async def test_explicit_capture_choice_during_audio_test_takes_over_from_the_test() -> None:
+    backend = RecordingBackend()
+
+    async def stop_audio_test() -> None:
+        backend.events.append(("audio-test-stop",))
+        backend.audio_test_active = False
+
+    backend.stop_audio_test = stop_audio_test
+    backend.release_audio_test_capture_restore = lambda channel: backend.events.append(
+        ("audio-test-release", channel)
+    )
+    boundary = UiApplicationBoundary(backend)
+
+    await boundary.set_peer_translation_enabled(False)
+    await boundary.set_stt_enabled(True)
+    await boundary.set_peer_translation_enabled(True)
+
+    assert backend.events == [
+        ("audio-test-release", "peer"),
+        ("peer", False),
+        ("audio-test-release", "self"),
+        ("audio-test-stop",),
+        ("self", True),
+        ("audio-test-release", "peer"),
+        ("peer", True),
+    ]
 
 
 @pytest.mark.asyncio
@@ -385,7 +415,9 @@ async def test_frozen_boundary_rejects_mutating_intents_but_keeps_stall_diagnost
 @pytest.mark.asyncio
 async def test_boundary_preserves_settings_failure_and_restart_projection() -> None:
     class FailingBackend(RecordingBackend):
-        async def apply_settings(self, settings: object) -> None:
+        async def apply_settings(
+            self, settings: object, *, provider_requested: bool = False
+        ) -> None:
             self.events.append(("settings-failed", settings))
             raise RuntimeError("settings apply failed")
 
@@ -463,3 +495,115 @@ async def test_boundary_stop_owns_github_prompt_generation_and_cancellation() ->
     assert await task is False
     assert cancelled.is_set() is True
     assert boundary.application_lifecycle().is_terminal
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("paused_channel", ("self", "peer"))
+@pytest.mark.parametrize("override_channel", ("self", "peer"))
+async def test_audio_start_orders_gated_pause_before_explicit_capture_takeover(
+    paused_channel: str, override_channel: str
+) -> None:
+    from tests.app.test_audio_test_session_owner import Harness
+
+    harness = Harness()
+    pause_entered = asyncio.Event()
+    release_pause = asyncio.Event()
+    original = harness.control.set_enabled
+
+    async def set_enabled(channel: str, enabled: bool) -> None:
+        await original(channel, enabled)
+        if channel == paused_channel and not enabled:
+            pause_entered.set()
+            await release_pause.wait()
+
+    harness.control.set_enabled = set_enabled
+
+    class Backend(RecordingBackend):
+        def __getattribute__(self, name):
+            if name == "audio_test_active":
+                return harness.owner.active
+            return super().__getattribute__(name)
+
+        async def start_audio_test(self, **kwargs):
+            return await harness.owner.start(**kwargs)
+
+        async def stop_audio_test(self):
+            await harness.owner.stop()
+
+        def release_audio_test_capture_restore(self, channel):
+            harness.owner.release_capture_restore(channel)
+
+        async def set_stt_enabled(self, enabled):
+            await original("self", enabled)
+
+        async def set_peer_translation_enabled(self, enabled):
+            await original("peer", enabled)
+
+    boundary = UiApplicationBoundary(Backend())
+    starting = asyncio.create_task(boundary.start_audio_test())
+    takeover = None
+    try:
+        await pause_entered.wait()
+        assert harness.owner.active
+        assert harness.owner.snapshot["state"] == "pending"
+        operation = (
+            boundary.set_stt_enabled
+            if override_channel == "self"
+            else boundary.set_peer_translation_enabled
+        )
+        takeover = asyncio.create_task(operation(True))
+        await asyncio.sleep(0)
+        assert not takeover.done()
+        assert not any(harness.control.enabled.values()) or paused_channel == "self"
+        release_pause.set()
+        assert await starting
+        await takeover
+        assert not harness.owner.active
+        assert harness.owner.snapshot["state"] == "off"
+        assert harness.control.enabled == {"self": True, "peer": True}
+        assert override_channel not in harness.owner.snapshot["restore_capture"]
+    finally:
+        release_pause.set()
+        await asyncio.gather(
+            *(task for task in (starting, takeover) if task is not None), return_exceptions=True
+        )
+        await harness.owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ("stop", "close"))
+async def test_audio_stop_interrupts_startup_while_capture_pause_is_gated(operation: str) -> None:
+    from tests.app.test_audio_test_session_owner import Harness
+
+    harness = Harness()
+    paused = asyncio.Event()
+    release = asyncio.Event()
+    original = harness.control.set_enabled
+
+    async def set_enabled(channel: str, enabled: bool) -> None:
+        await original(channel, enabled)
+        if channel == "peer" and not enabled:
+            paused.set()
+            await release.wait()
+
+    harness.control.set_enabled = set_enabled
+    starting = asyncio.create_task(harness.owner.start())
+    stopping = None
+    try:
+        await paused.wait()
+        stopping = asyncio.create_task(getattr(harness.owner, operation)())
+        await asyncio.sleep(0)
+        release.set()
+        assert await starting is False
+        await stopping
+        assert harness.owner.snapshot["state"] == "off"
+        assert harness.control.enabled == {"self": operation == "stop", "peer": operation == "stop"}
+        assert all(
+            harness.owner.runtime_for(channel).source is None for channel in ("self", "peer")
+        )
+    finally:
+        release.set()
+        await asyncio.gather(
+            *(task for task in (starting, stopping) if task is not None), return_exceptions=True
+        )
+        await harness.owner.close()

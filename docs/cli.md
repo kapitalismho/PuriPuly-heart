@@ -142,7 +142,7 @@ puripuly.exe capture set self on
 puripuly.exe capture set peer off
 puripuly.exe translation set on
 puripuly.exe asr set --channel both --provider soniox
-puripuly.exe microphone test on
+puripuly.exe audio test on
 puripuly.exe audio target set <value-from-audio-target-status>
 puripuly.exe audio retry
 puripuly.exe overlay set on
@@ -170,6 +170,22 @@ puripuly.exe models status
 - An older installed revision is invalid until model repair replaces it. Restarting alone does not update the files.
 - Installation reports progress through the normal application owner.
 - It publishes `ready` only after validation and staged replacement complete.
+
+### Model management
+
+Use the `assets` entries in `models status` for model IDs, state and import requirements.
+
+```powershell
+puripuly.exe models download --model-id <model-id>
+puripuly.exe models import --model-id <gemma-model-id> --dir <folder>
+puripuly.exe models cancel --model-id <model-id>
+puripuly.exe models delete --model-id <model-id>
+```
+
+- Operations preserve settings and provider selection without blocking unrelated commands.
+- Gemma imports verify the required files before replacement. Explicit Gemma download/repair also checks installed file integrity.
+- Only one model task runs at a time. Conflicts, including `gemma.prepare`, return `failed` with `task_busy`; deleting an in-use model returns `model_in_use`.
+- `models cancel` requests cancellation; wait for the original operation to settle before retrying conflicts. Runtime demand changes do not cancel transfers; shutdown drains owned work.
 
 ### Peer capture and consent
 
@@ -264,17 +280,13 @@ For example:
 
 Numeric CLI values are sent as JSON numbers. The application owner validates field-specific bounds.
 
-### Microphone test
+### Audio test
 
-- `microphone test on` stays in progress until the owner receives an actual input frame. Scheduling a capture task is not enough.
-- `app status` returns a `microphone_test` object with:
-  - `state`, `desired_active`, and `effective_active`.
-  - Normalized `meter_level` (0–1).
-  - `failure_reason` and `failure_type`.
-- No audio content is returned.
-- An unavailable input produces `action_required`.
-- `microphone test off` can interrupt pending startup. It waits for owned input resources to close.
-- Testing takes exclusive self-input ownership and can disable normal self capture. Re-enable that capture explicitly afterward if needed.
+`audio test on|off` checks VAD for the Self microphone and Peer loopback target without recognition or translation.
+
+- Inspect `audio_test` in `app status` for state, channel failures and VAD readings. `applied` means both inputs are ready; `degraded` means one; `action_required` means neither.
+- The test pauses normal capture and restores only still-valid prior capture intent. Explicit capture-on or source changes stop it.
+- `off` revokes pending starts and waits for input release. Failed cleanup stays visible and blocks restart; shutdown does not restore capture.
 
 ### Manual text
 
@@ -309,6 +321,7 @@ A direct JSON file rewrite is not a settings operation.
 - Revisions and settings events follow successfully committed changes, including GUI-only edits.
 - Queries return the committed snapshot without advancing its revision.
 - Staged preparation and failed persistence are not reported as persisted settings.
+- Mixed provider/general changes commit together. Explicit provider fields retry pending application; general-only edits do not. Runtime failure returns `degraded` without reverting saved intent.
 
 ### Activation notice
 
@@ -401,7 +414,9 @@ Discover current values with `settings choices` before applying them:
 
 Apply model and connection together through `settings apply`. The normal settings owner persists the selection; observe it again after a fresh process restart. `gemma.prepare` prepares the selected model, and `gemma.cancel` cancels ongoing preparation. Use `models status` for the managed Gemma owner, not ASR-specific `gpu status`. A completed preparation is not evidence of a completed translation; correlate `text submit` admission with the translation events.
 
-Models download on demand with progress, cancellation, checksum validation and atomic installation. No weights are bundled with the installer. The 26B target is `unsloth/gemma-4-26B-A4B-it-qat-GGUF` revision `7b92b5b28818151e8669af2e45e88d6086f490dd`, file `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf`, 14249047104 bytes, SHA-256 `a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891`. Chinese UI locales download that file from ModelScope revision `f5f82bed79bc0bc49b01e0e577bb3dc949ebc564` first. Other locales try that mirror after Hugging Face fails. The installed manifest keeps the Hugging Face revision. It has no draft model or multimodal projector. E4B retains its existing pinned target and CPU MTP drafter.
+Models download on demand with progress, cancellation, checksum validation and atomic installation. No weights are bundled with the installer. The 26B target is `unsloth/gemma-4-26B-A4B-it-qat-GGUF` revision `7b92b5b28818151e8669af2e45e88d6086f490dd`, file `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf`, 14249047104 bytes, SHA-256 `a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891`. ModelScope serves that file at revision `f5f82bed79bc0bc49b01e0e577bb3dc949ebc564`. The installed manifest keeps the Hugging Face revision. It has no draft model or multimodal projector. E4B retains its existing pinned target and CPU MTP drafter.
+
+Local ASR and Gemma downloads try sources in UI-locale order: Chinese locales use ModelScope → `hf-mirror.net` → Hugging Face; others use Hugging Face → ModelScope → `hf-mirror.net`. Unsupported sources are skipped. `--source` selects one source without fallback. Downloads verify pinned assets; mirror transfers are anonymous, resumable and confined to their HTTPS host.
 
 The managed runtime is pinned to llama.cpp **b11537 / `8e2d31e0eb658d0382d3106a61369dff81f0c080`**. Source runtime files live under `build/llama.cpp/llama.cpp-b11537/{cpu,vulkan}`; installed files live under `_runtime/llama.cpp-b11537/{cpu,vulkan}`. `PURIPULY_HEART_LLAMA_CPP_ROOT` may select a compatible root with those backend subdirectories, but an incompatible executable build/commit is rejected. A missing or incompatible executable fails before launch; `models status` reports `failure_phase: runtime_files` with `failure_code` `runtime_missing` or `runtime_incompatible`, distinct from a native load failure (`runtime`). Distribution archive identities are in [the runtime notice](../third_party/llama.cpp/README.md).
 

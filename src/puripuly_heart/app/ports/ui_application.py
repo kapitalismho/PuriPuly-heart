@@ -55,7 +55,7 @@ class UiApplicationState:
     translation_enabled: bool
     stt_state: object | None
     peer_translation_eula_accepted: bool | None
-    microphone_test_active: bool
+    audio_test_active: bool
     provider_name: str | None
     overlay_target: str | None
     desktop_overlay_captions_locked: bool
@@ -75,6 +75,17 @@ class UiApplicationFactoryPort(Protocol):
 
 
 class UiApplicationPort(Protocol):
+    def model_asset_entries(self) -> tuple[object, ...]: ...
+
+    async def refresh_model_assets(self) -> tuple[object, ...]: ...
+
+    async def download_model_asset(self, model_id: str, *, source: str | None = None) -> object: ...
+
+    async def import_model_asset(self, model_id: str, directory: Path) -> object: ...
+
+    async def cancel_model_asset(self, model_id: str) -> bool: ...
+
+    async def delete_model_asset(self, model_id: str) -> object: ...
     @property
     def diagnostic_instance_id(self) -> str | None: ...
 
@@ -178,7 +189,12 @@ class UiApplicationPort(Protocol):
         self, settings: AppSettingsVNext
     ) -> AppSettingsVNext: ...
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> object: ...
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> object: ...
 
     async def apply_providers(
         self,
@@ -193,17 +209,20 @@ class UiApplicationPort(Protocol):
 
     async def ensure_gpu_device_discovery(self) -> None: ...
 
-    async def start_microphone_test(
+    def audio_test_start_revision(self) -> int: ...
+
+    async def start_audio_test(
         self,
         *,
-        meter_callback: Callable[[float], None] | None = None,
+        observation_callback: Callable[[str, tuple[object, ...]], object] | None = None,
+        admission_revision: int | None = None,
     ) -> bool: ...
 
-    def microphone_test_snapshot(self) -> dict[str, object]: ...
+    def audio_test_snapshot(self) -> dict[str, object]: ...
 
-    async def wait_microphone_test_ready(self) -> bool: ...
+    async def wait_audio_test_ready(self) -> bool: ...
 
-    async def stop_microphone_test(self) -> None: ...
+    async def stop_audio_test(self) -> None: ...
 
     async def set_desktop_overlay_captions_locked(self, locked: bool) -> dict[str, str]: ...
 

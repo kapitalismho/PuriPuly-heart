@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.app.ports.peer_capture_target import (
@@ -42,6 +42,7 @@ class PeerCaptureTargetApplicationOwner:
     runtime_effects: PeerCaptureTargetRuntimeEffectsPort
     settings_presentation_sink: SettingsPresentationSink
     warning_reset: WarningReset
+    stop_audio_test: Callable[[], Awaitable[None]]
     _target_resolution: PeerCaptureTargetResolutionService = field(
         init=False,
         default_factory=PeerCaptureTargetResolutionService,
@@ -134,6 +135,8 @@ class PeerCaptureTargetApplicationOwner:
             return
         if not any(option.value == value and not option.disabled for option in self.options()):
             raise PeerCaptureTargetUnavailable("capture target is not available")
+        if value != self.current_value():
+            await self.stop_audio_test()
         apply_capture_target = getattr(self.settings, "apply_capture_target", None)
         if apply_capture_target is not None:
             next_settings = apply_capture_target(self.decode_option(value))

@@ -50,11 +50,12 @@ class SettingsProviderIntents:
     settings_secrets: SettingsSecretsPort
     custom_stt_secret_changed: Callable[[], None] | None = None
     chatgpt: SettingsChatGptIntents | None = None
+    open_model_assets: Callable[[], None] | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class SettingsGeneralIntents:
-    start_microphone_test: Callable[[], None]
+    start_audio_test: Callable[[], None]
     telemetry_enabled_change: Callable[[bool], None]
     list_loopback_capture_options: Callable[[], object]
     list_loopback_process_options: Callable[[], object]
@@ -167,7 +168,7 @@ class SettingsApiSlotProvider(Protocol):
 
     def gpu_llm_control(self) -> ft.Control: ...
 
-    def gpu_refresh_control(self) -> ft.Control: ...
+    def model_assets_control(self) -> ft.Control: ...
 
     def local_llm_connection_control(self) -> ft.Control: ...
 
@@ -188,7 +189,7 @@ class SettingsApiSurfaceSlots:
     soniox_speaker_diarization: ft.Control
     gpu_device: ft.Control
     gpu_llm: ft.Control
-    gpu_refresh: ft.Control
+    model_assets: ft.Control
     local_llm_connection: ft.Control
     custom_stt_connection: ft.Control
     managed_key: ft.Control
@@ -209,7 +210,7 @@ class SettingsApiSurfaceSlots:
             soniox_speaker_diarization=provider.soniox_speaker_diarization_control(),
             gpu_device=provider.gpu_device_control(),
             gpu_llm=provider.gpu_llm_control(),
-            gpu_refresh=provider.gpu_refresh_control(),
+            model_assets=provider.model_assets_control(),
             local_llm_connection=provider.local_llm_connection_control(),
             custom_stt_connection=provider.custom_stt_connection_control(),
             managed_key=provider.managed_key_control(),
@@ -237,7 +238,7 @@ class SettingsGeneralSurfaceSlots:
     audio_host_api: ft.Control
     microphone: ft.Control
     loopback: ft.Control
-    microphone_test: ft.Control
+    audio_test: ft.Control
     self_vad: ft.Control
     peer_vad: ft.Control
     clipboard_auto_translate: ft.Control

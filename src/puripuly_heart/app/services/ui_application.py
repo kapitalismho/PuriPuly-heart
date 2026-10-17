@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from collections.abc import Awaitable, Callable, Sequence
+from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -40,11 +41,11 @@ from puripuly_heart.app.ports.ui_application import (
     UiApplicationState,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
+    UiAudioTestRuntimePort,
     UiDiagnosticsRuntimePort,
     UiEngagementRuntimePort,
     UiInputRuntimePort,
     UiManagedRuntimePort,
-    UiMicrophoneRuntimePort,
     UiOverlayRuntimePort,
     UiPeerCaptureRuntimePort,
     UiProviderRuntimePort,
@@ -111,6 +112,11 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "handle_gpu_notice_action",
         "handle_managed_gemma_notice_action",
         "install_selected_gpu_model_if_needed",
+        "download_model_asset",
+        "import_model_asset",
+        "cancel_model_asset",
+        "delete_model_asset",
+        "refresh_model_assets",
         "edit_alibaba_connection_draft",
         "on_dashboard_language_change",
         "persist_api_key_verification",
@@ -138,9 +144,9 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "start_discord_managed_auth_from_dialog",
         "start_github_star_prompt",
         "start_managed_auth_task",
-        "start_microphone_test",
+        "start_audio_test",
         "start_qq_managed_auth_from_dialog",
-        "stop_microphone_test",
+        "stop_audio_test",
         "submit_text",
         "verify_alibaba_connection_draft",
         "verify_api_key",
@@ -165,6 +171,7 @@ _ORDERED_INTENTS = frozenset(
         "set_translation_enabled",
         "set_overlay_enabled",
         "persist_provider_secret_change",
+        "start_audio_test",
     }
 )
 
@@ -175,6 +182,8 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
         @functools.wraps(method)
         async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
             self._admit_application_intent(method.__name__)
+            if method.__name__ == "start_audio_test" and kwargs.get("admission_revision") is None:
+                kwargs["admission_revision"] = self.audio_test_start_revision()
             control = self._control
             if method.__name__ == "set_translation_enabled":
                 preparation = kwargs.get("preparation")
@@ -248,7 +257,7 @@ class UiApplicationBoundary:
         peer_capture: UiPeerCaptureRuntimePort,
         settings: UiSettingsRuntimePort,
         provider: UiProviderRuntimePort,
-        microphone: UiMicrophoneRuntimePort,
+        audio_test: UiAudioTestRuntimePort,
         overlay: UiOverlayRuntimePort,
         managed: UiManagedRuntimePort,
         engagement: UiEngagementRuntimePort,
@@ -268,7 +277,7 @@ class UiApplicationBoundary:
         self._peer_capture = peer_capture
         self._settings = settings
         self._provider = provider
-        self._microphone = microphone
+        self._audio_test = audio_test
         self._overlay = overlay
         self._managed = managed
         self._engagement = engagement
@@ -283,6 +292,7 @@ class UiApplicationBoundary:
         self._scene_observation_provider = scene_observation_provider
         self._index_selection = index_selection
         self._translation_selection_intent = 0
+        self._audio_test_start_revision = 0
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )
@@ -585,11 +595,13 @@ class UiApplicationBoundary:
         return result
 
     async def set_stt_enabled(self, enabled: bool) -> object:
+        await self._yield_audio_test_capture("self", enabled)
         result = await self._input_runtime.set_stt_enabled(enabled)
         await self._publish_osc_state()
         return result
 
     async def set_peer_translation_enabled(self, enabled: bool) -> object:
+        await self._yield_audio_test_capture("peer", enabled)
         result = await self._peer_capture.set_peer_translation_enabled(enabled)
         await self._publish_osc_state()
         return result
@@ -648,8 +660,15 @@ class UiApplicationBoundary:
     ) -> AppSettingsVNext:
         return self._settings.merge_settings_tab_apply_with_current_languages(settings)
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> object:
-        result = await self._settings.apply_settings(settings)
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> object:
+        result = await self._settings.apply_settings(
+            settings, provider_requested=provider_requested
+        )
         await self._publish_osc_state()
         return result
 
@@ -711,28 +730,39 @@ class UiApplicationBoundary:
     async def ensure_gpu_device_discovery(self) -> None:
         await self._provider.ensure_gpu_device_discovery()
 
-    async def start_microphone_test(
+    def audio_test_start_revision(self) -> int:
+        return self._audio_test_start_revision
+
+    async def start_audio_test(
         self,
         *,
-        meter_callback: Callable[[float], None] | None = None,
+        observation_callback: Callable[[str, tuple[object, ...]], object] | None = None,
+        admission_revision: int | None = None,
     ) -> bool:
-        start = self._microphone.start_microphone_test
-        if meter_callback is not None and _accepts_keyword(start, "meter_callback"):
-            result = start(meter_callback=meter_callback)
-        else:
-            result = start()
-        return bool(await result if inspect.isawaitable(result) else result)
+        if admission_revision != self._audio_test_start_revision:
+            return False
+        return bool(
+            await self._audio_test.start_audio_test(observation_callback=observation_callback)
+        )
 
-    def microphone_test_snapshot(self) -> dict[str, object]:
-        return self._microphone.microphone_test_snapshot()
+    def audio_test_snapshot(self) -> dict[str, object]:
+        return self._audio_test.audio_test_snapshot()
 
-    async def wait_microphone_test_ready(self) -> bool:
-        return await self._microphone.wait_microphone_test_ready()
+    async def wait_audio_test_ready(self) -> bool:
+        return await self._audio_test.wait_audio_test_ready()
 
-    async def stop_microphone_test(self) -> None:
-        result = self._microphone.stop_microphone_test()
-        if inspect.isawaitable(result):
-            await result
+    async def stop_audio_test(self) -> None:
+        self._audio_test_start_revision += 1
+        await self._audio_test.stop_audio_test()
+
+    async def _yield_audio_test_capture(self, channel: str, enabled: bool) -> None:
+        self._audio_test.release_audio_test_capture_restore(channel)
+        if enabled:
+            self._audio_test_start_revision += 1
+        if enabled and self.state().audio_test_active:
+            await self._audio_test.stop_audio_test()
+            if self.state().audio_test_active:
+                raise RuntimeError("Audio test resources are still being released")
 
     async def set_desktop_overlay_captions_locked(self, locked: bool) -> dict[str, str]:
         return await self._overlay.set_desktop_overlay_captions_locked(locked)
@@ -1120,22 +1150,30 @@ class UiApplicationBoundary:
     ) -> object:
         return await self._provider.handle_managed_gemma_notice_action(action)
 
+    def model_asset_entries(self) -> tuple[object, ...]:
+        return self._provider.model_asset_entries()
+
+    async def refresh_model_assets(self) -> tuple[object, ...]:
+        return await self._provider.refresh_model_assets()
+
+    async def download_model_asset(self, model_id: str, *, source: str | None = None) -> object:
+        return await self._provider.download_model_asset(model_id, source=source)
+
+    async def import_model_asset(self, model_id: str, directory: Path) -> object:
+        return await self._provider.import_model_asset(model_id, directory)
+
+    async def cancel_model_asset(self, model_id: str) -> bool:
+        return await self._provider.cancel_model_asset(model_id)
+
+    async def delete_model_asset(self, model_id: str) -> object:
+        return await self._provider.delete_model_asset(model_id)
+
 
 for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:
     setattr(
         UiApplicationBoundary,
         _intent_method_name,
         _guard_application_intent(getattr(UiApplicationBoundary, _intent_method_name)),
-    )
-
-
-def _accepts_keyword(callable_obj: object, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(callable_obj).parameters
-    except TypeError, ValueError:
-        return True
-    return keyword in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
     )
 
 

@@ -77,8 +77,8 @@ class RecordingShutdownRuntime(ApplicationRuntimeShutdownStub):
     async def close_local_asr_provisioning(self) -> None:
         self.events.append("local-asr")
 
-    async def close_microphone_test_runtime(self) -> None:
-        self.events.append("microphone-test")
+    async def close_audio_test_runtime(self) -> None:
+        self.events.append("audio-test")
 
     async def close_self_capture_owner(self) -> None:
         self.events.append("self-close")

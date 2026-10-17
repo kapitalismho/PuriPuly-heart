@@ -9,7 +9,7 @@ from puripuly_heart.app.language_selection import (
     LanguageSelectionChange,
     unify_recent_language_codes,
 )
-from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort
+from puripuly_heart.app.ports.runtime_apply import RuntimeApplyPort, RuntimeApplyRequest
 from puripuly_heart.app.ports.settings_runtime_effects import SettingsRuntimeEffectsPort
 from puripuly_heart.app.ports.settings_view import (
     ActivationNoticeSettingsIntent,
@@ -78,6 +78,9 @@ from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
 from puripuly_heart.app.services.provider_runtime_apply import (
     NoopRuntimeApply,
     OverlayOscOutputRuntimeApplyAdapter,
+    ProviderRuntimeApplyAdapter,
+    ProviderRuntimeApplyPlan,
+    ProviderRuntimeOwner,
     SttLanguageAudioRuntimeApplyAdapter,
     UiPromptClipboardStateRuntimeApplyAdapter,
     _exception_code,
@@ -122,6 +125,7 @@ from puripuly_heart.config.translation_values import (
     provider_llm_for_translation,
 )
 from puripuly_heart.core.messages import (
+    RUNTIME_APPLY_STATUS_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
@@ -906,12 +910,14 @@ class SettingsApplicationOwner:
     active_local_asr_change: SettingsPredicate
     results: SettingsTransactionResultOwner = field(default_factory=SettingsTransactionResultOwner)
     success_sink: Callable[[str], object] = lambda _message: None
+    provider_runtime: ProviderRuntimeOwner | None = None
 
     async def apply(
         self,
         next_settings: AppSettingsVNext,
         *,
         reload_settings_view: bool = True,
+        provider_requested: bool = False,
     ) -> bool:
         current = self.settings.canonical
         if current is not None:
@@ -967,7 +973,24 @@ class SettingsApplicationOwner:
                     ),
                 )
             installation_fallback = bool(fallback_plan.installation_fallback and fallback_channels)
-        if next_settings is not self.settings.canonical:
+        provider_plan = None
+        if (
+            self.provider_runtime is not None
+            and current is not None
+            and (
+                provider_requested
+                or settings_view_surface_snapshots(current)[0]
+                != settings_view_surface_snapshots(next_settings)[0]
+                or self.provider_runtime.llm_signature_builder(current)
+                != self.provider_runtime.llm_signature_builder(next_settings)
+            )
+        ):
+            provider_plan = self.provider_runtime.build_plan(
+                next_settings,
+                force_rebuild_llm=False,
+                canonical_settings=self.settings.project_canonical_delta(current, next_settings),
+            )
+        if provider_plan is None and next_settings is not self.settings.canonical:
             if await self._route(
                 next_settings,
                 reload_settings_view=reload_settings_view,
@@ -982,6 +1005,7 @@ class SettingsApplicationOwner:
         applied = await self.apply_direct(
             next_settings,
             reload_settings_view=reload_settings_view,
+            provider_plan=provider_plan,
         )
         self.fallback_sink(fallback_channels, installation_fallback)
         if applied:
@@ -1104,6 +1128,7 @@ class SettingsApplicationOwner:
         strict_runtime_errors: bool = False,
         strict_persistence_errors: bool = False,
         reload_settings_view: bool = True,
+        provider_plan: ProviderRuntimeApplyPlan | None = None,
     ) -> bool:
         next_settings = await self.runtime_effects.preserve_before_replace(next_settings)
         if persist:
@@ -1147,30 +1172,67 @@ class SettingsApplicationOwner:
                     return False
                 self.results.mark_settings_committed()
                 committed = True
+            runtime_failure = None
             try:
                 await self.runtime_effects.apply_after_persist(
                     transition,
                     strict_runtime_errors=strict_runtime_errors,
                     reload_settings_view=reload_settings_view,
+                    rebuild_managed_gemma=not (
+                        provider_plan is not None and provider_plan.should_rebuild_llm
+                    ),
                 )
             except Exception as exc:
                 if strict_runtime_errors:
                     raise
-                self._set_result(
-                    _stt_language_audio_runtime_degraded_transaction_result(
-                        code=_exception_code(exc, "settings_runtime_apply_exception"),
-                        exception=exc,
+                runtime_failure = _stt_language_audio_runtime_degraded_transaction_result(
+                    code=_exception_code(exc, "settings_runtime_apply_exception"),
+                    exception=exc,
+                )
+                self._set_result(runtime_failure)
+            if provider_plan is not None and self.provider_runtime is not None:
+                runtime_result = await ProviderRuntimeApplyAdapter(
+                    owner=self.provider_runtime,
+                    settings=transition.settings,
+                    plan=provider_plan,
+                ).apply_runtime(
+                    RuntimeApplyRequest(
+                        settings_values=self.settings.snapshot_values(transition.settings),
+                        reason="settings_provider_apply",
+                        correlation_id=None,
                     )
                 )
-            else:
-                if persist:
-                    self._set_result(
-                        TransactionResult(
-                            status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
-                            message=None,
-                            diagnostics=None,
+                if runtime_result.status != RUNTIME_APPLY_STATUS_APPLIED:
+                    provider_failure = _runtime_apply_result_as_degraded_transaction(runtime_result)
+                    if runtime_failure is not None:
+                        primary = runtime_failure.diagnostics
+                        secondary = provider_failure.secondary_diagnostics
+                        if provider_failure.diagnostics is not None:
+                            secondary = (
+                                replace(
+                                    provider_failure.diagnostics,
+                                    cause_id=primary.diagnostic_id if primary else None,
+                                ),
+                                *secondary,
+                            )
+                        runtime_failure = replace(
+                            runtime_failure,
+                            secondary_diagnostics=(
+                                *runtime_failure.secondary_diagnostics,
+                                *secondary,
+                            ),
                         )
+                    else:
+                        runtime_failure = provider_failure
+                    self._set_result(runtime_failure)
+            if persist and runtime_failure is None:
+                self._set_result(
+                    TransactionResult(
+                        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                        message=None,
+                        diagnostics=None,
                     )
+                )
             self.projection.remember_all(self.settings.canonical)
             return True
         finally:

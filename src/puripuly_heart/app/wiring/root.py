@@ -45,7 +45,7 @@ from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 from puripuly_heart.core.storage.secrets import SecretStore
 
 from .wiring_composition import (
-    create_microphone_test_capture_adapter,
+    create_audio_test_capture_adapter,
     create_peer_capture_admission_adapter,
     create_peer_capture_audio_loop_adapter,
     create_peer_capture_source_adapter,
@@ -273,7 +273,7 @@ __all__ = (
     "create_llm_provider",
     "create_llm_provider_from_resolved_config",
     "create_local_asr_provisioning_owner",
-    "create_microphone_test_capture_adapter",
+    "create_audio_test_capture_adapter",
     "create_peer_capture_admission_adapter",
     "create_peer_capture_audio_loop_adapter",
     "create_peer_capture_source_adapter",

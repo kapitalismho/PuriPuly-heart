@@ -29,11 +29,11 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderApplyIntent,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
+    UiAudioTestRuntimePort,
     UiDiagnosticsRuntimePort,
     UiEngagementRuntimePort,
     UiInputRuntimePort,
     UiManagedRuntimePort,
-    UiMicrophoneRuntimePort,
     UiOverlayRuntimePort,
     UiPeerCaptureRuntimePort,
     UiProviderRuntimePort,
@@ -210,13 +210,18 @@ class UiApplicationRuntimeStub:
         )
         return bool(refresh()) if callable(refresh) else False
 
-    async def stop_microphone_test(self) -> None:
-        stop = getattr(self._backend, "stop_microphone_test", None)
+    async def stop_audio_test(self) -> None:
+        stop = getattr(self._backend, "stop_audio_test", None)
         if not callable(stop):
             return
         result = stop()
         if hasattr(result, "__await__"):
             await result
+
+    def release_audio_test_capture_restore(self, channel: str) -> None:
+        release = getattr(self._backend, "release_audio_test_capture_restore", None)
+        if callable(release):
+            release(channel)
 
     def overlay_peer_presentation_state(self) -> object | None:
         state = getattr(self._backend, "overlay_peer_presentation_state", None)
@@ -329,8 +334,8 @@ class UiApplicationStateRuntimeStub:
         return bool(getattr(peer, "eula_accepted", False))
 
     @property
-    def microphone_test_active(self) -> bool:
-        return bool(getattr(self._backend, "microphone_test_active", False))
+    def audio_test_active(self) -> bool:
+        return bool(getattr(self._backend, "audio_test_active", False))
 
     @property
     def provider_name(self) -> str | None:
@@ -417,7 +422,7 @@ class ApplicationRuntimeShutdownStub:
     async def close_local_asr_provisioning(self) -> None:
         return None
 
-    async def close_microphone_test_runtime(self) -> None:
+    async def close_audio_test_runtime(self) -> None:
         return None
 
     async def close_self_capture_owner(self) -> None:
@@ -514,7 +519,7 @@ def compose_test_ui_application_boundary(
         peer_capture=cast(UiPeerCaptureRuntimePort, runtime),
         settings=cast(UiSettingsRuntimePort, runtime),
         provider=cast(UiProviderRuntimePort, runtime),
-        microphone=cast(UiMicrophoneRuntimePort, runtime),
+        audio_test=cast(UiAudioTestRuntimePort, runtime),
         overlay=cast(UiOverlayRuntimePort, runtime),
         managed=cast(UiManagedRuntimePort, runtime),
         engagement=cast(UiEngagementRuntimePort, runtime),

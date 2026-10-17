@@ -59,8 +59,10 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Self capture owner      | Microphone source and capture lifecycle                    | `core/runtime/self_capture.py`                       |
 | Self translation owner  | Self STT events, turns, state, output projection           | `core/orchestrator/self_translation_channel.py`      |
 | Peer capture owner      | Peer audio source, segmentation, and capture lifecycle | `core/runtime/peer_channel.py`                       |
+| Audio test owner        | VAD-only audio testing and capture restoration | `app/services/audio_test.py`, `core/runtime/audio_test.py` |
 | Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_runtime.py`         |
 | Managed local translation | Local model provisioning and runtime lifecycle | `app/services/managed_gemma_translation.py` and `core/local_translation/runtime.py` |
+| Model assets application | Explicit local-model asset operations and provisioning coordination | `app/services/model_assets.py` |
 | Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_turn.py`                 |
 | Index selection owner | Availability checks and persisted fallback selection | `app/services/index_selection.py`, `app/wiring/wiring_index_selection.py` |
 | Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/output.py`                              |
@@ -95,6 +97,7 @@ Peer:   loopback / process audio → capture / segmentation → recognition
 - Self and Peer share audio contracts. Each channel retains its own endpoint policies.
 - Capture authority determines which audio may enter recognition.
 - Source completion drains admitted input. Stop or discontinuity invalidates affected work.
+- The application boundary owns audio-test admission and restoration. VAD-only tests exclude normal capture; stopping revokes pending starts and drains owned inputs before restoring authorized capture.
 
 Implementation: `core/audio/ownership.py`, `core/audio/listen_delivery.py`.
 
@@ -144,7 +147,7 @@ Composition may construct resources, but must transfer long-lived ownership to a
 
 ## Local Application Control
 
-GUI and headless hosts share application owners and runtime resources. Presentation adapters determine whether there is a main window.
+GUI and headless hosts share application owners, runtime resources and turn-event contracts. Presentation adapters determine whether there is a main window.
 
 - **Operations and queries**
   - `ApplicationControlOwner` exposes typed operations and owner-backed queries.
@@ -192,10 +195,11 @@ Settings changes follow this path:
 
 - Settings persistence owns intent. Runtime owners own its application.
 - The provider-apply boundary coordinates capture and Local ASR owners.
+- Mixed settings changes share one persistence transaction. Runtime owners retain their own application results; provider retry authority remains explicit.
 - Failed or incomplete application must not appear as successfully applied runtime state.
-- LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.
+- LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings-effect, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.
 
-Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
+Implementation: `app/services/settings/settings_application.py`, `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_application_control_contract.py`, `tests/app/test_stt_provider_apply_vertical.py`.
 
 ## Provider Boundaries
 
@@ -424,6 +428,7 @@ Build policy and validation: `scripts/ci/build-native-experimental.ps1`, `releas
 - **Provisioning lifecycle**
   - Setup provisions required CPU ASR assets before app replacement. Provisioning failure blocks installation.
   - Managed Gemma and optional GPU ASR keep on-demand runtime preparation.
+  - Explicit asset work has a cancellation lifetime independent of runtime preparation. Provisioning exclusion lasts until owned work settles.
   - Adding mirrors does not change these lifecycle owners.
 
 Implementation: `core/local_asr/local_stt_runtime_installer.py`, `core/local_translation/provisioning.py`, `installer.iss`. Behavior: `tests/core/test_local_stt_runtime_installer.py`, `tests/core/local_translation/test_gemma_provisioning.py`, `tests/scripts/test_install_local_stt_model.py`.

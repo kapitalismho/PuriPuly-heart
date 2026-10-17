@@ -555,6 +555,14 @@ def build_self_stt_provider_request_from_vnext(
     )
 
 
+def self_vad_hangover_ms_from_vnext(settings: AppSettingsVNext) -> int:
+    return (
+        settings.intent.stt.low_latency_vad_hangover_ms
+        if FIXED_TRANSLATION_POLICY.fast_translation_enabled
+        else 1100
+    )
+
+
 def build_self_capture_session_config_from_vnext(
     settings: AppSettingsVNext,
 ) -> SelfCaptureSessionConfig:
@@ -574,11 +582,7 @@ def build_self_capture_session_config_from_vnext(
         internal_channels=1,
         ring_buffer_ms=audio.ring_buffer_ms,
         vad_speech_threshold=stt.vad_speech_threshold,
-        vad_hangover_ms=(
-            stt.low_latency_vad_hangover_ms
-            if FIXED_TRANSLATION_POLICY.fast_translation_enabled
-            else 1100
-        ),
+        vad_hangover_ms=self_vad_hangover_ms_from_vnext(settings),
         source_mode=resolved.source_mode,
         source_language=resolved.source_language,
         expected_languages=(resolved.source_language,),
@@ -1439,14 +1443,11 @@ def build_peer_capture_session_config(
     return build_peer_capture_session_config_from_vnext(canonical_settings or settings)
 
 
-def build_peer_capture_session_config_from_vnext(
-    settings: AppSettingsVNext,
-) -> PeerCaptureSessionConfig:
-    backend = resolve_peer_stt_runtime_config_from_vnext(settings)
-    provider_signature = build_peer_stt_provider_signature_from_vnext(settings)
-    desktop_audio = settings.intent.desktop_audio
-    capture_target = resolve_desktop_audio_capture_target(desktop_audio.capture_target)
-    target = PeerCaptureTargetIntent(
+def build_peer_capture_target_from_vnext(settings: AppSettingsVNext) -> PeerCaptureTargetIntent:
+    capture_target = resolve_desktop_audio_capture_target(
+        settings.intent.desktop_audio.capture_target
+    )
+    return PeerCaptureTargetIntent(
         kind=capture_target.kind,
         device_name=capture_target.device_name,
         process_kind=capture_target.process_kind,
@@ -1454,6 +1455,16 @@ def build_peer_capture_session_config_from_vnext(
         discord_channel=capture_target.discord_channel,
         executable_basename=capture_target.executable_basename,
     )
+
+
+def build_peer_capture_session_config_from_vnext(
+    settings: AppSettingsVNext,
+) -> PeerCaptureSessionConfig:
+    backend = resolve_peer_stt_runtime_config_from_vnext(settings)
+    provider_signature = build_peer_stt_provider_signature_from_vnext(settings)
+    desktop_audio = settings.intent.desktop_audio
+    capture_target = resolve_desktop_audio_capture_target(desktop_audio.capture_target)
+    target = build_peer_capture_target_from_vnext(settings)
     model_id = None
     if backend.provider == STTProviderName.LOCAL_QWEN_GPU.value:
         model_id = LOCAL_QWEN_GPU_MODEL_ID

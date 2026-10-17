@@ -8,6 +8,7 @@ import os
 from collections import OrderedDict
 from collections.abc import AsyncIterator, Callable, Mapping
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -75,7 +76,10 @@ from puripuly_heart.core.diagnostics import (
     normalize_diagnostic,
     sanitize_diagnostic_fields,
 )
-from puripuly_heart.core.local_translation.provisioning import GemmaProvisioningCancelled
+from puripuly_heart.core.local_translation.provisioning import (
+    GemmaProvisioningCancelled,
+    GemmaProvisioningError,
+)
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
     DIAGNOSTIC_VISIBILITY_BASIC,
@@ -108,14 +112,17 @@ COMMANDS = {
     "capture.set": "Set self or peer capture explicitly",
     "translation.set": "Set translation explicitly",
     "text.submit": "Submit manual text through the self pipeline",
-    "microphone.test": "Start or stop microphone test",
+    "audio.test": "Start or stop the microphone and loopback audio test",
     "audio.target.set": "Set peer loopback target",
     "audio.retry": "Retry lost peer process target",
     "settings.apply": "Apply focused typed settings changes",
     "provider.apply": "Apply self and peer STT changes together",
     "models.install": "Install or repair selected CPU/GPU ASR assets",
     "models.prepare": "Inspect CPU or GPU model readiness and integrity",
-    "models.cancel": "Cancel an active CPU/GPU model installation",
+    "models.cancel": "Cancel an active CPU/GPU model installation or one model download",
+    "models.download": "Download or repair one local model (ASR or Gemma)",
+    "models.import": "Import one Gemma model from a folder with the pinned files",
+    "models.delete": "Delete one installed local model",
     "gemma.prepare": "Prepare managed local Gemma model assets",
     "gemma.cancel": "Cancel managed local Gemma preparation",
     "models.retry": "Retry GPU activation after installation",
@@ -160,7 +167,7 @@ COMMAND_ARGUMENTS = {
     },
     "translation.set": {"enabled": "boolean"},
     "text.submit": {"text": "non-empty string (protected content)"},
-    "microphone.test": {"enabled": "boolean"},
+    "audio.test": {"enabled": "boolean"},
     "audio.target.set": {"value": "available audio.target option value"},
     "audio.retry": {},
     "settings.apply": {
@@ -199,7 +206,19 @@ COMMAND_ARGUMENTS = {
         "open_browser": "optional boolean, default false (OAuth only)",
     },
     "auth.logout": {"provider": ["qq", "discord", "openrouter", "chatgpt"]},
-    "models.cancel": {"backend": "cpu or gpu (optional; default gpu)"},
+    "models.cancel": {
+        "backend": "cpu or gpu (optional; default gpu)",
+        "model_id": "optional models.status assets ID; cancels that model's download instead",
+    },
+    "models.download": {
+        "model_id": "models.status assets ID",
+        "source": "optional auto, huggingface, modelscope or hf-mirror (default auto)",
+    },
+    "models.import": {
+        "model_id": "importable models.status assets ID",
+        "directory": "folder that contains the model's required_files",
+    },
+    "models.delete": {"model_id": "models.status assets ID"},
     "gemma.prepare": {},
     "gemma.cancel": {},
     "overlay.position.reset": {},
@@ -421,6 +440,7 @@ class _Operation:
     backend: str | None = None
     install_started: bool = False
     interrupt_requested: bool = False
+    audio_test_revision: int | None = None
 
 
 class InvalidArgumentsError(ValueError):
@@ -1170,7 +1190,7 @@ class ApplicationControlOwner:
                 **base,
                 "host_pid": os.getpid(),
                 "channels": self._channels(),
-                "microphone_test": self.application.microphone_test_snapshot(),
+                "audio_test": self.application.audio_test_snapshot(),
                 "translation_enabled": self.application.state().translation_enabled,
                 "translation_runtime_ready": self.application.state().translation_runtime_ready,
                 "overlay_target": self.application.state().overlay_target,
@@ -1205,10 +1225,12 @@ class ApplicationControlOwner:
         if name == "models.status":
             owner = self.provisioning()
             gemma = self.gemma()
+            assets = await self.application.refresh_model_assets()
             return {
                 **base,
                 "state": _json(getattr(owner, "snapshot", None)) if owner is not None else None,
                 "gemma": _json(gemma.snapshot) if gemma is not None else None,
+                "assets": [entry.to_dict() for entry in assets],
             }
         if name == "overlay.status":
             output = self.application.output_status()
@@ -1313,6 +1335,11 @@ class ApplicationControlOwner:
             receipt,
             backend=arguments.get("backend", "gpu") if command == "models.install" else None,
             request_signature=signature,
+            audio_test_revision=(
+                self.application.audio_test_start_revision()
+                if command == "audio.test" and arguments.get("enabled") is True
+                else None
+            ),
         )
         self._requests[request_id] = operation_id
         task = asyncio.create_task(
@@ -1516,9 +1543,14 @@ class ApplicationControlOwner:
                 and len(changes) == 1
                 and "locale" in changes
             )
-            independent_stop = command in {"app.stop", "models.cancel", "gemma.cancel"} or (
-                command == "microphone.test" and arguments.get("enabled") is False
-            )
+            independent_stop = command in {
+                "app.stop",
+                "models.cancel",
+                "gemma.cancel",
+                "models.download",
+                "models.import",
+                "models.delete",
+            } or (command == "audio.test" and arguments.get("enabled") is False)
             resource_lock = (
                 None
                 if independent_stop
@@ -1776,6 +1808,33 @@ class ApplicationControlOwner:
             if acquired:
                 resource_lock.release()
 
+    async def _model_asset_command(self, command: str, args: dict) -> dict:
+        from puripuly_heart.app.services.model_assets import ModelAssetsError
+
+        app = self.application
+        model_id = args["model_id"]
+        try:
+            if command == "models.download":
+                source = args.get("source", "auto")
+                entry = await app.download_model_asset(
+                    model_id,
+                    source=None if source == "auto" else source.replace("-", "_"),
+                )
+            elif command == "models.import":
+                entry = await app.import_model_asset(model_id, Path(args["directory"]))
+            else:
+                entry = await app.delete_model_asset(model_id)
+        except ModelAssetsError as error:
+            current = next(
+                (item for item in app.model_asset_entries() if item.model_id == model_id), None
+            )
+            return {
+                "status": "cancelled" if error.failure_code == "cancelled" else "failed",
+                "error": {"code": error.failure_code},
+                "asset": current.to_dict() if current is not None else None,
+            }
+        return {"status": "applied", "asset": entry.to_dict()}
+
     def _start_model_install(self, args: dict, operation_id: str) -> asyncio.Task:
         from puripuly_heart.core.local_asr_provisioning import LocalASRInstallRequest
 
@@ -1938,35 +1997,34 @@ class ApplicationControlOwner:
             if not isinstance(text, str) or not text.strip():
                 raise InvalidArgumentsError("text must be non-empty")
             return self._text_admission_data(await app.submit_text(text))
-        if command == "microphone.test":
+        if command == "audio.test":
             if not _boolean(args, "enabled"):
-                await app.stop_microphone_test()
-                snapshot = app.microphone_test_snapshot()
+                await app.stop_audio_test()
+                snapshot = app.audio_test_snapshot()
                 return {
                     "status": (
                         "applied"
                         if snapshot["state"] == "off" and not snapshot["effective_active"]
                         else "failed"
                     ),
-                    "microphone_test": snapshot,
+                    "audio_test": snapshot,
                 }
-            started = await app.start_microphone_test()
-            ready = await app.wait_microphone_test_ready() if started else False
-            snapshot = app.microphone_test_snapshot()
-            if ready and snapshot["failure_reason"] is None:
-                return {"status": "applied", "microphone_test": snapshot}
-            if (
-                started
-                and snapshot["state"] in {"off", "stopping"}
-                and snapshot["failure_reason"] is None
-            ):
-                return {"status": "cancelled", "microphone_test": snapshot}
-            if snapshot["state"] in {"pending", "ready", "stopping"}:
-                return {"status": "degraded", "microphone_test": snapshot}
+            admission_revision = self._operations[operation_id].audio_test_revision
+            started = await app.start_audio_test(admission_revision=admission_revision)
+            ready = await app.wait_audio_test_ready() if started else False
+            snapshot = app.audio_test_snapshot()
+            if admission_revision != app.audio_test_start_revision():
+                return {"status": "cancelled", "audio_test": snapshot}
+            if ready and snapshot["state"] == "ready":
+                return {"status": "applied", "audio_test": snapshot}
+            if started and snapshot["state"] in {"off", "stopping"}:
+                return {"status": "cancelled", "audio_test": snapshot}
+            if snapshot["state"] in {"pending", "ready", "degraded"}:
+                return {"status": "degraded", "audio_test": snapshot}
             return {
                 "status": "action_required",
-                "action": "select_available_microphone",
-                "microphone_test": snapshot,
+                "action": "select_available_audio_devices",
+                "audio_test": snapshot,
             }
         if command == "audio.target.set":
             value = args["value"]
@@ -2001,6 +2059,15 @@ class ApplicationControlOwner:
             else:
                 raise InvalidArgumentsError("unsupported model backend")
             return {"status": "applied", "models": _json(snapshot)}
+        if command in {"models.download", "models.import", "models.delete"}:
+            return await self._model_asset_command(command, args)
+        if command == "models.cancel" and "model_id" in args:
+            cancelled = await app.cancel_model_asset(args["model_id"])
+            return {
+                "status": "cancelled" if cancelled else "rejected",
+                "model_id": args["model_id"],
+                "reason": None if cancelled else "no_active_download",
+            }
         if command == "models.cancel":
             owner = self.provisioning()
             if owner is None:
@@ -2021,7 +2088,12 @@ class ApplicationControlOwner:
             settings = app.compatibility_settings()
             if owner is None or settings is None:
                 return {"status": "failed", "error": {"code": "gemma_owner_unavailable"}}
-            activation = await owner.prepare(self.gemma_selection(settings))
+            try:
+                activation = await owner.prepare(self.gemma_selection(settings))
+            except GemmaProvisioningError as error:
+                if error.failure_code != "task_busy":
+                    raise
+                return {"status": "failed", "error": {"code": "task_busy"}}
             await activation.release()
             return {"status": "applied", "gemma": _json(owner.snapshot)}
         if command == "gemma.cancel":
@@ -2724,24 +2796,22 @@ class ApplicationControlOwner:
                     ProviderApplyIntent((edit,)),
                     materialize_translation=self.settings.materialize_translation,
                 )
-        if any(
-            key in changes
-            for key in (
-                set(PROVIDER_EDITS)
-                | {
-                    "stt.provider",
-                    "peer_stt.provider",
-                    "stt.cloud_free_tier_providers",
-                    "translation.model",
-                    "translation.connection",
-                    "translation.connection_history",
-                    "translation.previous_llm_model",
-                    "managed.referral_id",
-                }
-            )
-        ):
+        provider_fields = set(PROVIDER_EDITS) | {
+            "stt.provider",
+            "peer_stt.provider",
+            "stt.cloud_free_tier_providers",
+            "translation.model",
+            "translation.connection",
+            "translation.connection_history",
+            "translation.previous_llm_model",
+            "managed.referral_id",
+        }
+        if changes.keys() <= provider_fields:
             return await self.application.apply_providers(updated)
-        return await self.application.apply_settings(updated)
+        return await self.application.apply_settings(
+            updated,
+            provider_requested=bool(changes.keys() & provider_fields),
+        )
 
     async def operation(self, operation_id: str) -> dict:
         return dict(self._get(operation_id).receipt)
@@ -2855,7 +2925,7 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
         "capture.set": {"channel", "enabled"},
         "translation.set": {"enabled"},
         "text.submit": {"text"},
-        "microphone.test": {"enabled"},
+        "audio.test": {"enabled"},
         "audio.target.set": {"value"},
         "secrets.set": {"name", "value"},
         "secrets.delete": {"name"},
@@ -2866,9 +2936,26 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
         "overlay.calibrate": {"action"},
         "auth.login": {"provider"},
         "auth.logout": {"provider"},
+        "models.download": {"model_id"},
+        "models.import": {"model_id", "directory"},
+        "models.delete": {"model_id"},
     }.get(command, set())
     if required - args.keys():
         raise InvalidArgumentsError("missing command arguments")
+    if command in {"models.download", "models.import", "models.delete", "models.cancel"}:
+        if "model_id" in args and (type(args["model_id"]) is not str or not args["model_id"]):
+            raise InvalidArgumentsError("model_id must be a non-empty string")
+    if command == "models.download" and args.get("source", "auto") not in {
+        "auto",
+        "huggingface",
+        "modelscope",
+        "hf-mirror",
+    }:
+        raise InvalidArgumentsError("unsupported model source")
+    if command == "models.import" and (
+        type(args["directory"]) is not str or not args["directory"].strip()
+    ):
+        raise InvalidArgumentsError("directory must be a non-empty string")
 
     if command == "capture.set":
         if type(args["channel"]) is not str or args["channel"] not in {"self", "peer"}:
@@ -2880,7 +2967,7 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
             raise InvalidArgumentsError("accept_terms must be a boolean")
         if accept_terms and (args["channel"] != "peer" or not args["enabled"]):
             raise InvalidArgumentsError("accept_terms is only valid when enabling peer capture")
-    elif command in {"translation.set", "microphone.test", "overlay.set"}:
+    elif command in {"translation.set", "audio.test", "overlay.set"}:
         if type(args["enabled"]) is not bool:
             raise InvalidArgumentsError("enabled must be a boolean")
     elif command == "overlay.lock":

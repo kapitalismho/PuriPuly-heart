@@ -575,7 +575,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         peer_capture=SimpleNamespace(),
         settings=ui_settings,
         provider=ui_provider,
-        microphone=SimpleNamespace(),
+        audio_test=SimpleNamespace(),
         overlay=SimpleNamespace(),
         managed=SimpleNamespace(),
         engagement=SimpleNamespace(),
