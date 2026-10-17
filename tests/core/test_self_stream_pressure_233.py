@@ -16,7 +16,7 @@ from tests.core.test_self_stream_owned_ingress_233 import (
     ControlledRecognitionProvider,
     OwnedIngress,
 )
-from tests.fixtures.self_grace_233.stream2.run import Provider, Sender, begin, contribution, until
+from tests.helpers.self_stream import Provider, Sender, begin, contribution, until
 from tests.helpers.translation_owners import compose_translation_test_harness
 
 

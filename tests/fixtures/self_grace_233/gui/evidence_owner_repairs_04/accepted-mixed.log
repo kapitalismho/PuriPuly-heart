@@ -1,3 +1,0 @@
-[Diagnostic][LlmLatency] request_end request_id=3 utterance_id=d453beb3-e5a2-4723-8f1c-2bb7e5ab3640 parent_utterance_id=d453beb3-e5a2-4723-8f1c-2bb7e5ab3640 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=12 prompt_chars=0 context_chars=0 status=cancelled request_ms=21784 queue_ms=0 attempts=0 winner_attempt=none
-[Conversation] Self · Mic · Original (French) · Original "older speech" · Outcome cancelled
-[Logging] conversation_ui_delivery_failed cause=unclassified exception_type=RuntimeError

@@ -79,19 +79,11 @@ pythonpath = ["."]
 [tool.black]
 line-length = 100
 target-version = ["py314"]
-force-exclude = '''
-build\.spec
-| /tests/fixtures/self_grace_233/audio/historical_75c4485a/run_production_audio\.py$
-| /tests/fixtures/self_grace_233/correctness_results/source/self_translation_channel\.py$
-'''
+force-exclude = "build\\.spec"
 
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-extend-exclude = [
-  "tests/fixtures/self_grace_233/audio/historical_75c4485a/run_production_audio.py",
-  "tests/fixtures/self_grace_233/correctness_results/source/self_translation_channel.py",
-]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

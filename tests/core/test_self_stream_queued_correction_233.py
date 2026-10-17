@@ -11,7 +11,7 @@ from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import SelfTurnPresentation, UIEventType
 from puripuly_heart.domain.models import OSCMessage
-from tests.fixtures.self_grace_233.stream2.run import (
+from tests.helpers.self_stream import (
     Provider,
     Sender,
     begin,

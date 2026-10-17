@@ -1,5 +1,0 @@
-[Diagnostic][LlmLatency] request_end request_id=1 utterance_id=7069c90f-6e3d-4e6e-b19d-6d3c19072309 parent_utterance_id=7069c90f-6e3d-4e6e-b19d-6d3c19072309 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=12 prompt_chars=0 context_chars=0 status=success request_ms=1108 queue_ms=0 attempts=0 winner_attempt=none
-[Diagnostic][LlmLatency] request_end request_id=2 utterance_id=7069c90f-6e3d-4e6e-b19d-6d3c19072309 parent_utterance_id=7069c90f-6e3d-4e6e-b19d-6d3c19072309 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=23 prompt_chars=0 context_chars=0 status=success request_ms=1052 queue_ms=0 attempts=0 winner_attempt=none
-[Conversation] Self · Mic · Original (French) · Original "blue lantern and bright"
-[Context] utterance_id=7069c90f-6e3d-4e6e-b19d-6d3c19072309 context_count=0
-[Conversation] Self · Mic → English · Translation "en:blue lantern and bright"

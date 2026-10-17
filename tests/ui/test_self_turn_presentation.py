@@ -23,7 +23,7 @@ from puripuly_heart.ui.i18n import get_locale, set_locale, t
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from puripuly_heart.ui.views.dashboard import DashboardView
 from puripuly_heart.ui.views.logs import ConversationViewModel, LogsView
-from tests.fixtures.self_grace_233.gui.owner_presentation import (
+from tests.helpers.self_turn_presentation import (
     ControlledSourceOverlay,
     OwnerPresentation,
     eventually,

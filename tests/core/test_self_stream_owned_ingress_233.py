@@ -25,7 +25,7 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
-from tests.fixtures.self_grace_233.stream2.run import Provider, Sender, until
+from tests.helpers.self_stream import Provider, Sender, until
 from tests.helpers.translation_owners import compose_translation_test_harness
 
 
