@@ -104,8 +104,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Index-Translate 35B** | Unlimited | Unlimited | 5,000 | 7,260 |
-| **Gemma 4 E4B & 26B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
+| **Index-Translate 35B A3B** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **Gemma 4 26B A4B + 31B** | 13,940 | 13,940 | 3,680 | 4,770 |
 | **DeepSeek V4.1 Flash** | 16,800 | 16,800 | 3,860 | 5,070 |
 | **GPT 6 Luna** | 8,680 | 8,680 | 3,170 | 3,950 |
@@ -114,6 +113,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | Unlimited | Unlimited | 5,000 | 7,260 |
 | **DeepSeek V4 Flash (OpenRouter)** | 17,020 | 17,020 | 3,860 | 5,090 |
 | **Gemini 3.8 Flash** | 1,160 | 1,160 | 940 | 1,000 |
 | **Qwen 3.8 Flash** | 7,460 | 7,460 | 2,990 | 3,680 |
@@ -124,8 +124,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Index-Translate 35B** | $0 | $0 | ~$0.0002 | ~$0.00014 |
-| **Gemma 4 E4B & 26B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
+| **Index-Translate 35B A3B** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **Gemma 4 26B A4B + 31B** | ~$0.00007 | ~$0.00007 | ~$0.0003 | ~$0.00021 |
 | **DeepSeek V4.1 Flash** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **GPT 6 Luna** | ~$0.00012 | ~$0.00012 | ~$0.0003 | ~$0.00025 |
@@ -134,6 +133,7 @@ It works in many environments, including VRChat and Discord.
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | $0 | $0 | ~$0.0002 | ~$0.00014 |
 | **DeepSeek V4 Flash (OpenRouter)** | ~$0.00006 | ~$0.00006 | ~$0.0003 | ~$0.00020 |
 | **Gemini 3.8 Flash** | ~$0.0009 | ~$0.0009 | ~$0.0011 | ~$0.0010 |
 | **Qwen 3.8 Flash** | ~$0.0001 | ~$0.0001 | ~$0.0003 | ~$0.00027 |

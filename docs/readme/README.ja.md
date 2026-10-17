@@ -103,8 +103,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Index-Translate 35B** | 無制限 | 無制限 | 5,000回 | 7,260回 |
-| **Gemma 4 E4B & 26B (Local)** | 無制限 | 無制限 | 5,000回 | 7,260回 |
+| **Index-Translate 35B A3B** | 無制限 | 無制限 | 5,000回 | 7,260回 |
 | **Gemma 4 26B A4B + 31B** | 13,940回 | 13,940回 | 3,680回 | 4,770回 |
 | **DeepSeek V4.1 Flash** | 16,800回 | 16,800回 | 3,860回 | 5,070回 |
 | **GPT 6 Luna** | 8,680回 | 8,680回 | 3,170回 | 3,950回 |
@@ -113,6 +112,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | 無制限 | 無制限 | 5,000回 | 7,260回 |
 | **DeepSeek V4 Flash (OpenRouter)** | 17,020回 | 17,020回 | 3,860回 | 5,090回 |
 | **Gemini 3.8 Flash** | 1,160回 | 1,160回 | 940回 | 1,000回 |
 | **Qwen 3.8 Flash** | 7,460回 | 7,460回 | 2,990回 | 3,680回 |
@@ -123,8 +123,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Index-Translate 35B** | 0円 | 0円 | ~0.03円 | ~0.02円 |
-| **Gemma 4 E4B & 26B (Local)** | 0円 | 0円 | ~0.03円 | ~0.02円 |
+| **Index-Translate 35B A3B** | 0円 | 0円 | ~0.03円 | ~0.02円 |
 | **Gemma 4 26B A4B + 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **DeepSeek V4.1 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **GPT 6 Luna** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
@@ -133,6 +132,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | 0円 | 0円 | ~0.03円 | ~0.02円 |
 | **DeepSeek V4 Flash (OpenRouter)** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **Gemini 3.8 Flash** | ~0.13円 | ~0.13円 | ~0.16円 | ~0.15円 |
 | **Qwen 3.8 Flash** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
