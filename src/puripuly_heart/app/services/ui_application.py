@@ -7,7 +7,6 @@ import logging
 import os
 import time
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -36,7 +35,10 @@ from puripuly_heart.app.ports.settings_view import (
     PromptApplyIntent,
     ProviderApplyIntent,
 )
-from puripuly_heart.app.ports.ui_application import UiApplicationState
+from puripuly_heart.app.ports.ui_application import (
+    TranslationEnablePreparation,
+    UiApplicationState,
+)
 from puripuly_heart.app.ports.ui_application_intents import (
     UiDiagnosticsRuntimePort,
     UiEngagementRuntimePort,
@@ -165,13 +167,6 @@ _ORDERED_INTENTS = frozenset(
         "persist_provider_secret_change",
     }
 )
-
-
-@dataclass(frozen=True, slots=True)
-class TranslationEnablePreparation:
-    intent_revision: int
-    selection_generation: int | None
-    ready: bool
 
 
 def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:

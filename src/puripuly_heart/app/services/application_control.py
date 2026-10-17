@@ -88,10 +88,8 @@ from puripuly_heart.core.messages import (
 )
 
 if TYPE_CHECKING:
-    from puripuly_heart.app.services.ui_application import (
-        TranslationEnablePreparation,
-        UiApplicationBoundary,
-    )
+    from puripuly_heart.app.ports.ui_application import TranslationEnablePreparation
+    from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 
 TERMINAL = frozenset(
     {

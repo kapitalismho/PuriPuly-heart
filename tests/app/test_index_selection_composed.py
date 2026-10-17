@@ -644,7 +644,7 @@ async def test_rejected_index_enable_does_not_invalidate_a_pending_gui_enable(co
 async def test_failed_preflight_with_stale_revision_never_advances_pending_intent(
     composed, monkeypatch
 ):
-    from puripuly_heart.app.services.ui_application import TranslationEnablePreparation
+    from puripuly_heart.app.ports.ui_application import TranslationEnablePreparation
 
     _path, http, create = composed
     app, _presentation = create()
