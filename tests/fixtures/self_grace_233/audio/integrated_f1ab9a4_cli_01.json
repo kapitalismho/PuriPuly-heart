@@ -1,0 +1,2002 @@
+{
+  "schema": "self-stream-233/isolated-actual-app-cli/v1",
+  "status": "passed",
+  "revision": "f1ab9a47d9caaf67bd7666b7d5f5e380da46b185",
+  "runner_sha256": "76a4c6b7a928947b66516b4606d363e9639f3ac0c9949c15090ee377452381be",
+  "support_sha256": "5c1601769389f17cbc457f28f0a5c80156d4e0c4f00e47b38755eab83ca17045",
+  "interpreter": "<checkout>\\.venv\\Scripts\\python.exe",
+  "operations": [
+    {
+      "arguments": [
+        "capabilities"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.4601606000069296,
+      "payload": {
+        "output_version": 1,
+        "version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "commands": {
+          "app.stop": {
+            "description": "Request ordered host shutdown",
+            "arguments": {},
+            "cancellable": false
+          },
+          "capture.set": {
+            "description": "Set self or peer capture explicitly",
+            "arguments": {
+              "channel": [
+                "self",
+                "peer"
+              ],
+              "enabled": "boolean",
+              "accept_terms": "optional boolean (true only for peer enabled; defaults false)"
+            },
+            "cancellable": false
+          },
+          "translation.set": {
+            "description": "Set translation explicitly",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "text.submit": {
+            "description": "Submit manual text through the self pipeline",
+            "arguments": {
+              "text": "non-empty string (protected content)"
+            },
+            "cancellable": false
+          },
+          "microphone.test": {
+            "description": "Start or stop microphone test",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "audio.target.set": {
+            "description": "Set peer loopback target",
+            "arguments": {
+              "value": "available audio.target option value"
+            },
+            "cancellable": false
+          },
+          "audio.retry": {
+            "description": "Retry lost peer process target",
+            "arguments": {},
+            "cancellable": false
+          },
+          "settings.apply": {
+            "description": "Apply focused typed settings changes",
+            "arguments": {
+              "changes": "object of settings_fields to typed values (or direct typed fields)"
+            },
+            "cancellable": false
+          },
+          "provider.apply": {
+            "description": "Apply self and peer STT changes together",
+            "arguments": {
+              "channel": [
+                "self",
+                "peer",
+                "both"
+              ],
+              "provider": "settings.choices stt_providers",
+              "self": "optional settings.choices stt_providers",
+              "peer": "optional settings.choices stt_providers"
+            },
+            "cancellable": false
+          },
+          "models.install": {
+            "description": "Install or repair selected CPU/GPU ASR assets",
+            "arguments": {
+              "backend": "cpu or gpu (default gpu)",
+              "model_ids": "optional list of backend-compatible models.status IDs; empty means backend default"
+            },
+            "cancellable": true
+          },
+          "models.prepare": {
+            "description": "Inspect CPU or GPU model readiness and integrity",
+            "arguments": {
+              "backend": "cpu or gpu (default cpu)",
+              "verify_checksums": "optional boolean (default false)"
+            },
+            "cancellable": false
+          },
+          "models.cancel": {
+            "description": "Cancel an active CPU/GPU model installation",
+            "arguments": {
+              "backend": "cpu or gpu (optional; default gpu)"
+            },
+            "cancellable": false
+          },
+          "gemma.prepare": {
+            "description": "Prepare managed local Gemma model assets",
+            "arguments": {},
+            "cancellable": true
+          },
+          "gemma.cancel": {
+            "description": "Cancel managed local Gemma preparation",
+            "arguments": {},
+            "cancellable": false
+          },
+          "models.retry": {
+            "description": "Retry GPU activation after installation",
+            "arguments": {
+              "backend": "gpu (optional; default gpu)"
+            },
+            "cancellable": false
+          },
+          "gpu.discover": {
+            "description": "Discover available GPU devices",
+            "arguments": {},
+            "cancellable": false
+          },
+          "secrets.set": {
+            "description": "Store provider credential (value never returned)",
+            "arguments": {
+              "name": "declared secrets.presence key",
+              "value": "non-empty secret (stdin/hidden input only)"
+            },
+            "cancellable": false
+          },
+          "secrets.delete": {
+            "description": "Delete provider credential",
+            "arguments": {
+              "name": "declared secrets.presence key"
+            },
+            "cancellable": false
+          },
+          "secrets.verify": {
+            "description": "Verify provider credential separately from storage",
+            "arguments": {
+              "name": "secret key",
+              "value": "non-empty secret (stdin/hidden input only)"
+            },
+            "cancellable": false
+          },
+          "auth.login": {
+            "description": "Authorize a QQ, Discord, OpenRouter, or ChatGPT account with explicit browser consent",
+            "arguments": {
+              "provider": [
+                "qq",
+                "discord",
+                "openrouter",
+                "chatgpt"
+              ],
+              "qq_identity": "required non-empty string for QQ",
+              "credential": "required non-empty secret for QQ (stdin/hidden input only)",
+              "referral_id": "optional referral string for QQ or Discord",
+              "open_browser": "optional boolean, default false (OAuth only)"
+            },
+            "cancellable": false
+          },
+          "auth.logout": {
+            "description": "Remove locally stored account authorization (ChatGPT also requests remote revocation)",
+            "arguments": {
+              "provider": [
+                "qq",
+                "discord",
+                "openrouter",
+                "chatgpt"
+              ]
+            },
+            "cancellable": false
+          },
+          "overlay.set": {
+            "description": "Set overlay enabled state",
+            "arguments": {
+              "enabled": "boolean"
+            },
+            "cancellable": false
+          },
+          "overlay.lock": {
+            "description": "Lock/unlock desktop caption positioning",
+            "arguments": {
+              "locked": "boolean"
+            },
+            "cancellable": false
+          },
+          "overlay.size": {
+            "description": "Select desktop overlay size",
+            "arguments": {
+              "preset": "settings.choices overlay size"
+            },
+            "cancellable": false
+          },
+          "overlay.position.reset": {
+            "description": "Reset desktop overlay position",
+            "arguments": {},
+            "cancellable": false
+          },
+          "overlay.calibrate": {
+            "description": "Begin, change, apply or cancel overlay calibration",
+            "arguments": {
+              "action": [
+                "begin",
+                "change",
+                "apply",
+                "cancel"
+              ],
+              "field": "required for change: anchor, offset_x, offset_y, distance, text_scale, background_alpha",
+              "value": "required for change; type/range depends on field"
+            },
+            "cancellable": false
+          }
+        },
+        "queries": [
+          "app.status",
+          "audio.devices",
+          "audio.processes",
+          "audio.target",
+          "auth.status",
+          "capture.channels",
+          "consent.peer_translation",
+          "diagnostics.health",
+          "diagnostics.history",
+          "gpu.status",
+          "models.status",
+          "osc.status",
+          "overlay.status",
+          "providers.status",
+          "secrets.presence",
+          "settings.choices",
+          "settings.current"
+        ],
+        "query_arguments": {
+          "diagnostics.history": {
+            "operation_id": "optional operation identity",
+            "diagnostic_id": "optional failure identity",
+            "instance_id": "optional originating host identity",
+            "after": "optional nonnegative diagnostic sequence",
+            "limit": "integer 1..100, default 50"
+          },
+          "diagnostics.health": {}
+        },
+        "settings_fields": [
+          "audio.input_device",
+          "audio.input_host_api",
+          "audio.output_device",
+          "chatbox.activation_notice.enabled",
+          "chatbox.source.enabled",
+          "clipboard.enabled",
+          "custom_vocabulary",
+          "languages",
+          "local_llm.base_url",
+          "local_llm.extra_body_json",
+          "local_llm.model",
+          "locale",
+          "managed.referral_id",
+          "osc.connection",
+          "overlay.background_alpha",
+          "overlay.desktop_size",
+          "overlay.peer_original.enabled",
+          "overlay.swap_caption_languages",
+          "overlay.target",
+          "overlay.translation.enabled",
+          "peer_expected_languages",
+          "peer_stt.provider",
+          "peer_vad.hangover_ms",
+          "peer_vad.pre_roll_ms",
+          "peer_vad.speech_threshold",
+          "prompts.system_prompt_override",
+          "prompts.value",
+          "self_vad.speech_threshold",
+          "stt.cloud_free_tier_providers",
+          "stt.custom.endpoint",
+          "stt.custom.extra_json",
+          "stt.custom.model",
+          "stt.gpu_device_id",
+          "stt.provider",
+          "stt.soniox.enable_speaker_diarization",
+          "telemetry.enabled",
+          "translation.connection",
+          "translation.connection_history",
+          "translation.gpu_device_id",
+          "translation.http_extension_id",
+          "translation.model",
+          "translation.previous_llm_model",
+          "translation.qwen.beijing.api_host",
+          "translation.qwen.region",
+          "translation.qwen.singapore.api_host",
+          "vrc_mic_intercept.enabled"
+        ],
+        "secret_keys": [
+          "google_api_key",
+          "openrouter_api_key",
+          "openai_api_key",
+          "deepseek_api_key",
+          "deepgram_api_key",
+          "gemini_transcribe_api_key",
+          "elevenlabs_scribe_api_key",
+          "soniox_api_key",
+          "local_llm_api_key",
+          "custom_stt_api_key",
+          "alibaba_api_key_beijing",
+          "alibaba_api_key_singapore"
+        ],
+        "topics": [
+          "operation",
+          "settings",
+          "auth",
+          "capture",
+          "transcript",
+          "translation",
+          "session_state_changed",
+          "error",
+          "logs",
+          "gap"
+        ]
+      },
+      "stdout": "{\"output_version\": 1, \"version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"commands\": {\"app.stop\": {\"description\": \"Request ordered host shutdown\", \"arguments\": {}, \"cancellable\": false}, \"capture.set\": {\"description\": \"Set self or peer capture explicitly\", \"arguments\": {\"channel\": [\"self\", \"peer\"], \"enabled\": \"boolean\", \"accept_terms\": \"optional boolean (true only for peer enabled; defaults false)\"}, \"cancellable\": false}, \"translation.set\": {\"description\": \"Set translation explicitly\", \"arguments\": {\"enabled\": \"boolean\"}, \"cancellable\": false}, \"text.submit\": {\"description\": \"Submit manual text through the self pipeline\", \"arguments\": {\"text\": \"non-empty string (protected content)\"}, \"cancellable\": false}, \"microphone.test\": {\"description\": \"Start or stop microphone test\", \"arguments\": {\"enabled\": \"boolean\"}, \"cancellable\": false}, \"audio.target.set\": {\"description\": \"Set peer loopback target\", \"arguments\": {\"value\": \"available audio.target option value\"}, \"cancellable\": false}, \"audio.retry\": {\"description\": \"Retry lost peer process target\", \"arguments\": {}, \"cancellable\": false}, \"settings.apply\": {\"description\": \"Apply focused typed settings changes\", \"arguments\": {\"changes\": \"object of settings_fields to typed values (or direct typed fields)\"}, \"cancellable\": false}, \"provider.apply\": {\"description\": \"Apply self and peer STT changes together\", \"arguments\": {\"channel\": [\"self\", \"peer\", \"both\"], \"provider\": \"settings.choices stt_providers\", \"self\": \"optional settings.choices stt_providers\", \"peer\": \"optional settings.choices stt_providers\"}, \"cancellable\": false}, \"models.install\": {\"description\": \"Install or repair selected CPU/GPU ASR assets\", \"arguments\": {\"backend\": \"cpu or gpu (default gpu)\", \"model_ids\": \"optional list of backend-compatible models.status IDs; empty means backend default\"}, \"cancellable\": true}, \"models.prepare\": {\"description\": \"Inspect CPU or GPU model readiness and integrity\", \"arguments\": {\"backend\": \"cpu or gpu (default cpu)\", \"verify_checksums\": \"optional boolean (default false)\"}, \"cancellable\": false}, \"models.cancel\": {\"description\": \"Cancel an active CPU/GPU model installation\", \"arguments\": {\"backend\": \"cpu or gpu (optional; default gpu)\"}, \"cancellable\": false}, \"gemma.prepare\": {\"description\": \"Prepare managed local Gemma model assets\", \"arguments\": {}, \"cancellable\": true}, \"gemma.cancel\": {\"description\": \"Cancel managed local Gemma preparation\", \"arguments\": {}, \"cancellable\": false}, \"models.retry\": {\"description\": \"Retry GPU activation after installation\", \"arguments\": {\"backend\": \"gpu (optional; default gpu)\"}, \"cancellable\": false}, \"gpu.discover\": {\"description\": \"Discover available GPU devices\", \"arguments\": {}, \"cancellable\": false}, \"secrets.set\": {\"description\": \"Store provider credential (value never returned)\", \"arguments\": {\"name\": \"declared secrets.presence key\", \"value\": \"non-empty secret (stdin/hidden input only)\"}, \"cancellable\": false}, \"secrets.delete\": {\"description\": \"Delete provider credential\", \"arguments\": {\"name\": \"declared secrets.presence key\"}, \"cancellable\": false}, \"secrets.verify\": {\"description\": \"Verify provider credential separately from storage\", \"arguments\": {\"name\": \"secret key\", \"value\": \"non-empty secret (stdin/hidden input only)\"}, \"cancellable\": false}, \"auth.login\": {\"description\": \"Authorize a QQ, Discord, OpenRouter, or ChatGPT account with explicit browser consent\", \"arguments\": {\"provider\": [\"qq\", \"discord\", \"openrouter\", \"chatgpt\"], \"qq_identity\": \"required non-empty string for QQ\", \"credential\": \"required non-empty secret for QQ (stdin/hidden input only)\", \"referral_id\": \"optional referral string for QQ or Discord\", \"open_browser\": \"optional boolean, default false (OAuth only)\"}, \"cancellable\": false}, \"auth.logout\": {\"description\": \"Remove locally stored account authorization (ChatGPT also requests remote revocation)\", \"arguments\": {\"provider\": [\"qq\", \"discord\", \"openrouter\", \"chatgpt\"]}, \"cancellable\": false}, \"overlay.set\": {\"description\": \"Set overlay enabled state\", \"arguments\": {\"enabled\": \"boolean\"}, \"cancellable\": false}, \"overlay.lock\": {\"description\": \"Lock/unlock desktop caption positioning\", \"arguments\": {\"locked\": \"boolean\"}, \"cancellable\": false}, \"overlay.size\": {\"description\": \"Select desktop overlay size\", \"arguments\": {\"preset\": \"settings.choices overlay size\"}, \"cancellable\": false}, \"overlay.position.reset\": {\"description\": \"Reset desktop overlay position\", \"arguments\": {}, \"cancellable\": false}, \"overlay.calibrate\": {\"description\": \"Begin, change, apply or cancel overlay calibration\", \"arguments\": {\"action\": [\"begin\", \"change\", \"apply\", \"cancel\"], \"field\": \"required for change: anchor, offset_x, offset_y, distance, text_scale, background_alpha\", \"value\": \"required for change; type/range depends on field\"}, \"cancellable\": false}}, \"queries\": [\"app.status\", \"audio.devices\", \"audio.processes\", \"audio.target\", \"auth.status\", \"capture.channels\", \"consent.peer_translation\", \"diagnostics.health\", \"diagnostics.history\", \"gpu.status\", \"models.status\", \"osc.status\", \"overlay.status\", \"providers.status\", \"secrets.presence\", \"settings.choices\", \"settings.current\"], \"query_arguments\": {\"diagnostics.history\": {\"operation_id\": \"optional operation identity\", \"diagnostic_id\": \"optional failure identity\", \"instance_id\": \"optional originating host identity\", \"after\": \"optional nonnegative diagnostic sequence\", \"limit\": \"integer 1..100, default 50\"}, \"diagnostics.health\": {}}, \"settings_fields\": [\"audio.input_device\", \"audio.input_host_api\", \"audio.output_device\", \"chatbox.activation_notice.enabled\", \"chatbox.source.enabled\", \"clipboard.enabled\", \"custom_vocabulary\", \"languages\", \"local_llm.base_url\", \"local_llm.extra_body_json\", \"local_llm.model\", \"locale\", \"managed.referral_id\", \"osc.connection\", \"overlay.background_alpha\", \"overlay.desktop_size\", \"overlay.peer_original.enabled\", \"overlay.swap_caption_languages\", \"overlay.target\", \"overlay.translation.enabled\", \"peer_expected_languages\", \"peer_stt.provider\", \"peer_vad.hangover_ms\", \"peer_vad.pre_roll_ms\", \"peer_vad.speech_threshold\", \"prompts.system_prompt_override\", \"prompts.value\", \"self_vad.speech_threshold\", \"stt.cloud_free_tier_providers\", \"stt.custom.endpoint\", \"stt.custom.extra_json\", \"stt.custom.model\", \"stt.gpu_device_id\", \"stt.provider\", \"stt.soniox.enable_speaker_diarization\", \"telemetry.enabled\", \"translation.connection\", \"translation.connection_history\", \"translation.gpu_device_id\", \"translation.http_extension_id\", \"translation.model\", \"translation.previous_llm_model\", \"translation.qwen.beijing.api_host\", \"translation.qwen.region\", \"translation.qwen.singapore.api_host\", \"vrc_mic_intercept.enabled\"], \"secret_keys\": [\"google_api_key\", \"openrouter_api_key\", \"openai_api_key\", \"deepseek_api_key\", \"deepgram_api_key\", \"gemini_transcribe_api_key\", \"elevenlabs_scribe_api_key\", \"soniox_api_key\", \"local_llm_api_key\", \"custom_stt_api_key\", \"alibaba_api_key_beijing\", \"alibaba_api_key_singapore\"], \"topics\": [\"operation\", \"settings\", \"auth\", \"capture\", \"transcript\", \"translation\", \"session_state_changed\", \"error\", \"logs\", \"gap\"]}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "status"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.4370654999947874,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "port": 52755,
+        "revision": 1,
+        "host_pid": 49772,
+        "channels": {
+          "self": {
+            "selected_provider": "local_parakeet_v3",
+            "runtime_provider": "local_parakeet_v3",
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "ready",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "ready",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 1,
+              "provider_id": "local_parakeet_v3",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "local_parakeet_v3",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                []
+              ],
+              "failure_reason": null,
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": "local_parakeet_v3",
+              "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+              "phase": "running",
+              "generation": 1,
+              "pending_handoff": false,
+              "has_resources": true,
+              "provider_live": true
+            }
+          },
+          "peer": {
+            "selected_provider": "local_parakeet_v3",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        },
+        "microphone_test": {
+          "state": "off",
+          "desired_active": false,
+          "effective_active": false,
+          "meter_level": 0.0,
+          "failure_reason": null,
+          "failure_type": null
+        },
+        "translation_enabled": false,
+        "translation_runtime_ready": false,
+        "overlay_target": "steamvr",
+        "stopping": false,
+        "scene_observation": {
+          "observation_succeeded": null,
+          "process_present": null,
+          "observation_diagnostic_id": null
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"port\": 52755, \"revision\": 1, \"host_pid\": 49772, \"channels\": {\"self\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": \"local_parakeet_v3\", \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"ready\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"ready\", \"desired_active\": false, \"effective_active\": false, \"generation\": 1, \"provider_id\": \"local_parakeet_v3\", \"runtime_signature\": [\"en\", \"Windows WASAPI (Compatibility Mode)\", \"\", \"local_parakeet_v3\", 0.3, true, 600, 10, 500, 2.0, 500, 16000, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, []], \"failure_reason\": null, \"admission_reason\": null, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"self\", \"provider_id\": \"local_parakeet_v3\", \"model_id\": \"parakeet-tdt-0.6b-v3-int8-sherpa\", \"phase\": \"running\", \"generation\": 1, \"pending_handoff\": false, \"has_resources\": true, \"provider_live\": true}}, \"peer\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"target_status\": null, \"desired_active\": false, \"effective_active\": false, \"generation\": 0, \"provider_id\": null, \"runtime_signature\": null, \"capture_target\": null, \"resolved_target\": null, \"language\": null, \"failure_reason\": null, \"admission_reason\": null, \"target_reason\": null, \"retry_available\": false, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"requested_delivery_profile\": \"off\", \"effective_delivery_profile\": null, \"requested_vad_hangover_ms\": null, \"effective_vad_hangover_ms\": null, \"smart_turn_availability\": \"disabled\", \"requested_language\": null, \"effective_language\": null, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"peer\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 0, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}}, \"microphone_test\": {\"state\": \"off\", \"desired_active\": false, \"effective_active\": false, \"meter_level\": 0.0, \"failure_reason\": null, \"failure_type\": null}, \"translation_enabled\": false, \"translation_runtime_ready\": false, \"overlay_target\": \"steamvr\", \"stopping\": false, \"scene_observation\": {\"observation_succeeded\": null, \"process_present\": null, \"observation_diagnostic_id\": null}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "settings",
+        "current"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.37052219999895897,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "revision": 1,
+        "settings": {
+          "settings_version": 52,
+          "intent": {
+            "translation": {
+              "model": "custom_http",
+              "connection": "managed",
+              "http_extension_id": "self-stream-233-unavailable-by-design",
+              "previous_llm_model": null,
+              "connection_history": {
+                "gemma4_26b_31b": "managed"
+              },
+              "concurrency_limit": 10,
+              "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+              "openrouter_routing_mode": "latency",
+              "openrouter_model": "google/gemma-4-26b-a4b-it",
+              "openrouter_selected_source": "managed",
+              "openrouter_selection_alias": "gemma4_26b_31b_managed",
+              "openrouter_provider_routing": "gemma4_26b_31b_latency",
+              "gemini": {
+                "llm_model": "gemini-3.8-flash"
+              },
+              "deepseek": {
+                "llm_model": "deepseek-flash"
+              },
+              "qwen": {
+                "region": "beijing",
+                "llm_model": "qwen3.8-flash",
+                "beijing": {
+                  "endpoint_mode": "legacy_shared",
+                  "api_host": "",
+                  "revision": 0
+                },
+                "singapore": {
+                  "endpoint_mode": "legacy_shared",
+                  "api_host": "",
+                  "revision": 0
+                }
+              },
+              "gpu_device_id": "auto"
+            },
+            "local_llm": {
+              "backend": "ollama",
+              "base_url": "http://127.0.0.1:11434/v1",
+              "model": "llama3.1:8b",
+              "extra_body": {
+                "reasoning_effort": "none",
+                "temperature": 0.6
+              }
+            },
+            "stt": {
+              "provider": "local_parakeet_v3",
+              "drain_timeout_s": 2.0,
+              "vad_speech_threshold": 0.3,
+              "low_latency_mode": true,
+              "low_latency_vad_hangover_ms": 500,
+              "low_latency_merge_gap_ms": 600,
+              "low_latency_spec_retry_max": 10,
+              "custom_vocabulary_enabled": "<redacted>",
+              "custom_terms": "<redacted>",
+              "gpu_device_id": "auto",
+              "cloud_free_tier_providers": [
+                "gemini_transcribe"
+              ],
+              "deepgram": {
+                "model": "nova-3"
+              },
+              "gemini_transcribe": {
+                "model": "gemini-3.5-transcribe-live"
+              },
+              "elevenlabs_scribe": {
+                "model": "scribe_v2_realtime"
+              },
+              "soniox": {
+                "model": "stt-rt-v5",
+                "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+                "keepalive_interval_s": 10.0,
+                "trailing_silence_ms": 100,
+                "enable_speaker_diarization": true
+              },
+              "custom": {
+                "mode": "offline",
+                "compatibility": "openai_transcription",
+                "endpoint": "",
+                "model": "",
+                "extra": {}
+              }
+            },
+            "peer_stt": {
+              "provider": "local_parakeet_v3"
+            },
+            "languages": {
+              "source_language": "en",
+              "target_language": "ja",
+              "secondary_target_language": "",
+              "peer_source_language": "en",
+              "peer_target_language": "ko",
+              "peer_source_mode": "manual",
+              "peer_expected_languages": [],
+              "recent_source_languages": [
+                "en",
+                "zh-CN",
+                "ja"
+              ],
+              "recent_target_languages": [
+                "en",
+                "zh-CN",
+                "ja"
+              ]
+            },
+            "audio": {
+              "ring_buffer_ms": 500,
+              "input_host_api": "Windows WASAPI (Compatibility Mode)",
+              "input_device": ""
+            },
+            "desktop_audio": {
+              "output_device": "",
+              "capture_target": {
+                "kind": "default_output_device",
+                "device_name": null,
+                "process": null
+              },
+              "vad_speech_threshold": 0.4,
+              "vad_hangover_ms": 500,
+              "vad_pre_roll_ms": 500
+            },
+            "overlay": {
+              "target": "steamvr",
+              "show_translation": true,
+              "show_peer_original": true,
+              "calibration": {
+                "anchor": "head_locked",
+                "offset_x": 0.0,
+                "offset_y": -0.45,
+                "distance": 1.1,
+                "text_scale": 1.0,
+                "background_alpha": 0.24
+              },
+              "desktop_flet": {
+                "size_preset": "medium",
+                "position": {
+                  "x": null,
+                  "y": null
+                },
+                "swap_caption_languages": false,
+                "visual": {
+                  "background_alpha": 0.6
+                }
+              }
+            },
+            "osc": {
+              "connection_mode": "off",
+              "host": "127.0.0.1",
+              "port": 55944,
+              "send_port": 55944,
+              "receive_port": 9001,
+              "chatbox_address": "/chatbox/input",
+              "chatbox_send": true,
+              "chatbox_clear": false,
+              "chatbox_max_chars": 144,
+              "vrc_mic_intercept": false,
+              "chatbox_include_source": false,
+              "activation_notice_enabled": false
+            },
+            "secrets": "<redacted>",
+            "ui": {
+              "locale": "en"
+            },
+            "clipboard": {
+              "auto_translate_enabled": false
+            },
+            "integrated_context": {
+              "enabled": true
+            },
+            "telemetry": {
+              "enabled": false
+            },
+            "prompts": "<redacted>"
+          },
+          "state": {
+            "provider_verification": {
+              "deepgram": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "gemini_transcribe": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "elevenlabs_scribe": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "soniox": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "google": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "openrouter": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "openai": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "deepseek": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "alibaba_beijing": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              },
+              "alibaba_singapore": {
+                "status": "unknown",
+                "provider": null,
+                "secret_key": "<redacted>",
+                "secret_revision": "<redacted>",
+                "secret_fingerprint": "<redacted>",
+                "verifier_context": {},
+                "verifier_evidence": {}
+              }
+            },
+            "managed_connection": {
+              "installation_id": "",
+              "release_token": "<redacted>",
+              "release_token_expires_at": "<redacted>",
+              "verified_hardware_hash": null,
+              "verified_hardware_hash_salt_version": null,
+              "active_managed_credential_ref": "<redacted>",
+              "active_managed_expires_at": null,
+              "founder_letter_seen_credential_ref": "<redacted>",
+              "referral_id": "<redacted>",
+              "referral_source": "<redacted>",
+              "local_managed_claim_sources": [],
+              "pending_delivery_ack_source": null,
+              "pending_delivery_ack_delivery_id": null,
+              "pending_delivery_ack_managed_credential_ref": "<redacted>",
+              "pending_delivery_ack_expires_at": null,
+              "pending_managed_operation_id": null,
+              "pending_managed_operation_source": null,
+              "pending_managed_operation_installation_id": null,
+              "pending_managed_operation_state": null
+            },
+            "github_star_prompt": "<redacted>",
+            "peer_translation": {
+              "eula_accepted": false
+            },
+            "integrated_context": {
+              "bootstrapped": false
+            },
+            "telemetry": {
+              "anonymous_id": null,
+              "last_sent_date_utc": null
+            }
+          },
+          "compatibility_extensions": {}
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"revision\": 1, \"settings\": {\"settings_version\": 52, \"intent\": {\"translation\": {\"model\": \"custom_http\", \"connection\": \"managed\", \"http_extension_id\": \"self-stream-233-unavailable-by-design\", \"previous_llm_model\": null, \"connection_history\": {\"gemma4_26b_31b\": \"managed\"}, \"concurrency_limit\": 10, \"openrouter_broker_base_url\": \"https://puripuly-heart-broker.kapitalismho.workers.dev\", \"openrouter_routing_mode\": \"latency\", \"openrouter_model\": \"google/gemma-4-26b-a4b-it\", \"openrouter_selected_source\": \"managed\", \"openrouter_selection_alias\": \"gemma4_26b_31b_managed\", \"openrouter_provider_routing\": \"gemma4_26b_31b_latency\", \"gemini\": {\"llm_model\": \"gemini-3.8-flash\"}, \"deepseek\": {\"llm_model\": \"deepseek-flash\"}, \"qwen\": {\"region\": \"beijing\", \"llm_model\": \"qwen3.8-flash\", \"beijing\": {\"endpoint_mode\": \"legacy_shared\", \"api_host\": \"\", \"revision\": 0}, \"singapore\": {\"endpoint_mode\": \"legacy_shared\", \"api_host\": \"\", \"revision\": 0}}, \"gpu_device_id\": \"auto\"}, \"local_llm\": {\"backend\": \"ollama\", \"base_url\": \"http://127.0.0.1:11434/v1\", \"model\": \"llama3.1:8b\", \"extra_body\": {\"reasoning_effort\": \"none\", \"temperature\": 0.6}}, \"stt\": {\"provider\": \"local_parakeet_v3\", \"drain_timeout_s\": 2.0, \"vad_speech_threshold\": 0.3, \"low_latency_mode\": true, \"low_latency_vad_hangover_ms\": 500, \"low_latency_merge_gap_ms\": 600, \"low_latency_spec_retry_max\": 10, \"custom_vocabulary_enabled\": \"<redacted>\", \"custom_terms\": \"<redacted>\", \"gpu_device_id\": \"auto\", \"cloud_free_tier_providers\": [\"gemini_transcribe\"], \"deepgram\": {\"model\": \"nova-3\"}, \"gemini_transcribe\": {\"model\": \"gemini-3.5-transcribe-live\"}, \"elevenlabs_scribe\": {\"model\": \"scribe_v2_realtime\"}, \"soniox\": {\"model\": \"stt-rt-v5\", \"endpoint\": \"wss://stt-rt.soniox.com/transcribe-websocket\", \"keepalive_interval_s\": 10.0, \"trailing_silence_ms\": 100, \"enable_speaker_diarization\": true}, \"custom\": {\"mode\": \"offline\", \"compatibility\": \"openai_transcription\", \"endpoint\": \"\", \"model\": \"\", \"extra\": {}}}, \"peer_stt\": {\"provider\": \"local_parakeet_v3\"}, \"languages\": {\"source_language\": \"en\", \"target_language\": \"ja\", \"secondary_target_language\": \"\", \"peer_source_language\": \"en\", \"peer_target_language\": \"ko\", \"peer_source_mode\": \"manual\", \"peer_expected_languages\": [], \"recent_source_languages\": [\"en\", \"zh-CN\", \"ja\"], \"recent_target_languages\": [\"en\", \"zh-CN\", \"ja\"]}, \"audio\": {\"ring_buffer_ms\": 500, \"input_host_api\": \"Windows WASAPI (Compatibility Mode)\", \"input_device\": \"\"}, \"desktop_audio\": {\"output_device\": \"\", \"capture_target\": {\"kind\": \"default_output_device\", \"device_name\": null, \"process\": null}, \"vad_speech_threshold\": 0.4, \"vad_hangover_ms\": 500, \"vad_pre_roll_ms\": 500}, \"overlay\": {\"target\": \"steamvr\", \"show_translation\": true, \"show_peer_original\": true, \"calibration\": {\"anchor\": \"head_locked\", \"offset_x\": 0.0, \"offset_y\": -0.45, \"distance\": 1.1, \"text_scale\": 1.0, \"background_alpha\": 0.24}, \"desktop_flet\": {\"size_preset\": \"medium\", \"position\": {\"x\": null, \"y\": null}, \"swap_caption_languages\": false, \"visual\": {\"background_alpha\": 0.6}}}, \"osc\": {\"connection_mode\": \"off\", \"host\": \"127.0.0.1\", \"port\": 55944, \"send_port\": 55944, \"receive_port\": 9001, \"chatbox_address\": \"/chatbox/input\", \"chatbox_send\": true, \"chatbox_clear\": false, \"chatbox_max_chars\": 144, \"vrc_mic_intercept\": false, \"chatbox_include_source\": false, \"activation_notice_enabled\": false}, \"secrets\": \"<redacted>\", \"ui\": {\"locale\": \"en\"}, \"clipboard\": {\"auto_translate_enabled\": false}, \"integrated_context\": {\"enabled\": true}, \"telemetry\": {\"enabled\": false}, \"prompts\": \"<redacted>\"}, \"state\": {\"provider_verification\": {\"deepgram\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"gemini_transcribe\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"elevenlabs_scribe\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"soniox\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"google\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"openrouter\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"openai\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"deepseek\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"alibaba_beijing\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}, \"alibaba_singapore\": {\"status\": \"unknown\", \"provider\": null, \"secret_key\": \"<redacted>\", \"secret_revision\": \"<redacted>\", \"secret_fingerprint\": \"<redacted>\", \"verifier_context\": {}, \"verifier_evidence\": {}}}, \"managed_connection\": {\"installation_id\": \"\", \"release_token\": \"<redacted>\", \"release_token_expires_at\": \"<redacted>\", \"verified_hardware_hash\": null, \"verified_hardware_hash_salt_version\": null, \"active_managed_credential_ref\": \"<redacted>\", \"active_managed_expires_at\": null, \"founder_letter_seen_credential_ref\": \"<redacted>\", \"referral_id\": \"<redacted>\", \"referral_source\": \"<redacted>\", \"local_managed_claim_sources\": [], \"pending_delivery_ack_source\": null, \"pending_delivery_ack_delivery_id\": null, \"pending_delivery_ack_managed_credential_ref\": \"<redacted>\", \"pending_delivery_ack_expires_at\": null, \"pending_managed_operation_id\": null, \"pending_managed_operation_source\": null, \"pending_managed_operation_installation_id\": null, \"pending_managed_operation_state\": null}, \"github_star_prompt\": \"<redacted>\", \"peer_translation\": {\"eula_accepted\": false}, \"integrated_context\": {\"bootstrapped\": false}, \"telemetry\": {\"anonymous_id\": null, \"last_sent_date_utc\": null}}, \"compatibility_extensions\": {}}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "models",
+        "status"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.4540825000003679,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "revision": 1,
+        "state": {
+          "models": [
+            {
+              "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "qwen3-asr-0.6b-int8-sherpa",
+              "backend": "cpu",
+              "integrity": "missing",
+              "operation": "idle"
+            },
+            {
+              "model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+              "backend": "gpu",
+              "integrity": "not_requested",
+              "operation": "idle"
+            }
+          ],
+          "required_cpu_model_ids": [
+            "parakeet-tdt-0.6b-v3-int8-sherpa",
+            "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",
+            "qwen3-asr-0.6b-int8-sherpa"
+          ],
+          "gpu_model_id": "qwen3-asr-1.7b-q6-k-transcribe-vulkan",
+          "activities": [],
+          "revision": 2,
+          "closed": false
+        },
+        "gemma": {
+          "state": "idle",
+          "backend": null,
+          "progress_percent": null,
+          "error_type": null,
+          "failure_phase": null,
+          "failure_code": null,
+          "cause_type": null,
+          "worker_exit_code": null,
+          "status_code": null,
+          "os_error_code": null,
+          "model_id": null
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"revision\": 1, \"state\": {\"models\": [{\"model_id\": \"parakeet-tdt-0.6b-v3-int8-sherpa\", \"backend\": \"cpu\", \"integrity\": \"missing\", \"operation\": \"idle\"}, {\"model_id\": \"parakeet-tdt-ctc-0.6b-ja-int8-sherpa\", \"backend\": \"cpu\", \"integrity\": \"missing\", \"operation\": \"idle\"}, {\"model_id\": \"qwen3-asr-0.6b-int8-sherpa\", \"backend\": \"cpu\", \"integrity\": \"missing\", \"operation\": \"idle\"}, {\"model_id\": \"qwen3-asr-1.7b-q6-k-transcribe-vulkan\", \"backend\": \"gpu\", \"integrity\": \"not_requested\", \"operation\": \"idle\"}], \"required_cpu_model_ids\": [\"parakeet-tdt-0.6b-v3-int8-sherpa\", \"parakeet-tdt-ctc-0.6b-ja-int8-sherpa\", \"qwen3-asr-0.6b-int8-sherpa\"], \"gpu_model_id\": \"qwen3-asr-1.7b-q6-k-transcribe-vulkan\", \"activities\": [], \"revision\": 2, \"closed\": false}, \"gemma\": {\"state\": \"idle\", \"backend\": null, \"progress_percent\": null, \"error_type\": null, \"failure_phase\": null, \"failure_code\": null, \"cause_type\": null, \"worker_exit_code\": null, \"status_code\": null, \"os_error_code\": null, \"model_id\": null}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "osc",
+        "status"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.2841597000078764,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "revision": 1,
+        "ports": [
+          null,
+          null
+        ],
+        "output": {
+          "configured_mode": "off",
+          "configured_host": "127.0.0.1",
+          "configured_send_port": 55944,
+          "configured_receive_port": 9001,
+          "effective_mode": "off",
+          "effective_send_port": null,
+          "effective_receive_port": null,
+          "receiver_available": false,
+          "sender_available": false,
+          "query_service_started": false,
+          "query_advertised_port": null,
+          "discovered_remote": null,
+          "query_failure": null,
+          "state_publication": null,
+          "local_availability": "off",
+          "remote_delivery": "unacknowledged"
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"revision\": 1, \"ports\": [null, null], \"output\": {\"configured_mode\": \"off\", \"configured_host\": \"127.0.0.1\", \"configured_send_port\": 55944, \"configured_receive_port\": 9001, \"effective_mode\": \"off\", \"effective_send_port\": null, \"effective_receive_port\": null, \"receiver_available\": false, \"sender_available\": false, \"query_service_started\": false, \"query_advertised_port\": null, \"discovered_remote\": null, \"query_failure\": null, \"state_publication\": null, \"local_availability\": \"off\", \"remote_delivery\": \"unacknowledged\"}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "translation",
+        "set",
+        "off"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.3968614999903366,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "operation_id": "86c3930a05744736a74b02f8e4028992",
+        "request_id": "f49b133236ac51f4632d82e7a8c517f9",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "translation_enabled": false
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"operation_id\": \"86c3930a05744736a74b02f8e4028992\", \"request_id\": \"f49b133236ac51f4632d82e7a8c517f9\", \"status\": \"applied\", \"terminal\": true, \"revision\": 1, \"translation_enabled\": false}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "capture",
+        "set",
+        "self",
+        "off"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.300203100006911,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "operation_id": "f7449900058e4211a48bc61f7d373d5a",
+        "request_id": "b51317b7b0db744de26fa4be0afe9cbf",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "channel": {
+          "selected_provider": "local_parakeet_v3",
+          "runtime_provider": null,
+          "capture_attached_provider": null,
+          "desired_active": false,
+          "effective_active": false,
+          "pending_handoff": false,
+          "failure_reason": null,
+          "provider_status": "detached",
+          "capture": {
+            "state": "stopped",
+            "provider_status": "detached",
+            "desired_active": false,
+            "effective_active": false,
+            "generation": 2,
+            "provider_id": "local_parakeet_v3",
+            "runtime_signature": [
+              "en",
+              "Windows WASAPI (Compatibility Mode)",
+              "",
+              "local_parakeet_v3",
+              0.3,
+              true,
+              600,
+              10,
+              500,
+              2.0,
+              500,
+              16000,
+              1,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              false,
+              []
+            ],
+            "failure_reason": null,
+            "admission_reason": null,
+            "has_source": false,
+            "has_vad": false,
+            "has_loop_task": false,
+            "cleanup_debt": 0,
+            "closed": false,
+            "failure_diagnostics": null
+          },
+          "provider": {
+            "channel": "self",
+            "provider_id": null,
+            "model_id": null,
+            "phase": "inactive",
+            "generation": 2,
+            "pending_handoff": false,
+            "has_resources": false,
+            "provider_live": false
+          }
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"operation_id\": \"f7449900058e4211a48bc61f7d373d5a\", \"request_id\": \"b51317b7b0db744de26fa4be0afe9cbf\", \"status\": \"applied\", \"terminal\": true, \"revision\": 1, \"channel\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"desired_active\": false, \"effective_active\": false, \"generation\": 2, \"provider_id\": \"local_parakeet_v3\", \"runtime_signature\": [\"en\", \"Windows WASAPI (Compatibility Mode)\", \"\", \"local_parakeet_v3\", 0.3, true, 600, 10, 500, 2.0, 500, 16000, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, []], \"failure_reason\": null, \"admission_reason\": null, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"self\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 2, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "status"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.28974819999712054,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "port": 52755,
+        "revision": 1,
+        "host_pid": 49772,
+        "channels": {
+          "self": {
+            "selected_provider": "local_parakeet_v3",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 2,
+              "provider_id": "local_parakeet_v3",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "local_parakeet_v3",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                []
+              ],
+              "failure_reason": null,
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 2,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          },
+          "peer": {
+            "selected_provider": "local_parakeet_v3",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        },
+        "microphone_test": {
+          "state": "off",
+          "desired_active": false,
+          "effective_active": false,
+          "meter_level": 0.0,
+          "failure_reason": null,
+          "failure_type": null
+        },
+        "translation_enabled": false,
+        "translation_runtime_ready": false,
+        "overlay_target": "steamvr",
+        "stopping": false,
+        "scene_observation": {
+          "observation_succeeded": true,
+          "process_present": true,
+          "observation_diagnostic_id": null
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"port\": 52755, \"revision\": 1, \"host_pid\": 49772, \"channels\": {\"self\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"desired_active\": false, \"effective_active\": false, \"generation\": 2, \"provider_id\": \"local_parakeet_v3\", \"runtime_signature\": [\"en\", \"Windows WASAPI (Compatibility Mode)\", \"\", \"local_parakeet_v3\", 0.3, true, 600, 10, 500, 2.0, 500, 16000, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, []], \"failure_reason\": null, \"admission_reason\": null, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"self\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 2, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}, \"peer\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"target_status\": null, \"desired_active\": false, \"effective_active\": false, \"generation\": 0, \"provider_id\": null, \"runtime_signature\": null, \"capture_target\": null, \"resolved_target\": null, \"language\": null, \"failure_reason\": null, \"admission_reason\": null, \"target_reason\": null, \"retry_available\": false, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"requested_delivery_profile\": \"off\", \"effective_delivery_profile\": null, \"requested_vad_hangover_ms\": null, \"effective_vad_hangover_ms\": null, \"smart_turn_availability\": \"disabled\", \"requested_language\": null, \"effective_language\": null, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"peer\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 0, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}}, \"microphone_test\": {\"state\": \"off\", \"desired_active\": false, \"effective_active\": false, \"meter_level\": 0.0, \"failure_reason\": null, \"failure_type\": null}, \"translation_enabled\": false, \"translation_runtime_ready\": false, \"overlay_target\": \"steamvr\", \"stopping\": false, \"scene_observation\": {\"observation_succeeded\": true, \"process_present\": true, \"observation_diagnostic_id\": null}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "text",
+        "submit",
+        "--stdin"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.30139449999842327,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "operation_id": "3faaaedf8bf64d1f84633a4a3f1672c3",
+        "request_id": "bfcaa5a654d53c0078e9c0d29334433e",
+        "status": "applied",
+        "terminal": true,
+        "revision": 1,
+        "admission": "admitted",
+        "turn_id": "1467b3ce-8300-4432-a683-2a1e9f0d8cee",
+        "child_turn_ids": [
+          "1467b3ce-8300-4432-a683-2a1e9f0d8cee"
+        ],
+        "output_delivery": "unobserved"
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"operation_id\": \"3faaaedf8bf64d1f84633a4a3f1672c3\", \"request_id\": \"bfcaa5a654d53c0078e9c0d29334433e\", \"status\": \"applied\", \"terminal\": true, \"revision\": 1, \"admission\": \"admitted\", \"turn_id\": \"1467b3ce-8300-4432-a683-2a1e9f0d8cee\", \"child_turn_ids\": [\"1467b3ce-8300-4432-a683-2a1e9f0d8cee\"], \"output_delivery\": \"unobserved\"}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "status"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 0.28117080000811256,
+      "payload": {
+        "output_version": 1,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "port": 52755,
+        "revision": 1,
+        "host_pid": 49772,
+        "channels": {
+          "self": {
+            "selected_provider": "local_parakeet_v3",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 2,
+              "provider_id": "local_parakeet_v3",
+              "runtime_signature": [
+                "en",
+                "Windows WASAPI (Compatibility Mode)",
+                "",
+                "local_parakeet_v3",
+                0.3,
+                true,
+                600,
+                10,
+                500,
+                2.0,
+                500,
+                16000,
+                1,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                []
+              ],
+              "failure_reason": null,
+              "admission_reason": null,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "self",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 2,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          },
+          "peer": {
+            "selected_provider": "local_parakeet_v3",
+            "runtime_provider": null,
+            "capture_attached_provider": null,
+            "desired_active": false,
+            "effective_active": false,
+            "pending_handoff": false,
+            "failure_reason": null,
+            "provider_status": "detached",
+            "capture": {
+              "state": "stopped",
+              "provider_status": "detached",
+              "target_status": null,
+              "desired_active": false,
+              "effective_active": false,
+              "generation": 0,
+              "provider_id": null,
+              "runtime_signature": null,
+              "capture_target": null,
+              "resolved_target": null,
+              "language": null,
+              "failure_reason": null,
+              "admission_reason": null,
+              "target_reason": null,
+              "retry_available": false,
+              "has_source": false,
+              "has_vad": false,
+              "has_loop_task": false,
+              "cleanup_debt": 0,
+              "closed": false,
+              "requested_delivery_profile": "off",
+              "effective_delivery_profile": null,
+              "requested_vad_hangover_ms": null,
+              "effective_vad_hangover_ms": null,
+              "smart_turn_availability": "disabled",
+              "requested_language": null,
+              "effective_language": null,
+              "failure_diagnostics": null
+            },
+            "provider": {
+              "channel": "peer",
+              "provider_id": null,
+              "model_id": null,
+              "phase": "inactive",
+              "generation": 0,
+              "pending_handoff": false,
+              "has_resources": false,
+              "provider_live": false
+            }
+          }
+        },
+        "microphone_test": {
+          "state": "off",
+          "desired_active": false,
+          "effective_active": false,
+          "meter_level": 0.0,
+          "failure_reason": null,
+          "failure_type": null
+        },
+        "translation_enabled": false,
+        "translation_runtime_ready": false,
+        "overlay_target": "steamvr",
+        "stopping": false,
+        "scene_observation": {
+          "observation_succeeded": true,
+          "process_present": true,
+          "observation_diagnostic_id": null
+        }
+      },
+      "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"port\": 52755, \"revision\": 1, \"host_pid\": 49772, \"channels\": {\"self\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"desired_active\": false, \"effective_active\": false, \"generation\": 2, \"provider_id\": \"local_parakeet_v3\", \"runtime_signature\": [\"en\", \"Windows WASAPI (Compatibility Mode)\", \"\", \"local_parakeet_v3\", 0.3, true, 600, 10, 500, 2.0, 500, 16000, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, []], \"failure_reason\": null, \"admission_reason\": null, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"self\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 2, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}, \"peer\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"target_status\": null, \"desired_active\": false, \"effective_active\": false, \"generation\": 0, \"provider_id\": null, \"runtime_signature\": null, \"capture_target\": null, \"resolved_target\": null, \"language\": null, \"failure_reason\": null, \"admission_reason\": null, \"target_reason\": null, \"retry_available\": false, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"requested_delivery_profile\": \"off\", \"effective_delivery_profile\": null, \"requested_vad_hangover_ms\": null, \"effective_vad_hangover_ms\": null, \"smart_turn_availability\": \"disabled\", \"requested_language\": null, \"effective_language\": null, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"peer\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 0, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}}, \"microphone_test\": {\"state\": \"off\", \"desired_active\": false, \"effective_active\": false, \"meter_level\": 0.0, \"failure_reason\": null, \"failure_type\": null}, \"translation_enabled\": false, \"translation_runtime_ready\": false, \"overlay_target\": \"steamvr\", \"stopping\": false, \"scene_observation\": {\"observation_succeeded\": true, \"process_present\": true, \"observation_diagnostic_id\": null}}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "app",
+        "stop"
+      ],
+      "exit_code": 0,
+      "elapsed_s": 1.4378789999900619,
+      "payload": {
+        "output_version": 1,
+        "status": "stopped",
+        "terminal": true,
+        "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+        "operation_id": "2acde9d76ca74f1baaa595ddfb220822",
+        "cleanup_outcome": "unobserved"
+      },
+      "stdout": "{\"output_version\": 1, \"status\": \"stopped\", \"terminal\": true, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"operation_id\": \"2acde9d76ca74f1baaa595ddfb220822\", \"cleanup_outcome\": \"unobserved\"}\n",
+      "stderr": ""
+    }
+  ],
+  "limits": [
+    "Actual supported CLI and application composition; no GUI presentation claim",
+    "Translation is deliberately disabled and no external extension is installed",
+    "Manual text is synthetic; this operation is not speech/ASR/progressive-turn evidence",
+    "No capture, model installation, credential verification, cloud call, or physical VRChat session"
+  ],
+  "source_files": {
+    "src/puripuly_heart/main.py": "909aca8be8ae02464441721720f968e83948a11503e968a49355f1cff238ee55",
+    "src/puripuly_heart/cli/main.py": "98e7c74d92166e28c827367069957537f37bba5c34b8264633f1457eae0bad39",
+    "src/puripuly_heart/composition/application_runtime.py": "0cdae60692704361785d3922159c3009bddafd27bcc617e862c3b58094a449f0",
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": "d68c5baee58cbae6b38f8a3d726c53960d17d0839728a33657b739422f376432",
+    "src/puripuly_heart/core/orchestrator/self_translation_channel.py": "01e35cadd1443162e97a058c40a3ebccf696f3e4a64531df7a5895af06bae419",
+    "src/puripuly_heart/core/runtime/output.py": "df53306d0cce3a81ef8e757bef6af0da60b573708bbcc5b7058d6b44f4dc0c03"
+  },
+  "profile": {
+    "sha256": "2c326371a346397e40cd757b2592aff67e57c4b9630c53650ea120f46e091d49",
+    "settings": {
+      "settings_version": 52,
+      "intent": {
+        "translation": {
+          "model": "custom_http",
+          "connection": "managed",
+          "http_extension_id": "self-stream-233-unavailable-by-design",
+          "previous_llm_model": null,
+          "connection_history": {
+            "gemma4_26b_31b": "managed"
+          },
+          "concurrency_limit": 10,
+          "openrouter_broker_base_url": "https://puripuly-heart-broker.kapitalismho.workers.dev",
+          "openrouter_routing_mode": "latency",
+          "openrouter_model": "google/gemma-4-26b-a4b-it",
+          "openrouter_selected_source": "managed",
+          "openrouter_selection_alias": "gemma4_26b_31b_managed",
+          "openrouter_provider_routing": "gemma4_26b_31b_latency",
+          "gemini": {
+            "llm_model": "gemini-3.8-flash"
+          },
+          "deepseek": {
+            "llm_model": "deepseek-flash"
+          },
+          "qwen": {
+            "region": "beijing",
+            "llm_model": "qwen3.8-flash",
+            "beijing": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            },
+            "singapore": {
+              "endpoint_mode": "legacy_shared",
+              "api_host": "",
+              "revision": 0
+            }
+          },
+          "gpu_device_id": "auto"
+        },
+        "local_llm": {
+          "backend": "ollama",
+          "base_url": "http://127.0.0.1:11434/v1",
+          "model": "llama3.1:8b",
+          "extra_body": {
+            "reasoning_effort": "none",
+            "temperature": 0.6
+          }
+        },
+        "stt": {
+          "provider": "local_parakeet_v3",
+          "drain_timeout_s": 2.0,
+          "vad_speech_threshold": 0.3,
+          "low_latency_mode": true,
+          "low_latency_vad_hangover_ms": 500,
+          "low_latency_merge_gap_ms": 600,
+          "low_latency_spec_retry_max": 10,
+          "custom_vocabulary_enabled": false,
+          "custom_terms": {},
+          "gpu_device_id": "auto",
+          "cloud_free_tier_providers": [
+            "gemini_transcribe"
+          ],
+          "deepgram": {
+            "model": "nova-3"
+          },
+          "gemini_transcribe": {
+            "model": "gemini-3.5-transcribe-live"
+          },
+          "elevenlabs_scribe": {
+            "model": "scribe_v2_realtime"
+          },
+          "soniox": {
+            "model": "stt-rt-v5",
+            "endpoint": "wss://stt-rt.soniox.com/transcribe-websocket",
+            "keepalive_interval_s": 10.0,
+            "trailing_silence_ms": 100,
+            "enable_speaker_diarization": true
+          },
+          "custom": {
+            "mode": "offline",
+            "compatibility": "openai_transcription",
+            "endpoint": "",
+            "model": "",
+            "extra": {}
+          }
+        },
+        "peer_stt": {
+          "provider": "local_parakeet_v3"
+        },
+        "languages": {
+          "source_language": "en",
+          "target_language": "ja",
+          "secondary_target_language": "",
+          "peer_source_language": "en",
+          "peer_target_language": "ko",
+          "peer_source_mode": "manual",
+          "peer_expected_languages": [],
+          "recent_source_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ],
+          "recent_target_languages": [
+            "en",
+            "zh-CN",
+            "ja"
+          ]
+        },
+        "audio": {
+          "ring_buffer_ms": 500,
+          "input_host_api": "Windows WASAPI (Compatibility Mode)",
+          "input_device": ""
+        },
+        "desktop_audio": {
+          "output_device": "",
+          "capture_target": {
+            "kind": "default_output_device",
+            "device_name": null,
+            "process": null
+          },
+          "vad_speech_threshold": 0.4,
+          "vad_hangover_ms": 500,
+          "vad_pre_roll_ms": 500
+        },
+        "overlay": {
+          "target": "steamvr",
+          "show_translation": true,
+          "show_peer_original": true,
+          "calibration": {
+            "anchor": "head_locked",
+            "offset_x": 0.0,
+            "offset_y": -0.45,
+            "distance": 1.1,
+            "text_scale": 1.0,
+            "background_alpha": 0.24
+          },
+          "desktop_flet": {
+            "size_preset": "medium",
+            "position": {
+              "x": null,
+              "y": null
+            },
+            "swap_caption_languages": false,
+            "visual": {
+              "background_alpha": 0.6
+            }
+          }
+        },
+        "osc": {
+          "connection_mode": "off",
+          "host": "127.0.0.1",
+          "port": 55944,
+          "send_port": 55944,
+          "receive_port": 9001,
+          "chatbox_address": "/chatbox/input",
+          "chatbox_send": true,
+          "chatbox_clear": false,
+          "chatbox_max_chars": 144,
+          "vrc_mic_intercept": false,
+          "chatbox_include_source": false,
+          "activation_notice_enabled": false
+        },
+        "secrets": {
+          "backend": "encrypted_file",
+          "encrypted_file_path": "unused-isolated-secrets.json"
+        },
+        "ui": {
+          "locale": "en"
+        },
+        "clipboard": {
+          "auto_translate_enabled": false
+        },
+        "integrated_context": {
+          "enabled": true
+        },
+        "telemetry": {
+          "enabled": false
+        },
+        "prompts": {
+          "system_prompt_override": null
+        }
+      },
+      "state": {
+        "provider_verification": {
+          "deepgram": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "gemini_transcribe": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "elevenlabs_scribe": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "soniox": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "google": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "openrouter": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "openai": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "deepseek": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "alibaba_beijing": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          },
+          "alibaba_singapore": {
+            "status": "unknown",
+            "provider": null,
+            "secret_key": null,
+            "secret_revision": null,
+            "secret_fingerprint": null,
+            "verifier_context": {},
+            "verifier_evidence": {}
+          }
+        },
+        "managed_connection": {
+          "installation_id": "",
+          "release_token": null,
+          "release_token_expires_at": null,
+          "verified_hardware_hash": null,
+          "verified_hardware_hash_salt_version": null,
+          "active_managed_credential_ref": null,
+          "active_managed_expires_at": null,
+          "founder_letter_seen_credential_ref": null,
+          "referral_id": null,
+          "referral_source": null,
+          "local_managed_claim_sources": [],
+          "pending_delivery_ack_source": null,
+          "pending_delivery_ack_delivery_id": null,
+          "pending_delivery_ack_managed_credential_ref": null,
+          "pending_delivery_ack_expires_at": null,
+          "pending_managed_operation_id": null,
+          "pending_managed_operation_source": null,
+          "pending_managed_operation_installation_id": null,
+          "pending_managed_operation_state": null
+        },
+        "github_star_prompt": {
+          "clicked": false,
+          "last_shown_at": null,
+          "show_count": 0,
+          "translation_success_observed": false,
+          "eligible_launch_count": 0
+        },
+        "peer_translation": {
+          "eula_accepted": false
+        },
+        "integrated_context": {
+          "bootstrapped": false
+        },
+        "telemetry": {
+          "anonymous_id": null,
+          "last_sent_date_utc": null
+        }
+      },
+      "compatibility_extensions": {}
+    },
+    "isolation": "LOCALAPPDATA/APPDATA/USERPROFILE/HOME/TEMP/TMP are owned state; telemetry disabled, encrypted-file secrets, empty extensions, OSC connection off, sender only owned loopback port",
+    "receiver_port": 55944
+  },
+  "readiness": {
+    "state": "ready",
+    "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8"
+  },
+  "host_identity": {
+    "interpreter": "<checkout>\\.venv\\Scripts\\python.exe",
+    "module": "<checkout>\\src\\puripuly_heart\\__init__.py",
+    "packages": {
+      "puripuly-heart": "2.8.2",
+      "flet": "1.0.0",
+      "sherpa-onnx": "1.13.8",
+      "onnxruntime": "1.28.0"
+    }
+  },
+  "source_only_text_admission": {
+    "arguments": [
+      "text",
+      "submit",
+      "--stdin"
+    ],
+    "exit_code": 0,
+    "elapsed_s": 0.30139449999842327,
+    "payload": {
+      "output_version": 1,
+      "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+      "operation_id": "3faaaedf8bf64d1f84633a4a3f1672c3",
+      "request_id": "bfcaa5a654d53c0078e9c0d29334433e",
+      "status": "applied",
+      "terminal": true,
+      "revision": 1,
+      "admission": "admitted",
+      "turn_id": "1467b3ce-8300-4432-a683-2a1e9f0d8cee",
+      "child_turn_ids": [
+        "1467b3ce-8300-4432-a683-2a1e9f0d8cee"
+      ],
+      "output_delivery": "unobserved"
+    },
+    "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"operation_id\": \"3faaaedf8bf64d1f84633a4a3f1672c3\", \"request_id\": \"bfcaa5a654d53c0078e9c0d29334433e\", \"status\": \"applied\", \"terminal\": true, \"revision\": 1, \"admission\": \"admitted\", \"turn_id\": \"1467b3ce-8300-4432-a683-2a1e9f0d8cee\", \"child_turn_ids\": [\"1467b3ce-8300-4432-a683-2a1e9f0d8cee\"], \"output_delivery\": \"unobserved\"}\n",
+    "stderr": ""
+  },
+  "loopback_packets": [
+    {
+      "source": [
+        "127.0.0.1",
+        55945
+      ],
+      "messages": [
+        {
+          "address": "/chatbox/typing",
+          "params": [
+            true
+          ]
+        }
+      ]
+    },
+    {
+      "source": [
+        "127.0.0.1",
+        55945
+      ],
+      "messages": [
+        {
+          "address": "/chatbox/input",
+          "params": [
+            "SELF STREAM 233 isolated synthetic CLI probe.",
+            true,
+            false
+          ]
+        }
+      ]
+    },
+    {
+      "source": [
+        "127.0.0.1",
+        55945
+      ],
+      "messages": [
+        {
+          "address": "/chatbox/typing",
+          "params": [
+            false
+          ]
+        }
+      ]
+    }
+  ],
+  "post_operation_status": {
+    "arguments": [
+      "app",
+      "status"
+    ],
+    "exit_code": 0,
+    "elapsed_s": 0.28117080000811256,
+    "payload": {
+      "output_version": 1,
+      "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+      "port": 52755,
+      "revision": 1,
+      "host_pid": 49772,
+      "channels": {
+        "self": {
+          "selected_provider": "local_parakeet_v3",
+          "runtime_provider": null,
+          "capture_attached_provider": null,
+          "desired_active": false,
+          "effective_active": false,
+          "pending_handoff": false,
+          "failure_reason": null,
+          "provider_status": "detached",
+          "capture": {
+            "state": "stopped",
+            "provider_status": "detached",
+            "desired_active": false,
+            "effective_active": false,
+            "generation": 2,
+            "provider_id": "local_parakeet_v3",
+            "runtime_signature": [
+              "en",
+              "Windows WASAPI (Compatibility Mode)",
+              "",
+              "local_parakeet_v3",
+              0.3,
+              true,
+              600,
+              10,
+              500,
+              2.0,
+              500,
+              16000,
+              1,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              false,
+              []
+            ],
+            "failure_reason": null,
+            "admission_reason": null,
+            "has_source": false,
+            "has_vad": false,
+            "has_loop_task": false,
+            "cleanup_debt": 0,
+            "closed": false,
+            "failure_diagnostics": null
+          },
+          "provider": {
+            "channel": "self",
+            "provider_id": null,
+            "model_id": null,
+            "phase": "inactive",
+            "generation": 2,
+            "pending_handoff": false,
+            "has_resources": false,
+            "provider_live": false
+          }
+        },
+        "peer": {
+          "selected_provider": "local_parakeet_v3",
+          "runtime_provider": null,
+          "capture_attached_provider": null,
+          "desired_active": false,
+          "effective_active": false,
+          "pending_handoff": false,
+          "failure_reason": null,
+          "provider_status": "detached",
+          "capture": {
+            "state": "stopped",
+            "provider_status": "detached",
+            "target_status": null,
+            "desired_active": false,
+            "effective_active": false,
+            "generation": 0,
+            "provider_id": null,
+            "runtime_signature": null,
+            "capture_target": null,
+            "resolved_target": null,
+            "language": null,
+            "failure_reason": null,
+            "admission_reason": null,
+            "target_reason": null,
+            "retry_available": false,
+            "has_source": false,
+            "has_vad": false,
+            "has_loop_task": false,
+            "cleanup_debt": 0,
+            "closed": false,
+            "requested_delivery_profile": "off",
+            "effective_delivery_profile": null,
+            "requested_vad_hangover_ms": null,
+            "effective_vad_hangover_ms": null,
+            "smart_turn_availability": "disabled",
+            "requested_language": null,
+            "effective_language": null,
+            "failure_diagnostics": null
+          },
+          "provider": {
+            "channel": "peer",
+            "provider_id": null,
+            "model_id": null,
+            "phase": "inactive",
+            "generation": 0,
+            "pending_handoff": false,
+            "has_resources": false,
+            "provider_live": false
+          }
+        }
+      },
+      "microphone_test": {
+        "state": "off",
+        "desired_active": false,
+        "effective_active": false,
+        "meter_level": 0.0,
+        "failure_reason": null,
+        "failure_type": null
+      },
+      "translation_enabled": false,
+      "translation_runtime_ready": false,
+      "overlay_target": "steamvr",
+      "stopping": false,
+      "scene_observation": {
+        "observation_succeeded": true,
+        "process_present": true,
+        "observation_diagnostic_id": null
+      }
+    },
+    "stdout": "{\"output_version\": 1, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"port\": 52755, \"revision\": 1, \"host_pid\": 49772, \"channels\": {\"self\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"desired_active\": false, \"effective_active\": false, \"generation\": 2, \"provider_id\": \"local_parakeet_v3\", \"runtime_signature\": [\"en\", \"Windows WASAPI (Compatibility Mode)\", \"\", \"local_parakeet_v3\", 0.3, true, 600, 10, 500, 2.0, 500, 16000, 1, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, false, []], \"failure_reason\": null, \"admission_reason\": null, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"self\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 2, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}, \"peer\": {\"selected_provider\": \"local_parakeet_v3\", \"runtime_provider\": null, \"capture_attached_provider\": null, \"desired_active\": false, \"effective_active\": false, \"pending_handoff\": false, \"failure_reason\": null, \"provider_status\": \"detached\", \"capture\": {\"state\": \"stopped\", \"provider_status\": \"detached\", \"target_status\": null, \"desired_active\": false, \"effective_active\": false, \"generation\": 0, \"provider_id\": null, \"runtime_signature\": null, \"capture_target\": null, \"resolved_target\": null, \"language\": null, \"failure_reason\": null, \"admission_reason\": null, \"target_reason\": null, \"retry_available\": false, \"has_source\": false, \"has_vad\": false, \"has_loop_task\": false, \"cleanup_debt\": 0, \"closed\": false, \"requested_delivery_profile\": \"off\", \"effective_delivery_profile\": null, \"requested_vad_hangover_ms\": null, \"effective_vad_hangover_ms\": null, \"smart_turn_availability\": \"disabled\", \"requested_language\": null, \"effective_language\": null, \"failure_diagnostics\": null}, \"provider\": {\"channel\": \"peer\", \"provider_id\": null, \"model_id\": null, \"phase\": \"inactive\", \"generation\": 0, \"pending_handoff\": false, \"has_resources\": false, \"provider_live\": false}}}, \"microphone_test\": {\"state\": \"off\", \"desired_active\": false, \"effective_active\": false, \"meter_level\": 0.0, \"failure_reason\": null, \"failure_type\": null}, \"translation_enabled\": false, \"translation_runtime_ready\": false, \"overlay_target\": \"steamvr\", \"stopping\": false, \"scene_observation\": {\"observation_succeeded\": true, \"process_present\": true, \"observation_diagnostic_id\": null}}\n",
+    "stderr": ""
+  },
+  "stop": {
+    "arguments": [
+      "app",
+      "stop"
+    ],
+    "exit_code": 0,
+    "elapsed_s": 1.4378789999900619,
+    "payload": {
+      "output_version": 1,
+      "status": "stopped",
+      "terminal": true,
+      "instance_id": "b18038c5-36ee-4607-9812-c701a676a7b8",
+      "operation_id": "2acde9d76ca74f1baaa595ddfb220822",
+      "cleanup_outcome": "unobserved"
+    },
+    "stdout": "{\"output_version\": 1, \"status\": \"stopped\", \"terminal\": true, \"instance_id\": \"b18038c5-36ee-4607-9812-c701a676a7b8\", \"operation_id\": \"2acde9d76ca74f1baaa595ddfb220822\", \"cleanup_outcome\": \"unobserved\"}\n",
+    "stderr": ""
+  },
+  "host_exit_code": 0,
+  "host_output": "",
+  "cleanup": {
+    "owned_udp_receiver": "closed",
+    "isolated_state": "retained for exact local bytes",
+    "host_process": "exited",
+    "external_user_logs": "not read or modified"
+  },
+  "source_files_at_end": {
+    "src/puripuly_heart/main.py": "909aca8be8ae02464441721720f968e83948a11503e968a49355f1cff238ee55",
+    "src/puripuly_heart/cli/main.py": "98e7c74d92166e28c827367069957537f37bba5c34b8264633f1457eae0bad39",
+    "src/puripuly_heart/composition/application_runtime.py": "0cdae60692704361785d3922159c3009bddafd27bcc617e862c3b58094a449f0",
+    "src/puripuly_heart/core/orchestrator/translation_turn.py": "d68c5baee58cbae6b38f8a3d726c53960d17d0839728a33657b739422f376432",
+    "src/puripuly_heart/core/orchestrator/self_translation_channel.py": "01e35cadd1443162e97a058c40a3ebccf696f3e4a64531df7a5895af06bae419",
+    "src/puripuly_heart/core/runtime/output.py": "df53306d0cce3a81ef8e757bef6af0da60b573708bbcc5b7058d6b44f4dc0c03"
+  },
+  "candidate_stable_during_run": true,
+  "trace_export": {
+    "kind": "sanitized export, not original local bytes",
+    "original_local_sha256": "9b0f6dae18c5cb21e9eb8f07a43af520ce25482a631bb4c77914da58b8922270",
+    "redactions": "Personal checkout/model/state/home paths only; executed source/input/model/profile hashes and observation values retained",
+    "original_local_location": "<isolated-state>/integrated_f1ab9a4_cli_01.json"
+  }
+}

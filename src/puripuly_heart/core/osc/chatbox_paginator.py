@@ -4,6 +4,7 @@ import logging
 import textwrap
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 from uuid import UUID
 
 from puripuly_heart.core.clock import Clock
@@ -39,12 +40,19 @@ class ChatboxPaginator:
     _active_message: OSCMessage | None = field(default=None, init=False, repr=False)
     _active_page_index: int = field(default=0, init=False, repr=False)
     _active_page_count: int = field(default=0, init=False, repr=False)
+    _active_message_has_success: bool = field(default=False, init=False, repr=False)
     _latest_self_turn_key: tuple[int, int] | None = field(default=None, init=False, repr=False)
     _latest_self_utterance_id: UUID | None = field(default=None, init=False, repr=False)
     _latest_self_revision: int = field(default=-1, init=False, repr=False)
     _typing_reasons: set[str] = field(default_factory=set, init=False, repr=False)
     _legacy_typing_active: bool = field(default=False, init=False, repr=False)
     _last_typing_state: bool = field(default=False, init=False, repr=False)
+    _delivery_observer: Callable[[OSCMessage, str], None] | None = field(
+        default=None, init=False, repr=False
+    )
+    _stream_final_revisions: dict[tuple[UUID, int], bool] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         if self.max_chars <= 0:
@@ -58,6 +66,26 @@ class ChatboxPaginator:
         self._pending_pages = []
         self._pending_messages = []
 
+    def bind_delivery_observer(self, observer: Callable[[OSCMessage, str], None]) -> None:
+        self._delivery_observer = observer
+
+    def _notify_delivery(self, message: OSCMessage, status: str) -> None:
+        if self._delivery_observer is not None:
+            self._delivery_observer(message, status)
+        if status not in {"first_page_sent", "output_send_failed"}:
+            self._stream_final_revisions.pop(
+                (message.utterance_id, message.presentation_revision), None
+            )
+
+    def enqueue_self_turn(self, message: OSCMessage, *, final: bool) -> OSCMessage | None:
+        self._stream_final_revisions[(message.utterance_id, message.presentation_revision)] = final
+        return self.enqueue(message)
+
+    def promote_self_turn(self, utterance_id: UUID, revision: int) -> None:
+        key = (utterance_id, revision)
+        if key in self._stream_final_revisions:
+            self._stream_final_revisions[key] = True
+
     def enqueue(self, message: OSCMessage) -> OSCMessage | None:
         page_count = (
             len(
@@ -69,11 +97,12 @@ class ChatboxPaginator:
             if message.text.strip()
             else 0
         )
-        if message.self_turn_key is not None and self._prepare_self_turn_enqueue(
-            message,
-            page_count=page_count,
-        ):
-            return None
+        if message.self_turn_key is not None:
+            disposition = self._prepare_self_turn_enqueue(message, page_count=page_count)
+            if disposition is not None:
+                if disposition == "rejected":
+                    self._notify_delivery(message, "output_superseded")
+                return None
         if self._is_paginating():
             evicted: OSCMessage | None = None
             if message.self_speech:
@@ -84,6 +113,7 @@ class ChatboxPaginator:
                 ]
                 if len(waiting_speech_indexes) >= self.self_speech_waiting_capacity:
                     evicted = self._pending_messages.pop(waiting_speech_indexes[0])
+                    self._notify_delivery(evicted, "output_overload")
                     self._record_stage(
                         "message_terminal",
                         utterance_id=str(evicted.utterance_id),
@@ -139,6 +169,11 @@ class ChatboxPaginator:
             return
 
         self._next_page_at = 0.0
+        if self._active_message is not None:
+            self._stream_final_revisions.pop(
+                (self._active_message.utterance_id, self._active_message.presentation_revision),
+                None,
+            )
         self._active_message = None
         self._active_page_index = 0
         self._active_page_count = 0
@@ -205,12 +240,14 @@ class ChatboxPaginator:
         dropped_pages = len(self._pending_pages)
         dropped_messages = len(self._pending_messages)
         if self._active_message is not None:
+            self._notify_delivery(self._active_message, "output_runtime_closing")
             self._record_stage(
                 "message_terminal",
                 utterance_id=str(self._active_message.utterance_id),
                 status="output_runtime_closing",
             )
         for message in self._pending_messages:
+            self._notify_delivery(message, "output_runtime_closing")
             self._record_stage(
                 "message_terminal",
                 utterance_id=str(message.utterance_id),
@@ -218,6 +255,7 @@ class ChatboxPaginator:
             )
         self._pending_pages.clear()
         self._pending_messages.clear()
+        self._stream_final_revisions.clear()
         self._next_page_at = 0.0
         self._active_message = None
         self._active_page_index = 0
@@ -236,18 +274,18 @@ class ChatboxPaginator:
         message: OSCMessage,
         *,
         page_count: int,
-    ) -> bool:
+    ) -> Literal["rejected", "queued"] | None:
         assert self._pending_messages is not None
         incoming_key = message.self_turn_key
         assert incoming_key is not None
         if self._latest_self_turn_key is not None:
             if self._latest_self_turn_key > incoming_key:
-                return True
+                return "rejected"
             if self._latest_self_turn_key == incoming_key:
                 if self._latest_self_utterance_id != message.utterance_id:
                     raise ValueError("self turn key cannot identify multiple parent utterances")
                 if self._latest_self_revision >= message.presentation_revision:
-                    return True
+                    return "rejected"
         active = self._active_message if self._is_paginating() else None
         active_key = None if active is None else active.self_turn_key
         existing_self_messages = tuple(
@@ -256,7 +294,7 @@ class ChatboxPaginator:
             if candidate is not None and candidate.self_turn_key is not None
         )
         if any(candidate.self_turn_key > incoming_key for candidate in existing_self_messages):
-            return True
+            return "rejected"
         for candidate in existing_self_messages:
             if (
                 candidate.self_turn_key == incoming_key
@@ -268,7 +306,7 @@ class ChatboxPaginator:
             and candidate.presentation_revision >= message.presentation_revision
             for candidate in existing_self_messages
         ):
-            return True
+            return "rejected"
         self._latest_self_turn_key = incoming_key
         self._latest_self_utterance_id = message.utterance_id
         self._latest_self_revision = message.presentation_revision
@@ -290,6 +328,7 @@ class ChatboxPaginator:
                 target_languages=message.target_languages,
             )
         elif active_key is not None and active_key < incoming_key:
+            self._notify_delivery(active, "output_superseded")
             dropped_pages = self._clear_active_message()
             active_pruned = True
             self._record_stage(
@@ -308,6 +347,7 @@ class ChatboxPaginator:
                 next_pending.append(candidate)
                 continue
             if candidate_key < incoming_key:
+                self._notify_delivery(candidate, "output_superseded")
                 if replacement_index is None:
                     replacement_index = len(next_pending)
                 pruned_messages += 1
@@ -318,6 +358,7 @@ class ChatboxPaginator:
                 )
                 continue
             if candidate_key == incoming_key:
+                self._notify_delivery(candidate, "output_superseded")
                 if replacement_index is None:
                     replacement_index = len(next_pending)
                 replaced_pending_revision = max(
@@ -370,14 +411,19 @@ class ChatboxPaginator:
                 target_indexes=message.target_indexes,
                 target_languages=message.target_languages,
             )
-            return True
-        return False
+            return "queued"
+        return None
 
     def _clear_active_message(self) -> int:
         assert self._pending_pages is not None
         dropped_pages = len(self._pending_pages)
         self._pending_pages.clear()
         self._next_page_at = 0.0
+        if self._active_message is not None:
+            self._stream_final_revisions.pop(
+                (self._active_message.utterance_id, self._active_message.presentation_revision),
+                None,
+            )
         self._active_message = None
         self._active_page_index = 0
         self._active_page_count = 0
@@ -397,12 +443,16 @@ class ChatboxPaginator:
         self._active_message = message
         self._active_page_index = 0
         self._active_page_count = len(parts)
+        self._active_message_has_success = False
         self._send_page(mode="queued", text=head, remaining_parts=len(tail))
 
         if tail:
             self._pending_pages.extend(tail)
             self._next_page_at = self.clock.now() + self.page_interval_s
             return
+        self._stream_final_revisions.pop(
+            (message.utterance_id, message.presentation_revision), None
+        )
         self._active_message = None
         self._active_page_index = 0
         self._active_page_count = 0
@@ -414,6 +464,7 @@ class ChatboxPaginator:
                 next_message.self_speech
                 and self.clock.now() - next_message.created_at > self.self_speech_waiting_ttl_s
             ):
+                self._notify_delivery(next_message, "output_timeout")
                 self._record_stage(
                     "message_terminal",
                     utterance_id=str(next_message.utterance_id),
@@ -441,6 +492,8 @@ class ChatboxPaginator:
         try:
             self.sender.send_chatbox(text)
         except OSError as exc:
+            if self._active_message is not None and self._active_page_index == 0:
+                self._notify_delivery(self._active_message, "output_send_failed")
             self._emit_send_failure(mode=mode, exc=exc)
             if mode == "queued" and remaining_parts == 0:
                 active = self._active_message
@@ -451,11 +504,16 @@ class ChatboxPaginator:
                 )
             return False
         if mode == "queued":
+            first_successful_page = not self._active_message_has_success
+            self._active_message_has_success = True
+            if self._active_message is not None and self._active_page_index == 0:
+                self._notify_delivery(self._active_message, "first_page_sent")
             active = self._active_message
             self._record_stage(
                 "page_send",
                 utterance_id=None if active is None else str(active.utterance_id),
                 page_index=self._active_page_index,
+                first_successful_page=first_successful_page,
                 page_count=self._active_page_count,
                 remaining_parts=remaining_parts,
                 text_len=len(text),
@@ -464,6 +522,13 @@ class ChatboxPaginator:
                 presentation_revision=(None if active is None else active.presentation_revision),
                 target_indexes=() if active is None else active.target_indexes,
                 target_languages=() if active is None else active.target_languages,
+                self_turn_final=(
+                    None
+                    if active is None
+                    else self._stream_final_revisions.get(
+                        (active.utterance_id, active.presentation_revision)
+                    )
+                ),
             )
         return True
 

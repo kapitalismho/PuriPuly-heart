@@ -1,0 +1,2652 @@
+{
+  "stages": [
+    {
+      "stage": "progressive-source",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "blue lantern",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:54:27] Mic · French · In progress · preview\nblue lantern\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:27",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern",
+          "translated_text": null,
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 1,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [],
+      "snapshots": [
+        {
+          "parent_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+      }
+    },
+    {
+      "stage": "progressive-preview-one",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:blue lantern",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:54:27] Mic → English · In progress · preview\nblue lantern\nen:blue lantern",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:27",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern",
+          "translated_text": "en:blue lantern",
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 2,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern (en:blue lantern)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+      }
+    },
+    {
+      "stage": "progressive-extended-source",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "blue lantern and bright",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:54:27] Mic · French · In progress · preview\nblue lantern and bright\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:27",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern and bright",
+          "translated_text": null,
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 3,
+          "source_revision": 2,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern (en:blue lantern)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+      }
+    },
+    {
+      "stage": "progressive-preview-two",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:blue lantern and bright",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:54:27] Mic → English · In progress · preview\nblue lantern and bright\nen:blue lantern and bright",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:27",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern and bright",
+          "translated_text": "en:blue lantern and bright",
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 2,
+          "translation_source_revision": 2,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern (en:blue lantern)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright (en:blue lantern and bright)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "progressive-final",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:blue lantern and bright",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:27] Mic → English · Complete\nblue lantern and bright\nen:blue lantern and bright",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:27",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern and bright",
+          "translated_text": "en:blue lantern and bright",
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 6,
+          "source_revision": 2,
+          "translation_source_revision": 2,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+        }
+      ],
+      "accepted_record_keys": 2,
+      "accepted_keys": [
+        [
+          "self",
+          "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern (en:blue lantern)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright (en:blue lantern and bright)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright (en:blue lantern and bright)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "text": "blue lantern and bright (en:blue lantern and bright)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "7114fc62-06ba-4cea-8808-b635fc81ec7a"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "older-speech-held",
+      "case": "mixed",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "older speech",
+      "dashboard_status": "Source complete · translating",
+      "conversation": "[03:54:29] Mic · French · In progress · preview\nolder speech\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:29",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "older speech",
+          "translated_text": null,
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 3,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "fa808705-8668-4258-b785-f18127ab15eb"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "text": "older speech",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [],
+      "snapshots": [
+        {
+          "parent_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "manual-complete",
+      "case": "mixed",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:manual",
+      "dashboard_status": "Source complete · translating",
+      "conversation": "[03:54:29] Mic · French · In progress · preview\nolder speech\nTranslation pending\n\n[03:54:30] You · French\nmanual\n\n[03:54:30] You → English\nen:manual",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:29",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "older speech",
+          "translated_text": null,
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 3,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "fa808705-8668-4258-b785-f18127ab15eb"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "You",
+          "channel": "self",
+          "source_text": "manual",
+          "translated_text": null,
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:manual",
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6"
+        }
+      ],
+      "accepted_record_keys": 2,
+      "accepted_keys": [
+        [
+          "self",
+          "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "text": "older speech",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "text": "manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "text": "manual (en:manual)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": false
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "late-speech-final",
+      "case": "mixed",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:manual",
+      "dashboard_status": "Source complete · translating",
+      "conversation": "[03:54:29] Mic → English · Complete\nolder speech\nen:older speech\n\n[03:54:30] You · French\nmanual\n\n[03:54:30] You → English\nen:manual",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:29",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "older speech",
+          "translated_text": "en:older speech",
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "fa808705-8668-4258-b785-f18127ab15eb"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "You",
+          "channel": "self",
+          "source_text": "manual",
+          "translated_text": null,
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:manual",
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6"
+        }
+      ],
+      "accepted_record_keys": 4,
+      "accepted_keys": [
+        [
+          "self",
+          "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "fa808705-8668-4258-b785-f18127ab15eb",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "fa808705-8668-4258-b785-f18127ab15eb",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "text": "older speech",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "text": "manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "text": "manual (en:manual)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": false
+        },
+        {
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "text": "older speech (en:older speech)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "fa808705-8668-4258-b785-f18127ab15eb"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "successor-speech",
+      "case": "mixed",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:successor speech",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:29] Mic → English · Complete\nolder speech\nen:older speech\n\n[03:54:30] You · French\nmanual\n\n[03:54:30] You → English\nen:manual\n\n[03:54:30] Mic → English · Complete\nsuccessor speech\nen:successor speech",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:29",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "older speech",
+          "translated_text": "en:older speech",
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "fa808705-8668-4258-b785-f18127ab15eb"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "You",
+          "channel": "self",
+          "source_text": "manual",
+          "translated_text": null,
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:manual",
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6"
+        },
+        {
+          "timestamp_label": "03:54:30",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "successor speech",
+          "translated_text": "en:successor speech",
+          "utterance_id": "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "b3588491-025e-4ffc-ac46-65e9e60b4791"
+        }
+      ],
+      "accepted_record_keys": 6,
+      "accepted_keys": [
+        [
+          "self",
+          "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "fa808705-8668-4258-b785-f18127ab15eb",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "fa808705-8668-4258-b785-f18127ab15eb",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "text": "older speech",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "text": "manual",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          "text": "successor speech",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "aa1b7d37-a81c-4f6f-837d-509343b79aa6",
+          "text": "manual (en:manual)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": false
+        },
+        {
+          "utterance_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "text": "older speech (en:older speech)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          "text": "successor speech (en:successor speech)",
+          "turn_generation": 0,
+          "turn_order": 2,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          "text": "successor speech (en:successor speech)",
+          "turn_generation": 0,
+          "turn_order": 2,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          "text": "successor speech (en:successor speech)",
+          "turn_generation": 0,
+          "turn_order": 2,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "fa808705-8668-4258-b785-f18127ab15eb",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "fa808705-8668-4258-b785-f18127ab15eb"
+            }
+          ]
+        },
+        {
+          "parent_id": "b3588491-025e-4ffc-ac46-65e9e60b4791",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "b3588491-025e-4ffc-ac46-65e9e60b4791"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "dual-provisional",
+      "case": "dual-after",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en",
+          "ja"
+        ]
+      },
+      "dashboard": "dual source",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:54:31] Mic · French · In progress · preview\ndual source\nTranslation pending\n\n[03:54:31] Mic · French · In progress · preview\ndual source\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:31",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "dual source",
+          "translated_text": null,
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 1,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c"
+        },
+        {
+          "timestamp_label": "03:54:31",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "dual source",
+          "translated_text": null,
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "source_language": "fr",
+          "target_language": "ja",
+          "target_index": 1,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 1,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "text": "dual source",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [],
+      "snapshots": [
+        {
+          "parent_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            },
+            {
+              "language": "ja",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa"
+      }
+    },
+    {
+      "stage": "dual-final-after-snapshots",
+      "case": "dual-after",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en",
+          "ja"
+        ]
+      },
+      "dashboard": "English: en:dual source\nJapanese: ja:dual source",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:31] Mic → English · Complete\ndual source\nen:dual source\n\n[03:54:31] Mic → Japanese · Complete\ndual source\nja:dual source",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:31",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "dual source",
+          "translated_text": "en:dual source",
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 5,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c"
+        },
+        {
+          "timestamp_label": "03:54:31",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "dual source",
+          "translated_text": "ja:dual source",
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "source_language": "fr",
+          "target_language": "ja",
+          "target_index": 1,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 5,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c"
+        }
+      ],
+      "accepted_record_keys": 3,
+      "accepted_keys": [
+        [
+          "self",
+          "24def899-ef9d-5bca-a742-bf4177e31c54",
+          0,
+          1,
+          "translation"
+        ],
+        [
+          "self",
+          "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "text": "dual source",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "24def899-ef9d-5bca-a742-bf4177e31c54",
+          "text": "dual source",
+          "target_language": "ja"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "text": "ja:dual source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "text": "en:dual source\nja:dual source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "688a67f2-c36d-4712-85e5-ea6c5c57652c"
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "child_id": "24def899-ef9d-5bca-a742-bf4177e31c54"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source"
+      }
+    },
+    {
+      "stage": "dual-final-before-snapshots",
+      "case": "dual-before",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en",
+          "ja"
+        ]
+      },
+      "dashboard": "English: en:dual source\nJapanese: ja:dual source",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:32] Mic → English · Complete\ndual source\nen:dual source\n\n[03:54:32] Mic → Japanese · Complete\ndual source\nja:dual source",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:32",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "dual source",
+          "translated_text": "en:dual source",
+          "utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 5,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309"
+        },
+        {
+          "timestamp_label": "03:54:32",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "dual source",
+          "translated_text": "ja:dual source",
+          "utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          "source_language": "fr",
+          "target_language": "ja",
+          "target_index": 1,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 5,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309"
+        }
+      ],
+      "accepted_record_keys": 3,
+      "accepted_keys": [
+        [
+          "self",
+          "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "c305788d-3aa9-55cd-b96d-1c1448c8498c",
+          0,
+          1,
+          "translation"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          "text": "dual source",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "c305788d-3aa9-55cd-b96d-1c1448c8498c",
+          "text": "dual source",
+          "target_language": "ja"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          "text": "en:dual source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          "text": "en:dual source\nja:dual source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "253128f0-3dfc-4a26-a7a8-025bbeb8b309"
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "child_id": "c305788d-3aa9-55cd-b96d-1c1448c8498c"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true
+      }
+    },
+    {
+      "stage": "partial-primary-preview",
+      "case": "partial",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 50,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en",
+          "ja"
+        ]
+      },
+      "dashboard": "English: en:partial source",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:54:32] Mic → English · In progress · preview\npartial source\nen:partial source\n\n[03:54:32] Mic · French · In progress · preview\npartial source\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:32",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "partial source",
+          "translated_text": "en:partial source",
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 2,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8"
+        },
+        {
+          "timestamp_label": "03:54:32",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "partial source",
+          "translated_text": null,
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "source_language": "fr",
+          "target_language": "ja",
+          "target_index": 1,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 2,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "partial source",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "en:partial source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "571c0513-062b-48c2-8cd4-e30650b067c8"
+            },
+            {
+              "language": "ja",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true
+      }
+    },
+    {
+      "stage": "partial-target-failure",
+      "case": "partial",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 50,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en",
+          "ja"
+        ]
+      },
+      "dashboard": "English: en:partial source",
+      "dashboard_status": "Translation failed",
+      "conversation": "[03:54:32] Mic → English · Translation failed\npartial source\nen:partial source\n\n[03:54:32] Mic · French · Translation failed\npartial source\nTranslation failed",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:32",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "partial source",
+          "translated_text": "en:partial source",
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 6,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "failed",
+          "accepted": true,
+          "parent_utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8"
+        },
+        {
+          "timestamp_label": "03:54:32",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "partial source",
+          "translated_text": null,
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "source_language": "fr",
+          "target_language": "ja",
+          "target_index": 1,
+          "disposition": "failed",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 6,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "failed",
+          "accepted": true,
+          "parent_utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8"
+        }
+      ],
+      "accepted_record_keys": 2,
+      "accepted_keys": [
+        [
+          "self",
+          "571c0513-062b-48c2-8cd4-e30650b067c8",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "571c0513-062b-48c2-8cd4-e30650b067c8",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "partial source",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7b209a6c-985b-5b21-8597-0938e5643fdb",
+          "text": "partial source",
+          "target_language": "ja"
+        },
+        {
+          "utterance_id": "7b209a6c-985b-5b21-8597-0938e5643fdb",
+          "text": "partial source",
+          "target_language": "ja"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "en:partial source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "en:partial source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "en:partial source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "en:partial source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "text": "en:partial source",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "571c0513-062b-48c2-8cd4-e30650b067c8",
+          "status": "failed",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "571c0513-062b-48c2-8cd4-e30650b067c8"
+            },
+            {
+              "language": "ja",
+              "status": "failed",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true
+      }
+    },
+    {
+      "stage": "older-manual-held",
+      "case": "reverse",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "older manual",
+      "dashboard_status": "",
+      "conversation": "No conversation records yet.",
+      "conversation_visible": true,
+      "rows": [],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "text": "older manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [],
+      "snapshots": [],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159"
+      }
+    },
+    {
+      "stage": "newer-speech-complete",
+      "case": "reverse",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:newer speech",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:33] Mic → English · Complete\nnewer speech\nen:newer speech",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:33",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "newer speech",
+          "translated_text": "en:newer speech",
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": false,
+          "parent_utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "text": "older manual",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159"
+      }
+    },
+    {
+      "stage": "late-manual-final",
+      "case": "reverse",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:newer speech",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:33] Mic → English · Complete\nnewer speech\nen:newer speech\n\n[03:54:34] You · French\nolder manual\n\n[03:54:34] You → English\nen:older manual",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:33",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "newer speech",
+          "translated_text": "en:newer speech",
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": "older manual",
+          "translated_text": null,
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "32930880-0675-4c16-9092-1a28592be159"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:older manual",
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "32930880-0675-4c16-9092-1a28592be159"
+        }
+      ],
+      "accepted_record_keys": 4,
+      "accepted_keys": [
+        [
+          "self",
+          "32930880-0675-4c16-9092-1a28592be159",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "32930880-0675-4c16-9092-1a28592be159",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "text": "older manual",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "text": "older manual (en:older manual)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": false
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159",
+        "late_manual_chatbox_bypass_after_newer_speech": true
+      }
+    },
+    {
+      "stage": "future-manual-complete",
+      "case": "reverse",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:future manual",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:33] Mic → English · Complete\nnewer speech\nen:newer speech\n\n[03:54:34] You · French\nolder manual\n\n[03:54:34] You → English\nen:older manual\n\n[03:54:34] You · French\nfuture manual\n\n[03:54:34] You → English\nen:future manual",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:33",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "newer speech",
+          "translated_text": "en:newer speech",
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": "older manual",
+          "translated_text": null,
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "32930880-0675-4c16-9092-1a28592be159"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:older manual",
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "32930880-0675-4c16-9092-1a28592be159"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": "future manual",
+          "translated_text": null,
+          "utterance_id": "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:future manual",
+          "utterance_id": "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88"
+        }
+      ],
+      "accepted_record_keys": 6,
+      "accepted_keys": [
+        [
+          "self",
+          "32930880-0675-4c16-9092-1a28592be159",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "32930880-0675-4c16-9092-1a28592be159",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "text": "older manual",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88",
+          "text": "future manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "text": "newer speech (en:newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "32930880-0675-4c16-9092-1a28592be159",
+          "text": "older manual (en:older manual)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": false
+        },
+        {
+          "utterance_id": "c40e84fc-ef20-4fd4-a30a-bd67b4af0b88",
+          "text": "future manual (en:future manual)",
+          "turn_generation": 0,
+          "turn_order": 2,
+          "self_speech": false
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "ea4b06e0-771d-4589-a2cb-876a7fa98714"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159",
+        "late_manual_chatbox_bypass_after_newer_speech": true
+      }
+    },
+    {
+      "stage": "queued-legacy-source-final",
+      "case": "queued-legacy",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:queued newer speech",
+      "dashboard_status": "Complete",
+      "conversation": "[03:54:34] You · French\nqueued old manual\n\n[03:54:34] You → English\nen:queued old manual\n\n[03:54:34] Mic → English · Complete\nqueued newer speech\nen:queued newer speech",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": "queued old manual",
+          "translated_text": null,
+          "utterance_id": "6f60a108-c330-47a0-8e6c-9a49301e884a",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "6f60a108-c330-47a0-8e6c-9a49301e884a"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:queued old manual",
+          "utterance_id": "6f60a108-c330-47a0-8e6c-9a49301e884a",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "6f60a108-c330-47a0-8e6c-9a49301e884a"
+        },
+        {
+          "timestamp_label": "03:54:34",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "queued newer speech",
+          "translated_text": "en:queued newer speech",
+          "utterance_id": "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "b049bb79-76a0-4e46-b916-64c62cdaac95"
+        }
+      ],
+      "accepted_record_keys": 4,
+      "accepted_keys": [
+        [
+          "self",
+          "6f60a108-c330-47a0-8e6c-9a49301e884a",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "6f60a108-c330-47a0-8e6c-9a49301e884a",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "6f60a108-c330-47a0-8e6c-9a49301e884a",
+          "text": "queued old manual",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          "text": "queued newer speech",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "6f60a108-c330-47a0-8e6c-9a49301e884a",
+          "text": "queued old manual (en:queued old manual)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": false
+        },
+        {
+          "utterance_id": "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          "text": "queued newer speech (en:queued newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          "text": "queued newer speech (en:queued newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        },
+        {
+          "utterance_id": "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          "text": "queued newer speech (en:queued newer speech)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": true
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "b049bb79-76a0-4e46-b916-64c62cdaac95",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "b049bb79-76a0-4e46-b916-64c62cdaac95"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159",
+        "late_manual_chatbox_bypass_after_newer_speech": true,
+        "queued_old_source_and_final_consumed_after_new_speech": true
+      }
+    },
+    {
+      "stage": "pending-manual-source",
+      "case": "pending-source",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "pending manual",
+      "dashboard_status": "",
+      "conversation": "No conversation records yet.",
+      "conversation_visible": true,
+      "rows": [],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "text": "older manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [],
+      "snapshots": [],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159",
+        "late_manual_chatbox_bypass_after_newer_speech": true,
+        "queued_old_source_and_final_consumed_after_new_speech": true,
+        "pending_source_observed_before_admission": true
+      }
+    },
+    {
+      "stage": "late-manual-while-source-pending",
+      "case": "pending-source",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "pending manual",
+      "dashboard_status": "",
+      "conversation": "[03:54:35] You · French\nolder manual\n\n[03:54:35] You → English\nen:older manual",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:35",
+          "source": "You",
+          "channel": "self",
+          "source_text": "older manual",
+          "translated_text": null,
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d"
+        },
+        {
+          "timestamp_label": "03:54:35",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:older manual",
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d"
+        }
+      ],
+      "accepted_record_keys": 2,
+      "accepted_keys": [
+        [
+          "self",
+          "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "text": "older manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "text": "older manual (en:older manual)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": false
+        }
+      ],
+      "snapshots": [],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159",
+        "late_manual_chatbox_bypass_after_newer_speech": true,
+        "queued_old_source_and_final_consumed_after_new_speech": true,
+        "pending_source_observed_before_admission": true
+      }
+    },
+    {
+      "stage": "pending-manual-admitted",
+      "case": "pending-source",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:pending manual",
+      "dashboard_status": "",
+      "conversation": "[03:54:35] You · French\nolder manual\n\n[03:54:35] You → English\nen:older manual\n\n[03:54:35] You · French\npending manual\n\n[03:54:35] You → English\nen:pending manual",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:54:35",
+          "source": "You",
+          "channel": "self",
+          "source_text": "older manual",
+          "translated_text": null,
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d"
+        },
+        {
+          "timestamp_label": "03:54:35",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:older manual",
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d"
+        },
+        {
+          "timestamp_label": "03:54:35",
+          "source": "You",
+          "channel": "self",
+          "source_text": "pending manual",
+          "translated_text": null,
+          "utterance_id": "c191f073-e67d-499d-a7ba-7c4d6101b7d5",
+          "source_language": "fr",
+          "target_language": null,
+          "target_index": null,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "c191f073-e67d-499d-a7ba-7c4d6101b7d5"
+        },
+        {
+          "timestamp_label": "03:54:35",
+          "source": "You",
+          "channel": "self",
+          "source_text": null,
+          "translated_text": "en:pending manual",
+          "utterance_id": "c191f073-e67d-499d-a7ba-7c4d6101b7d5",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "translated",
+          "turn_kind": "manual",
+          "turn_generation": null,
+          "presentation_revision": 0,
+          "source_revision": 0,
+          "translation_source_revision": null,
+          "turn_status": null,
+          "accepted": true,
+          "parent_utterance_id": "c191f073-e67d-499d-a7ba-7c4d6101b7d5"
+        }
+      ],
+      "accepted_record_keys": 4,
+      "accepted_keys": [
+        [
+          "self",
+          "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          0,
+          null,
+          "source"
+        ],
+        [
+          "self",
+          "c191f073-e67d-499d-a7ba-7c4d6101b7d5",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "c191f073-e67d-499d-a7ba-7c4d6101b7d5",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "text": "older manual",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "c191f073-e67d-499d-a7ba-7c4d6101b7d5",
+          "text": "pending manual",
+          "target_language": "en"
+        }
+      ],
+      "chatbox_messages": [
+        {
+          "utterance_id": "3f3f33e3-01f0-4144-85c8-dedf5626761d",
+          "text": "older manual (en:older manual)",
+          "turn_generation": 0,
+          "turn_order": 0,
+          "self_speech": false
+        },
+        {
+          "utterance_id": "c191f073-e67d-499d-a7ba-7c4d6101b7d5",
+          "text": "pending manual (en:pending manual)",
+          "turn_generation": 0,
+          "turn_order": 1,
+          "self_speech": false
+        }
+      ],
+      "snapshots": [],
+      "facts": {
+        "progressive_parent": "7114fc62-06ba-4cea-8808-b635fc81ec7a",
+        "progressive_preview_update_id": "45e443e1628242a4ba13db9c9f0a72fa",
+        "secondary_first_dashboard": "Japanese: ja:dual source",
+        "accepted_before_any_snapshot": true,
+        "reverse_manual_parent": "32930880-0675-4c16-9092-1a28592be159",
+        "late_manual_chatbox_bypass_after_newer_speech": true,
+        "queued_old_source_and_final_consumed_after_new_speech": true,
+        "pending_source_observed_before_admission": true,
+        "pending_manual_parent": "c191f073-e67d-499d-a7ba-7c4d6101b7d5"
+      }
+    }
+  ]
+}

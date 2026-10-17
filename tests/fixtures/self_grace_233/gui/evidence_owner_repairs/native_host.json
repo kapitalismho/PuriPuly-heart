@@ -1,0 +1,20 @@
+{
+  "boundary": "New owned native Flet host, isolated synthetic UI runner, no application composition or canonical profile",
+  "host_executable": "<user-home>/.flet/client/flet-desktop-full-1.0.0/flet/flet.exe",
+  "host_sha256": "b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28",
+  "profile_isolated": true,
+  "stages": [],
+  "status": "failed",
+  "scenario": "owner_repairs",
+  "python_pid": 31880,
+  "phase": "finding_owned_window",
+  "owned_visible_windows": [],
+  "error": {
+    "type": "RuntimeError",
+    "message": "Synthetic runner exited before native host readiness: 1"
+  },
+  "runner_returncode": 1,
+  "native_host_exited": true,
+  "entry_exit_source_unchanged": null,
+  "isolated_profile_removed": true
+}

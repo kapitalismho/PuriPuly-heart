@@ -1,0 +1,13 @@
+[Diagnostic][LlmLatency] request_end request_id=27 utterance_id=e6b55b1f-1e38-47ed-b70b-c8fd0dbde7eb parent_utterance_id=e6b55b1f-1e38-47ed-b70b-c8fd0dbde7eb channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=27 prompt_chars=0 context_chars=21 status=success request_ms=366 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "manual after dropped source"
+[Context] utterance_id=e6b55b1f-1e38-47ed-b70b-c8fd0dbde7eb context_count=1 texts=["old speech"]
+[Conversation] Self · Manual → English · Translation "en:manual after dropped source"
+[Logging] untrusted_record_redacted level=INFO logger_sha256=e4dff420393775e2 message_len=213 message_sha256=983ccdfbb4bf74dc
+[Diagnostic][LlmLatency] request_end request_id=28 utterance_id=6ede5324-1df3-47bb-817c-82ab946b69f7 parent_utterance_id=6ede5324-1df3-47bb-817c-82ab946b69f7 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=18 prompt_chars=0 context_chars=60 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "pressure successor"
+[Context] utterance_id=6ede5324-1df3-47bb-817c-82ab946b69f7 context_count=2 texts=["old speech", "manual after dropped source"]
+[Conversation] Self · Mic → English · Translation "en:pressure successor"
+[Diagnostic][LlmLatency] request_end request_id=26 utterance_id=6763a5e6-02b9-42f8-b5ab-5ce2292da7e2 parent_utterance_id=6763a5e6-02b9-42f8-b5ab-5ce2292da7e2 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=10 prompt_chars=0 context_chars=0 status=success request_ms=1116 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "old speech"
+[Context] utterance_id=6763a5e6-02b9-42f8-b5ab-5ce2292da7e2 context_count=0
+[Conversation] Self · Mic → English · Translation "en:old speech"

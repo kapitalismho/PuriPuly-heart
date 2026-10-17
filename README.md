@@ -205,6 +205,8 @@ Self and Peer can translate concurrently on one managed GPU runtime, with at mos
 
 For bidirectional control setup and the stable parameter ABI, see [VRChat OSC controls](docs/vrchat-osc.md).
 
+SELF translations can appear in the chatbox while a speech turn is still in progress and update as more speech arrives. The app marks previews separately from completed turns. See [progressive Self chatbox translations](docs/vrchat-osc.md#progressive-self-chatbox-translations) for correction, ordering, and pagination behavior.
+
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
 

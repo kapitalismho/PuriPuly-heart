@@ -1,0 +1,7568 @@
+{
+  "revision": "75c4485a6787d504f5335d1602973f63b4d0c234",
+  "owner_source": "worktree",
+  "record_scope": "Original SELF-GRACE-1 historical correctness receipt; worktree is the original recorded label, not the current checkout",
+  "owner_source_sha256": "ec77ef5e91ddde932de59ed8a036e101da72373042b000b516ce831159e58e2f",
+  "preserved_owner_source": "source/self_translation_channel.py",
+  "command_path_normalization": "Interpreter location sanitized to <checkout>/.venv; recorded numerical evidence unchanged",
+  "production_policy_mutated_by_runner": false,
+  "environment": {
+    "python": "3.14.7",
+    "platform": "Windows-11-10.0.22631-SP0",
+    "packages": {
+      "numpy": "2.5.1",
+      "pytest": "9.1.1",
+      "pytest-asyncio": "1.4.0",
+      "sherpa-onnx": "1.13.4",
+      "onnxruntime": "1.28.0"
+    }
+  },
+  "command": [
+    "<checkout>/.venv/Scripts/python.exe",
+    "tests/fixtures/self_grace_233/run.py",
+    "--owner-source",
+    "worktree",
+    "--report-dir",
+    "tests/fixtures/self_grace_233/correctness_results"
+  ],
+  "pytest_exit_code": 0,
+  "case_policy_samples": 212,
+  "rows": [
+    {
+      "case": "active_SELF_intervening_Peer",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "active_SELF_intervening_Peer",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "active_SELF_intervening_Peer",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "active_SELF_intervening_Peer",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "boundary_period",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello."
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "final_update": 1,
+        "spec_preserve": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "boundary_period",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello."
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "final_update": 1,
+        "spec_preserve": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "boundary_period",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello."
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "final_update": 1,
+        "spec_preserve": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "boundary_period",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello."
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 550.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "final_update": 1,
+        "spec_preserve": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "B_before_buffer_final_only",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_before_buffer_final_only",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_before_buffer_final_only",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_before_buffer_final_only",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_unresolved_C_empty",
+      "policy": "combined",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.85,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 15,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 3,
+        "resume_false_start": 1,
+        "post_end_grace_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_empty",
+      "policy": "elapsed",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.85,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 15,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 3,
+        "resume_false_start": 1,
+        "post_end_grace_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_empty",
+      "policy": "no_op",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 2.2,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 16,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 3,
+        "resume_false_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_empty",
+      "policy": "unchanged",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 2.2,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 16,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 3,
+        "resume_false_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_final",
+      "policy": "combined",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.85,
+          "parts": [
+            "prior",
+            "hello",
+            "world",
+            "later"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 4,
+        "spec_start": 4,
+        "commit_blocked": 15,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 3,
+        "spec_cancel": 3,
+        "post_end_grace_timeout": 3,
+        "post_end_grace_start": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_final",
+      "policy": "elapsed",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.85,
+          "parts": [
+            "prior",
+            "hello",
+            "world",
+            "later"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 4,
+        "spec_start": 4,
+        "commit_blocked": 15,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 3,
+        "spec_cancel": 3,
+        "post_end_grace_timeout": 3,
+        "post_end_grace_start": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_final",
+      "policy": "no_op",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 2.2,
+          "parts": [
+            "prior",
+            "hello",
+            "world",
+            "later"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 4,
+        "final_phase": 4,
+        "spec_start": 4,
+        "commit_blocked": 16,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 3,
+        "spec_cancel": 3,
+        "post_end_grace_timeout": 3,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_unresolved_C_final",
+      "policy": "unchanged",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 2.2,
+          "parts": [
+            "prior",
+            "hello",
+            "world",
+            "later"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 4,
+        "final_phase": 4,
+        "spec_start": 4,
+        "commit_blocked": 16,
+        "spec_done": 3,
+        "resume_pending": 3,
+        "resume_confirmed": 3,
+        "spec_cancel": 3,
+        "post_end_grace_timeout": 3,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "B_watchdog_survives_C_false_start",
+      "policy": "combined",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.0,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 12,
+        "spec_done": 2,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_false_start": 1,
+        "resume_end_timeout": 2,
+        "post_end_grace_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_watchdog_survives_C_false_start",
+      "policy": "elapsed",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.0,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 12,
+        "spec_done": 2,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_false_start": 1,
+        "resume_end_timeout": 2,
+        "post_end_grace_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_watchdog_survives_C_false_start",
+      "policy": "no_op",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.0,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 12,
+        "spec_done": 2,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_false_start": 1,
+        "resume_end_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "B_watchdog_survives_C_false_start",
+      "policy": "unchanged",
+      "source_inputs": 4,
+      "commits": [
+        {
+          "at_s": 1.0,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 12,
+        "spec_done": 2,
+        "resume_pending": 3,
+        "resume_confirmed": 2,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_false_start": 1,
+        "resume_end_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "delayed_A_during_B_confirmed",
+      "policy": "combined",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.7,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 13,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 3,
+        "post_end_grace_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_confirmed",
+      "policy": "elapsed",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.7,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 13,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 3,
+        "post_end_grace_start": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_confirmed",
+      "policy": "no_op",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.7999999999999998,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 12,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_confirmed",
+      "policy": "unchanged",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.7999999999999998,
+          "parts": [
+            "prior",
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "P",
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 12,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_pending",
+      "policy": "combined",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_false_start"
+        },
+        {
+          "at_s": 1.7,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 12,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 3,
+        "post_end_grace_start": 1,
+        "resume_false_start": 1,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_pending",
+      "policy": "elapsed",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_false_start"
+        },
+        {
+          "at_s": 1.7,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 12,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 3,
+        "post_end_grace_start": 1,
+        "resume_false_start": 1,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_pending",
+      "policy": "no_op",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_false_start"
+        },
+        {
+          "at_s": 1.7999999999999998,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 11,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "resume_false_start": 1,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_A_during_B_pending",
+      "policy": "unchanged",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "prior",
+            "hello"
+          ],
+          "acoustics": [
+            "P",
+            "A"
+          ],
+          "reason": "resume_false_start"
+        },
+        {
+          "at_s": 1.7999999999999998,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 11,
+        "spec_done": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "resume_false_start": 1,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "delayed_VAD_receipt",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "delayed_VAD_receipt",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "delayed_VAD_receipt",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "delayed_VAD_receipt",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "duplicate_native_and_same_snapshot",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "duplicate_native_and_same_snapshot",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "duplicate_native_and_same_snapshot",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "duplicate_native_and_same_snapshot",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_after_end",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_after_end",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_after_end",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_after_end",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_short_asr",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_short_asr",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_short_asr",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "final_short_asr",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "future_VAD_anchor_fallback",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "future_VAD_anchor_fallback",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "future_VAD_anchor_fallback",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "future_VAD_anchor_fallback",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "G1_continuation_0.49_fast",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.99,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 490.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "post_end_grace_timeout": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_fast",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.99,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 490.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "post_end_grace_timeout": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_fast",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.0899999999999999,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 590.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_fast",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.0899999999999999,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 590.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_slow",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.49,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "post_end_grace_timeout": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_slow",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.49,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "post_end_grace_timeout": 2,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_slow",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.49,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.49_slow",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.49,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_fast",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.0,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_fast",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.0,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_fast",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.1,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 600.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_fast",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.1,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 600.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_slow",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_slow",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_slow",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.50_slow",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_fast",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.05,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_fast",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.05,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_fast",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.15,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 650.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_fast",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.15,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 650.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_slow",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.55,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_slow",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.55,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_slow",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.55,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.55_slow",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.55,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_fast",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.1,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_fast",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.1,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_fast",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.2000000000000002,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 700.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_fast",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.2000000000000002,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 700.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_slow",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_slow",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_slow",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.60_slow",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_fast",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.11,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_fast",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.11,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_fast",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.21,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 700.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_fast",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.21,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 700.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_slow",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.61,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_slow",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.61,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_slow",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.61,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G1_continuation_0.61_slow",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.61,
+          "parts": [
+            "one",
+            "two"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "post_end_grace_timeout": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "G2_fixed_three_fast",
+      "policy": "combined",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.3,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 2.1,
+          "parts": [
+            "three"
+          ],
+          "acoustics": [
+            "C"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 750.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 9,
+        "spec_done": 3,
+        "post_end_grace_timeout": 3,
+        "spec_terminal": 3,
+        "merge_commit": 3,
+        "spec_reuse": 3
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_fast",
+      "policy": "elapsed",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.3,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 2.1,
+          "parts": [
+            "three"
+          ],
+          "acoustics": [
+            "C"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 750.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 9,
+        "spec_done": 3,
+        "post_end_grace_timeout": 3,
+        "spec_terminal": 3,
+        "merge_commit": 3,
+        "spec_reuse": 3
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_fast",
+      "policy": "no_op",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.4,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 2.2,
+          "parts": [
+            "three"
+          ],
+          "acoustics": [
+            "C"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 1050.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 9,
+        "spec_done": 3,
+        "post_end_grace_timeout": 3,
+        "spec_terminal": 3,
+        "merge_commit": 3,
+        "spec_reuse": 3
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_fast",
+      "policy": "unchanged",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "one"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.4,
+          "parts": [
+            "two"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 2.2,
+          "parts": [
+            "three"
+          ],
+          "acoustics": [
+            "C"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 1050.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 9,
+        "spec_done": 3,
+        "post_end_grace_timeout": 3,
+        "spec_terminal": 3,
+        "merge_commit": 3,
+        "spec_reuse": 3
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_slow",
+      "policy": "combined",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 2.8,
+          "parts": [
+            "one",
+            "two",
+            "three"
+          ],
+          "acoustics": [
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 8,
+        "post_end_grace_timeout": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_slow",
+      "policy": "elapsed",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 2.8,
+          "parts": [
+            "one",
+            "two",
+            "three"
+          ],
+          "acoustics": [
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 8,
+        "post_end_grace_timeout": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_slow",
+      "policy": "no_op",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 2.8,
+          "parts": [
+            "one",
+            "two",
+            "three"
+          ],
+          "acoustics": [
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 8,
+        "post_end_grace_timeout": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "G2_fixed_three_slow",
+      "policy": "unchanged",
+      "source_inputs": 3,
+      "commits": [
+        {
+          "at_s": 2.8,
+          "parts": [
+            "one",
+            "two",
+            "three"
+          ],
+          "acoustics": [
+            "A",
+            "B",
+            "C"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 3,
+        "final_phase": 3,
+        "spec_start": 3,
+        "commit_blocked": 8,
+        "post_end_grace_timeout": 3,
+        "resume_pending": 2,
+        "resume_confirmed": 2,
+        "spec_cancel": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "manual_and_recognition_unit",
+      "policy": "combined",
+      "source_inputs": 0,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {},
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "manual_and_recognition_unit",
+      "policy": "elapsed",
+      "source_inputs": 0,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {},
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "manual_and_recognition_unit",
+      "policy": "no_op",
+      "source_inputs": 0,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {},
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "manual_and_recognition_unit",
+      "policy": "unchanged",
+      "source_inputs": 0,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {},
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_cancelled",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_cancelled",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_cancelled",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_cancelled",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_empty",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_empty",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_empty",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_empty",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_expired",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_expired",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_expired",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_expired",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_failed",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_failed",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_failed",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_failed",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_false_start",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 6,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_false_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "matching_B_false_start",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 6,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_false_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "matching_B_false_start",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 6,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_false_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "matching_B_false_start",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 6,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_false_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "matching_B_resume_timeout",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_end_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_resume_timeout",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_end_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_resume_timeout",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_end_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "matching_B_resume_timeout",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_end_timeout"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 5,
+        "spec_done": 1,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "resume_end_timeout": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "negation_is_revision",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "do not"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "negation_is_revision",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "do not"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "negation_is_revision",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "do not"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "negation_is_revision",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "do not"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "number_is_revision",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "pay 20"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "number_is_revision",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "pay 20"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "number_is_revision",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "pay 20"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "number_is_revision",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "pay 20"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "OFF_manual_survives",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "OFF_manual_survives",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "OFF_manual_survives",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "OFF_manual_survives",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "prebuffer_B_ended_pending",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.05,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "prebuffer_B_ended_pending",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.05,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 6,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "prebuffer_B_ended_pending",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.4,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "prebuffer_B_ended_pending",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.4,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "post_end_grace_timeout": 2,
+        "spec_cancel": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "provider_replacement",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_stale"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "provider_replacement",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_stale"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "provider_replacement",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "provider_replacement",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "provider_terminal_pre_end",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "provider_terminal_pre_end",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "provider_terminal_pre_end",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "provider_terminal_pre_end",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "question_is_revision",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello?"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "question_is_revision",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello?"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 200.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "question_is_revision",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello?"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "question_is_revision",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello?"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 5,
+        "spec_done": 2,
+        "final_update": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "recognition_configuration_barrier",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "recognition_configuration_barrier"
+        },
+        {
+          "at_s": 0.8999999999999999,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "merge_commit": 2,
+        "spec_terminal": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "recognition_configuration_barrier",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "recognition_configuration_barrier"
+        },
+        {
+          "at_s": 0.8999999999999999,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "merge_commit": 2,
+        "spec_terminal": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "recognition_configuration_barrier",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "recognition_configuration_barrier"
+        },
+        {
+          "at_s": 1.0,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "merge_commit": 2,
+        "spec_terminal": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "recognition_configuration_barrier",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.6,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "recognition_configuration_barrier"
+        },
+        {
+          "at_s": 1.0,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 500.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "merge_commit": 2,
+        "spec_terminal": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 3
+    },
+    {
+      "case": "repeated_identical_speech",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello",
+            "hello"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 300.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "repeated_identical_speech",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.8,
+          "parts": [
+            "hello",
+            "hello"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 300.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "repeated_identical_speech",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello",
+            "hello"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "repeated_identical_speech",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello",
+            "hello"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "same_acoustic_suffix_during_B_pending",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.5,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_false_start"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 1,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2,
+        "resume_false_start": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "same_acoustic_suffix_during_B_pending",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.5,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_false_start"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 1,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2,
+        "resume_false_start": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "same_acoustic_suffix_during_B_pending",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.5,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_false_start"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 1,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2,
+        "resume_false_start": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "same_acoustic_suffix_during_B_pending",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.5,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "resume_false_start"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 1,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2,
+        "resume_false_start": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "serial_provider_B_queued",
+      "policy": "combined",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "serial_provider_B_queued",
+      "policy": "elapsed",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.5,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 250.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "serial_provider_B_queued",
+      "policy": "no_op",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "serial_provider_B_queued",
+      "policy": "unchanged",
+      "source_inputs": 2,
+      "commits": [
+        {
+          "at_s": 1.6,
+          "parts": [
+            "hello",
+            "world"
+          ],
+          "acoustics": [
+            "A",
+            "B"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 2,
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 7,
+        "resume_pending": 1,
+        "resume_confirmed": 1,
+        "spec_cancel": 1,
+        "post_end_grace_timeout": 2,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "shutdown_running",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "shutdown_running",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "shutdown_running",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "shutdown_running",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "slow_translation",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "slow_translation",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "slow_translation",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "slow_translation",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 1.3,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "speculation_failure",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_failed"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "speculation_failure",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_failed"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "speculation_failure",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "speculation_failure",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "stable_after_end_terminal_late",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_after_end_terminal_late",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_after_end_terminal_late",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_after_end_terminal_late",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_before_end_terminal_early",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "post_end_grace_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_before_end_terminal_early",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "post_end_grace_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_before_end_terminal_early",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "post_end_grace_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_before_end_terminal_early",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 4,
+        "spec_done": 1,
+        "post_end_grace_start": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_contradiction",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "pay 10"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_contradiction",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "pay 10"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_contradiction",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "pay 10"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_contradiction",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "pay 10"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_terminal_before_timer",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 150.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_terminal_before_timer",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 150.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_terminal_before_timer",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "stable_terminal_before_timer",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 1
+    },
+    {
+      "case": "translation_configuration_change",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_cancel": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "translation_configuration_change",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.5,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_cancel": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "translation_configuration_change",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_cancel": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "translation_configuration_change",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.6000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_cancel": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "two_targets",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "secondary_prestart": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "two_targets",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.55,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "spec_done"
+        }
+      ],
+      "grace_only_wait_ms": 0.0,
+      "metrics": {
+        "final_phase": 1,
+        "spec_start": 1,
+        "secondary_prestart": 1,
+        "commit_blocked": 2,
+        "post_end_grace_timeout": 1,
+        "spec_done": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "two_targets",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "secondary_prestart": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "two_targets",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.9,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 350.0,
+      "metrics": {
+        "post_end_grace_start": 1,
+        "final_phase": 1,
+        "spec_start": 1,
+        "secondary_prestart": 1,
+        "commit_blocked": 3,
+        "spec_done": 1,
+        "post_end_grace_timeout": 1,
+        "spec_terminal": 1,
+        "merge_commit": 1,
+        "spec_reuse": 1
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "watchdog_prefix_suffix_terminal",
+      "policy": "combined",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.4,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 2,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "watchdog_prefix_suffix_terminal",
+      "policy": "elapsed",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.4,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 2,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "watchdog_prefix_suffix_terminal",
+      "policy": "no_op",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.4,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 2,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    },
+    {
+      "case": "watchdog_prefix_suffix_terminal",
+      "policy": "unchanged",
+      "source_inputs": 1,
+      "commits": [
+        {
+          "at_s": 0.7000000000000001,
+          "parts": [
+            "hello"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        },
+        {
+          "at_s": 1.4,
+          "parts": [
+            "world"
+          ],
+          "acoustics": [
+            "A"
+          ],
+          "reason": "post_end_grace"
+        }
+      ],
+      "grace_only_wait_ms": 400.0,
+      "metrics": {
+        "final_phase": 2,
+        "spec_start": 2,
+        "commit_blocked": 8,
+        "spec_done": 2,
+        "awaiting_vad_timeout": 2,
+        "post_end_grace_start": 2,
+        "post_end_grace_timeout": 2,
+        "spec_terminal": 2,
+        "merge_commit": 2,
+        "spec_reuse": 2
+      },
+      "required_continuation_status": "passed",
+      "physical_active_at_observation_end": 0,
+      "provider_invocations": 2
+    }
+  ],
+  "case_reports": [
+    "active_SELF_intervening_Peer__combined.json",
+    "active_SELF_intervening_Peer__elapsed.json",
+    "active_SELF_intervening_Peer__no_op.json",
+    "active_SELF_intervening_Peer__unchanged.json",
+    "boundary_period__combined.json",
+    "boundary_period__elapsed.json",
+    "boundary_period__no_op.json",
+    "boundary_period__unchanged.json",
+    "B_before_buffer_final_only__combined.json",
+    "B_before_buffer_final_only__elapsed.json",
+    "B_before_buffer_final_only__no_op.json",
+    "B_before_buffer_final_only__unchanged.json",
+    "B_unresolved_C_empty__combined.json",
+    "B_unresolved_C_empty__elapsed.json",
+    "B_unresolved_C_empty__no_op.json",
+    "B_unresolved_C_empty__unchanged.json",
+    "B_unresolved_C_final__combined.json",
+    "B_unresolved_C_final__elapsed.json",
+    "B_unresolved_C_final__no_op.json",
+    "B_unresolved_C_final__unchanged.json",
+    "B_watchdog_survives_C_false_start__combined.json",
+    "B_watchdog_survives_C_false_start__elapsed.json",
+    "B_watchdog_survives_C_false_start__no_op.json",
+    "B_watchdog_survives_C_false_start__unchanged.json",
+    "delayed_A_during_B_confirmed__combined.json",
+    "delayed_A_during_B_confirmed__elapsed.json",
+    "delayed_A_during_B_confirmed__no_op.json",
+    "delayed_A_during_B_confirmed__unchanged.json",
+    "delayed_A_during_B_pending__combined.json",
+    "delayed_A_during_B_pending__elapsed.json",
+    "delayed_A_during_B_pending__no_op.json",
+    "delayed_A_during_B_pending__unchanged.json",
+    "delayed_VAD_receipt__combined.json",
+    "delayed_VAD_receipt__elapsed.json",
+    "delayed_VAD_receipt__no_op.json",
+    "delayed_VAD_receipt__unchanged.json",
+    "duplicate_native_and_same_snapshot__combined.json",
+    "duplicate_native_and_same_snapshot__elapsed.json",
+    "duplicate_native_and_same_snapshot__no_op.json",
+    "duplicate_native_and_same_snapshot__unchanged.json",
+    "final_after_end__combined.json",
+    "final_after_end__elapsed.json",
+    "final_after_end__no_op.json",
+    "final_after_end__unchanged.json",
+    "final_short_asr__combined.json",
+    "final_short_asr__elapsed.json",
+    "final_short_asr__no_op.json",
+    "final_short_asr__unchanged.json",
+    "future_VAD_anchor_fallback__combined.json",
+    "future_VAD_anchor_fallback__elapsed.json",
+    "future_VAD_anchor_fallback__no_op.json",
+    "future_VAD_anchor_fallback__unchanged.json",
+    "G1_continuation_0.49_fast__combined.json",
+    "G1_continuation_0.49_fast__elapsed.json",
+    "G1_continuation_0.49_fast__no_op.json",
+    "G1_continuation_0.49_fast__unchanged.json",
+    "G1_continuation_0.49_slow__combined.json",
+    "G1_continuation_0.49_slow__elapsed.json",
+    "G1_continuation_0.49_slow__no_op.json",
+    "G1_continuation_0.49_slow__unchanged.json",
+    "G1_continuation_0.50_fast__combined.json",
+    "G1_continuation_0.50_fast__elapsed.json",
+    "G1_continuation_0.50_fast__no_op.json",
+    "G1_continuation_0.50_fast__unchanged.json",
+    "G1_continuation_0.50_slow__combined.json",
+    "G1_continuation_0.50_slow__elapsed.json",
+    "G1_continuation_0.50_slow__no_op.json",
+    "G1_continuation_0.50_slow__unchanged.json",
+    "G1_continuation_0.55_fast__combined.json",
+    "G1_continuation_0.55_fast__elapsed.json",
+    "G1_continuation_0.55_fast__no_op.json",
+    "G1_continuation_0.55_fast__unchanged.json",
+    "G1_continuation_0.55_slow__combined.json",
+    "G1_continuation_0.55_slow__elapsed.json",
+    "G1_continuation_0.55_slow__no_op.json",
+    "G1_continuation_0.55_slow__unchanged.json",
+    "G1_continuation_0.60_fast__combined.json",
+    "G1_continuation_0.60_fast__elapsed.json",
+    "G1_continuation_0.60_fast__no_op.json",
+    "G1_continuation_0.60_fast__unchanged.json",
+    "G1_continuation_0.60_slow__combined.json",
+    "G1_continuation_0.60_slow__elapsed.json",
+    "G1_continuation_0.60_slow__no_op.json",
+    "G1_continuation_0.60_slow__unchanged.json",
+    "G1_continuation_0.61_fast__combined.json",
+    "G1_continuation_0.61_fast__elapsed.json",
+    "G1_continuation_0.61_fast__no_op.json",
+    "G1_continuation_0.61_fast__unchanged.json",
+    "G1_continuation_0.61_slow__combined.json",
+    "G1_continuation_0.61_slow__elapsed.json",
+    "G1_continuation_0.61_slow__no_op.json",
+    "G1_continuation_0.61_slow__unchanged.json",
+    "G2_fixed_three_fast__combined.json",
+    "G2_fixed_three_fast__elapsed.json",
+    "G2_fixed_three_fast__no_op.json",
+    "G2_fixed_three_fast__unchanged.json",
+    "G2_fixed_three_slow__combined.json",
+    "G2_fixed_three_slow__elapsed.json",
+    "G2_fixed_three_slow__no_op.json",
+    "G2_fixed_three_slow__unchanged.json",
+    "manual_and_recognition_unit__combined.json",
+    "manual_and_recognition_unit__elapsed.json",
+    "manual_and_recognition_unit__no_op.json",
+    "manual_and_recognition_unit__unchanged.json",
+    "matching_B_cancelled__combined.json",
+    "matching_B_cancelled__elapsed.json",
+    "matching_B_cancelled__no_op.json",
+    "matching_B_cancelled__unchanged.json",
+    "matching_B_empty__combined.json",
+    "matching_B_empty__elapsed.json",
+    "matching_B_empty__no_op.json",
+    "matching_B_empty__unchanged.json",
+    "matching_B_expired__combined.json",
+    "matching_B_expired__elapsed.json",
+    "matching_B_expired__no_op.json",
+    "matching_B_expired__unchanged.json",
+    "matching_B_failed__combined.json",
+    "matching_B_failed__elapsed.json",
+    "matching_B_failed__no_op.json",
+    "matching_B_failed__unchanged.json",
+    "matching_B_false_start__combined.json",
+    "matching_B_false_start__elapsed.json",
+    "matching_B_false_start__no_op.json",
+    "matching_B_false_start__unchanged.json",
+    "matching_B_resume_timeout__combined.json",
+    "matching_B_resume_timeout__elapsed.json",
+    "matching_B_resume_timeout__no_op.json",
+    "matching_B_resume_timeout__unchanged.json",
+    "negation_is_revision__combined.json",
+    "negation_is_revision__elapsed.json",
+    "negation_is_revision__no_op.json",
+    "negation_is_revision__unchanged.json",
+    "number_is_revision__combined.json",
+    "number_is_revision__elapsed.json",
+    "number_is_revision__no_op.json",
+    "number_is_revision__unchanged.json",
+    "OFF_manual_survives__combined.json",
+    "OFF_manual_survives__elapsed.json",
+    "OFF_manual_survives__no_op.json",
+    "OFF_manual_survives__unchanged.json",
+    "prebuffer_B_ended_pending__combined.json",
+    "prebuffer_B_ended_pending__elapsed.json",
+    "prebuffer_B_ended_pending__no_op.json",
+    "prebuffer_B_ended_pending__unchanged.json",
+    "provider_replacement__combined.json",
+    "provider_replacement__elapsed.json",
+    "provider_replacement__no_op.json",
+    "provider_replacement__unchanged.json",
+    "provider_terminal_pre_end__combined.json",
+    "provider_terminal_pre_end__elapsed.json",
+    "provider_terminal_pre_end__no_op.json",
+    "provider_terminal_pre_end__unchanged.json",
+    "question_is_revision__combined.json",
+    "question_is_revision__elapsed.json",
+    "question_is_revision__no_op.json",
+    "question_is_revision__unchanged.json",
+    "recognition_configuration_barrier__combined.json",
+    "recognition_configuration_barrier__elapsed.json",
+    "recognition_configuration_barrier__no_op.json",
+    "recognition_configuration_barrier__unchanged.json",
+    "repeated_identical_speech__combined.json",
+    "repeated_identical_speech__elapsed.json",
+    "repeated_identical_speech__no_op.json",
+    "repeated_identical_speech__unchanged.json",
+    "same_acoustic_suffix_during_B_pending__combined.json",
+    "same_acoustic_suffix_during_B_pending__elapsed.json",
+    "same_acoustic_suffix_during_B_pending__no_op.json",
+    "same_acoustic_suffix_during_B_pending__unchanged.json",
+    "serial_provider_B_queued__combined.json",
+    "serial_provider_B_queued__elapsed.json",
+    "serial_provider_B_queued__no_op.json",
+    "serial_provider_B_queued__unchanged.json",
+    "shutdown_running__combined.json",
+    "shutdown_running__elapsed.json",
+    "shutdown_running__no_op.json",
+    "shutdown_running__unchanged.json",
+    "slow_translation__combined.json",
+    "slow_translation__elapsed.json",
+    "slow_translation__no_op.json",
+    "slow_translation__unchanged.json",
+    "speculation_failure__combined.json",
+    "speculation_failure__elapsed.json",
+    "speculation_failure__no_op.json",
+    "speculation_failure__unchanged.json",
+    "stable_after_end_terminal_late__combined.json",
+    "stable_after_end_terminal_late__elapsed.json",
+    "stable_after_end_terminal_late__no_op.json",
+    "stable_after_end_terminal_late__unchanged.json",
+    "stable_before_end_terminal_early__combined.json",
+    "stable_before_end_terminal_early__elapsed.json",
+    "stable_before_end_terminal_early__no_op.json",
+    "stable_before_end_terminal_early__unchanged.json",
+    "stable_contradiction__combined.json",
+    "stable_contradiction__elapsed.json",
+    "stable_contradiction__no_op.json",
+    "stable_contradiction__unchanged.json",
+    "stable_terminal_before_timer__combined.json",
+    "stable_terminal_before_timer__elapsed.json",
+    "stable_terminal_before_timer__no_op.json",
+    "stable_terminal_before_timer__unchanged.json",
+    "translation_configuration_change__combined.json",
+    "translation_configuration_change__elapsed.json",
+    "translation_configuration_change__no_op.json",
+    "translation_configuration_change__unchanged.json",
+    "two_targets__combined.json",
+    "two_targets__elapsed.json",
+    "two_targets__no_op.json",
+    "two_targets__unchanged.json",
+    "watchdog_prefix_suffix_terminal__combined.json",
+    "watchdog_prefix_suffix_terminal__elapsed.json",
+    "watchdog_prefix_suffix_terminal__no_op.json",
+    "watchdog_prefix_suffix_terminal__unchanged.json"
+  ]
+}

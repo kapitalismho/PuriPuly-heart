@@ -1,0 +1,1517 @@
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+........................................................................ [ 17%]
+........................................................................ [ 20%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 31%]
+........................................................................ [ 34%]
+........................................................................ [ 38%]
+........................................................................ [ 41%]
+........................................................................ [ 44%]
+........................................................................ [ 48%]
+........................................................................ [ 51%]
+........................................................................ [ 55%]
+........................................................................ [ 58%]
+........................................................................ [ 62%]
+........................................................................ [ 65%]
+..FF..FF.........FFFFFFFF..FF...................................FF.FF.FF [ 69%]
+F....................................................................... [ 72%]
+........................................................................ [ 76%]
+........................................................................ [ 79%]
+........................................................................ [ 83%]
+........................................................................ [ 86%]
+........................................................................ [ 89%]
+........................................................................ [ 93%]
+........................................................................ [ 96%]
+.................................................................        [100%]
+================================== FAILURES ===================================
+_ test_self_initial_native_admission_uses_short_retries_then_real_consumer_progress[connect] _
+
+failure = 'connect'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("failure", ["connect", "task_started"])
+    async def test_self_initial_native_admission_uses_short_retries_then_real_consumer_progress(
+        failure,
+    ):
+        failed = (
+            [TimeoutError(), TimeoutError()]
+            if failure == "connect"
+            else [ScriptedSocket(ready=False), ScriptedSocket(ready=False)]
+        )
+        transport = FaultTransport([*failed, ScriptedSocket()])
+        async with self_capture_pipeline(transport) as env:
+            assert transport.attempts == 0
+            await spoken_turn(env)
+            await wait_until(lambda: transport.attempts == 3 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], "Self initial recovered.")
+>           transcript = await require_final_source(env, "Self initial recovered.")
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:255: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1D7EA30>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+_ test_self_initial_native_admission_uses_short_retries_then_real_consumer_progress[task_started] _
+
+failure = 'task_started'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("failure", ["connect", "task_started"])
+    async def test_self_initial_native_admission_uses_short_retries_then_real_consumer_progress(
+        failure,
+    ):
+        failed = (
+            [TimeoutError(), TimeoutError()]
+            if failure == "connect"
+            else [ScriptedSocket(ready=False), ScriptedSocket(ready=False)]
+        )
+        transport = FaultTransport([*failed, ScriptedSocket()])
+        async with self_capture_pipeline(transport) as env:
+            assert transport.attempts == 0
+            await spoken_turn(env)
+            await wait_until(lambda: transport.attempts == 3 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], "Self initial recovered.")
+>           transcript = await require_final_source(env, "Self initial recovered.")
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:255: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1BECB40>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+_ test_self_later_successor_failure_keeps_nonrecovery_policy_without_new_short_retries _
+
+    @pytest.mark.asyncio
+    async def test_self_later_successor_failure_keeps_nonrecovery_policy_without_new_short_retries():
+        first = ScriptedSocket()
+        unused = ScriptedSocket()
+        transport = FaultTransport([first, TimeoutError(), unused])
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: finish_sent(first))
+            await finish(first, "Self admitted initial.")
+>           await require_final_source(env, "Self admitted initial.")
+
+tests\providers\test_qwen_audio_delivery_recovery.py:309: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1BEFD70>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_genuinely_new_self_provider_scope_gets_initial_retry_budget_without_cooldown _
+
+    @pytest.mark.asyncio
+    async def test_genuinely_new_self_provider_scope_gets_initial_retry_budget_without_cooldown():
+        first, second = ScriptedSocket(), ScriptedSocket()
+        transport = FaultTransport([first, TimeoutError(), second])
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: finish_sent(first))
+            await finish(first, "First scope completed.")
+>           await require_final_source(env, "First scope completed.")
+
+tests\providers\test_qwen_audio_delivery_recovery.py:328: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1D7DBC0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_real_self_vad_gap_settles_admitted_stable_and_fresh_tail_reaches_source_and_translation _
+
+    @pytest.mark.asyncio
+    async def test_real_self_vad_gap_settles_admitted_stable_and_fresh_tail_reaches_source_and_translation():
+        llm = HeldManualProvider()
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport, llm) as env:
+            first_id = await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            first = transport.sockets[0]
+            await first.push(native(first.task_ids[0], text="Already admitted A."))
+            await wait_until(lambda: env.harness.self_owner.merge_buffer is not None)
+            assert env.harness.self_owner.merge_buffer.parts == ["Already admitted A."]
+            assert first_id in env.harness.self_owner.runtime.speech_ended_ids
+            second_id = await spoken_turn(env, 0.2)
+            await wait_until(lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[1]))
+            second = transport.sockets[1]
+            await second.push(native(second.task_ids[0], text="UNADMITTED_B"))
+            engine = env.factory.engines[0]
+            await wait_until(
+                lambda: any(turn.pending_update is not None for turn in engine._turns.values())
+            )
+            await spoken_turn(env, 0.25)
+            manual = await env.harness.self_owner.submit_text("Manual independent marker.")
+            await asyncio.wait_for(llm.manual_entered.wait(), timeout=1)
+            await source_gap(env)
+            await wait_until(lambda: all(socket.closed for socket in transport.sockets))
+            assert not engine._event_dispatch_task.done()
+            await wait_until(lambda: len(terminals(env)) >= 2)
+            cancelled = [event for event in terminals(env) if event.outcome == "cancelled"]
+            assert {event.identity.segment.segment_id for event in cancelled} == {first_id, second_id}
+            assert all(
+                not event.included_contributions and not event.recognition_origins
+                for event in cancelled
+            )
+            assert env.guarded.retention_budget.used_bytes == 0
+            llm.manual_release.set()
+            fresh_id = await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(transport.sockets) == 3 and finish_sent(transport.sockets[-1]))
+            fresh = transport.sockets[-1]
+            await fresh.push(native(fresh.task_ids[0], 1, " Fresh C."))
+            await fresh.push(native(fresh.task_ids[0], 2, " Exact tail."))
+            await fresh.push(control(fresh.task_ids[0], "task-finished"))
+            expected = "Already admitted A. Fresh C. Exact tail."
+>           result = await require_final_source(env, expected)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:496: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1D7D170>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+_ test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[provider] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1AD5010>
+held_boundary = 'provider'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("held_boundary", ["provider", "callback", "consumer", "overflow"])
+    async def test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses(
+        monkeypatch, held_boundary
+    ):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            old = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            if held_boundary in ("provider", "overflow"):
+                original = engine._deferred_event_sink
+                if held_boundary == "overflow":
+                    original_capacity = engine._event_buffer.max_events
+                    engine._event_buffer._max_events = 1
+    
+                async def hold(event):
+                    if isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(event)
+    
+                engine.bind_event_sink(hold)
+            elif held_boundary == "callback":
+                original = TranslationChannelOwnerCallbacks._publish_self_session_state
+    
+                async def hold(self, state):
+                    if self is env.callbacks and not entered.is_set():
+                        entered.set()
+                        await release.wait()
+                    await original(self, state)
+    
+                monkeypatch.setattr(
+                    TranslationChannelOwnerCallbacks, "_publish_self_session_state", hold
+                )
+            else:
+                original = SelfTranslationChannelOwner.handle_stt_event
+    
+                async def hold(self, event):
+                    if self is env.harness.self_owner and isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(self, event)
+    
+                monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", hold)
+            try:
+                await old.push(native(old.task_ids[0], text="PRE_GAP_NOT_ADMITTED"))
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                assert env.harness.self_owner.merge_buffer is None
+                if held_boundary == "overflow":
+                    await old.push(native(old.task_ids[0], 2, " extra one."))
+                    await old.push(native(old.task_ids[0], 3, " extra two."))
+                    await wait_until(lambda: bool(engine._event_buffer._retired_epochs))
+                before = engine._authority_generation
+                await source_gap(env)
+                assert engine._authority_generation > before
+            finally:
+                release.set()
+            await engine.wait_for_event_ingress_drain()
+            assert env.harness.self_owner.merge_buffer is None
+            assert not any("PRE_GAP_NOT_ADMITTED" in call["text"] for call in env.llm.calls)
+            assert env.owner.snapshot.effective_active
+            if held_boundary == "overflow":
+                engine._event_buffer._max_events = original_capacity
+            await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], "Only fresh admitted source.")
+>           result = await require_final_source(env, "Only fresh admitted source.")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:587: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1BEFED0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+_ test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[callback] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1D199B0>
+held_boundary = 'callback'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("held_boundary", ["provider", "callback", "consumer", "overflow"])
+    async def test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses(
+        monkeypatch, held_boundary
+    ):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            old = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            if held_boundary in ("provider", "overflow"):
+                original = engine._deferred_event_sink
+                if held_boundary == "overflow":
+                    original_capacity = engine._event_buffer.max_events
+                    engine._event_buffer._max_events = 1
+    
+                async def hold(event):
+                    if isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(event)
+    
+                engine.bind_event_sink(hold)
+            elif held_boundary == "callback":
+                original = TranslationChannelOwnerCallbacks._publish_self_session_state
+    
+                async def hold(self, state):
+                    if self is env.callbacks and not entered.is_set():
+                        entered.set()
+                        await release.wait()
+                    await original(self, state)
+    
+                monkeypatch.setattr(
+                    TranslationChannelOwnerCallbacks, "_publish_self_session_state", hold
+                )
+            else:
+                original = SelfTranslationChannelOwner.handle_stt_event
+    
+                async def hold(self, event):
+                    if self is env.harness.self_owner and isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(self, event)
+    
+                monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", hold)
+            try:
+                await old.push(native(old.task_ids[0], text="PRE_GAP_NOT_ADMITTED"))
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                assert env.harness.self_owner.merge_buffer is None
+                if held_boundary == "overflow":
+                    await old.push(native(old.task_ids[0], 2, " extra one."))
+                    await old.push(native(old.task_ids[0], 3, " extra two."))
+                    await wait_until(lambda: bool(engine._event_buffer._retired_epochs))
+                before = engine._authority_generation
+                await source_gap(env)
+                assert engine._authority_generation > before
+            finally:
+                release.set()
+            await engine.wait_for_event_ingress_drain()
+            assert env.harness.self_owner.merge_buffer is None
+            assert not any("PRE_GAP_NOT_ADMITTED" in call["text"] for call in env.llm.calls)
+            assert env.owner.snapshot.effective_active
+            if held_boundary == "overflow":
+                engine._event_buffer._max_events = original_capacity
+            await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], "Only fresh admitted source.")
+>           result = await require_final_source(env, "Only fresh admitted source.")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:587: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1BEE560>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+_ test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[consumer] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1F4E4A0>
+held_boundary = 'consumer'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("held_boundary", ["provider", "callback", "consumer", "overflow"])
+    async def test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses(
+        monkeypatch, held_boundary
+    ):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            old = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            if held_boundary in ("provider", "overflow"):
+                original = engine._deferred_event_sink
+                if held_boundary == "overflow":
+                    original_capacity = engine._event_buffer.max_events
+                    engine._event_buffer._max_events = 1
+    
+                async def hold(event):
+                    if isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(event)
+    
+                engine.bind_event_sink(hold)
+            elif held_boundary == "callback":
+                original = TranslationChannelOwnerCallbacks._publish_self_session_state
+    
+                async def hold(self, state):
+                    if self is env.callbacks and not entered.is_set():
+                        entered.set()
+                        await release.wait()
+                    await original(self, state)
+    
+                monkeypatch.setattr(
+                    TranslationChannelOwnerCallbacks, "_publish_self_session_state", hold
+                )
+            else:
+                original = SelfTranslationChannelOwner.handle_stt_event
+    
+                async def hold(self, event):
+                    if self is env.harness.self_owner and isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(self, event)
+    
+                monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", hold)
+            try:
+                await old.push(native(old.task_ids[0], text="PRE_GAP_NOT_ADMITTED"))
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                assert env.harness.self_owner.merge_buffer is None
+                if held_boundary == "overflow":
+                    await old.push(native(old.task_ids[0], 2, " extra one."))
+                    await old.push(native(old.task_ids[0], 3, " extra two."))
+                    await wait_until(lambda: bool(engine._event_buffer._retired_epochs))
+                before = engine._authority_generation
+                await source_gap(env)
+                assert engine._authority_generation > before
+            finally:
+                release.set()
+            await engine.wait_for_event_ingress_drain()
+            assert env.harness.self_owner.merge_buffer is None
+            assert not any("PRE_GAP_NOT_ADMITTED" in call["text"] for call in env.llm.calls)
+            assert env.owner.snapshot.effective_active
+            if held_boundary == "overflow":
+                engine._event_buffer._max_events = original_capacity
+            await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], "Only fresh admitted source.")
+>           result = await require_final_source(env, "Only fresh admitted source.")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:587: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1D8F480>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+_ test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[overflow] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1C04C20>
+held_boundary = 'overflow'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("held_boundary", ["provider", "callback", "consumer", "overflow"])
+    async def test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses(
+        monkeypatch, held_boundary
+    ):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            old = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            if held_boundary in ("provider", "overflow"):
+                original = engine._deferred_event_sink
+                if held_boundary == "overflow":
+                    original_capacity = engine._event_buffer.max_events
+                    engine._event_buffer._max_events = 1
+    
+                async def hold(event):
+                    if isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(event)
+    
+                engine.bind_event_sink(hold)
+            elif held_boundary == "callback":
+                original = TranslationChannelOwnerCallbacks._publish_self_session_state
+    
+                async def hold(self, state):
+                    if self is env.callbacks and not entered.is_set():
+                        entered.set()
+                        await release.wait()
+                    await original(self, state)
+    
+                monkeypatch.setattr(
+                    TranslationChannelOwnerCallbacks, "_publish_self_session_state", hold
+                )
+            else:
+                original = SelfTranslationChannelOwner.handle_stt_event
+    
+                async def hold(self, event):
+                    if self is env.harness.self_owner and isinstance(event, STTProviderTurnUpdate):
+                        entered.set()
+                        await release.wait()
+                    await original(self, event)
+    
+                monkeypatch.setattr(SelfTranslationChannelOwner, "handle_stt_event", hold)
+            try:
+                await old.push(native(old.task_ids[0], text="PRE_GAP_NOT_ADMITTED"))
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                assert env.harness.self_owner.merge_buffer is None
+                if held_boundary == "overflow":
+                    await old.push(native(old.task_ids[0], 2, " extra one."))
+                    await old.push(native(old.task_ids[0], 3, " extra two."))
+                    await wait_until(lambda: bool(engine._event_buffer._retired_epochs))
+                before = engine._authority_generation
+                await source_gap(env)
+                assert engine._authority_generation > before
+            finally:
+                release.set()
+            await engine.wait_for_event_ingress_drain()
+            assert env.harness.self_owner.merge_buffer is None
+            assert not any("PRE_GAP_NOT_ADMITTED" in call["text"] for call in env.llm.calls)
+            assert env.owner.snapshot.effective_active
+            if held_boundary == "overflow":
+                engine._event_buffer._max_events = original_capacity
+            await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], "Only fresh admitted source.")
+>           result = await require_final_source(env, "Only fresh admitted source.")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:587: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1BED220>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+____ test_source_gap_does_not_cancel_work_already_admitted_by_consumption _____
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1C04BB0>
+
+    @pytest.mark.asyncio
+    async def test_source_gap_does_not_cancel_work_already_admitted_by_consumption(monkeypatch):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            old = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            original = SelfTranslationChannelOwner._apply_scoped_contribution
+    
+            async def hold(self, identity, text, origins=()):
+                if self is env.harness.self_owner and text == "Consumed before gap.":
+                    entered.set()
+                    await release.wait()
+                await original(self, identity, text, origins)
+    
+            monkeypatch.setattr(SelfTranslationChannelOwner, "_apply_scoped_contribution", hold)
+            try:
+                await old.push(native(old.task_ids[0], text="Consumed before gap."))
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                assert env.harness.self_owner._stt_consumption.consumed_contribution_ids
+                assert env.harness.self_owner.merge_buffer is None
+                await source_gap(env)
+                assert not engine._event_dispatch_task.cancelling()
+            finally:
+                release.set()
+            await engine.wait_for_event_ingress_drain()
+            assert env.harness.self_owner.merge_buffer.parts == ["Consumed before gap."]
+            await spoken_turn(env, 0.3, epoch=2)
+            await wait_until(lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1]))
+            await finish(transport.sockets[-1], " Fresh after admitted work.")
+>           result = await require_final_source(env, "Consumed before gap. Fresh after admitted work.")
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_delivery_recovery.py:626: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1DA1220>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+_ test_orderly_retirement_preserves_deferred_terminal_and_consumed_source[close] _
+
+retirement = 'close'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("retirement", ["close", "idle"])
+    async def test_orderly_retirement_preserves_deferred_terminal_and_consumed_source(retirement):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            socket = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            original = engine._deferred_event_sink
+    
+            async def hold(event):
+                if isinstance(event, STTProviderTurnTerminal):
+                    entered.set()
+                    await release.wait()
+                await original(event)
+    
+            engine.bind_event_sink(hold)
+            closing = None
+            try:
+                await finish(socket, "Orderly source conserved.")
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                if retirement == "close":
+                    closing = asyncio.create_task(engine.close())
+                    await wait_until(lambda: engine._closing)
+                    assert not closing.done()
+                else:
+                    await env.factory.clock.advance_to(60)
+                    await wait_until(lambda: socket.closed)
+            finally:
+                release.set()
+                if closing is not None:
+                    await closing
+>           await require_final_source(env, "Orderly source conserved.")
+
+tests\providers\test_qwen_audio_delivery_recovery.py:666: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1DA12D0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_orderly_retirement_preserves_deferred_terminal_and_consumed_source[idle] _
+
+retirement = 'idle'
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("retirement", ["close", "idle"])
+    async def test_orderly_retirement_preserves_deferred_terminal_and_consumed_source(retirement):
+        transport = FaultTransport()
+        async with self_capture_pipeline(transport) as env:
+            await spoken_turn(env)
+            await wait_until(lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0]))
+            socket = transport.sockets[0]
+            engine = env.factory.engines[0]
+            entered, release = asyncio.Event(), asyncio.Event()
+            original = engine._deferred_event_sink
+    
+            async def hold(event):
+                if isinstance(event, STTProviderTurnTerminal):
+                    entered.set()
+                    await release.wait()
+                await original(event)
+    
+            engine.bind_event_sink(hold)
+            closing = None
+            try:
+                await finish(socket, "Orderly source conserved.")
+                await asyncio.wait_for(entered.wait(), timeout=1)
+                if retirement == "close":
+                    closing = asyncio.create_task(engine.close())
+                    await wait_until(lambda: engine._closing)
+                    assert not closing.done()
+                else:
+                    await env.factory.clock.advance_to(60)
+                    await wait_until(lambda: socket.closed)
+            finally:
+                release.set()
+                if closing is not None:
+                    await closing
+>           await require_final_source(env, "Orderly source conserved.")
+
+tests\providers\test_qwen_audio_delivery_recovery.py:666: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1D7C9E0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order[False] _
+
+prefix = False
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1F4D160>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("prefix", [False, True])
+    async def test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order(
+        prefix, monkeypatch
+    ):
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=None,
+            osc=RecordingOscQueue(),
+            clock=FakeClock(),
+            low_latency_mode=True,
+            low_latency_awaiting_vad_timeout_s=60,
+            low_latency_finalize_wait_ms=500,
+        )
+        owner = harness.self_owner
+        emitted = []
+    
+        finals = []
+        original_transcript = type(owner)._handle_transcript
+    
+        async def observe_transcript(current_owner, transcript, **kwargs):
+            if current_owner is owner and kwargs.get("is_final"):
+                finals.append(transcript)
+            await original_transcript(current_owner, transcript, **kwargs)
+    
+        monkeypatch.setattr(type(owner), "_handle_transcript", observe_transcript)
+    
+        async def sink(event):
+            emitted.append(event)
+            await owner.handle_stt_event(event)
+    
+        engine, factory, _sessions = await make_engine("self", sink=sink)
+        ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+        a_start, _, a_end = segment_events(ledger, start_sample=0, now=0)
+        b_start, _, b_end = segment_events(ledger, start_sample=100, now=1)
+        try:
+            await harness.start()
+            await engine.handle_owned_vad_event(a_start)
+            a = factory.sockets[0]
+            if prefix:
+                await a.push(native(a.task_ids[0], 1, " A prefix "))
+                await wait_until(lambda: owner.merge_buffer is not None)
+                assert owner.merge_buffer.parts == [" A prefix "]
+            await engine.handle_owned_vad_event(a_end)
+            await owner.handle_vad_event(a_end.event)
+            await engine.handle_owned_vad_event(b_start)
+            b = factory.sockets[1]
+            await b.push(native(b.task_ids[0], 1, " B stable "))
+            await b.push(native(b.task_ids[0], 2, " B tail "))
+            await engine.handle_owned_vad_event(b_end)
+            await owner.handle_vad_event(b_end.event)
+            await b.push(control(b.task_ids[0], "task-finished"))
+            await wait_until(lambda: any(turn.terminal_ready.done() for turn in engine._turns.values()))
+            assert not any(
+                event.identity.segment.segment_id == b_start.event.utterance_id for event in emitted
+            )
+            assert (owner.merge_buffer.parts if owner.merge_buffer is not None else []) == (
+                [" A prefix "] if prefix else []
+            )
+            await a.push(native(a.task_ids[0], 2 if prefix else 1, " A drain "))
+            await a.push(control(a.task_ids[0], "task-finished"))
+            await wait_until(
+                lambda: sum(isinstance(event, STTProviderTurnTerminal) for event in emitted) == 2
+            )
+            expected_a = " A prefix  A drain " if prefix else " A drain "
+            assert owner.merge_buffer.parts == [expected_a, " B stable  B tail "]
+            assert [event.text for event in emitted if isinstance(event, STTProviderTurnTerminal)] == [
+                expected_a,
+                " B stable  B tail ",
+            ]
+>           await wait_until(lambda: len(finals) == 1, timeout=2)
+
+tests\providers\test_qwen_audio_peer.py:127: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order.<locals>.<lambda> at 0x0000020FC1D7E400>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order[True] _
+
+prefix = True
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000020FC1BF89F0>
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("prefix", [False, True])
+    async def test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order(
+        prefix, monkeypatch
+    ):
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=None,
+            osc=RecordingOscQueue(),
+            clock=FakeClock(),
+            low_latency_mode=True,
+            low_latency_awaiting_vad_timeout_s=60,
+            low_latency_finalize_wait_ms=500,
+        )
+        owner = harness.self_owner
+        emitted = []
+    
+        finals = []
+        original_transcript = type(owner)._handle_transcript
+    
+        async def observe_transcript(current_owner, transcript, **kwargs):
+            if current_owner is owner and kwargs.get("is_final"):
+                finals.append(transcript)
+            await original_transcript(current_owner, transcript, **kwargs)
+    
+        monkeypatch.setattr(type(owner), "_handle_transcript", observe_transcript)
+    
+        async def sink(event):
+            emitted.append(event)
+            await owner.handle_stt_event(event)
+    
+        engine, factory, _sessions = await make_engine("self", sink=sink)
+        ledger = PeerAudioSegmentLedger(activation_generation=1, settings=settings("qwen_audio"))
+        a_start, _, a_end = segment_events(ledger, start_sample=0, now=0)
+        b_start, _, b_end = segment_events(ledger, start_sample=100, now=1)
+        try:
+            await harness.start()
+            await engine.handle_owned_vad_event(a_start)
+            a = factory.sockets[0]
+            if prefix:
+                await a.push(native(a.task_ids[0], 1, " A prefix "))
+                await wait_until(lambda: owner.merge_buffer is not None)
+                assert owner.merge_buffer.parts == [" A prefix "]
+            await engine.handle_owned_vad_event(a_end)
+            await owner.handle_vad_event(a_end.event)
+            await engine.handle_owned_vad_event(b_start)
+            b = factory.sockets[1]
+            await b.push(native(b.task_ids[0], 1, " B stable "))
+            await b.push(native(b.task_ids[0], 2, " B tail "))
+            await engine.handle_owned_vad_event(b_end)
+            await owner.handle_vad_event(b_end.event)
+            await b.push(control(b.task_ids[0], "task-finished"))
+            await wait_until(lambda: any(turn.terminal_ready.done() for turn in engine._turns.values()))
+            assert not any(
+                event.identity.segment.segment_id == b_start.event.utterance_id for event in emitted
+            )
+            assert (owner.merge_buffer.parts if owner.merge_buffer is not None else []) == (
+                [" A prefix "] if prefix else []
+            )
+            await a.push(native(a.task_ids[0], 2 if prefix else 1, " A drain "))
+            await a.push(control(a.task_ids[0], "task-finished"))
+            await wait_until(
+                lambda: sum(isinstance(event, STTProviderTurnTerminal) for event in emitted) == 2
+            )
+            expected_a = " A prefix  A drain " if prefix else " A drain "
+            assert owner.merge_buffer.parts == [expected_a, " B stable  B tail "]
+            assert [event.text for event in emitted if isinstance(event, STTProviderTurnTerminal)] == [
+                expected_a,
+                " B stable  B tail ",
+            ]
+>           await wait_until(lambda: len(finals) == 1, timeout=2)
+
+tests\providers\test_qwen_audio_peer.py:127: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order.<locals>.<lambda> at 0x0000020FC1C92770>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_self_reenable_blocks_retired_qwen_before_build_then_reclaims_before_two_fresh_turns _
+
+    @pytest.mark.asyncio
+    async def test_self_reenable_blocks_retired_qwen_before_build_then_reclaims_before_two_fresh_turns():
+        unsafe = ReleasableSocket()
+        transport = FaultTransport([unsafe])
+        factory = RequestFactory(transport)
+        llm = HeldManualProvider()
+        async with self_capture_pipeline(
+            transport, llm, provider_factory=factory, peer_translation_enabled=True
+        ) as env:
+            try:
+                runtime, handle, old = await require_retired_self(env, unsafe)
+                config = env.owner.current_config
+                manual = await env.harness.self_owner.submit_text("Manual independent marker.")
+                await asyncio.wait_for(llm.manual_entered.wait(), timeout=1)
+                blocked = await enable_self(env, config)
+                assert not blocked.effective_active
+                assert transport.attempts == 1
+                assert len(factory.requests) == 1 and len(factory.engines) == 1
+                assert handle.provider is None
+                assert handle._retired_providers == [old]
+                assert old.cleanup_debt == 1 and not unsafe.closed
+                assert failed_reclaims(runtime, "self")[-1].event == "provider_reclaim"
+                with pytest.raises(ProviderResourceQuarantinedError) as captured:
+                    await handle.reclaim_qwen_resources()
+                assert captured.value.cleanup_debt == 1 and captured.value.owner_count == 1
+                assert captured.value.__cause__ is not None
+                assert str(captured.value.__cause__) == "provider_resource_quarantined"
+                async with peer_pipeline(env) as peer:
+                    await utterance(peer, 0.15)
+                    await wait_until(
+                        lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1])
+                    )
+                    await finish(transport.sockets[-1], "Independent Peer source.")
+                    await wait_until(lambda: peer_final_sources(env) == ["Independent Peer source."])
+                    await wait_until(
+                        lambda: any(call["text"] == "Independent Peer source." for call in llm.calls)
+                    )
+                    assert peer.owner.snapshot.effective_active
+                    assert not unsafe.closed
+                    llm.manual_release.set()
+                    await env.harness.translation_turns.wait_for_idle()
+                    assert any(
+                        event.type is UIEventType.TRANSLATION_DONE
+                        and event.utterance_id == manual.turn_id
+                        for event in env.harness.ui_events._queue
+                    )
+                    unsafe.allow_close = True
+                    resumed = await enable_self(env, config)
+                    assert resumed.effective_active and unsafe.closed
+                    assert old.cleanup_debt == 0 and old not in handle._retired_providers
+                    before = len(transport.sockets)
+                    await spoken_turn(env, 0.2, epoch=2)
+                    await wait_until(
+                        lambda: len(transport.sockets) == before + 1
+                        and finish_sent(transport.sockets[-1])
+                    )
+                    first = transport.sockets[-1]
+                    await spoken_turn(env, 0.3, epoch=2)
+                    await wait_until(
+                        lambda: len(transport.sockets) == before + 2
+                        and finish_sent(transport.sockets[-1])
+                    )
+                    second = transport.sockets[-1]
+                    assert sum(not socket.closed for socket in (unsafe, first, second)) == 2
+                    for socket, prefix, tail in (
+                        (second, " Runtime B.", " Tail B."),
+                        (first, "Runtime A.", " Tail A."),
+                    ):
+                        await socket.push(native(socket.task_ids[0], 1, prefix))
+                        await socket.push(native(socket.task_ids[0], 2, tail))
+                        await socket.push(control(socket.task_ids[0], "task-finished"))
+>                   result = await require_final_source(env, "Runtime A. Tail A. Runtime B. Tail B.")
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:272: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1EE21F0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.local_asr_provider_runtime:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+_ test_qwen_to_other_provider_then_qwen_does_not_hide_retired_qwen_ownership __
+
+    @pytest.mark.asyncio
+    async def test_qwen_to_other_provider_then_qwen_does_not_hide_retired_qwen_ownership():
+        unsafe = ReleasableSocket()
+        transport = FaultTransport([unsafe])
+        factory = RequestFactory(transport)
+        async with self_capture_pipeline(transport, provider_factory=factory) as env:
+            try:
+                runtime, handle, old = await require_retired_self(env, unsafe)
+                qwen = env.settings_box[0]
+                other = replace(
+                    qwen, intent=replace(qwen.intent, stt=replace(qwen.intent.stt, provider="soniox"))
+                )
+                env.settings_box[0] = other
+                other_config = build_self_capture_session_config_from_vnext(other)
+                await enable_self(env, other_config)
+                assert env.owner.snapshot.effective_active
+                assert runtime.snapshot.channel_for("self").provider_id == "soniox"
+                await spoken_turn(env, 0.2)
+>               await require_final_source(env, "Other provider permitted.")
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:299: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1FB54E0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+_ test_qwen_publication_rechecks_cleanup_that_appears_while_factory_is_in_flight _
+
+    @pytest.mark.asyncio
+    async def test_qwen_publication_rechecks_cleanup_that_appears_while_factory_is_in_flight():
+        unsafe = ReleasableSocket()
+        transport = FaultTransport([unsafe])
+        factory = RequestFactory(transport)
+        async with self_capture_pipeline(transport, provider_factory=factory) as env:
+            replacing = None
+            try:
+                runtime = env.harness.self_owner.local_asr_runtime
+                factory.hold_next_build = True
+                request = build_self_stt_provider_request_from_vnext(env.settings_box[0], warmup=False)
+                replacing = asyncio.create_task(runtime.replace_provider(request, start=True))
+                await asyncio.wait_for(factory.build_entered.wait(), timeout=1)
+                _, handle, old = await require_retired_self(env, unsafe)
+                factory.build_release.set()
+                result = await replacing
+                assert result.status == "failed"
+                assert result.failure_code == "provider_resource_quarantined"
+                assert result.failure_stage == "provider_replace"
+                assert handle.provider is None and old in handle._retired_providers
+                assert old.cleanup_debt == 1
+                assert transport.attempts == 1
+                assert len(factory.engines) == 2 and factory.engines[1]._closed
+                unsafe.allow_close = True
+                await enable_self(env, env.owner.current_config)
+                assert unsafe.closed and old.cleanup_debt == 0
+                await spoken_turn(env, 0.3, epoch=2)
+                await wait_until(
+                    lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1])
+                )
+                await finish(transport.sockets[-1], "Atomic admission recovered.")
+>               await require_final_source(env, "Atomic admission recovered.")
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:425: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1D8DA60>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.local_asr_provider_runtime:diagnostics.py:774 [Failure] structured_failure
+_ test_pending_qwen_handoff_cannot_report_admission_after_actual_fault_retirement _
+
+    @pytest.mark.asyncio
+    async def test_pending_qwen_handoff_cannot_report_admission_after_actual_fault_retirement():
+        unsafe = ReleasableSocket()
+        transport = FaultTransport([unsafe])
+        factory = RequestFactory(transport)
+        async with self_capture_pipeline(transport, provider_factory=factory) as env:
+            handing_off = None
+            try:
+                await spoken_turn(env)
+                await wait_until(lambda: bool(unsafe.task_ids))
+                runtime = env.harness.self_owner.local_asr_runtime
+                handle = runtime._handles["self"]
+                request = build_self_stt_provider_request_from_vnext(env.settings_box[0], warmup=False)
+                handing_off = asyncio.create_task(runtime.handoff_provider(request, start=True))
+                await wait_until(lambda: handle._pending_handoff is not None)
+                await wait_until(
+                    lambda: bool(handle._retired_providers) and not env.owner.snapshot.desired_active
+                )
+                result = await handing_off
+                assert result.status == "failed"
+                assert result.failure_code == "provider_resource_quarantined"
+                assert handle.provider is None
+                assert runtime.snapshot.channel_for("self").provider_id is None
+                assert transport.attempts == 1 and not unsafe.closed
+                unsafe.allow_close = True
+                await enable_self(env, env.owner.current_config)
+                assert unsafe.closed
+                await spoken_turn(env, 0.3, epoch=2)
+                await wait_until(
+                    lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1])
+                )
+                await finish(transport.sockets[-1], "Handoff admission recovered.")
+>               await require_final_source(env, "Handoff admission recovered.")
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:465: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1BECF60>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.orchestrator.translation:diagnostics.py:774 [Failure] structured_failure
+ERROR    puripuly_heart.core.runtime.local_asr_provider_runtime:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.runtime.self_capture:diagnostics.py:774 [Failure] structured_failure
+WARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:774 [Failure] structured_failure
+_ test_healthy_qwen_retained_expiry_stays_owned_until_native_drain_then_two_fresh_turns _
+
+    @pytest.mark.asyncio
+    async def test_healthy_qwen_retained_expiry_stays_owned_until_native_drain_then_two_fresh_turns():
+        transport = FaultTransport([])
+        factory = RequestFactory(transport)
+        async with self_capture_pipeline(transport, provider_factory=factory) as env:
+            returning = None
+            completed = set()
+            try:
+                await spoken_turn(env)
+                await wait_until(
+                    lambda: len(transport.sockets) == 1 and finish_sent(transport.sockets[0])
+                )
+                old_socket = transport.sockets[0]
+                await old_socket.push(native(old_socket.task_ids[0], 1, "Already admitted old."))
+                await wait_until(
+                    lambda: env.harness.self_owner.merge_buffer is not None
+                    and env.harness.self_owner.merge_buffer.parts == ["Already admitted old."]
+                )
+                runtime, handle, old, request = await expire_healthy_qwen_owner(env)
+                assert not old_socket.closed
+                assert handle._event_handler_for(provider=old, generation=0) is None
+                before = len(factory.requests)
+                returning = asyncio.create_task(runtime.handoff_provider(request, start=True))
+                await wait_until(lambda: runtime.snapshot.channel_for("self").phase == "building")
+                assert not returning.done()
+                assert len(factory.requests) == before and transport.attempts == 1
+                assert old in handle._retired_providers and old.cleanup_debt == 0
+                assert not old_socket.closed
+                await old_socket.push(native(old_socket.task_ids[0], 2, " EXPIRED OLD TAIL."))
+                await old_socket.push(control(old_socket.task_ids[0], "task-finished"))
+                completed.add(old_socket)
+                assert (await returning).status == "applied"
+                assert old_socket.closed and old.cleanup_debt == 0
+                assert old not in handle._retired_providers
+                await spoken_turn(env, 0.2)
+                await wait_until(
+                    lambda: len(transport.sockets) == 2 and finish_sent(transport.sockets[-1])
+                )
+                first = transport.sockets[-1]
+                await spoken_turn(env, 0.3)
+                await wait_until(
+                    lambda: len(transport.sockets) == 3 and finish_sent(transport.sockets[-1])
+                )
+                second = transport.sockets[-1]
+                assert sum(not socket.closed for socket in transport.sockets) == 2
+                for socket, text, tail in (
+                    (second, " Fresh B.", " Tail B."),
+                    (first, " Fresh A.", " Tail A."),
+                ):
+                    await socket.push(native(socket.task_ids[0], 1, text))
+                    await socket.push(native(socket.task_ids[0], 2, tail))
+                    await socket.push(control(socket.task_ids[0], "task-finished"))
+                    completed.add(socket)
+>               source = await require_final_source(
+                    env, "Already admitted old. Fresh A. Tail A. Fresh B. Tail B."
+                )
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:638: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1FB6400>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_healthy_retained_qwen_changed_scope_blocks_on_unconfirmed_close_then_recovers _
+
+    @pytest.mark.asyncio
+    async def test_healthy_retained_qwen_changed_scope_blocks_on_unconfirmed_close_then_recovers():
+        unsafe = ReleasableSocket()
+        transport = FaultTransport([unsafe])
+        factory = RequestFactory(transport)
+        async with self_capture_pipeline(transport, provider_factory=factory) as env:
+            try:
+                await spoken_turn(env)
+                await wait_until(lambda: bool(unsafe.task_ids))
+                await unsafe.push(control(unsafe.task_ids[0], "task-started"))
+                await wait_until(lambda: finish_sent(unsafe))
+                await finish(unsafe, "Healthy admitted source.")
+>               await require_final_source(env, "Healthy admitted source.")
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:668: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1C93D70>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+_ test_healthy_retained_qwen_reclaim_drains_authorized_tail_before_fresh_scope _
+
+    @pytest.mark.asyncio
+    async def test_healthy_retained_qwen_reclaim_drains_authorized_tail_before_fresh_scope():
+        transport = FaultTransport([])
+        factory = RequestFactory(transport)
+        async with self_capture_pipeline(transport, provider_factory=factory) as env:
+            returning = None
+            old_socket = None
+            try:
+                await spoken_turn(env)
+                await wait_until(lambda: bool(transport.sockets) and finish_sent(transport.sockets[0]))
+                old_socket = transport.sockets[0]
+                await old_socket.push(native(old_socket.task_ids[0], 1, "Already admitted old."))
+                await wait_until(
+                    lambda: env.harness.self_owner.merge_buffer is not None
+                    and env.harness.self_owner.merge_buffer.parts == ["Already admitted old."]
+                )
+                runtime = env.harness.self_owner.local_asr_runtime
+                handle = runtime._handles["self"]
+                old = runtime.current_provider("self")
+                initial = env.settings_box[0]
+                other = replace(
+                    initial,
+                    intent=replace(initial.intent, stt=replace(initial.intent.stt, provider="soniox")),
+                )
+                switching = asyncio.create_task(
+                    runtime.handoff_provider(
+                        build_self_stt_provider_request_from_vnext(other, warmup=False), start=True
+                    )
+                )
+                await wait_until(lambda: handle._pending_handoff is not None)
+                await runtime.commit_handoff("self")
+                assert (await switching).status == "applied"
+                changed = replace(
+                    initial,
+                    intent=replace(
+                        initial.intent,
+                        languages=replace(initial.intent.languages, source_language="ja"),
+                    ),
+                )
+                before = len(factory.requests)
+                returning = asyncio.create_task(
+                    runtime.handoff_provider(
+                        build_self_stt_provider_request_from_vnext(changed, warmup=False), start=True
+                    )
+                )
+                await wait_until(lambda: old._closing)
+                assert old.cleanup_debt == 0 and old in handle.retained_scoped_providers
+                assert not returning.done() and len(factory.requests) == before
+                assert not old_socket.closed and transport.attempts == 1
+                await old_socket.push(native(old_socket.task_ids[0], 2, " Legitimate tail."))
+                await old_socket.push(control(old_socket.task_ids[0], "task-finished"))
+                assert (await returning).status == "applied" and old_socket.closed
+>               source = await require_final_source(env, "Already admitted old. Legitimate tail.")
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\providers\test_qwen_audio_runtime_quarantine.py:769: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\providers\test_qwen_audio_delivery_recovery.py:232: in require_final_source
+    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function require_final_source.<locals>.<lambda> at 0x0000020FC1C038A0>
+timeout = 2
+
+    async def wait_until(predicate, *, timeout: float = 1.0) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+        while not predicate():
+            if loop.time() >= deadline:
+>               raise AssertionError("timed out")
+E               AssertionError: timed out
+
+tests\core\test_stt_scoped_engine.py:285: AssertionError
+============================== warnings summary ===============================
+.venv\Lib\site-packages\deepgram\core\pydantic_utilities.py:13
+  <user-home>\Documents\dev\puripuly_heart\.worktrees\puripuly_heart\latency-select-and-implement-evidence-backed-sel\.venv\Lib\site-packages\deepgram\core\pydantic_utilities.py:13: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+    from pydantic.v1.datetime_parse import parse_date as parse_date
+
+.venv\Lib\site-packages\websockets\legacy\__init__.py:6
+  <user-home>\Documents\dev\puripuly_heart\.worktrees\puripuly_heart\latency-select-and-implement-evidence-backed-sel\.venv\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/providers/test_gemini_transcribe_backend.py::test_session_configures_verbatim_transcription
+  <user-home>\Documents\dev\puripuly_heart\.worktrees\puripuly_heart\latency-select-and-implement-evidence-backed-sel\.venv\Lib\site-packages\google\genai\types.py:42: DeprecationWarning: '_UnionGenericAlias' is deprecated and slated for removal in Python 3.17
+    VersionedUnionType = Union[builtin_types.UnionType, _UnionGenericAlias]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_self_initial_native_admission_uses_short_retries_then_real_consumer_progress[connect] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_self_initial_native_admission_uses_short_retries_then_real_consumer_progress[task_started] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_self_later_successor_failure_keeps_nonrecovery_policy_without_new_short_retries - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_genuinely_new_self_provider_scope_gets_initial_retry_budget_without_cooldown - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_real_self_vad_gap_settles_admitted_stable_and_fresh_tail_reaches_source_and_translation - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[provider] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[callback] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[consumer] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_deferred_pre_gap_update_is_rejected_at_real_consumption_and_fresh_source_progresses[overflow] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_source_gap_does_not_cancel_work_already_admitted_by_consumption - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_orderly_retirement_preserves_deferred_terminal_and_consumed_source[close] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_delivery_recovery.py::test_orderly_retirement_preserves_deferred_terminal_and_consumed_source[idle] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_peer.py::test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order[False] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_peer.py::test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order[True] - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_self_reenable_blocks_retired_qwen_before_build_then_reclaims_before_two_fresh_turns - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_qwen_to_other_provider_then_qwen_does_not_hide_retired_qwen_ownership - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_qwen_publication_rechecks_cleanup_that_appears_while_factory_is_in_flight - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_pending_qwen_handoff_cannot_report_admission_after_actual_fault_retirement - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_healthy_qwen_retained_expiry_stays_owned_until_native_drain_then_two_fresh_turns - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_healthy_retained_qwen_changed_scope_blocks_on_unconfirmed_close_then_recovers - AssertionError: timed out
+FAILED tests/providers/test_qwen_audio_runtime_quarantine.py::test_healthy_retained_qwen_reclaim_drains_authorized_tail_before_fresh_scope - AssertionError: timed out
+21 failed, 2060 passed, 3 warnings in 441.13s (0:07:21)

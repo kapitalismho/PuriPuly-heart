@@ -250,6 +250,7 @@ class STTProviderInputTerminal:
     epoch_disposition: Literal["reuse", "retire"] = "reuse"
     recovery_pending: bool = False
     failure_diagnostics: ErrorDiagnostics | None = None
+    independent_recognition: bool = False
 
 
 @dataclass(frozen=True, slots=True)

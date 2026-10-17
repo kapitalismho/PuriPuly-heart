@@ -7,6 +7,23 @@
 - Manual: send `9000`, receive `9001` by default
 - Off: stop control traffic and preserve manual ports
 
+## Progressive Self chatbox translations
+
+SELF speech can send a usable speculative translation before the speech turn is finalized. Later results update that turn as recognition adds content. This works even when the VR overlay is off.
+
+- The same speech turn can produce several chatbox updates. Unsent older revisions of that turn may be replaced by its newest valid result.
+- Finalization does not send an identical payload again if its compatible preview was already successfully transmitted. A changed final translation can produce a correction.
+- Different speech turns remain distinct, including repeated words. Later speech can be translated concurrently, while its chatbox preview waits for an earlier required correction's normal sending opportunity.
+- Manual messages keep their existing bypass. Long messages retain normal pagination and replacement of unsent pages; not every intermediate revision or page is guaranteed to appear.
+- With two target languages, an available target can appear first. Later output adds the other target in configured order. If one target fails, the app retains the other target's valid translation and reports the failure.
+- A preview may be revised as more speech arrives. Text already sent cannot be retracted from someone who read it. OSC sends update the current chatbox; they do not edit a remote message by application turn ID.
+- Speech recognition must supply usable text first. A final-only recognizer cannot show translations before its first result.
+
+The app's display and conversation view distinguish ongoing previews from completed, failed, or cancelled turns. Conversation rows identify the target language even while waiting or after failure. If one target fails, a successful current-source target keeps its own completed status. Preview display does not create accepted conversation-log entries. The source grace interval and overlay replacement policy remain unchanged.
+
+Local packet transmission is not confirmation that VRChat received or displayed the text. Use separate observations when diagnosing the sender, VRChat chatbox, or headset.
+
+
 ## Expression Parameters
 
 - Add only the parameters you need to the avatar's Expression Parameters.

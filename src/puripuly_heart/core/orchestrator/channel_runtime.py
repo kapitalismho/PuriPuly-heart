@@ -3,19 +3,10 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import TYPE_CHECKING
 from uuid import UUID
 
-from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfigSnapshot
 from puripuly_heart.domain.models import ChannelId, UtteranceBundle
 from puripuly_heart.domain.recognition import RecognitionTextOrigin
-
-if TYPE_CHECKING:
-    from puripuly_heart.core.orchestrator.translation_turn import (
-        TerminalTranslationFailure,
-        TranslationTurnProcessResult,
-    )
 
 _LOW_LATENCY_COMMITTED_TOMBSTONE_LIMIT = 1024
 
@@ -40,34 +31,6 @@ class ContextEntry:
             object.__setattr__(self, "origin", self.channel)
 
 
-class _SpeculativeAttemptStatus(StrEnum):
-    RUNNING = "running"
-    READY = "ready"
-    FAILED = "failed"
-    STALE = "stale"
-    CANCELLED = "cancelled"
-
-
-@dataclass(slots=True)
-class _SpeculativeAttempt:
-    source_text: str
-    normalized_text: str
-    config_snapshot: TranslationRuntimeConfigSnapshot
-    provider_generation: int
-    sequence: int
-    status: _SpeculativeAttemptStatus = _SpeculativeAttemptStatus.RUNNING
-    task: asyncio.Task[None] | None = None
-    result: object | None = None
-    terminal_failure: TerminalTranslationFailure | None = None
-    started_at: float | None = None
-    completed_at: float | None = None
-    terminal_action_started: bool = False
-    latency_stage_times: dict[str, float] = field(default_factory=dict)
-    secondary_target_language: str | None = None
-    secondary_utterance_id: UUID | None = None
-    secondary_task: asyncio.Task[TranslationTurnProcessResult] | None = None
-
-
 @dataclass(slots=True)
 class _MergeBuffer:
     merge_id: UUID
@@ -78,8 +41,6 @@ class _MergeBuffer:
     last_end_time: float | None = None
     last_final_at: float = 0.0
     recognition_scope: tuple[object, ...] | None = None
-    speculative_attempt: _SpeculativeAttempt | None = None
-    speculative_sequence: int = 0
     resume_pending: bool = False
     resume_confirmed: bool = False
     resume_utterance_id: UUID | None = None
@@ -92,11 +53,6 @@ class _MergeBuffer:
     finalize_wait_started_at: float | None = None
     resume_end_timeout_task: asyncio.Task[None] | None = None
     resume_end_utterance_id: UUID | None = None
-
-    def __post_init__(self) -> None:
-        attempt = self.speculative_attempt
-        if attempt is not None:
-            self.speculative_sequence = max(self.speculative_sequence, attempt.sequence)
 
 
 @dataclass(slots=True)
@@ -197,12 +153,7 @@ class ChannelRuntime:
             raise ValueError("speech-origin reset requires the Self channel")
         merge_buffer = self.merge_buffer
         if merge_buffer is not None:
-            attempt = merge_buffer.speculative_attempt
-            if attempt is not None:
-                attempt.status = _SpeculativeAttemptStatus.CANCELLED
-                attempt.terminal_failure = None
             tasks = (
-                attempt.task if attempt is not None else None,
                 merge_buffer.finalize_wait_task,
                 merge_buffer.awaiting_vad_timeout_task,
                 merge_buffer.resume_end_timeout_task,
@@ -260,13 +211,7 @@ class ChannelRuntime:
             return
 
         merge_buffer = self.merge_buffer
-        spec_attempt = merge_buffer.speculative_attempt
-        if spec_attempt is not None:
-            spec_attempt.status = _SpeculativeAttemptStatus.CANCELLED
-            spec_attempt.terminal_failure = None
         merge_tasks = [
-            spec_attempt.task if spec_attempt is not None else None,
-            spec_attempt.secondary_task if spec_attempt is not None else None,
             merge_buffer.finalize_wait_task,
             merge_buffer.awaiting_vad_timeout_task,
             merge_buffer.resume_end_timeout_task,

@@ -1,0 +1,1184 @@
+{
+  "authority": "SELF-STREAM-2",
+  "historical_baseline": false,
+  "case_count": 8,
+  "cases": [
+    {
+      "case": "identical_final",
+      "status": "passed",
+      "overlay": "absent",
+      "observations": {
+        "preview_before_source_close": true,
+        "no_reissue_on_source_close": true
+      },
+      "packets_at_local_sender": [
+        "en:alpha"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "41498cf8-6e7c-47a3-baae-d5b53a6b757d",
+          "alpha"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "41498cf8-6e7c-47a3-baae-d5b53a6b757d",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "41498cf8-6e7c-47a3-baae-d5b53a6b757d",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "734923b9132f4bd3bbedbd0aea1b4948"
+            }
+          ]
+        },
+        {
+          "turn": "41498cf8-6e7c-47a3-baae-d5b53a6b757d",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "734923b9132f4bd3bbedbd0aea1b4948"
+            }
+          ]
+        },
+        {
+          "turn": "41498cf8-6e7c-47a3-baae-d5b53a6b757d",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "734923b9132f4bd3bbedbd0aea1b4948"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.070785,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "changed_final",
+      "status": "passed",
+      "overlay": "absent",
+      "observations": {
+        "preview_before_source_close": true,
+        "no_reissue_on_source_close": true
+      },
+      "packets_at_local_sender": [
+        "en:alpha",
+        "en:alpha revised"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "alpha revised",
+          "target": "en",
+          "context": ""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "alpha revised"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "4da370ca0a304544bbbea238297343a4"
+            }
+          ]
+        },
+        {
+          "turn": "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 2,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 2,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "order": 0,
+          "revision": 5,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": true,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 2,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "9f0a59dc-2c5a-4bfc-b40d-3fe52749a43b",
+          "order": 0,
+          "revision": 6,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 2,
+              "update_id": "bd3cd5263a6e404eb3ff2f6e3a08f308"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.077749,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "late_predecessor",
+      "status": "passed",
+      "overlay": "absent",
+      "observations": {
+        "successor_computed_while_predecessor_pending": true
+      },
+      "packets_at_local_sender": [
+        "en:alpha",
+        "en:bravo"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "bravo",
+          "target": "en",
+          "context": "- [self] \"alpha\""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "04f5a424-11e3-4f29-ba37-e4df03c41ce3",
+          "alpha"
+        ],
+        [
+          "18bac412-1b28-4a0b-8e7f-3464f4d223bd",
+          "bravo"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "04f5a424-11e3-4f29-ba37-e4df03c41ce3",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "04f5a424-11e3-4f29-ba37-e4df03c41ce3",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "04f5a424-11e3-4f29-ba37-e4df03c41ce3",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "18bac412-1b28-4a0b-8e7f-3464f4d223bd",
+          "order": 1,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "18bac412-1b28-4a0b-8e7f-3464f4d223bd",
+          "order": 1,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "57bb92c3f14a482fb75e6d8389ca105b"
+            }
+          ]
+        },
+        {
+          "turn": "04f5a424-11e3-4f29-ba37-e4df03c41ce3",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "d6fc821a07ec4014b3bd0d940811266e"
+            }
+          ]
+        },
+        {
+          "turn": "18bac412-1b28-4a0b-8e7f-3464f4d223bd",
+          "order": 1,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "57bb92c3f14a482fb75e6d8389ca105b"
+            }
+          ]
+        },
+        {
+          "turn": "18bac412-1b28-4a0b-8e7f-3464f4d223bd",
+          "order": 1,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "57bb92c3f14a482fb75e6d8389ca105b"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.107511,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "dual",
+      "status": "passed",
+      "overlay": "absent",
+      "observations": {
+        "no_reissue_on_source_close": true
+      },
+      "packets_at_local_sender": [
+        "ja:alpha",
+        "en:alpha\nja:alpha"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "alpha",
+          "target": "ja",
+          "context": ""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "f717e6ca-7dff-4df8-bf46-a93808ccca3c",
+          "alpha"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "f717e6ca-7dff-4df8-bf46-a93808ccca3c",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "f717e6ca-7dff-4df8-bf46-a93808ccca3c",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "24d2128d061349c9a500c50f693b69f4"
+            }
+          ]
+        },
+        {
+          "turn": "f717e6ca-7dff-4df8-bf46-a93808ccca3c",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "24d2128d061349c9a500c50f693b69f4"
+            }
+          ]
+        },
+        {
+          "turn": "f717e6ca-7dff-4df8-bf46-a93808ccca3c",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "24d2128d061349c9a500c50f693b69f4"
+            }
+          ]
+        },
+        {
+          "turn": "f717e6ca-7dff-4df8-bf46-a93808ccca3c",
+          "order": 0,
+          "revision": 5,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "15c035997280456bac7eb5aa604be9d4"
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "24d2128d061349c9a500c50f693b69f4"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.06295,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "identical_final",
+      "status": "passed",
+      "overlay": "disabled",
+      "observations": {
+        "preview_before_source_close": true,
+        "no_reissue_on_source_close": true
+      },
+      "packets_at_local_sender": [
+        "en:alpha"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "b1d4c6c2-d8e7-4f56-b21d-7c1dfd3ec398",
+          "alpha"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "b1d4c6c2-d8e7-4f56-b21d-7c1dfd3ec398",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "b1d4c6c2-d8e7-4f56-b21d-7c1dfd3ec398",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "7c5ed732b3444a2085265fbb0b3843f8"
+            }
+          ]
+        },
+        {
+          "turn": "b1d4c6c2-d8e7-4f56-b21d-7c1dfd3ec398",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "7c5ed732b3444a2085265fbb0b3843f8"
+            }
+          ]
+        },
+        {
+          "turn": "b1d4c6c2-d8e7-4f56-b21d-7c1dfd3ec398",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "7c5ed732b3444a2085265fbb0b3843f8"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.076435,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "changed_final",
+      "status": "passed",
+      "overlay": "disabled",
+      "observations": {
+        "preview_before_source_close": true,
+        "no_reissue_on_source_close": true
+      },
+      "packets_at_local_sender": [
+        "en:alpha",
+        "en:alpha revised"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "alpha revised",
+          "target": "en",
+          "context": ""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "ee87b491-d835-4351-8011-4a34045df274",
+          "alpha revised"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "ee87b491-d835-4351-8011-4a34045df274",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "ee87b491-d835-4351-8011-4a34045df274",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "79ca495296ed49e5bbf408cba8a373fc"
+            }
+          ]
+        },
+        {
+          "turn": "ee87b491-d835-4351-8011-4a34045df274",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 2,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "ee87b491-d835-4351-8011-4a34045df274",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 2,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "ee87b491-d835-4351-8011-4a34045df274",
+          "order": 0,
+          "revision": 5,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": true,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 2,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "ee87b491-d835-4351-8011-4a34045df274",
+          "order": 0,
+          "revision": 6,
+          "source_revision": 2,
+          "source": "alpha revised",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 2,
+              "update_id": "f3523fcc897845fdbd97ce372020d449"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.077978,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "late_predecessor",
+      "status": "passed",
+      "overlay": "disabled",
+      "observations": {
+        "successor_computed_while_predecessor_pending": true
+      },
+      "packets_at_local_sender": [
+        "en:alpha",
+        "en:bravo"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "bravo",
+          "target": "en",
+          "context": "- [self] \"alpha\""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "e2439fd9-d615-42ff-87ed-34ba2d021971",
+          "alpha"
+        ],
+        [
+          "04c12fc2-0022-48db-9239-0e759024809f",
+          "bravo"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "e2439fd9-d615-42ff-87ed-34ba2d021971",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "e2439fd9-d615-42ff-87ed-34ba2d021971",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "e2439fd9-d615-42ff-87ed-34ba2d021971",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "04c12fc2-0022-48db-9239-0e759024809f",
+          "order": 1,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "04c12fc2-0022-48db-9239-0e759024809f",
+          "order": 1,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "29b694c9c4d24ec79e6126b4cfb1d32e"
+            }
+          ]
+        },
+        {
+          "turn": "e2439fd9-d615-42ff-87ed-34ba2d021971",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "bdfa0eda7a96489b9af3ce7e64acb948"
+            }
+          ]
+        },
+        {
+          "turn": "04c12fc2-0022-48db-9239-0e759024809f",
+          "order": 1,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "29b694c9c4d24ec79e6126b4cfb1d32e"
+            }
+          ]
+        },
+        {
+          "turn": "04c12fc2-0022-48db-9239-0e759024809f",
+          "order": 1,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "bravo",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "29b694c9c4d24ec79e6126b4cfb1d32e"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.108108,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    },
+    {
+      "case": "dual",
+      "status": "passed",
+      "overlay": "disabled",
+      "observations": {
+        "no_reissue_on_source_close": true
+      },
+      "packets_at_local_sender": [
+        "ja:alpha",
+        "en:alpha\nja:alpha"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "alpha",
+          "target": "ja",
+          "context": ""
+        }
+      ],
+      "cancelled": [],
+      "closed_sources": [
+        [
+          "d3ae45ab-e107-445a-a749-01c399084c1f",
+          "alpha"
+        ]
+      ],
+      "snapshots": [
+        {
+          "turn": "d3ae45ab-e107-445a-a749-01c399084c1f",
+          "order": 0,
+          "revision": 1,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            }
+          ]
+        },
+        {
+          "turn": "d3ae45ab-e107-445a-a749-01c399084c1f",
+          "order": 0,
+          "revision": 2,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "c1cc28cb85004ca88beed734da4ad606"
+            }
+          ]
+        },
+        {
+          "turn": "d3ae45ab-e107-445a-a749-01c399084c1f",
+          "order": 0,
+          "revision": 3,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": false,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "c1cc28cb85004ca88beed734da4ad606"
+            }
+          ]
+        },
+        {
+          "turn": "d3ae45ab-e107-445a-a749-01c399084c1f",
+          "order": 0,
+          "revision": 4,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "source_revision": 1,
+              "update_id": null
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "c1cc28cb85004ca88beed734da4ad606"
+            }
+          ]
+        },
+        {
+          "turn": "d3ae45ab-e107-445a-a749-01c399084c1f",
+          "order": 0,
+          "revision": 5,
+          "source_revision": 1,
+          "source": "alpha",
+          "closed": true,
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "ce0e7c235d2143ed9f1ce37740643a98"
+            },
+            {
+              "language": "ja",
+              "status": "ready",
+              "source_revision": 1,
+              "update_id": "c1cc28cb85004ca88beed734da4ad606"
+            }
+          ]
+        }
+      ],
+      "elapsed_s": 0.048674,
+      "destination_limit": "controlled local sender; no UDP reception, VRChat, GUI or HMD claim"
+    }
+  ],
+  "fixed_source_schedule": [
+    {
+      "llm_profile": "fast",
+      "closed_sources": [
+        "alpha",
+        "bravo"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "bravo",
+          "target": "en",
+          "context": "- [self] \"alpha\""
+        }
+      ],
+      "cancelled": [],
+      "packets": [
+        "en:alpha",
+        "en:bravo"
+      ]
+    },
+    {
+      "llm_profile": "late",
+      "closed_sources": [
+        "alpha",
+        "bravo"
+      ],
+      "invocations": [
+        {
+          "text": "alpha",
+          "target": "en",
+          "context": ""
+        },
+        {
+          "text": "bravo",
+          "target": "en",
+          "context": "- [self] \"alpha\""
+        }
+      ],
+      "cancelled": [],
+      "packets": [
+        "en:alpha",
+        "en:bravo"
+      ]
+    }
+  ],
+  "limits": [
+    "synthetic owned text/VAD ingress",
+    "controlled provider and local sender",
+    "no audio recognition, external services, GUI, UDP, VRChat or HMD observation"
+  ]
+}

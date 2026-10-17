@@ -1,0 +1,196 @@
+{
+  "boundary": "New owned native Flet host, isolated synthetic UI runner, no application composition or canonical profile",
+  "host_executable": "<user-home>/.flet/client/flet-desktop-full-1.0.0/flet/flet.exe",
+  "host_sha256": "b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28",
+  "driver_sha256": "2bb7778e990ecce6be1a23c02e61a11e4a16850c17ee4a97217ab542c4df4686",
+  "profile_isolated": true,
+  "stages": [
+    {
+      "stage": "progressive-source",
+      "native_status_label": "1/14 · progressive-source · retained rows 1",
+      "dashboard": "blue lantern",
+      "dashboard_status": "In progress · preview",
+      "retained_rows": 1,
+      "accepted_record_keys": 0
+    },
+    {
+      "stage": "progressive-preview-one",
+      "native_status_label": "2/14 · progressive-preview-one · retained rows 1",
+      "dashboard": "en:blue lantern",
+      "dashboard_status": "In progress · preview",
+      "retained_rows": 1,
+      "accepted_record_keys": 0
+    },
+    {
+      "stage": "progressive-extended-source",
+      "native_status_label": "3/14 · progressive-extended-source · retained rows 1",
+      "dashboard": "blue lantern and bright",
+      "dashboard_status": "In progress · preview",
+      "retained_rows": 1,
+      "accepted_record_keys": 0
+    },
+    {
+      "stage": "progressive-preview-two",
+      "native_status_label": "4/14 · progressive-preview-two · retained rows 1",
+      "dashboard": "en:blue lantern and bright",
+      "dashboard_status": "In progress · preview",
+      "retained_rows": 1,
+      "accepted_record_keys": 0
+    },
+    {
+      "stage": "progressive-final",
+      "native_status_label": "5/14 · progressive-final · retained rows 1",
+      "dashboard": "en:blue lantern and bright",
+      "dashboard_status": "Complete",
+      "retained_rows": 1,
+      "accepted_record_keys": 2
+    }
+  ],
+  "status": "failed",
+  "scenario": "owner_repairs",
+  "python_pid": 46164,
+  "phase": "observing_native_stage:older-speech-held",
+  "owned_visible_windows": [
+    {
+      "pid": 3900,
+      "title": "SELF-STREAM-2 owner presentation repair proof"
+    }
+  ],
+  "native_host_pid": 3900,
+  "native_host_parent_pid": 66084,
+  "window_handle": 8325226,
+  "window_title": "SELF-STREAM-2 owner presentation repair proof",
+  "window_process_matches_owned_host": true,
+  "window_rectangle": [
+    0,
+    0,
+    1580,
+    1000
+  ],
+  "native_bounds_verified": true,
+  "initial_controls": [
+    {
+      "name": "",
+      "type": "Pane"
+    },
+    {
+      "name": "",
+      "type": "Group"
+    },
+    {
+      "name": "",
+      "type": "Group"
+    },
+    {
+      "name": "",
+      "type": "Group"
+    },
+    {
+      "name": "SELF-STREAM-2 · real owner/logger UI repair proof",
+      "type": "Text"
+    },
+    {
+      "name": "Next snapshot",
+      "type": "Button"
+    },
+    {
+      "name": "Capture surface",
+      "type": "Button"
+    },
+    {
+      "name": "Ready · real owner/logger composition · isolated synthetic state",
+      "type": "Text"
+    },
+    {
+      "name": "TALK",
+      "type": "Text"
+    },
+    {
+      "name": "TRANS",
+      "type": "Text"
+    },
+    {
+      "name": "LISTEN",
+      "type": "Text"
+    },
+    {
+      "name": "CAPTIONS",
+      "type": "Text"
+    },
+    {
+      "name": "",
+      "type": "Text"
+    },
+    {
+      "name": "Type message to send",
+      "type": "Edit"
+    },
+    {
+      "name": "French",
+      "type": "Text"
+    },
+    {
+      "name": "French",
+      "type": "Text"
+    },
+    {
+      "name": "English",
+      "type": "Text"
+    },
+    {
+      "name": "English",
+      "type": "Text"
+    },
+    {
+      "name": "System Logs",
+      "type": "Text"
+    },
+    {
+      "name": "",
+      "type": "Group"
+    },
+    {
+      "name": "Open Folder",
+      "type": "Button"
+    },
+    {
+      "name": "Conversation View",
+      "type": "Button"
+    },
+    {
+      "name": "",
+      "type": "TitleBar"
+    },
+    {
+      "name": "시스템",
+      "type": "MenuBar"
+    },
+    {
+      "name": "시스템",
+      "type": "MenuItem"
+    },
+    {
+      "name": "최소화",
+      "type": "Button"
+    },
+    {
+      "name": "최대화",
+      "type": "Button"
+    },
+    {
+      "name": "닫기",
+      "type": "Button"
+    }
+  ],
+  "conversation_control_visible": true,
+  "capture_boundary": "Native production Screenshot control only; no desktop or other windows captured",
+  "capture_interaction": "Actual native Capture surface button clicked; new render image observed",
+  "error": {
+    "type": "TimeoutError",
+    "message": "Owned native GUI condition was not observed before its deadline"
+  },
+  "runner_returncode": 0,
+  "native_host_exited": true,
+  "entry_exit_source_unchanged": true,
+  "isolated_profile_removed": true
+}

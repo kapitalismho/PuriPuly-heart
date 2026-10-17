@@ -1,0 +1,27 @@
+{
+  "candidate": "27e93797dd9ab8b6a2a7969eac73e409ccaffcda",
+  "scope": "All tests/ui and tests/architecture plus affected SELF/projection/turn/request/dual-target/output/paginator/diagnostics behavior suites",
+  "command": ".venv/Scripts/python.exe -m pytest tests/ui tests/architecture tests/core/test_self_translation_channel_owner.py tests/core/test_translation_output_projection_owner.py tests/core/test_translation_output_streaming.py tests/core/test_translation_ui_delivery.py tests/core/test_self_translation_low_latency.py tests/core/test_self_stream_233.py tests/core/test_self_stream_pressure_233.py tests/core/test_self_stream_owned_ingress_233.py tests/core/test_self_stream_queued_correction_233.py tests/core/test_translation_owner_branch_coverage.py tests/core/test_dual_target_translation_lifecycle.py tests/core/test_translation_turn_owner.py tests/core/test_translation_request_owner.py tests/core/test_translation_latency_diagnostics_owner.py tests/core/runtime/test_output_runtime.py tests/core/test_chatbox_paginator.py -o addopts=\"\" -q -rs",
+  "result": {
+    "passed": 2160,
+    "failed": 0,
+    "skipped": 2,
+    "warnings": 43,
+    "pytest_seconds": 95.48,
+    "wall_seconds": 97.66
+  },
+  "skips": [
+    "test_flet_desktop_view_process_owner.py:522 requires real process",
+    "test_flet_desktop_view_process_owner.py:548 requires real process"
+  ],
+  "warnings": "Existing asyncio.iscoroutinefunction deprecation in app/overlay tests",
+  "retained_output": "integration_27e93797.txt",
+  "output_scope": "Observed result/warning/skip excerpt; progress dots omitted, not a raw full-output archive",
+  "static": {
+    "ruff_source_tests_excluding_task_fixtures": "passed",
+    "ruff_current_three_gui_probes": "passed",
+    "black_maintained_and_current_probe_python_files": 57,
+    "black": "passed"
+  },
+  "applicability": "Exact final product/helper/test candidate. Earlier b399 full non-integration run remains separately attributed, not a final-pin full-suite claim."
+}

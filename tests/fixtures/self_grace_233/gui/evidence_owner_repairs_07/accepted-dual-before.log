@@ -1,0 +1,6 @@
+[Diagnostic][LlmLatency] request_end request_id=8 utterance_id=c4aa122c-e02b-4d28-a141-24d2ee99348d parent_utterance_id=c4aa122c-e02b-4d28-a141-24d2ee99348d channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=11 prompt_chars=0 context_chars=0 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Diagnostic][LlmLatency] request_end request_id=9 utterance_id=44ad37f9-ee63-54eb-bd01-6cafd17b9544 parent_utterance_id=c4aa122c-e02b-4d28-a141-24d2ee99348d channel=self kind=self source_language=fr target_language=ja provider_generation=0 input_chars=11 prompt_chars=0 context_chars=0 status=success request_ms=1 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "dual source"
+[Context] utterance_id=c4aa122c-e02b-4d28-a141-24d2ee99348d context_count=0
+[Conversation] Self · Mic → English · Translation "en:dual source"
+[Conversation] Self · Mic → Japanese · Translation "ja:dual source"

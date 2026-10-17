@@ -1,0 +1,13 @@
+[Diagnostic][LlmLatency] request_end request_id=4 utterance_id=484f1fab-03b7-408c-a2a0-d2c2224cd01e parent_utterance_id=484f1fab-03b7-408c-a2a0-d2c2224cd01e channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=6 prompt_chars=0 context_chars=23 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "manual"
+[Context] utterance_id=484f1fab-03b7-408c-a2a0-d2c2224cd01e context_count=1 texts=["older speech"]
+[Conversation] Self · Manual → English · Translation "en:manual"
+[Logging] untrusted_record_redacted level=INFO logger_sha256=eb938b2c5e98d775 message_len=212 message_sha256=50ec25a219cb31ea
+[Diagnostic][LlmLatency] request_end request_id=3 utterance_id=f34db91c-ff4d-4b77-b7ff-ed8cd487a234 parent_utterance_id=f34db91c-ff4d-4b77-b7ff-ed8cd487a234 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=12 prompt_chars=0 context_chars=0 status=success request_ms=716 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "older speech"
+[Context] utterance_id=f34db91c-ff4d-4b77-b7ff-ed8cd487a234 context_count=0
+[Conversation] Self · Mic → English · Translation "en:older speech"
+[Diagnostic][LlmLatency] request_end request_id=5 utterance_id=3989b8b2-6cdb-471e-a78a-35e0dd8b909e parent_utterance_id=3989b8b2-6cdb-471e-a78a-35e0dd8b909e channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=16 prompt_chars=0 context_chars=41 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "successor speech"
+[Context] utterance_id=3989b8b2-6cdb-471e-a78a-35e0dd8b909e context_count=2 texts=["older speech", "manual"]
+[Conversation] Self · Mic → English · Translation "en:successor speech"

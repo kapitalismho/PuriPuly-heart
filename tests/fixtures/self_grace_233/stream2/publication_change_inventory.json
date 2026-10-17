@@ -1,0 +1,30 @@
+{
+  "previous_audit_candidate": "69b67ed8be9370ea4112f1833b45f4e3a198ac7e",
+  "unchanged_code_candidate": "27e93797dd9ab8b6a2a7969eac73e409ccaffcda",
+  "scope": "Evidence-only delta after initial terminal audit; this inventory is the sole subsequent addition before the publication evidence commit",
+  "changes": [
+    {
+      "status": "M",
+      "path": "tests/fixtures/self_grace_233/stream2/COMPLETION.md"
+    },
+    {
+      "status": "A",
+      "path": "tests/fixtures/self_grace_233/stream2/publication_receipt.json"
+    },
+    {
+      "status": "A",
+      "path": "tests/fixtures/self_grace_233/stream2/published_issue_evidence.md"
+    },
+    {
+      "status": "A",
+      "path": "tests/fixtures/self_grace_233/stream2/terminal_review_initial.md"
+    }
+  ],
+  "disposition": {
+    "T1": "English final issue comment published; exact API body readback retained",
+    "T2": "Physical C10 remains blocked/unperformed, no scope waiver",
+    "T3": "Completion index now explicitly limits isolation to current final verification and retains historical inferred logging side effect"
+  },
+  "publication_url": "https://github.com/kapitalismho/PuriPuly-heart/issues/233#issuecomment-6240157587",
+  "product_tests_probes_docs_changes": "None after initial audit candidate"
+}

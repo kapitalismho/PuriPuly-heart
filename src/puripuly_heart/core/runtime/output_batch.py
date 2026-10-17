@@ -157,6 +157,7 @@ class DestinationBatchAdmission:
         origin: str,
         payloads: dict[int, str],
         destinations: Iterable[OutputDestination],
+        replace_payloads: bool = False,
     ) -> frozenset[OutputDestination]:
         admitted: set[OutputDestination] = set()
         for destination in destinations:
@@ -164,7 +165,7 @@ class DestinationBatchAdmission:
             batch = self.batches.get((scope, parent_id))
             if batch is None or batch.disposition is not None:
                 continue
-            next_payloads = dict(batch.retained_payloads)
+            next_payloads = {} if replace_payloads else dict(batch.retained_payloads)
             next_payloads.update(payloads)
             next_reserved_bytes = self.payload_bytes(next_payloads.values())
             additional = next_reserved_bytes - batch.reserved_bytes

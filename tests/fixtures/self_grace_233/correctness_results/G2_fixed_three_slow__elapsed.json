@@ -1,0 +1,1254 @@
+{
+  "case": "G2_fixed_three_slow",
+  "policy": "elapsed",
+  "revision": "75c4485a6787d504f5335d1602973f63b4d0c234",
+  "owner_source": "worktree",
+  "owner_source_sha256": "ec77ef5e91ddde932de59ed8a036e101da72373042b000b516ce831159e58e2f",
+  "profile": {
+    "source_language": "en",
+    "target_language": "ko",
+    "self_target_languages": [
+      "ko"
+    ],
+    "peer_source_language": "",
+    "peer_target_language": "",
+    "peer_source_mode": "manual",
+    "system_prompt": "",
+    "chatbox_include_source": true,
+    "fallback_transcript_only": false,
+    "translation_enabled": true,
+    "peer_translation_enabled": true,
+    "concurrency_limit": 10,
+    "integrated_context_enabled": false,
+    "hangover_s": 1.0,
+    "peer_hangover_s": 0.6,
+    "context_time_window_s": 30.0,
+    "context_max_entries": 3,
+    "integrated_context_time_window_s": 60.0,
+    "integrated_context_max_entries": 5,
+    "low_latency_mode": true,
+    "low_latency_merge_gap_ms": 600,
+    "low_latency_spec_retry_max": 1,
+    "low_latency_finalize_wait_ms": 400,
+    "low_latency_awaiting_vad_timeout_s": 3.0
+  },
+  "route": "modeled_local_final_only",
+  "provider_boundary": "ControlledScopedSession, not live ASR",
+  "source_inputs": 3,
+  "scheduled_steps": [
+    {
+      "at": 0.0,
+      "event": "start",
+      "acoustic": "A",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.01,
+      "event": "chunk",
+      "acoustic": "A",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.02,
+      "event": "chunk",
+      "acoustic": "A",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.03,
+      "event": "chunk",
+      "acoustic": "A",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.1,
+      "event": "end",
+      "acoustic": "A",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.2,
+      "event": "terminal",
+      "acoustic": "A",
+      "text": "one",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.8,
+      "event": "start",
+      "acoustic": "B",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.81,
+      "event": "chunk",
+      "acoustic": "B",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.8200000000000001,
+      "event": "chunk",
+      "acoustic": "B",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.8300000000000001,
+      "event": "chunk",
+      "acoustic": "B",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 0.9,
+      "event": "end",
+      "acoustic": "B",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.0,
+      "event": "terminal",
+      "acoustic": "B",
+      "text": "two",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.6,
+      "event": "start",
+      "acoustic": "C",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.61,
+      "event": "chunk",
+      "acoustic": "C",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.62,
+      "event": "chunk",
+      "acoustic": "C",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.6300000000000001,
+      "event": "chunk",
+      "acoustic": "C",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.7,
+      "event": "end",
+      "acoustic": "C",
+      "text": "",
+      "outcome": "final",
+      "source_at": null
+    },
+    {
+      "at": 1.8,
+      "event": "terminal",
+      "acoustic": "C",
+      "text": "three",
+      "outcome": "final",
+      "source_at": null
+    }
+  ],
+  "llm_delay_s": 1.0,
+  "provider_overlap": true,
+  "commits": [
+    {
+      "at_s": 2.8,
+      "parts": [
+        "one",
+        "two",
+        "three"
+      ],
+      "acoustics": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reason": "spec_done"
+    }
+  ],
+  "premature_commits": [],
+  "required_continuation_status": "passed",
+  "grace_only_wait_ms": 0.0,
+  "metrics": {
+    "final_phase": 3,
+    "spec_start": 3,
+    "commit_blocked": 8,
+    "post_end_grace_timeout": 3,
+    "resume_pending": 2,
+    "resume_confirmed": 2,
+    "spec_cancel": 2,
+    "spec_done": 1,
+    "spec_terminal": 1,
+    "merge_commit": 1,
+    "spec_reuse": 1
+  },
+  "llm_invocations": [
+    {
+      "at_s": 0.2,
+      "event": "llm_invoked",
+      "text": "one",
+      "target": "ko",
+      "invoked_at_s": 0.2,
+      "context": "",
+      "physical_active": 1
+    },
+    {
+      "at_s": 1.0,
+      "event": "llm_invoked",
+      "text": "one two",
+      "target": "ko",
+      "invoked_at_s": 1.0,
+      "context": "",
+      "physical_active": 2
+    },
+    {
+      "at_s": 1.8,
+      "event": "llm_invoked",
+      "text": "one two three",
+      "target": "ko",
+      "invoked_at_s": 1.8,
+      "context": "",
+      "physical_active": 2
+    }
+  ],
+  "physical_active_at_observation_end": 0,
+  "continuation_entries_at_observation_end": 0,
+  "finals": [
+    {
+      "channel": "self",
+      "text": "one two three"
+    }
+  ],
+  "timeline": [
+    {
+      "at_s": 0.0,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.0,
+        "event": "start",
+        "acoustic": "A",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.0,
+      "event": "vad_owner_receipt",
+      "acoustic": "A",
+      "kind": "SpeechStart",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 1,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 0,
+          "source_end_sample": 160,
+          "source_start_monotonic_s": 0.0,
+          "source_end_monotonic_s": 0.01,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 0,
+          "normalized_end_sample": 160
+        }
+      ]
+    },
+    {
+      "at_s": 0.01,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.01,
+        "event": "chunk",
+        "acoustic": "A",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.01,
+      "event": "vad_owner_receipt",
+      "acoustic": "A",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 1,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 0,
+          "source_end_sample": 320,
+          "source_start_monotonic_s": 0.0,
+          "source_end_monotonic_s": 0.02,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 0,
+          "normalized_end_sample": 320
+        }
+      ]
+    },
+    {
+      "at_s": 0.02,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.02,
+        "event": "chunk",
+        "acoustic": "A",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.02,
+      "event": "vad_owner_receipt",
+      "acoustic": "A",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 1,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 0,
+          "source_end_sample": 480,
+          "source_start_monotonic_s": 0.0,
+          "source_end_monotonic_s": 0.03,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 0,
+          "normalized_end_sample": 480
+        }
+      ]
+    },
+    {
+      "at_s": 0.03,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.03,
+        "event": "chunk",
+        "acoustic": "A",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.03,
+      "event": "vad_owner_receipt",
+      "acoustic": "A",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 1,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 0,
+          "source_end_sample": 640,
+          "source_start_monotonic_s": 0.0,
+          "source_end_monotonic_s": 0.04,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 0,
+          "normalized_end_sample": 640
+        }
+      ]
+    },
+    {
+      "at_s": 0.1,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.1,
+        "event": "end",
+        "acoustic": "A",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.1,
+      "event": "vad_owner_receipt",
+      "acoustic": "A",
+      "kind": "SpeechEnd",
+      "sealed_at_s": 0.1,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 1,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 0,
+          "source_end_sample": 640,
+          "source_start_monotonic_s": 0.0,
+          "source_end_monotonic_s": 0.04,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 0,
+          "normalized_end_sample": 640
+        }
+      ]
+    },
+    {
+      "at_s": 0.2,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.2,
+        "event": "terminal",
+        "acoustic": "A",
+        "text": "one",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.2,
+      "event": "recognition_owner_receipt",
+      "acoustic": "A",
+      "kind": "STTProviderTurnTerminal",
+      "outcome": "final",
+      "contribution": null,
+      "included_contributions": [],
+      "source_identity": {
+        "activation": 1,
+        "order": 1,
+        "capture_epoch": 1
+      },
+      "stable_is_terminal": false
+    },
+    {
+      "at_s": 0.2,
+      "event": "publication_contribution",
+      "acoustic": "A",
+      "publication": "ff3c0ee6-0264-49d2-ac76-2106bd7279c6",
+      "text": "one",
+      "resume_before": null
+    },
+    {
+      "at_s": 0.2,
+      "event": "overlay_accepted",
+      "kind": "self_active_update",
+      "primary": "one",
+      "secondary": "",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 0.2,
+      "event": "grace_armed",
+      "rule": "sealed_VAD_end_credit",
+      "anchor_s": 0.1,
+      "deadline_s": 0.5,
+      "terminal_readiness": [
+        "final"
+      ]
+    },
+    {
+      "at_s": 0.2,
+      "event": "eligibility_evaluated",
+      "reason": "final_reconciled",
+      "blocker": "post_end_grace",
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 0.5,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 0.2,
+      "event": "publication_reconciled",
+      "resume_after": null
+    },
+    {
+      "at_s": 0.2,
+      "event": "eligibility_evaluated",
+      "reason": "recognition_terminal",
+      "blocker": "post_end_grace",
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 0.5,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 0.2,
+      "event": "llm_invoked",
+      "text": "one",
+      "target": "ko",
+      "invoked_at_s": 0.2,
+      "context": "",
+      "physical_active": 1
+    },
+    {
+      "at_s": 0.5,
+      "event": "eligibility_evaluated",
+      "reason": "post_end_grace",
+      "blocker": null,
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 0.5,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 0.8,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.8,
+        "event": "start",
+        "acoustic": "B",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.8,
+      "event": "vad_owner_receipt",
+      "acoustic": "B",
+      "kind": "SpeechStart",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 12801,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 12800,
+          "source_end_sample": 12960,
+          "source_start_monotonic_s": 0.8,
+          "source_end_monotonic_s": 0.81,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 12800,
+          "normalized_end_sample": 12960
+        }
+      ]
+    },
+    {
+      "at_s": 0.81,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.81,
+        "event": "chunk",
+        "acoustic": "B",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.81,
+      "event": "vad_owner_receipt",
+      "acoustic": "B",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 12801,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 12800,
+          "source_end_sample": 13120,
+          "source_start_monotonic_s": 0.8,
+          "source_end_monotonic_s": 0.8200000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 12800,
+          "normalized_end_sample": 13120
+        }
+      ]
+    },
+    {
+      "at_s": 0.8200000000000001,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.8200000000000001,
+        "event": "chunk",
+        "acoustic": "B",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.8200000000000001,
+      "event": "vad_owner_receipt",
+      "acoustic": "B",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 12801,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 12800,
+          "source_end_sample": 13280,
+          "source_start_monotonic_s": 0.8,
+          "source_end_monotonic_s": 0.8300000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 12800,
+          "normalized_end_sample": 13280
+        }
+      ]
+    },
+    {
+      "at_s": 0.8300000000000001,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.8300000000000001,
+        "event": "chunk",
+        "acoustic": "B",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.8300000000000001,
+      "event": "vad_owner_receipt",
+      "acoustic": "B",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 12801,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 12800,
+          "source_end_sample": 13440,
+          "source_start_monotonic_s": 0.8,
+          "source_end_monotonic_s": 0.8400000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 12800,
+          "normalized_end_sample": 13440
+        }
+      ]
+    },
+    {
+      "at_s": 0.8300000000000001,
+      "event": "llm_logical_cancel",
+      "text": "one",
+      "physical_done": false
+    },
+    {
+      "at_s": 0.9,
+      "event": "scheduled_input",
+      "step": {
+        "at": 0.9,
+        "event": "end",
+        "acoustic": "B",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 0.9,
+      "event": "vad_owner_receipt",
+      "acoustic": "B",
+      "kind": "SpeechEnd",
+      "sealed_at_s": 0.9,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 12801,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 12800,
+          "source_end_sample": 13440,
+          "source_start_monotonic_s": 0.8,
+          "source_end_monotonic_s": 0.8400000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 12800,
+          "normalized_end_sample": 13440
+        }
+      ]
+    },
+    {
+      "at_s": 0.9,
+      "event": "eligibility_evaluated",
+      "reason": "speech_end",
+      "blocker": "resume",
+      "attempt_status": null,
+      "provider_generation_current": false,
+      "translation_config_current": false,
+      "resume_acoustic": "B",
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 0.5,
+      "active_acoustics": [],
+      "unresolved_acoustics": [
+        "B"
+      ]
+    },
+    {
+      "at_s": 1.0,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.0,
+        "event": "terminal",
+        "acoustic": "B",
+        "text": "two",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.0,
+      "event": "recognition_owner_receipt",
+      "acoustic": "B",
+      "kind": "STTProviderTurnTerminal",
+      "outcome": "final",
+      "contribution": null,
+      "included_contributions": [],
+      "source_identity": {
+        "activation": 1,
+        "order": 2,
+        "capture_epoch": 1
+      },
+      "stable_is_terminal": false
+    },
+    {
+      "at_s": 1.0,
+      "event": "publication_contribution",
+      "acoustic": "B",
+      "publication": "edcabc0c-57c4-4d5a-ae49-4f85ecadc3e2",
+      "text": "two",
+      "resume_before": null
+    },
+    {
+      "at_s": 1.0,
+      "event": "overlay_accepted",
+      "kind": "self_active_update",
+      "primary": "one two",
+      "secondary": "",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 1.0,
+      "event": "grace_armed",
+      "rule": "sealed_VAD_end_credit",
+      "anchor_s": 0.9,
+      "deadline_s": 1.3,
+      "terminal_readiness": [
+        "final",
+        "final"
+      ]
+    },
+    {
+      "at_s": 1.0,
+      "event": "eligibility_evaluated",
+      "reason": "final_reconciled",
+      "blocker": "post_end_grace",
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 1.3,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 1.0,
+      "event": "publication_reconciled",
+      "resume_after": null
+    },
+    {
+      "at_s": 1.0,
+      "event": "eligibility_evaluated",
+      "reason": "recognition_terminal",
+      "blocker": "post_end_grace",
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 1.3,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 1.0,
+      "event": "llm_invoked",
+      "text": "one two",
+      "target": "ko",
+      "invoked_at_s": 1.0,
+      "context": "",
+      "physical_active": 2
+    },
+    {
+      "at_s": 1.2,
+      "event": "llm_ready",
+      "text": "one",
+      "target": "ko",
+      "after_logical_cancel": true
+    },
+    {
+      "at_s": 1.2,
+      "event": "llm_physical_finished",
+      "text": "one",
+      "physical_active": 1
+    },
+    {
+      "at_s": 1.3,
+      "event": "eligibility_evaluated",
+      "reason": "post_end_grace",
+      "blocker": null,
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 1.3,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 1.6,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.6,
+        "event": "start",
+        "acoustic": "C",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.6,
+      "event": "vad_owner_receipt",
+      "acoustic": "C",
+      "kind": "SpeechStart",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 25601,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 25600,
+          "source_end_sample": 25760,
+          "source_start_monotonic_s": 1.6,
+          "source_end_monotonic_s": 1.61,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 25600,
+          "normalized_end_sample": 25760
+        }
+      ]
+    },
+    {
+      "at_s": 1.61,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.61,
+        "event": "chunk",
+        "acoustic": "C",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.61,
+      "event": "vad_owner_receipt",
+      "acoustic": "C",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 25601,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 25600,
+          "source_end_sample": 25920,
+          "source_start_monotonic_s": 1.6,
+          "source_end_monotonic_s": 1.62,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 25600,
+          "normalized_end_sample": 25920
+        }
+      ]
+    },
+    {
+      "at_s": 1.62,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.62,
+        "event": "chunk",
+        "acoustic": "C",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.62,
+      "event": "vad_owner_receipt",
+      "acoustic": "C",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 25601,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 25600,
+          "source_end_sample": 26080,
+          "source_start_monotonic_s": 1.6,
+          "source_end_monotonic_s": 1.6300000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 25600,
+          "normalized_end_sample": 26080
+        }
+      ]
+    },
+    {
+      "at_s": 1.6300000000000001,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.6300000000000001,
+        "event": "chunk",
+        "acoustic": "C",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.6300000000000001,
+      "event": "vad_owner_receipt",
+      "acoustic": "C",
+      "kind": "SpeechChunk",
+      "sealed_at_s": null,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 25601,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 25600,
+          "source_end_sample": 26240,
+          "source_start_monotonic_s": 1.6,
+          "source_end_monotonic_s": 1.6400000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 25600,
+          "normalized_end_sample": 26240
+        }
+      ]
+    },
+    {
+      "at_s": 1.6300000000000001,
+      "event": "llm_logical_cancel",
+      "text": "one two",
+      "physical_done": false
+    },
+    {
+      "at_s": 1.7,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.7,
+        "event": "end",
+        "acoustic": "C",
+        "text": "",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.7,
+      "event": "vad_owner_receipt",
+      "acoustic": "C",
+      "kind": "SpeechEnd",
+      "sealed_at_s": 1.7,
+      "source_ranges": [
+        {
+          "capture_epoch": 1,
+          "callback_sequence": 25601,
+          "source_sample_rate_hz": 16000,
+          "source_start_sample": 25600,
+          "source_end_sample": 26240,
+          "source_start_monotonic_s": 1.6,
+          "source_end_monotonic_s": 1.6400000000000001,
+          "discontinuity_before": null,
+          "normalized_sample_rate_hz": 16000,
+          "normalized_start_sample": 25600,
+          "normalized_end_sample": 26240
+        }
+      ]
+    },
+    {
+      "at_s": 1.7,
+      "event": "eligibility_evaluated",
+      "reason": "speech_end",
+      "blocker": "resume",
+      "attempt_status": null,
+      "provider_generation_current": false,
+      "translation_config_current": false,
+      "resume_acoustic": "C",
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 1.3,
+      "active_acoustics": [],
+      "unresolved_acoustics": [
+        "C"
+      ]
+    },
+    {
+      "at_s": 1.8,
+      "event": "scheduled_input",
+      "step": {
+        "at": 1.8,
+        "event": "terminal",
+        "acoustic": "C",
+        "text": "three",
+        "outcome": "final",
+        "source_at": null
+      }
+    },
+    {
+      "at_s": 1.8,
+      "event": "recognition_owner_receipt",
+      "acoustic": "C",
+      "kind": "STTProviderTurnTerminal",
+      "outcome": "final",
+      "contribution": null,
+      "included_contributions": [],
+      "source_identity": {
+        "activation": 1,
+        "order": 3,
+        "capture_epoch": 1
+      },
+      "stable_is_terminal": false
+    },
+    {
+      "at_s": 1.8,
+      "event": "publication_contribution",
+      "acoustic": "C",
+      "publication": "2cba6594-8b4a-4e14-a85d-ff8846616aee",
+      "text": "three",
+      "resume_before": null
+    },
+    {
+      "at_s": 1.8,
+      "event": "overlay_accepted",
+      "kind": "self_active_update",
+      "primary": "one two three",
+      "secondary": "",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 1.8,
+      "event": "grace_armed",
+      "rule": "sealed_VAD_end_credit",
+      "anchor_s": 1.7,
+      "deadline_s": 2.1,
+      "terminal_readiness": [
+        "final",
+        "final",
+        "final"
+      ]
+    },
+    {
+      "at_s": 1.8,
+      "event": "eligibility_evaluated",
+      "reason": "final_reconciled",
+      "blocker": "post_end_grace",
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 2.1,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 1.8,
+      "event": "publication_reconciled",
+      "resume_after": null
+    },
+    {
+      "at_s": 1.8,
+      "event": "eligibility_evaluated",
+      "reason": "recognition_terminal",
+      "blocker": "post_end_grace",
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 2.1,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 1.8,
+      "event": "llm_invoked",
+      "text": "one two three",
+      "target": "ko",
+      "invoked_at_s": 1.8,
+      "context": "",
+      "physical_active": 2
+    },
+    {
+      "at_s": 2.0,
+      "event": "llm_ready",
+      "text": "one two",
+      "target": "ko",
+      "after_logical_cancel": true
+    },
+    {
+      "at_s": 2.0,
+      "event": "llm_physical_finished",
+      "text": "one two",
+      "physical_active": 1
+    },
+    {
+      "at_s": 2.1,
+      "event": "eligibility_evaluated",
+      "reason": "post_end_grace",
+      "blocker": null,
+      "attempt_status": "running",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 2.1,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 2.8,
+      "event": "llm_ready",
+      "text": "one two three",
+      "target": "ko",
+      "after_logical_cancel": false
+    },
+    {
+      "at_s": 2.8,
+      "event": "llm_physical_finished",
+      "text": "one two three",
+      "physical_active": 0
+    },
+    {
+      "at_s": 2.8,
+      "event": "overlay_accepted",
+      "kind": "self_active_update",
+      "primary": "one two three",
+      "secondary": "translated:ko:one two three",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 2.8,
+      "event": "eligibility_evaluated",
+      "reason": "spec_done",
+      "blocker": null,
+      "attempt_status": "ready",
+      "provider_generation_current": true,
+      "translation_config_current": true,
+      "resume_acoustic": null,
+      "awaiting_vad_end": false,
+      "grace_deadline_s": 2.1,
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 2.8,
+      "event": "overlay_accepted",
+      "kind": "self_transcript_final",
+      "primary": "one two three",
+      "secondary": "",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 2.8,
+      "event": "overlay_accepted",
+      "kind": "translation_final",
+      "primary": "translated:ko:one two three",
+      "secondary": "",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 2.8,
+      "event": "overlay_accepted",
+      "kind": "utterance_closed",
+      "primary": "",
+      "secondary": "",
+      "physical_display_observed": false
+    },
+    {
+      "at_s": 2.8,
+      "event": "source_committed",
+      "parts": [
+        "one",
+        "two",
+        "three"
+      ],
+      "acoustics": [
+        "A",
+        "B",
+        "C"
+      ],
+      "reason": "spec_done",
+      "active_acoustics": [],
+      "unresolved_acoustics": []
+    },
+    {
+      "at_s": 4.0,
+      "event": "llm_closed",
+      "physical_active": 0
+    }
+  ],
+  "evidence_limits": [
+    "Synthetic metadata/PCM levels are not speech or semantic quality proof",
+    "Timer futures explicitly wake with compatible controlled clock; clock advance alone is never a sleep",
+    "Sink acceptance is not chatbox send or physical display",
+    "Stable contribution is not request terminal"
+  ]
+}

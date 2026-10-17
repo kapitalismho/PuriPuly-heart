@@ -24,6 +24,7 @@ class LogsStateSink(Protocol):
         disposition: str = "accepted",
         origin_wall_clock_ms: int | None = None,
         turn_kind: str | None = None,
+        parent_utterance_id: str | None = None,
     ) -> None: ...
 
     def apply_locale(self) -> None: ...

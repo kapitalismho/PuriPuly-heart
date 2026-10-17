@@ -11,13 +11,11 @@ from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
     ContextEntry,
     _MergeBuffer,
-    _SpeculativeAttemptStatus,
 )
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 from tests.helpers.translation_owners import (
     compose_translation_test_harness,
-    make_speculative_attempt,
 )
 
 
@@ -133,14 +131,12 @@ async def test_clear_live_translation_state_preserves_history_and_stt_task() -> 
     preserved_id = uuid4()
     stt_task = asyncio.create_task(asyncio.sleep(60.0))
     translation_task = asyncio.create_task(asyncio.sleep(60.0))
-    spec_task = asyncio.create_task(asyncio.sleep(60.0))
     finalize_wait_task = asyncio.create_task(asyncio.sleep(60.0))
     awaiting_vad_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
     resume_end_timeout_task = asyncio.create_task(asyncio.sleep(60.0))
     all_tasks = [
         stt_task,
         translation_task,
-        spec_task,
         finalize_wait_task,
         awaiting_vad_timeout_task,
         resume_end_timeout_task,
@@ -170,13 +166,10 @@ async def test_clear_live_translation_state_preserves_history_and_stt_task() -> 
     runtime.merge_buffer = _MergeBuffer(
         merge_id=uuid4(),
         utterance_ids=[merge_id_1, merge_id_2],
-        speculative_attempt=make_speculative_attempt(task=spec_task),
         finalize_wait_task=finalize_wait_task,
         awaiting_vad_timeout_task=awaiting_vad_timeout_task,
         resume_end_timeout_task=resume_end_timeout_task,
     )
-    speculative_attempt = runtime.merge_buffer.speculative_attempt
-    assert speculative_attempt is not None
 
     try:
         await runtime.clear_live_translation_state()
@@ -206,8 +199,6 @@ async def test_clear_live_translation_state_preserves_history_and_stt_task() -> 
         assert runtime.utterance_start_times == {preserved_id: 3.0}
         assert runtime.speech_ended_ids == {preserved_id}
         assert translation_task.cancelled() is True
-        assert spec_task.cancelled() is True
-        assert speculative_attempt.status is _SpeculativeAttemptStatus.CANCELLED
         assert finalize_wait_task.cancelled() is True
         assert awaiting_vad_timeout_task.cancelled() is True
         assert resume_end_timeout_task.cancelled() is True

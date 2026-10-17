@@ -25,7 +25,7 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.format import AudioCaptureDiscontinuity, AudioFrameF32
-from puripuly_heart.core.audio.ownership import CaptureStreamInput
+from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, CaptureStreamInput
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
@@ -79,8 +79,9 @@ class FaultTransport:
 
 
 class BoundaryRuntimeSink(RuntimeSink):
-    def __init__(self, runtime, channel):
+    def __init__(self, runtime, channel, source_owner):
         super().__init__(runtime, channel)
+        self.source_owner = source_owner
         self.boundaries = []
         self.cancelled_dispatch = asyncio.Event()
         self.cancelled_dispatch_gate = None
@@ -100,6 +101,10 @@ class BoundaryRuntimeSink(RuntimeSink):
     async def handle_stream_input(self, event):
         self.boundaries.append(event.event)
         await self.runtime.handle_stream_input(self.channel, event)
+
+    async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None:
+        await super().handle_source_segment_retired(receipt)
+        await self.source_owner.handle_source_segment_retired(receipt)
 
 
 class RecoveryFactory:
@@ -194,7 +199,7 @@ async def capture_runtime(channel, transport):
         retired_event_handler=receive,
     )
     loop = LoopHarness()
-    sink = BoundaryRuntimeSink(runtime, channel)
+    sink = BoundaryRuntimeSink(runtime, channel, harness.self_owner)
     if channel == "self":
         adapter = SelfCaptureProviderAdapter(runtime, harness)
         owner, *_ = build_owner(provider=adapter, sink=sink, loop=loop)
@@ -499,7 +504,7 @@ async def test_real_capture_gap_bypasses_blocked_fifo_retires_both_slots_and_new
                 lambda: any(turn.pending_update is not None for turn in engine._turns.values())
             )
         env.sink.cancelled_dispatch_gate = asyncio.Event()
-        await utterance(env, 0.25)
+        blocked_id = await utterance(env, 0.25)
         await asyncio.sleep(0.01)
         assert transport.attempts == 2
 
@@ -546,6 +551,13 @@ async def test_real_capture_gap_bypasses_blocked_fifo_retires_both_slots_and_new
         assert [event.boundary_reason for event in env.sink.boundaries] == ["source_discontinuity"]
         assert all(event.chunk.size == 0 and event.capture == () for event in env.sink.boundaries)
         await wait_until(lambda: all(socket.closed for socket in old_sockets))
+        if channel == "self":
+            assert [
+                (receipt.identity.segment_id, receipt.outcome)
+                for receipt in env.sink.retired_sources
+            ] == [(blocked_id, "cancelled")]
+        else:
+            assert env.sink.retired_sources == []
         assert not env.guarded._queue
         retained_after_abort = env.guarded.retention_budget.used_bytes
         assert retained_after_abort == 0

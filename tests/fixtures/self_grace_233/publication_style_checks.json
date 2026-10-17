@@ -1,0 +1,381 @@
+{
+  "schema": "self-grace-233/publication-style-checks/v1",
+  "authority": "https://github.com/kapitalismho/PuriPuly-heart/issues/233; SELF-STREAM-2A; bounded publication style repair only",
+  "starting_labels_supplied_by_director": {
+    "HEAD": "ef9e06ac",
+    "reviewed_exercised_product": "27e",
+    "origin_dev": "f1ab9a4"
+  },
+  "git_operations_performed": false,
+  "preformat_archive": {
+    "path": "tests/fixtures/self_grace_233/publication_preformat.zip",
+    "sha256": "f93c22854120db3a161d8054ea41b4cf62a5673dd688c0e3e1d06f35bbd5fa67",
+    "file_count": 15,
+    "manifest_member": "manifest.json"
+  },
+  "semantic_check": {
+    "phase": "All formatter candidates checked in memory before active source changes; applied bytes matched those candidates",
+    "normalization": [
+      "sort adjacent import blocks and their aliases",
+      "remove original experiment.py from uuid import UUID only; no AST Name uses existed"
+    ],
+    "nonmechanical_deltas": [],
+    "assertions_preserved": 150,
+    "previews": [
+      {
+        "path": "tests/fixtures/self_grace_233/audio/evidence_support.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/replay_recorded_schedule.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/run_isolated_app.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/run_isolated_app_f1ab9a4_probe01.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/run_production_audio.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/run_production_audio_f1ab9a4_probe01.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/summarize_evidence.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/audio/summarize_runtime_evidence.py",
+        "ruff_changes": false,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/experiment.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 49
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/gui/owner_presentation.py",
+        "ruff_changes": false,
+        "black_changes": false,
+        "assertions_preserved": 1
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/gui/run_native_observation.py",
+        "ruff_changes": false,
+        "black_changes": false,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/gui/run_owner_presentation.py",
+        "ruff_changes": false,
+        "black_changes": false,
+        "assertions_preserved": 86
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/gui/run_presentation.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/run.py",
+        "ruff_changes": true,
+        "black_changes": true,
+        "assertions_preserved": 0
+      },
+      {
+        "path": "tests/fixtures/self_grace_233/stream2/run.py",
+        "ruff_changes": false,
+        "black_changes": false,
+        "assertions_preserved": 14
+      }
+    ]
+  },
+  "current_active_python": [
+    {
+      "path": "tests/fixtures/self_grace_233/audio/evidence_support.py",
+      "sha256": "a26a06fa821b7d4cf458606ee688709eecda62fc435e7b0403b4098069aedb86",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/replay_recorded_schedule.py",
+      "sha256": "6ec2f052f21614653b9b297aeda29d7ec6b58ab77230ee035485e9740bdb97ad",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/run_isolated_app.py",
+      "sha256": "bd5be5963d3c13f1a6a4c9cb1f75d3d5cf2c24833f95d1cd97b12bd114a89430",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/run_isolated_app_f1ab9a4_probe01.py",
+      "sha256": "74549242ea4bddb687714fac1e4e6121e91add00ef3a0d6cdef94bf94fe58cca",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/run_production_audio.py",
+      "sha256": "4833958d55d7baea6bc25af4eda35c4f12fa3c3d7e8f10597f6bb68c31ff9e4c",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/run_production_audio_f1ab9a4_probe01.py",
+      "sha256": "9075c8ebaab1e9dc4cf0b694fe5eb30d7c0b492ef01314be93e0dafd2d698a3a",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/summarize_evidence.py",
+      "sha256": "55c3978668b4a42f9fabeaec4b1eaa611cb679a64b83e63a0761ecb3d9788889",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/audio/summarize_runtime_evidence.py",
+      "sha256": "f64d98495679054b1a01db4ab19190f216f02b200a0293f96dc4097e9db8e6e4",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/experiment.py",
+      "sha256": "cd48aaef6d039206af93bff09b645c724628c79180a5a16d6e9d85ef8c05232e",
+      "assertions": 49
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/gui/owner_presentation.py",
+      "sha256": "28d325288651d0a7b7f798823006cbf740b020d5bc35372320b64a553ef4bcd9",
+      "assertions": 1
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/gui/run_native_observation.py",
+      "sha256": "82142027e066c4f1bb222cb88b2f5cc87aabc5c60f3130e328c3f7cfcd22660f",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/gui/run_owner_presentation.py",
+      "sha256": "789fdd7b5a50e42cfe94fc1afc95be345f558d5dd29a7ee965b6c095610747fa",
+      "assertions": 86
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/gui/run_presentation.py",
+      "sha256": "396daad58720e74feb9e507767398fa86be565b364423082ead69d24b184f50f",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/run.py",
+      "sha256": "fce41e0cbd71c751289d02dcaae955563c511b18b6500d02e16eda4bf60f25d2",
+      "assertions": 0
+    },
+    {
+      "path": "tests/fixtures/self_grace_233/stream2/run.py",
+      "sha256": "c8bb14cf342049a002c23ea3a73d4bbcf4ac02078483bc47f9d5d5658f53ba93",
+      "assertions": 14
+    }
+  ],
+  "changed_active_python": [
+    "tests/fixtures/self_grace_233/audio/evidence_support.py",
+    "tests/fixtures/self_grace_233/audio/replay_recorded_schedule.py",
+    "tests/fixtures/self_grace_233/audio/run_isolated_app.py",
+    "tests/fixtures/self_grace_233/audio/run_isolated_app_f1ab9a4_probe01.py",
+    "tests/fixtures/self_grace_233/audio/run_production_audio.py",
+    "tests/fixtures/self_grace_233/audio/run_production_audio_f1ab9a4_probe01.py",
+    "tests/fixtures/self_grace_233/audio/summarize_evidence.py",
+    "tests/fixtures/self_grace_233/audio/summarize_runtime_evidence.py",
+    "tests/fixtures/self_grace_233/experiment.py",
+    "tests/fixtures/self_grace_233/gui/run_presentation.py",
+    "tests/fixtures/self_grace_233/run.py"
+  ],
+  "frozen_archival_sha256": {
+    "tests/fixtures/self_grace_233/audio/historical_75c4485a/run_production_audio.py": "4394a3dca2770bc9620e426aea13949c294b6b24ff323cd5419c44269a561386",
+    "tests/fixtures/self_grace_233/correctness_results/source/self_translation_channel.py": "ec77ef5e91ddde932de59ed8a036e101da72373042b000b516ce831159e58e2f"
+  },
+  "pyproject_sha256": "9e6cb4b4256ed77de62a73fbddf96827febc93a4302213bb2399ddb36246cf01",
+  "exact_CI_commands": [
+    {
+      "command": "uv run --locked ruff check .",
+      "exit_code": 0,
+      "stdout": "All checks passed!\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked black --check .",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "All done! ✨ 🍰 ✨\n1109 files would be left unchanged.\n"
+    },
+    {
+      "command": "uv run --locked python scripts/ci/check_test_selection.py",
+      "exit_code": 0,
+      "stdout": "PR test selection covers 493 offline files\nExcluded tests/integration: Mixed live-provider, credential, model-download, and other opt-in integration prerequisites; not authorized for ordinary offline PR execution.\nIntentionally excluded files: 9\n",
+      "stderr": ""
+    }
+  ],
+  "help_commands": [
+    {
+      "command": "uv run --locked python -B -m tests.fixtures.self_grace_233.stream2.run --help",
+      "exit_code": 0,
+      "stdout": "usage: python.exe -m tests.fixtures.self_grace_233.stream2.run\n       [-h] [--output OUTPUT]\n\noptions:\n  -h, --help       show this help message and exit\n  --output OUTPUT\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/run.py --help",
+      "exit_code": 0,
+      "stdout": "usage: run.py [-h] --report-dir REPORT_DIR [--case CASE]\n              [--owner-source {baseline,historical-correctness}]\n\nReplay historical SELF-GRACE-1 evidence, not the current SELF-STREAM-2 product\n\noptions:\n  -h, --help            show this help message and exit\n  --report-dir REPORT_DIR\n                        A new directory; existing evidence is never\n                        overwritten\n  --case CASE           pytest -k selector; default runs all 53 historical\n                        schedules\n  --owner-source {baseline,historical-correctness}\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/audio/run_production_audio.py --help",
+      "exit_code": 0,
+      "stdout": "usage: run_production_audio.py [-h] [--generate] --report REPORT\n                               [--llm-delay LLM_DELAY] [--no-overlay]\n\noptions:\n  -h, --help            show this help message and exit\n  --generate\n  --report REPORT\n  --llm-delay LLM_DELAY\n  --no-overlay\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/audio/run_production_audio_f1ab9a4_probe01.py --help",
+      "exit_code": 0,
+      "stdout": "usage: run_production_audio_f1ab9a4_probe01.py [-h] [--generate]\n                                               --report REPORT\n                                               [--llm-delay LLM_DELAY]\n                                               [--no-overlay]\n\noptions:\n  -h, --help            show this help message and exit\n  --generate\n  --report REPORT\n  --llm-delay LLM_DELAY\n  --no-overlay\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/audio/run_isolated_app.py --help",
+      "exit_code": 0,
+      "stdout": "usage: run_isolated_app.py [-h] [--report REPORT] [--child CHILD]\n\noptions:\n  -h, --help       show this help message and exit\n  --report REPORT\n  --child CHILD\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/audio/run_isolated_app_f1ab9a4_probe01.py --help",
+      "exit_code": 0,
+      "stdout": "usage: run_isolated_app_f1ab9a4_probe01.py [-h] [--report REPORT]\n                                           [--child CHILD]\n\noptions:\n  -h, --help       show this help message and exit\n  --report REPORT\n  --child CHILD\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/audio/summarize_runtime_evidence.py --help",
+      "exit_code": 0,
+      "stdout": "usage: summarize_runtime_evidence.py [-h] --reports REPORTS [REPORTS ...]\n                                     --output OUTPUT\n\noptions:\n  -h, --help            show this help message and exit\n  --reports REPORTS [REPORTS ...]\n  --output OUTPUT\n",
+      "stderr": ""
+    },
+    {
+      "command": "uv run --locked python -B tests/fixtures/self_grace_233/gui/run_presentation.py --help",
+      "exit_code": 0,
+      "stdout": "usage: run_presentation.py [-h] --report-dir REPORT_DIR [--port PORT]\n                           [--native]\n\noptions:\n  -h, --help            show this help message and exit\n  --report-dir REPORT_DIR\n  --port PORT\n  --native\n",
+      "stderr": ""
+    }
+  ],
+  "focused_current_runner": {
+    "command": "uv run --locked python -B -m tests.fixtures.self_grace_233.stream2.run --output tests/fixtures/self_grace_233/publication_style_smoke.json",
+    "exit_code": 0,
+    "stderr": "",
+    "case_count": 8,
+    "case_statuses": [
+      "passed",
+      "passed",
+      "passed",
+      "passed",
+      "passed",
+      "passed",
+      "passed",
+      "passed"
+    ],
+    "fixed_source_profiles": [
+      {
+        "llm_profile": "fast",
+        "closed_sources": [
+          "alpha",
+          "bravo"
+        ],
+        "invocations": [
+          {
+            "text": "alpha",
+            "target": "en",
+            "context": ""
+          },
+          {
+            "text": "bravo",
+            "target": "en",
+            "context": "- [self] \"alpha\""
+          }
+        ],
+        "cancelled": [],
+        "packets": [
+          "en:alpha",
+          "en:bravo"
+        ]
+      },
+      {
+        "llm_profile": "late",
+        "closed_sources": [
+          "alpha",
+          "bravo"
+        ],
+        "invocations": [
+          {
+            "text": "alpha",
+            "target": "en",
+            "context": ""
+          },
+          {
+            "text": "bravo",
+            "target": "en",
+            "context": "- [self] \"alpha\""
+          }
+        ],
+        "cancelled": [],
+        "packets": [
+          "en:alpha",
+          "en:bravo"
+        ]
+      }
+    ],
+    "limits": [
+      "synthetic owned text/VAD ingress",
+      "controlled provider and local sender",
+      "no audio recognition, external services, GUI, UDP, VRChat or HMD observation"
+    ]
+  },
+  "focused_changed_helpers": {
+    "command_argv": [
+      "uv",
+      "run",
+      "--locked",
+      "python",
+      "-B",
+      "-c",
+      "import hashlib\nimport json\nimport os\nimport runpy\nimport socket\nimport sys\nfrom dataclasses import dataclass\nfrom pathlib import Path\nfrom uuid import UUID\n\nroot = Path.cwd()\nassert (root / \"tests/fixtures/self_grace_233/audio/evidence_support.py\").is_file()\nsys.path.insert(0, str(root / \"tests/fixtures/self_grace_233/audio\"))\nimport evidence_support\n\n@dataclass\nclass SyntheticValue:\n    identity: UUID\n    path: Path\n\nidentity = UUID(\"00000000-0000-0000-0000-000000000233\")\nassert evidence_support.plain(SyntheticValue(identity, Path(\"synthetic\"))) == {\"identity\": str(identity), \"path\": \"synthetic\"}\narchive = root / \"tests/fixtures/self_grace_233/publication_preformat.zip\"\nassert evidence_support.digest(archive) == \"f93c22854120db3a161d8054ea41b4cf62a5673dd688c0e3e1d06f35bbd5fa67\"\nsummary = runpy.run_path(str(root / \"tests/fixtures/self_grace_233/audio/summarize_evidence.py\"))\nassert summary[\"distribution\"]([]) == {\"samples\": 0}\nassert summary[\"distribution\"]([3, 1, 2]) == {\"samples\": 3, \"min_ms\": 1, \"median_ms\": 2, \"mean_ms\": 2, \"max_ms\": 3, \"values_ms\": [1, 2, 3]}\nassert summary[\"sha256\"](archive) == evidence_support.digest(archive)\nos.environ.pop(\"SELF_GRACE_233_ISOLATED_ROOT\", None)\ntry:\n    runpy.run_path(str(root / \"tests/fixtures/self_grace_233/experiment.py\"))\nexcept RuntimeError as exc:\n    assert str(exc) == \"Run this historical fixture through tests/fixtures/self_grace_233/run.py\"\nelse:\n    raise AssertionError(\"Historical fixture unexpectedly admitted the current tree\")\nevidence_support.install_network_guard()\nassert socket.getaddrinfo(\"127.0.0.1\", 0)\nfor host, port, message in [(\"example.invalid\", 443, \"Task probe forbids non-loopback network access\"), (\"127.0.0.1\", 9000, \"Task probe forbids default VRChat OSC ports\")]:\n    try:\n        socket.getaddrinfo(host, port)\n    except PermissionError as exc:\n        assert str(exc) == message\n    else:\n        raise AssertionError(\"Expected network guard rejection\")\nprint(json.dumps({\"status\": \"passed\", \"checks\": [\"evidence serialization\", \"archive digest\", \"empty and populated summarizer distribution\", \"historical current-tree import rejection\", \"loopback lookup admission\", \"non-loopback lookup rejection before DNS\", \"default VRChat port rejection\"], \"network_connections\": 0, \"files_written\": 0}))\n"
+    ],
+    "exit_code": 0,
+    "stdout": "{\"status\": \"passed\", \"checks\": [\"evidence serialization\", \"archive digest\", \"empty and populated summarizer distribution\", \"historical current-tree import rejection\", \"loopback lookup admission\", \"non-loopback lookup rejection before DNS\", \"default VRChat port rejection\"], \"network_connections\": 0, \"files_written\": 0}\n",
+    "stderr": ""
+  },
+  "execution_environment": {
+    "command_argv": [
+      "uv",
+      "run",
+      "--locked",
+      "python",
+      "-B",
+      "-c",
+      "import importlib.metadata\nimport json\nimport sys\nfrom pathlib import Path\nimport puripuly_heart\nimport tests.fixtures.self_grace_233.stream2.run as runner\nimport tests.helpers.translation_owners as owners\nroot = Path.cwd().resolve()\npaths = {\"product\": Path(puripuly_heart.__file__).resolve(), \"runner\": Path(runner.__file__).resolve(), \"test_owners\": Path(owners.__file__).resolve()}\nassert all(path.is_relative_to(root) for path in paths.values())\nprint(json.dumps({\"python\": sys.version, \"executable\": \"<checkout>/\" + Path(sys.executable).resolve().relative_to(root).as_posix(), \"imports\": {name: path.relative_to(root).as_posix() for name, path in paths.items()}, \"tool_versions\": {name: importlib.metadata.version(name) for name in (\"ruff\", \"black\", \"pytest\", \"pytest-asyncio\")}}, indent=2))\n"
+    ],
+    "exit_code": 0,
+    "stdout": "{\n  \"python\": \"3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]\",\n  \"executable\": \"<checkout>/.venv/Scripts/python.exe\",\n  \"imports\": {\n    \"product\": \"src/puripuly_heart/__init__.py\",\n    \"runner\": \"tests/fixtures/self_grace_233/stream2/run.py\",\n    \"test_owners\": \"tests/helpers/translation_owners.py\"\n  },\n  \"tool_versions\": {\n    \"ruff\": \"0.16.1\",\n    \"black\": \"26.5.1\",\n    \"pytest\": \"9.1.1\",\n    \"pytest-asyncio\": \"1.4.0\"\n  }\n}\n",
+    "stderr": ""
+  }
+}

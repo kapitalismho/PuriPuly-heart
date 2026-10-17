@@ -1,0 +1,79 @@
+{
+  "python_pid": 60628,
+  "python": ".venv/Scripts/python.exe",
+  "native": true,
+  "candidate_head": "8eba7512bf6c50fdb01024fd536bada0351aca14",
+  "source_fingerprints": {
+    "puripuly_heart.domain.events": {
+      "path": "src/puripuly_heart/domain/events.py",
+      "sha256": "06cd314014e897658419ea73dc7f9232244cc2074a3b07efa5d05c36c0eed850"
+    },
+    "puripuly_heart.ui.event_mapping": {
+      "path": "src/puripuly_heart/ui/event_mapping.py",
+      "sha256": "80fa272f48231e60675a11f4ef2cb47d3470647e1d603c7762e0052f9bb279bc"
+    },
+    "puripuly_heart.ui.event_projection": {
+      "path": "src/puripuly_heart/ui/event_projection.py",
+      "sha256": "00937a6d7b4468036ad7b2162694e11781c5f646fa2993d28148c4f6800ac334"
+    },
+    "puripuly_heart.ui.event_dispatch": {
+      "path": "src/puripuly_heart/ui/event_dispatch.py",
+      "sha256": "89a769c118ffe8ae38e298402b4beaae5478aef06431f09bbb7cfe90e2220d2a"
+    },
+    "puripuly_heart.ui.presentation_adapter": {
+      "path": "src/puripuly_heart/ui/presentation_adapter.py",
+      "sha256": "e8bf2026188b1c2cd8dbd56b833a91c4d0573dfcd40e1a5e5c5cba3819dc5933"
+    },
+    "puripuly_heart.ui.components.display_card": {
+      "path": "src/puripuly_heart/ui/components/display_card.py",
+      "sha256": "8128850cb52181e15ccbd7b0ecc62ec86c9209abacc472db32f77c7436c3ca5c"
+    },
+    "puripuly_heart.ui.views.dashboard": {
+      "path": "src/puripuly_heart/ui/views/dashboard.py",
+      "sha256": "f9428cf5e774cff56d19f2fddea5bb9b77f2114562265956afd501ac670a8a32"
+    },
+    "puripuly_heart.ui.views.logs": {
+      "path": "src/puripuly_heart/ui/views/logs.py",
+      "sha256": "56697735a3ab6e2a4d9d2ea64f5df9b329289ce66f0c6c63c9bbd04a8fb4724f"
+    },
+    "puripuly_heart.ui.logs.contract": {
+      "path": "src/puripuly_heart/ui/logs/contract.py",
+      "sha256": "6ec8f64abf9a869f5ffc4c11c243c67c54df5262a1a8fb28101f25e32e9839c6"
+    },
+    "puripuly_heart.core.runtime_logging": {
+      "path": "src/puripuly_heart/core/runtime_logging.py",
+      "sha256": "0e67e5a099ec4ff25fb59faed1b25132992f365637af8d8891d1a35d1403a9bd"
+    },
+    "puripuly_heart.core.orchestrator.self_translation_channel": {
+      "path": "src/puripuly_heart/core/orchestrator/self_translation_channel.py",
+      "sha256": "14706d489967e4facf9a2c4933fa15a48333475fbc2f3b227de48dcc7ed3a6f7"
+    },
+    "puripuly_heart.core.orchestrator.translation_turn": {
+      "path": "src/puripuly_heart/core/orchestrator/translation_turn.py",
+      "sha256": "036471d468dda40b3ba4a11747de2876f9e02701fe16b8373ab22ee43123096d"
+    },
+    "puripuly_heart.core.orchestrator.translation_request": {
+      "path": "src/puripuly_heart/core/orchestrator/translation_request.py",
+      "sha256": "de6266596fd1abeb59329033c19bafc9762768116947893a9044422643465733"
+    },
+    "puripuly_heart.core.orchestrator.translation_output_projection": {
+      "path": "src/puripuly_heart/core/orchestrator/translation_output_projection.py",
+      "sha256": "bf604602eed642fcf8ae76a75228380582437d2f03ab86b46b56b407ca4a6f24"
+    },
+    "puripuly_heart.core.runtime.output": {
+      "path": "src/puripuly_heart/core/runtime/output.py",
+      "sha256": "ba28b169a1aa522715325dbf96b15341ed9342e9d529ad3443d4407073ba9200"
+    },
+    "tests.fixtures.self_grace_233.gui.owner_presentation": {
+      "path": "tests/fixtures/self_grace_233/gui/owner_presentation.py",
+      "sha256": "61a8a2b42ecf4894f978f99065094b5acca4d2f885462610ce16c1580fc0c83c"
+    },
+    "task_probe.run_owner_presentation": {
+      "path": "tests/fixtures/self_grace_233/gui/run_owner_presentation.py",
+      "sha256": "d2cbeeeb79c939d07c12515aa8a34c4f82ab328d67d517b45e12caad2dce9b34"
+    }
+  },
+  "product_source_manifest_sha256": "93c5f693953c3dc63929cf5d6b92584e41f33b43ee2f082e5591f764d74c7f65",
+  "product_python_files": 556,
+  "boundary": "Real Self/turn/request/output owners, bounded UI bridge, native production views and accepted runtime logger; synthetic STT events and controlled local provider/chatbox boundaries; no live audio/provider/profile/discovery/OSC sink"
+}

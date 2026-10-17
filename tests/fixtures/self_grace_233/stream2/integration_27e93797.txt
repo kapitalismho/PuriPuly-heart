@@ -1,0 +1,12 @@
+Observed stdout excerpt from completed bg_72 at 27e93797dd9ab8b6a2a7969eac73e409ccaffcda.
+Progress dots omitted. This is an excerpt, not a raw full-output byte archive.
+
+Warnings: 43 existing DeprecationWarning occurrences for asyncio.iscoroutinefunction:
+- tests/ui/test_app_branches.py::test_main_gui_registers_awaited_idempotent_page_lifecycle_handler (line 4063): 1
+- tests/ui/test_desktop_overlay_renderer.py (line 1694): 42
+
+=========================== short test summary info ===========================
+SKIPPED [1] tests\ui\test_flet_desktop_view_process_owner.py:522: requires real process
+SKIPPED [1] tests\ui\test_flet_desktop_view_process_owner.py:548: requires real process
+2160 passed, 2 skipped, 43 warnings in 95.48s (0:01:35)
+Wall time: 97.66 seconds

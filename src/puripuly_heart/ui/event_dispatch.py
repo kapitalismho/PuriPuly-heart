@@ -22,7 +22,7 @@ from puripuly_heart.core.diagnostic_validation import (
 from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import sanitize_legacy_raw_user_visible_error_text
 from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
-from puripuly_heart.domain.events import STTSessionState, UIEvent
+from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState, UIEvent
 from puripuly_heart.domain.models import OSCMessage, Translation
 from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import (
@@ -58,6 +58,8 @@ class DashboardEventDestination(Protocol):
         debug_prefix: str | None = None,
     ) -> bool | None: ...
 
+    def publish_self_turn(self, snapshot: SelfTurnPresentation) -> bool | None: ...
+
     def publish_error(self, text: str) -> None: ...
 
 
@@ -70,6 +72,8 @@ class HistoryEventDestination(Protocol):
         translated: bool = False,
         language_code: str | None = None,
     ) -> None: ...
+
+    def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None: ...
 
 
 class ErrorEventDestination(Protocol):
@@ -132,6 +136,12 @@ class AppDashboardEventDestination:
         )
         return True
 
+    def publish_self_turn(self, snapshot: SelfTurnPresentation) -> bool:
+        if self._dashboard is None:
+            return False
+        self._dashboard.set_self_turn(snapshot)
+        return True
+
     def publish_error(self, text: str) -> None:
         dashboard = self._dashboard
         if dashboard is not None:
@@ -139,8 +149,13 @@ class AppDashboardEventDestination:
 
 
 class AppHistoryEventDestination:
-    def __init__(self, append_history_entry: object | None) -> None:
+    def __init__(
+        self,
+        append_history_entry: object | None,
+        conversation_view: object | None = None,
+    ) -> None:
         self._append_history_entry = append_history_entry
+        self._conversation_view = conversation_view
 
     def append_entry(
         self,
@@ -154,6 +169,10 @@ class AppHistoryEventDestination:
             self._append_history_entry(
                 source, text, translated=translated, language_code=language_code
             )
+
+    def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+        if self._conversation_view is not None:
+            self._conversation_view.update_self_turn(snapshot, source=source)
 
 
 class AppErrorEventDestination:
@@ -427,6 +446,24 @@ class UIEventBridge:
             return
         if mapped.kind == "status" and mapped.status is not None:
             self.dashboard_destination.publish_status(mapped.status)
+            return
+
+        if mapped.kind == "self_turn":
+            projection = self.projection_service.project(mapped, self._projection_context())
+            snapshot = projection.self_turn
+            if snapshot is None:
+                return
+            try:
+                self.history_destination.publish_self_turn(snapshot, source=mapped.source or "Mic")
+            except Exception as exc:
+                self._record_output_failure(event, "conversation_feed", exc)
+            if (
+                authority is None or authority.claim_presentation()
+            ) and self.projection_service.claim_current_turn(snapshot):
+                try:
+                    self.dashboard_destination.publish_self_turn(snapshot)
+                except Exception as exc:
+                    self._record_output_failure(event, "dashboard", exc)
             return
 
         if mapped.kind == "transcript":

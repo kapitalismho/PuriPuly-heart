@@ -16,6 +16,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioRetentionBinding,
     AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
+    AudioSegmentTerminalReceipt,
     CaptureStreamInput,
     OwnedStreamInput,
     OwnedVadEvent,
@@ -59,6 +60,7 @@ SelfCaptureDiagnosticSink = Callable[[SelfCaptureDiagnostic], object]
 class _VadSink(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
     async def handle_stream_input(self, event: OwnedStreamInput) -> None: ...
+    async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None: ...
     async def observe_source_activity(
         self,
         *,
@@ -200,9 +202,12 @@ class _GenerationGuardedVadSink:
             try:
                 await cast(_VadSink, self.sink).handle_stream_input(owned)
             finally:
-                await self.abort()
+                retired = await self.abort()
                 self._worker = None
                 self._closing = False
+                if self.owner.is_current_generation(self.capture_generation.value):
+                    for receipt in retired:
+                        await cast(_VadSink, self.sink).handle_source_segment_retired(receipt)
             return
         samples = int(event.chunk.size)
         if samples and self._stream_drop_pending:
@@ -309,7 +314,7 @@ class _GenerationGuardedVadSink:
         if worker is not None:
             await worker
 
-    async def abort(self) -> None:
+    async def abort(self) -> tuple[AudioSegmentTerminalReceipt, ...]:
         worker = self._worker
         if worker is not None and not worker.done():
             worker.cancel()
@@ -324,7 +329,7 @@ class _GenerationGuardedVadSink:
         self._retained_samples = 0
         self._rejected_segment_ids.clear()
         self._control_events = 0
-        self.ledger.cancel_unfinished(now_monotonic_s=asyncio.get_running_loop().time())
+        return self.ledger.cancel_unfinished(now_monotonic_s=asyncio.get_running_loop().time())
 
     async def _admit_unsent_segment(self, owned: OwnedVadEvent) -> None:
         while len(self._unsent_segments) >= self.max_wholly_unsent_segments:

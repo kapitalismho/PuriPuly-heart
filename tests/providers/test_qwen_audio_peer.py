@@ -23,6 +23,7 @@ from tests.core.test_stt_scoped_engine import (
 from tests.helpers.fakes import RecordingOscQueue
 from tests.helpers.translation_owners import compose_translation_test_harness
 from tests.providers.test_qwen_audio import SocketFactory, control, native
+from tests.providers.test_qwen_audio_delivery_recovery import SelfSourceObserver
 
 
 async def make_engine(channel, *, sink=None, factory=None, clock=None):
@@ -57,7 +58,7 @@ async def make_engine(channel, *, sink=None, factory=None, clock=None):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("prefix", [False, True])
 async def test_self_successor_stable_waits_for_predecessor_and_merge_preserves_native_order(
-    prefix, monkeypatch
+    prefix,
 ):
     harness = compose_translation_test_harness(
         stt=None,
@@ -71,15 +72,7 @@ async def test_self_successor_stable_waits_for_predecessor_and_merge_preserves_n
     owner = harness.self_owner
     emitted = []
 
-    finals = []
-    original_transcript = type(owner)._handle_transcript
-
-    async def observe_transcript(current_owner, transcript, **kwargs):
-        if current_owner is owner and kwargs.get("is_final"):
-            finals.append(transcript)
-        await original_transcript(current_owner, transcript, **kwargs)
-
-    monkeypatch.setattr(type(owner), "_handle_transcript", observe_transcript)
+    source_observer = SelfSourceObserver(harness)
 
     async def sink(event):
         emitted.append(event)
@@ -124,7 +117,8 @@ async def test_self_successor_stable_waits_for_predecessor_and_merge_preserves_n
             expected_a,
             " B stable  B tail ",
         ]
-        await wait_until(lambda: len(finals) == 1, timeout=2)
+        await wait_until(lambda: len(source_observer.final_sources()) == 1, timeout=2)
+        finals = source_observer.final_sources()
         assert len(finals) == 1
         final = finals[0]
         assert final.text == expected_a + " B stable  B tail "

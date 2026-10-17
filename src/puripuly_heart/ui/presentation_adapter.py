@@ -112,7 +112,8 @@ class FletUiPresentationAdapter:
                 getattr(self._app, "view_dashboard", None)
             ),
             history_destination=AppHistoryEventDestination(
-                getattr(self._app, "add_history_entry", None)
+                getattr(self._app, "add_history_entry", None),
+                getattr(self._app, "view_logs", None),
             ),
             get_language_codes=getattr(self._app, "get_event_language_codes", None),
             is_translation_enabled=getattr(self._app, "is_event_translation_enabled", None),

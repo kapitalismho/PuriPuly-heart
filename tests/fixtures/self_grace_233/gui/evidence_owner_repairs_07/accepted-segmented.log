@@ -1,0 +1,26 @@
+[Diagnostic][LlmLatency] request_end request_id=20 utterance_id=db6957aa-dfbb-4942-bf84-5edde422309e parent_utterance_id=db6957aa-dfbb-4942-bf84-5edde422309e channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=13 prompt_chars=0 context_chars=0 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "newer managed"
+[Context] utterance_id=db6957aa-dfbb-4942-bf84-5edde422309e context_count=0
+[Conversation] Self · Mic → English · Translation "en:newer managed"
+[Diagnostic][LlmLatency] request_end request_id=21 utterance_id=4366a030-c208-512f-a5ba-8663674e4798 parent_utterance_id=2301c00b-ed63-4084-ba8f-051b2443ca69 channel=self kind=self source_language=en target_language=en provider_generation=0 input_chars=6 prompt_chars=0 context_chars=0 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (English) · Original "first"
+[Context] utterance_id=2301c00b-ed63-4084-ba8f-051b2443ca69 context_count=0
+[Conversation] Self · Mic → English · Translation "en:first"
+[Diagnostic][LlmLatency] request_end request_id=22 utterance_id=471b1247-e5a4-5599-b33f-b7d79acbbccc parent_utterance_id=2301c00b-ed63-4084-ba8f-051b2443ca69 channel=self kind=self source_language=ja target_language=en provider_generation=0 input_chars=6 prompt_chars=0 context_chars=0 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (Japanese) · Original "second"
+[Context] utterance_id=2301c00b-ed63-4084-ba8f-051b2443ca69 context_count=0
+[Conversation] Self · Mic → English · Translation "en:second"
+[Diagnostic][LlmLatency] request_end request_id=23 utterance_id=cc06998a-1322-5488-b642-aa4b1024fdf8 parent_utterance_id=68b0c12d-772a-4a79-8cb0-80f602152a75 channel=self kind=self source_language=en target_language=en provider_generation=0 input_chars=13 prompt_chars=0 context_chars=16 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (English) · Original "future first"
+[Context] utterance_id=68b0c12d-772a-4a79-8cb0-80f602152a75 context_count=1 texts=["first"]
+[Conversation] Self · Mic → English · Translation "en:future first"
+[Diagnostic][LlmLatency] request_end request_id=24 utterance_id=9a8db808-219c-5d7e-b7be-5592662893df parent_utterance_id=68b0c12d-772a-4a79-8cb0-80f602152a75 channel=self kind=self source_language=ja target_language=en provider_generation=0 input_chars=13 prompt_chars=0 context_chars=17 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (Japanese) · Original "future second"
+[Context] utterance_id=68b0c12d-772a-4a79-8cb0-80f602152a75 context_count=1 texts=["second"]
+[Conversation] Self · Mic → English · Translation "en:future second"
+[Logging] untrusted_record_redacted level=INFO logger_sha256=30636a43bbc670f1 message_len=213 message_sha256=ffe820bccc697430
+[Logging] untrusted_record_redacted level=INFO logger_sha256=30636a43bbc670f1 message_len=213 message_sha256=df2d0ece29463eaf
+[Diagnostic][LlmLatency] request_end request_id=25 utterance_id=d25bf47f-cde6-4580-a55c-b2f4858786ca parent_utterance_id=d25bf47f-cde6-4580-a55c-b2f4858786ca channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=14 prompt_chars=0 context_chars=24 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "future managed"
+[Context] utterance_id=d25bf47f-cde6-4580-a55c-b2f4858786ca context_count=1 texts=["newer managed"]
+[Conversation] Self · Mic → English · Translation "en:future managed"

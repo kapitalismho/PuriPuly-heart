@@ -1134,7 +1134,9 @@ class ScopedRecognitionEngine:
             if turn.independent_recognition:
                 if sent and not turn.terminal_ready.done():
                     turn.terminal_ready.set_result(
-                        STTProviderInputTerminal(turn.identity, "submitted", self.channel)
+                        STTProviderInputTerminal(
+                            turn.identity, "submitted", self.channel, independent_recognition=True
+                        )
                     )
                 if not turn.terminal_ready.done():
                     self._set_turn_failure(turn, "provider_input_submission_failed")
@@ -2046,6 +2048,7 @@ class ScopedRecognitionEngine:
                     reason,
                     "retire",
                     failure_diagnostics=diagnostics,
+                    independent_recognition=True,
                 )
             )
             return
@@ -2118,6 +2121,8 @@ class ScopedRecognitionEngine:
             return
         if not turn.local_sealed:
             return
+        if turn.independent_recognition and isinstance(terminal, STTProviderInputTerminal):
+            terminal = replace(terminal, independent_recognition=True)
         if turn.independent_recognition and isinstance(terminal, STTProviderTurnTerminal):
             terminal = STTProviderInputTerminal(
                 terminal.identity,
@@ -2131,6 +2136,7 @@ class ScopedRecognitionEngine:
                 terminal.epoch_disposition,
                 terminal.recovery_pending,
                 terminal.failure_diagnostics,
+                independent_recognition=True,
             )
         turn.terminal_emitted = True
         key = (turn.identity.provider_epoch_id, turn.identity.provider_turn_id)
@@ -2158,7 +2164,12 @@ class ScopedRecognitionEngine:
         ):
             terminal = (
                 STTProviderInputTerminal(
-                    turn.identity, "cancelled", self.channel, "cancelled", "retire"
+                    turn.identity,
+                    "cancelled",
+                    self.channel,
+                    "cancelled",
+                    "retire",
+                    independent_recognition=True,
                 )
                 if turn.independent_recognition
                 else STTProviderTurnTerminal(

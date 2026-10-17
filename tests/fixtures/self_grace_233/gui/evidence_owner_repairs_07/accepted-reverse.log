@@ -1,0 +1,13 @@
+[Diagnostic][LlmLatency] request_end request_id=14 utterance_id=6b308733-feca-4d9d-8799-8da68f2f00b4 parent_utterance_id=6b308733-feca-4d9d-8799-8da68f2f00b4 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=12 prompt_chars=0 context_chars=23 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "newer speech"
+[Context] utterance_id=6b308733-feca-4d9d-8799-8da68f2f00b4 context_count=1 texts=["older manual"]
+[Conversation] Self · Mic → English · Translation "en:newer speech"
+[Diagnostic][LlmLatency] request_end request_id=13 utterance_id=9dc18f43-3c8f-4ecf-8933-68277d1a411c parent_utterance_id=9dc18f43-3c8f-4ecf-8933-68277d1a411c channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=12 prompt_chars=0 context_chars=0 status=success request_ms=761 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "older manual"
+[Context] utterance_id=9dc18f43-3c8f-4ecf-8933-68277d1a411c context_count=0
+[Conversation] Self · Manual → English · Translation "en:older manual"
+[Diagnostic][LlmLatency] request_end request_id=15 utterance_id=a644768a-9b21-432b-9a79-200b6085509e parent_utterance_id=a644768a-9b21-432b-9a79-200b6085509e channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=13 prompt_chars=0 context_chars=47 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "future manual"
+[Context] utterance_id=a644768a-9b21-432b-9a79-200b6085509e context_count=2 texts=["older manual", "newer speech"]
+[Conversation] Self · Manual → English · Translation "en:future manual"
+[Logging] untrusted_record_redacted level=INFO logger_sha256=88c3ce70951d6b62 message_len=213 message_sha256=322a3e28e1de9aee

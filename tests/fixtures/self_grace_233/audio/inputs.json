@@ -1,0 +1,117 @@
+{
+  "provenance": "Public invented synthetic English speech; offline Windows System.Speech SAPI; no microphone, private audio, downloads or remote speech provider",
+  "format": "mono 16000 Hz PCM16 WAV",
+  "normalization": "soxr HQ then PCM16 rounding; no trimming or VAD tuning",
+  "episodes": [
+    {
+      "label": "continuation_0",
+      "case": "continuation",
+      "phrase": "I will carry the lantern",
+      "file": "continuation_0.wav",
+      "sha256": "3493a5145b1ee6671cbb021f0d437a367f538bd2e2e57bf8c95f34a8545d6136",
+      "samples": 33985,
+      "seconds": 2.1240625,
+      "voice": {
+        "Culture": "en-US",
+        "Name": "Microsoft Zira Desktop",
+        "Age": "Adult",
+        "Gender": "Female"
+      },
+      "sapi_rate": 0,
+      "sapi_volume": 100,
+      "sapi_source_rate_hz": 22050
+    },
+    {
+      "label": "continuation_1",
+      "case": "continuation",
+      "phrase": "after sunset.",
+      "file": "continuation_1.wav",
+      "sha256": "7453ac0d8922a131dd81fe2dc5e60b683797ab2f7ced5bfce127480b586ae12e",
+      "samples": 29908,
+      "seconds": 1.86925,
+      "voice": {
+        "Culture": "en-US",
+        "Name": "Microsoft Zira Desktop",
+        "Age": "Adult",
+        "Gender": "Female"
+      },
+      "sapi_rate": 0,
+      "sapi_volume": 100,
+      "sapi_source_rate_hz": 22050
+    },
+    {
+      "label": "number_negation_0",
+      "case": "number_negation",
+      "phrase": "We need fifteen boxes.",
+      "file": "number_negation_0.wav",
+      "sha256": "2fc9b2e90b72c7cf1096c6791e6bc72c9bf56c71fd68185607155432ae04a954",
+      "samples": 37027,
+      "seconds": 2.3141875,
+      "voice": {
+        "Culture": "en-US",
+        "Name": "Microsoft Zira Desktop",
+        "Age": "Adult",
+        "Gender": "Female"
+      },
+      "sapi_rate": 0,
+      "sapi_volume": 100,
+      "sapi_source_rate_hz": 22050
+    },
+    {
+      "label": "number_negation_1",
+      "case": "number_negation",
+      "phrase": "Not fifty boxes.",
+      "file": "number_negation_1.wav",
+      "sha256": "7f1b4a5b2fe0fd61fa4bd5a74ac728e58b129cf84eac2f33a7f05f71d9fcccd8",
+      "samples": 33588,
+      "seconds": 2.09925,
+      "voice": {
+        "Culture": "en-US",
+        "Name": "Microsoft Zira Desktop",
+        "Age": "Adult",
+        "Gender": "Female"
+      },
+      "sapi_rate": 0,
+      "sapi_volume": 100,
+      "sapi_source_rate_hz": 22050
+    },
+    {
+      "label": "question_0",
+      "case": "question",
+      "phrase": "The gate is open.",
+      "file": "question_0.wav",
+      "sha256": "acd60e133b846fc58d3b9c70f4a7ee4f903251431318db2de0206b142e18babc",
+      "samples": 28629,
+      "seconds": 1.7893125,
+      "voice": {
+        "Culture": "en-US",
+        "Name": "Microsoft Zira Desktop",
+        "Age": "Adult",
+        "Gender": "Female"
+      },
+      "sapi_rate": 0,
+      "sapi_volume": 100,
+      "sapi_source_rate_hz": 22050
+    },
+    {
+      "label": "question_1",
+      "case": "question",
+      "phrase": "Is it safe to enter?",
+      "file": "question_1.wav",
+      "sha256": "52e32d73aa2e460325bb546cbebb03085a0ca16ed5fdcb5ddf339bdc78b03604",
+      "samples": 31187,
+      "seconds": 1.9491875,
+      "voice": {
+        "Culture": "en-US",
+        "Name": "Microsoft Zira Desktop",
+        "Age": "Adult",
+        "Gender": "Female"
+      },
+      "sapi_rate": 0,
+      "sapi_volume": 100,
+      "sapi_source_rate_hz": 22050
+    }
+  ],
+  "within_case_pause_s": 0.18,
+  "between_case_pause_s": 3.0
+}

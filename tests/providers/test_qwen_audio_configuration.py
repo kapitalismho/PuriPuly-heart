@@ -22,7 +22,7 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_self_stt_provider_request_from_vnext,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.audio.ownership import PeerAudioSegmentLedger
+from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, PeerAudioSegmentLedger
 from puripuly_heart.core.runtime.local_asr_provider_runtime import LocalASRProviderRuntimeOwner
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnTerminal,
@@ -92,12 +92,16 @@ class RuntimeSink:
     def __init__(self, runtime, channel):
         self.runtime = runtime
         self.channel = channel
+        self.retired_sources: list[AudioSegmentTerminalReceipt] = []
 
     async def handle_vad_event(self, event):
         await self.runtime.handle_owned_vad_event(self.channel, event)
 
     async def handle_owned_vad_event(self, event):
         await self.runtime.handle_owned_vad_event(self.channel, event)
+
+    async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None:
+        self.retired_sources.append(receipt)
 
 
 @pytest.mark.asyncio

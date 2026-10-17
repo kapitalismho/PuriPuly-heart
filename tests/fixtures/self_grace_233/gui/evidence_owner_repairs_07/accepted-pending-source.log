@@ -1,0 +1,9 @@
+[Diagnostic][LlmLatency] request_end request_id=18 utterance_id=ea075a36-78ab-4c69-8074-3bf5ca1f5828 parent_utterance_id=ea075a36-78ab-4c69-8074-3bf5ca1f5828 channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=12 prompt_chars=0 context_chars=0 status=success request_ms=362 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "older manual"
+[Context] utterance_id=ea075a36-78ab-4c69-8074-3bf5ca1f5828 context_count=0
+[Conversation] Self · Manual → English · Translation "en:older manual"
+[Diagnostic][LlmLatency] request_end request_id=19 utterance_id=f2cce5bc-c0c0-4aeb-928a-9b016d144320 parent_utterance_id=f2cce5bc-c0c0-4aeb-928a-9b016d144320 channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=14 prompt_chars=0 context_chars=23 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "pending manual"
+[Context] utterance_id=f2cce5bc-c0c0-4aeb-928a-9b016d144320 context_count=1 texts=["older manual"]
+[Conversation] Self · Manual → English · Translation "en:pending manual"
+[Logging] untrusted_record_redacted level=INFO logger_sha256=0114d61816f2e431 message_len=213 message_sha256=63eecd4edd8350fa

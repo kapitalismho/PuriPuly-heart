@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol
 
-from puripuly_heart.core.audio.ownership import OwnedStreamInput
+from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt, OwnedStreamInput
 
 
 class SelfCaptureVadEventRuntime(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
     async def handle_stream_input(self, event: OwnedStreamInput) -> None: ...
+    async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None: ...
     async def observe_source_activity(
         self,
         *,

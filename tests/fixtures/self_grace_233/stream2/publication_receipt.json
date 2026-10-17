@@ -1,0 +1,24 @@
+{
+  "issue": 233,
+  "comment_id": 6240157587,
+  "url": "https://github.com/kapitalismho/PuriPuly-heart/issues/233#issuecomment-6240157587",
+  "created_at": "2026-10-17T20:07:18Z",
+  "code_candidate": "27e93797dd9ab8b6a2a7969eac73e409ccaffcda",
+  "initial_terminal_audit_candidate": "69b67ed8be9370ea4112f1833b45f4e3a198ac7e",
+  "body_utf8_sha256": "1737f27fc715032819a1adc921f00d67e160a0c68f22c9ae505f3c80c8c8649f",
+  "exact_api_readback": true,
+  "observed_issue_project_state": {
+    "projectItems": [
+      {
+        "status": {
+          "optionId": "47fc9ee4",
+          "name": "In progress"
+        },
+        "title": "PuriPuly"
+      }
+    ],
+    "state": "OPEN",
+    "url": "https://github.com/kapitalismho/PuriPuly-heart/issues/233"
+  },
+  "remote_mutations": "Created this authorized English evidence comment only; no issue/project state change or code push/PR/merge/release"
+}

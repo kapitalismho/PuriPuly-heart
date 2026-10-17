@@ -1,0 +1,421 @@
+{
+  "stages": [
+    {
+      "stage": "progressive-source",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "blue lantern",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:29:25] Mic · French · In progress · preview\nblue lantern\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:29:25",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern",
+          "translated_text": null,
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 1,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern",
+          "target_language": "en"
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+      }
+    },
+    {
+      "stage": "progressive-preview-one",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:blue lantern",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:29:25] Mic → English · In progress · preview\nblue lantern\nen:blue lantern",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:29:25",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern",
+          "translated_text": "en:blue lantern",
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 2,
+          "source_revision": 1,
+          "translation_source_revision": 1,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern",
+          "target_language": "en"
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+      }
+    },
+    {
+      "stage": "progressive-extended-source",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "blue lantern and bright",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:29:25] Mic · French · In progress · preview\nblue lantern and bright\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:29:25",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern and bright",
+          "translated_text": null,
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 3,
+          "source_revision": 2,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern and bright",
+          "target_language": "en"
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+      }
+    },
+    {
+      "stage": "progressive-preview-two",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:blue lantern and bright",
+      "dashboard_status": "In progress · preview",
+      "conversation": "[03:29:25] Mic → English · In progress · preview\nblue lantern and bright\nen:blue lantern and bright",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:29:25",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern and bright",
+          "translated_text": "en:blue lantern and bright",
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 4,
+          "source_revision": 2,
+          "translation_source_revision": 2,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern and bright",
+          "target_language": "en"
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+        "progressive_preview_update_id": "ef81f26165ce4112a543e1948b137d2f"
+      }
+    },
+    {
+      "stage": "progressive-final",
+      "case": "progressive",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "en:blue lantern and bright",
+      "dashboard_status": "Complete",
+      "conversation": "[03:29:25] Mic → English · Complete\nblue lantern and bright\nen:blue lantern and bright",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:29:25",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "blue lantern and bright",
+          "translated_text": "en:blue lantern and bright",
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "ready",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 6,
+          "source_revision": 2,
+          "translation_source_revision": 2,
+          "turn_status": "complete",
+          "accepted": true,
+          "parent_utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+        }
+      ],
+      "accepted_record_keys": 2,
+      "accepted_keys": [
+        [
+          "self",
+          "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          0,
+          0,
+          "translation"
+        ],
+        [
+          "self",
+          "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          0,
+          null,
+          "source"
+        ]
+      ],
+      "provider_calls": [
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern",
+          "target_language": "en"
+        },
+        {
+          "utterance_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "text": "blue lantern and bright",
+          "target_language": "en"
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+          "status": "complete",
+          "targets": [
+            {
+              "language": "en",
+              "status": "ready",
+              "child_id": "7069c90f-6e3d-4e6e-b19d-6d3c19072309"
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+        "progressive_preview_update_id": "ef81f26165ce4112a543e1948b137d2f"
+      }
+    },
+    {
+      "stage": "older-speech-held",
+      "case": "mixed",
+      "profile": {
+        "low_latency_mode": true,
+        "low_latency_finalize_wait_ms": 0,
+        "low_latency_awaiting_vad_timeout_s": 3.0,
+        "source_language": "fr",
+        "self_target_languages": [
+          "en"
+        ]
+      },
+      "dashboard": "older speech",
+      "dashboard_status": "Source complete · translating",
+      "conversation": "[03:29:31] Mic · French · In progress · preview\nolder speech\nTranslation pending",
+      "conversation_visible": true,
+      "rows": [
+        {
+          "timestamp_label": "03:29:31",
+          "source": "Mic",
+          "channel": "self",
+          "source_text": "older speech",
+          "translated_text": null,
+          "utterance_id": "d453beb3-e5a2-4723-8f1c-2bb7e5ab3640",
+          "source_language": "fr",
+          "target_language": "en",
+          "target_index": 0,
+          "disposition": "pending",
+          "turn_kind": "speech",
+          "turn_generation": 0,
+          "presentation_revision": 3,
+          "source_revision": 1,
+          "translation_source_revision": null,
+          "turn_status": "active",
+          "accepted": false,
+          "parent_utterance_id": "d453beb3-e5a2-4723-8f1c-2bb7e5ab3640"
+        }
+      ],
+      "accepted_record_keys": 0,
+      "accepted_keys": [],
+      "provider_calls": [
+        {
+          "utterance_id": "d453beb3-e5a2-4723-8f1c-2bb7e5ab3640",
+          "text": "older speech",
+          "target_language": "en"
+        }
+      ],
+      "snapshots": [
+        {
+          "parent_id": "d453beb3-e5a2-4723-8f1c-2bb7e5ab3640",
+          "status": "active",
+          "targets": [
+            {
+              "language": "en",
+              "status": "pending",
+              "child_id": null
+            }
+          ]
+        }
+      ],
+      "facts": {
+        "progressive_parent": "7069c90f-6e3d-4e6e-b19d-6d3c19072309",
+        "progressive_preview_update_id": "ef81f26165ce4112a543e1948b137d2f"
+      }
+    }
+  ]
+}

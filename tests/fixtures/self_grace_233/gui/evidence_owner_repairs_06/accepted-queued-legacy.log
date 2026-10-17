@@ -1,0 +1,8 @@
+[Diagnostic][LlmLatency] request_end request_id=16 utterance_id=6f60a108-c330-47a0-8e6c-9a49301e884a parent_utterance_id=6f60a108-c330-47a0-8e6c-9a49301e884a channel=self kind=manual source_language=fr target_language=en provider_generation=0 input_chars=17 prompt_chars=0 context_chars=0 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Manual · Original (French) · Original "queued old manual"
+[Context] utterance_id=6f60a108-c330-47a0-8e6c-9a49301e884a context_count=0
+[Conversation] Self · Manual → English · Translation "en:queued old manual"
+[Diagnostic][LlmLatency] request_end request_id=17 utterance_id=b049bb79-76a0-4e46-b916-64c62cdaac95 parent_utterance_id=b049bb79-76a0-4e46-b916-64c62cdaac95 channel=self kind=self source_language=fr target_language=en provider_generation=0 input_chars=19 prompt_chars=0 context_chars=28 status=success request_ms=0 queue_ms=0 attempts=0 winner_attempt=none
+[Conversation] Self · Mic · Original (French) · Original "queued newer speech"
+[Context] utterance_id=b049bb79-76a0-4e46-b916-64c62cdaac95 context_count=1 texts=["queued old manual"]
+[Conversation] Self · Mic → English · Translation "en:queued newer speech"

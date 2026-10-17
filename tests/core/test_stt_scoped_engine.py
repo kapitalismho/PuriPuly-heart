@@ -18,6 +18,7 @@ from puripuly_heart.core.audio.ownership import (
     AudioRetentionBinding,
     AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
+    AudioSegmentTerminalReceipt,
     CaptureStreamInput,
     OwnedStreamInput,
     OwnedVadEvent,
@@ -3751,9 +3752,21 @@ async def test_queued_capture_discontinuity_retires_stream_after_successor_arriv
         _current_stream_capture_epoch=None,
         is_current_generation=lambda generation: generation == 3,
     )
+    retired_sources: list[AudioSegmentTerminalReceipt] = []
+
+    class NativeCaptureBoundary:
+        async def handle_vad_event(self, event: OwnedVadEvent) -> None:
+            await engine.handle_owned_vad_event(event)
+
+        async def handle_stream_input(self, event: OwnedStreamInput) -> None:
+            await engine.handle_stream_input(event)
+
+        async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None:
+            retired_sources.append(receipt)
+
     if channel == "self":
         guard = self_capture._GenerationGuardedVadSink(
-            sink=engine,
+            sink=NativeCaptureBoundary(),
             owner=runtime,
             capture_generation=self_capture._CaptureGeneration(3),
             ledger=ledger,
@@ -3804,6 +3817,7 @@ async def test_queued_capture_discontinuity_retires_stream_after_successor_arriv
             for capture in ranges
         ] == [(1, 0, 2), (1, 2, 6), (1, 6, 10)]
         assert guard.retention_budget.used_bytes == 0
+        assert retired_sources == []
     finally:
         session.send_gate.set()
         await guard.abort()
@@ -4416,6 +4430,7 @@ async def test_independent_retirement_resumes_unsent_audio_without_new_local_tur
         terminals = [e for e in emitted if isinstance(e, STTProviderInputTerminal)]
         assert len(terminals) == 1
         assert terminals[0].outcome == ("failed" if open_turn else "submitted")
+        assert terminals[0].independent_recognition
         if open_turn:
             assert terminals[0].recovery_pending
         assert failures == []

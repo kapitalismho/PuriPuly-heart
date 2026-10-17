@@ -833,6 +833,7 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
                     reason,
                     "retire",
                     failure_diagnostics=diagnostics,
+                    independent_recognition=True,
                 )
             )
         self._event_projection.end_epoch(
@@ -944,7 +945,9 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
             raise RuntimeError("Gemini sealed input contains unsubmitted audio")
         self._event_projection.seal(identity)
         self._event_projection.terminal(
-            STTProviderInputTerminal(identity, "submitted", request.channel)
+            STTProviderInputTerminal(
+                identity, "submitted", request.channel, independent_recognition=True
+            )
         )
         self._scoped_request = None
         self._sealing = False
@@ -957,7 +960,14 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         request = self._require_scoped_turn(identity)
         self._event_projection.terminal(
-            STTProviderInputTerminal(identity, "cancelled", request.channel, reason, "retire")
+            STTProviderInputTerminal(
+                identity,
+                "cancelled",
+                request.channel,
+                reason,
+                "retire",
+                independent_recognition=True,
+            )
         )
         self._scoped_request = None
         self._scoped_transport_failure(reason)
@@ -995,7 +1005,12 @@ class _GeminiTranscribeLiveSession(STTBackendSession):
         if request is not None:
             self._event_projection.terminal(
                 STTProviderInputTerminal(
-                    request.identity, "cancelled", request.channel, "stopped", "retire"
+                    request.identity,
+                    "cancelled",
+                    request.channel,
+                    "stopped",
+                    "retire",
+                    independent_recognition=True,
                 )
             )
         self._event_projection.end_epoch(orderly=True, reason="stopped")
