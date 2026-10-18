@@ -1479,3 +1479,22 @@ def test_native_auth_rejects_non_exact_caption_card_contract(capability: object)
     assert bridge._is_valid_auth_payload(payload)
     payload["contract_version"] = 15
     assert not bridge._is_valid_auth_payload(payload)
+
+
+@pytest.mark.parametrize(
+    "capability",
+    [
+        None,
+        {"version": 2, "policy": "immutable_first_readable_style"},
+        {"version": 2, "policy": "bounded_late_speaker_assignment"},
+        {"version": 3, "policy": "immutable_first_readable_style"},
+        {"version": 3, "policy": "bounded_late_speaker_assignment", "extension": True},
+    ],
+)
+def test_native_auth_rejects_retired_or_non_exact_speaker_assignment_contract(capability):
+    bridge = OverlayBridge(session_token="expected-token", overlay_instance_id="overlay-test")
+    payload = json.loads(_native_auth())
+    payload["capabilities"]["speaker_identity_presentation"] = capability
+    assert not bridge._is_valid_auth_payload(payload)
+    payload["capabilities"]["speaker_identity_presentation"] = OVERLAY_SPEAKER_IDENTITY_CONTRACT
+    assert bridge._is_valid_auth_payload(payload)

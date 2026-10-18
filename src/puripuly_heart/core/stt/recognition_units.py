@@ -149,6 +149,7 @@ def contribution_transcript(
             audio_settings=snapshot.settings,
             source_available_at_monotonic_s=created_at,
             speaker_attribution=audio.speaker_attribution if audio is not None else None,
+            speaker_proof_id=audio.speaker_proof_id if audio is not None else None,
             native_provenance=(
                 (event.provenance,)
                 if isinstance(event, STTProviderTurnUpdate)

@@ -95,9 +95,7 @@ class PeerTranslationChannelOwner:
     _peer_parent_speech_end_times: dict[UUID, float] = field(default_factory=dict)
     _peer_translation_parent_ids: set[UUID] = field(default_factory=set)
     _prepared_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
-    _speaker_identities: PeerSpeakerIdentityAllocator = field(
-        default_factory=PeerSpeakerIdentityAllocator
-    )
+    _speaker_identities: PeerSpeakerIdentityAllocator = field(init=False)
     _publication_order_by_generation: dict[int, int] = field(default_factory=dict)
     _retired_local_vad_ids: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
     _stt_consumption: STTContributionConsumptionLedger = field(
@@ -108,6 +106,10 @@ class PeerTranslationChannelOwner:
     def __post_init__(self) -> None:
         if self.runtime.channel != "peer":
             raise ValueError("Peer translation owner requires the Peer channel runtime")
+        self._speaker_identities = PeerSpeakerIdentityAllocator(
+            getattr(self.local_asr_runtime, "speaker_evidence", None), clock=self.clock.now
+        )
+        self.output_projection.output_runtime.bind_speaker_identities(self._speaker_identities)
 
     @property
     def accepting_events(self) -> bool:
@@ -115,9 +117,11 @@ class PeerTranslationChannelOwner:
 
     def set_clock(self, clock: Clock) -> None:
         self.clock = clock
+        self._speaker_identities.clock = clock.now
 
     async def open_ingress(self) -> None:
         self._accepting_events = True
+        self._speaker_identities.open()
 
     async def close_ingress(self) -> None:
         self._accepting_events = False
@@ -128,7 +132,7 @@ class PeerTranslationChannelOwner:
         await self.translation_turns.cancel_pending(channel="peer")
         await self.runtime.reset_runtime_state()
         self._prepared_requests.clear()
-        self._speaker_identities.reset()
+        self._speaker_identities.close()
         self._clear_peer_logical_turn_state()
         self._retired_local_vad_ids.clear()
         self._publication_order_by_generation.clear()
@@ -484,6 +488,12 @@ class PeerTranslationChannelOwner:
         self._require_ingress()
         self._stt_consumption.record_boundary(identity, boundary)
 
+    def _discard_unadmitted_speaker_proofs(self, event) -> None:
+        for audio in event.source_audio:
+            self._speaker_identities.evidence.release_unadopted(
+                audio.speaker_proof_id, published=True
+            )
+
     async def handle_provider_turn_update(
         self, snapshot: AudioSegmentSnapshot, update: STTProviderTurnUpdate
     ) -> STTFinalEvent | None:
@@ -494,6 +504,7 @@ class PeerTranslationChannelOwner:
             raise ValueError("contribution source request identity mismatch")
         pieces = self._stt_consumption.consume_parts(update)
         if not pieces:
+            self._discard_unadmitted_speaker_proofs(update)
             return None
         order = self._allocate_publication_order(snapshot.identity.activation_generation)
         transcript = contribution_transcript(
@@ -514,6 +525,7 @@ class PeerTranslationChannelOwner:
         if receipt.segment.sealed_at_monotonic_s is not None:
             self._stt_consumption.seal_audio(terminal.identity)
         if terminal.outcome not in {"final", "degraded"} or not terminal.text:
+            self._discard_unadmitted_speaker_proofs(terminal)
             self._stt_consumption.retire(terminal.identity)
             self.diagnostics.emit(
                 RuntimeDiagnostic(
@@ -536,6 +548,7 @@ class PeerTranslationChannelOwner:
             return None
         pieces = self._stt_consumption.consume_parts(terminal)
         if not pieces:
+            self._discard_unadmitted_speaker_proofs(terminal)
             return None
         transcript = contribution_transcript(
             receipt.segment,
@@ -787,7 +800,9 @@ class PeerTranslationChannelOwner:
             self._speaker_identities.observe(
                 child.transcript,
                 child_sequence=child.sequence,
+                defer_settlement=True,
             )
+        self._speaker_identities.refresh()
         segment_count = 0
         unknown_span_count = 0
         for child in children:
@@ -824,9 +839,14 @@ class PeerTranslationChannelOwner:
             )
             for child in children
         )
-        self._prepared_requests.update(self.translation_requests.admit_peer(requests))
-        if not await self.output_projection.admit_translation_parent(children):
-            raise RuntimeError("Peer translation output admission rejected parent")
+        try:
+            self._prepared_requests.update(self.translation_requests.admit_peer(requests))
+            if not await self.output_projection.admit_translation_parent(children):
+                raise RuntimeError("Peer translation output admission rejected parent")
+        except BaseException:
+            for child in children:
+                self._speaker_identities.cancel_attempt(child.utterance_id)
+            raise
 
     async def on_child_terminal(
         self,
@@ -882,6 +902,10 @@ class PeerTranslationChannelOwner:
             preserve_parent_speech_end_time=True,
         )
         self._speaker_identities.retire(child.utterance_id)
+        if outcome == "cancelled":
+            self._speaker_identities.cancel_attempt(child.utterance_id)
+        if not self.output_projection.has_overlay_destination:
+            self._speaker_identities.discard(child.utterance_id)
 
     async def on_parent_closed(self, parent_utterance_id: UUID) -> None:
         if parent_utterance_id in self._peer_translation_parent_ids:

@@ -7,7 +7,7 @@ from collections import deque
 from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
-from puripuly_heart.core.speaker.contracts import SpeakerEvidence
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -19,10 +19,7 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.speaker_attribution import (
-    SpeakerFrame,
-    attribute_speaker,
     partition_replay,
-    probability_state,
 )
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
 
@@ -52,8 +49,6 @@ class _Slice:
     parent: _Parent
     identity: STTProviderTurnIdentity
     audio: STTSourceAudio
-    unique_context: tuple
-    replayed_context: tuple
     speaker: FinalSpeakerRun | None = None
     evidence_valid: bool = True
     result: STTProviderTurnTerminal | None = None
@@ -62,19 +57,19 @@ class _Slice:
 class CausalBatchSession:
     allows_sealed_turn_overlap = True
     MAX_PENDING_SLICES = 8
-    MAX_FRAMES = 2048
+    MAX_SUBMITTED_RANGES = 2048
 
-    def __init__(self, inner, *, clock=time.monotonic):
+    def __init__(self, inner, *, clock=time.monotonic, evidence_view=None):
         self.inner = inner
         self.clock = clock
         self._events = STTProviderEventBuffer()
         self._parents = deque()
         self._active = None
         self._slices = {}
-        self._frames = []
-        self._submitted_ranges = deque(maxlen=self.MAX_FRAMES)
-        self._epoch = None
-        self._immutable = 0
+        self.evidence = evidence_view if evidence_view is not None else SpeakerEvidenceView()
+        self._owns_evidence = evidence_view is None
+        self._submitted_ranges = deque(maxlen=self.MAX_SUBMITTED_RANGES)
+        self._evidence_generation = self.evidence.generation
         self._closed = False
         self._cleanup_complete = False
         self._consumer = asyncio.create_task(self._consume(), name="causal-batch-results")
@@ -109,131 +104,18 @@ class CausalBatchSession:
         return parent
 
     async def observe_speaker_evidence(self, evidence):
+        if self._owns_evidence:
+            self.evidence.observe(evidence)
         async with self._lock:
             if self._closed:
                 return
-            for item in evidence:
-                if not isinstance(item, SpeakerEvidence):
-                    continue
-                if self._epoch is not None and item.speaker_epoch < self._epoch:
-                    continue
-                if item.speaker_epoch != self._epoch:
-                    if self._epoch is not None:
-                        for child in self._slices.values():
-                            child.evidence_valid = False
-                    self._frames.clear()
-                    self._submitted_ranges.clear()
-                    self._immutable = 0
-                    self._epoch = item.speaker_epoch
-                previous_immutable = self._immutable
-                self._immutable = max(self._immutable, item.immutable_through_sample)
-                if item.reason == "omitted_silence" and item.frame is None:
-                    for piece in item.source_map:
-                        if (
-                            piece.kind == "unobserved"
-                            and piece.capture is not None
-                            and piece.capture.normalized_start_sample is not None
-                            and piece.capture.normalized_end_sample is not None
-                        ):
-                            self._frames.append(
-                                SpeakerFrame(
-                                    piece.capture,
-                                    item.speaker_epoch,
-                                    piece.compact_end_sample,
-                                    item.observation_ready_monotonic_s,
-                                    True,
-                                    (),
-                                    False,
-                                    False,
-                                    False,
-                                )
-                            )
-                    continue
-                if item.reason not in (None, "vad_pause", "source_eof"):
-                    self._frames.clear()
-                    self._submitted_ranges.clear()
-                    for child in self._slices.values():
-                        child.evidence_valid = False
-                    continue
-                if item.frame is None:
-                    continue
-                state = probability_state(item.frame.probabilities)
-                if state is None:
-                    continue
-                slots, clear, uncertain, competing = state
-                for piece in item.source_map:
-                    span = piece.capture
-                    if span is None or piece.kind != "original":
-                        continue
-                    start, end = span.normalized_start_sample, span.normalized_end_sample
-                    if start is None or end is None:
-                        continue
-                    self._frames = [
-                        frame
-                        for frame in self._frames
-                        if not (
-                            frame.span.capture_epoch == span.capture_epoch
-                            and frame.span.normalized_start_sample < end
-                            and start < frame.span.normalized_end_sample
-                            and not frame.closed
-                            and frame.compact_end > previous_immutable
-                        )
-                    ]
-                    if any(
-                        frame.span.capture_epoch == span.capture_epoch
-                        and (frame.closed or frame.compact_end <= previous_immutable)
-                        and frame.span.normalized_start_sample < end
-                        and start < frame.span.normalized_end_sample
-                        for frame in self._frames
-                    ):
-                        continue
-                    self._frames.append(
-                        SpeakerFrame(
-                            span,
-                            item.speaker_epoch,
-                            piece.compact_end_sample,
-                            item.observation_ready_monotonic_s,
-                            item.range_state == "closed",
-                            slots,
-                            clear,
-                            uncertain,
-                            competing,
-                        )
-                    )
-            self._frames.sort(
-                key=lambda frame: (frame.span.capture_epoch, frame.span.normalized_start_sample)
-            )
-            self._prune_frames()
+            if self._evidence_generation != self.evidence.generation:
+                self._evidence_generation = self.evidence.generation
+                self._submitted_ranges.clear()
+                for child in self._slices.values():
+                    child.evidence_valid = False
             if self._active is not None:
                 await self._cut_available(self._active)
-
-    def _prune_frames(self):
-        needed = [
-            span
-            for child in self._slices.values()
-            for span in (*child.audio.source_ranges, *child.audio.context_ranges)
-        ]
-        if self._active is not None:
-            needed.extend(span for _, ranges, _ in self._active.payloads for span in ranges)
-        floors = {}
-        for span in needed:
-            if span.normalized_start_sample is not None:
-                floors[span.capture_epoch] = min(
-                    floors.get(span.capture_epoch, span.normalized_start_sample),
-                    span.normalized_start_sample,
-                )
-        newest = self._frames[-1].span if self._frames else None
-        if newest is not None:
-            floors[newest.capture_epoch] = min(
-                floors.get(newest.capture_epoch, newest.normalized_end_sample),
-                newest.normalized_end_sample - 8000,
-            )
-        self._frames = [
-            frame
-            for frame in self._frames
-            if frame.span.capture_epoch in floors
-            and frame.span.normalized_end_sample > floors[frame.span.capture_epoch]
-        ][-self.MAX_FRAMES :]
 
     async def _cut_available(self, parent):
         if parent.optional_cuts_disabled:
@@ -274,38 +156,32 @@ class CausalBatchSession:
         epoch = content[0].capture_epoch
         if start is None or end is None:
             return
-        frames = [
-            frame
-            for frame in self._frames
-            if frame.span.capture_epoch == epoch
-            and (frame.closed or frame.compact_end <= self._immutable)
-        ]
-        last_slot = previous_slot = last_end = boundary = None
-        qualified = previous_qualified = False
-        for frame in frames:
-            if last_end is not None and last_end != frame.span.normalized_start_sample:
-                last_slot = previous_slot = None
-                qualified = previous_qualified = False
-            last_end = frame.span.normalized_end_sample
-            if len(frame.slots) > 1 or frame.competing:
-                last_slot = previous_slot = None
-                qualified = previous_qualified = False
-                continue
-            if not frame.slots:
-                continue
-            slot = frame.slots[0]
-            if slot != last_slot:
-                previous_slot, previous_qualified = last_slot, qualified
-                last_slot, boundary, qualified = slot, frame.span.normalized_start_sample, False
-            qualified |= frame.clear
+        for boundary, _, successor in self.evidence.transitions():
             if (
-                qualified
-                and previous_qualified
-                and previous_slot != slot
-                and start < boundary < end
-                and boundary > parent.submitted_cursor
+                boundary.capture_epoch == epoch
+                and start < boundary.normalized_sample < end
+                and boundary.normalized_sample > parent.submitted_cursor
             ):
-                await self._submit(parent, boundary, "speaker", frame.ready_at)
+                cut = boundary.normalized_sample
+                for frame in reversed(self.evidence.frames):
+                    if frame.span.capture_epoch != epoch or frame.span.normalized_end_sample > cut:
+                        continue
+                    if (
+                        frame.span.normalized_end_sample != cut
+                        or not (frame.closed or frame.compact_end <= self.evidence.immutable)
+                        or frame.competing
+                        or frame.slots != successor.slots
+                    ):
+                        break
+                    cut = frame.span.normalized_start_sample
+                if cut <= start or cut <= parent.submitted_cursor:
+                    cut = boundary.normalized_sample
+                await self._submit(
+                    parent,
+                    cut,
+                    "speaker",
+                    boundary.observed_at_monotonic_s,
+                )
                 await self._cut_available(parent)
                 return
 
@@ -332,11 +208,6 @@ class CausalBatchSession:
         parent.payloads = remaining
         return selected
 
-    def _attribute(self, source, context, replayed=()):
-        return attribute_speaker(
-            (*source, *context), self._frames, self._immutable, replayed=replayed
-        )
-
     async def _submit(self, parent, boundary, reason, ready_at=None):
         selected = self._partition(parent, boundary)
         if not selected:
@@ -353,8 +224,11 @@ class CausalBatchSession:
             source,
             context,
             parent.request.display_group_id,
+            speaker_proof_id=self.evidence.pin(
+                (*source, *unique_context), replayed=replayed_context
+            ),
         )
-        child = _Slice(parent, child_id, audio, unique_context, replayed_context)
+        child = _Slice(parent, child_id, audio)
         parent.children.append(child)
         self._slices[child_id] = child
         await self.inner.begin_turn(
@@ -419,11 +293,7 @@ class CausalBatchSession:
         if child is None or child.parent.cancelled or child.speaker is not None:
             return
         child.speaker = (
-            self._attribute(
-                child.audio.source_ranges,
-                child.unique_context,
-                child.replayed_context,
-            )
+            self.evidence.resolve(child.audio.speaker_proof_id)
             if child.evidence_valid
             and all(
                 span.capture_epoch == child.identity.segment.capture_epoch
@@ -445,7 +315,6 @@ class CausalBatchSession:
                                     "native terminal did not snapshot speaker evidence"
                                 )
                             child.result = event
-                            self._prune_frames()
                             await self._release()
         finally:
             self._events.close()
@@ -457,10 +326,12 @@ class CausalBatchSession:
                 child = parent.children.popleft()
                 result = child.result
                 if parent.cancelled:
+                    self.evidence.release(child.audio.speaker_proof_id)
                     continue
                 if result.outcome not in ("final", "empty", "suppressed"):
                     parent.failures.append(result.failure_reason or result.outcome)
                 if not result.text:
+                    self.evidence.release(child.audio.speaker_proof_id)
                     continue
                 text = result.text
                 languages = result.final_language_runs or (FinalLanguageRun(text, ""),)
@@ -533,8 +404,8 @@ class CausalBatchSession:
             parent.failures.append(reason)
             for child in parent.children:
                 self._slices.pop(child.identity, None)
+                self.evidence.release(child.audio.speaker_proof_id)
             parent.children.clear()
-            self._prune_frames()
             if self._active is parent:
                 self._active = None
             await self._release()
@@ -547,9 +418,13 @@ class CausalBatchSession:
         if not self._consumer.done():
             self._consumer.cancel()
         await asyncio.gather(self._consumer, return_exceptions=True)
+        for parent in self._parents:
+            for child in parent.children:
+                self.evidence.release(child.audio.speaker_proof_id)
         self._parents.clear()
         self._slices.clear()
-        self._frames.clear()
+        if self._owns_evidence:
+            self.evidence.reset()
         self._submitted_ranges.clear()
         self._events.close()
 

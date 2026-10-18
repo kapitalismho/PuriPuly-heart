@@ -32,6 +32,7 @@ from puripuly_heart.providers.stt.local_parakeet_sherpa import (
     LocalParakeetV3SherpaSTTBackend,
 )
 from puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend
+from tests.helpers.speaker_evidence import temporal_frames
 
 
 def span(start, end, epoch=7):
@@ -150,7 +151,9 @@ async def test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins(bac
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
-        await session.observe_speaker_evidence((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        )
         events = session.turn_events()
         early = await asyncio.wait_for(anext(events), 2)
         assert early.source_release is not None
@@ -158,7 +161,7 @@ async def test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins(bac
         assert recognizer.calls[0].samples.size == 800
         assert early.final_speaker_runs[0].speaker_id == "0"
         await payload(session, req, 1600, 2400, 2)
-        await session.observe_speaker_evidence((evidence(1600, 2400, (0,)),))
+        await session.observe_speaker_evidence(temporal_frames((evidence(1600, 2400, (0,)),)))
         await seal(session, req)
         received = [early]
         async for event in events:
@@ -267,15 +270,15 @@ async def test_duplicate_stale_and_revised_evidence_never_reclaims_submitted_con
         await session.begin_turn(req)
         await payload(session, req, 0, 3200, 1)
         original = (evidence(0, 1600, (0,)), evidence(1600, 3200, (1,)))
-        await session.observe_speaker_evidence(original)
-        await session.observe_speaker_evidence(original)
+        await session.observe_speaker_evidence(temporal_frames(original))
+        await session.observe_speaker_evidence(temporal_frames(original))
         await session.observe_speaker_evidence(
-            (evidence(0, 800, (4,), epoch=10), evidence(800, 1600, (5,), epoch=10))
+            temporal_frames((evidence(0, 800, (4,), epoch=10), evidence(800, 1600, (5,), epoch=10)))
         )
-        await session.observe_speaker_evidence((evidence(0, 1600, (3,)),))
+        await session.observe_speaker_evidence(temporal_frames((evidence(0, 1600, (3,)),)))
         await payload(session, req, 3200, 4000, 2)
         await seal(session, req, reason)
-        await session.observe_speaker_evidence(original)
+        await session.observe_speaker_evidence(temporal_frames(original))
         backend._decode_lock.release()
         await asyncio.wait_for(terminal_events(session), 2)
         assert [call.samples.size for call in recognizer.calls] == [1600, 2400]
@@ -295,7 +298,9 @@ async def test_overlap_and_unknown_keep_all_short_audio_without_forced_cut(slots
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
-        await session.observe_speaker_evidence((evidence(0, 800, (0,)), evidence(800, 1600, slots)))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 800, (0,)), evidence(800, 1600, slots)))
+        )
         assert not recognizer.calls
         await seal(session, req)
         events = await asyncio.wait_for(terminal_events(session), 2)
@@ -328,14 +333,14 @@ async def test_small_proven_replay_intrusion_does_not_outvote_new_speech(
         if replayed:
             await session.begin_turn(first)
             await payload(session, first, 0, 4800, 1)
-            await session.observe_speaker_evidence((evidence(0, 4800, (0,)),))
+            await session.observe_speaker_evidence(temporal_frames((evidence(0, 4800, (0,)),)))
             await seal(session, first)
             await asyncio.wait_for(terminal_events(session), 2)
         await session.begin_turn(req)
         await payload(session, req, 4800 - context_samples, 4800, 1, context=context_only)
         await payload(session, req, 4800, 36800, 2)
         await session.observe_speaker_evidence(
-            (evidence(0, 4800, (0,)), evidence(4800, 36800, (1,)))
+            temporal_frames((evidence(0, 4800, (0,)), evidence(4800, 36800, (1,))))
         )
         await seal(session, req, "hardcut")
         events = await asyncio.wait_for(terminal_events(session), 2)
@@ -365,7 +370,9 @@ async def test_failed_prefix_does_not_discard_successful_successor_or_redecode_p
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
-        await session.observe_speaker_evidence((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        )
         await seal(session, req)
         events = await asyncio.wait_for(terminal_events(session), 2)
         assert events[-1].outcome == "degraded"
@@ -394,7 +401,9 @@ async def test_stop_fences_slow_decode_and_retained_tail():
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
-        await session.observe_speaker_evidence((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        )
         await session.abort_turn(req.identity, reason="stop")
         events = await asyncio.wait_for(terminal_events(session), 2)
         assert events[-1].outcome == "cancelled"
@@ -416,20 +425,24 @@ async def test_open_evidence_revisions_commit_only_at_immutable_frontier():
         await session.begin_turn(req)
         await payload(session, req, 0, 2400, 1)
         await session.observe_speaker_evidence(
-            (
-                evidence(0, 800, (0,), immutable=0, state="open"),
-                evidence(800, 1600, (1,), immutable=0, state="open"),
+            temporal_frames(
+                (
+                    evidence(0, 800, (0,), immutable=0, state="open"),
+                    evidence(800, 1600, (1,), immutable=0, state="open"),
+                )
             )
         )
         assert not recognizer.calls
         await session.observe_speaker_evidence(
-            (
-                evidence(800, 1600, (0,), immutable=0, state="open"),
-                evidence(1600, 2400, (1,), immutable=0, state="open"),
+            temporal_frames(
+                (
+                    evidence(800, 1600, (0,), immutable=0, state="open"),
+                    evidence(1600, 2400, (1,), immutable=0, state="open"),
+                )
             )
         )
         await session.observe_speaker_evidence(
-            (SpeakerEvidence("capture", 11, 3.0, (), 2400, 2400),)
+            temporal_frames((SpeakerEvidence("capture", 11, 3.0, (), 2400, 2400),))
         )
         await seal(session, req)
         await asyncio.wait_for(terminal_events(session), 2)
@@ -448,10 +461,10 @@ async def test_optional_cut_pressure_coalesces_tail_without_historical_burst_or_
         await session.begin_turn(req)
         await payload(session, req, 0, 20 * 160, 1)
         frames = tuple(
-            evidence(index * 160, (index + 1) * 160, (index % 2,)) for index in range(20)
+            evidence(index * 160, (index + 1) * 160, ((index // 2) % 2,)) for index in range(20)
         )
-        await session.observe_speaker_evidence(frames)
-        await session.observe_speaker_evidence(frames)
+        await session.observe_speaker_evidence(temporal_frames(frames))
+        await session.observe_speaker_evidence(temporal_frames(frames))
         await seal(session, req)
         backend._decode_lock.release()
         events = await asyncio.wait_for(terminal_events(session), 2)
@@ -474,10 +487,12 @@ async def test_discontinuity_invalidates_evidence_without_losing_owned_audio():
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
         await session.observe_speaker_evidence(
-            (
-                evidence(0, 800, (0,), immutable=0, state="open"),
-                SpeakerEvidence("capture", 11, 3, (), 800, 0, reason="source_discontinuity"),
-                evidence(800, 1600, (1,), epoch=12),
+            temporal_frames(
+                (
+                    evidence(0, 800, (0,), immutable=0, state="open"),
+                    SpeakerEvidence("capture", 11, 3, (), 800, 0, reason="source_discontinuity"),
+                    evidence(800, 1600, (1,), epoch=12),
+                )
             )
         )
         await seal(session, req)
@@ -523,10 +538,12 @@ async def test_actual_engine_preserves_onset_group_and_sourcechild_context_befor
     segment_id = uuid4()
     try:
         await engine.observe_speaker_evidence(
-            (
-                evidence(0, 8000, (0,)),
-                evidence(8000, 16000, (0,)),
-                evidence(16000, 24000, (1,)),
+            temporal_frames(
+                (
+                    evidence(0, 8000, (0,)),
+                    evidence(8000, 16000, (0,)),
+                    evidence(16000, 24000, (1,)),
+                )
             )
         )
         owned = ledger.observe_vad_event(
@@ -597,7 +614,7 @@ async def test_real_probability_contract_cuts_without_adapter_active_slots_and_p
             evidence(1600, 2400, (1,)),
         )
         raw = tuple(replace(item, frame=replace(item.frame, active_slots=())) for item in raw)
-        await session.observe_speaker_evidence(raw)
+        await session.observe_speaker_evidence(temporal_frames(raw))
         early = await asyncio.wait_for(anext(session.turn_events()), 2)
         assert early.source_audio[0].source_ranges == (span(0, 2400).slice_normalized(0, 1200),)
         assert early.final_speaker_runs[0].speaker_id == "0"
@@ -624,7 +641,7 @@ async def test_competing_raw_probabilities_block_pure_transfer_even_with_single_
             ),
         )
         await session.observe_speaker_evidence(
-            (evidence(0, 800, (0,)), ambiguous, evidence(1600, 2400, (1,)))
+            temporal_frames((evidence(0, 800, (0,)), ambiguous, evidence(1600, 2400, (1,))))
         )
         assert not recognizer.calls
         await seal(session, req)
@@ -732,7 +749,9 @@ async def test_failed_slice_resolves_before_successor_is_queued_and_capture_cont
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 1600, 1)
-        await session.observe_speaker_evidence((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 800, (0,)), evidence(800, 1600, (1,))))
+        )
         async with asyncio.timeout(2):
             while not attempts:
                 await asyncio.sleep(0)
@@ -868,10 +887,12 @@ async def test_out_of_order_native_results_release_only_source_ordered_prefix():
         await session.begin_turn(req)
         await payload(session, req, 0, 2400, 1)
         await session.observe_speaker_evidence(
-            (
-                evidence(0, 800, (0,)),
-                evidence(800, 1600, (1,)),
-                evidence(1600, 2400, (0,)),
+            temporal_frames(
+                (
+                    evidence(0, 800, (0,)),
+                    evidence(800, 1600, (1,)),
+                    evidence(1600, 2400, (0,)),
+                )
             )
         )
         await seal(session, req)
@@ -930,7 +951,7 @@ async def test_late_observation_selects_retained_prefix_and_records_distinct_cau
         assert not recognizer.calls
         with caplog.at_level("INFO", logger="puripuly_heart.core.stt.batch_speaker"):
             await session.observe_speaker_evidence(
-                (evidence(0, 38400, (0,)), evidence(38400, 48000, (1,)))
+                temporal_frames((evidence(0, 38400, (0,)), evidence(38400, 48000, (1,))))
             )
         (selection,) = [record.getMessage() for record in caplog.records]
         assert "reason=speaker source_boundary=38400 evidence_ready=3.0" in selection
@@ -974,7 +995,9 @@ async def test_imminent_safety_coalesces_optional_cut_without_losing_short_succe
                 context_only=False,
             )
             await session.observe_speaker_evidence(
-                (evidence(0, 94400, (0,), ready=5.99), evidence(94400, 95900, (1,), ready=5.99))
+                temporal_frames(
+                    (evidence(0, 94400, (0,), ready=5.99), evidence(94400, 95900, (1,), ready=5.99))
+                )
             )
         assert not recognizer.calls
         assert any("coalesced=safety" in record.getMessage() for record in caplog.records)
@@ -985,7 +1008,9 @@ async def test_imminent_safety_coalesces_optional_cut_without_losing_short_succe
             source_ranges=(span(95900, 96000),),
             context_only=False,
         )
-        await session.observe_speaker_evidence((evidence(95900, 96000, (1,), ready=6.0),))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(95900, 96000, (1,), ready=6.0),))
+        )
         await seal(session, req, "hardcut")
         events = await asyncio.wait_for(terminal_events(session), 1)
         assert len(recognizer.calls) == 1
@@ -1052,7 +1077,9 @@ async def test_actual_listen_safety_policy_reaches_owner_without_restarting_dead
         assert opened_requests[0].optional_cutoff_at_monotonic_s == 5.7
         now = 5.99
         await engine.observe_speaker_evidence(
-            (evidence(0, 94400, (0,), ready=now), evidence(94400, 95900, (1,), ready=now))
+            temporal_frames(
+                (evidence(0, 94400, (0,), ready=now), evidence(94400, 95900, (1,), ready=now))
+            )
         )
         assert not recognizer.calls
         await delivery.handle_vad_event(
@@ -1094,10 +1121,12 @@ async def test_parakeet_disjoint_slices_preserve_native_options_and_rollover_con
         await session.begin_turn(first)
         await payload(session, first, 0, 7200, 1)
         await session.observe_speaker_evidence(
-            (
-                evidence(0, 2400, (0,)),
-                evidence(2400, 4800, (1,)),
-                evidence(4800, 7200, (0,)),
+            temporal_frames(
+                (
+                    evidence(0, 2400, (0,)),
+                    evidence(2400, 4800, (1,)),
+                    evidence(4800, 7200, (0,)),
+                )
             )
         )
         await backend.reconfigure_session_options(
@@ -1165,13 +1194,13 @@ async def test_each_native_final_snapshots_delivered_evidence_before_ordered_rel
             await seal(session, req)
         first_id, second_id = [req.identity for req in inner.requests]
         if second_evidence_before_final:
-            await session.observe_speaker_evidence((evidence(16000, 32000, (1,)),))
+            await session.observe_speaker_evidence(temporal_frames((evidence(16000, 32000, (1,)),)))
         inner.emit(
             STTProviderTurnTerminal(second_id, "final", "No.", text_authority="authoritative")
         )
         await until(lambda: second_id not in session._slices)
         await session.observe_speaker_evidence(
-            (evidence(0, 16000, (0,)), evidence(16000, 32000, (1,)))
+            temporal_frames((evidence(0, 16000, (0,)), evidence(16000, 32000, (1,))))
         )
         inner.emit(
             STTProviderTurnTerminal(first_id, "final", "Alpha.", text_authority="authoritative")
@@ -1207,19 +1236,19 @@ async def test_unresolved_native_request_retains_proof_until_final_with_hard_cac
         await session.begin_turn(first)
         await payload(session, first, 0, 16000, 1)
         await seal(session, first)
-        await session.observe_speaker_evidence((evidence(0, 16000, (0,)),))
+        await session.observe_speaker_evidence(temporal_frames((evidence(0, 16000, (0,)),)))
         await session.begin_turn(second)
         await payload(session, second, 16000, 48000, 1)
         later = (
             tuple(
                 evidence(16000 + i * 16, 16016 + i * 16, (1,))
-                for i in range(session.MAX_FRAMES + 1)
+                for i in range(session.evidence.MAX_FRAMES + 1)
             )
             if exhausted
             else (evidence(16000, 48000, (1,)),)
         )
-        await session.observe_speaker_evidence(later)
-        assert len(session._frames) <= session.MAX_FRAMES
+        await session.observe_speaker_evidence(temporal_frames(later))
+        assert len(session.evidence.frames) <= session.evidence.MAX_FRAMES
         inner.emit(
             STTProviderTurnTerminal(
                 inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative"
@@ -1247,21 +1276,25 @@ async def test_pending_final_cannot_use_new_epoch_reset_or_other_capture_evidenc
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 16000, 1)
-        await session.observe_speaker_evidence((evidence(0, 16000, (0,)),))
+        await session.observe_speaker_evidence(temporal_frames((evidence(0, 16000, (0,)),)))
         await seal(session, req)
         if fence == "epoch":
             replacement = evidence(0, 16000, (0,), epoch=12)
         elif fence == "reset":
             await session.observe_speaker_evidence(
-                (SpeakerEvidence("capture", 11, 4, (), 16000, 16000, reason="manual_reset"),)
+                temporal_frames(
+                    (SpeakerEvidence("capture", 11, 4, (), 16000, 16000, reason="manual_reset"),)
+                )
             )
             replacement = evidence(0, 16000, (0,))
         else:
             await session.observe_speaker_evidence(
-                (
-                    SpeakerEvidence(
-                        "capture", 11, 4, (), 16000, 16000, reason="source_discontinuity"
-                    ),
+                temporal_frames(
+                    (
+                        SpeakerEvidence(
+                            "capture", 11, 4, (), 16000, 16000, reason="source_discontinuity"
+                        ),
+                    )
                 )
             )
             original = evidence(0, 16000, (0,))
@@ -1269,7 +1302,7 @@ async def test_pending_final_cannot_use_new_epoch_reset_or_other_capture_evidenc
                 original,
                 source_map=(replace(original.source_map[0], capture=span(0, 16000, epoch=8)),),
             )
-        await session.observe_speaker_evidence((replacement,))
+        await session.observe_speaker_evidence(temporal_frames((replacement,)))
         inner.emit(
             STTProviderTurnTerminal(
                 inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative"
@@ -1326,7 +1359,7 @@ async def test_representative_utterance_tolerates_bounded_edges_but_never_clear_
             if slot is None:
                 item = replace(item, frame=replace(item.frame, probabilities=(0.4,) + (0.01,) * 7))
             observed.append(item)
-        await session.observe_speaker_evidence(tuple(observed))
+        await session.observe_speaker_evidence(temporal_frames(tuple(observed)))
         await seal(session, req)
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].attribution_state == expected
@@ -1353,7 +1386,13 @@ async def test_own_final_uses_only_delivered_immutable_probability_frontier(immu
         await payload(session, req, 0, 16000, 1)
         await seal(session, req)
         await session.observe_speaker_evidence(
-            (evidence(0, 16000, (0,), immutable=16000 if immutable_at_final else 0, state="open"),)
+            temporal_frames(
+                (
+                    evidence(
+                        0, 16000, (0,), immutable=16000 if immutable_at_final else 0, state="open"
+                    ),
+                )
+            )
         )
         inner.emit(
             STTProviderTurnTerminal(
@@ -1363,7 +1402,7 @@ async def test_own_final_uses_only_delivered_immutable_probability_frontier(immu
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].speaker_id == ("0" if immutable_at_final else None)
         await session.observe_speaker_evidence(
-            (SpeakerEvidence("capture", 11, 4, (), 16000, 16000),)
+            temporal_frames((SpeakerEvidence("capture", 11, 4, (), 16000, 16000),))
         )
         assert result.final_speaker_runs[0].speaker_id == ("0" if immutable_at_final else None)
     finally:
@@ -1378,7 +1417,7 @@ async def test_missing_central_eligible_evidence_is_not_a_confidence_hole():
         await session.begin_turn(req)
         await payload(session, req, 0, 32000, 1)
         await session.observe_speaker_evidence(
-            (evidence(0, 15920, (0,)), evidence(16080, 32000, (0,)))
+            temporal_frames((evidence(0, 15920, (0,)), evidence(16080, 32000, (0,))))
         )
         await seal(session, req)
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
@@ -1404,14 +1443,16 @@ async def test_native_emission_freezes_evidence_before_wrapper_dequeue(late_evid
         await seal(session, req)
         if late_evidence != "new":
             await session.observe_speaker_evidence(
-                (
-                    evidence(
-                        0,
-                        16000,
-                        (0,),
-                        immutable=0 if late_evidence == "immutable" else 16000,
-                        state="open",
-                    ),
+                temporal_frames(
+                    (
+                        evidence(
+                            0,
+                            16000,
+                            (0,),
+                            immutable=0 if late_evidence == "immutable" else 16000,
+                            state="open",
+                        ),
+                    )
                 )
             )
         child_id = inner.requests[0].identity
@@ -1430,7 +1471,7 @@ async def test_native_emission_freezes_evidence_before_wrapper_dequeue(late_evid
             late = evidence(0, 16000, (1,), epoch=12, ready=1.0)
         else:
             late = SpeakerEvidence("capture", 11, 1.0, (), 16000, 16000, reason="input_overload")
-        await session.observe_speaker_evidence((late,))
+        await session.observe_speaker_evidence(temporal_frames((late,)))
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].speaker_id == expected
         assert result.source_audio[0].speaker_attribution == child.speaker.attribution
@@ -1460,7 +1501,7 @@ async def test_synchronous_terminal_during_seal_snapshots_without_reentering_wra
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 16000, 1)
-        await session.observe_speaker_evidence((evidence(0, 16000, (0,)),))
+        await session.observe_speaker_evidence(temporal_frames((evidence(0, 16000, (0,)),)))
         await asyncio.wait_for(seal(session, req), 2)
         assert [speaker.speaker_id for speaker in snapshots] == ["0"]
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]

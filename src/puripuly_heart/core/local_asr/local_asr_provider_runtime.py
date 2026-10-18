@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 import numpy as np
 
@@ -18,6 +18,9 @@ from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.local_asr_transition import LocalASRSessionOptions
 from puripuly_heart.core.stt.backend import STTProviderTurnEvent
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 
 ProviderRuntimeChannel = Literal["self", "peer"]
 ProviderRuntimeChannelPhase = Literal[
@@ -269,6 +272,8 @@ class ProviderRuntimeProviderFactoryPort(Protocol):
 
 
 class LocalASRProviderRuntimePort(Protocol):
+    speaker_evidence: SpeakerEvidenceView
+
     @property
     def snapshot(self) -> LocalASRProviderRuntimeSnapshot: ...
 

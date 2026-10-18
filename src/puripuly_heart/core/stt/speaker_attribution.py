@@ -26,6 +26,7 @@ class SpeakerFrame:
     clear: bool
     uncertain: bool
     competing: bool
+    probabilities: tuple[float, ...] = ()
 
 
 def probability_state(values):
@@ -135,9 +136,15 @@ def attribute_speaker(ranges, frames, immutable, *, replayed=()):
     support = 0.0
     ambiguity = []
     foreign_replay = False
+    foreign_uncertainty = False
     if candidate is not None:
         for capture, left, right, rate, frame, is_replay in pieces:
             foreign = frame.clear and frame.slots != (candidate,)
+            if not is_replay and frame.uncertain and frame.probabilities:
+                peak = max(frame.probabilities)
+                foreign_uncertainty |= (
+                    peak >= COMPETING_PROBABILITY and frame.probabilities[candidate] < peak
+                )
             foreign_replay |= is_replay and foreign
             if not is_replay and frame.clear:
                 support += (right - left) / rate
@@ -168,7 +175,7 @@ def attribute_speaker(ranges, frames, immutable, *, replayed=()):
                 if foreign_replay and exceeds
                 else (
                     "uncertain"
-                    if (candidate is None and active_slots) or exceeds
+                    if foreign_uncertainty or (candidate is None and active_slots) or exceeds
                     else "unavailable" if candidate is None else "identified"
                 )
             )

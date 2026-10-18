@@ -927,7 +927,7 @@ async fn connect_test_bridge() -> (
         assert_eq!(auth_payload["contract_version"], EXPECTED_CONTRACT_VERSION);
         assert_eq!(
             auth_payload["capabilities"]["speaker_identity_presentation"],
-            json!({"version":2,"policy":"immutable_first_readable_style"})
+            json!({"version":3,"policy":"bounded_late_speaker_assignment"})
         );
         assert_eq!(
             auth_payload["capabilities"]["caption_card_presentation"],
@@ -969,6 +969,25 @@ async fn connect_test_bridge() -> (
     let (client, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
     assert!(snapshot.blocks.is_empty());
     (client, server)
+}
+
+#[tokio::test]
+async fn bridge_auth_and_ready_declare_bounded_assignment_without_devices() {
+    let logger = test_logger("bounded-speaker-capability").await;
+    let (mut bridge, server) = connect_test_bridge().await;
+    let mut runtime = OverlayRuntime::new(OverlayPresentationSnapshot::default());
+    runtime.emit_ready(&mut bridge, &logger).await.unwrap();
+    drop(bridge);
+    let messages = server.await.unwrap();
+    let ready = messages
+        .iter()
+        .find(|message| message["type"] == "overlay_ready")
+        .unwrap();
+    assert_eq!(
+        ready["capabilities"]["speaker_identity_presentation"],
+        json!({"version":3,"policy":"bounded_late_speaker_assignment"})
+    );
+    logger.shutdown().unwrap();
 }
 
 struct WriteGate {
@@ -2430,7 +2449,7 @@ async fn runtime_emits_overlay_ready_only_after_first_texture_submit() {
     );
     assert_eq!(
         ready["capabilities"]["speaker_identity_presentation"],
-        json!({"version":2,"policy":"immutable_first_readable_style"})
+        json!({"version":3,"policy":"bounded_late_speaker_assignment"})
     );
     assert_eq!(
         ready["capabilities"]["caption_card_presentation"],
@@ -6528,7 +6547,7 @@ fn check_startup_contract_reports_current_contract_version() {
     );
     assert_eq!(
         payload["speaker_identity_presentation"],
-        json!({"version":2,"policy":"immutable_first_readable_style"})
+        json!({"version":3,"policy":"bounded_late_speaker_assignment"})
     );
     assert_eq!(
         payload["caption_card_presentation"],

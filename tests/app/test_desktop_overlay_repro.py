@@ -356,6 +356,17 @@ def test_raw_ingress_requires_current_speaker_identity_capability() -> None:
     }
     assert not ingress._is_matched_desktop_auth(missing)
     assert not ingress._is_matched_desktop_auth(retired)
+    previous_policy = {
+        **base,
+        "capabilities": {
+            **base["capabilities"],
+            "speaker_identity_presentation": {
+                "version": 2,
+                "policy": "immutable_first_readable_style",
+            },
+        },
+    }
+    assert not ingress._is_matched_desktop_auth(previous_policy)
 
 
 def test_owner_drives_raw_authenticated_fifo_gate_through_shipping_renderer(tmp_path: Path) -> None:

@@ -47,6 +47,8 @@ class SpeakerAssignment:
     palette_overflow: bool = False
     source_text_range: tuple[int, int] | None = None
     source_text_revision: str | None = None
+    revision: int = 0
+    settled: bool = True
 
 
 def _validate_channel(channel: str) -> None:

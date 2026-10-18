@@ -955,6 +955,16 @@ class TranslationOutputProjectionOwner:
             utterance_id = UUID(raw_utterance_id)
         except ValueError:
             return
+        identities = self.output_runtime.speaker_identities
+        if identities is not None and decision.metadata.get("outcome") not in (
+            "pending",
+            "waiting",
+        ):
+            identities.output_disposition(
+                utterance_id,
+                applied=decision.decision == OUTPUT_ROUTING_DECISION_PUBLISHED
+                and decision.reason == "application_applied",
+            )
         if (
             decision.decision == OUTPUT_ROUTING_DECISION_PUBLISHED
             and decision.reason == "application_applied"

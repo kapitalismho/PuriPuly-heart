@@ -26,6 +26,7 @@ from puripuly_heart.core.network_diagnostics import (
     classify_transport_error,
     transport_exception_chain,
 )
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 from puripuly_heart.core.stt.backend import (
     PermanentSTTScopedSessionError,
     STTIndependentRecognitionSession,
@@ -224,6 +225,7 @@ class ScopedRecognitionEngine:
         Callable[[Exception | ErrorDiagnostics], Awaitable[None] | None] | None
     ) = None
     session_lifetime_enabled: bool = True
+    evidence_view: SpeakerEvidenceView | None = None
     exclusive_provider_ids: frozenset[str] = frozenset(
         {
             "local_cpu_auto",
@@ -1705,6 +1707,20 @@ class ScopedRecognitionEngine:
             self._notify_terminal_failure(last_error)
         return False
 
+    def _discard_speaker_proofs(self, event, *, published=False) -> None:
+        if self.evidence_view is not None:
+            for audio in getattr(event, "source_audio", ()):
+                self.evidence_view.release_unadopted(audio.speaker_proof_id, published=published)
+
+    def _publish_speaker_proofs(self, event) -> None:
+        if self.evidence_view is not None and (
+            isinstance(event, STTProviderTurnTerminal)
+            or isinstance(event, STTProviderTurnUpdate)
+            and event.source_release is not None
+        ):
+            for audio in event.source_audio:
+                self.evidence_view.publish(audio.speaker_proof_id)
+
     async def _consume_session_events(
         self,
         session: STTScopedTurnSession,
@@ -1714,11 +1730,13 @@ class ScopedRecognitionEngine:
         try:
             async for event in session.turn_events():
                 if authority_generation != self._authority_generation or self._closed:
+                    self._discard_speaker_proofs(event)
                     continue
                 if (
                     epoch_id != self._provider_epoch_id
                     and epoch_id not in self._retiring_provider_epoch_ids
                 ):
+                    self._discard_speaker_proofs(event)
                     continue
                 if isinstance(event, STTProviderAudioBoundary):
                     turn = self._turns.get(event.identity)
@@ -1853,6 +1871,7 @@ class ScopedRecognitionEngine:
                     return
                 turn = self._turns.get(event.identity)
                 if turn is None:
+                    self._discard_speaker_proofs(event)
                     continue
                 if isinstance(event, STTProviderInputTerminal):
                     if not turn.independent_recognition or turn.terminal_ready.done():
@@ -1871,6 +1890,7 @@ class ScopedRecognitionEngine:
                     try:
                         normalized = turn.normalizer.apply_update(event)
                     except STTNormalizationError as exc:
+                        self._discard_speaker_proofs(event)
                         self._set_turn_failure(turn, exc.reason)
                     else:
                         if normalized is not None:
@@ -1878,6 +1898,7 @@ class ScopedRecognitionEngine:
                     continue
                 if isinstance(event, STTProviderTurnTerminal):
                     if turn.terminal_ready.done():
+                        self._discard_speaker_proofs(event)
                         continue
                     if turn.settings.provider_id == "qwen_audio":
                         turn.terminal_ready.set_result(event)
@@ -1886,6 +1907,7 @@ class ScopedRecognitionEngine:
                     try:
                         terminal = turn.normalizer.apply_terminal(event)
                     except STTNormalizationError as exc:
+                        self._discard_speaker_proofs(event)
                         terminal = STTProviderTurnTerminal(
                             identity=turn.identity,
                             outcome="failed",
@@ -2724,16 +2746,22 @@ class ScopedRecognitionEngine:
         if sink is None and isinstance(event, STTProviderInputTerminal):
             sink = self._deferred_event_sink
         if sink is not None:
+            self._publish_speaker_proofs(event)
             try:
                 result = sink(event)
                 if inspect.isawaitable(result):
                     await result
             except Exception as exc:
+                self._discard_speaker_proofs(event, published=True)
                 self._record_delivery_failure(exc, getattr(event, "identity", None))
                 raise
             return
         self._event_drained.clear()
         accepted = self._event_buffer.put(event)
+        if not accepted:
+            self._discard_speaker_proofs(event)
+        else:
+            self._publish_speaker_proofs(event)
         if not accepted and isinstance(
             event, (STTRecognitionUnitTerminal, STTProviderInputTerminal)
         ):
@@ -2756,13 +2784,16 @@ class ScopedRecognitionEngine:
                 raise RuntimeError("scoped STT event sink is not bound")
             self._event_dispatching = True
             try:
+                original_event = event
                 event = scoped_event_for_delivery(event)
                 if event is None:
+                    self._discard_speaker_proofs(original_event, published=True)
                     continue
                 result = sink(event)
                 if inspect.isawaitable(result):
                     await result
             except Exception as exc:
+                self._discard_speaker_proofs(original_event, published=True)
                 diagnostics = recognition_failure_diagnostics(
                     exc,
                     provider=str(self._session_scope[0]) if self._session_scope else "stt",

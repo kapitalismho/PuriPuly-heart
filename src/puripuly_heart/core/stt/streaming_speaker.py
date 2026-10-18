@@ -6,9 +6,8 @@ import time
 from collections import deque
 from dataclasses import dataclass, field, replace
 
-from puripuly_heart.core.speaker.contracts import SpeakerEvidence
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 from puripuly_heart.core.stt.backend import (
-    STTAudioBoundary,
     STTProviderAudioBoundary,
     STTProviderEpochEnded,
     STTProviderInputTerminal,
@@ -21,143 +20,7 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import STTNormalizationError, STTScopedTurnNormalizer
-from puripuly_heart.core.stt.speaker_attribution import (
-    SpeakerFrame,
-    attribute_speaker,
-    probability_state,
-)
 from puripuly_heart.domain.models import FinalSpeakerRun
-
-
-class _Timeline:
-    MAX_FRAMES = 2048
-
-    def __init__(self):
-        self.frames = []
-        self.epoch = None
-        self.immutable = 0
-
-    def observe(self, evidence):
-        for item in evidence:
-            if not isinstance(item, SpeakerEvidence):
-                continue
-            if self.epoch is not None and item.speaker_epoch < self.epoch:
-                continue
-            if self.epoch != item.speaker_epoch:
-                self.frames.clear()
-                self.epoch = item.speaker_epoch
-                self.immutable = 0
-            previous = self.immutable
-            self.immutable = max(self.immutable, item.immutable_through_sample)
-            if item.reason == "omitted_silence" and item.frame is None:
-                for piece in item.source_map:
-                    if (
-                        piece.kind == "unobserved"
-                        and piece.capture is not None
-                        and piece.capture.normalized_start_sample is not None
-                        and piece.capture.normalized_end_sample is not None
-                    ):
-                        self.frames.append(
-                            SpeakerFrame(
-                                piece.capture,
-                                item.speaker_epoch,
-                                piece.compact_end_sample,
-                                item.observation_ready_monotonic_s,
-                                True,
-                                (),
-                                False,
-                                False,
-                                False,
-                            )
-                        )
-                continue
-            if item.reason not in (None, "vad_pause", "source_eof"):
-                self.frames.clear()
-                continue
-            if item.frame is None:
-                continue
-            state = probability_state(item.frame.probabilities)
-            if state is None:
-                continue
-            slots, clear, uncertain, competing = state
-            for piece in item.source_map:
-                span = piece.capture
-                if piece.kind != "original" or span is None:
-                    continue
-                start, end = span.normalized_start_sample, span.normalized_end_sample
-                if start is None or end is None:
-                    continue
-                overlapping = [
-                    frame
-                    for frame in self.frames
-                    if frame.span.capture_epoch == span.capture_epoch
-                    and frame.span.normalized_start_sample < end
-                    and start < frame.span.normalized_end_sample
-                ]
-                if any(frame.closed or frame.compact_end <= previous for frame in overlapping):
-                    continue
-                self.frames = [frame for frame in self.frames if frame not in overlapping]
-                self.frames.append(
-                    SpeakerFrame(
-                        span,
-                        item.speaker_epoch,
-                        piece.compact_end_sample,
-                        item.observation_ready_monotonic_s,
-                        item.range_state == "closed",
-                        slots,
-                        clear,
-                        uncertain,
-                        competing,
-                    )
-                )
-        self.frames.sort(
-            key=lambda frame: (frame.span.capture_epoch, frame.span.normalized_start_sample)
-        )
-        self.frames = self.frames[-self.MAX_FRAMES :]
-
-    def stable_frames(self):
-        return (
-            frame for frame in self.frames if frame.closed or frame.compact_end <= self.immutable
-        )
-
-    def attribute(self, ranges):
-        return attribute_speaker(ranges, self.frames, self.immutable)
-
-    def boundaries(self):
-        return (boundary for boundary, _, _ in self.transitions())
-
-    def transitions(self):
-        previous = None
-        last_epoch = last_end = None
-        for frame in self.stable_frames():
-            if (
-                last_epoch != frame.span.capture_epoch
-                or last_end != frame.span.normalized_start_sample
-                or frame.span.discontinuity_before is not None
-            ):
-                previous = None
-            last_epoch, last_end = frame.span.capture_epoch, frame.span.normalized_end_sample
-            if frame.competing or len(frame.slots) > 1:
-                previous = None
-                continue
-            if not frame.clear:
-                continue
-            if previous is not None and previous.slots != frame.slots:
-                yield (
-                    STTAudioBoundary(
-                        f"nemotron:{frame.epoch}:{frame.span.capture_epoch}:{frame.span.normalized_start_sample}",
-                        frame.span.capture_epoch,
-                        frame.span.normalized_start_sample,
-                        frame.ready_at,
-                        "speaker",
-                        str(frame.epoch),
-                        transition_start_sample=previous.span.normalized_end_sample,
-                        transition_end_sample=frame.span.normalized_start_sample,
-                    ),
-                    previous,
-                    frame,
-                )
-            previous = frame
 
 
 @dataclass(slots=True)
@@ -175,6 +38,9 @@ class _Turn:
     mapping_available: bool = True
     source_endpoints: set = field(default_factory=set)
     native_inputs: dict = field(default_factory=dict)
+    proofs: dict = field(default_factory=dict)
+    transferred_proofs: set = field(default_factory=set)
+    input_proof: str | None = None
 
 
 class StreamingSpeakerSession:
@@ -182,13 +48,14 @@ class StreamingSpeakerSession:
     MAX_MAP_PIECES = 4096
     MAX_TIMINGS = 4096
 
-    def __init__(self, inner, *, clock=time.monotonic):
+    def __init__(self, inner, *, clock=time.monotonic, evidence_view=None):
         self.inner = inner
         self.clock = clock
         self.sent_until = 0
         self.audio_boundaries = deque(maxlen=256)
         self._maps = deque(maxlen=self.MAX_MAP_PIECES)
-        self._timeline = _Timeline()
+        self._timeline = evidence_view if evidence_view is not None else SpeakerEvidenceView()
+        self._owns_evidence = evidence_view is None
         self._turns = {}
         self._events = STTProviderEventBuffer()
         self._closed = False
@@ -245,13 +112,21 @@ class StreamingSpeakerSession:
         async with self._lock:
             turn = self._turns[identity]
             start = self.sent_until
-            await self.inner.send_turn_audio(
-                identity,
-                pcm16le,
-                payload_sequence=payload_sequence,
-                source_ranges=source_ranges,
-                context_only=context_only,
-            )
+            proof = self._timeline.pin(tuple(turn.content + turn.context) + tuple(source_ranges))
+            self._timeline.release(turn.input_proof)
+            turn.input_proof = proof
+            try:
+                await self.inner.send_turn_audio(
+                    identity,
+                    pcm16le,
+                    payload_sequence=payload_sequence,
+                    source_ranges=source_ranges,
+                    context_only=context_only,
+                )
+            except BaseException:
+                self._timeline.release(turn.input_proof)
+                turn.input_proof = None
+                raise
             count = len(pcm16le) // 2
             exact = sum(span.normalized_sample_count for span in source_ranges) == count
             if self.sent_until != start or not exact or len(pcm16le) % 2:
@@ -278,11 +153,14 @@ class StreamingSpeakerSession:
 
     async def abort_turn(self, identity, *, reason):
         await self.inner.abort_turn(identity, reason=reason)
-        self._turns.pop(identity, None)
+        turn = self._turns.pop(identity, None)
+        if turn is not None:
+            self._release_proofs(turn)
 
     async def observe_speaker_evidence(self, evidence):
         async with self._lock:
-            self._timeline.observe(evidence)
+            if self._owns_evidence:
+                self._timeline.observe(evidence)
             self._record_boundaries()
             for turn in self._turns.values():
                 self._release_available(turn)
@@ -614,6 +492,23 @@ class StreamingSpeakerSession:
             ranges.extend(mapped)
         return self._timeline.attribute(tuple(ranges))
 
+    def _proof_for(self, turn, contribution, source, context, *, transferred):
+        footprint = (contribution.contribution_id, source, context)
+        token = turn.proofs.get(footprint)
+        if token is None and len(turn.proofs) < self.MAX_MAP_PIECES:
+            token = self._timeline.pin(source + context)
+            turn.proofs[footprint] = token
+        if transferred and token is not None:
+            turn.transferred_proofs.add(token)
+        return token
+
+    def _release_proofs(self, turn):
+        self._timeline.release(turn.input_proof)
+        turn.input_proof = None
+        for token in turn.proofs.values():
+            if token not in turn.transferred_proofs:
+                self._timeline.release(token)
+
     def _annotate(self, turn, event):
         text = event.text
         provenance = (
@@ -713,6 +608,20 @@ class StreamingSpeakerSession:
                     context,
                     turn.request.display_group_id,
                     attribution.attribution,
+                    speaker_proof_id=(
+                        self._proof_for(
+                            turn,
+                            contribution,
+                            source,
+                            context,
+                            transferred=isinstance(event, STTProviderTurnTerminal)
+                            or event.source_release is not None,
+                        )
+                        if allowed
+                        and turn.mapping_available
+                        and (mapped or capability.policy == "whole_span")
+                        else None
+                    ),
                 )
             )
         return replace(
@@ -814,6 +723,7 @@ class StreamingSpeakerSession:
                                 replace(event, sequence=turn.sequence, final_speaker_runs=())
                             )
                             self._turns.pop(event.identity, None)
+                            self._release_proofs(turn)
                             continue
                         if normalized is None:
                             continue
@@ -846,6 +756,7 @@ class StreamingSpeakerSession:
                                 event = replace(event, final_speaker_runs=())
                             else:
                                 event = self._annotate(turn, event)
+                            self._release_proofs(turn)
                         else:
                             event = replace(event, final_speaker_runs=())
                         self._events.put(event)
@@ -857,8 +768,12 @@ class StreamingSpeakerSession:
                             isinstance(event, STTProviderInputTerminal)
                             and self.independent_recognition_units
                         ):
-                            self._turns.pop(event.identity, None)
+                            turn = self._turns.pop(event.identity, None)
+                            if turn is not None:
+                                self._release_proofs(turn)
                         if isinstance(event, STTProviderEpochEnded):
+                            for turn in self._turns.values():
+                                self._release_proofs(turn)
                             self._turns.clear()
         finally:
             self._events.close()
@@ -871,8 +786,12 @@ class StreamingSpeakerSession:
         if not self._consumer.done():
             self._consumer.cancel()
         await asyncio.gather(self._consumer, return_exceptions=True)
+        for turn in self._turns.values():
+            self._release_proofs(turn)
         self._turns.clear()
         self._maps.clear()
+        if self._owns_evidence:
+            self._timeline.reset()
         self._events.close()
 
     async def stop(self):

@@ -9,6 +9,7 @@ from uuid import UUID, uuid5
 
 from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.speaker_identity import SpeakerPresentationAssignments
 
 from .presenter_acceptance import (
     PRESENTER_AGGREGATE_BYTE_LIMIT,
@@ -77,6 +78,8 @@ class OverlayPresenter(OverlaySink):
     translation_enabled: bool = True
     native_retry_enabled: bool = False
     task_factory: Any | None = None
+    speaker_identities: SpeakerPresentationAssignments | None = None
+    _speaker_task: asyncio.Task[None] | None = field(init=False, default=None)
 
     _acceptance: PresenterAcceptanceLedger = field(
         init=False,
@@ -156,6 +159,30 @@ class OverlayPresenter(OverlaySink):
 
     def detach_bridge(self) -> None:
         self.bridge = None
+
+    def bind_speaker_identities(self, identities: SpeakerPresentationAssignments) -> None:
+        if self.speaker_identities is not None and self.speaker_identities is not identities:
+            self.speaker_identities.changed.set()
+        self.speaker_identities = identities
+        if (self._speaker_task is None or self._speaker_task.done()) and not self._closed:
+            self._speaker_task = self._create_task(
+                self._watch_speaker_assignments(), task_name="overlay-speaker-assignments"
+            )
+
+    async def _watch_speaker_assignments(self) -> None:
+        while not self._closed:
+            identities = self.speaker_identities
+            deadline = identities.next_deadline()
+            timeout = None if deadline is None else max(0.0, deadline - self.clock.now())
+            try:
+                await asyncio.wait_for(identities.changed.wait(), timeout=timeout)
+            except TimeoutError:
+                pass
+            identities.changed.clear()
+            async with self._ownership_transition_lock:
+                if self._closed:
+                    return
+                await self._publish_if_changed()
 
     def snapshot(self) -> OverlayPresentationSnapshot:
         return self._presentation_state.snapshot()
@@ -437,6 +464,10 @@ class OverlayPresenter(OverlaySink):
             self.native_retry_enabled = False
             self._retry_projection.reset()
             self._closed = True
+        if self._speaker_task is not None:
+            self._speaker_task.cancel()
+            await asyncio.gather(self._speaker_task, return_exceptions=True)
+            self._speaker_task = None
 
     def _apply_event(self, event: OverlayEventUnion) -> bool:
         now = self.clock.now()
@@ -574,6 +605,10 @@ class OverlayPresenter(OverlaySink):
             show_peer_original=self.show_peer_original,
             translation_enabled=self.translation_enabled,
         )
+        if not unit.readable and self.speaker_identities is not None:
+            assignment = self.speaker_identities.resolve_source(unit.source, now=now)
+            if assignment is not None:
+                content.speaker_assignment = assignment
         if unit.card_key is not None and new_application:
             compatible_key = self._compatible_source_card(unit)
             if compatible_key is not None and compatible_key != unit.card_key:
@@ -604,8 +639,8 @@ class OverlayPresenter(OverlaySink):
             unit.card_key = card_key
             self._sources.card_sources.setdefault(card_key, []).append(source_key)
         entry = self._entries[unit.card_key]
-        if entry.speaker_style is None and event.speaker_assignment is not None:
-            entry.speaker_assignment = event.speaker_assignment
+        if entry.speaker_style is None and content.speaker_assignment is not None:
+            entry.speaker_assignment = content.speaker_assignment
         previous = (
             entry.original_text,
             entry.translation_text,
@@ -876,6 +911,62 @@ class OverlayPresenter(OverlaySink):
     def _live_peer_entry(self) -> tuple[tuple[str, UUID], _LogicalTurnEntry] | None:
         return self._live_entry_for_channel("peer")
 
+    def _prepare_unreadable_sources(self, *, now: float) -> None:
+        self.speaker_identities.refresh(now=now)
+        for unit in sorted(tuple(self._sources.units.values()), key=lambda item: item.source.order):
+            if unit.readable:
+                continue
+            assignment = self.speaker_identities.resolve_source(unit.source, now=now)
+            if assignment is not None:
+                unit.content.speaker_assignment = assignment
+            entry = self._entries.get(unit.card_key)
+            if entry is None:
+                continue
+            if entry.speaker_style is None:
+                entry.speaker_assignment = unit.content.speaker_assignment
+            if not self._presentation_state.entry_is_publishable(
+                unit.content,
+                show_peer_original=self.show_peer_original,
+                translation_enabled=self.translation_enabled,
+            ):
+                continue
+            compatible = self._compatible_source_card(unit)
+            if compatible is None or compatible == unit.card_key:
+                continue
+            old_key = unit.card_key
+            source_key = (unit.source.channel, unit.source.source_id)
+            self._sources.card_sources.pop(old_key, None)
+            self._remove_entry(old_key, reason="source_applied_to_visible_card", now=now)
+            unit.card_key = compatible
+            self._sources.card_sources.setdefault(compatible, []).append(source_key)
+            units = sorted(
+                (self._sources.units[key] for key in self._sources.card_sources[compatible]),
+                key=lambda item: item.source.order,
+            )
+            target = self._entries[compatible]
+            target.original_text = " ".join(item.source.effective_text.strip() for item in units)
+            target.translation_text = " ".join(
+                item.content.translation_text.strip()
+                for item in units
+                if item.content.translation_text.strip()
+            )
+            target.original_language = unit.content.original_language
+            target.translation_language = unit.content.translation_language
+            target.translation_update_id = unit.content.translation_update_id
+            target.translation_origin_wall_clock_ms = unit.content.translation_origin_wall_clock_ms
+            target.translation_session_scope = unit.content.translation_session_scope
+            target.translation_source_text_hash = unit.content.translation_source_text_hash
+            target.translation_source_text_len = unit.content.translation_source_text_len
+            target.translation_logical_turn_key = unit.content.translation_logical_turn_key
+            target.original_seq = entry.original_seq
+            target.last_updated_seq = max(target.last_updated_seq, entry.last_updated_seq)
+            target.appearance_seq = self._next_appearance_seq()
+            target.publishable_seq = target.appearance_seq
+            target.publication_ordering = unit.publication_ordering
+            target.source_application_pending = True
+            target.card_revision += 1
+            unit.applied = True
+
     async def _publish_if_changed(
         self,
         *,
@@ -885,6 +976,8 @@ class OverlayPresenter(OverlaySink):
     ) -> None:
         now = self.clock.now()
         self._expire_closed_entries(now=now)
+        if self.speaker_identities is not None:
+            self._prepare_unreadable_sources(now=now)
         previous_snapshot = self.snapshot()
         selection = self._presentation_state.visible_block_selection(
             entries=self._entries,
@@ -1075,6 +1168,33 @@ class OverlayPresenter(OverlaySink):
         self,
         rendered_entries: list[tuple[tuple[str, UUID], OverlayPresentationBlock]],
     ) -> list[tuple[tuple[str, UUID], OverlayPresentationBlock]]:
+        if self.speaker_identities is not None:
+            now = self.clock.now()
+            for key, block in rendered_entries:
+                if block.channel != "peer":
+                    continue
+                entry = self._entries.get(key)
+                if entry is None:
+                    continue
+                for source_key in self._sources.card_sources.get(key, []):
+                    unit = self._sources.units[source_key]
+                    assignment = self.speaker_identities.mark_readable(unit.source, now=now)
+                    unit.readable = True
+                    if assignment is None:
+                        continue
+                    previous = entry.speaker_assignment
+                    if entry.speaker_style is None or (
+                        entry.speaker_style == "gray"
+                        and entry.speaker_gray_reason
+                        in ("not_ready", "unavailable", "uncertain", "unallocated", "missing")
+                        and assignment.palette_index is not None
+                        and (previous is None or assignment.revision > previous.revision)
+                    ):
+                        entry.speaker_assignment = assignment
+                        unit.content.speaker_assignment = assignment
+                        entry.speaker_style = None
+                        if previous != assignment:
+                            entry.card_revision += 1
         for key, block in rendered_entries:
             if block.channel != "peer":
                 continue
@@ -1286,6 +1406,11 @@ class OverlayPresenter(OverlaySink):
         self._acceptance.retire_entry(key)
         for source_key in self._sources.card_sources.get(key, []):
             self._acceptance.retire_entry(source_key)
+            if (
+                self.speaker_identities is not None
+                and record.reason != "source_applied_to_visible_card"
+            ):
+                self.speaker_identities.retire_source(source_key[1])
         self._sources.retire_card(key)
         seq = record.tombstone_seq if record.tombstone_seq is not None else entry.closed_seq
         if record.reason == "expired" and entry.ever_visible:

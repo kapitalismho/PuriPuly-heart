@@ -866,6 +866,10 @@ def test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape() ->
     presentation_snapshot = OverlayPresentationSnapshot(blocks=[block]).to_dict()
 
     assert OVERLAY_CONTRACT_VERSION == snapshot["contract_version"]
+    assert (
+        overlay_manifest_module.OVERLAY_SPEAKER_IDENTITY_CONTRACT
+        == snapshot["speaker_identity_presentation"]
+    )
     assert tuple(sorted(overlay_manifest_module._MANIFEST_FIELDS)) == tuple(
         snapshot["manifest_fields"]
     )

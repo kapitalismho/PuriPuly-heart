@@ -1,0 +1,20 @@
+{
+  "schema": "issue264-validation-formatting-1",
+  "scope": "Only six task-owned scripts. No historical helper, product source, maintained document or Git mutation; formatter tools do not import product.",
+  "script_arguments": "native/nemotron/issue264_validation_prerequisites.py native/nemotron/issue264_validation_inputs.py native/nemotron/issue264_validation_launch.py native/nemotron/issue264_validation_runtime.py native/nemotron/issue264_validation_caption.py native/nemotron/issue264_validation_summary.py",
+  "commands_in_execution_order": [
+    {"command": ".venv/Scripts/python.exe -m ruff check <script_arguments> && .venv/Scripts/python.exe -m black --check <script_arguments>", "outcome": "Exit 1: Ruff found six I001 import-order errors, one per script. Chained Black check did not execute."},
+    {"command": ".venv/Scripts/python.exe -m ruff check --fix <script_arguments>", "outcome": "Six import-format errors fixed, zero remaining."},
+    {"command": ".venv/Scripts/python.exe -m black <script_arguments>", "outcome": "Six files reformatted."},
+    {"command": ".venv/Scripts/python.exe -m ruff check <script_arguments>", "outcome": "All checks passed."},
+    {"command": ".venv/Scripts/python.exe -m black --check <script_arguments>", "outcome": "Passed: six files would be left unchanged."}
+  ],
+  "deepgram_confirmation": {
+    "evidence": "build/issue264-validation-inputs-01/inputs.json",
+    "canonical_tape": "native/nemotron/issue218_cloud_deepgram_raw.zip:valid/trace.json; distinct_repeated_A_B_A baseline repetition 1",
+    "first_authoritative_native_result": "Washed the detritus from his hair. Gentlemen of the press.",
+    "conclusion": "Selected repeated tape contains the complete coherent Gentlemen sentence. Companion short_A_B_A tape retains No. Two-tape scope unchanged; no fresh provider execution."
+  },
+  "reuse_and_retention": "Historical files untouched. Task runtime reuses existing input/native-trace/source-owner/managed-translation/Flet visibility helpers; derivative contains changed evidence binding and observation logic. Avoid archiving redundant copied harness portions once final evidence and safe reuse applicability are established; do not remove the currently needed execution driver before measurements.",
+  "runtime_status": "Not executed; awaiting Director stable product pin/readiness. No moving product imports, inference, Flet start or cloud calls occurred during formatting."
+}

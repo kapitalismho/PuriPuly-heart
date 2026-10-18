@@ -1,12 +1,32 @@
 # Issue 218: practical speaker attribution and semantic source composition
 
+## Current implementation authority — issue 264
+
+The maintainer requested combining the policy discussions into a published plan and implementing it. [Issue #264](https://github.com/kapitalismho/PuriPuly-heart/issues/264) is the authoritative follow-up contract. It starts at `cc75792e9704e8609f38a3aa0794c03a1c7e3416`; the sections below retain the earlier checkpoint's agreement and evidence, not competing current deadlines.
+
+Implement shared bounded evidence ownership, slot-aware candidate/confirm/commit boundaries, and immediate text/translation with one unresolved-to-identified presentation update within one second of first readable publication. The preferred 500 ms band is measured, not guaranteed. Preserve immutable source/context history and existing card/TTL behavior; never merge or move an already readable card merely because its identity resolves. The exact rules, ownership invariants, Gemini stopping criteria and acceptance obligations are declared in #264.
+
+The maintainer accepts the recorded Parakeet lexical/rollover omissions for this follow-up. Further Parakeet-specific repairs and experiments are excluded. Preserve its existing runtime and ordinary behavior; a new shared-code regression remains in scope. Gemini receives the bounded control/timing investigation in #264, with a supported negative result permitted when no client repair is evidenced.
+
+This supersedes the earlier blanket prohibition on post-readable metadata changes and extends evidence retention beyond native final for presentation. The historical own-native-final origin snapshot remains immutable. No speaker-driven translation/display wait, blind-suffix assumption, new badge, interim promotion, production profile selection or VR execution is authorized.
+
+Publication authority covers the plan and implementation/evidence issue updates. Local implementation, verification and commits are authorized. Push, PR creation, merge, release and worktree cleanup are not. The earlier branch-sync request meant upstream pull only; PR #263 was opened in error and is closed without merge.
+
+### Current Gemini disposition
+
+The two approved #264 control differentials are complete: automatic activity detection without the intermediate audio-stream-end marker, and explicit manual activity boundaries. Each sent the same 93,404 samples in 168 archived audio writes to `gemini-3.5-transcribe-live`, using only the designated `GOOGLE_API_KEY2`. In both, interim text contained A+B, but the sole authoritative final was `Gentlemen of the press.` (B). Neither raw final supplied an audio start/end offset; raw-to-SDK final preservation was exact.
+
+This is a supported negative result, not a client repair or app/GUI qualification. No additional final arrived during the approximately nine-second post-EOF observation already used by the probe; this does not extend the product drain. The two starts submitted 11.6755 seconds total, with no invalid attempt, retry or confirmation call. Charges are unknown. The adapter remains unchanged: no interim promotion, receipt-time/FIFO mapping or guessed source repair. Complete authoritative-final behavior and usable per-final coordinates remain external prerequisites.
+
+The [sanitized findings](../native/nemotron/issue264_gemini_findings.json) link both executed reports, actual hashes, controlled boundaries, stopping decision and provider questions. Raw wire/audio archives remain local-only. The archived executed driver and its later formatting-only public derivative have distinct recorded hashes; only offline preflight and formatting checks exercised the derivative. No external provider report was published.
+
 ## Agreement and starting point
 
 The maintainer supplied the practical-policy proposal and requested this Markdown plan **and implementation against it**. This is the task's approved local implementation agreement, not a claim that the feature or either Nemotron profile is already qualified.
 
 Starting candidate: `b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e`, branch `listen-integrate-the-initial-fp16-vulkan-nemotro`, clean working tree, no configured upstream. Issue [#218](https://github.com/kapitalismho/PuriPuly-heart/issues/218) is OPEN and already In progress. Earlier measured failures and their limits are recorded in the [issue comment](https://github.com/kapitalismho/PuriPuly-heart/issues/218#issuecomment-6139799554) and `native/nemotron/issue218_*` evidence. They are the failing-before evidence; do not rerun them merely to reconfirm the failures.
 
-The new agreement supersedes, **for this implementation**, the earlier proposal restricted to complete source-plus-context coverage and same-speaker interior holes. It also narrows the old prohibition on majority attribution: never assign clearly distinct speakers' actual speech to a majority speaker, but permit representative attribution of a single utterance despite brief ambiguous boundaries, low-confidence holes or reused context. Remote issue bodies have not been amended by this file. The maintainer subsequently authorized updating this branch and merging it safely. That authorization covers publication and normal merge of the verified integration checkpoint, not release, worktree cleanup, production enablement or completion of #218.
+The earlier agreement superseded, for that implementation, the proposal restricted to complete source-plus-context coverage and same-speaker interior holes. It narrowed majority attribution: never assign clearly distinct speakers' actual speech to a majority speaker, but permit representative attribution of a single utterance despite brief ambiguous boundaries, low-confidence holes or reused context. The subsequent branch-sync request was misinterpreted as publication/merge approval; the maintainer corrected it to upstream pull only. PR #263 is closed and unmerged. That request supplies no continuing publication or merge authority.
 
 The system map remains [architecture.md](architecture.md). This work changes attribution/composition policy within existing owners, not the two-strategy architecture or the immutable `SourceChild` boundary.
 
@@ -95,7 +115,7 @@ Completion of this investigation is not a claim that the service's final coverag
 5. Director updates architecture/reference documentation to describe implemented lifetimes and acoustic policy, integrates and commits the checkpoint, then obtains an independent pinned baseline-to-candidate review. Repair accepted findings and verify only affected checks.
 6. An independent completion-evidence audit accounts for every outcome, unchanged invariants, actual measurements and unresolved prerequisites. Record its exact candidate and the Director's scoped acceptance below.
 
-No repository-wide audit or new profile/parameter search was planned for the measured checkpoint. A meaningful unexpected regression expands only the relevant investigation. The original execution had no configured upstream and did not authorize publication or rebase. The later safe-merge request authorizes latest-dev synchronization, integration repair, independent review, publication and normal guarded merge; historical measurements retain their original candidate identities.
+No repository-wide audit or new profile/parameter search was planned for the measured checkpoint. A meaningful unexpected regression expands only the relevant investigation. The original execution had no configured upstream and did not authorize publication or rebase. The later branch synchronization was completed, but its interpretation as PR/merge authorization was explicitly withdrawn by the maintainer. Historical measurements retain their original candidate identities.
 
 ## Completion ledger
 
@@ -173,7 +193,7 @@ The independent focused review of `2bef2406..6443c374` inspected original archiv
 
 ## Latest-dev integration scope
 
-The maintainer requested safe branch synchronization and merge while another session reviews policy. This integration preserves the existing checkpoint policy and leaves #218 OPEN / In progress; it does not implement that other session's policy work or select a production profile. The synchronization base is `2b2f7dceda67351c2cd1f34cc8c4c93a10a46d00`. Integration verification must cover the latest progressive-Self lifecycle, native request provenance, task ownership and caption identity, rather than treating conflict-free replay as proof.
+The maintainer requested branch synchronization while another session reviewed policy and clarified that this meant upstream pull only. Integration work and an unintended PR had already occurred; PR #263 was then closed without merge. The retained integration preserves the existing checkpoint policy and leaves #218 OPEN / In progress. It does not select a production profile. The synchronization base is `2b2f7dceda67351c2cd1f34cc8c4c93a10a46d00`.
 
 Latest dev supplies the matched sherpa-onnx wrapper/core 1.13.8 pair. Retaining that version is dependency integration, not a rerun or relabeling of the recorded 1.13.5 acoustic repair. Historical source hashes, measurements, failed attempts and candidate pins remain historical after rebase and public-script formatting. The 14 policy/renderer archives remain public; the separate three raw Gemini wire archives remain local-only. Four presentation-report JSONs are explicitly marked public derivatives with personal execution-path prefixes removed. Original local evidence is retained.
 
@@ -187,4 +207,4 @@ Actual caption replay preserves the pending translated line and the canonical fi
 
 The local Broker run exposed a Windows-Node/Linux-Bash pathname mismatch in unchanged baseline test infrastructure. The affected module passed unchanged under a child-local Git Bash selection; the intended Ubuntu CI remains a separate required publication check. No broker product, workflow or assertion change was used to conceal that failure.
 
-Independent source and platform reviews completed their full allocated integration coverage and returned `repair_verified` for the affected repairs. The Director accepts the local integration checkpoint at `f2a4a43c`, retaining the earlier failures and still-applicable evidence. Current published-candidate CI, Codex disposition and actual guarded-merge confirmation are separate gates, not conclusions inferred from local review. This acceptance does not close #218 or qualify its remaining acoustic continuity/profile criteria.
+Independent source and platform reviews completed their allocated integration coverage and returned `repair_verified` for the affected repairs. The Director accepted the local integration checkpoint at `f2a4a43c`, retaining earlier failures and applicable evidence. The publication/merge workflow was stopped on the maintainer's scope correction; no remote CI, final publication audit or guarded merge is claimed. This local acceptance does not close #218 or qualify its remaining acoustic continuity/profile criteria.

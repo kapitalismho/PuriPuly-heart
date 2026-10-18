@@ -120,6 +120,10 @@
   },
   "overlay": {
     "contract_version": 16,
+    "speaker_identity_presentation": {
+      "version": 3,
+      "policy": "bounded_late_speaker_assignment"
+    },
     "manifest_fields": [
       "app_version",
       "bridge_url",

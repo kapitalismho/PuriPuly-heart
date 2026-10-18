@@ -1,0 +1,545 @@
+{
+  "issue": 264,
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "candidate": "Uncommitted worker changes; Director owns candidate pin and Git history.",
+  "scope": "Shared R1/R2/R3 implementation and deterministic production-class smoke; no acoustic/profile qualification.",
+  "surface_inventory": {
+    "accepted_evidence": [
+      "src/puripuly_heart/core/speaker/evidence.py",
+      "src/puripuly_heart/core/stt/speaker_attribution.py"
+    ],
+    "recognition_and_handoff": [
+      "src/puripuly_heart/core/stt/batch_speaker.py",
+      "src/puripuly_heart/core/stt/streaming_speaker.py",
+      "src/puripuly_heart/core/stt/scoped_engine.py",
+      "src/puripuly_heart/core/stt/backend.py",
+      "src/puripuly_heart/core/stt/recognition_units.py",
+      "src/puripuly_heart/domain/recognition.py"
+    ],
+    "source_order_and_output": [
+      "src/puripuly_heart/core/speaker_identity.py",
+      "src/puripuly_heart/core/orchestrator/peer_translation_channel.py",
+      "src/puripuly_heart/core/orchestrator/translation_output_projection.py",
+      "src/puripuly_heart/core/runtime/output.py",
+      "src/puripuly_heart/core/overlay/presenter.py",
+      "src/puripuly_heart/core/overlay/presenter_sources.py",
+      "src/puripuly_heart/domain/models.py"
+    ],
+    "composition": [
+      "src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py",
+      "src/puripuly_heart/core/runtime/local_asr_provider_runtime.py",
+      "src/puripuly_heart/core/local_asr/local_asr_provider_runtime.py"
+    ],
+    "tests": [
+      "tests/core/test_issue264_shared_speaker.py",
+      "tests/core/test_causal_batch_speaker.py",
+      "tests/core/test_streaming_speaker.py",
+      "tests/helpers/speaker_evidence.py"
+    ],
+    "negotiated_speaker_capability_cutover": [
+      "src/puripuly_heart/core/overlay/manifest.py",
+      "native/overlay/src/bridge.rs",
+      "native/overlay/src/runtime.rs",
+      "native/overlay/tests/runtime.rs",
+      "tests/core/test_overlay_bridge.py",
+      "tests/app/test_overlay_process_manager.py",
+      "tests/core/runtime/test_overlay_runtime.py",
+      "tests/app/test_desktop_overlay_repro.py",
+      "tests/config/test_public_compatibility_surfaces.py",
+      "tests/config/public_compatibility_surfaces_snapshot.json"
+    ],
+    "unchanged_by_design": [
+      "Immutable SourceChild contract and source/context text",
+      "Native/Flet renderer and overlay wire schema; existing complete snapshot style/card revision supports in-place updates",
+      "Nemotron runtime, model, eight-channel F16/Vulkan profiles",
+      "Provider-specific Parakeet code and dependencies",
+      "Gemini adapter/provider tests and investigation owned by separate worker"
+    ]
+  },
+  "implemented_contract": [
+    "One capture-scoped accepted SpeakerEvidenceView is shared by factory, runtime, batch, streaming and assignment authority. Runtime accepts synchronously before awaited routing; injected sessions do not ingest again.",
+    "Fixed source plus unique-onset and proven-replay claims are pinned before native submission. Request, contribution, and SourceChild stages distinguish lawful queued proof from unowned stale callbacks. Source admission registers all children before ordered settlement; duplicate/stale deliveries cannot retire lawful transferred proof.",
+    "Own-native-terminal batch origin snapshot is still synchronous and immutable. SourceChild, text, ranges, settings and context are never rewritten for late presentation.",
+    "Slot-relative probabilities distinguish foreign leaning uncertainty from candidate-relative ambiguity. Missing coverage, even a tiny suffix, remains unavailable. Replay cannot add unique support.",
+    "A shared transition generator requires two distinct contiguous clear successor frames after an established predecessor. Duplicate deliveries are not confirmation. Batch actuation can retain earlier active successor onset; streaming events and lexical phrase composition consume the same confirmed transitions.",
+    "Canonical source-keyed order authority blocks only palette allocation behind an unresolved earlier source. Text/translation remain immediate. Earlier deadline or nonpublication disposition closes its allocation opportunity without speculative colors.",
+    "Actual selected logical readable snapshot starts a monotonic 1.000 second opportunity. Eligible pre-display metadata participates before compatible-card choice, including hidden reveals and protected-row waits. At most one later unresolved-to-identified style revision is applied in place; established identity, card position/identity, text and TTL do not change.",
+    "Producer completion does not retire output ownership. Source-only, failed translation, multiple attempts/targets, output rejection, cancellation, eviction, reset, and ordinary ASR close have explicit claim disposition.",
+    "A single presenter watcher handles evidence and the next deadline. No per-source polling task, extra model, PCM ownership in proofs, translation redispatch, blind-suffix inheritance, or new badge UI is introduced."
+  ],
+  "reversible_heuristics": {
+    "boundary_confirmation": "Two distinct contiguous immutable/closed clear successor frames; native 10 ms geometry supplies 20 ms successor evidence. This is not an utterance minimum and not an acoustically qualified optimum. One isolated clear successor frame can veto whole-A attribution but cannot cut.",
+    "attribution": "Existing 0.5 active / 0.8 clear / 0.2 quiet / 0.35 competing and bounded practical ambiguity retained; foreign dominant probability at least 0.35 and stronger than candidate is conservatively uncertain rather than spending same-candidate budget.",
+    "late_assignment": "1.000 seconds from first selected readable snapshot; 0.500 seconds is measured only, never a deliberate wait.",
+    "bounds": {
+      "frames": 2048,
+      "proofs": 128,
+      "proof_range_pieces": 4096,
+      "canonical_sources": 128,
+      "attempt_aliases_and_dispositions": 4096,
+      "retained_resolution_delays": 128,
+      "new_presenter_tasks": 1
+    },
+    "pressure_disposition": "Evict/invalidate proof conservatively and keep text, rather than growing retention or waiting."
+  },
+  "coverage_rationale": "Focused checks distinguish rejecting whole-speaker attribution from confirmed early cuts, then exercise immediate selected-readable captions and source-order late settlement. Existing batch/streaming/source-card/output suites protect native-final snapshots, exact PCM/text ownership, lexical grouping, TTL, failures and neighboring SELF isolation. Synthetic checks do not establish acoustic or physical GUI quality; actual GPU/Flet qualification remains separately owned.",
+  "execution": [
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/core/test_issue264_shared_speaker.py",
+        "tests/core/test_speaker_identity.py"
+      ],
+      "exit_code": 0,
+      "outcome": "17 cases passed at the initial new-test checkpoint."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "pytest",
+        "-q",
+        "--tb=short",
+        "tests/core/test_causal_batch_speaker.py",
+        "tests/core/test_streaming_speaker.py",
+        "tests/core/test_speaker_identity_pipeline.py",
+        "tests/core/test_overlay_source_cards.py",
+        "tests/core/test_overlay_speaker_modes.py",
+        "tests/core/test_overlay_presenter.py",
+        "tests/core/runtime/test_output_runtime.py",
+        "tests/core/test_source_context_contract.py",
+        "tests/core/test_source_progressive_integration.py"
+      ],
+      "exit_code": 1,
+      "outcome": "29 failed cases observed; retained below. This run preceded native temporal fixture migration. Quiet configuration omitted a numeric pass summary.",
+      "failed_cases": [
+        "tests/core/test_causal_batch_speaker.py::test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins[LocalQwenSherpaSTTBackend]",
+        "tests/core/test_causal_batch_speaker.py::test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins[LocalParakeetV3SherpaSTTBackend]",
+        "tests/core/test_causal_batch_speaker.py::test_actual_adapters_early_disjoint_short_a_b_a_and_shared_origins[LocalParakeetJapaneseSherpaSTTBackend]",
+        "tests/core/test_causal_batch_speaker.py::test_duplicate_stale_and_revised_evidence_never_reclaims_submitted_content[silence]",
+        "tests/core/test_causal_batch_speaker.py::test_duplicate_stale_and_revised_evidence_never_reclaims_submitted_content[hardcut]",
+        "tests/core/test_causal_batch_speaker.py::test_duplicate_stale_and_revised_evidence_never_reclaims_submitted_content[source_discontinuity]",
+        "tests/core/test_causal_batch_speaker.py::test_failed_prefix_does_not_discard_successful_successor_or_redecode_parent",
+        "tests/core/test_causal_batch_speaker.py::test_open_evidence_revisions_commit_only_at_immutable_frontier",
+        "tests/core/test_causal_batch_speaker.py::test_optional_cut_pressure_coalesces_tail_without_historical_burst_or_loss",
+        "tests/core/test_causal_batch_speaker.py::test_actual_engine_preserves_onset_group_and_sourcechild_context_before_endpoint",
+        "tests/core/test_causal_batch_speaker.py::test_failed_slice_resolves_before_successor_is_queued_and_capture_continues",
+        "tests/core/test_causal_batch_speaker.py::test_out_of_order_native_results_release_only_source_ordered_prefix",
+        "tests/core/test_causal_batch_speaker.py::test_late_observation_selects_retained_prefix_and_records_distinct_causal_clocks",
+        "tests/core/test_causal_batch_speaker.py::test_parakeet_disjoint_slices_preserve_native_options_and_rollover_context",
+        "tests/core/test_causal_batch_speaker.py::test_unresolved_native_request_retains_proof_until_final_with_hard_cache_bound[False]",
+        "tests/core/test_causal_batch_speaker.py::test_unresolved_native_request_retains_proof_until_final_with_hard_cache_bound[True]",
+        "tests/core/test_streaming_speaker.py::test_supported_prefix_releases_before_end_and_successor_progresses",
+        "tests/core/test_streaming_speaker.py::test_consumed_text_preserves_later_audio_boundary_and_pending_successor[append]",
+        "tests/core/test_streaming_speaker.py::test_consumed_text_preserves_later_audio_boundary_and_pending_successor[replace]",
+        "tests/core/test_streaming_speaker.py::test_audio_boundary_survives_mapped_quiet_without_text[None-3200]",
+        "tests/core/test_streaming_speaker.py::test_audio_boundary_survives_mapped_quiet_without_text[2-1600]",
+        "tests/core/test_streaming_speaker.py::test_actual_provider_and_vulkan_trace_preserves_boundary_owned_source_groups[False]",
+        "tests/core/test_streaming_speaker.py::test_actual_provider_and_vulkan_trace_preserves_boundary_owned_source_groups[True]",
+        "tests/core/test_streaming_speaker.py::test_uncertain_transition_is_retained_but_cannot_release_identified_source",
+        "tests/core/test_streaming_speaker.py::test_internal_split_requires_both_established_audio_and_complete_text_boundary[True]",
+        "tests/core/test_streaming_speaker.py::test_fine_complete_word_prefix_preserves_crossing_group_and_terminal_residual[mixed]",
+        "tests/core/test_streaming_speaker.py::test_fine_complete_word_prefix_preserves_crossing_group_and_terminal_residual[uncertain]",
+        "tests/core/test_streaming_speaker.py::test_final_phrase_confidence_edges_do_not_fragment_source_or_translation[Gentlemen of the press.-leading-True-1]",
+        "tests/core/test_streaming_speaker.py::test_final_phrase_preserves_very_short_clear_no_between_returning_speaker"
+      ]
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-q",
+        "--tb=short",
+        "tests/core/test_causal_batch_speaker.py",
+        "tests/core/test_streaming_speaker.py"
+      ],
+      "exit_code": 1,
+      "outcome": "105 passed, 1 failed: pressure fixture still supplied isolated alternating frames."
+    },
+    {
+      "exit_code": 1,
+      "outcome": "411 passed, 1 failed: new protected-row test lacked authoritative output-parent admission; production rejection unauthorized_parent was correct."
+    },
+    {
+      "exit_code": 0,
+      "outcome": "412 passed after repairing the new test admission setup."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-q",
+        "--tb=short",
+        "tests/app/test_wiring_local_asr_provider_runtime.py",
+        "tests/app/test_runtime_pipeline_composition.py",
+        "tests/core/test_peer_translation_channel_owner.py",
+        "tests/architecture/test_dependency_boundaries.py"
+      ],
+      "exit_code": 0,
+      "outcome": "117 passed at the composition checkpoint."
+    },
+    {
+      "exit_code": 0,
+      "outcome": "19 shared-outcome cases passed after actual Peer source-only/failure/translation-delay additions."
+    },
+    {
+      "exit_code": 0,
+      "outcome": "416 passed before final request/contribution/source-stage rejection cleanup additions."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-q",
+        "--tb=short",
+        "tests/core/test_issue264_shared_speaker.py",
+        "tests/core/test_causal_batch_speaker.py",
+        "tests/core/test_streaming_speaker.py",
+        "tests/core/test_speaker_identity.py",
+        "tests/core/test_stt_scoped_engine.py",
+        "tests/core/test_speaker_identity_pipeline.py",
+        "tests/core/test_overlay_source_cards.py",
+        "tests/core/test_overlay_speaker_modes.py",
+        "tests/core/test_overlay_presenter.py",
+        "tests/core/runtime/test_output_runtime.py",
+        "tests/core/test_source_context_contract.py",
+        "tests/core/test_source_progressive_integration.py",
+        "tests/app/test_wiring_local_asr_provider_runtime.py",
+        "tests/app/test_runtime_pipeline_composition.py",
+        "tests/core/test_peer_translation_channel_owner.py",
+        "tests/architecture/test_dependency_boundaries.py"
+      ],
+      "exit_code": 0,
+      "outcome": "720 passed, 210 warnings in 65.38 seconds.",
+      "warnings": "210 websockets ConnectionClosed.reason deprecation warnings from the scoped-engine suite; retained, not suppressed.",
+      "scope_note": "Includes all changed source/boundary/presentation surfaces plus engine, output, source/context, composition and core dependency-boundary suites."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe",
+        "-m",
+        "pytest",
+        "-o",
+        "addopts=",
+        "-q",
+        "--tb=short",
+        "tests/core/test_overlay_protocol.py"
+      ],
+      "exit_code": 0,
+      "outcome": "57 passed in 0.37 seconds."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe", "-m", "pytest", "-o", "addopts=", "-q", "--tb=short",
+        "tests/core/test_issue264_shared_speaker.py", "tests/core/test_overlay_source_cards.py",
+        "tests/core/test_overlay_presenter.py", "tests/core/test_overlay_speaker_modes.py"
+      ],
+      "exit_code": 1,
+      "outcome": "164 passed, 1 failed in 2.12 seconds. New hidden-returning-source fixture incorrectly expected append across incompatible original-display layouts."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe", "-m", "pytest", "-o", "addopts=", "-q", "--tb=short",
+        "tests/core/test_issue264_shared_speaker.py", "tests/core/test_overlay_source_cards.py",
+        "tests/core/test_overlay_presenter.py", "tests/core/test_overlay_speaker_modes.py"
+      ],
+      "exit_code": 0,
+      "outcome": "167 passed in 2.90 seconds. Bounded repair verification after hidden-reveal metadata propagation: compatible returning A appends before first readable choice; incompatible layout remains separate; real monotonic one-second expiry releases absent proof without holding text.",
+      "evidence_reuse": "The preceding 720-case integration checkpoint and 57 protocol cases retain unaffected coverage. This delta adds three shared-outcome cases and verifies the affected presentation surfaces; it is not a relabelled rerun of all 720."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe", "-m", "pytest", "-o", "addopts=", "-q", "--tb=short",
+        "tests/core/test_issue264_shared_speaker.py", "tests/core/test_causal_batch_speaker.py",
+        "tests/core/test_streaming_speaker.py", "tests/core/test_speaker_identity.py",
+        "tests/core/test_stt_scoped_engine.py", "tests/core/test_speaker_identity_pipeline.py",
+        "tests/core/test_overlay_source_cards.py", "tests/core/test_overlay_speaker_modes.py",
+        "tests/core/test_overlay_presenter.py", "tests/core/runtime/test_output_runtime.py",
+        "tests/core/test_source_context_contract.py", "tests/core/test_source_progressive_integration.py",
+        "tests/app/test_wiring_local_asr_provider_runtime.py", "tests/app/test_runtime_pipeline_composition.py",
+        "tests/core/test_peer_translation_channel_owner.py", "tests/architecture/test_dependency_boundaries.py",
+        "tests/core/test_overlay_protocol.py"
+      ],
+      "exit_code": 1,
+      "outcome": "779 passed, 1 failed, 210 warnings in 66.03 seconds. Removing obsolete batch-local frame storage also removed its old MAX_FRAMES name; one retention-pressure input fixture still referenced that deleted owner-local constant.",
+      "failed_case": "test_unresolved_native_request_retains_proof_until_final_with_hard_cache_bound[True]",
+      "warnings": "Same 210 websockets ConnectionClosed.reason deprecation warnings; not suppressed."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe", "-m", "pytest", "-o", "addopts=", "-q", "--tb=short",
+        "tests/core/test_causal_batch_speaker.py"
+      ],
+      "exit_code": 0,
+      "outcome": "64 passed in 1.56 seconds after migrating the remaining pressure-fixture input count to session.evidence.MAX_FRAMES. The exercised hard bound and expected unavailable result under exhaustion are unchanged.",
+      "evidence_reuse": "Only the stale test-setup constant changed after the 780-case run. Its unaffected 779 passes remain applicable; the formerly failing case and complete 64-case batch module now pass. No full all-green 780-case rerun is claimed; Director retains the integration-barrier run."
+    },
+    {
+      "command": [
+        ".venv/Scripts/python.exe", "-m", "pytest", "-o", "addopts=", "-q", "--tb=short",
+        "tests/core/test_issue264_shared_speaker.py", "tests/core/test_streaming_speaker.py",
+        "tests/core/test_speaker_identity.py", "tests/core/test_peer_translation_channel_owner.py",
+        "tests/core/test_speaker_identity_pipeline.py", "tests/core/test_source_context_contract.py",
+        "tests/core/test_source_progressive_integration.py", "tests/core/runtime/test_output_runtime.py",
+        "tests/core/test_overlay_source_cards.py", "tests/core/test_overlay_presenter.py",
+        "tests/core/test_overlay_speaker_modes.py", "tests/app/test_runtime_pipeline_composition.py"
+      ],
+      "exit_code": 0,
+      "outcome": "389 passed in 6.51 seconds after final lifecycle cleanup: an independently owned streaming view resets at session close, injected shared claims survive ordinary ASR close, and assignment-owner close releases claims and detaches its evidence listener; reopening reattaches idempotently.",
+      "evidence_reuse": "Includes the final 26-case shared-outcome module and all affected source/presentation/Peer teardown surfaces. Retain applicable batch, engine, factory, dependency-boundary and wire-contract results above; Director still owns the final integrated-candidate run."
+    }
+  ],
+  "failure_repairs_and_protection": [
+    "Synthetic long-interval evidence fixtures now expand into distinct native 10 ms temporal frames. Existing PCM, text, source order, cut counts, short No, natural/safety, failure and context assertions remain unchanged.",
+    "The pressure fixture still has the same 3200 samples, 20 native temporal frames, nine calls at the pending cap, and mixed natural tail; speaker activity now lasts two frames instead of isolated alternating impulses.",
+    "A recorded Deepgram transition readiness assertion now observes the second distinct clear successor frame (82922.5787875), not the first candidate frame (82922.5787792). Text/source accounting assertions are unchanged.",
+    "The phrase-confidence fixture now models candidate-relative uncertainty for its positive representative-color case. New 0.4 and 0.6 foreign-leaning cases explicitly reject whole-candidate attribution while preserving complete phrase text.",
+    "The hard-frame-bound assertion now queries the single shared evidence owner instead of deleted session-local storage; no compatibility cache/shim was retained.",
+    "The protected-row test now registers the actual authoritative output parent. Its initial unauthorized_parent result remains a test-setup failure, not a product defect or waived assertion.",
+    "The hidden-returning-source fixture now tests both actual compatibility cases rather than expecting append across a changed layout. The positive case restores the original layout before reveal; the negative case explicitly requires a distinct card. Existing text/card/TTL guarantees remain asserted.",
+    "Removed redundant per-slice unique/replayed context fields after moving the fixed footprint to the shared view. Renamed the remaining batch replay-range cap to MAX_SUBMITTED_RANGES, without retaining a frame-cache compatibility alias. The last stale test input-count consumer was migrated to the actual shared frame cap; repository search found no other such consumers."
+  ],
+  "production_class_smoke": {
+    "command": [
+      ".venv/Scripts/python.exe",
+      "-B",
+      "-c"
+    ],
+    "inline_code": "\nimport asyncio, json, time\nfrom dataclasses import replace\nfrom pathlib import Path\nfrom puripuly_heart.core.clock import FakeClock\nfrom puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt\nfrom puripuly_heart.core.overlay.presenter import OverlayPresenter\nfrom puripuly_heart.config.overlay_calibration import OverlayCalibration\nfrom puripuly_heart.core.stt.batch_speaker import CausalBatchSession\nfrom puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer\nfrom puripuly_heart.core.stt.backend import STTSessionProjection, STTProviderTurnTerminal\nfrom puripuly_heart.providers.stt.local_qwen_sherpa import LocalQwenSherpaSTTBackend\nfrom tests.core.test_causal_batch_speaker import Recognizer, request, payload, seal, span\nfrom tests.core.test_issue264_shared_speaker import frames\nfrom tests.core.test_source_context_contract import ControlledProvider, harness_for, source_fixture, finish, close\n\nasync def main():\n    started = time.perf_counter()\n    clock = FakeClock(_now=10)\n    presenter = OverlayPresenter(OverlayCalibration(), clock=clock, visible_window_target_blocks=3)\n    translator = ControlledProvider()\n    harness, trace = harness_for(translator, overlay_sink=presenter)\n    harness.peer_owner.set_clock(clock)\n    view = harness.local_asr_runtime.speaker_evidence\n    assert view is harness.peer_owner._speaker_identities.evidence\n    backend = LocalQwenSherpaSTTBackend(Path('controlled-no-model'), language_hint='English')\n    recognizer = Recognizer()\n    backend._recognizer = recognizer\n    inner = await backend.open_session(projection=STTSessionProjection('scoped', 'provider-1'))\n    session = CausalBatchSession(inner, clock=clock.now, evidence_view=view)\n    req = replace(request(1), optional_cutoff_at_monotonic_s=99)\n    snapshot, _ = source_fixture()\n    snapshot = replace(snapshot, identity=req.identity.segment, settings=req.settings, content_ranges=(span(0, 3200),), content_sample_count=3200, display_group_id=req.display_group_id)\n    normalizer = STTScopedTurnNormalizer(req.identity)\n    events = session.turn_events()\n    try:\n        await session.begin_turn(req)\n        await payload(session, req, 0, 3200, 1)\n        view.observe(frames(0, 1600, 0) + frames(1600, 3200, 1))\n        await session.observe_speaker_evidence(())\n        early = normalizer.apply_update(await asyncio.wait_for(anext(events), 2))\n        await harness.peer_owner.handle_provider_turn_update(snapshot, early)\n        await finish(harness)\n        await harness.output_runtime.wait_for_peer_output_idle()\n        assert len(translator.calls) == 1 and presenter.snapshot().blocks[0].speaker_style == 'gold'\n        assert session._active is not None and not session._active.sealed\n        early_before_natural = {'sources': len(trace.items), 'translations': len(translator.calls), 'text': presenter.snapshot().blocks[0].primary_text, 'selected_pcm_samples': recognizer.calls[0].samples.size}\n        await seal(session, req)\n        async for event in events:\n            if isinstance(event, STTProviderTurnTerminal):\n                terminal = normalizer.apply_terminal(event)\n                await harness.peer_owner.handle_provider_turn_terminal(AudioSegmentTerminalReceipt(req.identity.segment, 'final', snapshot, clock.now()), terminal)\n                break\n        await finish(harness)\n        await harness.output_runtime.wait_for_peer_output_idle()\n        req2 = request(2)\n        snapshot2 = replace(snapshot, identity=req2.identity.segment, settings=req2.settings, content_ranges=(span(3200, 4800),), content_sample_count=1600, display_group_id=req2.display_group_id)\n        await session.begin_turn(req2)\n        await payload(session, req2, 3200, 4800, 1)\n        await seal(session, req2)\n        async for event in events:\n            if isinstance(event, STTProviderTurnTerminal):\n                terminal2 = STTScopedTurnNormalizer(req2.identity).apply_terminal(event)\n                assert terminal2.final_speaker_runs[0].speaker_id is None\n                await harness.peer_owner.handle_provider_turn_terminal(AudioSegmentTerminalReceipt(req2.identity.segment, 'final', snapshot2, clock.now()), terminal2)\n                break\n        await finish(harness)\n        await harness.output_runtime.wait_for_peer_output_idle()\n        first = presenter.snapshot().blocks[-1]\n        assert first.speaker_style == 'gray'\n        card = next(entry for entry in presenter._entries.values() if entry.block_id == first.id)\n        deadline = presenter._entry_expiration_deadline(card)\n        await session.close()\n        clock.advance(0.2)\n        await harness.peer_owner.observe_speaker_evidence(frames(3200, 4800, 0))\n        for _ in range(30):\n            if presenter.snapshot().blocks[-1].speaker_style == 'gold':\n                break\n            await asyncio.sleep(0)\n        final = presenter.snapshot().blocks[-1]\n        assert final.speaker_style == 'gold' and final.id == first.id and final.appearance_seq == first.appearance_seq\n        assert final.primary_text == first.primary_text and final.secondary_text == first.secondary_text\n        assert presenter._entry_expiration_deadline(card) == deadline\n        assert len(trace.items) == len(translator.calls) == len(harness.peer_runtime.translation_history) == 3\n        assert len(view._proofs) == 0 and harness.output_runtime.chatbox.messages == []\n        print(json.dumps({'status': 'passed', 'module': 'src/puripuly_heart/core/stt/batch_speaker.py', 'boundaries_controlled': ['Nemotron probabilities', 'native recognizer text', 'translation provider', 'logical transport; no GUI'], 'early_before_natural': early_before_natural, 'sources': len(trace.items), 'translations': len(translator.calls), 'context_records': len(harness.peer_runtime.translation_history), 'styles': [block.speaker_style for block in presenter.snapshot().blocks], 'returning_update_delay_s': 0.2, 'in_place': True, 'ttl_unchanged': True, 'historical_native_final_unknown': terminal2.final_speaker_runs[0].speaker_id is None, 'proofs_after_settlement': len(view._proofs), 'elapsed_s': time.perf_counter() - started}))\n    finally:\n        await session.close()\n        await backend.close()\n        await close(harness)\n        await presenter.close()\n\nasyncio.run(main())\n",
+    "inline_sha256": "75762a284319a3a5c92b7ec551aa6e16134646132d045198ac9d30257ea63af6",
+    "initial_exit_code": 0,
+    "initial_observation": {
+      "status": "passed",
+      "module": "src/puripuly_heart/core/stt/batch_speaker.py",
+      "boundaries_controlled": [
+        "Nemotron probabilities",
+        "native recognizer text",
+        "translation provider",
+        "logical transport; no GUI"
+      ],
+      "early_before_natural": {
+        "sources": 1,
+        "translations": 1,
+        "text": "ja:no",
+        "selected_pcm_samples": 1600
+      },
+      "sources": 3,
+      "translations": 3,
+      "context_records": 3,
+      "styles": [
+        "gold",
+        "cyan",
+        "gold"
+      ],
+      "returning_update_delay_s": 0.2,
+      "in_place": true,
+      "ttl_unchanged": true,
+      "historical_native_final_unknown": true,
+      "proofs_after_settlement": 0,
+      "elapsed_s": 0.011202199995750561
+    },
+    "final_exit_code": 0,
+    "final_observation": {
+      "status": "passed",
+      "module": "src/puripuly_heart/core/stt/batch_speaker.py",
+      "boundaries_controlled": [
+        "Nemotron probabilities",
+        "native recognizer text",
+        "translation provider",
+        "logical transport; no GUI"
+      ],
+      "early_before_natural": {
+        "sources": 1,
+        "translations": 1,
+        "text": "ja:no",
+        "selected_pcm_samples": 1600
+      },
+      "sources": 3,
+      "translations": 3,
+      "context_records": 3,
+      "styles": [
+        "gold",
+        "cyan",
+        "gold"
+      ],
+      "returning_update_delay_s": 0.2,
+      "in_place": true,
+      "ttl_unchanged": true,
+      "historical_native_final_unknown": true,
+      "proofs_after_settlement": 0,
+      "elapsed_s": 0.009613399975933135
+    },
+    "limits": "Executable real production classes, not acoustic inference: native recognizer, diarizer probabilities, translator, and logical transport are controlled/replaced. No actual GUI pixels or native model/GPU runtime are qualified. Elapsed time is only the measured smoke envelope, not a performance claim.",
+    "isolation_and_cleanup": "Only synthetic in-memory PCM/state and RecordingOscQueue; no model loading, secrets access, cloud requests, discovery, telemetry, application settings, GUI/VR processes, or sockets were intentionally exercised. All owned batch/backend/harness/presenter resources closed in finally. Inline driver was not written as a throwaway script."
+  },
+  "public_observation_interface": {
+    "view": "factory.speaker_evidence / runtime.speaker_evidence; batch.evidence; injected wrappers share evidence_view.",
+    "authority": "Peer owner _speaker_identities is also output_runtime.speaker_identities; presenter.bind_speaker_identities(authority).",
+    "snapshot": "authority.source_snapshot(source_id) returns assignment(revision, settled), first_readable_at, deadline and evidence_revision; None after retirement/reset.",
+    "wake": "authority.changed Event and next_deadline() feed one presenter task.",
+    "measurement_bands": "readable_unresolved, resolved_within_500ms, resolved_within_1s, bounded resolution_delays are canonical assignment observations; renderer/pixel timing is separate."
+  },
+  "director_documentation_recommendations": [
+    "Update architecture STT/evidence sections: one capture-scoped accepted view, request-to-contribution-to-source claim stages, proof retention independent of ASR session/PCM, batch historical native snapshot versus live presentation assignment.",
+    "Update boundary policy to describe one shared candidate/confirmation transition meaning, distinct temporal frames, conservative foreign-relative uncertainty, and natural/safety progress without a global utterance minimum.",
+    "Update output/overlay sections and user-facing caption guidance for immediate text, eligible pre-display metadata, a single <=1.000 second unresolved-to-identified in-place style revision, source-order color deferral, and no TTL/card migration or translation redispatch.",
+    "Retain #218 historical failing Goal evidence and accepted Parakeet residual omissions. This implementation/evidence does not complete #211/#218 or choose a profile.",
+    "Retain wire bridge16 and the card schema, but require speaker_identity_presentation version 3 with policy bounded_late_speaker_assignment. The previous version-2 immutable_first_readable_style capability is rejected, not aliased. Native/Flet render algorithms already apply supplied style/card revisions and remain unchanged."
+  ],
+  "remaining_owner_checks_and_limits": [
+    "Director must pin the integrated candidate and perform its integration-barrier verification/review. No Git/index/history/GitHub mutations were performed by this worker.",
+    "Validation owner must run coordinated actual non-VR Nemotron/GPU Qwen/local Gemma/Flet cases and recorded Deepgram phrase regressions at the pinned candidate. No shared GPU run or acoustic/GUI qualification was performed here.",
+    "Separate Gemini owner supplies R4 investigation/repair or evidenced negative disposition; no fresh provider calls or Gemini adapter edits were made here.",
+    "The follow-up below records targeted Ruff/Black success, native compilation and pure contract/report checks, the final combined Python result, and the retained pre-existing native whole-file rustfmt failure. Actual Flet/native pixels, photon timing, acoustic/profile quality and VR remain unqualified."
+  ],
+  "new_files": [
+    "src/puripuly_heart/core/speaker/evidence.py",
+    "tests/core/test_issue264_shared_speaker.py",
+    "tests/helpers/speaker_evidence.py",
+    "native/nemotron/issue264_shared_evidence.json"
+  ],
+  "director_requested_final_checkpoint": {
+    "contract_decision": {
+      "speaker_identity_presentation": {
+        "version": 3,
+        "policy": "bounded_late_speaker_assignment"
+      },
+      "wire_contract_version": 16,
+      "caption_card_contract": {
+        "version": 1,
+        "policy": "source_bound_accumulation"
+      },
+      "cutover": "Exact v3 capability required at Python authentication, native process readiness and startup-contract validation, and Desktop raw ingress. Desktop producers import the shared Python constant. Rust authentication, ready emission and startup reporting declare v3. Explicit old-v2 rejection and public compatibility guards are included; there is no compatibility alias.",
+      "renderer_observation": "Native OverlaySlot::update_from_block already compares/copies speaker_style and card_revision; native render signatures/cache keys include them. Desktop caption projection carries card_revision and derives both line colors from block.speaker_style. No rendering algorithm, resolver inference, GPU/device or VR policy was added.",
+      "scope_authority": "Director explicitly approved this minimal semantic capability cutover and the pure native startup-report early-exit path; Director owns README/architecture updates."
+    },
+    "coverage_rationale": "One final combined Python command covers the prior shared-speaker envelope after final claim/teardown changes and the strict v3 capability consumers. Explicit v2 negatives and a literal public compatibility snapshot avoid tautological imported-constant tests. Native auth/ready and actual pure-report observations cover the compiled declarations without graphics/OpenVR/device initialization.",
+    "python_quality": {
+      "initial_ruff": "Exit 1: six I001 import-format errors on owned surfaces. Targeted Ruff --fix --select I corrected all six.",
+      "initial_black_capture": "The initial Windows cp949 capture could not decode Black's Unicode output. A formatting invocation completed source formatting but its driver raised UnicodeDecodeError while reading output; that attempt is not claimed as a successful check. UTF-8 capture was then used.",
+      "scope": "Only the 22 original owned Python files and six approved contract-cutover Python files were formatted or linted. No sibling provider or Director documentation files were included.",
+      "ruff_command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/recognition_units.py src/puripuly_heart/domain/recognition.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/orchestrator/peer_translation_channel.py src/puripuly_heart/core/orchestrator/translation_output_projection.py src/puripuly_heart/core/runtime/output.py src/puripuly_heart/core/overlay/presenter.py src/puripuly_heart/core/overlay/presenter_sources.py src/puripuly_heart/domain/models.py src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py src/puripuly_heart/core/runtime/local_asr_provider_runtime.py src/puripuly_heart/core/local_asr/local_asr_provider_runtime.py tests/core/test_issue264_shared_speaker.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/helpers/speaker_evidence.py src/puripuly_heart/core/overlay/manifest.py tests/app/test_overlay_process_manager.py tests/core/runtime/test_overlay_runtime.py tests/core/test_overlay_bridge.py tests/app/test_desktop_overlay_repro.py tests/config/test_public_compatibility_surfaces.py",
+      "ruff_exit_code": 0,
+      "ruff_result": "All checks passed.",
+      "black_command": ".venv/Scripts/python.exe -m black --check --workers 1 src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/recognition_units.py src/puripuly_heart/domain/recognition.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/orchestrator/peer_translation_channel.py src/puripuly_heart/core/orchestrator/translation_output_projection.py src/puripuly_heart/core/runtime/output.py src/puripuly_heart/core/overlay/presenter.py src/puripuly_heart/core/overlay/presenter_sources.py src/puripuly_heart/domain/models.py src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py src/puripuly_heart/core/runtime/local_asr_provider_runtime.py src/puripuly_heart/core/local_asr/local_asr_provider_runtime.py tests/core/test_issue264_shared_speaker.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/helpers/speaker_evidence.py src/puripuly_heart/core/overlay/manifest.py tests/app/test_overlay_process_manager.py tests/core/runtime/test_overlay_runtime.py tests/core/test_overlay_bridge.py tests/app/test_desktop_overlay_repro.py tests/config/test_public_compatibility_surfaces.py",
+      "black_exit_code": 0,
+      "black_result": "28 files would be left unchanged.",
+      "typing_configuration": "No Python mypy/pyright/basedpyright configuration or Python typing CI command is configured in pyproject.toml, conventional configuration filenames, or the relevant CI workflow. CI pnpm typecheck belongs to the untouched Broker and was not run. Native Rust checking is recorded below."
+    },
+    "native_format_limit": {
+      "command": "rustfmt --check --edition 2021 native/overlay/src/bridge.rs native/overlay/src/runtime.rs native/overlay/tests/runtime.rs",
+      "exit_code": 1,
+      "disposition": "Retained failed/pre-existing whole-file check. Director explicitly prohibited restyling these unrelated blocks. It was not rerun unchanged, and no global native-format success is claimed.",
+      "provenance_commands": [
+        "git show cc75792e9704e8609f38a3aa0794c03a1c7e3416:native/overlay/src/runtime.rs",
+        "git show cc75792e9704e8609f38a3aa0794c03a1c7e3416:native/overlay/tests/runtime.rs"
+      ],
+      "provenance_result": "Both read-only Git queries exited 0. Every formatter-requested removed line below occurs in the same order in the supplied baseline. No Git/index/history mutation occurred.",
+      "hunks": [
+        {
+          "file": "native/overlay/src/runtime.rs",
+          "reported_line": 1737,
+          "removed_lines": ["        self", "            .runtime"],
+          "ordered_baseline_match": true
+        },
+        {
+          "file": "native/overlay/src/runtime.rs",
+          "reported_line": 3833,
+          "removed_lines": ["        let result = owner.finish_run(", "            &mut bridge,", "            &logger,", "            Err(RuntimeFailure::Render(\"private-token-body-path\".into())),", "        ).await;"],
+          "ordered_baseline_match": true
+        },
+        {
+          "file": "native/overlay/src/runtime.rs",
+          "reported_line": 3844,
+          "removed_lines": ["        let terminal = emitted.lines()", "            .find(|value| value[\"type\"] == \"startup_error\").unwrap();"],
+          "ordered_baseline_match": true
+        },
+        {
+          "file": "native/overlay/tests/runtime.rs",
+          "reported_line": 2679,
+          "removed_lines": ["    assert_eq!(runtime.state().snapshot().blocks[0].primary_text, primary_text);", "    assert_eq!(runtime.state().snapshot().blocks[0].secondary_text, secondary_text);"],
+          "ordered_baseline_match": true
+        },
+        {
+          "file": "native/overlay/tests/runtime.rs",
+          "reported_line": 2692,
+          "removed_lines": ["    assert_eq!(promoted.layout().visible_blocks[0].primary_lines[0].font_size_px, shrunk_primary);", "        promoted.layout().visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px,"],
+          "ordered_baseline_match": true
+        },
+        {
+          "file": "native/overlay/tests/runtime.rs",
+          "reported_line": 2708,
+          "removed_lines": ["    assert!((reoccupied.layout().visible_blocks[0].primary_lines[0].font_size_px - 132.0).abs() < 0.01);", "        (reoccupied.layout().visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px - 81.84)"],
+          "ordered_baseline_match": true
+        }
+      ],
+      "new_contract_hunks": "The whole-file formatter requested no changes to the new capability declarations. Its reported test line numbers precede insertion of the new pure auth/ready test.",
+      "new_auth_test_check": {
+        "command": "rustfmt --check --edition 2021",
+        "input": "Only the final bridge_auth_and_ready_declare_bounded_assignment_without_devices function supplied on stdin.",
+        "input_sha256": "b355b77baa3705814457174236638b299b86079bdb378af02ab52ba60c3d8eab",
+        "exit_code": 0,
+        "scope": "New auth/ready test hunk only; does not waive or relabel the whole-file formatting failure."
+      }
+    },
+    "native_compile_and_contracts": {
+      "initial_check_command": "cargo check --locked --offline --manifest-path native/overlay/Cargo.toml --tests",
+      "initial_check_exit_code": 101,
+      "initial_failure": "OpenVR dependency CMake/MSVC compilation failed with FileTracker FTK1011 in the long checkout target path. No device or application startup was attempted.",
+      "short_target_check_command": "env CARGO_TARGET_DIR=C:/Temp/puri264-11567207 cargo check --locked --offline --manifest-path native/overlay/Cargo.toml --tests",
+      "short_target_check_exit_code": 0,
+      "short_target_check_result": "Finished dev profile, all native test targets compiled/checked in 17.19 seconds; no dependency or lockfile change.",
+      "initial_auth_test_command": "env CARGO_TARGET_DIR=C:/Temp/puri264-11567207 cargo test --locked --offline --manifest-path native/overlay/Cargo.toml --test runtime bridge_auth_and_ready_declare_bounded_assignment_without_devices -- --exact",
+      "initial_auth_test_exit_code": 101,
+      "initial_auth_test_failure": "Capability assertions succeeded, then the new test's remove_dir_all cleanup failed NotFound. OverlayLogger::open intentionally ignores its directory parameter and writes to streams; it creates no dedicated log directory.",
+      "auth_test_repair": "Use established test_logger fixture and retain logger.shutdown. Remove the false assumption that this stdout-only test created a directory. No capability assertion or readiness/identity guarantee was weakened.",
+      "auth_test_command": "env CARGO_TARGET_DIR=C:/Temp/puri264-11567207 cargo test --locked --offline --manifest-path native/overlay/Cargo.toml --test runtime bridge_auth_and_ready_declare_bounded_assignment_without_devices -- --exact",
+      "auth_test_exit_code": 0,
+      "auth_test_result": "1 passed, 101 filtered out. Real Rust BridgeClient authenticated against the isolated localhost fixture, and direct logical ready emission advertised v3. No CaptionRenderer, graphics device or OpenVR initialization was called.",
+      "startup_contract_test_command": "env CARGO_TARGET_DIR=C:/Temp/puri264-11567207 cargo test --locked --offline --manifest-path native/overlay/Cargo.toml --test runtime check_startup_contract_reports_current_contract_version -- --exact",
+      "startup_contract_test_exit_code": 0,
+      "startup_contract_test_result": "1 passed, 101 filtered out. Executes only the approved early-exit startup report flag.",
+      "retained_outputs": "Short isolated Cargo target and failed default target build outputs remain available. They were not deleted; no worktree cleanup was performed."
+    },
+    "actual_native_pure_report": {
+      "command": "C:/Temp/puri264-11567207/debug/PuriPulyHeartOverlay.exe --check-startup-contract",
+      "exit_code": 0,
+      "observed_payload": {
+        "app_version": "2.8.2",
+        "contract_version": 16,
+        "execution_contract": {"revision": "r2", "version": 1},
+        "native_presentation_retry": {"ownership": "exclusive", "version": 1},
+        "speaker_identity_presentation": {"policy": "bounded_late_speaker_assignment", "version": 3},
+        "caption_card_presentation": {"policy": "source_bound_accumulation", "version": 1}
+      },
+      "verified_early_exit_boundary": "main.rs constructs the Tokio executor and forwards argv to run_cli. run_cli's exact two-argument --check-startup-contract branch prints JSON and returns 0 at runtime.rs:2543-2555, before load_manifest, environment profile resolution, run_with_manifest_and_profile, logging, BridgeClient connection, and initialize_runtime_resources. Ordinary native startup, graphics/device initialization and VR were not executed."
+    },
+    "one_final_combined_python_command": {
+      "command": ".venv/Scripts/python.exe -m pytest -o addopts= -q --tb=short tests/core/test_issue264_shared_speaker.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_speaker_identity.py tests/core/test_stt_scoped_engine.py tests/core/test_speaker_identity_pipeline.py tests/core/test_overlay_source_cards.py tests/core/test_overlay_speaker_modes.py tests/core/test_overlay_presenter.py tests/core/runtime/test_output_runtime.py tests/core/test_source_context_contract.py tests/core/test_source_progressive_integration.py tests/app/test_wiring_local_asr_provider_runtime.py tests/app/test_runtime_pipeline_composition.py tests/core/test_peer_translation_channel_owner.py tests/architecture/test_dependency_boundaries.py tests/core/test_overlay_protocol.py tests/core/test_overlay_manifest.py tests/core/test_overlay_bridge.py tests/app/test_overlay_process_manager.py tests/core/runtime/test_overlay_runtime.py tests/app/test_desktop_overlay_repro.py tests/ui/test_desktop_overlay_renderer.py tests/config/test_public_compatibility_surfaces.py::test_overlay_contract_snapshot_matches_manifest_and_protocol_wire_shape tests/config/test_public_compatibility_surfaces.py::test_overlay_startup_contract_snapshot_matches_python_runners_and_manifest_handoff",
+      "exit_code": 0,
+      "result": "1181 passed, 2 skipped, 252 warnings in 87.80 seconds.",
+      "shared_module": "Includes the final 26-case shared-speaker outcome module after all claim/teardown changes and the v3 contract cutover.",
+      "skips": [
+        "tests/core/runtime/test_overlay_runtime.py::test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_reader_cleanup",
+        "tests/core/runtime/test_overlay_runtime.py::test_runtime_real_bridge_writer_delivers_one_shutdown_before_delayed_child_exit"
+      ],
+      "skip_reason": "Existing INTEGRATION != 1 guards: requires real subprocess. Guards were unchanged; these outcomes are not passes.",
+      "warnings": "210 existing websockets ConnectionClosed.reason deprecations and 42 asyncio.iscoroutinefunction deprecations in fake-Desktop renderer tests; retained, not suppressed.",
+      "limits": "Fake-Flet adapters and localhost protocol fixtures only. No actual Flet GUI, GPU inference, cloud provider or ordinary native/VR startup."
+    },
+    "handoff": "Source assignment/snapshot interfaces are stable and the validation owner was notified of v3. Product/test mutations stop after this record pending Director pin and independent review."
+  },
+  "sanitization": "No private paths, raw audio, secrets or credentials are contained in this record."
+}

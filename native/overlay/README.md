@@ -13,10 +13,18 @@ Windows Rust runtime for the VR subtitle overlay.
 
 The shared bridge is version 16 with execution contract r2 and exclusive native
 presentation retries. Authentication and readiness require both
-`speaker_identity_presentation: {"version":2,"policy":"immutable_first_readable_style"}`
+`speaker_identity_presentation: {"version":3,"policy":"bounded_late_speaker_assignment"}`
 and `caption_card_presentation: {"version":1,"policy":"source_bound_accumulation"}`.
-Version 15 and earlier are incompatible. Python fixes a caption's `speaker_style` at
-first readable publication and sends only that style, not speaker identity. SELF
+Version 15 and earlier are incompatible. Bridge-16 peers advertising the older
+version-2 immutable-style capability are also rejected; there is no compatibility
+alias. The snapshot/card schema is unchanged.
+
+Python resolves eligible speaker metadata before the first readable card choice.
+Text and translation never wait for a speaker. An unresolved caption can receive
+one identified style within 1.000 seconds of its first logically readable original
+or translation; 500 ms is a preferred observation band, not a deliberate wait or
+guarantee. An established speaker cannot change. Python sends only the resulting
+`speaker_style`, not speaker identity, and owns the deadline/assignment policy. SELF
 remains white. With speaker tracking disabled, the existing plain Peer presentation
 uses gold `#FFD700` without consuming speaker slots. Nemotron is the speaker authority
 when tracking is enabled, independently of ASR provider: peers use four stable
@@ -40,6 +48,11 @@ at readable application. Source/context order remains unchanged; expired or evic
 accumulated history is not restored. Same-source completion, targets, retries,
 metadata and replay neither append an utterance nor renew its lifetime. Caption
 aggregation never changes OSC/chatbox payloads.
+An already-readable unknown card that resolves changes style and revision in place;
+it does not merge into an older same-speaker card or change position, text or TTL.
+The existing returning-speaker append path remains available when identity is known
+before the initial readable card choice. An earlier unresolved source may defer
+later colors to preserve source-order allocation, but never delays their text.
 This no-renew rule also covers finalized SELF cards: late translation does not add
 the former four-second minimum or restart eight seconds. Active SELF preview and
 slot protection remain separate from finalized-card lifetime.

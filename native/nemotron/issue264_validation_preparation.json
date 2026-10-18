@@ -1,0 +1,50 @@
+{
+  "schema": "issue264-validation-preparation-1",
+  "authority": ["https://github.com/kapitalismho/PuriPuly-heart/issues/264", "https://github.com/kapitalismho/PuriPuly-heart/issues/211", "https://github.com/kapitalismho/PuriPuly-heart/issues/218#issuecomment-6246195969", "docs/issue218-speaker-attribution-plan.md:3-13"],
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "readiness": "Preparation only. Await Director stable product pin and final implementation interface inventory. No product import, inference, caption startup, provider call or product check has run.",
+  "actual_prerequisites": {
+    "execution": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_prerequisites.py --output build/issue264-validation-prerequisites-01",
+    "inventory": "build/issue264-validation-prerequisites-01/prerequisites.json",
+    "offline_input_preparation": "Executed .venv/Scripts/python.exe -B native/nemotron/issue264_validation_inputs.py --output build/issue264-validation-inputs-01. Exact existing audio/input_cases AST definitions prepared all five PCM assemblies without product import; both selected canonical tape input hashes match. Inputs: cleanAB 5.94575s, repeatedABA 8.4515625s, shortABA 7.121625s, correction 3.2249375s, continuation 9.67s. Scoring assembly maps remain separate.",
+    "installed_flet_client": "Existing fingerprinted Flet 1.0.0 client SHA-256 b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28. Installed loader inspection shows shared ~/.flet cache may touch markers and garbage-collect stale siblings. Task launcher uses supported FLET_VIEW_PATH to this installed read-only client, bypassing shared cache unpack/touch/GC; no Flet launch has occurred.",
+    "outcome": "All required artifact/runtime/model/corpus/tape/helper paths present; all five approved audio hashes match; original valid Deepgram tape member readable; no puripuly_heart module loaded.",
+    "python": "Repository .venv Python 3.14.7, Windows AMD64",
+    "dependencies": {"numpy": "2.5.1", "onnxruntime": "1.28.0", "httpx": "0.28.1", "flet": "1.0.0", "flet-desktop": "1.0.0", "psutil": "7.2.2", "deepgram-sdk": "5.3.4", "sherpa-onnx": "1.13.8", "sherpa-onnx-core": "1.13.8", "truststore": "0.10.4"},
+    "unused_optional_dependency_absent": "soundfile is absent, but the inherited approved audio loader invokes existing ffmpeg to produce mono 16kHz float32; soundfile is not a prerequisite of this route.",
+    "device_enumeration": "vulkaninfo --summary exited 0: GPU0 AMD Radeon RX 7900 XTX, AMD proprietary driver 26.8.1 (LLPC), Vulkan 1.4.349; instance 1.4.341. Existing OBS layer version warning retained. Enumeration is not inference readiness.",
+    "runtime": "Nemotron runtime manifest: NeMo-Speech.cpp b809bbb467fb2da2be0042fff5ef1f503828c9cf, F16, Vulkan, neural_cpu_fallback=false. Gemma uses current installed llama.cpp b11537, not historical b10423 default; effective backend/version to be observed after pin.",
+    "controlled_acquisition_authorized": "Maintainer explicitly authorized read-only existing-install validator injection. Harness retains actual managed Gemma owners/runtime/server/model/provider; validate_gemma_install verifies pinned files/checksums and rejects missing/mismatch. Acquisition/provisioning only is controlled: no shared provisioning lease, download, installation or persistence claim. Existing measured Gemma/MTP hashes and byte counts match current GEMMA_ASSETS declarations.",
+    "artifact_sha256": {"nemotron": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38", "qwen_model": "c75a961b7134a6c952d89797865cb0d0376876185aee04ef6d12c31c2952e4e1", "qwen_worker": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d", "gemma_model": "df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3", "gemma_mtp": "423074e537504b4f9ec5eafed5c639fac82c96631626efccacdd3c4039b20605"},
+    "native_tape": {"archive": "native/nemotron/issue218_cloud_deepgram_raw.zip", "member": "valid/trace.json", "member_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7", "historical_candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9"},
+    "background": "Existing OVRServer_x64.exe observed; no VRChat, vrserver or vrmonitor matched. Unowned background is neither launched nor stopped; this is not a VR coexistence claim.",
+    "missing_required_files": [],
+    "pending_runtime_prerequisites": ["Director stable candidate pin/readiness", "Final shared evidence and source-keyed assignment interface; source-only/failure/TTL controls", "Actual model activation/device/geometry, Flet owned HWND uncloaked/layout/readback and local-only sockets must be observed during authorized execution"]
+  },
+  "proposed_smallest_first_observation": {
+    "case": "GPU distinct_repeated_A_B_A, complete 1.04 profile, once; this is one of the approved ten cases, not an extra warmup/repetition.",
+    "rationale": "One existing input can demonstrate preceding A and B translation before enclosing completion, distinct B, returning A continuity, safety continuation, and late evidence settlement. Mere boundary callbacks, renderer ACKs and speaker counts could all look good while these results are wrong; correlate complete source text/real translation to actual caption IDs/styles and owned-window pixels.",
+    "continuation": "If valid, complete remaining four cases at 1.04 then five at 0.64, exactly one repetition; no baseline/profile-selection or acoustic tuning sweep.",
+    "preserved_settings": "Full 1.04 geometry 9/4/0/264/264/222 and full 0.64 6/2/0/264/264/222; 50ms production drain; eight-slot Nemotron F16/Vulkan only; GPU Qwen; actual managed/local Gemma Vulkan; 500ms onset and 300ms rollover; trimming OFF; no extra speaker wait; unchanged source/context/prompt/concurrency settings.",
+    "gpu_cases": ["clean_A_B", "distinct_repeated_A_B_A", "short_A_B_A", "linguistic_correction", "six_second_rollover"],
+    "deepgram_tapes": ["distinct_repeated_A_B_A baseline repetition 1: coherent Washed/Gentlemen phrases, B and returning A", "short_A_B_A baseline repetition 1: exact short No preservation inside original final and conservative attribution"],
+    "deepgram_scope": "Run the two minimal canonical tapes through current shared path with real Nemotron, local Gemma and Flet, both complete profiles once. No fresh provider call. Preserve raw final bytes, capture/PCM hashes, original successful cursor/control schedule and lexical timing; only host origin rebased. Expand only for a concrete changed-path regression. Label historical native playback, not fresh acoustic ASR."
+  },
+  "observations_to_retain": [
+    "Stable candidate plus exact source/import/executable/model hashes; owned PIDs and requested/effective device/profile/runtime.",
+    "Original capture coordinates, evidence delivery/acceptance revision/frontiers, native submit/terminal frozen origin, source admission and source-order translation start/end/publication.",
+    "Natural-end and safety timestamps beside complete preceding source/translation and actual readback upper bounds, not only first token or boundary events.",
+    "First actual logical readable original-or-translation application, source-keyed assignment revision/settlement and metadata-only update: pre-display, <=500ms, <=1.000s, expired/unresolved. Correct epoch/key versus scoring references separately from count; missing late proof versus wrong mapping.",
+    "Before/after text, languages, card IDs, order/position, appearance, expiration/TTL, source/history/translation counts, destination isolation; no card migration or renewed TTL from metadata.",
+    "Actual Flet owned HWND/PID, visible/nonminimized DWM cloak=0 before/after, layout bounds, stable revision and requested palette pixel checks; inspect screenshot containing changed style. Renderer ACK remains distinct from visible readback and photon timing.",
+    "Separate controlled synthetic metadata actual-caption cases for source-only, translation failure, deadline, established nonrecolor, expiry/TTL/reset, hidden reveal and ordered/protected output if real audio does not cover them; never label controlled metadata as actual acoustic inference.",
+    "Raw evidence and reference annotations separate; annotations never fed into product decisions; no harness threshold adjustments. Failed/invalid/skipped/missing-access records retained."
+  ],
+  "isolation": {
+    "no_cloud": "No cloud service calls, credential-file reads, live/private audio, Parakeet-specific runs, VRChat or SteamVR launches.",
+    "prepared_drivers": ["native/nemotron/issue264_validation_launch.py", "native/nemotron/issue264_validation_runtime.py", "native/nemotron/issue264_validation_caption.py", "native/nemotron/issue264_validation_summary.py"],
+    "startup_inspection": "Construct scoped owners directly, not full application composition: no persisted settings/keyring, Broker, discovery, OSCQuery, VRChat logs or telemetry owners. Translation uses InMemorySecretStore and task-local empty extension registry; explicit existing assets; no disk prefix cache. Require all network boundaries loopback and only owned child processes.",
+    "runtime_plan": "Scrub credential-like environment names without publishing values before product import; HF_HUB_OFFLINE=1; task-local TEMP/TMP/APPDATA/LOCALAPPDATA/output; explicit existing FLET_VIEW_PATH avoids default shared-cache side effects; deny unintended external Python network/provisioning rather than fallback. Native child filesystem access and third-party layers are not an OS sandbox and remain an explicit limit. Keep Flet existing guarded launch/readback and public bounds controls. Record owned resources and process exit; stop only owned children.",
+    "preparation_cleanup": "Inventory process and Vulkan enumeration exited; no inference process or window started. Retained task-local script/report and build inventory only."
+  }
+}

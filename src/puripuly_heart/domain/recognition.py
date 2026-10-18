@@ -123,6 +123,7 @@ class RecognitionTextOrigin:
     source_available_at_monotonic_s: float | None = None
     speaker_attribution: SpeakerAttribution | None = None
     native_provenance: tuple[STTNativeProvenance, ...] = ()
+    speaker_proof_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.text_start < 0 or self.text_end < self.text_start:

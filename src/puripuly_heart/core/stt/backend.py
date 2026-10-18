@@ -80,6 +80,7 @@ class STTSourceAudio:
     context_ranges: tuple[AudioCaptureSpan, ...] = ()
     display_group_id: UUID | None = None
     speaker_attribution: SpeakerAttribution | None = None
+    speaker_proof_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.contribution_id:

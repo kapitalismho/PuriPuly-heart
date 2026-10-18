@@ -41,6 +41,7 @@ from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
@@ -125,6 +126,9 @@ class LocalASRProviderRuntimeOwner:
         if diagnostics_capacity < 1:
             raise ValueError("diagnostics_capacity must be positive")
         self._provider_factory = provider_factory
+        self.speaker_evidence = getattr(provider_factory, "speaker_evidence", None)
+        if self.speaker_evidence is None:
+            self.speaker_evidence = SpeakerEvidenceView()
         self._gpu_runtime_factory = gpu_runtime_factory
         self._provisioning = provisioning
         self._state_changed = state_changed
@@ -850,6 +854,8 @@ class LocalASRProviderRuntimeOwner:
     ) -> None:
         if self._closed:
             return
+        if channel == "peer":
+            self.speaker_evidence.observe(evidence)
         async with self._operation():
             for provider in self._source_fact_targets(self._handles[channel]):
                 observe = getattr(provider, "observe_speaker_evidence", None)
@@ -1107,6 +1113,7 @@ class LocalASRProviderRuntimeOwner:
                 return
             self._closing = True
             self._closed = True
+            self.speaker_evidence.reset()
             self._gpu_phase = "closed"
             for channel in _CHANNELS:
                 self._channel_phases[channel] = "closed"

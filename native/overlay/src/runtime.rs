@@ -671,8 +671,8 @@ impl PresentationRuntime {
                     "ownership": "exclusive"
                 },
                 "speaker_identity_presentation": {
-                    "version": 2,
-                    "policy": "immutable_first_readable_style"
+                    "version": 3,
+                    "policy": "bounded_late_speaker_assignment"
                 },
                 "caption_card_presentation": {
                     "version": 1,
@@ -2548,7 +2548,7 @@ pub async fn run_cli(args: &[String]) -> i32 {
                 "app_version": env!("CARGO_PKG_VERSION"),
                 "execution_contract": {"version": 1, "revision": "r2"},
                 "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
-                "speaker_identity_presentation": {"version": 2, "policy": "immutable_first_readable_style"},
+                "speaker_identity_presentation": {"version": 3, "policy": "bounded_late_speaker_assignment"},
                 "caption_card_presentation": {"version": 1, "policy": "source_bound_accumulation"},
             })
         );

@@ -29,6 +29,7 @@ from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
 from puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession
 from puripuly_heart.domain.models import FinalSpeakerRun
+from tests.helpers.speaker_evidence import temporal_frames
 
 
 def span(start, end):
@@ -152,7 +153,9 @@ async def test_supported_prefix_releases_before_end_and_successor_progresses():
     try:
         await session.begin_turn(req)
         await send(session, req, 0, 3200, 1)
-        await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        )
         assert session.audio_boundaries[0][1].normalized_sample == 1600
         assert not provider.sealed
         provider.events.put(update(req, "短い。 "))
@@ -208,7 +211,9 @@ async def test_consumed_text_preserves_later_audio_boundary_and_pending_successo
     try:
         await session.begin_turn(req)
         await send(session, req, 0, 3200, 1)
-        await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        )
         provider.events.put(update(req, first_text))
         normalizer.apply_update(await next_text(events))
         first_release = normalizer.apply_update(await next_text(events))
@@ -218,7 +223,9 @@ async def test_consumed_text_preserves_later_audio_boundary_and_pending_successo
         assert first.raw_text == first_text
         assert first.speaker.speaker_id == "0"
 
-        await session.observe_speaker_evidence((evidence(3200, 4800, 2, ready=4.0),))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(3200, 4800, 2, ready=4.0),))
+        )
         boundary = await asyncio.wait_for(anext(events), 1)
         assert isinstance(boundary, STTProviderAudioBoundary)
         assert boundary.boundary.normalized_sample == 3200
@@ -254,7 +261,9 @@ async def test_consumed_text_preserves_later_audio_boundary_and_pending_successo
         assert pending.source_release is None
         assert pending.final_speaker_runs[-1].attribution_state == "unavailable"
         await send(session, req, 3200, 4000, 2)
-        await session.observe_speaker_evidence((evidence(4800, 6400, 3, ready=5.0),))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(4800, 6400, 3, ready=5.0),))
+        )
         await send(session, req, 4000, 4800, 3)
         boundary = await asyncio.wait_for(anext(events), 1)
         assert isinstance(boundary, STTProviderAudioBoundary)
@@ -310,7 +319,9 @@ async def test_unknown_clock_or_point_never_becomes_interval(semantics, qualifie
     try:
         await session.begin_turn(req)
         await send(session, req, 0, 3200, 1)
-        await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        )
         provider.events.put(
             update(req, "No.", qualified=qualified, semantics=semantics, release=True)
         )
@@ -334,7 +345,7 @@ async def test_untimed_considers_all_replayed_context(context_slot, expected):
         await send(session, req, 0, 800, 1, context=True)
         await send(session, req, 800, 1600, 2)
         await session.observe_speaker_evidence(
-            (evidence(0, 800, context_slot), evidence(800, 1600, 0))
+            temporal_frames((evidence(0, 800, context_slot), evidence(800, 1600, 0)))
         )
         provider.events.put(update(req, "No.", policy="whole_span", release=True))
         result = await next_text(session.turn_events())
@@ -352,7 +363,7 @@ async def test_unknown_actual_backend_does_not_inherit_request_purity():
     try:
         await session.begin_turn(req)
         await send(session, req, 0, 1600, 1)
-        await session.observe_speaker_evidence((evidence(0, 1600, 0),))
+        await session.observe_speaker_evidence(temporal_frames((evidence(0, 1600, 0),)))
         provider.events.put(update(req, "No.", policy="unknown", release=True))
         result = await next_text(session.turn_events())
         assert result.source_audio[0].speaker_attribution.state == "unavailable"
@@ -411,7 +422,9 @@ async def test_native_ids_cannot_change_actual_admitted_source_units():
         try:
             await session.begin_turn(req)
             await send(session, req, 0, 3200, 1)
-            await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+            await session.observe_speaker_evidence(
+                temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+            )
             event = update(req, "No.", release=True)
             event = replace(
                 event,
@@ -449,7 +462,9 @@ async def test_explicit_clock_reset_and_synthetic_input_do_not_guess_offsets():
         await session.begin_turn(req)
         provider.observer(800)
         await send(session, req, 0, 3200, 1)
-        await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        )
         event = update(req, "No.", release=True)
         event = replace(
             event,
@@ -597,10 +612,12 @@ async def test_audio_boundary_survives_mapped_quiet_without_text(middle_slot, ex
         await session.begin_turn(req)
         await send(session, req, 0, 4800, 1)
         await session.observe_speaker_evidence(
-            (
-                evidence(0, 1600, 0),
-                evidence(1600, 3200, middle_slot),
-                evidence(3200, 4800, 1),
+            temporal_frames(
+                (
+                    evidence(0, 1600, 0),
+                    evidence(1600, 3200, middle_slot),
+                    evidence(3200, 4800, 1),
+                )
             )
         )
         assert session.audio_boundaries[0][1].normalized_sample == expected_boundary
@@ -630,7 +647,9 @@ async def test_same_speaker_word_pieces_create_one_complete_source_not_word_jobs
     try:
         await session.begin_turn(req)
         await send(session, req, 0, 3200, 1)
-        await session.observe_speaker_evidence((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        await session.observe_speaker_evidence(
+            temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
+        )
         event = update(req, "No. yes.", release=True)
         event = replace(
             event,
@@ -740,7 +759,7 @@ async def replay_captured_fragmentation(*, complete_words=True):
                     )
                 )
                 evidence_cursor += 1
-            await session.observe_speaker_evidence(tuple(observed))
+            await session.observe_speaker_evidence(temporal_frames(tuple(observed)))
             transcription = captured["transcription"]
             provenance = STTNativeProvenance(
                 native_event_id=f"captured-{captured['sequence']}",
@@ -837,7 +856,7 @@ async def replay_captured_fragmentation(*, complete_words=True):
             if item.transition_start_sample == 42048 and item.transition_end_sample == 49888
         )
         assert boundary.normalized_sample == 49888
-        assert boundary.observed_at_monotonic_s == 82922.5787792
+        assert boundary.observed_at_monotonic_s == 82922.5787875
         await send(session, req, initial + sent, initial + sent + 512, sequence + 1)
         return {
             "raw_sources": [source.raw_text for source in sources],
@@ -908,7 +927,7 @@ async def test_established_transition_never_bridges_invalid_coverage(separation)
                     ),
                 ),
             )
-        await session.observe_speaker_evidence((first, gray, successor))
+        await session.observe_speaker_evidence(temporal_frames((first, gray, successor)))
         assert not session.audio_boundaries
     finally:
         await session.close()
@@ -930,7 +949,7 @@ async def test_uncertain_transition_is_retained_but_cannot_release_identified_so
             ),
         )
         await session.observe_speaker_evidence(
-            (evidence(0, 1600, 0), gray, evidence(3200, 4800, 1))
+            temporal_frames((evidence(0, 1600, 0), gray, evidence(3200, 4800, 1)))
         )
         boundary = session.audio_boundaries[0][1]
         assert (boundary.transition_start_sample, boundary.transition_end_sample) == (1600, 3200)
@@ -968,10 +987,15 @@ async def test_bounded_transition_history_cannot_bridge_evicted_predecessor():
         count = session._timeline.MAX_FRAMES + 32
         await send(session, req, 0, (count + 2) * 16, 1)
         await session.observe_speaker_evidence(
-            tuple(
-                [evidence(0, 16, 0)]
-                + [evidence(index * 16, (index + 1) * 16, None) for index in range(1, count + 1)]
-                + [evidence((count + 1) * 16, (count + 2) * 16, 1)]
+            temporal_frames(
+                tuple(
+                    [evidence(0, 16, 0)]
+                    + [
+                        evidence(index * 16, (index + 1) * 16, None)
+                        for index in range(1, count + 1)
+                    ]
+                    + [evidence((count + 1) * 16, (count + 2) * 16, 1)]
+                )
             )
         )
         assert not session.audio_boundaries
@@ -1005,10 +1029,12 @@ async def test_internal_split_requires_both_established_audio_and_complete_text_
         await session.begin_turn(req)
         await send(session, req, 0, 4800, 1)
         await session.observe_speaker_evidence(
-            (
-                evidence(0, 1600, 0),
-                evidence(1600, 2400, None),
-                evidence(2400, 4800, 1),
+            temporal_frames(
+                (
+                    evidence(0, 1600, 0),
+                    evidence(1600, 2400, None),
+                    evidence(2400, 4800, 1),
+                )
             )
         )
         event = update(req, "No. Yes.", release=True)
@@ -1101,7 +1127,7 @@ async def test_fine_complete_word_prefix_preserves_crossing_group_and_terminal_r
             frame=ProbabilityFrame(1600, 2400, (0.4,) + (0.01,) * 7),
         )
         await session.observe_speaker_evidence(
-            (evidence(0, 1600, 0), gray, evidence(2400, 4800, 1))
+            temporal_frames((evidence(0, 1600, 0), gray, evidence(2400, 4800, 1)))
         )
         event = update(req, text)
         event = replace(
@@ -1210,7 +1236,9 @@ async def test_lexical_cuts_without_qualified_audio_partition_do_not_create_word
             frame=ProbabilityFrame(1600, 2400, (0.4,) + (0.01,) * 7),
         )
         await session.observe_speaker_evidence(
-            (evidence(0, 1600, 0), gray, evidence(2400, 4800, 1 if transition else 0))
+            temporal_frames(
+                (evidence(0, 1600, 0), gray, evidence(2400, 4800, 1 if transition else 0))
+            )
         )
         event = update(req, "One two three.", qualified=qualified, release=True)
         event = replace(
@@ -1299,7 +1327,11 @@ async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translati
         gray_start, gray_end = (32000 - edge, 32000) if uncertain_edge == "trailing" else (0, edge)
         gray = replace(
             evidence(gray_start, gray_end, None),
-            frame=ProbabilityFrame(gray_start, gray_end, (0.4,) + (0.01,) * 7),
+            frame=ProbabilityFrame(
+                gray_start,
+                gray_end,
+                tuple(0.4 if index == slot else 0.01 for index in range(8)),
+            ),
         )
         clear = (
             evidence(0, 32000 - edge, slot)
@@ -1307,7 +1339,7 @@ async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translati
             else evidence(edge, 32000, slot)
         )
         await session.observe_speaker_evidence(
-            (clear, gray) if uncertain_edge == "trailing" else (gray, clear)
+            temporal_frames((clear, gray) if uncertain_edge == "trailing" else (gray, clear))
         )
         words = text.split()
         positions = []
@@ -1374,7 +1406,9 @@ async def test_final_phrase_preserves_very_short_clear_no_between_returning_spea
         await session.begin_turn(req)
         await send(session, req, 0, 32800, 1)
         await session.observe_speaker_evidence(
-            (evidence(0, 16000, 0), evidence(16000, 16800, 1), evidence(16800, 32800, 0))
+            temporal_frames(
+                (evidence(0, 16000, 0), evidence(16000, 16800, 1), evidence(16800, 32800, 0))
+            )
         )
         event = update(req, text, release=True)
         word_ranges = [
@@ -1495,7 +1529,7 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
                 start = index * 1600 + piece * 1600 // count
                 end = index * 1600 + (piece + 1) * 1600 // count
                 observations.append(evidence(start, end, index % 2))
-        await session.observe_speaker_evidence(tuple(observations))
+        await session.observe_speaker_evidence(temporal_frames(tuple(observations)))
         event = update(req, text, qualified=qualified, release=True)
         event = replace(
             event,

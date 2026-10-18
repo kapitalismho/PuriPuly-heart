@@ -21,6 +21,7 @@ class SourceCaptionUnit:
     card_key: OverlayEntryKey | None = None
     publication_ordering: tuple[str, int, int, int] | None = None
     applied: bool = False
+    readable: bool = False
 
 
 @dataclass(slots=True)

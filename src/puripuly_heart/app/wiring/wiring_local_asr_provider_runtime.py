@@ -4,7 +4,7 @@ import contextlib
 import inspect
 import logging
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -36,6 +36,7 @@ from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     ProviderRuntimeStateChanged,
 )
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.stt.backend import (
     PermanentSTTScopedSessionError,
@@ -124,6 +125,7 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     runtime_logging: SessionRuntimeLoggingService | None = None
     fault_profile_provider: FaultProfileProvider | None = None
     event_ingress_observer: Callable[..., object] | None = None
+    speaker_evidence: SpeakerEvidenceView = field(default_factory=SpeakerEvidenceView)
 
     async def create(
         self,
@@ -181,9 +183,13 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 STTScopedTurnSession,
             ):
                 if config.channel == "peer" and str(config.provider) in _LOCAL_PROVIDER_IDS:
-                    return CausalBatchSession(session, clock=self.clock.now)
+                    return CausalBatchSession(
+                        session, clock=self.clock.now, evidence_view=self.speaker_evidence
+                    )
                 if config.channel == "peer":
-                    return StreamingSpeakerSession(session, clock=self.clock.now)
+                    return StreamingSpeakerSession(
+                        session, clock=self.clock.now, evidence_view=self.speaker_evidence
+                    )
                 return session
             try:
                 await session.close()
@@ -224,6 +230,7 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
 
         return ScopedRecognitionEngine(
             channel=config.channel,
+            evidence_view=self.speaker_evidence if config.channel == "peer" else None,
             session_factory=open_scoped_session,
             watchdog_resolver=lambda _settings: _recognition_watchdogs(config),
             monotonic_clock=self.clock.now,

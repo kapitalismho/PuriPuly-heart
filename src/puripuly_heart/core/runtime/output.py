@@ -55,6 +55,7 @@ from puripuly_heart.core.runtime.output_batch import (
     DestinationBatchAdmission,
     OutputDestination,
 )
+from puripuly_heart.core.speaker_identity import SpeakerPresentationAssignments
 from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.domain.models import ChannelId, OSCMessage
 
@@ -149,6 +150,7 @@ class OutputRuntime:
     chatbox: ChatboxQueue
     clock: Clock = field(default_factory=SystemClock)
     overlay_sink: OverlaySink | None = None
+    speaker_identities: SpeakerPresentationAssignments | None = None
     overlay_event_adapter: OverlayEventAdapter | None = None
     flush_interval_s: float = 0.1
     diagnostics_capacity: int = 4096
@@ -375,6 +377,12 @@ class OutputRuntime:
             return None
         return overlay_sink.active_self_overlay_metadata()
 
+    def bind_speaker_identities(self, identities: SpeakerPresentationAssignments) -> None:
+        self.speaker_identities = identities
+        bind = getattr(self.overlay_sink, "bind_speaker_identities", None)
+        if callable(bind):
+            bind(identities)
+
     async def replace_overlay_sink(
         self,
         overlay_sink: OverlaySink | None,
@@ -393,6 +401,9 @@ class OutputRuntime:
                 return True
             await self._cancel_active_delivery_tasks_locked(replacement=True)
             self.overlay_sink = overlay_sink
+            bind = getattr(overlay_sink, "bind_speaker_identities", None)
+            if callable(bind) and self.speaker_identities is not None:
+                bind(self.speaker_identities)
             return True
 
     def bind_ui_delivery(self, delivery: UiDeliveryLifecyclePort) -> None:
@@ -1890,6 +1901,15 @@ class OutputRuntime:
     def _unconfigured_overlay_result(self, event: OverlayEventUnion) -> OutputPublicationResult:
         return self._overlay_failure_result(event, "destination_unconfigured")
 
+    def _reject_peer_speaker_assignment(self, event: OverlayEventUnion) -> None:
+        if (
+            self.speaker_identities is not None
+            and event.channel == "peer"
+            and event.utterance_id is not None
+            and event.type in ("peer_transcript_final", "translation_final")
+        ):
+            self.speaker_identities.output_disposition(event.utterance_id, applied=False)
+
     def _overlay_failure_result(
         self,
         event: OverlayEventUnion,
@@ -1897,6 +1917,7 @@ class OutputRuntime:
         *,
         error_type: str | None = None,
     ) -> OutputPublicationResult:
+        self._reject_peer_speaker_assignment(event)
         metadata: dict[str, str | int | float | bool | None] = {
             "channel": event.channel,
             **self._event_identity_metadata(event),
@@ -1987,6 +2008,7 @@ class OutputRuntime:
         reason: str,
         scene_revision: int | None = None,
     ) -> OutputPublicationResult:
+        self._reject_peer_speaker_assignment(event)
         return self._observe_result(
             status=OUTPUT_ROUTING_DECISION_SKIPPED,
             route=OUTPUT_ROUTE_SUBTITLE_OVERLAY,
