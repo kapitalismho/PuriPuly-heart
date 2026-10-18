@@ -1,6 +1,16 @@
 {
   "schema": "issue264-compact-executed-matrix-1",
   "status": "Authorized observations completed; evidence and limitations reported, not product acceptance or all-green quality.",
+  "independent_assessment_correction": {
+    "reviewed_candidate": "6670a009d15bfc3431e0c7b8eba201da4bc650ca",
+    "original_report_sha256": "a960013ac022ce4ce8987e2a61df0ae8750fbd95bc6b39e5462dc51dddb9d4e8",
+    "original_report_preservation": "The original report remains in the reviewed Git commit. This additive qualification changes no recorded run, timestamp, assertion status, count, source, image or raw trace.",
+    "review_report": "native/nemotron/issue264_review_matrix.json",
+    "result": "repair_failed",
+    "finding": "E5: the named hidden_reveal control was already readable and identified before its intended reveal. Its passing assertions and valid pixels support ordinary late source-only assignment, not hidden-to-readable qualification.",
+    "required_followup": "A separately pinned one-case control must await output processing, demonstrate a genuinely hidden interval longer than one second, then verify reveal-time first readability and bounded assignment. No product defect or need for another acoustic run is inferred.",
+    "retained_scope": "The fourteen actual pipelines, nine other named caption boundaries and separate correction-presentation replay retain the unaffected evidence described by the independent review."
+  },
   "product_candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
   "baseline_not_rerun": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
   "task_candidate_limit": "GPU and native runs used pinned runtime421542/summary8298/launcher17ca. Caption attempt01 used acc270 and failed before GUI; authorized import-only caption repair4b42 used for attempt02. Product hashes stayed unchanged; final task pin/import-delta review belongs to Director. Additional authorized presentation-only replay used new narrow launcher probe7ca24 and replay driver7825; existing audit/helper controls unchanged. Exact execution sources retained separately.",
@@ -1137,6 +1147,9 @@
       {
         "case": "hidden_reveal",
         "status": "executed_assertions_passed",
+        "coverage_status": "hidden_to_readable_boundary_not_exercised",
+        "review_finding": "E5",
+        "actual_observation": "First readable output occurred about 0.311 ms after output start, before the supposed 1.1-second hidden interval. hidden_before_reveal already contains a readable gold card. Preserve this as ordinary late source-only assignment evidence, not a successful hidden-reveal check.",
         "ttl_conserved": true,
         "first_readable_monotonic": 141560.333181,
         "proof_delivered_monotonic": 141560.6363008,

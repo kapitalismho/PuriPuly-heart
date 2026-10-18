@@ -29,6 +29,30 @@ from puripuly_heart.core.speaker_identity import PeerSpeakerIdentityAllocator
 from tests.core.test_issue264_shared_speaker import admitted, frames
 from tests.helpers.overlay_source_cards import translated_event
 
+CAPTION_CASES = (
+    "source_only_ttl",
+    "translation_error_disposition",
+    "deadline",
+    "established_nonrecolor",
+    "reset",
+    "retirement",
+    "hidden_reveal",
+    "late_overflow_divider_return",
+    "application_after_cap",
+    "application_within_cap",
+)
+
+
+def selected_caption_cases(specification):
+    requested = specification.split(",")
+    if (
+        not requested
+        or len(set(requested)) != len(requested)
+        or any(kind not in CAPTION_CASES for kind in requested)
+    ):
+        raise argparse.ArgumentTypeError("Select nonempty, unique existing caption case names")
+    return tuple(kind for kind in CAPTION_CASES if kind in requested)
+
 
 async def await_snapshot(presenter, predicate, *, timeout=3.0):
     deadline = time.monotonic() + timeout
@@ -52,6 +76,23 @@ def unchanged_except_style(before, after):
     )
 
 
+def hidden_source_state(presenter, identities, source, clock):
+    snapshot = identities.source_snapshot(source.source_id)
+    assert snapshot is not None
+    assert presenter.snapshot().blocks == []
+    assert snapshot.first_readable_at is None
+    assert snapshot.deadline is None
+    next_deadline = identities.next_deadline()
+    assert next_deadline is None
+    return {
+        "at": clock.now(),
+        "blocks": frozen_blocks(presenter.snapshot()),
+        "first_readable_at": snapshot.first_readable_at,
+        "deadline": snapshot.deadline,
+        "next_deadline": next_deadline,
+    }
+
+
 async def case_run(desktop, kind, order):
     record = {
         "case": kind,
@@ -66,7 +107,7 @@ async def case_run(desktop, kind, order):
         calibration=local.OverlayCalibration(),
         bridge=desktop,
         clock=clock,
-        translation_enabled=False,
+        translation_enabled=kind == "hidden_reveal",
         show_peer_original=kind != "hidden_reveal",
     )
     output = local.OutputRuntime(
@@ -141,13 +182,40 @@ async def case_run(desktop, kind, order):
         )
         record["source_output_completed"] = clock.now()
         if kind == "hidden_reveal":
-            assert presenter.snapshot().blocks == []
-            assert identities.next_deadline() is None
-            await asyncio.sleep(1.1)
-            record["hidden_before_reveal"] = frozen_blocks(presenter.snapshot())
-            await presenter.update_display_preferences(
-                show_translation=False, show_peer_original=True
+            await output.wait_for_peer_output_idle()
+            record["output_application_barrier_completed"] = clock.now()
+            hidden_started = clock.now()
+            record["hidden_interval_started"] = hidden_started
+            while True:
+                await output.wait_for_peer_output_idle()
+                record.setdefault("hidden_interval_observations", []).append(
+                    hidden_source_state(presenter, identities, source, clock)
+                )
+                assert not any(
+                    item["snapshot"]["blocks"] for item in desktop.snapshots[starts[0] :]
+                )
+                assert "proof_delivered_monotonic" not in record
+                if clock.now() - hidden_started >= 1.1:
+                    break
+                await asyncio.sleep(0.05)
+            record["hidden_interval_completed"] = clock.now()
+            record["hidden_capture"] = await desktop.picture(f"controlled_hidden_{order}")
+            record["hidden_capture_limit"] = (
+                "Protected blank-surface capture attempted without relaxing owned-window "
+                "visibility safeguards; not_captured is not proof of pixel absence."
             )
+            await output.wait_for_peer_output_idle()
+            record["hidden_interval_observations"].append(
+                hidden_source_state(presenter, identities, source, clock)
+            )
+            assert not any(item["snapshot"]["blocks"] for item in desktop.snapshots[starts[0] :])
+            assert "proof_delivered_monotonic" not in record
+            record["hidden_before_reveal"] = frozen_blocks(presenter.snapshot())
+            record["reveal_requested_monotonic"] = clock.now()
+            await presenter.update_display_preferences(
+                show_translation=True, show_peer_original=True
+            )
+            record["reveal_completed_monotonic"] = clock.now()
         await await_snapshot(presenter, lambda snapshot: bool(snapshot.blocks))
         first_request = next(
             snapshot
@@ -159,6 +227,15 @@ async def case_run(desktop, kind, order):
         record["first_readable_monotonic"] = identities.source_snapshot(
             source.source_id
         ).first_readable_at
+        if kind == "hidden_reveal":
+            state = identities.source_snapshot(source.source_id)
+            assert (
+                record["reveal_requested_monotonic"]
+                <= state.first_readable_at
+                <= record["reveal_completed_monotonic"]
+            )
+            assert state.deadline == state.first_readable_at + 1.0
+            authority("first_readable_after_reveal")
         entry = next(iter(presenter._entries.values()))
         expires = presenter._entry_expiration_deadline(entry)
         record["original_expiration"] = expires
@@ -204,6 +281,14 @@ async def case_run(desktop, kind, order):
             assert unchanged_except_style(first, final)
             assert presenter._entry_expiration_deadline(entry) == expires
             assert not view.has_proof(token)
+            if kind == "hidden_reveal":
+                assert len(identities.resolution_delays) == 1
+                assert 0 < identities.resolution_delays[0] <= 1.0
+                record["one_shot_resolution_delay_s"] = identities.resolution_delays[0]
+                record["hidden_qualification"] = (
+                    "Sustained hidden-state, reveal-clock and one-shot in-place assertions "
+                    "passed; actual gray/gold/hidden pixels require qualified capture inspection."
+                )
         record["final_snapshot"] = frozen_blocks(presenter.snapshot())
         record["expiration_after_metadata"] = presenter._entry_expiration_deadline(entry)
         record["ttl_conserved"] = record["expiration_after_metadata"] == expires
@@ -463,11 +548,13 @@ async def run(args):
         raise RuntimeError("Use isolated launcher only after Director stable-candidate readiness")
     desktop = ObservedDesktop(args.output)
     report = {
-        "schema": "issue264-controlled-actual-caption-1",
+        "schema": "issue264-controlled-actual-caption-2",
         "candidate": args.candidate,
         "sources_sha256": source_manifest(),
         "scope": "Actual Flet caption checks with controlled source-only/error dispositions, synthetic evidence, TTL, overflow identities/divider, and logical application-cap scheduling. F3/F5 use a controlled logical clock and ownership-lock schedule, not acoustic latency. Another target is serialized on the same owned window, not a concurrent-destination qualification.",
         "cases": [],
+        "authorized_cases": CAPTION_CASES,
+        "requested_cases": args.cases,
         "cloud_calls": 0,
         "model_calls": 0,
         "translation_calls": 0,
@@ -476,54 +563,46 @@ async def run(args):
         await desktop.start()
         report["owned_renderer_pid"] = desktop.pid
         report["owned_backdrop_pid"] = desktop.backdrop_pid
-        for index, kind in enumerate(
-            (
-                "source_only_ttl",
-                "translation_error_disposition",
-                "deadline",
-                "established_nonrecolor",
-                "reset",
-                "retirement",
-                "hidden_reveal",
-            ),
-            101,
-        ):
-            record = await case_run(desktop, kind, index)
+        for kind in args.cases:
+            index = CAPTION_CASES.index(kind)
+            record = (
+                await case_run(desktop, kind, 101 + index)
+                if index < 7
+                else await repaired_caption_case(desktop, kind)
+            )
             report["cases"].append(record)
             save(args.output / "caption.json", report)
             if record["status"] != "executed_assertions_passed":
                 break
-        if all(case["status"] == "executed_assertions_passed" for case in report["cases"]):
-            for kind in (
-                "late_overflow_divider_return",
-                "application_after_cap",
-                "application_within_cap",
-            ):
-                record = await repaired_caption_case(desktop, kind)
-                report["cases"].append(record)
-                save(args.output / "caption.json", report)
-                if record["status"] != "executed_assertions_passed":
-                    break
     except Exception as error:
         report["error"] = str(error)
         report["traceback"] = traceback.format_exc()
     finally:
         await desktop.close()
         report["renderer_errors"] = desktop.errors
+        executed = tuple(case["case"] for case in report["cases"])
+        report["execution_inventory"] = {
+            "authorized": CAPTION_CASES,
+            "requested": args.cases,
+            "executed": executed,
+            "requested_inventory_complete": executed == args.cases,
+            "complete_authorized_caption_executed": executed == CAPTION_CASES,
+        }
         report["status"] = (
-            "executed"
-            if len(report["cases"]) == 10
+            "requested_assertions_passed"
+            if executed == args.cases
             and all(case["status"] == "executed_assertions_passed" for case in report["cases"])
             else "failed_observation"
         )
         save(args.output / "caption.json", report)
-    return 0 if report["status"] == "executed" else 1
+    return 0 if report["status"] == "requested_assertions_passed" else 1
 
 
 def arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--cases", type=selected_caption_cases, default=CAPTION_CASES)
     args = parser.parse_args()
     args.output = args.output.resolve()
     if args.output.parent != ROOT / "build" or not args.output.name.startswith(

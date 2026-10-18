@@ -1,0 +1,84 @@
+{
+  "RESULT": "repair_failed",
+  "DOMAIN": "Bounded REPAIR_VERIFY of exact b98bfb7c6fb821838787aca7dbd77285903f26cd..6670a009d15bfc3431e0c7b8eba201da4bc650ca task/docs/evidence delta. E1–E4 closure and unaffected prior coverage retained. No moving streaming repair was reviewed or executed.",
+  "summary": "Caption import setup, narrow presentation replay, provenance and most actual evidence claims are supported. One material false-positive remains: the controlled hidden_reveal case was already readable and identified before its purported reveal. This does not invalidate the 14 actual pipelines or establish a product defect, but it prevents accepting that named boundary observation and the corresponding plan claim.",
+  "finding": {
+    "id": "E5",
+    "severity": "P2 — controlled-caption evidence false positive",
+    "exact_locations": [
+      "native/nemotron/issue264_validation_caption.py:65-71,143-150 — translation-disabled source-only configuration and immediate hidden assertions",
+      "native/nemotron/issue264_validation_matrix_report.json:1138-1155 — hidden_reveal reported as executed_assertions_passed",
+      "docs/issue218-speaker-attribution-plan.md:31 — claim that controlled checks exercised hidden reveal"
+    ],
+    "violated_promise": "Issue264 R3 requires the late-assignment window to start at actual first readable application, including a genuinely hidden-to-readable preference change. The named check must demonstrate hidden state before reveal, not an empty snapshot before queued output is applied.",
+    "decisive_original_observation": "Original caption02/caption.json records hidden_reveal output start 141560.3328702 and first_readable 141560.333181: about 0.311ms later, not after the 1.1s hidden interval. Its snapshots show gray at +0.388ms and gold at +303.843ms. hidden_before_reveal already contains a readable gold source107 card. Thus the source was published and resolved before update_display_preferences.",
+    "mechanism": "The empty-block/no-deadline assertions immediately follow asynchronous output admission, so they can pass before application. The subsequent wait does not reassert hidden state. With translation disabled, this source-only configuration does not establish the intended hidden-original condition.",
+    "smallest_required_repair": "Use the supported hidden-source configuration already exercised by the pinned test_hidden_source_only_reveal_starts_clock_at_selected_readable_snapshot; await output processing, assert no readable block/first-readable/deadline throughout the hidden interval, then reveal and verify first-readable timing and bounded assignment. Retain this original run as an ordinary late source-only assignment observation, not qualifying hidden-reveal evidence. Correct the compact report/plan claim until the intended observation is obtained.",
+    "defenses_and_limits": "All ten logical assertion statuses really were recorded passed; the defect is their coverage implication. The other actual cases, protected screenshots and source-only late assignment remain useful. No actual product hide-preference defect is inferred, and no acoustic/model rerun is needed to isolate this task-control repair."
+  },
+  "COVERAGE": [
+    {
+      "item": "Caption ROOT/sys.path setup repair and retained failed attempt",
+      "status": "repair_verified",
+      "basis": "Exact source delta is import sys plus checkout ROOT insertion before unchanged existing helpers. Caption01 isolation records ModuleNotFoundError tests, no subprocesses, no policy rejection and no product change. Caption02 records the repaired 4b42e1a7… hash and successful startup. Helper/import control retains its initial Ruff failure and dependent commands not run; final lint/import results were read, not rerun."
+    },
+    {
+      "item": "Launcher caption_replay choice and new no-model replay",
+      "status": "inspected; supported",
+      "basis": "Launcher changes only the bounded probe choice/wrapping; audit controls are unchanged. Replay validates the exact recorded correction case, official decoder round-trip and unchanged blocks, rebases only transport revisions, records requested/observed intervals and checks no model-worker children. Original and replayed block arrays match. The new replay used launcher7ca24… and driver7825…, unlike the original matrix launcher17ca…. Actual owned gold two-line correction pixels were independently inspected."
+    },
+    {
+      "item": "Exact candidate/import/executed-source pinning",
+      "status": "independently checked",
+      "basis": "All 585 archived product Python sources in each of the three pipeline execution archives match both recorded SHA256 manifests and exact b98 Git blobs. Caption/replay manifests also match those 585 pinned sources. Final eight task hashes match the compact report a960013a…. All six isolation records retain unchanged product sources, no policy rejections, reaped owned children and removed temporary roots. No current uncommitted product code was imported or exercised."
+    },
+    {
+      "item": "Actual matrix inventory, full profiles and composition",
+      "status": "independently checked",
+      "basis": "Original traces contain ten GPU plus four native-tape cases, all pipeline_completed; 24 GPU requests, 38 admitted sources/translation jobs, zero failed/expired/degraded terminal occurrences and zero unsuccessful decode diagnostics. All fourteen readiness records retain the expected full geometry/artifact and forbidden neural CPU fallback. Three actual Gemma owners report Vulkan with checksum-verified existing installations. Acquisition/lease substitution, FLET_VIEW_PATH and non-OS-sandbox limits remain explicit."
+    },
+    {
+      "item": "Immediate translated output and bounded returning-A assignment",
+      "status": "supported by original records and inspected pixels",
+      "basis": "First ABA commit1 contains complete A original and Korean translation before safety/natural seals by 857.486ms/1805.028ms. Commit2 shows distinct A/B colors; commit3 returning prefix gray; commit4 the same card gold. Independent comparison finds only speaker_style and card_revision changed; card order and expiration 141147.6139391 are identical. Authority delay is 593.974ms; qualified software-readback upper bound is 850.826ms. These are distinct measurements, not photon latency."
+    },
+    {
+      "item": "Assignment counts versus accuracy",
+      "status": "inspected; independently checked",
+      "basis": "All 38 compact-report applied keys match recorded settled public authority keys, with no observed established-key reassignment. The presentation band inventory is 27 identified-before-display, three late and eight unresolved, not an accuracy estimate. Canonical window counters separately total five readable-unresolved opportunities, two resolutions within500ms and three within1s; permanently conservative/unsupported gray sources must not be silently used as the same denominator."
+    },
+    {
+      "item": "Controlled caption cases, clocks, TTL, overflow, targets/retries",
+      "status": "inspected; E5 exception",
+      "basis": "Ten assertion executions are retained. Independently inspected source-only gray→gold, overflow divider/known return and after-cap-gray versus within-cap-gold screenshots support those boundaries. FakeClock and ownership-lock schedules are explicit, not wall-clock/acoustic latency. Retry/other target is serialized on the same window, not concurrent-destination qualification. TTL expiry has logical empty-projection evidence but no separately photographed blank surface, as disclosed. Hidden reveal is not established."
+    },
+    {
+      "item": "Qualified pixels versus ACKs, invalid readbacks and separate replay",
+      "status": "independently checked",
+      "basis": "All 29 qualified coupled captures have matching saved hashes, stable requested revisions and uncloaked owned before/after visibility. Twelve coupled readbacks remain invalid; fourteen controlled captures qualify and twelve remain invalid. Original GPU correction0.64 revision34 has no capture and DWM cloak2, still invalid. Its separately authorized no-model replay supplies new presentation evidence only; it does not rescue original pixels, latency, TTL or acoustic quality. Inspected images include first ABA1–4, GPU short31, clearAB26, native short20/coherent phrase13 and the new correction replay."
+    },
+    {
+      "item": "Native tapes, actual word timing and mapping/remaining-gray reports",
+      "status": "inspected; independently checked provenance",
+      "basis": "All four current recorded_raw_result value sequences exactly match canonical historical native results and input hashes; transport verification is retained. Native timings are historical provider data, not fresh cloud latency or arrival/FIFO mapping. The mapping control loads the exact archived streaming method and declared successful PCM map, discloses its controlled owner, and contrasts the one-sample estimated-span overrun with individually mappable real word intervals. It does not clamp, change rounding or substitute the contrast into production. Remaining-gray reconstruction uses frozen code and separates evidence availability from application/observational upper bounds."
+    },
+    {
+      "item": "Three ignore exclusions, publication hygiene and review chronology",
+      "status": "inspected",
+      "basis": "Only the exact three large generated analysis reports are newly ignored. Compact reports retain relative/sanitized local references without publishing raw archives/full timelines or credentials. Earlier E4 repair_failed and later b98 repair_verified records retain their distinct identities; original first01–04 outcomes are not rewritten."
+    },
+    {
+      "item": "Current plan and authorized streaming refinements",
+      "status": "inspected; E5 factual exception",
+      "basis": "Historical own-final/Parakeet/freeze material is now clearly historical. Actual metrics and before-evidence limitations are accurately separated from newly authorized, still-pending word-envelope/lexical-junction repairs. No forced color, guessed mapping, approved waiver or claimed success of those later repairs is introduced."
+    }
+  ],
+  "remaining_actual_evidence_gaps": [
+    "Eight gray sources remain in this before-streaming-repair matrix. Native short No. He washed/mixed-proof and estimated-span mapping cases remain open, not accepted limitations or repaired outcomes.",
+    "Returning rollover fragments/overlapping wording and native No, no, three. insertion are preserved quality limitations; exact downstream conservation and required-word coverage do not establish semantic fidelity.",
+    "Native full1.04 coherent early A/B has only superseded readbacks; full0.64 supplies independently qualified coherent phrase pixels. Original correction0.64 coupled pixels/latency remain missing despite the separate valid replay.",
+    "All three Windows counter sampler returncode1 failures remain retained; no successful profiling/utilization/VRAM or statistical performance claim follows.",
+    "Later streaming product changes require their own pinned review and targeted actual replay. This matrix is their before evidence, not final Goal acceptance."
+  ],
+  "verification_limits": "Read-only JSON/source/archive/Git-object inspection, saved-image inspection and small offline accounting/hash comparisons only. No model, GUI, cloud, VR, credential-file access, product/test/task/docs edits, builds or formatting/lint execution. E1–E4 remain closed; the remaining bounded task repair is E5. Product repair and terminal acceptance remain Director-owned."
+}

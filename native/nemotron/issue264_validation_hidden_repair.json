@@ -1,0 +1,79 @@
+{
+  "schema": "issue264-hidden-reveal-repair-preparation-1",
+  "status": "PREPARED_AND_FROZEN_NOT_EXECUTED",
+  "scope": "Director-authorized E5 task-only preparation. No product/source/test/docs/Git/GitHub mutation. No current or archived product code imported or executed for checks; no model/service/Flet/cloud operation. Actual run waits for a new Director product/task pin, independent review and explicit readiness.",
+  "accepted_before_assessment": {
+    "finding": "E5, P2 task coverage false positive, not a product hide-preference defect",
+    "independent_review": "native/nemotron/issue264_review_matrix.json, Director-owned verbatim review",
+    "original_matrix_git_snapshot": "6670a009d15bfc3431e0c7b8eba201da4bc650ca",
+    "original_matrix_sha256": "a960013ac022ce4ce8987e2a61df0ae8750fbd95bc6b39e5462dc51dddb9d4e8",
+    "matrix_path": "native/nemotron/issue264_validation_matrix_report.json",
+    "original_product_candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
+    "original_caption_path": "build/issue264-validation-repaired-caption-02/caption.json",
+    "original_caption_driver_sha256": "4b42e1a74f9d54cb3511e102305a7c5bd62c2db9c1bb907eedea2daf02c9886b",
+    "original_observation": {
+      "source_output_started": 141560.3328702,
+      "first_readable_at": 141560.333181,
+      "first_readable_delay_ms_approx": 0.311,
+      "hidden_before_reveal": "Already contains readable gold source107, as established by the independent review; not re-executed to confirm.",
+      "hidden_qualification": "FAILED_TASK_COVERAGE",
+      "retained_useful_scope": "Ordinary late source-only assignment observation. Original ten executed assertion statuses, counts, raw traces and images remain unchanged. The other nine named caption boundaries and fourteen pipelines retain their independently reviewed scope."
+    },
+    "assessment_ownership": "Director may add explicit versioned assessment metadata and has corrected the plan claim. This worker did not overwrite the original a960/Git6670 matrix or raw caption02 records; the historical hash is not a claim about a later metadata-amended matrix."
+  },
+  "prepared_code_delta": {
+    "changed_file": "native/nemotron/issue264_validation_caption.py",
+    "new_sha256": "3ce1e50a71eb4a8061823d7f742caf02e59b4e89a972506cdee03a421887c347",
+    "supported_config_reference": "tests/core/test_issue264_shared_speaker.py::test_hidden_source_only_reveal_starts_clock_at_selected_readable_snapshot",
+    "configuration": "Only hidden_reveal now uses translation_enabled=True and show_peer_original=False, matching the supported hidden-source presenter configuration. It reveals with show_translation=True/show_peer_original=True. Source-only projection remains manually selected and invokes no translation service. Other nine case configurations are unchanged.",
+    "processing_barrier": "Await actual OutputRuntime.wait_for_peer_output_idle after source admission, every hidden-interval checkpoint and after the guarded hidden-photo attempt. Do not use immediate pre-application empty assertions as coverage.",
+    "hidden_interval": "For at least1.1 actual monotonic seconds after processing completes, repeatedly require no readable presenter block, no public first_readable_at, no public source deadline, and no allocator next_deadline. Also require no nonempty outgoing snapshot anywhere in the case bridge history and no proof delivery before reveal. Recheck all invariants after the photo attempt immediately before reveal.",
+    "reveal_clock": "Record reveal request/completion, require first_readable_at within that interval and deadline exactly first_readable_at+1s. First snapshot must be gray. Existing synthetic proof delivery is scheduled from first_readable_at+0.30s, never from source receipt and never by manually marking the source readable.",
+    "in_place_assignment": "Require exactly one resolution delay in(0,1s], actual gray-to-gold application within1s, unchanged card/text/order/appearance fields except style+revision, same expiration and released proof. No speaker-product wait, threshold, deadline override or forced identity is introduced.",
+    "pixel_boundary": "Existing asynchronous protected readbacks retain gray/gold PNGs where qualified; the final named gold capture is retained. A guarded hidden/blank capture is attempted with the same owned-window visibility/layout/foreign-window safeguards. A not_captured hidden image is explicitly not proof of pixel absence. Actual image inspection and qualified/invalid readback accounting remain required after the authorized run.",
+    "case_selector": "Existing caption driver gains --cases CSV selection from the same ten canonical case names. --cases hidden_reveal requests only that case. Empty/unknown/duplicate names reject; canonical order is retained. Authorized/requested/executed inventories distinguish one selected execution from all ten, and empty/failed/extra-case execution cannot report requested_assertions_passed.",
+    "caption_report_schema": "issue264-controlled-actual-caption-2; requested_assertions_passed is selected assertion completion, not automatic GUI/quality acceptance.",
+    "launcher": "Unchanged at7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5. No new probe choice, guard exception, acquisition path or product boundary is needed for E5."
+  },
+  "preparation_checks": {
+    "task_protocol_command": ".venv/Scripts/python.exe -B build/issue264-validation-hidden-prepare-01/check.py",
+    "task_protocol_result": "Six task-only AST/protocol groups passed. Explicit controlled doubles only, no moving-product imports or real asynchronous/event-loop/network/model/GUI execution. Not actual hidden-reveal qualification.",
+    "task_protocol_report": "build/issue264-validation-hidden-prepare-01/checks.json",
+    "task_protocol_driver_sha256": "60a0e61126afdb43f09efbd3ebf5ea980bc381ba5bc1a5fa4f16a885cc5aa9ea",
+    "controls": [
+      "Exact CLI selects only hidden_reveal; canonical order and empty/unknown/duplicate rejection",
+      "Supported hidden configuration enabled only for the intended case",
+      "Exact hidden branch requires awaited processing and sustained >1s hidden state; rejects readable-on-application, mid-interval leak, post-photo leak and premature proof delivery",
+      "Hidden checkpoint independently rejects readable blocks, stale first-readable, source/owner deadline and missing source state",
+      "Exact post-reveal checks reject the legacy pre-reveal first-readable and incorrect deadline",
+      "Exact completion predicate rejects empty, failed and extra-case execution"
+    ],
+    "preserved_initial_checker_failure": {
+      "error": "StopIteration at check.py:51: AST lookup searched only direct case_run.body instead of the branch nested under try",
+      "exit_code": 1,
+      "failed_script_sha256": "40b43ebd5e10c0981f06443d8fedb55037ebeef24e8332fad1b3c7992714e5b5",
+      "archive": "build/issue264-validation-hidden-prepare-01/failed_check_01.zip",
+      "archive_sha256": "e8e82dfad99169cdae4eaf4edc87be9c389bf1245b33392917e136fecc7d92ba",
+      "repair": "Changed only checker branch discovery to ast.walk; no product or caption behavior change to make the control pass."
+    },
+    "formatting_command": ".venv/Scripts/python.exe -m ruff check native/nemotron/issue264_validation_prerequisites.py native/nemotron/issue264_validation_inputs.py native/nemotron/issue264_validation_launch.py native/nemotron/issue264_validation_runtime.py native/nemotron/issue264_validation_caption.py native/nemotron/issue264_validation_caption_replay.py native/nemotron/issue264_validation_summary.py native/nemotron/issue264_validation_diagnose.py && .venv/Scripts/python.exe -m black --check native/nemotron/issue264_validation_prerequisites.py native/nemotron/issue264_validation_inputs.py native/nemotron/issue264_validation_launch.py native/nemotron/issue264_validation_runtime.py native/nemotron/issue264_validation_caption.py native/nemotron/issue264_validation_caption_replay.py native/nemotron/issue264_validation_summary.py native/nemotron/issue264_validation_diagnose.py",
+    "formatting_result": "Ruff passed and Black --check left all eight task scripts unchanged. Targeted preparation Black formatted only caption.py before these final checks."
+  },
+  "final_task_hashes": {
+    "prerequisites": "354e1816b0f78c7be73e06c3b968e90a8ad3c8d8e4ce4108d4e5513d88cae7b3",
+    "inputs": "b5a307d65fab46e14ba4e8d5fa7f03c2987a3412f3b8185b43e9e196044fcec5",
+    "launcher": "7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5",
+    "runtime": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+    "caption": "3ce1e50a71eb4a8061823d7f742caf02e59b4e89a972506cdee03a421887c347",
+    "caption_replay": "7825c1bfcdfb1f930bd6024324e2907f7121dd3ffeb218d1fb879653620fd116",
+    "summary": "8298c7c64a581f1229b7301bdef8185ebd5b432c19dd4ce79c05a52671149ae5",
+    "diagnose": "76c3a46675745ff6e3a56d7ce0f025525d528ea425346d66d0451b089922048c"
+  },
+  "actual_execution": {
+    "status": "NOT_EXECUTED",
+    "new_product_task_candidate": "Await Director frozen pin and original-reviewer bounded check; current product working changes are not imported or tested by this worker.",
+    "later_selected_arguments": ["--probe", "caption", "--cases", "hidden_reveal"],
+    "required_readiness": "Director explicitly authorizes exactly one no-model actual caption run after the new pin and review. Record its own candidate, driver hash, new resource path, hidden interval/reveal/assignment times, qualified/invalid pixels, inspected images and cleanup in a separate repair addendum; never amend old raw observations or count it as ten rerun cases.",
+    "no_extra_scope": "No GPU/ASR/Gemma/Nemotron/cloud/VR/private capture or rerun of the other nine caption cases for E5."
+  }
+}
