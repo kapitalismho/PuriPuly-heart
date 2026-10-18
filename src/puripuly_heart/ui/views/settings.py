@@ -297,6 +297,15 @@ _TRANSLATION_MODEL_LABEL_KEYS = {
     TranslationModel.LOCAL_LLM: "provider.local_llms",
     TranslationModel.CUSTOM_HTTP: "provider.custom_http",
 }
+_LOCAL_STT_PROVIDERS = frozenset(
+    {
+        STTProviderName.LOCAL_CPU_AUTO,
+        STTProviderName.LOCAL_PARAKEET_V3,
+        STTProviderName.LOCAL_PARAKEET_JAPANESE,
+        STTProviderName.LOCAL_QWEN,
+        STTProviderName.LOCAL_QWEN_GPU,
+    }
+)
 _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.PUBLIC_API: "settings.translation_connection.public_api",
     TranslationConnection.CPU: "settings.translation_connection.cpu",
@@ -468,8 +477,9 @@ class SettingsView(ft.Column):
         self.on_desktop_overlay_recovery_action: Callable[[str], None] | None = None
         self.on_desktop_overlay_position_reset: Callable[[], None] | None = None
         self.on_view_logs: Callable[[], None] | None = None
-        self.on_start_microphone_test: Callable[[], None] | None = None
+        self.on_start_audio_test: Callable[[], None] | None = None
         self.on_gpu_discovery_requested: Callable[[], object] | None = None
+        self.on_open_model_assets: Callable[[], None] | None = None
         self.on_telemetry_enabled_change: Callable[[bool], None] | None = None
         self.on_list_loopback_capture_options: Callable[[], object] | None = None
         self.on_list_loopback_process_options: Callable[[], object] | None = None
@@ -568,8 +578,8 @@ class SettingsView(ft.Column):
     def gpu_llm_control(self) -> ft.Control:
         return self._gpu_llm_card
 
-    def gpu_refresh_control(self) -> ft.Control:
-        return self._gpu_refresh_card
+    def model_assets_control(self) -> ft.Control:
+        return self._model_assets_card
 
     def local_llm_connection_control(self) -> ft.Control:
         return self._local_llm_connection_card
@@ -609,9 +619,10 @@ class SettingsView(ft.Column):
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_custom_stt_secret_changed = provider.custom_stt_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
+        self.on_open_model_assets = provider.open_model_assets
         self._settings_secrets = provider.settings_secrets
         self._chatgpt_intents = provider.chatgpt
-        self.on_start_microphone_test = general.start_microphone_test
+        self.on_start_audio_test = general.start_audio_test
         self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
@@ -747,7 +758,7 @@ class SettingsView(ft.Column):
             self._osc_connection_text,
             self._clipboard_auto_translate_text,
             self._activation_notice_button,
-            self._microphone_test_text,
+            self._audio_test_text,
             self._vrc_mic_text,
             self._mic_audio_text,
             self._audio_host_api_text,
@@ -1585,19 +1596,19 @@ class SettingsView(ft.Column):
             value=self._vrc_mic_text,
         )
 
-        self._microphone_test_text = self._build_clickable_text(
-            t("settings.microphone_test.action"),
-            self._on_microphone_test_click,
+        self._audio_test_text = self._build_clickable_text(
+            t("settings.audio_test.action"),
+            self._on_audio_test_click,
         )
-        self._microphone_test_title = ft.Text(
-            t("settings.microphone_test"),
+        self._audio_test_title = ft.Text(
+            t("settings.audio_test"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        microphone_test_card = self._wrap_unit_card(
-            title=self._microphone_test_title,
-            value=self._microphone_test_text,
+        audio_test_card = self._wrap_unit_card(
+            title=self._audio_test_title,
+            value=self._audio_test_text,
         )
 
         self._general_ui_card = ui_card
@@ -1704,7 +1715,7 @@ class SettingsView(ft.Column):
                 audio_host_api=self._general_host_api_card,
                 microphone=self._general_mic_audio_card,
                 loopback=self._general_loopback_audio_card,
-                microphone_test=microphone_test_card,
+                audio_test=audio_test_card,
                 self_vad=self._self_vad_card,
                 peer_vad=self._peer_vad_card,
                 clipboard_auto_translate=clipboard_auto_translate_card,
@@ -1767,26 +1778,19 @@ class SettingsView(ft.Column):
             title=self._gpu_llm_title,
             value=self._gpu_llm_text,
         )
-        self._gpu_refresh_title = ft.Text(
-            t("settings.gpu_device.refresh"),
+        self._model_assets_title = ft.Text(
+            t("settings.model_assets"),
             size=24,
             weight=ft.FontWeight.BOLD,
             color=COLOR_SECONDARY,
         )
-        self._gpu_refresh_icon = ft.Container(
-            content=ft.Icon(
-                ft.Icons.REFRESH_ROUNDED,
-                size=44,
-                color=COLOR_ON_BACKGROUND,
-            ),
-            alignment=_CENTER_ALIGNMENT,
-            expand=True,
-            on_click=self._on_gpu_refresh_click,
-            on_hover=self._on_text_hover,
+        self._model_assets_text = self._build_clickable_text(
+            t("settings.model_assets.action"),
+            self._on_model_assets_click,
         )
-        self._gpu_refresh_card = self._wrap_unit_card(
-            title=self._gpu_refresh_title,
-            value=self._gpu_refresh_icon,
+        self._model_assets_card = self._wrap_unit_card(
+            title=self._model_assets_title,
+            value=self._model_assets_text,
         )
 
         self._overlay_translation_title = ft.Text(
@@ -2585,12 +2589,6 @@ class SettingsView(ft.Column):
         )
         self.controls = [self._settings_subtab_shell]
 
-    def _gpu_asr_selected(self, settings: ProviderSettingsSnapshot) -> bool:
-        return (
-            settings.stt_provider == STTProviderName.LOCAL_QWEN_GPU
-            or settings.peer_stt_provider == STTProviderName.LOCAL_QWEN_GPU
-        )
-
     def _gpu_llm_selected(self, settings: ProviderSettingsSnapshot) -> bool:
         model = settings.translation.model
         return (
@@ -2598,11 +2596,15 @@ class SettingsView(ft.Column):
             and settings.translation.connection == TranslationConnection.GPU
         )
 
-    def _gpu_selected(self, settings: ProviderSettingsSnapshot | None = None) -> bool:
+    def _local_model_selected(self, settings: ProviderSettingsSnapshot | None = None) -> bool:
         current = settings or self._build_settings_with_provider_draft()
         return bool(
             current is not None
-            and (self._gpu_asr_selected(current) or self._gpu_llm_selected(current))
+            and (
+                current.stt_provider in _LOCAL_STT_PROVIDERS
+                or current.peer_stt_provider in _LOCAL_STT_PROVIDERS
+                or current.translation.model in MANAGED_GEMMA_MODELS
+            )
         )
 
     def _gpu_column_label(
@@ -2630,7 +2632,7 @@ class SettingsView(ft.Column):
         llm_label = self._gpu_column_label(llm_selected, getattr(self, "_llm_gpu_devices", ()))
         self._set_unit_card_value_text(self._gpu_device_text, asr_label)
         self._set_unit_card_value_text(self._gpu_llm_text, llm_label)
-        visible = self._gpu_selected(settings)
+        visible = self._local_model_selected(settings)
         self._gpu_device_row.visible = visible
         _update_control_if_mounted(self._gpu_device_row)
 
@@ -2723,9 +2725,9 @@ class SettingsView(ft.Column):
             on_select=self._on_llm_gpu_device_selected,
         )
 
-    def _on_gpu_refresh_click(self, _event) -> None:
-        if self.on_gpu_discovery_requested is not None:
-            self.on_gpu_discovery_requested()
+    def _on_model_assets_click(self, _event) -> None:
+        if self.on_open_model_assets is not None:
+            self.on_open_model_assets()
 
     def _on_gpu_device_selected(self, value: str) -> None:
         if self._provider_snapshot is None:
@@ -4295,9 +4297,7 @@ class SettingsView(ft.Column):
         self._openai_verification_notice.visible = self._openai_key.visible
         self._deepseek_key.visible = bool(not is_custom_http and llm == LLMProviderName.DEEPSEEK)
         self._sync_openrouter_pkce_button_state(settings)
-        self._translation_connection_row.visible = (
-            not is_custom_http and settings.translation.model not in MANAGED_GEMMA_MODELS
-        )
+        self._translation_connection_row.visible = not is_custom_http
         self._local_llm_connection_card.visible = (
             not is_custom_http and llm == LLMProviderName.LOCAL_LLM
         )
@@ -6393,34 +6393,45 @@ class SettingsView(ft.Column):
         _update_control_if_mounted(self._vad_slider)
 
     def _handle_vad_change(self, e) -> None:
-        if self._general_snapshot is None:
-            return
-
-        new_vad = float(e.control.value)
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            self_vad_speech_threshold=new_vad,
-        )
-        self._emit_settings_changed(SelfVadSettingsIntent(new_vad))
+        self.apply_vad_threshold("self", float(e.control.value))
 
     def _handle_peer_vad_visual_change(self, e) -> None:
         self._peer_vad_slider.label = f"{float(e.control.value):.2f}"
         _update_control_if_mounted(self._peer_vad_slider)
 
     def _handle_peer_vad_change(self, e) -> None:
+        self.apply_vad_threshold("peer", float(e.control.value))
+
+    def vad_thresholds(self) -> dict[str, float] | None:
+        if self._general_snapshot is None:
+            return None
+        return {
+            "self": self._general_snapshot.self_vad_speech_threshold,
+            "peer": self._general_snapshot.peer_vad_speech_threshold,
+        }
+
+    def apply_vad_threshold(self, channel: str, value: float) -> None:
         if self._general_snapshot is None:
             return
-
-        new_vad = float(e.control.value)
-
-        self._general_snapshot = replace(
-            self._general_snapshot,
-            peer_vad_speech_threshold=new_vad,
-        )
-        self._peer_vad_slider.label = f"{new_vad:.2f}"
-        _update_control_if_mounted(self._peer_vad_slider)
-        self._emit_settings_changed(PeerVadSpeechThresholdIntent(new_vad))
+        new_vad = float(value)
+        if channel == "peer":
+            self._general_snapshot = replace(
+                self._general_snapshot,
+                peer_vad_speech_threshold=new_vad,
+            )
+            slider = self._peer_vad_slider
+            intent = PeerVadSpeechThresholdIntent(new_vad)
+        else:
+            self._general_snapshot = replace(
+                self._general_snapshot,
+                self_vad_speech_threshold=new_vad,
+            )
+            slider = self._vad_slider
+            intent = SelfVadSettingsIntent(new_vad)
+        slider.value = new_vad
+        slider.label = f"{new_vad:.2f}"
+        _update_control_if_mounted(slider)
+        self._emit_settings_changed(intent)
 
     def _on_vrc_mic_click(self, e) -> None:
         """Toggle VRC mic intercept immediately from the unit card."""
@@ -6429,11 +6440,11 @@ class SettingsView(ft.Column):
         next_value = "off" if self._general_snapshot.vrc_mic_intercept else "on"
         self._on_vrc_mic_selected(next_value)
 
-    def _on_microphone_test_click(self, e) -> None:
-        """Request the app/controller-owned microphone-test lifecycle."""
+    def _on_audio_test_click(self, e) -> None:
+        """Request the app/controller-owned audio-test lifecycle."""
         _ = e
-        if self.on_start_microphone_test is not None:
-            self.on_start_microphone_test()
+        if self.on_start_audio_test is not None:
+            self.on_start_audio_test()
 
     def _on_vrc_mic_selected(self, value: str) -> None:
         """处理选项卡的选择结果
@@ -6732,7 +6743,7 @@ class SettingsView(ft.Column):
         self._loopback_audio_title.value = t("settings.section.loopback_audio")
         self._self_vad_title.value = t("settings.section.self_vad_sensitivity")
         self._peer_vad_title.value = t("settings.section.peer_vad_sensitivity")
-        self._microphone_test_title.value = t("settings.microphone_test")
+        self._audio_test_title.value = t("settings.audio_test")
         self._translation_connection_title.value = t("settings.translation_connection")
         self._cloud_free_tier_title.value = t("settings.cloud_free_tier")
         self._soniox_speaker_diarization_title.value = t("settings.soniox_speaker_diarization")
@@ -6780,7 +6791,11 @@ class SettingsView(ft.Column):
         self._peer_provider_title.value = t("settings.section.peer_stt")
         self._gpu_device_title.value = t("settings.gpu_device.asr")
         self._gpu_llm_title.value = t("settings.gpu_device.llm")
-        self._gpu_refresh_title.value = t("settings.gpu_device.refresh")
+        self._model_assets_title.value = t("settings.model_assets")
+        self._set_unit_card_value_text(
+            self._model_assets_text,
+            t("settings.model_assets.action"),
+        )
         self._overlay_target_title.value = t("settings.overlay.caption_location")
         self._overlay_translation_title.value = t("settings.overlay.show_translation")
         self._overlay_peer_original_title.value = t("settings.overlay.show_peer_original")
@@ -6885,8 +6900,8 @@ class SettingsView(ft.Column):
             if self._general_snapshot is not None:
                 self._sync_telemetry_enabled_card(self._general_snapshot)
             self._set_unit_card_value_text(
-                self._microphone_test_text,
-                t("settings.microphone_test.action"),
+                self._audio_test_text,
+                t("settings.audio_test.action"),
             )
             self._sync_overlay_controls()
             self._sync_overlay_calibration_controls()

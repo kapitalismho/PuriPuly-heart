@@ -277,7 +277,7 @@ async def test_valid_hf_install_is_reused_after_locale_and_source_changes(
             downloader=downloader,
             install_dir=install_dir,
             locale=locale,
-            preferred_source=source,
+            source=source,
         )
         assert reused == installed
     assert downloader.requests == []
@@ -728,7 +728,7 @@ async def test_valid_modelscope_install_is_reused_after_switching_to_hf(
         install_dir=install_dir,
         spec=spec,
         locale="en",
-        preferred_source="huggingface",
+        source="huggingface",
     )
 
     assert reused == installed

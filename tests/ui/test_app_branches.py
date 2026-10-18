@@ -53,6 +53,7 @@ from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
+from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
@@ -260,16 +261,15 @@ class DummyContent:
         self.update_calls += 1
 
 
-class InlineMicrophoneTestSettingsView:
+class InlineAudioTestSettingsView:
     def __init__(self) -> None:
-        self.levels: list[float] = []
-        self.active_states: list[bool] = []
+        self.applied: list[tuple[str, float]] = []
 
-    def set_microphone_test_level(self, value: float) -> None:
-        self.levels.append(value)
+    def vad_thresholds(self) -> dict[str, float]:
+        return {"self": 0.4, "peer": 0.55}
 
-    def set_microphone_test_active(self, active: bool) -> None:
-        self.active_states.append(active)
+    def apply_vad_threshold(self, channel: str, value: float) -> None:
+        self.applied.append((channel, value))
 
 
 class RuntimeLoggingController:
@@ -797,14 +797,13 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_settings_changed = None
         self.on_prompt_apply_settings = None
         self.on_providers_changed = None
-        self.on_start_microphone_test = None
+        self.on_start_audio_test = None
         self.on_request_openrouter_pkce = None
         self.on_verify_api_key = None
         self.on_secret_cleared = None
         self.on_local_llm_secret_changed = None
         self.on_desktop_overlay_lock_change = None
         self.on_desktop_overlay_size_change = None
-        self.on_stop_microphone_test = None
         self.on_desktop_overlay_recovery_action = None
         self.on_desktop_overlay_position_reset = None
         self.show_snackbar = None
@@ -825,7 +824,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_secret_cleared = provider.secret_cleared
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
-        self.on_start_microphone_test = general.start_microphone_test
+        self.on_start_audio_test = general.start_audio_test
         self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
@@ -911,7 +910,7 @@ def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         app_module,
         "TitleBar",
-        lambda _page, *, on_close: ft.Container(data=on_close),
+        lambda _page, *, on_close, **_tools: ft.Container(data=on_close),
     )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
@@ -957,7 +956,7 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     )
     assert app.view_settings.on_verify_api_key == app._on_verify_api_key
     assert app.view_settings.on_prompt_apply_settings == app._on_prompt_apply_settings
-    assert app.view_settings.on_start_microphone_test == app._on_start_microphone_test
+    assert app.view_settings.on_start_audio_test == app._on_start_audio_test
     assert app.view_settings.on_desktop_overlay_lock_change == (app._on_desktop_overlay_lock_change)
     assert app.view_settings.on_desktop_overlay_size_change == (app._on_desktop_overlay_size_change)
     assert app.view_settings.on_desktop_overlay_recovery_action == (
@@ -3151,150 +3150,226 @@ async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
     assert applied_targets == ["ja"]
 
 
-@pytest.mark.asyncio
-async def test_start_microphone_test_success_shows_measured_level() -> None:
+def _audio_test_app(controller: SimpleNamespace) -> TranslatorApp:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-
-    async def fake_start_microphone_test(**kwargs) -> bool:
-        kwargs["meter_callback"](0.37)
-        return True
-
-    controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=lambda: None,
-        microphone_test_active=True,
-    )
+    app.view_settings = InlineAudioTestSettingsView()
+    app._run_page_task = lambda coroutine, *args: app.page.tasks.append(coroutine)
     app._ui_application = compose_test_ui_application_boundary(controller)
+    return app
 
-    app._on_start_microphone_test()
-    await app.page.tasks[0]()
 
-    assert len(app.page.opened) == 1
-    assert "37%" in _dialog_text_values(app.page.opened[0])
+def _audio_snapshot(state: str, **channels: dict[str, object]) -> dict[str, object]:
+    idle = {
+        "state": "off",
+        "failure_reason": None,
+        "failure_type": None,
+        "device": {},
+        "meter_level": 0.0,
+        "speech_probability": 0.0,
+        "speech_detected": False,
+        "speech_threshold": None,
+    }
+    return {
+        "state": state,
+        "desired_active": state in {"pending", "ready", "degraded"},
+        "effective_active": state in {"ready", "degraded"},
+        "channels": {
+            "self": {**idle, **channels.get("self_", {})},
+            "peer": {**idle, **channels.get("peer", {})},
+        },
+        "restore_capture": [],
+    }
 
 
 @pytest.mark.asyncio
-async def test_microphone_test_meter_callback_updates_modal_percentage() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
+async def test_audio_test_opens_two_column_modal_with_live_channels_and_saved_thresholds() -> None:
     callbacks: list[object] = []
+    snapshot = {"value": _audio_snapshot("pending")}
 
-    async def fake_start_microphone_test(**kwargs) -> bool:
-        callbacks.append(kwargs["meter_callback"])
+    async def fake_start_audio_test(**kwargs) -> bool:
+        callbacks.append(kwargs["observation_callback"])
         return True
 
     controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=lambda: None,
-        microphone_test_active=True,
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: snapshot["value"],
+        audio_test_active=True,
     )
-    app._ui_application = compose_test_ui_application_boundary(controller)
+    app = _audio_test_app(controller)
 
-    app._on_start_microphone_test()
-    await app.page.tasks[0]()
-    callbacks[0](0.82)
-
-    assert "82%" in _dialog_text_values(app.page.opened[0])
-
-
-@pytest.mark.asyncio
-async def test_microphone_test_backdrop_dismiss_stops_runtime() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-    stop_calls: list[str] = []
-
-    async def fake_start_microphone_test(**_kwargs) -> bool:
-        return True
-
-    async def fake_stop_microphone_test() -> None:
-        stop_calls.append("stop")
-
-    controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=fake_stop_microphone_test,
-        microphone_test_active=True,
-    )
-    app._ui_application = compose_test_ui_application_boundary(controller)
-
-    app._on_start_microphone_test()
+    app._on_start_audio_test()
     await app.page.tasks[0]()
 
     assert len(app.page.opened) == 1
-    app._microphone_test_dialog._handle_dismiss(None)
+    texts = _dialog_text_values(app.page.opened[0])
+    assert t("settings.audio_test") in texts
+    assert t("audio_test.channel.self") in texts
+    assert t("audio_test.channel.peer") in texts
+    dialog = app._audio_test_dialog
+    assert dialog.panel("self").slider.value == 0.4
+    assert dialog.panel("peer").slider.value == 0.55
 
-    assert len(app.page.tasks) == 2
-    await app.page.tasks[1]()
-    assert stop_calls == ["stop"]
+    callbacks[0]("peer", (SimpleNamespace(probability=0.8, level=0.3),))
+    snapshot["value"] = _audio_snapshot(
+        "degraded",
+        self_={"state": "failed", "failure_reason": "input_route_unavailable"},
+        peer={
+            "state": "ready",
+            "speech_detected": True,
+            "device": {"kind": "process", "name": "VRChat.exe"},
+        },
+    )
+    snapshot["value"]["restore_capture"] = ["peer"]
+    dialog.refresh()
+
+    texts = _dialog_text_values(app.page.opened[0])
+    assert t("audio_test.state.speech") in texts
+    assert t("audio_test.error.input_route_unavailable") in texts
+    assert t("audio_test.device.process", name="VRChat.exe") in texts
+    assert dialog.panel("peer").history[-1] == (0.8, 0.3)
+    assert dialog._notice_text.visible is True
 
 
 @pytest.mark.asyncio
-async def test_navigation_cleanup_closes_microphone_test_modal_and_stops_runtime() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-    stop_calls: list[str] = []
-
-    async def fake_start_microphone_test(**_kwargs) -> bool:
+async def test_audio_test_modal_threshold_changes_use_the_settings_view_path() -> None:
+    async def fake_start_audio_test(**_kwargs) -> bool:
         return True
 
-    async def fake_stop_microphone_test() -> None:
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
+    )
+    app = _audio_test_app(controller)
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+
+    slider = app._audio_test_dialog.panel("peer").slider
+    slider.on_change_end(SimpleNamespace(control=SimpleNamespace(value=0.7)))
+
+    assert app.view_settings.applied == [("peer", 0.7)]
+
+
+@pytest.mark.asyncio
+async def test_audio_test_start_failure_marks_both_channels_failed() -> None:
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return False
+
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: _audio_snapshot("off"),
+        audio_test_active=False,
+    )
+    app = _audio_test_app(controller)
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+
+    texts = _dialog_text_values(app.page.opened[0])
+    assert texts.count(t("audio_test.error.generic")) == 2
+    app._audio_test_dialog.refresh()
+    app._audio_test_dialog.refresh()
+    assert _dialog_text_values(app.page.opened[0]).count(t("audio_test.error.generic")) == 2
+    controller.audio_test_snapshot = lambda: _audio_snapshot(
+        "ready", self_={"state": "ready"}, peer={"state": "ready"}
+    )
+    app._audio_test_dialog.refresh()
+    assert t("audio_test.error.generic") not in _dialog_text_values(app.page.opened[0])
+
+
+@pytest.mark.asyncio
+async def test_audio_test_backdrop_dismiss_stops_runtime() -> None:
+    stop_calls: list[str] = []
+
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return True
+
+    async def fake_stop_audio_test() -> None:
         stop_calls.append("stop")
 
     controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=fake_stop_microphone_test,
-        microphone_test_active=True,
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=fake_stop_audio_test,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
     )
-    app._ui_application = compose_test_ui_application_boundary(controller)
+    app = _audio_test_app(controller)
 
-    app._on_start_microphone_test()
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+
+    assert len(app.page.opened) == 1
+    app._audio_test_dialog._handle_dismiss(None)
+
+    stop_task = app.page.tasks[-1]
+    await stop_task()
+    assert stop_calls == ["stop"]
+    assert app._audio_test_dialog.is_open is False
+
+
+@pytest.mark.asyncio
+async def test_navigation_cleanup_closes_audio_test_modal_and_stops_runtime() -> None:
+    stop_calls: list[str] = []
+
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return True
+
+    async def fake_stop_audio_test() -> None:
+        stop_calls.append("stop")
+
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=fake_stop_audio_test,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
+    )
+    app = _audio_test_app(controller)
+
+    app._on_start_audio_test()
     await app.page.tasks[0]()
     opened_dialog = app.page.opened[0]
 
     app._close_open_dialog_for_navigation()
 
     assert app.page.closed == [opened_dialog]
-    assert len(app.page.tasks) == 2
-    await app.page.tasks[1]()
+    await app.page.tasks[-1]()
     assert stop_calls == ["stop"]
 
 
 @pytest.mark.asyncio
-async def test_settings_apply_closes_microphone_test_modal_after_audio_cleanup() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
+async def test_settings_apply_closes_audio_test_modal_only_after_the_test_stopped() -> None:
     events: list[str] = []
-    controller = SimpleNamespace(microphone_test_active=True)
+    snapshot = {"value": _audio_snapshot("failed")}
+    controller = SimpleNamespace(audio_test_active=False)
 
-    async def fake_start_microphone_test(**_kwargs) -> bool:
+    async def fake_start_audio_test(**_kwargs) -> bool:
         events.append("start")
         return True
 
     async def fake_apply_settings(settings) -> None:
         events.append(f"apply:{settings}")
-        controller.microphone_test_active = False
 
-    async def fake_stop_microphone_test() -> None:
-        events.append("stop")
-
-    controller.start_microphone_test = fake_start_microphone_test
+    controller.start_audio_test = fake_start_audio_test
     controller.apply_settings = fake_apply_settings
-    controller.stop_microphone_test = fake_stop_microphone_test
-    app._ui_application = compose_test_ui_application_boundary(controller)
+    controller.stop_audio_test = lambda: events.append("stop")
+    controller.audio_test_snapshot = lambda: snapshot["value"]
+    app = _audio_test_app(controller)
 
-    app._on_start_microphone_test()
+    app._on_start_audio_test()
     await app.page.tasks[0]()
 
-    app._on_settings_changed("audio")
-    await app.page.tasks[1]()
+    app._on_settings_changed("threshold")
+    await app.page.tasks[-1]()
+    assert app.page.closed == []
 
-    assert events == ["start", "apply:audio"]
-    assert len(app.page.opened) == 1
+    snapshot["value"] = _audio_snapshot("off")
+    app._on_settings_changed("audio")
+    await app.page.tasks[-1]()
+
+    assert events == ["start", "apply:threshold", "apply:audio"]
     assert app.page.closed == [app.page.opened[0]]
 
 
@@ -4245,3 +4320,143 @@ def test_rejected_page_task_admission_restores_actionable_dialog(source) -> None
     assert app.application.managed_auth_task_names() == ()
     assert notifications == []
     assert visuals == []
+
+
+@pytest.mark.asyncio
+async def test_audio_test_dismiss_preempts_gated_settings_start_and_allows_later_start() -> None:
+    from tests.app.test_audio_test_session_owner import Harness
+
+    harness = Harness()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    original = harness.control.set_enabled
+    opened = []
+
+    async def pause(channel, enabled):
+        await original(channel, enabled)
+        if channel == "peer" and not enabled:
+            entered.set()
+            await release.wait()
+
+    harness.control.set_enabled = pause
+    for channel, opener in harness.openers.items():
+        open_source = opener.open
+
+        async def open_owned(*, on_acquired, channel=channel, open_source=open_source):
+            opened.append(channel)
+            return await open_source(on_acquired=on_acquired)
+
+        opener.open = open_owned
+    controller = SimpleNamespace(
+        start_audio_test=harness.owner.start,
+        stop_audio_test=harness.owner.stop,
+        audio_test_snapshot=lambda: harness.owner.snapshot,
+        audio_test_active=False,
+    )
+    app = _audio_test_app(controller)
+    app._on_start_audio_test()
+    starting = asyncio.create_task(app.page.tasks[0]())
+    stopping = None
+    try:
+        await entered.wait()
+        assert app._settings_mutation_worker_active
+        app._audio_test_dialog._handle_dismiss(None)
+        stopping = asyncio.create_task(app.page.tasks[-1]())
+        await asyncio.sleep(0)
+        release.set()
+        await asyncio.wait_for(asyncio.gather(starting, stopping), timeout=2)
+        assert not app._settings_mutation_worker_active
+        assert not harness.owner.active
+        assert harness.owner.snapshot["state"] == "off"
+        assert opened == []
+        assert harness.control.enabled == {"self": True, "peer": True}
+        app._on_start_audio_test()
+        await app.page.tasks[-1]()
+        harness.sources["self"].feed(0.0)
+        assert await harness.owner.wait_ready()
+        assert set(opened) == {"self", "peer"}
+        app._audio_test_dialog._handle_dismiss(None)
+        await app.page.tasks[-1]()
+        assert harness.owner.snapshot["state"] == "off"
+        assert all(source.closed for source in harness.sources.values())
+    finally:
+        release.set()
+        await asyncio.gather(
+            *(task for task in (starting, stopping) if task is not None), return_exceptions=True
+        )
+        await harness.owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("locale", ("en", "ko", "ja", "ru", "zh-CN"))
+async def test_audio_open_failures_are_channel_specific_persistent_and_recover(locale) -> None:
+    previous_locale = i18n_module.get_locale()
+    i18n_module.set_locale(locale)
+    snapshot = {
+        "value": _audio_snapshot(
+            "failed",
+            self_={"state": "failed", "failure_reason": "source_open_failed"},
+            peer={"state": "ready"},
+        )
+    }
+
+    async def start(**_kwargs):
+        return True
+
+    controller = SimpleNamespace(
+        start_audio_test=start,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: snapshot["value"],
+        audio_test_active=False,
+    )
+    app = _audio_test_app(controller)
+    try:
+        app._on_start_audio_test()
+        await app.page.tasks[0]()
+        dialog = app._audio_test_dialog
+        dialog.refresh()
+        self_failure = dialog.panel("self").status_text.value
+        assert self_failure
+        assert not self_failure.startswith("audio_test.")
+        snapshot["value"]["channels"]["peer"] = {
+            "state": "failed",
+            "failure_reason": "source_open_failed",
+        }
+        dialog.refresh()
+        peer_failure = dialog.panel("peer").status_text.value
+        assert peer_failure
+        assert not peer_failure.startswith("audio_test.")
+        assert peer_failure != self_failure
+        dialog.refresh()
+        dialog.refresh()
+        assert dialog.panel("self").status_text.value == self_failure
+        assert dialog.panel("peer").status_text.value == peer_failure
+        snapshot["value"] = _audio_snapshot(
+            "degraded",
+            self_={"state": "ready"},
+            peer={"state": "failed", "failure_reason": "target_unavailable"},
+        )
+        dialog.refresh()
+        target_failure = dialog.panel("peer").status_text.value
+        assert target_failure
+        assert not target_failure.startswith("audio_test.")
+        assert target_failure not in {self_failure, peer_failure}
+        dialog.refresh()
+        assert dialog.panel("peer").status_text.value == target_failure
+        assert dialog.panel("self").status_text.value not in {self_failure, peer_failure}
+        snapshot["value"] = _audio_snapshot(
+            "failed",
+            self_={"state": "failed", "failure_reason": "vad_unavailable"},
+            peer={"state": "failed", "failure_reason": "vad_unavailable"},
+        )
+        dialog.refresh()
+        assert dialog.panel("self").status_text.value == dialog.panel("peer").status_text.value
+        snapshot["value"] = _audio_snapshot(
+            "ready", self_={"state": "ready"}, peer={"state": "ready"}
+        )
+        dialog.refresh()
+        assert dialog.panel("self").status_text.value not in {self_failure, peer_failure}
+        assert dialog.panel("peer").status_text.value not in {self_failure, peer_failure}
+    finally:
+        app._audio_test_dialog.close()
+        i18n_module.set_locale(previous_locale)

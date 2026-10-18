@@ -115,6 +115,7 @@ def _capture_target_owner(
         runtime_effects=SimpleNamespace(),
         settings_presentation_sink=lambda _settings: None,
         warning_reset=lambda: None,
+        stop_audio_test=lambda: asyncio.sleep(0),
     )
 
 
@@ -664,6 +665,7 @@ async def test_capture_target_owner_publishes_general_snapshot_after_apply() -> 
         runtime_effects=SimpleNamespace(apply_capture_target=apply_capture_target),
         settings_presentation_sink=presented.append,
         warning_reset=lambda: None,
+        stop_audio_test=lambda: asyncio.sleep(0),
     )
 
     await owner.apply("device:Headset")

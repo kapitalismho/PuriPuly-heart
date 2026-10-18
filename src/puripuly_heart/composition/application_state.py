@@ -11,8 +11,8 @@ from puripuly_heart.app.services.desktop_overlay_application import (
 from puripuly_heart.app.services.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
 )
+from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 
@@ -25,7 +25,7 @@ class ApplicationUiStateAdapter:
     desktop_overlay: DesktopOverlayApplicationOwner
     managed: ManagedAccountComponents
     calibration: OverlayCalibrationApplicationOwner
-    microphone: Callable[[], MicrophoneTestRuntime | None]
+    audio_test: Callable[[], AudioTestRuntime | None]
 
     @property
     def compatibility_settings(self) -> AppSettingsVNext | None:
@@ -52,9 +52,9 @@ class ApplicationUiStateAdapter:
         return bool(settings.state.peer_translation.eula_accepted) if settings is not None else None
 
     @property
-    def microphone_test_active(self) -> bool:
-        microphone = self.microphone()
-        return microphone.active if microphone is not None else False
+    def audio_test_active(self) -> bool:
+        audio_test = self.audio_test()
+        return audio_test.active if audio_test is not None else False
 
     @property
     def provider_name(self) -> str | None:

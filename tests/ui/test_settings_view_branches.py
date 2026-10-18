@@ -1516,7 +1516,7 @@ def test_managed_gemma_selection_auto_applies_and_exposes_only_cpu_gpu(
     assert pending.intent.translation.connection == TranslationConnection.CPU.value
     assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
     assert applies == [True]
-    assert view._translation_connection_row.visible is False
+    assert view._translation_connection_row.visible is True
     assert view._translation_connection_title.value == t("settings.translation_connection")
     assert view._get_llm_display_label(view._provider_draft or view._provider_snapshot) == t(
         "provider.managed_gemma_cpu"
@@ -1558,7 +1558,7 @@ def test_gemma_26b_selection_applies_gpu_only_and_preserves_e4b_history(
     assert pending.intent.translation.model == "managed_gemma_26b"
     assert pending.intent.translation.connection == "gpu"
     assert _llm(pending) == LLMProviderName.MANAGED_GEMMA.value
-    assert view._translation_connection_row.visible is False
+    assert view._translation_connection_row.visible is True
     assert view._gpu_device_row.visible is True
     assert view._get_llm_modal_value(view._provider_draft) == "managed_gemma_26b"
     assert view._llm_text.content.value == t("provider.managed_gemma_26b")
@@ -2314,15 +2314,16 @@ def test_gpu_card_is_standard_one_by_one_and_contains_only_device_selection(
     assert view._gpu_device_row.content.controls == [
         view._gpu_device_card,
         view._gpu_llm_card,
-        view._gpu_refresh_card,
+        view._model_assets_card,
     ]
 
 
-def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
+def test_local_model_row_repaints_for_cpu_and_gpu_local_models_and_collapses_for_cloud(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
-    settings = _vnext(settings, stt_provider=STTProviderName.LOCAL_QWEN)
+    settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     view, _ = _make_settings_view(monkeypatch)
     repainted: list[ft.Control] = []
     monkeypatch.setattr(settings_view, "_update_control_if_mounted", repainted.append)
@@ -2331,18 +2332,34 @@ def test_gpu_row_repaints_and_collapses_immediately_with_provider_selection(
     assert view._gpu_device_row.visible is False
     assert view._http_extension_host.visible is False
 
-    repainted.clear()
-    view._on_stt_selected(STTProviderName.LOCAL_QWEN_GPU.value)
+    for provider in (STTProviderName.LOCAL_QWEN, STTProviderName.LOCAL_QWEN_GPU):
+        repainted.clear()
+        view._on_stt_selected(provider.value)
 
-    assert view._gpu_device_row.visible is True
-    assert view._http_extension_host.visible is False
-    assert view._gpu_device_row in repainted
+        assert view._gpu_device_row.visible is True
+        assert view._http_extension_host.visible is False
+        assert view._gpu_device_row in repainted
 
     repainted.clear()
-    view._on_stt_selected(STTProviderName.LOCAL_QWEN.value)
+    view._on_stt_selected(STTProviderName.DEEPGRAM.value)
 
     assert view._gpu_device_row.visible is False
     assert view._gpu_device_row in repainted
+
+
+def test_cpu_gemma_shows_the_local_model_row_and_keeps_the_diarization_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+
+    view._on_llm_selected("managed_gemma_cpu")
+
+    assert view._gpu_device_row.visible is True
+    assert view._translation_connection_row.visible is True
 
 
 def test_gpu_card_shows_split_labels_when_asr_and_gemma_use_different_devices(
@@ -2396,11 +2413,12 @@ def test_gpu_card_click_opens_column_modal_and_refresh_requests_discovery(
             opened.append(current)
 
     monkeypatch.setattr(settings_view, "SettingsModal", CapturingModal)
+    view.on_open_model_assets = lambda: requests.append("model_assets")
     view._on_gpu_device_click(None)
     view._on_llm_gpu_device_click(None)
-    view._on_gpu_refresh_click(None)
+    view._on_model_assets_click(None)
 
-    assert requests == ["discover", "discover", "discover"]
+    assert requests == ["discover", "discover", "model_assets"]
     assert opened[0][0] == t("settings.gpu_device.asr")
     assert opened[0][1] == "auto"
     assert opened[1] == "auto"
@@ -2412,6 +2430,8 @@ def test_selecting_gemma_gpu_requests_discovery_and_shows_card(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings = AppSettingsVNext()
+    settings = _vnext(settings, stt_provider=STTProviderName.DEEPGRAM)
+    settings = _vnext(settings, peer_stt_provider=STTProviderName.DEEPGRAM)
     view, _ = _make_settings_view(monkeypatch)
     view.load_from_settings(settings, config_path=Path("settings.json"))
     requests: list[str] = []
@@ -3557,6 +3577,26 @@ def test_peer_vad_slider_change_updates_state_and_emits_intent(
     assert len(changed) == 1
     assert changed[0] is not settings
     assert changed[0].intent.desktop_audio.vad_speech_threshold == 0.77
+
+
+def test_audio_test_threshold_changes_share_the_settings_sliders_and_intents(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = AppSettingsVNext()
+    changed: list[AppSettingsVNext] = []
+    view, _ = _make_settings_view(monkeypatch)
+    view.load_from_settings(settings, config_path=Path("settings.json"))
+    view.on_settings_changed = lambda incoming: changed.append(incoming)
+    monkeypatch.setattr(type(view._vad_slider), "update", lambda self: None)
+
+    view.apply_vad_threshold("self", 0.65)
+    view.apply_vad_threshold("peer", 0.35)
+
+    assert view.vad_thresholds() == {"self": 0.65, "peer": 0.35}
+    assert (view._vad_slider.value, view._vad_slider.label) == (0.65, "0.65")
+    assert (view._peer_vad_slider.value, view._peer_vad_slider.label) == (0.35, "0.35")
+    assert changed[-1].intent.stt.vad_speech_threshold == 0.65
+    assert changed[-1].intent.desktop_audio.vad_speech_threshold == 0.35
 
 
 def test_audio_change_messages_use_basic_runtime_log(
@@ -4743,12 +4783,12 @@ def test_general_osc_card_is_locale_independent(
         i18n_module.set_locale(old_locale)
 
 
-def test_microphone_test_card_click_invokes_start_callback_without_modal(
+def test_audio_test_card_click_invokes_start_callback_without_modal(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
     calls: list[str] = []
-    view.on_start_microphone_test = lambda: calls.append("start")
+    view.on_start_audio_test = lambda: calls.append("start")
     modal_calls: list[str] = []
 
     class DummyModal:
@@ -4757,29 +4797,29 @@ def test_microphone_test_card_click_invokes_start_callback_without_modal(
 
     monkeypatch.setattr(settings_view, "SettingsModal", DummyModal)
 
-    view._on_microphone_test_click(None)
+    view._on_audio_test_click(None)
 
     assert calls == ["start"]
     assert modal_calls == []
 
 
-def test_microphone_test_card_clicks_always_request_start_without_inline_state(
+def test_audio_test_card_clicks_always_request_start_without_inline_state(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     view, _ = _make_settings_view(monkeypatch)
-    card = _general_tab_card(view, t("settings.microphone_test"))
+    card = _general_tab_card(view, t("settings.audio_test"))
     calls: list[str] = []
-    view.on_start_microphone_test = lambda: calls.append("start")
+    view.on_start_audio_test = lambda: calls.append("start")
 
     assert not any(isinstance(node, ft.Slider) for node in _iter_control_tree(card))
-    assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
+    assert view._audio_test_text.content.value == t("settings.audio_test.action")
 
-    view._on_microphone_test_click(None)
+    view._on_audio_test_click(None)
     assert calls == ["start"]
 
-    view._on_microphone_test_click(None)
+    view._on_audio_test_click(None)
     assert calls == ["start", "start"]
-    assert view._microphone_test_text.content.value == t("settings.microphone_test.action")
+    assert view._audio_test_text.content.value == t("settings.audio_test.action")
 
 
 def test_api_tab_places_independent_managed_key_card_above_api_keys(
@@ -4810,7 +4850,7 @@ def test_api_tab_places_independent_managed_key_card_above_api_keys(
     assert _row_card_titles(api_controls[3]) == [
         t("settings.gpu_device.asr"),
         t("settings.gpu_device.llm"),
-        t("settings.gpu_device.refresh"),
+        t("settings.model_assets"),
     ]
     assert view._gpu_device_row.visible is False
     assert _row_card_titles(api_controls[4]) == [t("settings.local_llm.connection")]
@@ -6753,7 +6793,12 @@ class PromptApplyBackend:
         self.apply_started = asyncio.Event()
         self.release_apply = asyncio.Event()
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> bool:
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> bool:
         self.apply_started.set()
         await self.release_apply.wait()
         if self.succeed:

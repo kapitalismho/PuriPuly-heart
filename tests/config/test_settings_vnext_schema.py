@@ -72,6 +72,12 @@ def test_vnext_schema_defaults_match_current_persisted_settings_defaults() -> No
     )
 
 
+def test_ui_settings_persist_only_locale() -> None:
+    schema = _load_schema_module()
+
+    assert {field.name for field in fields(schema.UiIntent)} == {"locale"}
+
+
 def test_vnext_schema_represents_current_intent_and_state_leaves() -> None:
     schema = _load_schema_module()
 

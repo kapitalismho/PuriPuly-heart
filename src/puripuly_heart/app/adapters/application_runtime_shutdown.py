@@ -20,8 +20,8 @@ from puripuly_heart.app.services.github_star_prompt import GithubStarPromptOwner
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import (
     RuntimePipelineHandle,
     RuntimePipelineLauncher,
@@ -49,7 +49,7 @@ class ApplicationRuntimeShutdownAdapter:
     vrc_mic_sync: Callable[[], OscControlIntegrationOwner | None]
     github_prompt: Callable[[], GithubStarPromptOwner | None]
     clipboard: Callable[[], ClipboardAutoTranslationOwner | None]
-    microphone: Callable[[], MicrophoneTestRuntime | None]
+    audio_test: Callable[[], AudioTestRuntime | None]
     close_managed_gemma_owner: Callable[[], Awaitable[None]] | None = None
     local_asr_provisioning: Callable[[], object | None] | None = None
 
@@ -226,8 +226,8 @@ class ApplicationRuntimeShutdownAdapter:
     async def close_local_asr_provisioning(self) -> None:
         await self.close_local_asr_provisioning_owner()
 
-    async def close_microphone_test_runtime(self) -> None:
-        runtime = self.microphone()
+    async def close_audio_test_runtime(self) -> None:
+        runtime = self.audio_test()
         if runtime is not None:
             await runtime.close()
 

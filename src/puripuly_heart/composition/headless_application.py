@@ -13,6 +13,7 @@ from puripuly_heart.core.runtime_logging import (
     RuntimeLoggingSinks,
     install_headless_console_privacy_filter,
 )
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.ui.event_dispatch import UIEventBridge
 from puripuly_heart.ui.i18n import available_locales, get_locale, set_locale, t
 
@@ -41,6 +42,21 @@ class _HeadlessDashboard:
         self.translation = text
         return True
 
+    def publish_self_turn(self, snapshot: SelfTurnPresentation) -> bool:
+        self.transcript = snapshot.source_text
+        self.translation = (
+            "\n".join(
+                target.translation.text
+                for target in snapshot.targets
+                if target.status == "ready"
+                and target.source_revision == snapshot.source_revision
+                and target.translation is not None
+                and snapshot.status not in ("cancelled", "expired")
+            )
+            or None
+        )
+        return True
+
     def publish_error(self, text: str) -> None:
         self.issue = text
 
@@ -49,6 +65,9 @@ class _HeadlessHistory:
     def append_entry(
         self, source: str, text: str, *, translated: bool = False, language_code: str | None = None
     ) -> None:
+        pass
+
+    def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
         pass
 
 

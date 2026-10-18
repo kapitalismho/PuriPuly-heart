@@ -9,6 +9,7 @@ import re
 import threading
 import time
 from collections.abc import Awaitable
+from concurrent.futures import ThreadPoolExecutor
 from logging.handlers import QueueHandler, RotatingFileHandler
 from pathlib import Path
 from uuid import uuid4
@@ -158,11 +159,14 @@ class _BlockingStream:
         self._target = target
         self.started = threading.Event()
         self.release = threading.Event()
+        self.write_finished = threading.Event()
 
     def write(self, text: str) -> int:
         self.started.set()
         self.release.wait()
-        return self._target.write(text)
+        written = self._target.write(text)
+        self.write_finished.set()
+        return written
 
     def __getattr__(self, name: str):
         return getattr(self._target, name)
@@ -299,6 +303,7 @@ def test_configured_main_logging_drops_exception_and_stack_details_before_live_a
     stream = io.StringIO()
     root_logger.addHandler(logging.StreamHandler(stream))
     sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    owner = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
 
     try:
         root_logger.info("ordinary safe exception-neighbor message")
@@ -310,25 +315,117 @@ def test_configured_main_logging_drops_exception_and_stack_details_before_live_a
         except RuntimeError:
             root_logger.exception("provider call failed safely")
         root_logger.error("stack-only failure breadcrumb", stack_info=True)
-        _wait_for_log_text(sinks.log_file, "untrusted_record_redacted")
-
-        live = stream.getvalue()
-        persisted = sinks.log_file.read_text(encoding="utf-8")
-        combined = live + persisted
-        assert live == ""
-        assert persisted.count("untrusted_record_redacted") == 3
-        assert "ordinary safe exception-neighbor message" not in persisted
-        assert "provider call failed safely" not in persisted
-        assert "stack-only failure breadcrumb" not in persisted
-        assert "exception-provider-secret" not in combined
-        assert "exception-token-secret" not in combined
-        assert "provider_response_body" not in combined
-        assert "Traceback" not in combined
-        assert "Stack (most recent call last)" not in combined
-        assert 'File "' not in combined
-        assert "RuntimeError" not in combined
     finally:
+        owner.close_terminal_owner()
+
+    health = owner.diagnostic_health()["file"]
+    assert health["enqueued_records"] == 3
+    assert health["written_records"] == 3
+    assert health["queue_pending"] == 0
+    assert health["dropped_records"] == 0
+    assert health["delivery_failures"] == 0
+    assert health["oversized_rejected"] == 0
+    assert health["cleanup_failures"] == 0
+    assert health["shutdown_complete"] is True
+    live = stream.getvalue()
+    persisted = sinks.log_file.read_text(encoding="utf-8")
+    combined = live + persisted
+    assert live == ""
+    assert len(persisted.splitlines()) == 3
+    assert "ordinary safe exception-neighbor message" not in persisted
+    assert "provider call failed safely" not in persisted
+    assert "stack-only failure breadcrumb" not in persisted
+    assert "exception-provider-secret" not in combined
+    assert "exception-token-secret" not in combined
+    assert "provider_response_body" not in combined
+    assert "Traceback" not in combined
+    assert "Stack (most recent call last)" not in combined
+    assert 'File "' not in combined
+    assert "RuntimeError" not in combined
+    assert str(Path(__file__).resolve()) not in combined
+
+
+def test_terminal_close_settles_untrusted_records_before_privacy_snapshot(tmp_path) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.privacy_settlement.{uuid4()}")
+    root_logger.propagate = False
+    stream = io.StringIO()
+    root_logger.addHandler(logging.StreamHandler(stream))
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    owner = SessionRuntimeLoggingService(root_logger=root_logger, sinks=sinks)
+    sinks.file_handler.stream = sinks.file_handler._open()
+    blocked_stream = _BlockingStream(sinks.file_handler.stream)
+    sinks.file_handler.stream = blocked_stream
+    visible_message = "[Lifecycle] boundary phase=readiness"
+    private_messages = (
+        "synthetic-private-ordinary-text",
+        "synthetic-private-provider-failure",
+        "synthetic-private-stack-failure",
+    )
+
+    def close_and_capture() -> str:
         sinks.close()
+        assert blocked_stream.write_finished.is_set()
+        return sinks.log_file.read_text(encoding="utf-8")
+
+    try:
+        owner.emit_basic(visible_message)
+        root_logger.info(private_messages[0])
+        try:
+            raise RuntimeError(
+                "provider_response_body={'token':'synthetic-private-provider-secret'} "
+                "authorization=Bearer synthetic-private-token-secret "
+                "C:/synthetic-private-user/provider.py"
+            )
+        except RuntimeError:
+            root_logger.exception(private_messages[1])
+        root_logger.error(private_messages[2], stack_info=True)
+        assert blocked_stream.started.wait(timeout=1.0)
+        pending_health = owner.diagnostic_health()["file"]
+        assert pending_health["enqueued_records"] == 4
+        assert pending_health["written_records"] == 0
+        assert pending_health["queue_pending"] == 4
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            snapshot = executor.submit(close_and_capture)
+            try:
+                _wait_until(lambda: owner.diagnostic_health()["file"]["availability"] == "closing")
+                assert not snapshot.done()
+                assert not blocked_stream.write_finished.is_set()
+            finally:
+                blocked_stream.release.set()
+            persisted = snapshot.result(timeout=2.0)
+
+        health = owner.diagnostic_health()["file"]
+        assert health["enqueued_records"] == 4
+        assert health["written_records"] == 4
+        assert health["queue_pending"] == 0
+        assert health["dropped_records"] == 0
+        assert health["delivery_failures"] == 0
+        assert health["oversized_rejected"] == 0
+        assert health["cleanup_failures"] == 0
+        assert health["shutdown_complete"] is True
+        live = stream.getvalue()
+        assert len(live.splitlines()) == 1
+        assert visible_message in live
+        assert len(persisted.splitlines()) == 4
+        assert visible_message in persisted
+        combined = live + persisted
+        for private_text in (
+            *private_messages,
+            "synthetic-private-provider-secret",
+            "synthetic-private-token-secret",
+            "C:/synthetic-private-user",
+            "provider_response_body",
+            "Traceback",
+            "Stack (most recent call last)",
+            'File "',
+            "RuntimeError",
+        ):
+            assert private_text not in combined
+    finally:
+        blocked_stream.release.set()
+        owner.close()
+        sinks.close(force=True)
 
 
 def test_session_runtime_logging_redacts_direct_records_with_injected_sinks(tmp_path) -> None:

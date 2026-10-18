@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Literal
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
@@ -43,6 +44,7 @@ from puripuly_heart.app.services.managed_gemma_translation import (
     ManagedGemmaTranslationOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.model_assets import ModelAssetsApplication
 from puripuly_heart.app.services.overlay_application import OverlayApplicationOwner
 from puripuly_heart.app.services.overlay_calibration_application import (
     OverlayCalibrationApplicationOwner,
@@ -69,8 +71,8 @@ from puripuly_heart.app.services.settings_projection import (
     SettingsProjectionOwner,
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
+from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
 from puripuly_heart.app.wiring_managed_account import ManagedAccountComponents
-from puripuly_heart.app.wiring_microphone_test import MicrophoneTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_runtime_pipeline import RuntimePipelineHandle
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
@@ -173,28 +175,23 @@ class UiPeerCaptureRuntimeAdapter:
 
 
 @dataclass(slots=True)
-class UiMicrophoneRuntimeAdapter:
-    microphone: MicrophoneTestRuntime
-    level_log_interval_seconds: float
+class UiAudioTestRuntimeAdapter:
+    audio_test: AudioTestRuntime
 
-    async def start_microphone_test(
-        self,
-        *,
-        meter_callback=None,
-    ) -> bool:
-        return await self.microphone.start(
-            meter_callback=meter_callback,
-            level_log_interval_s=self.level_log_interval_seconds,
-        )
+    async def start_audio_test(self, *, observation_callback=None) -> bool:
+        return await self.audio_test.start(observation_callback=observation_callback)
 
-    def microphone_test_snapshot(self) -> dict[str, object]:
-        return self.microphone.snapshot
+    def audio_test_snapshot(self) -> dict[str, object]:
+        return self.audio_test.snapshot
 
-    async def wait_microphone_test_ready(self) -> bool:
-        return await self.microphone.wait_ready()
+    async def wait_audio_test_ready(self) -> bool:
+        return await self.audio_test.wait_ready()
 
-    async def stop_microphone_test(self) -> None:
-        await self.microphone.stop()
+    async def stop_audio_test(self) -> None:
+        await self.audio_test.stop()
+
+    def release_audio_test_capture_restore(self, channel: str) -> None:
+        self.audio_test.release_capture_restore(channel)
 
 
 @dataclass(slots=True)
@@ -342,8 +339,13 @@ class UiSettingsRuntimeAdapter:
     ) -> AppSettingsVNext:
         return self.merge_provider_settings(settings)
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> object:
-        return await self.application.apply(settings)
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> object:
+        return await self.application.apply(settings, provider_requested=provider_requested)
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
         settings = self.settings.canonical
@@ -400,6 +402,7 @@ class UiProviderRuntimeAdapter:
     llm_devices_sink: Callable[[tuple[GpuDeviceOption, ...]], None] | None = None
     chatgpt: ChatGptAccountOwner | None = None
     connection_readiness: LlmConnectionReadinessOwner | None = None
+    model_assets: ModelAssetsApplication | None = None
     _alibaba_workspace: AlibabaWorkspaceOwner | None = field(default=None, init=False)
 
     def alibaba_workspace(self) -> AlibabaWorkspaceOwner:
@@ -667,6 +670,31 @@ class UiProviderRuntimeAdapter:
         if action == "cancel":
             return False if self.managed_gemma is None else self.managed_gemma.cancel()
         raise ValueError(f"unsupported managed Gemma notice action: {action}")
+
+    def model_asset_entries(self) -> tuple[object, ...]:
+        return self.model_assets.entries() if self.model_assets is not None else ()
+
+    async def refresh_model_assets(self) -> tuple[object, ...]:
+        if self.model_assets is None:
+            return ()
+        return await self.model_assets.refresh()
+
+    async def download_model_asset(self, model_id: str, *, source: str | None = None) -> object:
+        return await self._require_model_assets().download(model_id, source=source)
+
+    async def import_model_asset(self, model_id: str, directory: Path) -> object:
+        return await self._require_model_assets().import_directory(model_id, directory)
+
+    async def cancel_model_asset(self, model_id: str) -> bool:
+        return await self._require_model_assets().cancel(model_id)
+
+    async def delete_model_asset(self, model_id: str) -> object:
+        return await self._require_model_assets().delete(model_id)
+
+    def _require_model_assets(self) -> ModelAssetsApplication:
+        if self.model_assets is None:
+            raise RuntimeError("Model assets are unavailable")
+        return self.model_assets
 
 
 @dataclass(slots=True)

@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from puripuly_heart.core.runtime.audio_test import AudioTestCaptureRuntime
     from puripuly_heart.core.runtime.clipboard import ClipboardRuntime
     from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
     from puripuly_heart.core.runtime.local_stt_download import LocalSTTDownloadRuntime
     from puripuly_heart.core.runtime.logging import RuntimeLoggingCloseError, RuntimeLoggingService
-    from puripuly_heart.core.runtime.mic_test import MicTestRuntime
     from puripuly_heart.core.runtime.oauth import OAuthRuntime
     from puripuly_heart.core.runtime.output import OutputRuntime
     from puripuly_heart.core.runtime.peer_channel import (
@@ -25,10 +25,10 @@ __all__ = [
     "PeerCaptureSessionOwner",
     "PeerChannelRuntimeState",
     "PeerRuntimeConfig",
+    "AudioTestCaptureRuntime",
     "ClipboardRuntime",
     "GithubStarPromptRuntime",
     "LocalSTTDownloadRuntime",
-    "MicTestRuntime",
     "OAuthRuntime",
     "OscReceiverRuntime",
     "OutputRuntime",
@@ -42,6 +42,10 @@ __all__ = [
 
 def __getattr__(name: str) -> object:
     if name in __all__:
+        if name == "AudioTestCaptureRuntime":
+            from puripuly_heart.core.runtime import audio_test
+
+            return getattr(audio_test, name)
         if name == "ClipboardRuntime":
             from puripuly_heart.core.runtime import clipboard
 
@@ -58,10 +62,6 @@ def __getattr__(name: str) -> object:
             from puripuly_heart.core.runtime import logging as runtime_logging
 
             return getattr(runtime_logging, name)
-        if name == "MicTestRuntime":
-            from puripuly_heart.core.runtime import mic_test
-
-            return getattr(mic_test, name)
         if name == "OAuthRuntime":
             from puripuly_heart.core.runtime import oauth
 

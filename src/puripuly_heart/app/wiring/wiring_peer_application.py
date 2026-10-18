@@ -70,6 +70,7 @@ def compose_peer_application(
     settings_presentation_sink: Callable[[GeneralSettingsSnapshot], None],
     log_basic: Callable[..., object],
     log_diagnostic: Callable[..., object],
+    stop_audio_test: Callable[[], Awaitable[None]],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
 ) -> PeerApplicationRuntime:
     state = PeerApplicationStateAdapter(
@@ -132,6 +133,7 @@ def compose_peer_application(
         ),
         settings_presentation_sink=settings_presentation_sink,
         warning_reset=lambda: setattr(owner, "process_warning_reason", None),
+        stop_audio_test=stop_audio_test,
     )
     return PeerApplicationRuntime(
         state=state,

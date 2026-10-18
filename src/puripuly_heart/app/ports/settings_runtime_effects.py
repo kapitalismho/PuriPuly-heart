@@ -73,6 +73,7 @@ class SettingsRuntimeEffectsPort(Protocol[SettingsT]):
         *,
         strict_runtime_errors: bool,
         reload_settings_view: bool,
+        rebuild_managed_gemma: bool = True,
     ) -> None: ...
 
 

@@ -20,7 +20,7 @@ class UiApplicationStateOwner:
             translation_enabled=runtime.translation_enabled,
             stt_state=runtime.stt_state,
             peer_translation_eula_accepted=runtime.peer_translation_eula_accepted,
-            microphone_test_active=runtime.microphone_test_active,
+            audio_test_active=runtime.audio_test_active,
             provider_name=runtime.provider_name,
             overlay_target=runtime.overlay_target,
             desktop_overlay_captions_locked=runtime.desktop_overlay_captions_locked,
