@@ -1425,35 +1425,60 @@ class TranslationOutputProjectionOwner:
                         handoff=True,
                     )
                 if snapshot.status not in {"cancelled", "expired"}:
-                    await self.emit_final_transcript(
-                        TranscriptOverlayProjection(
-                            transcript=Transcript(
-                                utterance_id=snapshot.utterance_id,
-                                text=snapshot.source_text,
-                                is_final=True,
-                                created_at=snapshot.created_at,
-                                channel="self",
-                                source_child=source_child,
-                                source_text_revision=(
-                                    source_child.revision if source_child is not None else None
+                    if ready is not None and ready.text.strip():
+                        await self.emit_translation(
+                            TranslationOverlayProjection(
+                                translation=replace(
+                                    ready,
+                                    utterance_id=snapshot.utterance_id,
+                                    source_text=snapshot.source_text,
+                                    source_child=source_child,
+                                    source_text_hash=(
+                                        ready.source_text_hash
+                                        if ready.source_text == snapshot.source_text
+                                        else None
+                                    ),
+                                    source_text_len=len(snapshot.source_text),
                                 ),
-                                recognition_origins=(
-                                    source_child.origins if source_child is not None else ()
+                                source_text=snapshot.source_text,
+                                source_language=self._language_or_fallback(
+                                    ready.source_language, snapshot.source_language
+                                ),
+                                target_language=self._language_or_fallback(
+                                    ready.target_language, config_snapshot.value.target_language
+                                ),
+                                applied_context_mode=None,
+                            ),
+                            handoff=True,
+                        )
+                    else:
+                        await self.emit_final_transcript(
+                            TranscriptOverlayProjection(
+                                transcript=Transcript(
+                                    utterance_id=snapshot.utterance_id,
+                                    text=snapshot.source_text,
+                                    is_final=True,
+                                    created_at=snapshot.created_at,
+                                    channel="self",
+                                    source_child=source_child,
+                                    source_text_revision=(
+                                        source_child.revision if source_child is not None else None
+                                    ),
+                                    recognition_origins=(
+                                        source_child.origins if source_child is not None else ()
+                                    ),
+                                ),
+                                source_language=self._language_or_fallback(
+                                    ready.source_language if ready is not None else None,
+                                    snapshot.source_language,
+                                ),
+                                target_language=self._language_or_fallback(
+                                    ready.target_language if ready is not None else None,
+                                    config_snapshot.value.target_language,
                                 ),
                             ),
-                            source_language=(
-                                ready.source_language
-                                if ready is not None
-                                else snapshot.source_language
-                            ),
-                            target_language=(
-                                ready.target_language
-                                if ready is not None
-                                else config_snapshot.value.target_language
-                            ),
-                        ),
-                        handoff=True,
-                    )
+                            handoff=True,
+                        )
                 await self.close_overlay_utterance(
                     utterance_id=snapshot.utterance_id,
                     channel="self",
@@ -1706,6 +1731,8 @@ class TranslationOutputProjectionOwner:
     async def emit_translation(
         self,
         projection: TranslationOverlayProjection,
+        *,
+        handoff: bool = False,
     ) -> None:
         if not self.has_overlay_destination:
             return
@@ -1740,6 +1767,7 @@ class TranslationOutputProjectionOwner:
             ),
             publication_generation=projection.publication_generation,
             source_order=projection.source_order,
+            handoff=handoff,
         )
 
     async def close_overlay_utterance(

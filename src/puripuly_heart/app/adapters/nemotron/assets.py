@@ -80,7 +80,7 @@ class NativeSpeakerAssets:
         cancel_event = threading.Event()
         self._cancel_event = cancel_event
         self.phase = "installing"
-        self._install_task = asyncio.create_task(
+        install_task = asyncio.create_task(
             (
                 self._install_local(source_path, download_consent, cancel_event)
                 if source_path is not None
@@ -88,14 +88,16 @@ class NativeSpeakerAssets:
             ),
             name="speaker:install",
         )
+        self._install_task = install_task
         try:
-            await asyncio.shield(self._install_task)
+            await asyncio.shield(install_task)
             return await self.inspect()
         except asyncio.CancelledError:
-            await self.cancel()
+            cancel_event.set()
+            await asyncio.shield(asyncio.gather(install_task, return_exceptions=True))
             raise
         finally:
-            if self._install_task.done():
+            if self._install_task is install_task and install_task.done():
                 self.phase = "idle"
 
     async def _install_local(

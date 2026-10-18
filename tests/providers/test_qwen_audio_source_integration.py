@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from uuid import uuid4
 
@@ -292,3 +293,110 @@ async def test_timing_policy_snapshots_actual_task_model_and_connection_region(
         await events.aclose()
     finally:
         await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("intervals", "policies"),
+    [
+        (((0, 500), (500, 1000), (1000, 1500)), ("timed", "timed", "timed")),
+        (((500, 1000), (0, 500), (1000, 1500)), ("timed", "unknown", "unknown")),
+        (((0, 1000), (500, 750), (1000, 1500)), ("timed", "unknown", "unknown")),
+        (((0, 500), (500, 500), (1000, 1500)), ("timed", "unknown", "unknown")),
+        (((0, 500), (500, None), (1000, 1500)), ("timed", "unknown", "unknown")),
+    ],
+    ids=["valid", "regressed-start", "regressed-end", "invalid-interval", "missing-end"],
+)
+async def test_task_clock_authority_latches_until_new_task_with_useful_recovery(
+    intervals, policies
+):
+    inner, factory = await open_session(
+        "peer", endpoint="wss://controlled.cn-beijing.maas.aliyuncs.com/api-ws/v1/inference"
+    )
+    wrapper = StreamingSpeakerSession(inner)
+    stream = wrapper.turn_events()
+
+    async def next_terminal():
+        while True:
+            event = await asyncio.wait_for(anext(stream), 1)
+            if isinstance(event, STTProviderTurnTerminal):
+                return event
+
+    try:
+        first = request("peer")
+        await wrapper.begin_turn(first)
+        await send(wrapper, first, count=24000)
+        await wrapper.observe_speaker_evidence(
+            tuple(
+                replace(
+                    item,
+                    source_map=tuple(
+                        replace(piece, capture=replace(piece.capture, capture_epoch=1))
+                        for piece in item.source_map
+                    ),
+                )
+                for item in (
+                    evidence(0, 8000, 0),
+                    evidence(8000, 16000, 1),
+                    evidence(16000, 32000, 0),
+                    evidence(32000, 40000, 1),
+                )
+            )
+        )
+        await seal(wrapper, first)
+        socket = factory.sockets[0]
+        for sentence_id, (begin, end) in enumerate(intervals, 1):
+            await socket.push(
+                native(
+                    socket.task_ids[0],
+                    sentence_id,
+                    f"Sentence{sentence_id}",
+                    begin_time=begin,
+                    end_time=end,
+                )
+            )
+        await socket.push(control(socket.task_ids[0], "task-finished"))
+        terminal = await next_terminal()
+        assert terminal.text == "Sentence1 Sentence2 Sentence3"
+        assert terminal.outcome == "final" and terminal.text_authority == "authoritative"
+        native_events = [item for item in terminal.provenance if item.transcription is not None]
+        assert tuple(item.capabilities.policy for item in native_events) == policies
+        assert [
+            (item.transcription.begin_time_ms, item.transcription.end_time_ms)
+            for item in native_events
+        ] == list(intervals)
+        assert [item.transcription.native_sentence_id for item in native_events] == ["1", "2", "3"]
+        validate_recognition_origins(terminal.recognition_origins, terminal.text)
+        if policies[-1] == "timed":
+            assert [run.speaker_id for run in terminal.final_speaker_runs] == ["0", "1", "0"]
+        else:
+            assert all(run.speaker_id is None for run in terminal.final_speaker_runs)
+        second = request("peer", order=2)
+        await wrapper.begin_turn(second)
+        await send(wrapper, second, start=24000, count=16000)
+        await seal(wrapper, second)
+        successor = factory.sockets[1]
+        for sentence_id, begin in ((1, 0), (2, 500)):
+            await successor.push(
+                native(
+                    successor.task_ids[0],
+                    sentence_id,
+                    f"Next{sentence_id}",
+                    begin_time=begin,
+                    end_time=begin + 500,
+                )
+            )
+        await successor.push(control(successor.task_ids[0], "task-finished"))
+        recovered = await next_terminal()
+        assert recovered.text == "Next1 Next2" and recovered.outcome == "final"
+        assert [
+            item.capabilities.policy
+            for item in recovered.provenance
+            if item.transcription is not None
+        ] == ["timed", "timed"]
+        assert [run.speaker_id for run in recovered.final_speaker_runs] == ["0", "1"]
+        assert inner.task_finished_count == 2
+    finally:
+        await wrapper.close()
+        await stream.aclose()
+    assert all(socket.closed for socket in factory.sockets)

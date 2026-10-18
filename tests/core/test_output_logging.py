@@ -268,7 +268,7 @@ async def test_peer_overlay_wait_is_file_only_and_terminal_application_remains_l
     service, live, log_file = output_logs
     started, release = asyncio.Event(), asyncio.Event()
 
-    class PacedSink:
+    class ProtectedSink:
         async def emit_peer_when_admissible(self, event, *, on_wait):
             on_wait("protected_rows")
             started.set()
@@ -282,37 +282,49 @@ async def test_peer_overlay_wait_is_file_only_and_terminal_application_remains_l
 
     output = OutputRuntime(
         chatbox=ChatboxPaginator(sender=FakeSender(), clock=FakeClock(), runtime_logging=service),
-        overlay_sink=PacedSink(),
+        overlay_sink=ProtectedSink(),
         routing_observer=service.record_output_routing_decision,
     )
     output.activate_peer_generation(1)
+    event = OverlayEventAdapter().utterance_closed(
+        utterance_id=uuid4(), channel="peer", is_final=True
+    )
+
+    def records_for_event(rendered):
+        records = [
+            dict(token.split("=", 1) for token in line.split() if "=" in token)
+            for line in rendered.splitlines()
+        ]
+        return [record for record in records if record.get("publication_id") == event.event_id]
+
     try:
         await output.publish_overlay_event(
-            OverlayEventAdapter().utterance_closed(
-                utterance_id=uuid4(), channel="peer", is_final=True
-            ),
+            event,
             publication_generation=1,
             source_order=0,
         )
         await asyncio.wait_for(started.wait(), timeout=1)
         assert live.getvalue() == ""
-        pending_file = log_file.read_text(encoding="utf-8")
-        assert len(pending_file.splitlines()) == 2
-        assert "admission_accepted" in pending_file
-        assert "logical_pacing" in pending_file
-        assert "decision=published" not in pending_file
+        pending_records = records_for_event(log_file.read_text(encoding="utf-8"))
+        assert pending_records
+        assert all(record.get("outcome") != "applied" for record in pending_records)
+        assert all(record.get("physical_ack") == "false" for record in pending_records)
 
         release.set()
         await output.wait_for_peer_output_idle()
-        assert [decision.reason for decision in output.routing_decisions] == [
-            "accepted_handoff",
-            "logical_pacing_wait",
-            "application_applied",
-        ]
-        assert len(live.getvalue().splitlines()) == 1
-        assert "application_applied" in live.getvalue()
-        assert "physical_ack=false" in live.getvalue()
-        assert len(log_file.read_text(encoding="utf-8").splitlines()) == 3
+        assert any(
+            decision.publication_id == event.event_id
+            and decision.metadata.get("outcome") == "applied"
+            for decision in output.routing_decisions
+        )
+        live_records = records_for_event(live.getvalue())
+        assert live_records
+        assert all(record.get("outcome") == "applied" for record in live_records)
+        assert all(record.get("physical_ack") == "false" for record in live_records)
+        assert any(
+            record.get("outcome") == "applied"
+            for record in records_for_event(log_file.read_text(encoding="utf-8"))
+        )
     finally:
         release.set()
         await output.close()

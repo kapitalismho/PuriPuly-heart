@@ -416,7 +416,7 @@ class CausalBatchSession:
 
     def _snapshot_native_terminal(self, event):
         child = self._slices.get(event.identity)
-        if self._closed or child is None or child.parent.cancelled or child.speaker is not None:
+        if child is None or child.parent.cancelled or child.speaker is not None:
             return
         child.speaker = (
             self._attribute(
@@ -438,8 +438,6 @@ class CausalBatchSession:
             async for event in self.inner.turn_events():
                 if isinstance(event, STTProviderTurnTerminal):
                     async with self._lock:
-                        if self._closed:
-                            continue
                         child = self._slices.pop(event.identity, None)
                         if child is not None:
                             if child.speaker is None:

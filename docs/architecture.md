@@ -273,7 +273,7 @@ Clock validity and source order are separate. Qwen's documented increasing numer
 
 Once the latest stable text is fully consumed, later audio/evidence does not repeat its attribution proof. Audio-boundary recording remains independent, and newly extended or partially pending source is still reevaluated; this avoids blocking capture on already immutable source.
 
-Streaming and causal-batch wrappers settle their own result consumer even when inner stop/close fails or is cancelled. Ingress stays fenced, but incomplete inner cleanup remains retryable; a wrapper's closed flag cannot turn unresolved provider resource debt into successful quarantine reclamation. Successful inner closure still drains already-owned terminal output before local settlement.
+Streaming and causal-batch wrappers settle their own result consumer even when inner stop/close fails or is cancelled. Ingress retirement and result settlement are distinct: healthy stop/close still accepts already-owned native callbacks and drains terminal output, while explicitly cancelled requests remain fenced. Incomplete inner cleanup stays retryable; a wrapper's closed flag cannot turn unresolved provider resource debt into successful quarantine reclamation.
 
 An uncertain transfer is an interval, not a fabricated exact acoustic split: the audio-boundary event preserves its start/end and the first established successor position separately. Within one lawful finalized text release, qualified complete lexical cuts separate supported distinct speakers. Confidence-only gray/identified changes stay in the same phrase; representative attribution may identify it, otherwise the coherent phrase stays gray. This adds no wait for another native result and does not merge actual A-B-A or unsupported clock/epoch ownership. Separators retain exact source coverage rather than being reconstructed.
 
@@ -311,7 +311,7 @@ Parakeet's Python wrapper and native core are version-matched at sherpa-onnx 1.1
 
 `SpeakerRuntime` owns Peer speaker evidence independently of the selected ASR. The initial adapter runs Nemotron-3-Diarization in an isolated private child process with resident model weights, explicit Vulkan device selection, and no CPU neural-inference fallback.
 
-`SpeakerApplicationOwner` depends on the asset protocol and a required runtime factory. Composition injects `NativeSpeakerAssets` and constructs the native-backed runtime; the service does not select or import concrete adapters. Installation retains its staging/lease obligation through cancellation independently of runtime activation.
+`SpeakerApplicationOwner` depends on the asset protocol and a required runtime factory. Composition injects `NativeSpeakerAssets` and constructs the native-backed runtime; the service does not select or import concrete adapters. Installation retains its staging/lease obligation through cancellation independently of runtime activation. Request-specific cancellation signals and joins that request's acquisition task, even if a successor starts during readiness inspection; only the current owner may reset installation phase. Explicit asset-wide cancel/close retains authority over the current installation.
 
 - Peer capture supplies each original normalized input range and the existing VAD observation once, before provider routing or ASR onset/continuation replay. Physical capture identity, ASR activation, and speaker epoch are distinct.
 - Ordinary VAD pauses preserve frontend, lookahead, FIFO and speaker-cache state. Pending speech tails use causally available real context and explicitly mapped synthetic padding, never a future speech island or terminal finish.
@@ -362,7 +362,7 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 - Freed speculative capacity resumes only the current open draft; sealed turns retain normal bounded admission.
 - Speculative context is not accepted history. Canonical source order is allocated at admission/seal, independently of draft-open order. All target contexts are prepared before one canonical source registration; logical cancellation does not release occupied provider capacity.
 - `SelfTurnPresentation` carries authoritative turn identity, revisions, and per-target status independently of overlay display state.
-- Finalized Transcript ingress carries the canonical `SourceChild` for translated, source-only and failure output before source closure. Sealed sources retain channel publication order; an obsolete draft cannot overwrite a newer manual presentation. Draft presentation does not invent a finalized source.
+- Finalized Self output binds the canonical `SourceChild` before source closure. Compatible readable success retains translated text, actual response-language metadata and parent display identity through translated-final projection; blank, source-only and failed results retain source-final ingress. Sealed sources retain channel publication order; an obsolete draft cannot overwrite a newer manual presentation. Draft presentation does not invent a finalized source.
 
 Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestrator/translation_turn.py`, `domain/events.py`. Behavior: `tests/core/test_self_stream_233.py`.
 

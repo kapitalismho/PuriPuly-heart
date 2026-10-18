@@ -328,7 +328,7 @@ For an already-downloaded supported artifact, use `speaker install --source C:\M
 
 `speaker status` reports configured intent separately from effective readiness and unavailable reasons. An absent model/runtime, unavailable Vulkan device, or inference failure does not switch to CPU diarization or native Soniox speaker decisions. Normal recognition and translation continue with gray unavailable attribution. Disabling the feature stops only its speaker resources.
 
-`speaker reset` starts a new speaker epoch without unnecessarily reloading weights. Ordinary VAD pauses, ASR request completion and server endpoints do not reset it. `speaker cancel` cancels the owned model installation; it does not cancel ASR work.
+`speaker reset` starts a new speaker epoch without unnecessarily reloading weights. Ordinary VAD pauses, ASR request completion and server endpoints do not reset it. `speaker cancel` cancels the current owned model installation; it does not cancel ASR work. To cancel one specific request, obtain its operation ID from `speaker install --no-wait` and use `operation cancel <operation-id>`. The terminal receipt follows settlement of that request's acquisition cleanup; cancelling an earlier request does not cancel a successor installation.
 
 ## Typed settings and provider changes
 
@@ -558,7 +558,7 @@ puripuly.exe operation wait <operation-id>
 puripuly.exe operation cancel <operation-id>
 ```
 
-- Active model installation and Gemma preparation are the cancellable long-running operations.
+- `models.install`, `speaker.install`, and `gemma.prepare` are the cancellable long-running operations.
 - Other operation types may report `cancellation: unsupported`. The CLI exits 4 and leaves a still-running operation marked nonterminal.
 - Cancellation is not a rollback. A settings commit or already-applied runtime change remains committed.
 - The operation receipt describes what has already completed.

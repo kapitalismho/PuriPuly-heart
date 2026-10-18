@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from puripuly_heart.app.adapters.nemotron.assets import NativeSpeakerAssets
 from puripuly_heart.app.ports.speaker_assets import SpeakerAssetSnapshot
 from puripuly_heart.app.services.speaker_application import SpeakerApplicationOwner
 from puripuly_heart.composition.headless_application import compose_headless_application
@@ -424,3 +425,80 @@ async def test_control_shutdown_waits_for_active_speaker_operation_cleanup(
             await asyncio.gather(drain, return_exceptions=True)
         await app.stop()
     assert assets.closed
+
+
+@pytest.mark.asyncio
+async def test_advertised_speaker_operation_cancel_waits_for_asset_cleanup(tmp_path, monkeypatch):
+    from puripuly_heart.composition import application_runtime
+
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    settled = asyncio.Event()
+
+    class GatedNativeAssets(NativeSpeakerAssets):
+        async def _install_download(self, cancel_event):
+            entered.set()
+            await asyncio.to_thread(cancel_event.wait)
+            cancelled.set()
+            await release_cleanup.wait()
+            settled.set()
+            raise asyncio.CancelledError
+
+    assets = GatedNativeAssets(
+        artifact_path=tmp_path / "speaker" / "model.gguf", runtime_dir=tmp_path / "runtime"
+    )
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-speaker-cancel")
+    monkeypatch.setattr(application_runtime, "NativeSpeakerAssets", lambda: assets)
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            osc=replace(settings.intent.osc, connection_mode="off"),
+            telemetry=replace(settings.intent.telemetry, enabled=False),
+            secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
+            speaker=SpeakerIntent(download_consent=True),
+        ),
+    )
+    config = tmp_path / "settings.json"
+    config.write_text(json.dumps(to_dict(settings)), encoding="utf-8")
+    app = compose_headless_application(config)
+    cancellation = None
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("speaker-operation-cancel")
+        assert control.capabilities()["commands"]["speaker.install"]["cancellable"]
+        accepted = await control.submit("speaker.install", {}, request_id="speaker-install")
+        await asyncio.wait_for(entered.wait(), 5)
+        cancellation = asyncio.create_task(control.cancel(accepted["operation_id"]))
+        await asyncio.wait_for(cancelled.wait(), 5)
+        assert not settled.is_set()
+        assert not cancellation.done()
+        assert not (await control.operation(accepted["operation_id"]))["terminal"]
+        release_cleanup.set()
+        receipt = await asyncio.wait_for(cancellation, 5)
+        assert settled.is_set()
+        assert receipt["status"] == "cancelled"
+        assert receipt["terminal"] is True
+        assert assets.phase == "idle"
+        assert await control.cancel(accepted["operation_id"]) == receipt
+        successor = await control.submit(
+            "speaker.configure",
+            {"profile": "0.64", "vulkan_device_id": "0"},
+            request_id="speaker-after-cancel",
+        )
+        assert (await control.wait(successor["operation_id"], timeout=5))["status"] == "applied"
+        observed = (await control.query("speaker.status", {}))["speaker"]
+        assert observed["state"] == "disabled"
+        assert observed["intent"]["profile"] == "0.64"
+        assert observed["runtime"] is None
+        persisted = from_dict(json.loads(config.read_text(encoding="utf-8")))
+        assert persisted.intent.speaker.profile == "0.64"
+        assert not persisted.intent.speaker.enabled
+    finally:
+        release_cleanup.set()
+        if cancellation is not None:
+            await asyncio.gather(cancellation, return_exceptions=True)
+        await app.stop()

@@ -931,6 +931,22 @@
   ],
   "non_public_module_classifications": [
     {
+      "surface": "independent Nemotron speaker backend and artifact adapter",
+      "classification": "internal_adapter_implementation_contract",
+      "modules": [
+        "puripuly_heart.app.adapters.nemotron"
+      ],
+      "rationale": "The native backend and artifact helpers implement the internal speaker runtime and asset ports through application composition. Their explicit exports support production wiring and focused tests, not an external Python compatibility facade; speaker settings and control operations retain their separate product contracts."
+    },
+    {
+      "surface": "backend-neutral speaker evidence contracts and runtime",
+      "classification": "internal_core_contract_modules",
+      "modules": [
+        "puripuly_heart.core.speaker"
+      ],
+      "rationale": "Speaker evidence DTOs, backend protocol and bounded runtime are internal contracts consumed by capture, recognition and the speaker application owner. Package exports do not establish an external Python compatibility facade or replace the separately tested settings, control and caption contracts."
+    },
+    {
       "surface": "translation backend and extension implementation modules",
       "classification": "internal_translation_contract",
       "module_prefixes": [

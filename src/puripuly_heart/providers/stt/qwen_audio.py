@@ -236,6 +236,9 @@ class _QwenTask:
     captures: list[_QwenTaskCapture] = field(default_factory=list)
     sentence_ids: set[int] = field(default_factory=set)
     last_sentence_id: int = 0
+    last_sentence_start_ms: int | float | None = None
+    last_sentence_end_ms: int | float | None = None
+    clock_qualified: bool = True
     metadata_bytes: int = 0
     text: str = ""
     origins: tuple[RecognitionTextOrigin, ...] = ()
@@ -728,6 +731,15 @@ class _QwenAudioSession(STTBackendSession):
             raise QwenAudioProtocolError("Qwen Audio final text is missing")
         begin = self._native_time(sentence.get("begin_time"))
         end = self._native_time(sentence.get("end_time"))
+        valid_interval = begin is not None and end is not None and 0 <= begin < end
+        clock_regression = valid_interval and (
+            (task.last_sentence_start_ms is not None and begin < task.last_sentence_start_ms)
+            or (task.last_sentence_end_ms is not None and end < task.last_sentence_end_ms)
+        )
+        if not valid_interval or clock_regression:
+            task.clock_qualified = False
+        if valid_interval:
+            task.last_sentence_start_ms, task.last_sentence_end_ms = begin, end
         words_value = sentence.get("words") or ()
         if (
             not isinstance(words_value, (tuple, list))
@@ -814,7 +826,11 @@ class _QwenAudioSession(STTBackendSession):
             native_task_id=task.task_id,
             barrier="sentence_end",
             transcription=native,
-            capabilities=task.capabilities,
+            capabilities=(
+                task.capabilities
+                if task.clock_qualified or task.capabilities is None
+                else replace(task.capabilities, policy="unknown")
+            ),
             text_timing=tuple(timings),
         )
         task.provenance.append(provenance)

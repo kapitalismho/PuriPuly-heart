@@ -2931,7 +2931,7 @@ class ApplicationControlOwner:
             owner = self.gemma()
             if owner is not None:
                 owner.cancel()
-        else:
+        elif not operation.task.get_name().startswith("control:speaker.install:"):
             return {**operation.receipt, "cancellation": "unsupported"}
         operation.task.cancel()
         await operation.task
