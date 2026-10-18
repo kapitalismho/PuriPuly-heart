@@ -45,6 +45,7 @@ class _SourceAssignment:
     first_readable: float | None = None
     settled: bool = False
     historical_identified: bool = False
+    presented: SpeakerAssignment | None = None
 
 
 class PeerSpeakerIdentityAllocator:
@@ -164,6 +165,13 @@ class PeerSpeakerIdentityAllocator:
             record.first_readable is not None
             and record.assignment.attribution.key is not None
             and (record.assignment.palette_index is not None or record.assignment.palette_overflow)
+            and record.presented is not None
+            and (
+                record.presented.attribution.key is None
+                or (
+                    record.presented.palette_index is None and not record.presented.palette_overflow
+                )
+            )
         ):
             delay = max(0.0, now - record.first_readable)
             self.resolution_delays.append(delay)
@@ -173,10 +181,12 @@ class PeerSpeakerIdentityAllocator:
         self._release(record)
         self.changed.set()
 
-    def refresh(self, *, now=None):
+    def refresh(self, *, now=None, applying_source_id=None):
         now = self.clock() if now is None else now
         blocked = False
-        for record in sorted(self._sources.values(), key=lambda item: item.assignment.scope_order):
+        for source_id, record in sorted(
+            self._sources.items(), key=lambda item: item[1].assignment.scope_order
+        ):
             if record.settled:
                 continue
             if (
@@ -193,6 +203,8 @@ class PeerSpeakerIdentityAllocator:
                 record.first_readable is not None
                 and now >= record.first_readable + self.LATE_WINDOW_S
             ):
+                if record.presented is not None:
+                    record.assignment = record.presented
                 self._settle(record, now=now)
                 continue
             if record.assignment.attribution.key is None and record.proofs:
@@ -224,6 +236,9 @@ class PeerSpeakerIdentityAllocator:
                 continue
             if blocked:
                 continue
+            if record.first_readable is not None and source_id != applying_source_id:
+                blocked = True
+                continue
             scope = (attribution.source, attribution.speaker_scope_id)
             if scope != self._scope:
                 self._scope = scope
@@ -250,13 +265,17 @@ class PeerSpeakerIdentityAllocator:
         return None if record is None else record.assignment
 
     def mark_readable(self, source, *, now):
+        self.refresh(now=now)
         record = self._sources.get(source.source_id)
         if record is not None and record.first_readable is None:
             record.first_readable = now
+            record.presented = record.assignment
             if not record.settled:
                 self.readable_unresolved += 1
                 self.changed.set()
-        self.refresh(now=now)
+        self.refresh(now=now, applying_source_id=source.source_id)
+        if record is not None:
+            record.presented = record.assignment
         return None if record is None else record.assignment
 
     def next_deadline(self):

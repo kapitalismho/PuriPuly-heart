@@ -252,6 +252,7 @@ class STTAudioBoundary:
     speaker_epoch: str | None = None
     transition_start_sample: int | None = None
     transition_end_sample: int | None = None
+    successor_onset_sample: int | None = None
 
     def __post_init__(self) -> None:
         if not self.boundary_id or self.capture_epoch < 0 or self.normalized_sample < 0:
@@ -264,6 +265,13 @@ class STTAudioBoundary:
             or self.normalized_sample != self.transition_end_sample
         ):
             raise ValueError("invalid audio transition interval")
+        if self.successor_onset_sample is not None and (
+            self.transition_start_sample is None
+            or not self.transition_start_sample
+            <= self.successor_onset_sample
+            <= self.transition_end_sample
+        ):
+            raise ValueError("invalid successor onset")
 
 
 @dataclass(frozen=True, slots=True)

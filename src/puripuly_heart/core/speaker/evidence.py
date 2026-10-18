@@ -8,6 +8,7 @@ from puripuly_heart.core.stt.backend import STTAudioBoundary
 from puripuly_heart.core.stt.speaker_attribution import (
     SpeakerFrame,
     attribute_speaker,
+    leading_slot,
     probability_state,
     unique_ranges,
 )
@@ -154,7 +155,14 @@ class SpeakerEvidenceView:
                 if (
                     piece.compact_start_sample < 0
                     or piece.compact_end_sample > item.processed_through_sample
-                    or piece.compact_end_sample - piece.compact_start_sample != end - start
+                    or (
+                        item.frame is None
+                        and (piece.compact_start_sample, piece.compact_end_sample) != (0, 0)
+                    )
+                    or (
+                        item.frame is not None
+                        and piece.compact_end_sample - piece.compact_start_sample != end - start
+                    )
                     or (
                         item.frame is not None
                         and (
@@ -184,6 +192,11 @@ class SpeakerEvidenceView:
                         item.frame is None or item.range_state == "closed",
                         *state,
                         probabilities=probabilities,
+                        native_frame=(
+                            None
+                            if item.frame is None
+                            else (item.frame.start_sample, item.frame.end_sample)
+                        ),
                     )
                 )
                 changed = True
@@ -214,55 +227,76 @@ class SpeakerEvidenceView:
         return attribute_speaker(ranges, self.frames, self.immutable)
 
     def transitions(self):
-        previous = candidate = None
+        previous = candidate = onset = None
         confirmations = 0
-        last_capture = last_end = None
+        last_capture = last_end = last_epoch = last_native = None
         for frame in self.stable_frames():
             if (
                 last_capture != frame.span.capture_epoch
+                or last_epoch != frame.epoch
                 or last_end != frame.span.normalized_start_sample
                 or frame.span.discontinuity_before is not None
             ):
-                previous = candidate = None
+                previous = candidate = onset = None
                 confirmations = 0
-            last_capture, last_end = frame.span.capture_epoch, frame.span.normalized_end_sample
+                last_native = None
+            last_capture, last_end, last_epoch = (
+                frame.span.capture_epoch,
+                frame.span.normalized_end_sample,
+                frame.epoch,
+            )
             if frame.competing or len(frame.slots) > 1:
-                previous = candidate = None
+                previous = candidate = onset = None
                 confirmations = 0
+                last_native = None
                 continue
+            leader = leading_slot(frame)
+            if previous is not None and leader is not None and (leader,) != previous.slots:
+                if onset is None or leading_slot(onset) != leader:
+                    onset = frame
+            else:
+                onset = None
             if not frame.clear:
                 candidate = None
                 confirmations = 0
+                last_native = None
                 continue
-            if previous is None or frame.slots == previous.slots:
+            if previous is not None and frame.slots == previous.slots:
                 previous = frame
-                candidate = None
+                candidate = onset = None
                 confirmations = 0
+                last_native = None
                 continue
             if candidate is None or frame.slots != candidate.slots:
                 candidate = frame
                 confirmations = 1
+                last_native = frame.native_frame
                 continue
-            confirmations += 1
+            if frame.native_frame != last_native:
+                confirmations += 1
+                last_native = frame.native_frame
             if confirmations < self.CONFIRM_FRAMES:
                 continue
-            yield (
-                STTAudioBoundary(
-                    f"nemotron:{candidate.epoch}:{candidate.span.capture_epoch}:{candidate.span.normalized_start_sample}",
-                    candidate.span.capture_epoch,
-                    candidate.span.normalized_start_sample,
-                    frame.ready_at,
-                    "speaker",
-                    str(candidate.epoch),
-                    transition_start_sample=previous.span.normalized_end_sample,
-                    transition_end_sample=candidate.span.normalized_start_sample,
-                ),
-                previous,
-                candidate,
-            )
+            if previous is not None:
+                yield (
+                    STTAudioBoundary(
+                        f"nemotron:{candidate.epoch}:{candidate.span.capture_epoch}:{candidate.span.normalized_start_sample}",
+                        candidate.span.capture_epoch,
+                        candidate.span.normalized_start_sample,
+                        frame.ready_at,
+                        "speaker",
+                        str(candidate.epoch),
+                        transition_start_sample=previous.span.normalized_end_sample,
+                        transition_end_sample=candidate.span.normalized_start_sample,
+                        successor_onset_sample=onset.span.normalized_start_sample,
+                    ),
+                    previous,
+                    candidate,
+                )
             previous = frame
-            candidate = None
+            candidate = onset = None
             confirmations = 0
+            last_native = None
 
     def boundaries(self):
         return (boundary for boundary, _, _ in self.transitions())

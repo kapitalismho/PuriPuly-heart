@@ -1,0 +1,303 @@
+{
+  "issue": 264,
+  "reviewer": "speaker-264-product-review",
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "reviewed_candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+  "record_kind": "Original independent review and same-review addenda, before repair verification; not acceptance of a later candidate",
+  "records": [
+    {
+      "RESULT": "findings",
+      "DOMAIN": "FULL_REVIEW — fresh independent PRODUCT checkpoint: all assigned src/, native/overlay/, tests/, and maintained architecture/plan/README interactions",
+      "range": {
+        "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+        "candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+        "scope_control": "Initial assessment used requirements, pinned diff, callers and tests before implementation narratives. After the repair interjection, investigation remained on 8c01 Git objects and the original 8c01 trace; no moving repair was reviewed."
+      },
+      "summary": "Assigned review coverage is complete. Five material findings remain, including a directly evidenced cause of the two actual 10 ms submissions. Deterministic successes do not establish Goal completion; the actual frozen-candidate run failed, and later acoustic/GUI qualification and repaired-candidate review remain separate obligations.",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "P1",
+          "title": "Backdating a cut commits the same confirmed transition twice and submits a 10 ms successor fragment",
+          "violated_contract": "#264 R2 and #211 R1/R8: one-time boundary commit, preserve successor onset, and no burst of stale cuts. Useful early progress must not create unnecessary destructive recognition requests.",
+          "exact_location": [
+            "src/puripuly_heart/core/stt/batch_speaker.py:159-186, especially 165-178 and recursive call at 185"
+          ],
+          "reachable_path": "For one confirmed A→B transition, an earlier B-active but not-yet-clear frame permits backtracking the actuation coordinate before boundary.normalized_sample. _submit advances submitted_cursor only to that earlier coordinate. Recursive _cut_available sees the same transition's later nominal coordinate as still unsubmitted; backtracking now reaches start/cursor, so the fallback selects the nominal coordinate and submits the intervening fragment as another speaker cut. There is no committed transition identity fencing this second actuation.",
+          "decisive_original_evidence": [
+            "Executed the frozen attribution/evidence/batch Git objects with one transition ID nemotron:11:7:1760: A clear through 1600; B-active probability 0.7 over 1600–1760; two distinct clear B frames thereafter. Before natural seal, the single transition submitted [0,1600] and [1600,1760]. Natural completion then submitted [1760,2400]. Probe exited 0; inner native execution was controlled, with no inference.",
+            "Original actual trace build/issue264-validation-first-04/trace.json pins 8c01. At 138463.6091985 the first request ends at 49728; at 138463.6098947 another speaker request submits precisely [49728,49888], 160 samples. Evidence shows B-active probability 0.7632228 over 49728–49888, followed by clear B over 49888–50048 and 50048–50208. Both batch log entries use the same evidence-ready time 138463.5509268.",
+            "The second actual transfer repeats the mechanism: cut at 75968, then a separate [75968,76128] 160-sample request. The earlier frame has returning-A probability 0.7360674, followed by clear A frames.",
+            "These two actual 0.01-second requests report decode_failure, restart_only recovery, and failed GpuASRDecodeDropped native results. This connects the failure to the observed duplicate-actuation path rather than inferring a cause from request counts."
+          ],
+          "defenses_and_limits": [
+            "The first earlier cut is supported onset preservation, not itself the defect; the second application of the same transition is the defect.",
+            "Normal two-distinct-frame positive progress remains necessary. A universal minimum duration, dropping short corrections, suppressing every early boundary, or padding every short request would not repair this ownership error.",
+            "No GPU failure was rerun. The original actual run supplies native failure evidence; my new reproduction isolates the frozen selector mechanism."
+          ]
+        },
+        {
+          "id": "F2",
+          "severity": "P2",
+          "title": "Two mapping pieces of one native probability frame are counted as temporal corroboration",
+          "violated_contract": "#264 R2: confirmation requires distinct temporal evidence; duplicating the same model observation must not create confirmation. Architecture currently promises two distinct clear successor frames.",
+          "exact_location": [
+            "src/puripuly_heart/core/speaker/evidence.py:147-187 and 216-248",
+            "Unchanged producer: src/puripuly_heart/core/speaker/runtime.py:539-555 and 585-587"
+          ],
+          "reachable_path": "SpeakerRuntime._mapped preserves capture-block boundaries, so one native 160-sample frame can map to two contiguous source-map pieces. observe creates a separate SpeakerFrame for each piece without retaining their common native-frame identity. transitions increments confirmations for both pieces, qualifying a lone successor impulse.",
+          "decisive_original_evidence": [
+            "Original isolated probe: predecessor A [0,160]; one native B ProbabilityFrame [160,320] mapped as [160,240] plus [240,320]. The accepted view contained three pieces and emitted boundary 160. The same native B frame with one mapping piece emitted no boundary.",
+            "A controlled production CausalBatchSession/LocalQwen adapter probe then showed the split single frame actually causes submission of a 160-sample prefix before natural completion; decoded PCM partition was [160,320]. A separate legitimate two-distinct-successor-frame control also progressed.",
+            "The actual original trace independently demonstrates real native frames crossing capture-piece boundaries, for example native frame 48320–48480 maps to capture 50048–50176 and 50176–50208. Thus multi-piece native frames are not an invented input shape."
+          ],
+          "defenses_and_limits": [
+            "Existing duplicate-delivery tests correctly reject repeated identical evidence, but do not cover two source pieces belonging to one native observation.",
+            "The actual two 10 ms decode failures are explained by F1; I do not claim F2 caused those particular failures.",
+            "No acoustic incidence or false-boundary rate is claimed. This is a deterministic confirmation-policy violation."
+          ]
+        },
+        {
+          "id": "F3",
+          "severity": "P2",
+          "title": "Late palette-overflow assignments never reach the readable card",
+          "violated_contract": "#264 R3 and preserved #211 R5: fifth-and-later keys remain established and distinct even though gray; preserve overflow-divider eligibility and returning-speaker append behavior without moving an already readable card.",
+          "exact_location": [
+            "src/puripuly_heart/core/overlay/presenter.py:1185-1195, specifically palette_index-only eligibility at 1190",
+            "Affected consumers: presenter.py:529-537 and 1283-1298"
+          ],
+          "reachable_path": "After four keys consume the palette, a fifth source first reads unresolved gray. The allocator later settles its correct key with palette_overflow=True and palette_index=None. The presenter requires a non-None palette index to copy the late assignment, so the card retains its unresolved attribution and gray reason instead of its established overflow identity.",
+          "decisive_original_evidence": [
+            "Original six-source controlled presenter probe exited 0. Sources 1–4 established the palette before display. Sources 5 and 6 were displayed unresolved and then received eligible proof at +0.1 seconds.",
+            "For source 5, authority key was 4 and authority_overflow was true, while entry_key remained null and gray_reason remained unavailable. Source 6 similarly had authority key 5 but entry_key null.",
+            "The final visible pair contained translation 5 and translation 6, both gray, with speaker_divider=false despite distinct established same-epoch overflow keys."
+          ],
+          "defenses_and_limits": [
+            "Remaining gray is correct; allocating a fifth color would be wrong. The defect is losing the established identity/overflow disposition at the card.",
+            "The same stale card attribution also prevents _compatible_source_card from recognizing a later known returning occurrence; this consequence follows statically from its key comparison.",
+            "Text remained readable and unchanged. No actual renderer launch was needed to establish the incorrect authoritative snapshot state."
+          ]
+        },
+        {
+          "id": "F4",
+          "severity": "P2",
+          "title": "The shared view rejects every intentionally omitted-silence record emitted by the existing producer",
+          "violated_contract": "#264 R1/R2 and preserved #211 R6: distinguish positively eligible omitted quiet from missing/unprocessed speech; conservative missing-coverage behavior must not discard valid quiet provenance and unnecessarily prevent supported attribution.",
+          "exact_location": [
+            "src/puripuly_heart/core/speaker/evidence.py:135-157",
+            "Unchanged producer: src/puripuly_heart/core/speaker/runtime.py:390-395 and 440-442"
+          ],
+          "reachable_path": "The omitted_silence branch selects unobserved source pieces, but then applies the original-audio compact-length equality requirement. SpeakerRuntime._unobserved intentionally encodes omitted capture silence with compact coordinates (0,0), since it was not submitted to the compact diarizer stream. Every nonempty omitted capture range therefore fails line 157. A lawful source footprint intersecting such quiet remains permanently unavailable, and transitions cannot bridge that explicitly accounted quiet.",
+          "decisive_original_evidence": [
+            "Original pure producer/consumer probe used SpeakerRuntime._retain_onset and its normal 8000-sample onset ring, without starting a backend. Ring pressure emitted one omitted_silence record for capture [16000,17600] with compact [0,0].",
+            "SpeakerEvidenceView accepted zero new pieces from that real producer record. With clear A over [0,16000], attribution of [0,16000] was identified, but attribution of [0,17600] remained unavailable.",
+            "This is reachable when a retained ASR source includes trailing quiet beyond the speaker work horizon, such as a configured VAD/delivery hangover longer than the diarizer's retained tail/ring interval. VAD emits SpeechChunk during active trailing silence (gating.py:317-323), and the capture ledger appends those ranges (ownership.py:317-320)."
+          ],
+          "defenses_and_limits": [
+            "Do not relax coverage checks for missing speech or fabricate silence. The existing producer's explicit omitted_silence provenance is the positive eligibility distinction.",
+            "This probe controlled speech probabilities and exercised the production omission producer; it did not perform acoustic qualification.",
+            "The initial omitted ranges visible in the recorded ABA trace precede that request's supplied context start. I do not attribute that run's A/B gray result to this finding."
+          ]
+        },
+        {
+          "id": "F5",
+          "severity": "P2",
+          "title": "A settled-but-not-yet-applied assignment can color a card after its one-second presentation deadline",
+          "violated_contract": "#264 R3: the bounded exception is an update within first-readable +1.000 seconds, and the unresolved card must remain gray after that deadline. Evidence settlement and logical snapshot application are separate decisions.",
+          "exact_location": [
+            "src/puripuly_heart/core/speaker_identity.py:157-174, 179-195 and 242-259",
+            "src/puripuly_heart/core/overlay/presenter.py:172-185 and 1181-1195"
+          ],
+          "reachable_path": "assignment_for/refresh can settle a source before the watcher applies its snapshot. Subsequent refresh skips settled records before checking the deadline, next_deadline no longer includes that record, and the presenter accepts its revision without checking whether the still-gray card's application window has expired. Peer output preparation invokes assignment_for outside the presenter watcher (peer_translation_channel.py:1016).",
+          "decisive_original_evidence": [
+            "Original controlled monotonic-schedule probe: first logical readable gray snapshot at 10.0; eligible proof and assignment_for settlement at 10.9; defer watcher application behind the ownership lock until 11.1. The same card changed gray→gold at logical clock 11.1. The authority retained resolution_delays=[0.9]. Probe exited 0.",
+            "The ordinary expiry test covers evidence first processed after the cap, not an assignment already settled before the cap but applied later."
+          ],
+          "defenses_and_limits": [
+            "The probe deliberately controlled scheduling/lock availability; it is not a measurement of real GUI or wall-clock frequency.",
+            "[INFERENCE] In production this requires watcher scheduling delay across the remaining window. The default bridge replace_snapshot currently performs synchronous mailbox admission rather than a network wait, so I did not establish a normal long bridge-held-lock occurrence.",
+            "The source-level missing application guard is conclusive under that schedule. This finding does not concern physical photons or transport latency after an already-applied logical snapshot, and does not justify adding a translation/display hold."
+          ]
+        }
+      ],
+      "COVERAGE": [
+        {
+          "item": "Authoritative requirements, scoped parent amendment, accepted Parakeet omissions and no broader closure/profile selection",
+          "status": "inspected",
+          "basis": "Read https://github.com/kapitalismho/PuriPuly-heart/issues/264 and https://github.com/kapitalismho/PuriPuly-heart/issues/211 directly, repository instructions, current-plan authority header, and pinned diff. Both profiles remain unselected; no Parakeet runtime/provider or Gemini adapter product delta."
+        },
+        {
+          "item": "All src/ changes and unchanged reachable owners/callers",
+          "status": "inspected",
+          "basis": "Reviewed the full product delta and source/runtime/factory/engine/translation/output/presenter composition, including contribution consumption, origin projection and existing renderer consumers."
+        },
+        {
+          "item": "Shared accepted view, source/handoff/generation/claim bounds, synchronous native-final snapshot and ordinary ASR close",
+          "status": "inspected; supported_by_prior_evidence",
+          "basis": "Reviewed evidence stages, pins/range/frame bounds, factory injection, synchronous runtime acceptance, batch terminal hook, engine publication/rejection paths, contribution origins and source adoption. Existing focused tests cover frozen historical snapshots, capture/reset fences and transferred proof surviving ordinary shared-view ASR retirement. F2/F4 identify view-policy gaps."
+        },
+        {
+          "item": "Slot-relative uncertainty, competing speech, replay/onset, missing coverage, common confirmed transitions and one-time commit",
+          "status": "inspected; original counterexamples executed",
+          "basis": "Reviewed classifier and all three transition consumers. Foreign-leaning uncertainty cannot spend candidate-relative ambiguity allowance; genuine onset remains unique support; missing suffix is unavailable. Positive temporal progression and rejection were observed. F1/F2 violate commit/corroboration; F4 loses eligible quiet."
+        },
+        {
+          "item": "Batch retained PCM, submitted cursor, natural/safety completion and short B protection",
+          "status": "inspected; original counterexample executed; actual failure reused",
+          "basis": "Reviewed partition/submission/release/cancellation/pressure lifecycles and migrated tests. Frozen Git-object probe isolates duplicate commit; original GPU trace proves its two 160-sample actuation/failure chains. Existing natural/safety and short-No assertions remain, but do not prevent this case."
+        },
+        {
+          "item": "Streaming finalized timing, lexical composition, phrase preservation and terminal tails",
+          "status": "inspected; supported_by_prior_evidence",
+          "basis": "Reviewed complete mapping/composition/release lifecycle, shared transitions, qualified clocks, lexical cuts, native inputs, source endpoints and conservative unsupported paths. Inspected changed recorded-trace readiness and confidence fixtures; original text/accounting assertions remain. No new untimed split or Gemini fallback was introduced."
+        },
+        {
+          "item": "Canonical source order, attempt aliases, targets, output disposition and producer/output lifetime separation",
+          "status": "inspected; supported_by_prior_evidence",
+          "basis": "Reviewed allocator, admission of all children before settlement, output callbacks, rejection/cancellation and retirement. Existing reversed-order, multiple-attempt and protected-output tests protect text progress and source-order palette allocation. Bounds remain explicit."
+        },
+        {
+          "item": "First-readable clock, predisplay resolution, watcher/races, hidden reveal and protected rows",
+          "status": "inspected; original schedule probe executed",
+          "basis": "Reviewed selection/rendered-entry boundary, unreadable-source preparation, watcher/deadline loop and output waits. Hidden/protected cases start at logical selection rather than queue admission; F5 covers the settled-before-cap/applied-after-cap gap."
+        },
+        {
+          "item": "Source-only, failed translation, reset/cancel/expiry/eviction and ordinary ASR retirement",
+          "status": "inspected; supported_by_prior_evidence",
+          "basis": "Reviewed actual Peer projection tests and lifecycle consumers, including no-destination/rejected output and source removal. Existing tests cover immediate readable gray, failure/source-only late update, deadline rejection, owner close and cancellation. No independent new inference launch was performed."
+        },
+        {
+          "item": "A-B-A append versus late card-in-place; text/card/order/TTL/context/destination invariants",
+          "status": "inspected; supported_by_prior_evidence; original overflow probe executed",
+          "basis": "Reviewed compatible-card selection, unreadable migration, immutable readable placement, revision/TTL paths and source-unit histories. Metadata updates do not renew TTL or resend accumulated text. F3 loses overflow identity and associated divider/return compatibility."
+        },
+        {
+          "item": "SELF protection, palette overflow, gray divider and old-epoch handoff",
+          "status": "inspected",
+          "basis": "Late-update loop is Peer-only; SELF remains white/protected. Handoff and mixed reasons are excluded from recoloring. Palette indices and nonrecycling are retained, but overflow late propagation is broken as F3 shows."
+        },
+        {
+          "item": "Strict capability v3 migration across Python/Desktop/Rust with wire 16 unchanged",
+          "status": "inspected; supported_by_prior_evidence",
+          "basis": "Reviewed manifest constant, exact auth/readiness/raw-ingress consumers, Desktop imported producer declarations, all three Rust declarations, explicit v2/wrong-policy/extension negatives and literal public compatibility snapshot. Reused compiled pure auth/ready and startup-contract evidence; no native/VR launch repeated."
+        },
+        {
+          "item": "All assigned tests and fixture changes, including weakened-guarantee review",
+          "status": "inspected",
+          "basis": "Reviewed all tests/ delta plus native test delta. Temporal fixture expansion and paired pressure frames reflect the new confirmation policy rather than dropping original PCM/text/order assertions; foreign-relative positive fixture correction has explicit negative cases. Hidden-layout expectations retain both compatible and incompatible cases. Missing protections are identified in F1–F5; broad passing counts do not close them."
+        },
+        {
+          "item": "Architecture, native README and current-plan authority fidelity",
+          "status": "inspected",
+          "basis": "Capability, no-wait policy, historical own-final snapshot, shared claim lifetime, source immutability, in-place late styling, empirical defaults and unresolved Goal/profile obligations are documented. F1/F2/F4 expose implementation departures from the stated architecture, not authority to change the requirements."
+        },
+        {
+          "item": "native/nemotron task-local experimental drivers/reports and .gitignore",
+          "status": "not_applicable to allocated independent review",
+          "basis": "Did not duplicate the other fresh reviewer's driver/report audit. Read the assigned shared execution record after initial assessment and the newly supplied original failure trace only for product causality."
+        },
+        {
+          "item": "Actual acoustic/Flet Goal qualification and complete R4 experiment audit",
+          "status": "unverified by this reviewer; separately owned",
+          "basis": "No GPU/Flet/cloud/VR runs. The new original actual 8c01 run is failed, not completion proof. Separate evidence review and repaired-candidate qualification remain required; no #211/#218 closure or profile selection is supported."
+        }
+      ],
+      "verification": {
+        "original_checks_executed": [
+          {
+            "check": "Mapping-fragment temporal confirmation probe",
+            "outcome": "Observed lone native frame incorrectly confirmed only when split into two capture-map pieces; unsplit negative control rejected it."
+          },
+          {
+            "check": "Controlled Qwen adapter/batch actuation and valid temporal progress",
+            "outcome": "Exit 0. Both false split-frame case and legitimate two-distinct-frame control reached actual production-class PCM submission; no model inference."
+          },
+          {
+            "check": "Six-source late overflow presenter probe",
+            "outcome": "Exit 0. Authority established overflow keys 4/5; readable entries retained null keys/unavailable gray and no divider."
+          },
+          {
+            "check": "Controlled late-application schedule",
+            "outcome": "Exit 0. First readable 10.0, authority settlement 10.9, logical gray→gold application 11.1."
+          },
+          {
+            "check": "Production omitted-silence producer/view probe",
+            "outcome": "Exit 0. Valid compact-[0,0] omitted record was rejected; clear-plus-quiet footprint remained unavailable."
+          },
+          {
+            "check": "Frozen Git-object one-transition actuation probe",
+            "outcome": "Exit 0. One confirmed transition yielded two speaker submissions, including a 160-sample fragment, before natural tail."
+          },
+          {
+            "check": "Original driver failure retained",
+            "outcome": "The initial combined temporal/overflow driver exited 1 after producing the temporal observations because my reporting expression used SpeakerKey.speaker_id instead of local_speaker_id. Only the failed overflow step was corrected and rerun; this was an observation-driver error, not a product failure."
+          }
+        ],
+        "prior_evidence_reused": [
+          "native/nemotron/issue264_shared_evidence.json: final combined 1181 passed, 2 unchanged INTEGRATION skips, 252 retained warnings. Did not rerun this broad command.",
+          "Same record: native cargo check using short isolated target succeeded; pure Rust auth/ready test and check-startup-contract test each executed/passed, and the compiled --check-startup-contract report declared v3/wire16.",
+          "Retained native whole-file rustfmt failure is documented as pre-existing unrelated formatting; it was not rerun or restyled.",
+          "Existing shared production-class smoke controls diarizer probabilities, native recognizer, translator and logical transport. It supports composition only, not acoustic or GUI acceptance."
+        ],
+        "new_actual_failure_reused": {
+          "reference": "build/issue264-validation-first-04/trace.json",
+          "candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+          "outcome": "Failed actual full-1.04 ABA path: six native requests, two 10 ms decode failures/restart-only recoveries, four translations; first A/B gray, returning prefix gold, tail gray; three readable unresolved sources and zero late assignments.",
+          "causality": "F1 is supported by original coordinates/probabilities, matching duplicate speaker-cut logs and the native failure identities. Gray attribution causes are not inferred from counts and remain distinct.",
+          "legitimate_progress": "The first A native final contains 'He washed the detritus from his hair.' Its translated readable snapshot was submitted at 138465.1144908 and software commit observed at 138465.138012, before enclosing safety seal 138466.0770401. This is useful early text/translation progress despite the failed overall run, not a successful speaker/Goal result."
+        },
+        "not_run": "No GPU, Flet GUI, cloud, private audio, VR, whole-repository sweep, known-failure reconfirmation, formatter or type-checker run by this reviewer."
+      },
+      "changes": "None. Read-only review; no Git mutations or product/test/docs edits.",
+      "handoff": {
+        "director_decisions": "Adjudicate F1–F5 against frozen 8c01 and allocate repairs. F1 overlaps the newly assigned actual-failure root-cause work; it should not be counted as an independently resolved issue merely because repair is in progress.",
+        "recommended_bounded_checks": [
+          "One confirmed transition with active-but-unclear successor onset must actuate once; preserve that onset and valid short B/natural/safety progress.",
+          "A native frame split across multiple source-map pieces must remain one corroborating observation; two distinct native frames in one update must still qualify.",
+          "Late fifth/sixth key settlement must update identity/overflow reason in place, enable the lawful divider, preserve TTL/text and support a subsequent known return without migrating the already-readable card.",
+          "Consume actual producer-form omitted_silence while continuing to reject missing speech, malformed mapping and unprocessed coverage.",
+          "Expire unapplied late assignments at the actual logical application boundary; include a settled-before-cap but scheduled-after-cap case without adding a text wait."
+        ],
+        "remaining_goal_obligations": "Review the later repair delta under bounded REPAIR_VERIFY, then coordinate actual changed-path GPU/translation/Flet observations at the new pin. Preserve this failed actual run and all skips/format failures. Code inspection and this review are not final Goal acceptance."
+      }
+    },
+    {
+      "RESULT": "findings",
+      "DOMAIN": "Same FULL_REVIEW continuation — frozen cc75792e9704e8609f38a3aa0794c03a1c7e3416..8c01ad689aa8d48c0b5c73dd739f2944c12f5589 PRODUCT checkpoint",
+      "prior_result": "The complete coverage inventory and F1–F5 remain as submitted. This supplement independently checks the new causality leads against the original trace and frozen Git objects; it does not review the moving repair or replace the Director's adjudication.",
+      "independent_causality_check": {
+        "duplicate_actuation": {
+          "status": "supported",
+          "basis": "F1 already independently reproduced one confirmed transition producing two submissions in frozen code. Original trace evidence supports nominal transition 49888 backdated to 49728, then cursor-only recursion submitting 49728–49888; the returning transition similarly submits 75968–76128. The actual failures belong to those two 160-sample requests."
+        },
+        "first_A_gray": {
+          "status": "supported by an immutable foreign-edge witness, not inferred from counts",
+          "proof": "Trace own_native_final_attribution for native request 94a6391519ed4602859796583e2027ec records uncertain attribution, source bounds [9728,49728], context [1728,9728], generation 0.",
+          "witness": "Original native frame [47840,48000] maps to capture [49568,49664] and [49664,49728]. It is closed, with immutable frontier 57600; B=0.35061579942703247 and A=0.001764365821145475. Both pieces are inside the admitted source footprint, not replay.",
+          "frozen_code_consequence": "speaker_attribution.py:143-147 marks this foreign_uncertainty because the foreign peak is at least COMPETING_PROBABILITY=0.35 and exceeds candidate A. Lines 177-179 then retain uncertain attribution. In contrast, probability_state at lines 35-37 requires at least 0.5 for a slot; batch backtracking at batch_speaker.py:169-174 requires slots equal the successor's slots, so this earlier foreign-leaning frame is left with A."
+        },
+        "B_gray": {
+          "status": "supported by an immutable foreign-edge witness, not inferred from counts",
+          "proof": "Trace own_native_final_attribution for native request 256f793dcdaa40e5918f3eae6c931ef3 records uncertain attribution, source [49888,75968], no context, generation 0.",
+          "witness": "Original native frame [74080,74240] maps to capture [75808,75968]. It is closed, with immutable frontier 80640; A=0.4388357996940613 and B=0.000038317488360917196. The complete witness is inside B's source footprint.",
+          "frozen_code_consequence": "The same foreign_uncertainty branch rejects whole-B identification, while the 0.5 active-slot requirement prevents onset backtracking from including this earlier returning-A-leaning interval."
+        },
+        "why_more_time_does_not_repair_these_two_sources": {
+          "status": "supported static consequence",
+          "basis": "These are fixed proof footprints containing accepted closed evidence. SpeakerEvidenceView.observe rejects replacement of closed/immutable overlaps at evidence.py:174-175. Later evidence outside those footprints cannot remove their foreign_uncertainty witness; the late presentation opportunity cannot manufacture a pure assignment.",
+          "repair_limit": "[INFERENCE] A watermark-only repair that removes duplicate actuation but leaves these cut coordinates and attribution semantics unchanged would close the two micro-request failures without, by itself, resolving these A/B gray proofs. This is not an execution or verdict on the replacement owner's forthcoming repair."
+        },
+        "omitted_silence": {
+          "status": "distinct from the actual A/B gray cause",
+          "basis": "The original producer's compact-[0,0] omitted_silence mapping rejection remains F4. The initial omitted capture [0,192] is outside the actual first request's supplied footprint, which starts at context sample 1728. It is not evidence explaining that request's gray result."
+        }
+      },
+      "coverage_status": "All assigned frozen-candidate product/test/native/documentation coverage was completed in the preceding terminal result; this supplement closes the newly supplied causality clarification. No GPU, GUI, cloud, repair execution, or known-failure rerun was performed.",
+      "ownership_and_handoff": {
+        "repair_owner": "speaker-264-boundary-repair is the sole replacement repair owner per the new instruction; no repair was applied or directed through the old read-only owner.",
+        "needed_review_boundary": "The later delta needs bounded REPAIR_VERIFY for one-time transition actuation and coherent candidate-onset/source-footprint handling, including valid early progress, short corrections, conservative rejection and immutable historical snapshots. F2–F5 remain separately adjudicable findings.",
+        "authority_limit": "The observed 0.35/0.5 mismatch is causal evidence, not approval of a new optimal acoustic threshold, a duration floor, fake coloring, or a narrower Goal. Final acceptance remains with the assigned owners."
+      }
+    }
+  ]
+}

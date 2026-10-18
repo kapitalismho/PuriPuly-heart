@@ -41,6 +41,7 @@ class _Parent:
     audio: tuple = ()
     failures: list[str] = field(default_factory=list)
     submitted_cursor: int = -1
+    committed_transition_sample: int = -1
     optional_cuts_disabled: bool = False
 
 
@@ -156,26 +157,20 @@ class CausalBatchSession:
         epoch = content[0].capture_epoch
         if start is None or end is None:
             return
-        for boundary, _, successor in self.evidence.transitions():
+        for boundary, _, _ in self.evidence.transitions():
+            first_clear = boundary.normalized_sample
+            cut = (
+                boundary.successor_onset_sample
+                if boundary.successor_onset_sample is not None
+                else first_clear
+            )
             if (
                 boundary.capture_epoch == epoch
-                and start < boundary.normalized_sample < end
-                and boundary.normalized_sample > parent.submitted_cursor
+                and start < cut < end
+                and cut > parent.submitted_cursor
+                and first_clear > parent.committed_transition_sample
             ):
-                cut = boundary.normalized_sample
-                for frame in reversed(self.evidence.frames):
-                    if frame.span.capture_epoch != epoch or frame.span.normalized_end_sample > cut:
-                        continue
-                    if (
-                        frame.span.normalized_end_sample != cut
-                        or not (frame.closed or frame.compact_end <= self.evidence.immutable)
-                        or frame.competing
-                        or frame.slots != successor.slots
-                    ):
-                        break
-                    cut = frame.span.normalized_start_sample
-                if cut <= start or cut <= parent.submitted_cursor:
-                    cut = boundary.normalized_sample
+                parent.committed_transition_sample = first_clear
                 await self._submit(
                     parent,
                     cut,

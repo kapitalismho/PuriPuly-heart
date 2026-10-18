@@ -218,6 +218,9 @@ def test_reversed_proof_order_defers_only_color_and_settles_in_source_order():
     allocator.mark_readable(second, now=10)
     clock.advance(0.4)
     view.observe(frames(0, 1600, 0))
+    assert allocator.assignment_for(a.utterance_id).palette_index is None
+    allocator.mark_readable(first, now=clock.now())
+    allocator.mark_readable(second, now=clock.now())
     assert allocator.assignment_for(a.utterance_id).palette_index == 0
     assert allocator.assignment_for(b.utterance_id).palette_index == 1
     replay = replace(b, utterance_id=uuid4())
@@ -376,6 +379,8 @@ def test_source_order_deadline_unblocks_later_color_without_losing_text_obligati
     allocator.refresh()
     assert not view.has_proof(first_token)
     assert allocator.resolve_source(first, now=11).palette_index is None
+    assert allocator.assignment_for(b.utterance_id).palette_index is None
+    allocator.mark_readable(second, now=clock.now())
     assert allocator.assignment_for(b.utterance_id).palette_index == 0
 
 

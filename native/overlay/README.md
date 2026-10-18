@@ -34,6 +34,12 @@ The canonical style colors live in `src/renderer/types.rs`. The same selected
 color applies to source and translation and participates in native
 render-cache invalidation and replay.
 
+For an already-readable unresolved source, evidence availability is not snapshot
+application. If eligible proof arrives before the cap but cannot be applied until
+after it, the source remains unresolved across targets and retries. Late overflow
+identities still update their gray disposition/divider in place without allocating
+an additional color.
+
 Card `id` and `occupant_key` remain stable across accumulation. `appearance_seq`
 is the mutable latestness rank; both native and desktop apply its order rather than
 keeping an existing occupant in a sticky slot. `card_revision` participates in

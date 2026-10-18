@@ -349,6 +349,11 @@ class StreamingSpeakerSession:
                 if boundary.transition_start_sample is not None
                 else boundary.normalized_sample
             )
+            successor_onset = (
+                boundary.successor_onset_sample
+                if boundary.successor_onset_sample is not None
+                else boundary.normalized_sample
+            )
             preceding = following = None
             for index, timing in enumerate(lexical):
                 ranges = mapped[index]
@@ -373,10 +378,7 @@ class StreamingSpeakerSession:
                     and lexical[index - 1].text_end <= timing.text_start
                     and (speakers[index].session_scope, speakers[index].speaker_id)
                     == (str(successor.epoch), str(successor.slots[0]))
-                    and all(
-                        span.normalized_start_sample >= boundary.normalized_sample
-                        for span in ranges
-                    )
+                    and all(span.normalized_start_sample >= successor_onset for span in ranges)
                 ):
                     following = index
             if preceding is not None and not final:

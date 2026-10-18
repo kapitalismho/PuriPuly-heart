@@ -1,0 +1,230 @@
+{
+  "issue": 264,
+  "reviewer": "speaker-264-evidence-review",
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "reviewed_candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+  "record_kind": "Original independent review and same-review addenda, before repair verification; not acceptance of a later candidate",
+  "records": [
+    {
+      "RESULT": "findings",
+      "DOMAIN": "FULL_REVIEW — focused experiment/verification tooling and evidence, exact cc75792e9704e8609f38a3aa0794c03a1c7e3416..8c01ad689aa8d48c0b5c73dd739f2944c12f5589. Product/tests/native-overlay implementation acceptance excluded.",
+      "findings": [
+        {
+          "id": "E1",
+          "severity": "P2 — verification-tooling blocker, not product/acoustic failure",
+          "location": "native/nemotron/issue264_validation_launch.py:114-128 at the pinned candidate",
+          "violated_promise": "The isolated launcher must permit the intended installed Flet composition while rejecting external listeners/connections.",
+          "reachable_failure": "The audit hook rejects every non-loopback socket.bind, including Flet's non-listening ephemeral port discovery bind(('', 0)). Consequently the pinned launcher cannot reach scenario execution through the installed Flet startup path.",
+          "decisive_evidence": [
+            "Installed .venv/Lib/site-packages/flet/utils/network.py:4-15 creates a socket, binds ('', 0), and returns getsockname()[1]; it does not listen.",
+            "build/issue264-validation-first-01/isolation.json records socket.bind host '', runtime_exit_code 1, unchanged product sources, no remaining owned children, and successful temporary cleanup.",
+            "The same attempt's trace.json records failed_execution, cases=[], and Flet startup_error/window_configuration_failed/PermissionError. Actual managed Gemma checksum validation and Vulkan preparation succeeded first."
+          ],
+          "smallest_required_observation": "Bounded verification of the authorized exact-callsite guard repair: permit only this port-discovery operation; retain rejection of external connections and actual non-loopback listeners, then observe Flet startup.",
+          "defenses_and_limits": "The original guard correctly enforces a conservative default and the failure is preserved rather than reported as acoustic failure. A later task-only exception is outside this pinned verdict; it is not yet repair_verified here."
+        },
+        {
+          "id": "E2",
+          "severity": "P2 — verification-tooling blocker",
+          "location": "native/nemotron/issue264_validation_runtime.py:644-652 and native/nemotron/issue264_validation_caption.py:57-62 at the pinned candidate; inherited native/nemotron/issue218_experiment.py:81-85",
+          "violated_promise": "The controlled no-OSC boundary must allow construction of actual OutputRuntime without replacing or failing unrelated supported composition behavior.",
+          "reachable_failure": "Both drivers pass the inherited ChatboxGuard into OutputRuntime. OutputRuntime.__post_init__ probes optional bind_delivery_observer using getattr(..., None), but the guard raises RuntimeError instead of representing that optional capability as absent. Once Flet startup is allowed, this prevents all runtime cases and controlled caption cases from starting.",
+          "decisive_evidence": [
+            "src/puripuly_heart/core/runtime/output.py:215-223 performs the optional observer lookup during construction.",
+            "build/issue264-validation-first-02/trace.json records failed_execution, cases=[], and error 'Task must not send chatbox/OSC: bind_delivery_observer'."
+          ],
+          "smallest_required_observation": "Verify the task-local guard explicitly represents this optional callback as absent while still rejecting actual chatbox/OSC sends; exercise both runtime and caption construction.",
+          "defenses_and_limits": "Rejecting actual destination sends is desirable. This finding concerns capability introspection, not weakening destination isolation. The later ChatboxGuard subclass declaring bind_delivery_observer=None needs bounded follow-up review, not product repair."
+        },
+        {
+          "id": "E3",
+          "severity": "P2 — invalidating observation hook and success-label risk",
+          "location": "native/nemotron/issue264_validation_runtime.py:183-202, especially pinned lines 193-194; status construction at 964 and 1310-1314",
+          "violated_promise": "Task instrumentation must observe the pinned candidate without throwing from its native-final callback or allowing an invalid observation to become accepted runtime evidence.",
+          "reachable_failure": "ObservedBatch._snapshot_native_terminal delegates to the real hook, then accesses removed _Slice.unique_context and _Slice.replayed_context attributes. The pinned _Slice is slotted and has neither. This callback raises on a real native terminal. Some source output can nevertheless survive, so the existing sources-nonempty status rule can still label the case executed and the run matrix_executed.",
+          "decisive_evidence": [
+            "Pinned product context src/puripuly_heart/core/stt/batch_speaker.py:47-54 defines the actual slotted _Slice fields; source/context ownership is in child.audio and the shared evidence view.",
+            "build/issue264-validation-first-03/trace.json records driver SHA d11904e18a27a54d231e4b7ca6e125decdec712afa609cb905f6b3902a8856be, status matrix_executed, one distinct_repeated_A_B_A case marked executed, four admitted sources, and no case.errors.",
+            "The validation worker's original observation identifies the missing-attribute callback exception and explicitly invalidates this attempt. The trace also retains actual GPU decode_failure/GpuASRDecodeDropped events; these must remain separate observations rather than being erased or all attributed to the task exception."
+          ],
+          "smallest_required_observation": "Review removal/replacement of only obsolete observation fields, demonstrate native-final observations complete without task callback exceptions, and retain an explicit invalid-attempt disposition independently of nonempty source output. Preserve and assess real decode failures separately.",
+          "defenses_and_limits": "The delegate performs the real attribution snapshot before the failing observation, so this is not proof that product speaker settlement is defective. The first-03 run did activate actual Qwen Vulkan and Nemotron full 1.04 geometry, but is not accepted acoustic/latency evidence. Later hook edits are outside the pinned verdict."
+        }
+      ],
+      "COVERAGE": [
+        {
+          "item": ".gitignore",
+          "status": "inspected",
+          "basis": "Four pinned additions ignore both exact new raw ZIPs and both local raw directories. No raw archives are added by the pinned diff."
+        },
+        {
+          "item": "issue264_gemini_probe.py",
+          "status": "inspected",
+          "basis": "Reviewed exact PCM/chunk hash validation, original schedule reconstruction, dependency checks, automatic/manual controls, nonblocking successor delivery, raw-before-SDK instrumentation, explicit bounds, cleanup, final accounting and credential delegation."
+        },
+        {
+          "item": "issue264_gemini_auto-no-mid-eos_report.json and issue264_gemini_manual_report.json",
+          "status": "inspected",
+          "basis": "Offline comparison confirms identical 170-entry schedules, 168 audio writes and 93,404 samples per run; control frontiers 75,584/93,404; identical source/dependency records; cumulative A+B interim and B-only raw final with text-only fields; raw-to-SDK final text conserved. Post-EOF observations are approximately 9.0014s and 9.0086s."
+        },
+        {
+          "item": "issue264_gemini_execution_decision.json",
+          "status": "inspected",
+          "basis": "Reuses the original failure instead of rerunning a baseline; second variant is conditional on first nonrepair disposition; no tuning sweep or unsupported third confirmation."
+        },
+        {
+          "item": "issue264_gemini_findings.json",
+          "status": "inspected",
+          "basis": "Supported bounded negative R4 disposition: two starts, no invalid/access attempts or confirmation call, 186,808 successfully written samples / 11.6755s, unknown charges. Correctly separates text coverage, missing raw final offsets and model-specific mapping qualification; identifies provider clarification/reproducibility prerequisite without claiming a universal provider bug or app qualification."
+        },
+        {
+          "item": "Executed Gemini source versus published derivative",
+          "status": "inspected",
+          "basis": "Read only archived source members, not raw frames. Both archived executed drivers are byte-identical with SHA 73ee53e21b6d79153d2a9365296c949cdddbde774487c9f19644d1e033966bfc. Public derivative SHA is 542871cd62d485da111b5e2d2a0aef46b55ed13e835d74c94774213cd8cd3937; AST comparison is equal except top-level import ordering. Archived original helper is unchanged, and current adapter hash matches the recorded de82311c… hash. No derivative live execution is claimed."
+        },
+        {
+          "item": "KEY2-only handling / publication privacy",
+          "status": "inspected",
+          "basis": "Read credential() implementation, never the actual credential file. It selects exactly one nonempty GOOGLE_API_KEY2, clears fallback credential environment variables and passes the selected key explicitly. Public reports retain no key/hash/header/raw frames. Targeted public-surface inspection found no actual credentials or private absolute home paths; local archive references are explicitly non-public."
+        },
+        {
+          "item": "issue264_validation_prerequisites.py",
+          "status": "inspected",
+          "basis": "Artifact/dependency/corpus inventory, source hashes, public-input allowlist, Vulkan enumeration and background process inventory are clearly preparation, not inference readiness."
+        },
+        {
+          "item": "issue264_validation_inputs.py",
+          "status": "inspected",
+          "basis": "Reuses exact existing AST function definitions; checks selected tape input hashes. Followed input_cases: approved Common Voice/FLEURS and authorized synthetic Zira inputs, explicit assembly coordinates/crops, annotations separate from runtime decisions. Short No input is synthetic linguistic speech, not falsely described as natural conversational ground truth."
+        },
+        {
+          "item": "issue264_validation_launch.py",
+          "status": "inspected",
+          "basis": "Product HEAD/src pinning, source manifests/import paths, credential scrubbing, task-local environment/temp/appdata, supported installed FLET_VIEW_PATH, Python network audit, owned-child cleanup and explicit non-OS-sandbox limit reviewed. E1 applies."
+        },
+        {
+          "item": "issue264_validation_runtime.py",
+          "status": "inspected",
+          "basis": "Actual Qwen factory/backend, full-profile Nemotron invocation, shared evidence binding and 50ms drain, managed Gemma owner/server/model/provider, original tape PCM/control/timing replay, source/context/translation traces, logical assignment clock and Flet bridge/readback composition reviewed. Acquisition/lease substitution is explicitly disclosed and authorized. E2/E3 apply. Recorded replay retains historical native lexical timing and successful input mapping; it is not fresh provider ASR."
+        },
+        {
+          "item": "issue264_validation_caption.py",
+          "status": "inspected",
+          "basis": "Pinned version confirmed with git show after the working file began moving. Controlled synthetic metadata cases cover source-only/error disposition, late style/TTL, deadline, established nonrecolor, reset, retirement and hidden reveal. It does not execute a failing translation service; that controlled boundary is disclosed. E2 applies."
+        },
+        {
+          "item": "issue264_validation_summary.py",
+          "status": "inspected",
+          "basis": "Reviewed inherited analyzer and new assignment/style-transition summaries. Immutable source-time counts are explicitly not final presentation accuracy. Late delays are observation upper bounds; exact identity needs source coordinates/evidence. ACK, palette pixels and actual readable text are separate. Source/translation before natural end must be established from correlated traces and inspected images, not mere early cuts or matrix_executed."
+        },
+        {
+          "item": "issue264_validation_preparation.json and issue264_validation_formatting.json",
+          "status": "inspected",
+          "basis": "Retain preparation-only/unexecuted state, authorized existing-install and Flet controls, original lint failures and skipped chained Black check. No runtime qualification is inferred from formatting or artifact presence."
+        },
+        {
+          "item": "issue264_shared_evidence.json",
+          "status": "inspected",
+          "basis": "Reviewed complete retained execution chronology, initial failures, repairs, skips, warnings, test-source-change explanations, native compilation/report limits and executable smoke source. Smoke explicitly replaces recognizer, probabilities, translator and logical transport and uses a controlled clock; it is not GPU/GUI or performance proof. Reported pytest/native results were read, not independently rerun; product/test adequacy remains the separate product reviewer's domain."
+        },
+        {
+          "item": "Current plan Gemini discussion and experiment claims",
+          "status": "inspected",
+          "basis": "docs/issue218-speaker-attribution-plan.md:3-21 matches issue264 R4, distinguishes historical superseded rules, supports a negative result without app/GUI qualification, and records raw-local/executed-derivative boundaries. Official Live Transcribe manual-VAD/limitations and optional offset contract were read directly."
+        },
+        {
+          "item": "Actual complete GPU/GUI goal proof",
+          "status": "unverified",
+          "basis": "Concurrently owned by validator, not due as a whole-Goal proof in this checkpoint. first-01/02 are pre-scenario invalid attempts; first-03 contains actual inference but invalid observation. No accepted complete two-profile matrix, correct early source-plus-translation, late identity accuracy, or inspected GUI presentation is established by this review."
+        }
+      ],
+      "post_pin_delta_requiring_bounded_review": {
+        "surfaces": [
+          "native/nemotron/issue264_validation_launch.py",
+          "native/nemotron/issue264_validation_runtime.py",
+          "native/nemotron/issue264_validation_caption.py"
+        ],
+        "observed_changes": [
+          "Exact Flet port-discovery audit exception.",
+          "Task-local ChatboxGuard optional-callback absence.",
+          "Removal of obsolete _Slice observation attributes.",
+          "Switch from private assignment records to public source_snapshot records.",
+          "Literal wire16/v3 contract checks, summary source capture, and case-offset/count execution slicing."
+        ],
+        "consumer_warning": "The public source_snapshot schema uses first_readable_at and nested assignment.settled, whereas the pinned summary parser reads first_readable and record-level settled from the old private record schema. The schema transition and summary consumer must be reviewed together before using later summaries; pinned summary coverage must not be silently relabelled as coverage of moving harness output.",
+        "status": "Later changes identified only; not repair_verified. They do not make the pinned findings disappear. Preserve exact execution_sources.zip and per-attempt hashes."
+      },
+      "verification": {
+        "performed": [
+          "Read-only pinned diff/source/contract/evidence review.",
+          "Offline sanitized-report schedule/count/final-field comparisons.",
+          "Offline executed-source hash and normalized-AST comparison; no archived code execution.",
+          "Read-only filtered first-01/02/03 attempt records and installed Flet callsite inspection."
+        ],
+        "not_performed": [
+          "No new API calls, credential-file reads, private audio access, GPU/Flet/VR execution, tests, builds, linters, formatters or Git mutations.",
+          "No raw frames published or independently reprinted."
+        ],
+        "retained_original_observations": "first-03 actual GPU decode failures remain meaningful unresolved observations despite invalid task instrumentation. Do not count its nonempty output as an accepted positive case or dismiss its provider failures solely because the observer also failed."
+      },
+      "handoff": "Pin the repaired task-only harness and obtain bounded review of E1–E3 plus observation-schema/summary consumers. Validation owner should retain all invalid attempts and complete authorized actual observations; distinguish logical assertions, actual model inference, Flet dispatch, inspected pixels and natural-end causal timing. This verdict is neither terminal acceptance nor GitHub/remote approval."
+    },
+    {
+      "RESULT": "findings",
+      "DOMAIN": "Same-review clarification/addendum: new original first-04 evidence at product candidate 8c01ad689aa8d48c0b5c73dd739f2944c12f5589; original pinned-tooling verdict unchanged.",
+      "classification": "first-04 is a genuine failed product/scenario observation, NOT an invalid harness/setup attempt. Keep first-01/02/03 separately classified and retain all attempts. No further runtime execution was performed by this reviewer.",
+      "decisive_observations": {
+        "evidence": "build/issue264-validation-first-04/trace.json and isolation.json, read with filtered JSON selectors",
+        "product_candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+        "executed_runtime_driver_sha256": "5276fef359f02fe9ab4317827d78986fcd2f42284470eb8c368f91b48af62a09",
+        "counts": {
+          "native_requests": 6,
+          "translation_jobs": 4,
+          "admitted_sources": 4,
+          "readable_unresolved": 3,
+          "late_assignments_within_500ms": 0,
+          "late_assignments_within_1s": 0
+        },
+        "native_failures": "Two actual Vulkan Qwen decode_attempt records have result=decode_failure and audio_seconds=0.01. These are real retained outcomes, not observation exceptions.",
+        "presentation": "Recorded snapshots expose gray first A, gray B, gold returning-A prefix, and gray returning tail. Gold alone is not proof of correct returning-speaker identity. The returning text is fragmented into 'He washed the detritus from his.' and 'From his hair.'; source/native conservation alone cannot establish phrase quality.",
+        "isolation": "runtime_exit_code=0, policy_rejections=[], owned_children_unreaped=[], product_sources_unchanged=true; desktop_errors=[] and case.errors=[]. These establish execution/isolation status, not satisfaction of the speaker/boundary goal."
+      },
+      "legitimate_positive_progress": {
+        "observation": "The first readable snapshot contains both Korean translation and original A text, not merely an early boundary callback or cut.",
+        "translated_text": "그는 머리에서 이물질을 씻어냈어.",
+        "source_text": "He washed the detritus from his hair.",
+        "first_snapshot_submitted_at": 138465.1144908,
+        "renderer_ack_at": 138465.138012,
+        "valid_readback_completed_at": 138465.3721938,
+        "safety_delivery_deadline_at": 138466.0770718,
+        "natural_delivery_pause_at": 138467.010604,
+        "interpretation": "A valid software-readback upper bound precedes safety by about 0.705s and natural pause by about 1.638s. This is useful early source-plus-translation progress alongside the failed boundary/identity outcomes. Actual image inspection was reported by the validation worker; this reviewer independently inspected the recorded snapshot/timing data, not the PNG pixels."
+      },
+      "independent_falsepass_and_measurement_risks": [
+        {
+          "risk": "The report says status=matrix_executed and case.status=executed, and the launcher exits zero despite two native decode failures and zero late assignments.",
+          "basis": "Pinned runtime success construction checks nonempty sources / executed cases; inherited summary execution_failures counts case status, not native decode outcomes. In this later sliced one-case execution, matrix_executed also does not mean the authorized complete two-profile matrix ran.",
+          "disposition": "Treat these labels strictly as pipeline completion, as the validator explicitly does. They must never become a quality-pass or Goal-completion predicate. Preserve a separate failed-scenario disposition and actual requested/executed matrix inventory."
+        },
+        {
+          "risk": "A palette/key count or gold returning prefix could look successful while clear A/B remain gray, returning text is fragmented, or returning identity is unproven.",
+          "disposition": "Judge source-keyed epoch/identity against original capture/evidence coordinates and actual complete caption content. Three readable-unresolved sources with zero resolutions is a failed selected scenario, not an acoustic accuracy score. Zero late assignments by itself does not prove a resolver defect without eligible evidence/deadline causality."
+        },
+        {
+          "risk": "ACKs or all captured revisions cannot substitute for valid pixels.",
+          "basis": "Four readbacks exist but only three are readback_valid; revision 3 is explicitly false. Revision 4 cannot retroactively validate revision 3 or establish its onset time.",
+          "disposition": "Retain the invalid revision-3 readback. Use only stable, visibility-qualified readbacks plus inspected images for pixel claims. Logical first-readable clocks remain distinct from renderer ACK/readback/photon timing."
+        }
+      ],
+      "bounded_follow_up": "Still required for the post-pin launcher/runtime/caption changes, including the exact Flet guard exception, optional Chatbox capability, native observer fields, assignment-snapshot schema and summary consumers, and sliced-matrix accounting. first-04 provides genuine failure evidence for the frozen product but does not itself grant repair_verified to the moving task harness. Product repair and any new actual execution remain with their assigned owners after a new pin.",
+      "limits": "No fresh cloud/model/GUI run, no test rerun, no product repair, no raw-frame publication. This addendum does not approve acceptance or remote publication."
+    },
+    {
+      "RESULT": "findings",
+      "DOMAIN": "Pinned FULL_REVIEW follow-up coordination only",
+      "repair_handoff_received": "Validation worker reports task-only repairs and offline evidence in native/nemotron/issue264_validation_repair_handoff.json and issue264_validation_tooling_repair_checks.json, plus corrected first-04 diagnosis/summary. These later surfaces are outside cc75792e..8c01ad68 and have not received this reviewer's REPAIR_VERIFY.",
+      "next_review_boundary": "Director should pin the repaired task harness and explicitly assign bounded verification covering E1–E3, public snapshot→summary schema, native-failure/status accounting, authorized/requested/executed matrix inventory, and retention of first-01/02/03/04 distinctions. Claimed offline check results are peer-reported, not independently verified here.",
+      "retained_outcome": "first-04 remains a genuine failed acoustic/product observation, with meaningful early translated A output and separate invalid revision-3 readback. No additional actual run or acceptance is authorized by this coordination message."
+    }
+  ]
+}

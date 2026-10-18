@@ -1,0 +1,604 @@
+{
+  "schema": "issue264-boundary-and-presentation-repair-1",
+  "issue": 264,
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "failed_candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+  "repair_candidate": "Uncommitted local product/test delta; Director owns Git/index/history/new pin and subsequent actual validation.",
+  "disposition": "Scoped deterministic repair evidence, not acoustic/GUI acceptance, production enablement, profile selection, or issue closure.",
+  "authority": [
+    "Current issue264 R1/R2/R3 full contract",
+    "Director-accepted independent product findings F1-F5",
+    "No translation/display wait; preserve immutable source/context and own-native-final origin snapshots."
+  ],
+  "inventory": {
+    "product": [
+      "src/puripuly_heart/core/speaker/evidence.py",
+      "src/puripuly_heart/core/stt/speaker_attribution.py",
+      "src/puripuly_heart/core/stt/batch_speaker.py",
+      "src/puripuly_heart/core/stt/backend.py",
+      "src/puripuly_heart/core/stt/streaming_speaker.py",
+      "src/puripuly_heart/core/speaker_identity.py",
+      "src/puripuly_heart/core/overlay/presenter.py"
+    ],
+    "tests": [
+      "tests/core/test_issue264_boundary_repair.py",
+      "tests/core/test_issue264_shared_speaker.py"
+    ],
+    "evidence": "native/nemotron/issue264_boundary_repair.json",
+    "intentionally_unchanged": [
+      "SourceChild/domain text/context/ranges and historical origin contracts",
+      "Native models/dependencies/runtime/profiles and v3 bounded_late_speaker_assignment / wire16",
+      "Gemini/Parakeet adapters; validation drivers; historical issue264_shared_evidence.json",
+      "Factory, Peer translation and output owners already share the same evidence/assignment authority; no second cache or retained ASR PCM/session added."
+    ],
+    "maintained_docs": "Director-owned; proposed changes below, no maintained document edited by repair worker."
+  },
+  "source_sha256": {
+    "src/puripuly_heart/core/speaker/evidence.py": "284eb4b88c90bbe157707f2df3266133d2ab99cbefe735b2180bd6ffc1530f17",
+    "src/puripuly_heart/core/stt/speaker_attribution.py": "7730a70db432e3a95e83b16a341f5987d97960a1dd87ecb1ea5931cf4d56b7b3",
+    "src/puripuly_heart/core/stt/batch_speaker.py": "8139f3b89d0f257149667b6d95511bdc05f8d42331e71b47a0ae5071dd970727",
+    "src/puripuly_heart/core/stt/backend.py": "1c59a26d5924ac4c2bfbf1e3975cdb99c7524510fe3ec2f6c2740f09925fcf8c",
+    "src/puripuly_heart/core/stt/streaming_speaker.py": "335d6c2e11f1386d8dbf869d421197fc67257530a426589a293b4c6c54b631d1",
+    "src/puripuly_heart/core/speaker_identity.py": "006dbb2ac74b8b8b5582e7b5bda6c7f16e9b8509f143527992c11fc094228991",
+    "src/puripuly_heart/core/overlay/presenter.py": "4e83b2dc5e960951e7ed683836882919cc07fb917ee21bdac96805f6a4e2668c",
+    "tests/core/test_issue264_boundary_repair.py": "6e1bf5e6cfe61d869fa8bfd72544b979e1e08f8b93332d847386ce6dad113ae9",
+    "tests/core/test_issue264_shared_speaker.py": "98bfe9f2d6cb21cd415d7c1aa6a34189330e1b62cb4ef31e47b2ce87792abd44"
+  },
+  "original_actual_failure": {
+    "command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate 8c01ad689aa8d48c0b5c73dd739f2944c12f5589 --route gpu --case-count 1 --output build/issue264-validation-first-04",
+    "trace": "build/issue264-validation-first-04/trace.json",
+    "trace_sha256": "c87b9e870b7a1f187ca5389b1d8b66dc821bdaabdda5b836ad9a45a02b481a3d",
+    "executed_runtime_sha256": "5276fef359f02fe9ab4317827d78986fcd2f42284470eb8c368f91b48af62a09",
+    "actual_runtime": "Nemotron F16/Vulkan full1.04 geometry9/4/0/264/264/222; GPU Qwen7900XTX; Gemma Vulkan; guarded actual Flet.",
+    "outcome": "Six native requests, two actual160-sample(10ms) decode_failure/restart_only outcomes, four admitted translations; firstA/Bgray, returning prefixslot0gold, tailgray; three readable unresolved and zero late assignments.",
+    "not_rerun": true,
+    "separate_invalid_attempts": "First01-03 remain separate harness-invalid outcomes, not the valid first04 product failure.",
+    "diagnosis_reference": "native/nemotron/issue264_validation_diagnosis_04.json; native/nemotron/issue264_validation_first_findings.json; independent speaker-264-product-review frozen full review."
+  },
+  "root_causes_and_repairs": [
+    {
+      "id": "F1",
+      "root_cause": "Physical submitted_cursor advanced only to backdated onset, leaving nominal first-clear transition apparently unconsumed; recursive selector submitted the same transition again.",
+      "repair": "Per-parent monotonic committed_transition_sample tracks confirmed first-clear separately from physical PCM cursor. One actuation per confirmed transition, including same-delivery multi-transition updates. No fallback micro-request, minimum utterance duration, suppression, or PCM loss.",
+      "actual_before_source_cuts": [
+        [
+          9728,
+          49728
+        ],
+        [
+          49728,
+          49888
+        ],
+        [
+          49888,
+          75968
+        ],
+        [
+          75968,
+          76128
+        ]
+      ],
+      "after_source_cuts": [
+        [
+          9728,
+          49568
+        ],
+        [
+          49568,
+          75808
+        ]
+      ]
+    },
+    {
+      "id": "independent_A_B_gray",
+      "root_cause": "Batch-only onset backtracking required active0.5 slots while shared classifier correctly vetoed foreign-leaning unique support at0.35; fixed predecessor proofs retained immutable actual successor onset. More time could never resolve these proofs.",
+      "A": {
+        "foreign_range": [
+          49568,
+          49728
+        ],
+        "B_probability": 0.35061579942703247,
+        "A_probability": 0.001764365821145475,
+        "own_final_at": 138463.8724791,
+        "own_final_revision": 5,
+        "own_final_processed_immutable": 57600,
+        "first_readable": 138465.1057174,
+        "first_readable_revision": 7,
+        "first_readable_processed_immutable": 80640,
+        "deadline": 138466.1057174,
+        "deadline_observation": 138466.1393697,
+        "deadline_revision": 8
+      },
+      "B": {
+        "foreign_range": [
+          75808,
+          75968
+        ],
+        "A_probability": 0.4388357996940613,
+        "B_probability": 3.8317488360917196e-05,
+        "own_final_at": 138466.2054245,
+        "own_final_revision": 8,
+        "own_final_processed_immutable": 92160,
+        "first_readable": 138466.4279417,
+        "first_readable_revision": 8,
+        "first_readable_processed_immutable": 92160,
+        "deadline": 138467.4279417,
+        "deadline_observation": 138467.428087,
+        "deadline_revision": 10
+      },
+      "repair": "Shared transition authority records supported contiguous successor onset using the same existing candidate-relative foreign0.35 eligibility, while retaining distinct last-predecessor-clear, first-successor-clear, and observation-ready coordinates. Batch partitions at shared onset; streaming events carry both coordinates and lexical phrase composition uses shared supported onset. Classifier veto and uncertainty budgets are not loosened. Already-admitted old proofs remain uncertain, never rewritten."
+    },
+    {
+      "id": "F2",
+      "root_cause": "One native probability frame mapped to multiple callback pieces was counted as multiple corroborating frames.",
+      "repair": "Each accepted piece retains native compact frame interval identity. Confirmation counts distinct native frames, not source-map fragments or duplicate deliveries; initial predecessor establishment uses the same corroboration rule. Two distinct clear successor frames in one delivery still qualify. This is boundary stabilization, not a universal utterance minimum."
+    },
+    {
+      "id": "F3",
+      "root_cause": "Presenter copied a late assignment only with palette_index, discarding valid established palette_overflow identity.",
+      "repair": "In-place metadata eligibility accepts palette_index or palette_overflow. Fifth/sixth keys stay gray but receive established distinct keys/overflow reason; lawful gray divider and known-return append work, with no fifth color or readable-card migration/TTL restart."
+    },
+    {
+      "id": "F4",
+      "root_cause": "Original-audio compact width validation rejected producer-form omitted_silence whose compact[0,0] legitimately covers positive original quiet coordinates.",
+      "repair": "Accept only the actual zero-compact shape for explicitly omitted_silence/unobserved pieces without native frames; original-audio width/provenance checks remain. SpeakerRuntime only emits this reason from retained speech_observed=False ring coverage. Such explicit omission is eligible quiet, not unique speaker support. Genuinely absent/unprocessed coverage and frame=None without that reason remain unavailable. This did not cause first04 A/Bgray because those omissions were outside its fixed source/context footprints."
+    },
+    {
+      "id": "F5",
+      "root_cause": "Non-presentation assignment_for/refresh could settle an eligible late identity before watcher application, release it from deadline consideration, and count availability time instead of application time.",
+      "repair": "After unresolved readability, refresh may expose candidate proof availability but cannot allocate/settle/release or record resolution until mark_readable at the logical snapshot boundary. Deadline remains live; expiry restores the source-wide presented assignment, so retries/targets cannot resurrect an unapplied candidate. A lawful pre-cap logical commit remains canonical for later targets, including after cap. No extra text hold or renderer resolver."
+    }
+  ],
+  "coverage_rationale": "Observe actual selected native-input PCM and attribution through production CausalBatchSession/local provider adapter using original native evidence, rather than asserting source strings or mock echoes. Complement with shared streaming lexical composition, actual logical presenter snapshots, canonical allocation, overflow/expiry races, and existing shortNo/natural/safety/onset/replay/SELF/output suites. Controlled native recognition replaces inference only; exact PCM selection and shared classifier/presentation owners are real.",
+  "before_replay": {
+    "tool": "functions.eval",
+    "invocation": "replay_before = await replay_recorded_batch()",
+    "loading": "Production checkout modules imported before any repair edit; existing tests.core.test_causal_batch_speaker.opened installs a controlled recognizer in the real local Qwen provider adapter.",
+    "scope": "First capture parent, containing both failing transitions and original six-second safety completion. No inference or GUI/cloud call.",
+    "result": {
+      "native_input_samples": [
+        48000,
+        160,
+        26080,
+        160,
+        29344
+      ],
+      "source_bounds": [
+        [
+          9728,
+          49728
+        ],
+        [
+          49728,
+          49888
+        ],
+        [
+          49888,
+          75968
+        ],
+        [
+          75968,
+          76128
+        ],
+        [
+          76128,
+          105472
+        ]
+      ],
+      "total_samples": 103744,
+      "unique_source_samples": 95744,
+      "context_samples": 8000,
+      "exact_pcm_order_and_ownership": true,
+      "native_pcm_sha256": [
+        "db78f0567568988e95dd14dc83f8c6da6a6b45e805a1da09600574f34f55807a",
+        "58de370949080275ea8e8211cfac4d26644d89c019a9f6fb036a23843b438c58",
+        "e138828aef41533f597fdeebde6279f5f76ad02bcd13a6e8bafb5348a865e9f4",
+        "d95507d22648c681331d274c7cffc0bfb0ba9ba91128b4356608186799ab0a86",
+        "1f7cbc1f0a733c2784b032a22433888cb46abf46ac5bb52e6073d358d9373958"
+      ]
+    },
+    "all_five_native_pcm_hashes_equal_original_trace": true,
+    "own_final_before_replay": "Separate pre-edit accepted-view replay reproduced all six original own-final attribution states and exact revisions/frontiers: uncertain(rev5,57600) twice, uncertain(rev8,92160) twice, identified0(rev11,138240), uncertain(rev11,138240).",
+    "initial_invalid_observation": "Initial replay omitted1024source samples from its observer-driven feed and reported first input46976 instead of48000; not product evidence. Corrected replay filled exact recorded source-coordinate ownership and then all five original native PCM hashes matched. No model run occurred in either replay."
+  },
+  "after_replay": {
+    "command": [
+      ".venv/Scripts/python.exe",
+      "-c",
+      "<executed_python_source>"
+    ],
+    "tool": "functions.eval subprocess.run([sys.executable, \"-c\", replay_source], capture_output=True, text=True, timeout=60)",
+    "exit_code": 0,
+    "executed_python_source_sha256": "694f2aca3b48863d2e29d79fa05dbf10f314403cd28ab5f070f1031168860fa7",
+    "executed_python_source": "\nimport ast, asyncio, hashlib, json, subprocess\nfrom dataclasses import replace\nfrom pathlib import Path\nfrom types import SimpleNamespace\nimport numpy as np\nfrom puripuly_heart.core.audio.format import AudioCaptureSpan, float32_to_pcm16le_bytes\nfrom puripuly_heart.core.speaker.contracts import ProbabilityFrame, SourceMapPiece, SpeakerEvidence\nfrom tests.core.test_causal_batch_speaker import opened, request, terminal_events\ntrace_path=Path('build/issue264-validation-first-04/trace.json')\ntrace=json.loads(trace_path.read_text(encoding='utf-8'));case=trace['cases'][0]\nns={'np':np,'Path':Path,'subprocess':subprocess,'json':json,'digest':lambda p:hashlib.sha256(p.read_bytes()).hexdigest()}\nfor path,name in [('native/nemotron/probe.py','audio'),('native/nemotron/issue215_smoke.py','input_cases')]:\n    node=next(n for n in ast.parse(Path(path).read_text(encoding='utf-8')).body if isinstance(n,ast.FunctionDef) and n.name==name)\n    exec(compile(ast.Module(body=[node],type_ignores=[]),path,'exec'),ns)\n_,assembled=ns['input_cases'](SimpleNamespace(corpus=Path.home()/'.cache/puripuly-heart/sim-v02-public-corpus-600-v1',correction_root=Path.cwd().parent/'listen-mega-integrate-nemotron-speaker-tracking/docs/experiments/issue-212-clarification'))\nvalues=assembled[case['case']][0]\nassert hashlib.sha256(values.tobytes()).hexdigest()==case['input_pcm_f32_sha256']\npcm=float32_to_pcm16le_bytes(values)\ndef span(s):return AudioCaptureSpan(**s)\ndef decode(raw):\n    return SpeakerEvidence(**{**raw,'source_map':tuple(SourceMapPiece(**{**p,'capture':None if p['capture'] is None else span(p['capture'])}) for p in raw['source_map']),'frame':None if raw['frame'] is None else ProbabilityFrame(**{**raw['frame'],'probabilities':tuple(raw['frame']['probabilities']),'active_slots':tuple(raw['frame']['active_slots'])})})\nevidence=tuple(decode(e) for e in case['evidence'])\nsubmits=[e for e in case['trace'] if e['event']=='native_submit']\nowned={order:tuple(span(s) for e in submits if e['identity']['segment']['segment_order']==order for s in e['sealed_content_ranges']) for order in (1,2)}\nasync def main():\n    backend,recognizer,session=await opened();clock=[0.];session.clock=lambda:clock[0]\n    active=None;sequence=0;cursor=0;ei=0;historical=[];new_footprints=[];transitions=[]\n    async def send(spans,context=False):\n        nonlocal sequence\n        sequence+=1\n        await session.send_turn_audio(active.identity,b''.join(pcm[s.normalized_start_sample*2:s.normalized_end_sample*2] for s in spans),payload_sequence=sequence,source_ranges=spans,context_only=context)\n    async def until(end):\n        nonlocal cursor\n        spans=tuple(s.slice_normalized(max(cursor,s.normalized_start_sample),min(end,s.normalized_end_sample)) for s in owned[active.identity.segment.segment_order] if s.normalized_start_sample<end and cursor<s.normalized_end_sample)\n        if spans:await send(spans);cursor=end\n    await backend._decode_lock.acquire()\n    try:\n        for e in case['trace']:\n            clock[0]=e.get('at',e.get('observed_at',clock[0]))\n            if e['event']=='vad' and 'pre_roll_capture' in e['value']['event']:\n                order=e['value']['segment']['identity']['segment_order']\n                active=replace(request(order),optional_cutoff_at_monotonic_s=138465.76144780003 if order==1 else None)\n                sequence=0;cursor=owned[order][0].normalized_start_sample\n                await session.begin_turn(active)\n                await send(tuple(span(s) for s in e['value']['event']['pre_roll_capture']),True)\n                await until(e['value']['event']['chunk_capture'][-1]['normalized_end_sample'])\n            elif e['event']=='capture_input_observed' and active is not None and e['capture']:\n                stop=owned[active.identity.segment.segment_order][-1].normalized_end_sample\n                end=min(stop,e['capture'][-1]['normalized_end_sample'])\n                if cursor<end:await until(end)\n            elif e['event']=='evidence_poll':\n                await session.observe_speaker_evidence(evidence[ei:ei+e['count']]);ei+=e['count']\n            elif e['event']=='vad' and active is not None and 'reason' in e['value']['event']:\n                await until(owned[active.identity.segment.segment_order][-1].normalized_end_sample)\n                await session.seal_turn(active.identity,sealed_content_ranges=(),seal_reason=e['value']['event']['reason'],observed_trailing_silence_ms=0);active=None\n            elif e['event']=='own_native_final_attribution':\n                ranges=tuple(span(s) for s in e['source_ranges']+e['context_ranges'])\n                result=session.evidence.attribute(ranges)\n                historical.append({'at':e['at'],'state':result.attribution_state,'slot':result.speaker_id,'original_state':e['result']['attribution_state'],'revision':session.evidence.revision,'processed':session.evidence.processed,'immutable':session.evidence.immutable})\n                source_start=e['source_ranges'][0]['normalized_start_sample']\n                if source_start in (9728,49888):\n                    start,end=(1728,49568) if source_start==9728 else (49568,75808)\n                    base=span(e['source_ranges'][0]);adjusted=replace(base,source_start_sample=start,source_end_sample=end,normalized_start_sample=start,normalized_end_sample=end,source_start_monotonic_s=0,source_end_monotonic_s=(end-start)/16000)\n                    result=session.evidence.attribute((adjusted,))\n                    new_footprints.append({'original_native_final_at':e['at'],'range':[start,end],'state':result.attribution_state,'slot':result.speaker_id,'revision':session.evidence.revision})\n        transitions=[{'first_clear':b.normalized_sample,'onset':b.successor_onset_sample,'predecessor_end':b.transition_start_sample} for b,_,_ in session.evidence.transitions()]\n        backend._decode_lock.release()\n        events=await asyncio.wait_for(terminal_events(session,2),5)\n        terminal=[e for e in events if hasattr(e,'included_contributions')]\n        audio=[a for t in terminal for a in t.source_audio]\n        decoded=[np.round(r.samples*32768).astype('<i2').tobytes() for r in recognizer.calls]\n        expected=pcm[1728*2:105472*2]+pcm[100672*2:120832*2]\n        result={'trace_sha256':hashlib.sha256(trace_path.read_bytes()).hexdigest(),'input_f32_sha256':hashlib.sha256(values.tobytes()).hexdigest(),'native_input_samples':[len(p)//2 for p in decoded],'native_pcm_sha256':[hashlib.sha256(p).hexdigest() for p in decoded],'source_bounds':[(a.source_ranges[0].normalized_start_sample,a.source_ranges[-1].normalized_end_sample) for a in audio],'context_samples':[sum(s.normalized_sample_count for s in a.context_ranges) for a in audio],'exact_pcm_order_and_ownership':b''.join(decoded)==expected,'transitions':transitions,'historical_footprint_snapshots':historical,'counterfactual_corrected_footprint_snapshots_at_recorded_original_finals':new_footprints,'controlled_native_terminal_states':[a.speaker_attribution.state for a in audio],'controlled_native_terminal_slots':[a.speaker_attribution.key.local_speaker_id if a.speaker_attribution.key else None for a in audio]}\n        print(json.dumps(result))\n    finally:\n        if backend._decode_lock.locked():backend._decode_lock.release()\n        await session.close();await backend.close()\nasyncio.run(main())\n",
+    "result": {
+      "trace_sha256": "c87b9e870b7a1f187ca5389b1d8b66dc821bdaabdda5b836ad9a45a02b481a3d",
+      "input_f32_sha256": "47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67",
+      "native_input_samples": [
+        47840,
+        26240,
+        29664,
+        20160
+      ],
+      "native_pcm_sha256": [
+        "7d1c5990ee42c385a50ac72299d79efaf5248193ca4753e7cd15c05469861d8b",
+        "03b1a0a42a5b7ef5f44cf19fc54a8165ba62ce5efd91414f5f63af2c82f39a72",
+        "93978b19455fbc61574098c2d3898b988e4bf820730855d453b407063ece6d0a",
+        "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b"
+      ],
+      "source_bounds": [
+        [
+          9728,
+          49568
+        ],
+        [
+          49568,
+          75808
+        ],
+        [
+          75808,
+          105472
+        ],
+        [
+          105472,
+          120832
+        ]
+      ],
+      "context_samples": [
+        8000,
+        0,
+        0,
+        4800
+      ],
+      "exact_pcm_order_and_ownership": true,
+      "transitions": [
+        {
+          "first_clear": 49888,
+          "onset": 49568,
+          "predecessor_end": 42208
+        },
+        {
+          "first_clear": 76128,
+          "onset": 75808,
+          "predecessor_end": 73248
+        }
+      ],
+      "historical_footprint_snapshots": [
+        {
+          "at": 138463.8724791,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 7,
+          "processed": 57600,
+          "immutable": 57600
+        },
+        {
+          "at": 138463.9495711,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 7,
+          "processed": 57600,
+          "immutable": 57600
+        },
+        {
+          "at": 138466.2054245,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 10,
+          "processed": 92160,
+          "immutable": 92160
+        },
+        {
+          "at": 138466.2808333,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 10,
+          "processed": 92160,
+          "immutable": 92160
+        },
+        {
+          "at": 138468.4405568,
+          "state": "identified",
+          "slot": "0",
+          "original_state": "identified",
+          "revision": 13,
+          "processed": 138240,
+          "immutable": 138240
+        },
+        {
+          "at": 138468.604836,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 13,
+          "processed": 138240,
+          "immutable": 138240
+        }
+      ],
+      "counterfactual_corrected_footprint_snapshots_at_recorded_original_finals": [
+        {
+          "original_native_final_at": 138463.8724791,
+          "range": [
+            1728,
+            49568
+          ],
+          "state": "identified",
+          "slot": "0",
+          "revision": 7
+        },
+        {
+          "original_native_final_at": 138466.2054245,
+          "range": [
+            49568,
+            75808
+          ],
+          "state": "identified",
+          "slot": "1",
+          "revision": 10
+        }
+      ],
+      "controlled_native_terminal_states": [
+        "identified",
+        "identified",
+        "identified",
+        "uncertain"
+      ],
+      "controlled_native_terminal_slots": [
+        "0",
+        "1",
+        "0",
+        null
+      ]
+    },
+    "reporting_correction": "The executed report selected updates as well as terminals with hasattr(included_contributions), repeating cumulative audio rows. Native input sizes/hashes and exact-PCM assertion were already correct. Canonical per-request source/context/state/slot inventory was deduplicated offline; no product replay rerun. Raw repeated report retained below.",
+    "raw_cumulative_report": {
+      "trace_sha256": "c87b9e870b7a1f187ca5389b1d8b66dc821bdaabdda5b836ad9a45a02b481a3d",
+      "input_f32_sha256": "47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67",
+      "native_input_samples": [
+        47840,
+        26240,
+        29664,
+        20160
+      ],
+      "native_pcm_sha256": [
+        "7d1c5990ee42c385a50ac72299d79efaf5248193ca4753e7cd15c05469861d8b",
+        "03b1a0a42a5b7ef5f44cf19fc54a8165ba62ce5efd91414f5f63af2c82f39a72",
+        "93978b19455fbc61574098c2d3898b988e4bf820730855d453b407063ece6d0a",
+        "f2aef23a6dfe8f58c63aba5ac0d567574a26479d39b923bae22172aab4eddf3b"
+      ],
+      "source_bounds": [
+        [
+          9728,
+          49568
+        ],
+        [
+          9728,
+          49568
+        ],
+        [
+          49568,
+          75808
+        ],
+        [
+          9728,
+          49568
+        ],
+        [
+          49568,
+          75808
+        ],
+        [
+          75808,
+          105472
+        ],
+        [
+          105472,
+          120832
+        ]
+      ],
+      "context_samples": [
+        8000,
+        8000,
+        0,
+        8000,
+        0,
+        0,
+        4800
+      ],
+      "exact_pcm_order_and_ownership": true,
+      "transitions": [
+        {
+          "first_clear": 49888,
+          "onset": 49568,
+          "predecessor_end": 42208
+        },
+        {
+          "first_clear": 76128,
+          "onset": 75808,
+          "predecessor_end": 73248
+        }
+      ],
+      "historical_footprint_snapshots": [
+        {
+          "at": 138463.8724791,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 7,
+          "processed": 57600,
+          "immutable": 57600
+        },
+        {
+          "at": 138463.9495711,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 7,
+          "processed": 57600,
+          "immutable": 57600
+        },
+        {
+          "at": 138466.2054245,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 10,
+          "processed": 92160,
+          "immutable": 92160
+        },
+        {
+          "at": 138466.2808333,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 10,
+          "processed": 92160,
+          "immutable": 92160
+        },
+        {
+          "at": 138468.4405568,
+          "state": "identified",
+          "slot": "0",
+          "original_state": "identified",
+          "revision": 13,
+          "processed": 138240,
+          "immutable": 138240
+        },
+        {
+          "at": 138468.604836,
+          "state": "uncertain",
+          "slot": null,
+          "original_state": "uncertain",
+          "revision": 13,
+          "processed": 138240,
+          "immutable": 138240
+        }
+      ],
+      "counterfactual_corrected_footprint_snapshots_at_recorded_original_finals": [
+        {
+          "original_native_final_at": 138463.8724791,
+          "range": [
+            1728,
+            49568
+          ],
+          "state": "identified",
+          "slot": "0",
+          "revision": 7
+        },
+        {
+          "original_native_final_at": 138466.2054245,
+          "range": [
+            49568,
+            75808
+          ],
+          "state": "identified",
+          "slot": "1",
+          "revision": 10
+        }
+      ],
+      "controlled_native_terminal_states": [
+        "identified",
+        "identified",
+        "identified",
+        "identified",
+        "identified",
+        "identified",
+        "uncertain"
+      ],
+      "controlled_native_terminal_slots": [
+        "0",
+        "0",
+        "1",
+        "0",
+        "1",
+        "0",
+        null
+      ]
+    },
+    "limits": [
+      "Native decode lock deliberately delays controlled recognizer execution until all recorded evidence has been delivered; those controlled terminal snapshots are not new real native-final timing.",
+      "Corrected-footprint attribution at original recorded own-final times is explicitly counterfactual; it demonstrates eligibility available then, not the timing/content of a new actual inference request.",
+      "Source feed reconstructs original coordinate ownership using observer trace and native source maps; no arrival-order/text matching. Exact selected native bytes and source/context totals are checked.",
+      "No new actual ASR, diarizer, translation, Flet, VR or cloud execution; after-repair actual runtime evidence awaits Director pin.",
+      "After revisions differ from historical revisions because previously discarded positive omission records are now accepted. Historical origin objects are not rewritten."
+    ]
+  },
+  "execution": [
+    {
+      "command": ".venv/Scripts/python.exe -m pytest -o addopts= -q --tb=short tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py",
+      "exit_code": 1,
+      "outcome": "3failed133passed in4.65s. Initial repair incorrectly placed onset in strict normalized first-clear field; preserved the existing interval contract and added explicit successor_onset_sample, then migrated batch/lexical consumers."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest -o addopts= -q --tb=short tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py",
+      "exit_code": 1,
+      "outcome": "3failed138passed in4.12s: one new producer fixture omitted required drain_evidence(max_items); two old allocator-only tests assumed settlement without logical application. Corrected fixture and added explicit mark_readable at application with new pre-application-unallocated assertions, retaining every old palette/order assertion."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m black src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/overlay/presenter.py tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py",
+      "exit_code": 0,
+      "outcome": "4files formatted,5unchanged; scoped product/test files only."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/overlay/presenter.py tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py",
+      "exit_code": 1,
+      "outcome": "One unsorted import in new regression file; surgically moved to canonical import group."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest -o addopts= -q --tb=short tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_speaker_identity.py tests/core/test_speaker_identity_pipeline.py tests/core/test_overlay_source_cards.py tests/core/test_overlay_speaker_modes.py tests/core/test_overlay_presenter.py tests/core/runtime/test_output_runtime.py",
+      "exit_code": 0,
+      "outcome": "369passed in5.75s; final product code. No failures/skips/warnings reported. Subsequent changes only extend the new test file."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/overlay/presenter.py tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/overlay/presenter.py tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py",
+      "exit_code": 0,
+      "outcome": "All Ruff checks passed; Black9files unchanged."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m black tests/core/test_issue264_boundary_repair.py",
+      "exit_code": 0,
+      "outcome": "New regression file formatted after adding boundary-interval negatives and a later-target-after-cap assertion."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m pytest -o addopts= -q --tb=short tests/core/test_issue264_boundary_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/overlay/presenter.py tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/speaker_attribution.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/backend.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/speaker_identity.py src/puripuly_heart/core/overlay/presenter.py tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py",
+      "exit_code": 0,
+      "outcome": "Final12new regression cases passed in0.62s. All Ruff checks passed; Black9files unchanged."
+    }
+  ],
+  "preserved_tests_and_replacements": {
+    "only_existing_assertion_surface_changed": "tests/core/test_issue264_shared_speaker.py: reversed proof-order and source-order deadline allocator tests now explicitly mark logical application before expecting palette settlement; original palette0/1/order/alias/proof-release expectations remain. Added pre-application palette-is-None protection.",
+    "new_regressions": [
+      "Uncertain-successor-onset ABA: exactly two early speaker cuts and three final disjoint source contributions, exact PCM, no160sample intermediate, duplicate/stale reevaluation, correct0-1-0 attribution.",
+      "Native-frame source-map fragments cannot confirm; two real native frames can confirm; single predecessor impulse cannot establish a transition.",
+      "Shared streaming confirmed first-clear/onset coordinates and qualified lexical Alpha/No/Alpha source grouping, no internal untimed split.",
+      "Actual omission producer/view path accepts positive quiet; missing suffix and unqualified unobserved coverage remain unavailable.",
+      "Fifth/sixth late overflow identity/style reason in place, distinct gray divider, known-return append, four palette slots, unchanged text/card/TTL/appearance.",
+      "Proof availableat10.9 after first-readable10.0 cannot count/apply late at11.1; valid application10.95 succeeds. Canonical retry and another target after11.2 preserve either committed identity or expiredgray, with actual application delay accounting.",
+      "Malformed successor onset outside explicit uncertainty interval is rejected."
+    ],
+    "no_weakened_guarantees": "No changed tolerances, skip/xfail additions, dropped source/text/PCM/context assertions, profile/dependency changes, minimum duration, ASR fallback, or recognition retry."
+  },
+  "reused_evidence": [
+    "Historical issue264_shared_evidence.json remains unmodified. Its1181passed/2unchangedINTEGRATIONskips/252warnings and native pure strictv3/wire16 evidence are prior evidence only, not rerun here; broad passes did not prove first04.",
+    "Original first04 inference/translation/Flet failure and validator frozen own-final/readable/deadline diagnostics reused; no confirmation inference run.",
+    "Independent full review F1-F5 and original controlled reviewer probes reused as accepted findings, not claimed repaired-candidate review."
+  ],
+  "residuals_and_next_owner_actions": [
+    "Real native tail remains conservatively uncertain:110ms ambiguity versus236ms unique clear support exceeds20percent ratio; no foreign uncertainty or missing coverage. No threshold relaxation/blind inheritance applied.",
+    "Recorded returning-prefix actual transcription truncation and tail lexical split are not repaired by deterministic PCM/attribution changes. Actual repaired inference/translation/rendered outcome remains unobserved until Director new pin and validation.",
+    "Director should integrate/pin product repair and perform one focused integration verification, then request bounded independent F1-F5/foreign-onset repair review and resume actual stopped validation only at the pin.",
+    "No Goal acceptance, acoustic optimum, profile selection, #211/#218 completion, or R4 disposition beyond separately owned Gemini evidence claimed.",
+    "No type checker, native build/Rust formatter, whole-repo sweep, fresh cloud call or GPU/Flet/VR execution run by this worker."
+  ],
+  "proposed_maintained_guidance_for_director": [
+    "Document distinct confirmed first-clear/uncertainty interval and supported successor-onset coordinates shared across batch/streaming, with one-time committed-transition watermark independent from submitted PCM cursor.",
+    "State that native-frame identity, not callback mapping-piece count, supplies distinct temporal confirmation; predecessor establishment uses the same rule.",
+    "Distinguish explicit producer-certified omitted_silence quiet from genuinely missing/unprocessed coverage.",
+    "Clarify that late proof availability is not presentation settlement: canonical allocation/expiry/metrics commit at logical snapshot application. Established overflow metadata still propagates in place without another palette color."
+  ],
+  "cleanup": "No maintained docs/Git/index/history/GitHub/validation-driver mutations. No owned long-lived process/device/port, model session, new temporary script, duplicate evidence cache, or session/PCM retention introduced. Offline ffmpeg child calls and controlled local provider tasks completed/closed. Only assigned product/tests and this task-local report were authored."
+}

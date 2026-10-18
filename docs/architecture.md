@@ -277,6 +277,8 @@ Streaming and causal-batch wrappers settle their own result consumer even when i
 
 An uncertain transfer is an interval, not a fabricated exact acoustic split: the audio-boundary event preserves its start/end and the first established successor position separately. Batch cuts, streaming boundary events and lexical phrase composition use one shared candidate/confirm/commit rule. Two distinct contiguous stable clear successor frames confirm a transition; one isolated impulse or a duplicate callback does not. With native 10 ms frames this is 20 ms of confirming evidence, a reversible heuristic rather than a universal utterance minimum or measured optimum. Within one lawful finalized text release, qualified complete lexical cuts separate confirmed distinct speakers. Confidence-only gray/identified changes stay in the same phrase; representative attribution may identify it, otherwise the coherent phrase stays gray. This adds no wait for another native result and does not merge actual A-B-A or unsupported clock/epoch ownership. Separators retain exact source coverage rather than being reconstructed.
 
+Confirmation counts original native probability frames, not the number of capture-map pieces or callbacks carrying them; initial predecessor establishment uses the same corroboration rule. The shared transition preserves a supported successor-onset coordinate independently of its first-clear coordinate and uncertainty interval. Batch actuation and streaming lexical composition use that onset, so weaker but eligible successor evidence is not left inside the predecessor's fixed attribution footprint.
+
 - Soniox uses one final-token path for automatic `<end>` prefixes, serialized manual `<fin>` completion and stream drain. An automatic marker does not seal application input or reset VAD, grouping, pre-roll, the safety deadline, speaker state or the socket. Marker-only events admit no source. Automatic endpointing is ON by default under the [approved policy amendment](https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6135356918), using the native endpoint defaults exercised in the [#212 comparison](https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6114014900). Application natural/six-second manual completion remains active, and explicit endpointing OFF retains the manual path.
 - After Soniox's first manual completion, complete text is connection-owned rather than assigned to the current local successor. Raw post-control clocks remain available, but fine-grained capture attribution is unavailable. `<fin>` has no native operation identifier: serialized FIFO acknowledgement is the supported contract, not arbitrary delayed-duplicate disambiguation across different operations.
 - Lawful Soniox idle/maximum-lifetime retirement drains connection-owned final text through the retiring epoch; cancellation/reset still fence stale events. Transport failure preserves already-final tokens once. Returned Soniox text does not refresh source-idle activity, and SELF admits an earlier pending scoped source before a later connection-owned unit.
@@ -294,12 +296,13 @@ Implementation: `core/stt/streaming_speaker.py`, `core/stt/scoped_normalizer.py`
 
 `CausalBatchSession` owns retained, unsubmitted Peer audio and the submission cursor for local Qwen, both Parakeet routes, CPU Auto's resolved delegate and local GPU ASR. Custom offline, cloud routes and Self retain their existing policies.
 
-- Causally available confirmed speaker transitions can select a disjoint unsubmitted prefix while the successor keeps receiving audio. Boundary position, evidence-ready time, submission time and submitted cursor remain distinct. Duplicate, stale or revised evidence cannot reclaim submitted content. Rejecting attribution to A is not itself proof of a boundary to B.
+- Causally available confirmed speaker transitions can select a disjoint unsubmitted prefix while the successor keeps receiving audio. Boundary position, evidence-ready time, submission time and submitted cursor remain distinct. A per-parent committed-transition watermark is independent of the PCM cursor: backdating one transition cannot actuate it again at its later first-clear coordinate. Duplicate, stale or revised evidence cannot reclaim submitted content. Rejecting attribution to A is not itself proof of a boundary to B.
 - Slice results release in source order through the existing contribution ledger and one enclosing terminal. Failed slices do not replay successful content or discard successful successors. There is no whole-parent re-decode or second untimed speaker splitter.
 - Natural completion and the enclosing safety deadline remain capture-owned. Listen delivery supplies an immutable optional-cut cutoff to the selector, coalescing near-deadline cuts into ordinary closure without losing retained speech. Bounded pending-slice pressure also suppresses optional cuts rather than waiting indefinitely for diarization. Genuine onset recovery, hard-rollover context and disjoint local speaker cuts remain separate paths.
 - Submission freezes PCM, native options, source/context ranges and enclosing display group. A synchronous request-local `on_native_terminal` hook in the existing event projection snapshots each slice's historical attribution once immediately before native terminal enqueue. Deferred consumer scheduling and source-order release cannot admit newer evidence into that immutable `STTSourceAudio`/`RecognitionTextOrigin` snapshot. This is not the presentation-assignment deadline.
 - The shared accepted evidence view pins the fixed source/unique-onset/proven-replay footprint before native submission and transfers the claim through request, contribution and admitted source ownership without a prune gap. Presentation can resolve from later eligible evidence without retaining PCM, the ASR session or another probability history. Ordinary ASR retirement does not erase a transferred presentation claim; missing new-speech evidence stays unavailable rather than linking old source to a new epoch.
 - Local and streaming attribution share a slot-relative representative-speaker policy. Unique new speech and unreplayed onset supply positive support; bounded candidate-relative ambiguous edges/holes and brief proven replay intrusion may be tolerated. Foreign-leaning ambiguity cannot consume that same-speaker allowance, and clear competing new speech, even a short correction, cannot be outvoted. Overlap, substantial foreign replay and broken ownership remain mixed/unknown. Missing coverage, including a tiny suffix, is not assumed quiet. Confidence is an acoustic estimate, not a whole-input purity guarantee.
+- Explicit producer-certified `omitted_silence` is eligible quiet provenance even though its compact-stream width is zero. This does not qualify an unlabelled missing, unprocessed or otherwise unobserved range as silence.
 - Queued CPU work freezes its actual backend/model and native options. GPU work freezes submission-time language hints and source mode. Reconfiguration cannot mutate queued native options; existing cancellation and rebind authority still apply.
 - Local speaker slices submit only retained capture audio and explicitly declared capture pre-roll/rollover context. Parakeet V3 successors add no synthetic silence tail.
 
@@ -478,6 +481,11 @@ The first selected logically readable original or translation starts a 1.000-sec
 window for at most one unresolved-to-identified update. The preferred 500 ms band
 is measured, not an added wait or guarantee; established identities cannot change.
 This logical publication clock is distinct from physical renderer/photon timing.
+For an already-readable unresolved source, proof availability alone does not settle
+presentation or reserve a palette slot. Allocation, settlement, proof release and
+resolution timing commit at logical snapshot application. A candidate that becomes
+available before the cap but is not applied until after it expires source-wide;
+another target or retry cannot resurrect that late assignment.
 
 `OverlayPresenter` reports that first-readable selection and owns one watcher for
 evidence/deadlines. Hidden reveals and protected-row waits do not start the window
@@ -487,6 +495,9 @@ Expiry, reset, rejection and nonpublication close the applicable opportunity.
 If a readable unknown card resolves, its style/revision changes in place: no
 text change, retranslation, card merge/move, order change or lifetime renewal.
 Returning A can still append when identity is known before initial card choice.
+Late established palette-overflow keys also reach the existing card in place.
+They remain gray, but their identity/overflow disposition enables the lawful
+divider and subsequent known-return compatibility; no fifth color is allocated.
 
 Native and desktop consume complete ranked snapshots with stable card identity and
 explicit card revision. Renderer caches include text, style and revision without

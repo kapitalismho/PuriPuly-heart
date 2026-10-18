@@ -27,6 +27,7 @@ class SpeakerFrame:
     uncertain: bool
     competing: bool
     probabilities: tuple[float, ...] = ()
+    native_frame: tuple[int, int] | None = None
 
 
 def probability_state(values):
@@ -38,6 +39,13 @@ def probability_state(values):
     competing = ranked[1] >= COMPETING_PROBABILITY
     uncertain = not clear and ranked[0] >= QUIET_PROBABILITY
     return slots, clear, uncertain, competing
+
+
+def leading_slot(frame):
+    if not frame.probabilities or frame.competing:
+        return None
+    slot = max(range(len(frame.probabilities)), key=frame.probabilities.__getitem__)
+    return slot if frame.probabilities[slot] >= COMPETING_PROBABILITY else None
 
 
 def unique_ranges(ranges):
@@ -140,11 +148,9 @@ def attribute_speaker(ranges, frames, immutable, *, replayed=()):
     if candidate is not None:
         for capture, left, right, rate, frame, is_replay in pieces:
             foreign = frame.clear and frame.slots != (candidate,)
-            if not is_replay and frame.uncertain and frame.probabilities:
-                peak = max(frame.probabilities)
-                foreign_uncertainty |= (
-                    peak >= COMPETING_PROBABILITY and frame.probabilities[candidate] < peak
-                )
+            if not is_replay and frame.uncertain:
+                leader = leading_slot(frame)
+                foreign_uncertainty |= leader is not None and leader != candidate
             foreign_replay |= is_replay and foreign
             if not is_replay and frame.clear:
                 support += (right - left) / rate

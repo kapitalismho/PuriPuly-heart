@@ -1187,7 +1187,7 @@ class OverlayPresenter(OverlaySink):
                         entry.speaker_style == "gray"
                         and entry.speaker_gray_reason
                         in ("not_ready", "unavailable", "uncertain", "unallocated", "missing")
-                        and assignment.palette_index is not None
+                        and (assignment.palette_index is not None or assignment.palette_overflow)
                         and (previous is None or assignment.revision > previous.revision)
                     ):
                         entry.speaker_assignment = assignment
