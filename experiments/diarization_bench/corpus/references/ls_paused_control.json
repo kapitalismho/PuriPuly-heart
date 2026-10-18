@@ -1,0 +1,99 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ls_paused_control",
+ "category": "paused_transfer",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Alternation separated by 800/1500 ms pauses (natural-end control).",
+ "audio": {
+  "file": "ls_paused_control.wav",
+  "pcm_sha256": "8d31f8829189d5ce2440e571d18f05be2a5c4a440c55790ad1ade0c31bc102ef",
+  "samples": 323520,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 3.82,
+   "text": "a cold lucid indifference reigned in his soul",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 4.62,
+   "end": 6.92,
+   "text": "might learn something useful down there",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 8.42,
+   "end": 12.1,
+   "text": "well now ennis i declare you have a head and so has my stick",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 12.9,
+   "end": 15.2,
+   "text": "some others too big cotton county",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 16.7,
+   "end": 19.22,
+   "text": "stuff it into you his belly counselled him",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0007.flac",
+   "sha256": "c310a0558d2a9f3698a25675ce61c6ba1de232f2acb35ee8d096e504d0fe4299",
+   "id": "1089-134686-0007"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 73120,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0004.flac",
+   "sha256": "20daf9f52570d9bbefb8fab39eaa0dcd3e666aeac5231b3cbe13c68f815bfff9",
+   "id": "1995-1826-0004"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 133920,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0010.flac",
+   "sha256": "38f99d2ee3f3b8ef24b90baeb9f7572b09d28a98a0d6080643e6b0237047d75d",
+   "id": "1089-134686-0010"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 205600,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0008.flac",
+   "sha256": "57bb938d247c0c140b80ead1d44eba03bab9ff57a154f72db0120d13d1d52bf9",
+   "id": "1995-1826-0008"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 266400,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0001.flac",
+   "sha256": "3fc09ec6d4cc496c530b2019b17bd8fc8ef8a43d6697090971dd1d52cc3d4d89",
+   "id": "1089-134686-0001"
+  }
+ ]
+}

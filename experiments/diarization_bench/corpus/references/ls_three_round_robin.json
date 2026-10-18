@@ -1,0 +1,163 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ls_three_round_robin",
+ "category": "multi_speaker",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Three speakers in round robin with 150 ms gaps.",
+ "audio": {
+  "file": "ls_three_round_robin.wav",
+  "pcm_sha256": "4b234bf9309653122934e5e2c241670ff4a69f1b877882c9a746bfef3b37b5fa",
+  "samples": 561280,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 3.36,
+   "text": "why fade these children of the spring",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 3.51,
+   "end": 6.85,
+   "text": "pearl was a born outcast of the infantile world",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 7.0,
+   "end": 10.22,
+   "text": "out in the woods stood a nice little fir tree",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 10.37,
+   "end": 13.97,
+   "text": "and why it scatters its bright beauty thro the humid air",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 14.12,
+   "end": 18.04,
+   "text": "pearl saw and gazed intently but never sought to make acquaintance",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 18.19,
+   "end": 21.85,
+   "text": "but this was what the tree could not bear to hear",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 22.0,
+   "end": 25.66,
+   "text": "descend o little cloud and hover before the eyes of thel",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 25.81,
+   "end": 30.23,
+   "text": "yet these thoughts affected hester prynne less with hope than apprehension",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 30.38,
+   "end": 34.08,
+   "text": "rejoice in thy growth said the sunbeams",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/908/157963/908-157963-0003.flac",
+   "sha256": "dd5892dd62e1d390e4e5b9ce18613e127e6dd2825f22211d3faf8b069f882f71",
+   "id": "908-157963-0003"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 55360,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0013.flac",
+   "sha256": "afeb4a9850dd031ae25e8260d6589e7fda90b93d675e54dedaca1c6bf16bb6a8",
+   "id": "1221-135766-0013"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 111200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/672/122797/672-122797-0000.flac",
+   "sha256": "776b1ce553e7ecb2dc0254b2aa4b35af0bde50db65dbf7bdbdfa1560a2c9ec36",
+   "id": "672-122797-0000"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 165120,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/908/157963/908-157963-0013.flac",
+   "sha256": "13d7ec1497e85593be0049aca3de61b231430ecee9894272a6a009227aa52c61",
+   "id": "908-157963-0013"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 225120,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0014.flac",
+   "sha256": "9378d3b134dfadc2aec857f0a212c18c01e453de25643b3ef68a8705cd775814",
+   "id": "1221-135766-0014"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 290240,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/672/122797/672-122797-0003.flac",
+   "sha256": "b00cbf4705fcd94f9ea9130da79993f83b7e3a83313328314b3492d19295af94",
+   "id": "672-122797-0003"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 351200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/908/157963/908-157963-0014.flac",
+   "sha256": "e89714ee4bac5b4facedf00e53f164ce15932b1b5e4d8a792aa0fe292c8b0dfd",
+   "id": "908-157963-0014"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 412160,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0002.flac",
+   "sha256": "1f02bae046f9567010f0163e8f204612fd1035a751383586a7aef6cb0fcc6e60",
+   "id": "1221-135766-0002"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 485280,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/672/122797/672-122797-0010.flac",
+   "sha256": "1c13de1dab482949c39bb5ed530f868e41dd6141c5913e1f2c7db4dc012f92b6",
+   "id": "672-122797-0010"
+  }
+ ]
+}

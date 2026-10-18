@@ -1,0 +1,79 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "cv_ja_pair_repeated",
+ "category": "continuous_transfer",
+ "language": "ja",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Japanese two-speaker alternation; each speaker repeats one original clip.",
+ "audio": {
+  "file": "cv_ja_pair_repeated.wav",
+  "pcm_sha256": "3f09ae470471392275e025f18cde7cd6d0f78192849d176211bb2b454cd1dee2",
+  "samples": 303840,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 4.98,
+   "text": "両手の指は変形し、関節の辺りが、こぶ状に盛り上がっていた。",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 5.13,
+   "end": 9.17,
+   "text": "山田さんの妹さんは背が低くて、かわいいです。",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 9.32,
+   "end": 13.8,
+   "text": "両手の指は変形し、関節の辺りが、こぶ状に盛り上がっていた。",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 13.95,
+   "end": 17.99,
+   "text": "山田さんの妹さんは背が低くて、かわいいです。",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ja/common_voice_ja_21023058.mp3",
+   "sha256": "61e0f79cfc353f67ed7ac1d265bf31aec272048c80398562c8a7faf15be95752"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 81280,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ja/common_voice_ja_22191884.mp3",
+   "sha256": "ca73ec2fdfc6a7cdbec60fdf9ca81bfbb280f9c2c67b894b4925fffc6d4847eb"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 148320,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ja/common_voice_ja_21023058.mp3",
+   "sha256": "61e0f79cfc353f67ed7ac1d265bf31aec272048c80398562c8a7faf15be95752"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 222400,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ja/common_voice_ja_22191884.mp3",
+   "sha256": "ca73ec2fdfc6a7cdbec60fdf9ca81bfbb280f9c2c67b894b4925fffc6d4847eb"
+  }
+ ]
+}

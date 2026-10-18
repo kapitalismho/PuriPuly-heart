@@ -1,0 +1,83 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ls_long_rollover",
+ "category": "rollover_transfer",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Turns longer than six seconds handing over without a pause.",
+ "audio": {
+  "file": "ls_long_rollover.wav",
+  "pcm_sha256": "4f78f249366237cb4ddf5a013fa414210391373ea4d647f432c521bc75949df8",
+  "samples": 436320,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 7.9,
+   "text": "it is the head of a parrot with a little flower in his beak from a picture of carpaccio's one of his series of the life of saint george",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 7.9,
+   "end": 12.5,
+   "text": "what is your country olaf have you always been a thrall the thrall's eyes flashed",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 12.65,
+   "end": 20.53,
+   "text": "they unite every quality and sometimes you will find me referring to them as colorists sometimes as chiaroscurists",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 20.53,
+   "end": 26.27,
+   "text": "i made her for only twenty oars because i thought few men would follow me for i was young fifteen years old",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1188/133604/1188-133604-0005.flac",
+   "sha256": "d94b8c28ac1fa90b2641f97e1e4e02c8b6d4de203b4f8c2fea00240a743afccf",
+   "id": "1188-133604-0005"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 125600,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/5142/33396/5142-33396-0001.flac",
+   "sha256": "be7ea6c5995e58166c31b9d2ccb260d5ddb0eed705ec71de0d1787bc3728de13",
+   "id": "5142-33396-0001"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 201600,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1188/133604/1188-133604-0001.flac",
+   "sha256": "3022b442af790536b60f18abe88b5376418a208f2774547b8d9700d4ef00bb03",
+   "id": "1188-133604-0001"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 327680,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/5142/33396/5142-33396-0006.flac",
+   "sha256": "b0b27b755d2d37dff21982b8a1c8a31b3f111106e384bca30f38a0e20968cf49",
+   "id": "5142-33396-0006"
+  }
+ ]
+}

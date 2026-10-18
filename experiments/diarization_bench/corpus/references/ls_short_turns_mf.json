@@ -1,0 +1,115 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ls_short_turns_mf",
+ "category": "short_turns",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Quick exchange of 1.6-2.0 s turns with 150 ms gaps.",
+ "audio": {
+  "file": "ls_short_turns_mf.wav",
+  "pcm_sha256": "1d82fc831ccf2e079259483040053945cad389a433e3f7c85bd48bb36cf14dc3",
+  "samples": 214560,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 2.2,
+   "text": "he tried to think how it could be",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 2.35,
+   "end": 4.21,
+   "text": "at any rate i say go",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 4.36,
+   "end": 6.36,
+   "text": "hello bertie any good in your mind",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 6.51,
+   "end": 8.41,
+   "text": "cotton she paused",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 8.56,
+   "end": 10.32,
+   "text": "then he comes to the beak of it",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 10.47,
+   "end": 12.41,
+   "text": "been looking up tooms county",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0014.flac",
+   "sha256": "a18c81f8bb1bea70a226008e95a9b8d2e4f897a56dad5ef332f4f843f230a129",
+   "id": "1089-134686-0014"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 36800,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0010.flac",
+   "sha256": "9bf28f854203b8209aeac34b85b7f5604aafb93865778a9eb86b10129216bb9f",
+   "id": "1995-1826-0010"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 68960,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0003.flac",
+   "sha256": "d8692f61518fe07b45d4dad54e026c1d04f3fc016b0d39923d05fcbcff684563",
+   "id": "1089-134686-0003"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 103360,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0014.flac",
+   "sha256": "6a0bf110294aac8b2e2d49f8044495f52f7dc363f41186e74e5ad0319c4af8a1",
+   "id": "1995-1826-0014"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 136160,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1188/133604/1188-133604-0006.flac",
+   "sha256": "1f3cd38fcd11de325482d3f67037ede0abadd9b5cf4a0734182017951f26c63b",
+   "id": "1188-133604-0006"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 166720,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0006.flac",
+   "sha256": "3a670c460ca8607a5f67fed57c329dc6f7df7479cec7484b2786a326c5305fd2",
+   "id": "1995-1826-0006"
+  }
+ ]
+}

@@ -1,0 +1,1917 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ami_en2002b",
+ "category": "natural_meeting",
+ "language": "en",
+ "synthetic": false,
+ "synthetic_voice": false,
+ "description": "AMI EN2002b Mix-Headset 475-550 s; window selected for the most continuous transfers.",
+ "audio": {
+  "file": "ami_en2002b.wav",
+  "pcm_sha256": "21e3d6fe114d2dba15821872c0065dfaafd43f0534853898933ee6a0d3119258",
+  "samples": 1200000,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "C",
+   "start": 0.29,
+   "end": 0.79,
+   "text": "yeah",
+   "words": [
+    {
+     "text": "yeah",
+     "start": 0.29,
+     "end": 0.79
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 0.76,
+   "end": 1.01,
+   "text": "Like",
+   "words": [
+    {
+     "text": "Like",
+     "start": 0.76,
+     "end": 1.01
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 0.79,
+   "end": 0.84,
+   "text": "I",
+   "words": [
+    {
+     "text": "I",
+     "start": 0.79,
+     "end": 0.84
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 1.01,
+   "end": 3.98,
+   "text": "should we put i a hint that something like that might happen into the document",
+   "words": [
+    {
+     "text": "should",
+     "start": 1.01,
+     "end": 1.13
+    },
+    {
+     "text": "we",
+     "start": 1.13,
+     "end": 1.21
+    },
+    {
+     "text": "put",
+     "start": 1.21,
+     "end": 1.37
+    },
+    {
+     "text": "i",
+     "start": 1.37,
+     "end": 1.65
+    },
+    {
+     "text": "a",
+     "start": 1.65,
+     "end": 1.75
+    },
+    {
+     "text": "hint",
+     "start": 1.75,
+     "end": 2.18
+    },
+    {
+     "text": "that",
+     "start": 2.18,
+     "end": 2.32
+    },
+    {
+     "text": "something",
+     "start": 2.32,
+     "end": 2.59
+    },
+    {
+     "text": "like",
+     "start": 2.59,
+     "end": 2.71
+    },
+    {
+     "text": "that",
+     "start": 2.71,
+     "end": 2.85
+    },
+    {
+     "text": "might",
+     "start": 2.85,
+     "end": 3.01
+    },
+    {
+     "text": "happen",
+     "start": 3.01,
+     "end": 3.27
+    },
+    {
+     "text": "into",
+     "start": 3.27,
+     "end": 3.43
+    },
+    {
+     "text": "the",
+     "start": 3.43,
+     "end": 3.52
+    },
+    {
+     "text": "document",
+     "start": 3.52,
+     "end": 3.98
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 4.0,
+   "end": 6.45,
+   "text": "Or maybe the speaker characterisation might get slimmer",
+   "words": [
+    {
+     "text": "Or",
+     "start": 4.0,
+     "end": 4.05
+    },
+    {
+     "text": "maybe",
+     "start": 4.05,
+     "end": 4.37
+    },
+    {
+     "text": "the",
+     "start": 4.37,
+     "end": 4.61
+    },
+    {
+     "text": "speaker",
+     "start": 4.61,
+     "end": 4.92
+    },
+    {
+     "text": "characterisation",
+     "start": 4.92,
+     "end": 5.59
+    },
+    {
+     "text": "might",
+     "start": 5.59,
+     "end": 5.83
+    },
+    {
+     "text": "get",
+     "start": 5.83,
+     "end": 6.03
+    },
+    {
+     "text": "slimmer",
+     "start": 6.03,
+     "end": 6.45
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 6.89,
+   "end": 7.58,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 6.89,
+     "end": 7.58
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 6.94,
+   "end": 8.21,
+   "text": "Okay Alright",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 6.94,
+     "end": 7.56
+    },
+    {
+     "text": "Alright",
+     "start": 7.56,
+     "end": 8.21
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 7.58,
+   "end": 8.45,
+   "text": "that's right I",
+   "words": [
+    {
+     "text": "that's",
+     "start": 7.58,
+     "end": 7.81
+    },
+    {
+     "text": "right",
+     "start": 7.81,
+     "end": 8.21
+    },
+    {
+     "text": "I",
+     "start": 8.21,
+     "end": 8.45
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 8.21,
+   "end": 9.84,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 8.21,
+     "end": 9.84
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 8.22,
+   "end": 9.31,
+   "text": "Probably",
+   "words": [
+    {
+     "text": "Probably",
+     "start": 8.22,
+     "end": 9.31
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 8.45,
+   "end": 9.39,
+   "text": "I really wanna do it",
+   "words": [
+    {
+     "text": "I",
+     "start": 8.45,
+     "end": 8.55
+    },
+    {
+     "text": "really",
+     "start": 8.55,
+     "end": 8.82
+    },
+    {
+     "text": "wanna",
+     "start": 8.82,
+     "end": 9.04
+    },
+    {
+     "text": "do",
+     "start": 9.04,
+     "end": 9.26
+    },
+    {
+     "text": "it",
+     "start": 9.26,
+     "end": 9.39
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 9.31,
+   "end": 9.39,
+   "text": "we",
+   "words": [
+    {
+     "text": "we",
+     "start": 9.31,
+     "end": 9.39
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 9.39,
+   "end": 9.49,
+   "text": "I",
+   "words": [
+    {
+     "text": "I",
+     "start": 9.39,
+     "end": 9.49
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 9.39,
+   "end": 9.65,
+   "text": "won't",
+   "words": [
+    {
+     "text": "won't",
+     "start": 9.39,
+     "end": 9.65
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 9.49,
+   "end": 9.73,
+   "text": "mean",
+   "words": [
+    {
+     "text": "mean",
+     "start": 9.49,
+     "end": 9.73
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 9.65,
+   "end": 10.21,
+   "text": "disappear",
+   "words": [
+    {
+     "text": "disappear",
+     "start": 9.65,
+     "end": 10.21
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 9.73,
+   "end": 9.9,
+   "text": "it's",
+   "words": [
+    {
+     "text": "it's",
+     "start": 9.73,
+     "end": 9.9
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 9.84,
+   "end": 10.03,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 9.84,
+     "end": 10.03
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 9.9,
+   "end": 10.84,
+   "text": "not",
+   "words": [
+    {
+     "text": "not",
+     "start": 9.9,
+     "end": 10.84
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 10.03,
+   "end": 10.61,
+   "text": "I know",
+   "words": [
+    {
+     "text": "I",
+     "start": 10.03,
+     "end": 10.13
+    },
+    {
+     "text": "know",
+     "start": 10.13,
+     "end": 10.61
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 10.21,
+   "end": 10.8,
+   "text": "it yeah",
+   "words": [
+    {
+     "text": "it",
+     "start": 10.21,
+     "end": 10.3
+    },
+    {
+     "text": "yeah",
+     "start": 10.3,
+     "end": 10.8
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 10.61,
+   "end": 10.88,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 10.61,
+     "end": 10.88
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 10.84,
+   "end": 16.61,
+   "text": "it's not gonna be difficult If at least have all the information pop up that is already in the meta-data file",
+   "words": [
+    {
+     "text": "it's",
+     "start": 10.84,
+     "end": 10.97
+    },
+    {
+     "text": "not",
+     "start": 10.97,
+     "end": 11.11
+    },
+    {
+     "text": "gonna",
+     "start": 11.11,
+     "end": 11.23
+    },
+    {
+     "text": "be",
+     "start": 11.23,
+     "end": 11.31
+    },
+    {
+     "text": "difficult",
+     "start": 11.31,
+     "end": 11.78
+    },
+    {
+     "text": "If",
+     "start": 11.78,
+     "end": 12.35
+    },
+    {
+     "text": "at",
+     "start": 12.35,
+     "end": 12.57
+    },
+    {
+     "text": "least",
+     "start": 12.57,
+     "end": 12.83
+    },
+    {
+     "text": "have",
+     "start": 12.83,
+     "end": 13.14
+    },
+    {
+     "text": "all",
+     "start": 13.14,
+     "end": 13.34
+    },
+    {
+     "text": "the",
+     "start": 13.34,
+     "end": 13.59
+    },
+    {
+     "text": "information",
+     "start": 13.59,
+     "end": 14.05
+    },
+    {
+     "text": "pop",
+     "start": 14.05,
+     "end": 14.31
+    },
+    {
+     "text": "up",
+     "start": 14.31,
+     "end": 14.49
+    },
+    {
+     "text": "that",
+     "start": 14.49,
+     "end": 14.62
+    },
+    {
+     "text": "is",
+     "start": 14.62,
+     "end": 14.72
+    },
+    {
+     "text": "already",
+     "start": 14.72,
+     "end": 15.08
+    },
+    {
+     "text": "in",
+     "start": 15.08,
+     "end": 15.17
+    },
+    {
+     "text": "the",
+     "start": 15.17,
+     "end": 15.28
+    },
+    {
+     "text": "meta-data",
+     "start": 15.28,
+     "end": 15.8
+    },
+    {
+     "text": "file",
+     "start": 15.8,
+     "end": 16.61
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 16.3,
+   "end": 17.18,
+   "text": "Mm-hmm",
+   "words": [
+    {
+     "text": "Mm-hmm",
+     "start": 16.3,
+     "end": 17.18
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 16.61,
+   "end": 17.38,
+   "text": "That's gonna be no",
+   "words": [
+    {
+     "text": "That's",
+     "start": 16.61,
+     "end": 16.84
+    },
+    {
+     "text": "gonna",
+     "start": 16.84,
+     "end": 17.06
+    },
+    {
+     "text": "be",
+     "start": 17.06,
+     "end": 17.16
+    },
+    {
+     "text": "no",
+     "start": 17.16,
+     "end": 17.38
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 17.18,
+   "end": 17.28,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 17.18,
+     "end": 17.28
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 17.25,
+   "end": 17.78,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 17.25,
+     "end": 17.78
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 17.28,
+   "end": 17.77,
+   "text": "okay",
+   "words": [
+    {
+     "text": "okay",
+     "start": 17.28,
+     "end": 17.77
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 17.38,
+   "end": 17.82,
+   "text": "work at",
+   "words": [
+    {
+     "text": "work",
+     "start": 17.38,
+     "end": 17.67
+    },
+    {
+     "text": "at",
+     "start": 17.67,
+     "end": 17.82
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 17.77,
+   "end": 17.89,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 17.77,
+     "end": 17.89
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 17.78,
+   "end": 18.19,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 17.78,
+     "end": 18.19
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 17.82,
+   "end": 18.66,
+   "text": "all",
+   "words": [
+    {
+     "text": "all",
+     "start": 17.82,
+     "end": 18.66
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 17.89,
+   "end": 18.43,
+   "text": "true",
+   "words": [
+    {
+     "text": "true",
+     "start": 17.89,
+     "end": 18.43
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 18.19,
+   "end": 18.32,
+   "text": "Yep",
+   "words": [
+    {
+     "text": "Yep",
+     "start": 18.19,
+     "end": 18.32
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 18.43,
+   "end": 18.66,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 18.43,
+     "end": 18.66
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 18.66,
+   "end": 20.23,
+   "text": "So it's definitely gonna be something there",
+   "words": [
+    {
+     "text": "So",
+     "start": 18.66,
+     "end": 18.94
+    },
+    {
+     "text": "it's",
+     "start": 18.94,
+     "end": 19.12
+    },
+    {
+     "text": "definitely",
+     "start": 19.12,
+     "end": 19.43
+    },
+    {
+     "text": "gonna",
+     "start": 19.43,
+     "end": 19.56
+    },
+    {
+     "text": "be",
+     "start": 19.56,
+     "end": 19.65
+    },
+    {
+     "text": "something",
+     "start": 19.65,
+     "end": 20.06
+    },
+    {
+     "text": "there",
+     "start": 20.06,
+     "end": 20.23
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 20.34,
+   "end": 20.57,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 20.34,
+     "end": 20.57
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 20.42,
+   "end": 21.0,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 20.42,
+     "end": 21.0
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 20.57,
+   "end": 21.03,
+   "text": "we won't make it",
+   "words": [
+    {
+     "text": "we",
+     "start": 20.57,
+     "end": 20.64
+    },
+    {
+     "text": "won't",
+     "start": 20.64,
+     "end": 20.82
+    },
+    {
+     "text": "make",
+     "start": 20.82,
+     "end": 20.95
+    },
+    {
+     "text": "it",
+     "start": 20.95,
+     "end": 21.03
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 21.0,
+   "end": 21.21,
+   "text": "sounds",
+   "words": [
+    {
+     "text": "sounds",
+     "start": 21.0,
+     "end": 21.21
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 21.03,
+   "end": 21.18,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 21.03,
+     "end": 21.18
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 21.03,
+   "end": 21.43,
+   "text": "disappear",
+   "words": [
+    {
+     "text": "disappear",
+     "start": 21.03,
+     "end": 21.43
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 21.21,
+   "end": 21.39,
+   "text": "good",
+   "words": [
+    {
+     "text": "good",
+     "start": 21.21,
+     "end": 21.39
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 21.43,
+   "end": 22.81,
+   "text": "but we might thin it down a bit",
+   "words": [
+    {
+     "text": "but",
+     "start": 21.43,
+     "end": 21.55
+    },
+    {
+     "text": "we",
+     "start": 21.55,
+     "end": 21.65
+    },
+    {
+     "text": "might",
+     "start": 21.65,
+     "end": 21.87
+    },
+    {
+     "text": "thin",
+     "start": 21.87,
+     "end": 22.07
+    },
+    {
+     "text": "it",
+     "start": 22.07,
+     "end": 22.21
+    },
+    {
+     "text": "down",
+     "start": 22.21,
+     "end": 22.4
+    },
+    {
+     "text": "a",
+     "start": 22.4,
+     "end": 22.46
+    },
+    {
+     "text": "bit",
+     "start": 22.46,
+     "end": 22.81
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 23.07,
+   "end": 23.27,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 23.07,
+     "end": 23.27
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 24.21,
+   "end": 26.77,
+   "text": "Um but we might not you know but we might have time Depends",
+   "words": [
+    {
+     "text": "Um",
+     "start": 24.21,
+     "end": 24.53
+    },
+    {
+     "text": "but",
+     "start": 24.53,
+     "end": 24.62
+    },
+    {
+     "text": "we",
+     "start": 24.62,
+     "end": 24.69
+    },
+    {
+     "text": "might",
+     "start": 24.69,
+     "end": 24.88
+    },
+    {
+     "text": "not",
+     "start": 24.88,
+     "end": 25.03
+    },
+    {
+     "text": "you",
+     "start": 25.03,
+     "end": 25.11
+    },
+    {
+     "text": "know",
+     "start": 25.11,
+     "end": 25.21
+    },
+    {
+     "text": "but",
+     "start": 25.21,
+     "end": 25.37
+    },
+    {
+     "text": "we",
+     "start": 25.37,
+     "end": 25.45
+    },
+    {
+     "text": "might",
+     "start": 25.45,
+     "end": 25.62
+    },
+    {
+     "text": "have",
+     "start": 25.62,
+     "end": 25.71
+    },
+    {
+     "text": "time",
+     "start": 25.71,
+     "end": 25.95
+    },
+    {
+     "text": "Depends",
+     "start": 25.95,
+     "end": 26.77
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 26.3,
+   "end": 27.04,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 26.3,
+     "end": 27.04
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 26.77,
+   "end": 27.18,
+   "text": "how how",
+   "words": [
+    {
+     "text": "how",
+     "start": 26.77,
+     "end": 26.98
+    },
+    {
+     "text": "how",
+     "start": 26.98,
+     "end": 27.18
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 27.04,
+   "end": 27.51,
+   "text": "it might",
+   "words": [
+    {
+     "text": "it",
+     "start": 27.04,
+     "end": 27.14
+    },
+    {
+     "text": "might",
+     "start": 27.14,
+     "end": 27.51
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 27.18,
+   "end": 27.85,
+   "text": "how how things",
+   "words": [
+    {
+     "text": "how",
+     "start": 27.18,
+     "end": 27.33
+    },
+    {
+     "text": "how",
+     "start": 27.33,
+     "end": 27.47
+    },
+    {
+     "text": "things",
+     "start": 27.47,
+     "end": 27.85
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 27.51,
+   "end": 28.03,
+   "text": "turn out",
+   "words": [
+    {
+     "text": "turn",
+     "start": 27.51,
+     "end": 27.75
+    },
+    {
+     "text": "out",
+     "start": 27.75,
+     "end": 28.03
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 27.85,
+   "end": 28.12,
+   "text": "m",
+   "words": [
+    {
+     "text": "m",
+     "start": 27.85,
+     "end": 28.12
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 28.03,
+   "end": 29.84,
+   "text": "easier than thought",
+   "words": [
+    {
+     "text": "easier",
+     "start": 28.03,
+     "end": 28.34
+    },
+    {
+     "text": "than",
+     "start": 28.34,
+     "end": 29.41
+    },
+    {
+     "text": "thought",
+     "start": 29.41,
+     "end": 29.84
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 31.75,
+   "end": 32.21,
+   "text": "Um",
+   "words": [
+    {
+     "text": "Um",
+     "start": 31.75,
+     "end": 32.21
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 33.61,
+   "end": 38.76,
+   "text": "The topic segmentation with the L_C_ seg and text tiles basically done It just",
+   "words": [
+    {
+     "text": "The",
+     "start": 33.61,
+     "end": 33.68
+    },
+    {
+     "text": "topic",
+     "start": 33.68,
+     "end": 33.9
+    },
+    {
+     "text": "segmentation",
+     "start": 33.9,
+     "end": 34.79
+    },
+    {
+     "text": "with",
+     "start": 34.79,
+     "end": 34.95
+    },
+    {
+     "text": "the",
+     "start": 34.95,
+     "end": 35.6
+    },
+    {
+     "text": "L_C_",
+     "start": 35.6,
+     "end": 35.97
+    },
+    {
+     "text": "seg",
+     "start": 35.97,
+     "end": 36.26
+    },
+    {
+     "text": "and",
+     "start": 36.26,
+     "end": 36.68
+    },
+    {
+     "text": "text",
+     "start": 36.68,
+     "end": 36.94
+    },
+    {
+     "text": "tiles",
+     "start": 36.94,
+     "end": 37.68
+    },
+    {
+     "text": "basically",
+     "start": 37.68,
+     "end": 38.14
+    },
+    {
+     "text": "done",
+     "start": 38.14,
+     "end": 38.48
+    },
+    {
+     "text": "It",
+     "start": 38.48,
+     "end": 38.55
+    },
+    {
+     "text": "just",
+     "start": 38.55,
+     "end": 38.76
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 38.63,
+   "end": 40.51,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 38.63,
+     "end": 40.51
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 38.76,
+   "end": 40.57,
+   "text": "needs to be done because you",
+   "words": [
+    {
+     "text": "needs",
+     "start": 38.76,
+     "end": 39.02
+    },
+    {
+     "text": "to",
+     "start": 39.02,
+     "end": 39.13
+    },
+    {
+     "text": "be",
+     "start": 39.13,
+     "end": 40.0
+    },
+    {
+     "text": "done",
+     "start": 40.0,
+     "end": 40.33
+    },
+    {
+     "text": "because",
+     "start": 40.33,
+     "end": 40.51
+    },
+    {
+     "text": "you",
+     "start": 40.51,
+     "end": 40.57
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 40.51,
+   "end": 41.05,
+   "text": "Tuned",
+   "words": [
+    {
+     "text": "Tuned",
+     "start": 40.51,
+     "end": 41.05
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 40.57,
+   "end": 41.05,
+   "text": "know what I mean the",
+   "words": [
+    {
+     "text": "know",
+     "start": 40.57,
+     "end": 40.63
+    },
+    {
+     "text": "what",
+     "start": 40.63,
+     "end": 40.72
+    },
+    {
+     "text": "I",
+     "start": 40.72,
+     "end": 40.75
+    },
+    {
+     "text": "mean",
+     "start": 40.75,
+     "end": 40.94
+    },
+    {
+     "text": "the",
+     "start": 40.94,
+     "end": 41.05
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 41.05,
+   "end": 41.16,
+   "text": "I",
+   "words": [
+    {
+     "text": "I",
+     "start": 41.05,
+     "end": 41.16
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 41.05,
+   "end": 41.24,
+   "text": "co",
+   "words": [
+    {
+     "text": "co",
+     "start": 41.05,
+     "end": 41.24
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 41.16,
+   "end": 41.41,
+   "text": "guess",
+   "words": [
+    {
+     "text": "guess",
+     "start": 41.16,
+     "end": 41.41
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 41.24,
+   "end": 41.48,
+   "text": "yeah",
+   "words": [
+    {
+     "text": "yeah",
+     "start": 41.24,
+     "end": 41.48
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 41.41,
+   "end": 41.7,
+   "text": "or",
+   "words": [
+    {
+     "text": "or",
+     "start": 41.41,
+     "end": 41.7
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 41.48,
+   "end": 41.87,
+   "text": "tuned",
+   "words": [
+    {
+     "text": "tuned",
+     "start": 41.48,
+     "end": 41.87
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 41.7,
+   "end": 42.76,
+   "text": "yeah Yeah",
+   "words": [
+    {
+     "text": "yeah",
+     "start": 41.7,
+     "end": 41.85
+    },
+    {
+     "text": "Yeah",
+     "start": 41.85,
+     "end": 42.76
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 41.87,
+   "end": 47.98,
+   "text": "yeah A search through the parameters or something Let's see what happens",
+   "words": [
+    {
+     "text": "yeah",
+     "start": 41.87,
+     "end": 42.44
+    },
+    {
+     "text": "A",
+     "start": 42.44,
+     "end": 42.55
+    },
+    {
+     "text": "search",
+     "start": 42.55,
+     "end": 43.01
+    },
+    {
+     "text": "through",
+     "start": 43.01,
+     "end": 43.11
+    },
+    {
+     "text": "the",
+     "start": 43.11,
+     "end": 43.21
+    },
+    {
+     "text": "parameters",
+     "start": 43.21,
+     "end": 44.53
+    },
+    {
+     "text": "or",
+     "start": 44.53,
+     "end": 44.72
+    },
+    {
+     "text": "something",
+     "start": 44.72,
+     "end": 45.69
+    },
+    {
+     "text": "Let's",
+     "start": 45.69,
+     "end": 45.89
+    },
+    {
+     "text": "see",
+     "start": 45.89,
+     "end": 46.02
+    },
+    {
+     "text": "what",
+     "start": 46.02,
+     "end": 46.16
+    },
+    {
+     "text": "happens",
+     "start": 46.16,
+     "end": 47.98
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 47.48,
+   "end": 47.72,
+   "text": "Cool",
+   "words": [
+    {
+     "text": "Cool",
+     "start": 47.48,
+     "end": 47.72
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 51.11,
+   "end": 51.42,
+   "text": "Mm",
+   "words": [
+    {
+     "text": "Mm",
+     "start": 51.11,
+     "end": 51.42
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 51.6,
+   "end": 52.42,
+   "text": "Yeah sounds good",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 51.6,
+     "end": 51.93
+    },
+    {
+     "text": "sounds",
+     "start": 51.93,
+     "end": 52.17
+    },
+    {
+     "text": "good",
+     "start": 52.17,
+     "end": 52.42
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 55.15,
+   "end": 55.59,
+   "text": "What else",
+   "words": [
+    {
+     "text": "What",
+     "start": 55.15,
+     "end": 55.33
+    },
+    {
+     "text": "else",
+     "start": 55.33,
+     "end": 55.59
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 55.52,
+   "end": 55.7,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 55.52,
+     "end": 55.7
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 59.3,
+   "end": 59.52,
+   "text": "Hmm",
+   "words": [
+    {
+     "text": "Hmm",
+     "start": 59.3,
+     "end": 59.52
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 61.78,
+   "end": 63.13,
+   "text": "I don't know Shall we",
+   "words": [
+    {
+     "text": "I",
+     "start": 61.78,
+     "end": 61.84
+    },
+    {
+     "text": "don't",
+     "start": 61.84,
+     "end": 61.96
+    },
+    {
+     "text": "know",
+     "start": 61.96,
+     "end": 62.4
+    },
+    {
+     "text": "Shall",
+     "start": 62.4,
+     "end": 62.66
+    },
+    {
+     "text": "we",
+     "start": 62.66,
+     "end": 63.13
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 62.74,
+   "end": 63.37,
+   "text": "We should probably",
+   "words": [
+    {
+     "text": "We",
+     "start": 62.74,
+     "end": 62.85
+    },
+    {
+     "text": "should",
+     "start": 62.85,
+     "end": 63.03
+    },
+    {
+     "text": "probably",
+     "start": 63.03,
+     "end": 63.37
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 63.13,
+   "end": 64.45,
+   "text": "change",
+   "words": [
+    {
+     "text": "change",
+     "start": 63.13,
+     "end": 64.45
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 63.37,
+   "end": 64.59,
+   "text": "d sorry",
+   "words": [
+    {
+     "text": "d",
+     "start": 63.37,
+     "end": 64.31
+    },
+    {
+     "text": "sorry",
+     "start": 64.31,
+     "end": 64.59
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 64.45,
+   "end": 65.17,
+   "text": "the deadlines",
+   "words": [
+    {
+     "text": "the",
+     "start": 64.45,
+     "end": 64.57
+    },
+    {
+     "text": "deadlines",
+     "start": 64.57,
+     "end": 65.17
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 64.59,
+   "end": 73.93,
+   "text": "we should probably do another responsibility of packages as well That's what he hinted that we should also um indicate who who is responsible for what",
+   "words": [
+    {
+     "text": "we",
+     "start": 64.59,
+     "end": 64.71
+    },
+    {
+     "text": "should",
+     "start": 64.71,
+     "end": 64.87
+    },
+    {
+     "text": "probably",
+     "start": 64.87,
+     "end": 65.13
+    },
+    {
+     "text": "do",
+     "start": 65.13,
+     "end": 65.25
+    },
+    {
+     "text": "another",
+     "start": 65.25,
+     "end": 65.6
+    },
+    {
+     "text": "responsibility",
+     "start": 65.6,
+     "end": 66.29
+    },
+    {
+     "text": "of",
+     "start": 66.29,
+     "end": 66.41
+    },
+    {
+     "text": "packages",
+     "start": 66.41,
+     "end": 66.91
+    },
+    {
+     "text": "as",
+     "start": 66.91,
+     "end": 67.06
+    },
+    {
+     "text": "well",
+     "start": 67.06,
+     "end": 68.53
+    },
+    {
+     "text": "That's",
+     "start": 68.53,
+     "end": 68.74
+    },
+    {
+     "text": "what",
+     "start": 68.74,
+     "end": 68.91
+    },
+    {
+     "text": "he",
+     "start": 68.91,
+     "end": 69.1
+    },
+    {
+     "text": "hinted",
+     "start": 69.1,
+     "end": 69.44
+    },
+    {
+     "text": "that",
+     "start": 69.44,
+     "end": 69.62
+    },
+    {
+     "text": "we",
+     "start": 69.62,
+     "end": 69.74
+    },
+    {
+     "text": "should",
+     "start": 69.74,
+     "end": 70.02
+    },
+    {
+     "text": "also",
+     "start": 70.02,
+     "end": 70.9
+    },
+    {
+     "text": "um",
+     "start": 70.9,
+     "end": 71.3
+    },
+    {
+     "text": "indicate",
+     "start": 71.3,
+     "end": 71.8
+    },
+    {
+     "text": "who",
+     "start": 71.8,
+     "end": 72.21
+    },
+    {
+     "text": "who",
+     "start": 72.21,
+     "end": 72.29
+    },
+    {
+     "text": "is",
+     "start": 72.29,
+     "end": 72.44
+    },
+    {
+     "text": "responsible",
+     "start": 72.44,
+     "end": 72.9
+    },
+    {
+     "text": "for",
+     "start": 72.9,
+     "end": 73.09
+    },
+    {
+     "text": "what",
+     "start": 73.09,
+     "end": 73.93
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 73.33,
+   "end": 74.45,
+   "text": "Right",
+   "words": [
+    {
+     "text": "Right",
+     "start": 73.33,
+     "end": 74.45
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 73.93,
+   "end": 74.61,
+   "text": "from now on",
+   "words": [
+    {
+     "text": "from",
+     "start": 73.93,
+     "end": 74.17
+    },
+    {
+     "text": "now",
+     "start": 74.17,
+     "end": 74.38
+    },
+    {
+     "text": "on",
+     "start": 74.38,
+     "end": 74.61
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 74.45,
+   "end": 74.99,
+   "text": "Yeah Well I",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 74.45,
+     "end": 74.84
+    },
+    {
+     "text": "Well",
+     "start": 74.84,
+     "end": 74.96
+    },
+    {
+     "text": "I",
+     "start": 74.96,
+     "end": 74.99
+    }
+   ]
+  }
+ ],
+ "provenance": [
+  {
+   "dataset": "AMI Meeting Corpus (Mix-Headset)",
+   "license": "CC BY 4.0",
+   "mirror": "ggfox00000/dia-AMICorpus-all@a249db53de253a3a0a864c93a51d613159dfec7c",
+   "sha256": "50e2c8e4737850c4bf3cc24e7087c755e1c733cd91822106afd0df485ba64893",
+   "window_s": [
+    475.0,
+    550.0
+   ],
+   "annotation": "AMI manual annotations v1.6.2 words",
+   "files": {
+    "EN2002b.A.words.xml": "9690a5ad6eefeee14c5be6f9d019a1daa9fbba24467a03faf4d960c7abd16984",
+    "EN2002b.B.words.xml": "b9265cb5ac3391b6aefefc4d19f12a9b525650cbdda951f5252cd2725a0ca819",
+    "EN2002b.C.words.xml": "efe80687926259f6f0318d4e08f885f54a502b275ce51e0dab1777e084a09bbc",
+    "EN2002b.D.words.xml": "19a9d749879609f5f019446eede56a66c28ff993944edb891e0712edaa447622"
+   }
+  }
+ ]
+}

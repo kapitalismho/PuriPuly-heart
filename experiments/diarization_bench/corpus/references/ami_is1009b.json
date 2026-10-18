@@ -1,0 +1,1062 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ami_is1009b",
+ "category": "natural_meeting",
+ "language": "en",
+ "synthetic": false,
+ "synthetic_voice": false,
+ "description": "AMI IS1009b Mix-Headset 1130-1205 s; window selected for the most continuous transfers.",
+ "audio": {
+  "file": "ami_is1009b.wav",
+  "pcm_sha256": "9be2e0b038946f37ca9220ee9d2bf3ee6bc04467712a0b55fd03ec7f77b41de4",
+  "samples": 1200000,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "C",
+   "start": 0.07,
+   "end": 8.5,
+   "text": "the homepage of the um our website uh from where I have uh uh I got s few points",
+   "words": [
+    {
+     "text": "the",
+     "start": 0.07,
+     "end": 0.44
+    },
+    {
+     "text": "homepage",
+     "start": 0.44,
+     "end": 1.0
+    },
+    {
+     "text": "of",
+     "start": 1.0,
+     "end": 1.22
+    },
+    {
+     "text": "the",
+     "start": 1.22,
+     "end": 2.12
+    },
+    {
+     "text": "um",
+     "start": 2.12,
+     "end": 2.84
+    },
+    {
+     "text": "our",
+     "start": 2.84,
+     "end": 3.37
+    },
+    {
+     "text": "website",
+     "start": 3.37,
+     "end": 4.15
+    },
+    {
+     "text": "uh",
+     "start": 4.15,
+     "end": 4.33
+    },
+    {
+     "text": "from",
+     "start": 4.33,
+     "end": 4.62
+    },
+    {
+     "text": "where",
+     "start": 4.62,
+     "end": 4.77
+    },
+    {
+     "text": "I",
+     "start": 4.77,
+     "end": 4.94
+    },
+    {
+     "text": "have",
+     "start": 4.94,
+     "end": 5.22
+    },
+    {
+     "text": "uh",
+     "start": 5.22,
+     "end": 5.78
+    },
+    {
+     "text": "uh",
+     "start": 5.78,
+     "end": 6.93
+    },
+    {
+     "text": "I",
+     "start": 6.93,
+     "end": 7.06
+    },
+    {
+     "text": "got",
+     "start": 7.06,
+     "end": 7.54
+    },
+    {
+     "text": "s",
+     "start": 7.54,
+     "end": 7.77
+    },
+    {
+     "text": "few",
+     "start": 7.77,
+     "end": 7.95
+    },
+    {
+     "text": "points",
+     "start": 7.95,
+     "end": 8.5
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 9.48,
+   "end": 9.8,
+   "text": "Mm-hmm",
+   "words": [
+    {
+     "text": "Mm-hmm",
+     "start": 9.48,
+     "end": 9.8
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 10.21,
+   "end": 11.47,
+   "text": "That's it that's it from me now",
+   "words": [
+    {
+     "text": "That's",
+     "start": 10.21,
+     "end": 10.51
+    },
+    {
+     "text": "it",
+     "start": 10.51,
+     "end": 10.57
+    },
+    {
+     "text": "that's",
+     "start": 10.57,
+     "end": 10.74
+    },
+    {
+     "text": "it",
+     "start": 10.74,
+     "end": 10.84
+    },
+    {
+     "text": "from",
+     "start": 10.84,
+     "end": 11.1
+    },
+    {
+     "text": "me",
+     "start": 11.1,
+     "end": 11.26
+    },
+    {
+     "text": "now",
+     "start": 11.26,
+     "end": 11.47
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 11.76,
+   "end": 12.16,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 11.76,
+     "end": 12.16
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 17.15,
+   "end": 20.46,
+   "text": "So it um we should visit this site and have a look at uh what's",
+   "words": [
+    {
+     "text": "So",
+     "start": 17.15,
+     "end": 17.42
+    },
+    {
+     "text": "it",
+     "start": 17.42,
+     "end": 17.78
+    },
+    {
+     "text": "um",
+     "start": 17.78,
+     "end": 18.03
+    },
+    {
+     "text": "we",
+     "start": 18.03,
+     "end": 18.13
+    },
+    {
+     "text": "should",
+     "start": 18.13,
+     "end": 18.29
+    },
+    {
+     "text": "visit",
+     "start": 18.29,
+     "end": 18.65
+    },
+    {
+     "text": "this",
+     "start": 18.65,
+     "end": 18.8
+    },
+    {
+     "text": "site",
+     "start": 18.8,
+     "end": 19.02
+    },
+    {
+     "text": "and",
+     "start": 19.02,
+     "end": 19.13
+    },
+    {
+     "text": "have",
+     "start": 19.13,
+     "end": 19.27
+    },
+    {
+     "text": "a",
+     "start": 19.27,
+     "end": 19.33
+    },
+    {
+     "text": "look",
+     "start": 19.33,
+     "end": 19.5
+    },
+    {
+     "text": "at",
+     "start": 19.5,
+     "end": 19.8
+    },
+    {
+     "text": "uh",
+     "start": 19.8,
+     "end": 20.21
+    },
+    {
+     "text": "what's",
+     "start": 20.21,
+     "end": 20.46
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 20.38,
+   "end": 21.39,
+   "text": "Um",
+   "words": [
+    {
+     "text": "Um",
+     "start": 20.38,
+     "end": 21.39
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 20.46,
+   "end": 21.24,
+   "text": "up there Or",
+   "words": [
+    {
+     "text": "up",
+     "start": 20.46,
+     "end": 20.61
+    },
+    {
+     "text": "there",
+     "start": 20.61,
+     "end": 20.75
+    },
+    {
+     "text": "Or",
+     "start": 20.75,
+     "end": 21.24
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 21.62,
+   "end": 22.74,
+   "text": "Well you don't have to",
+   "words": [
+    {
+     "text": "Well",
+     "start": 21.62,
+     "end": 21.98
+    },
+    {
+     "text": "you",
+     "start": 21.98,
+     "end": 22.12
+    },
+    {
+     "text": "don't",
+     "start": 22.12,
+     "end": 22.29
+    },
+    {
+     "text": "have",
+     "start": 22.29,
+     "end": 22.49
+    },
+    {
+     "text": "to",
+     "start": 22.49,
+     "end": 22.74
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 22.75,
+   "end": 27.53,
+   "text": "Uh it's not like that I have referred the page to get new ideas or like",
+   "words": [
+    {
+     "text": "Uh",
+     "start": 22.75,
+     "end": 22.98
+    },
+    {
+     "text": "it's",
+     "start": 22.98,
+     "end": 23.16
+    },
+    {
+     "text": "not",
+     "start": 23.16,
+     "end": 23.34
+    },
+    {
+     "text": "like",
+     "start": 23.34,
+     "end": 23.52
+    },
+    {
+     "text": "that",
+     "start": 23.52,
+     "end": 23.7
+    },
+    {
+     "text": "I",
+     "start": 23.7,
+     "end": 23.88
+    },
+    {
+     "text": "have",
+     "start": 23.88,
+     "end": 24.12
+    },
+    {
+     "text": "referred",
+     "start": 24.12,
+     "end": 24.6
+    },
+    {
+     "text": "the",
+     "start": 24.6,
+     "end": 24.76
+    },
+    {
+     "text": "page",
+     "start": 24.76,
+     "end": 25.13
+    },
+    {
+     "text": "to",
+     "start": 25.13,
+     "end": 25.9
+    },
+    {
+     "text": "get",
+     "start": 25.9,
+     "end": 26.11
+    },
+    {
+     "text": "new",
+     "start": 26.11,
+     "end": 26.33
+    },
+    {
+     "text": "ideas",
+     "start": 26.33,
+     "end": 27.0
+    },
+    {
+     "text": "or",
+     "start": 27.0,
+     "end": 27.27
+    },
+    {
+     "text": "like",
+     "start": 27.27,
+     "end": 27.53
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 27.46,
+   "end": 27.87,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 27.46,
+     "end": 27.87
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 27.53,
+   "end": 31.35,
+   "text": "what can be the working design to how it works and all and",
+   "words": [
+    {
+     "text": "what",
+     "start": 27.53,
+     "end": 27.87
+    },
+    {
+     "text": "can",
+     "start": 27.87,
+     "end": 28.09
+    },
+    {
+     "text": "be",
+     "start": 28.09,
+     "end": 28.19
+    },
+    {
+     "text": "the",
+     "start": 28.19,
+     "end": 28.33
+    },
+    {
+     "text": "working",
+     "start": 28.33,
+     "end": 28.73
+    },
+    {
+     "text": "design",
+     "start": 28.73,
+     "end": 29.23
+    },
+    {
+     "text": "to",
+     "start": 29.23,
+     "end": 30.18
+    },
+    {
+     "text": "how",
+     "start": 30.18,
+     "end": 30.33
+    },
+    {
+     "text": "it",
+     "start": 30.33,
+     "end": 30.54
+    },
+    {
+     "text": "works",
+     "start": 30.54,
+     "end": 30.87
+    },
+    {
+     "text": "and",
+     "start": 30.87,
+     "end": 31.03
+    },
+    {
+     "text": "all",
+     "start": 31.03,
+     "end": 31.26
+    },
+    {
+     "text": "and",
+     "start": 31.26,
+     "end": 31.35
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 31.28,
+   "end": 32.05,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 31.28,
+     "end": 32.05
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 31.35,
+   "end": 31.72,
+   "text": "so and so",
+   "words": [
+    {
+     "text": "so",
+     "start": 31.35,
+     "end": 31.47
+    },
+    {
+     "text": "and",
+     "start": 31.47,
+     "end": 31.59
+    },
+    {
+     "text": "so",
+     "start": 31.59,
+     "end": 31.72
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 32.05,
+   "end": 33.75,
+   "text": "So it might be helpful if we had a look at that",
+   "words": [
+    {
+     "text": "So",
+     "start": 32.05,
+     "end": 32.2
+    },
+    {
+     "text": "it",
+     "start": 32.2,
+     "end": 32.26
+    },
+    {
+     "text": "might",
+     "start": 32.26,
+     "end": 32.49
+    },
+    {
+     "text": "be",
+     "start": 32.49,
+     "end": 32.59
+    },
+    {
+     "text": "helpful",
+     "start": 32.59,
+     "end": 32.89
+    },
+    {
+     "text": "if",
+     "start": 32.89,
+     "end": 33.01
+    },
+    {
+     "text": "we",
+     "start": 33.01,
+     "end": 33.1
+    },
+    {
+     "text": "had",
+     "start": 33.1,
+     "end": 33.24
+    },
+    {
+     "text": "a",
+     "start": 33.24,
+     "end": 33.31
+    },
+    {
+     "text": "look",
+     "start": 33.31,
+     "end": 33.46
+    },
+    {
+     "text": "at",
+     "start": 33.46,
+     "end": 33.56
+    },
+    {
+     "text": "that",
+     "start": 33.56,
+     "end": 33.75
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 34.5,
+   "end": 35.14,
+   "text": "Yeah if you want",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 34.5,
+     "end": 34.62
+    },
+    {
+     "text": "if",
+     "start": 34.62,
+     "end": 34.74
+    },
+    {
+     "text": "you",
+     "start": 34.74,
+     "end": 34.83
+    },
+    {
+     "text": "want",
+     "start": 34.83,
+     "end": 35.14
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 35.4,
+   "end": 36.03,
+   "text": "Okay",
+   "words": [
+    {
+     "text": "Okay",
+     "start": 35.4,
+     "end": 36.03
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 35.68,
+   "end": 36.08,
+   "text": "Yeah",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 35.68,
+     "end": 36.08
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 36.03,
+   "end": 36.24,
+   "text": "thank",
+   "words": [
+    {
+     "text": "thank",
+     "start": 36.03,
+     "end": 36.24
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 36.08,
+   "end": 36.29,
+   "text": "it's",
+   "words": [
+    {
+     "text": "it's",
+     "start": 36.08,
+     "end": 36.29
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 36.24,
+   "end": 36.35,
+   "text": "you",
+   "words": [
+    {
+     "text": "you",
+     "start": 36.24,
+     "end": 36.35
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 36.29,
+   "end": 36.46,
+   "text": "okay",
+   "words": [
+    {
+     "text": "okay",
+     "start": 36.29,
+     "end": 36.46
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 42.85,
+   "end": 46.07,
+   "text": "Could you go back to that slide where she had that uh s slide up Betsy",
+   "words": [
+    {
+     "text": "Could",
+     "start": 42.85,
+     "end": 42.96
+    },
+    {
+     "text": "you",
+     "start": 42.96,
+     "end": 43.05
+    },
+    {
+     "text": "go",
+     "start": 43.05,
+     "end": 43.14
+    },
+    {
+     "text": "back",
+     "start": 43.14,
+     "end": 43.36
+    },
+    {
+     "text": "to",
+     "start": 43.36,
+     "end": 43.43
+    },
+    {
+     "text": "that",
+     "start": 43.43,
+     "end": 43.64
+    },
+    {
+     "text": "slide",
+     "start": 43.64,
+     "end": 43.9
+    },
+    {
+     "text": "where",
+     "start": 43.9,
+     "end": 44.03
+    },
+    {
+     "text": "she",
+     "start": 44.03,
+     "end": 44.18
+    },
+    {
+     "text": "had",
+     "start": 44.18,
+     "end": 44.34
+    },
+    {
+     "text": "that",
+     "start": 44.34,
+     "end": 44.59
+    },
+    {
+     "text": "uh",
+     "start": 44.59,
+     "end": 44.83
+    },
+    {
+     "text": "s",
+     "start": 44.83,
+     "end": 45.26
+    },
+    {
+     "text": "slide",
+     "start": 45.26,
+     "end": 45.56
+    },
+    {
+     "text": "up",
+     "start": 45.56,
+     "end": 45.74
+    },
+    {
+     "text": "Betsy",
+     "start": 45.74,
+     "end": 46.07
+    }
+   ]
+  },
+  {
+   "speaker": "C",
+   "start": 46.37,
+   "end": 49.26,
+   "text": "Uh it's actually there now there on the screen",
+   "words": [
+    {
+     "text": "Uh",
+     "start": 46.37,
+     "end": 46.66
+    },
+    {
+     "text": "it's",
+     "start": 46.66,
+     "end": 46.84
+    },
+    {
+     "text": "actually",
+     "start": 46.84,
+     "end": 47.19
+    },
+    {
+     "text": "there",
+     "start": 47.19,
+     "end": 47.44
+    },
+    {
+     "text": "now",
+     "start": 47.44,
+     "end": 48.41
+    },
+    {
+     "text": "there",
+     "start": 48.41,
+     "end": 48.56
+    },
+    {
+     "text": "on",
+     "start": 48.56,
+     "end": 48.68
+    },
+    {
+     "text": "the",
+     "start": 48.68,
+     "end": 48.77
+    },
+    {
+     "text": "screen",
+     "start": 48.77,
+     "end": 49.26
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 49.44,
+   "end": 49.79,
+   "text": "This one",
+   "words": [
+    {
+     "text": "This",
+     "start": 49.44,
+     "end": 49.58
+    },
+    {
+     "text": "one",
+     "start": 49.58,
+     "end": 49.79
+    }
+   ]
+  },
+  {
+   "speaker": "D",
+   "start": 50.12,
+   "end": 51.11,
+   "text": "Yeah okay thank you",
+   "words": [
+    {
+     "text": "Yeah",
+     "start": 50.12,
+     "end": 50.44
+    },
+    {
+     "text": "okay",
+     "start": 50.44,
+     "end": 50.8
+    },
+    {
+     "text": "thank",
+     "start": 50.8,
+     "end": 51.0
+    },
+    {
+     "text": "you",
+     "start": 51.0,
+     "end": 51.11
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 67.41,
+   "end": 69.18,
+   "text": "And Francine",
+   "words": [
+    {
+     "text": "And",
+     "start": 67.41,
+     "end": 68.68
+    },
+    {
+     "text": "Francine",
+     "start": 68.68,
+     "end": 69.18
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 69.03,
+   "end": 69.72,
+   "text": "Participant two",
+   "words": [
+    {
+     "text": "Participant",
+     "start": 69.03,
+     "end": 69.59
+    },
+    {
+     "text": "two",
+     "start": 69.59,
+     "end": 69.72
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 70.4,
+   "end": 71.09,
+   "text": "You are",
+   "words": [
+    {
+     "text": "You",
+     "start": 70.4,
+     "end": 70.57
+    },
+    {
+     "text": "are",
+     "start": 70.57,
+     "end": 71.09
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 71.07,
+   "end": 72.09,
+   "text": "Yes",
+   "words": [
+    {
+     "text": "Yes",
+     "start": 71.07,
+     "end": 72.09
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 71.09,
+   "end": 71.61,
+   "text": "number two",
+   "words": [
+    {
+     "text": "number",
+     "start": 71.09,
+     "end": 71.34
+    },
+    {
+     "text": "two",
+     "start": 71.34,
+     "end": 71.61
+    }
+   ]
+  },
+  {
+   "speaker": "B",
+   "start": 72.09,
+   "end": 72.73,
+   "text": "No no I'm three",
+   "words": [
+    {
+     "text": "No",
+     "start": 72.09,
+     "end": 72.24
+    },
+    {
+     "text": "no",
+     "start": 72.24,
+     "end": 72.33
+    },
+    {
+     "text": "I'm",
+     "start": 72.33,
+     "end": 72.5
+    },
+    {
+     "text": "three",
+     "start": 72.5,
+     "end": 72.73
+    }
+   ]
+  },
+  {
+   "speaker": "A",
+   "start": 73.06,
+   "end": 73.41,
+   "text": "You're three",
+   "words": [
+    {
+     "text": "You're",
+     "start": 73.06,
+     "end": 73.2
+    },
+    {
+     "text": "three",
+     "start": 73.2,
+     "end": 73.41
+    }
+   ]
+  }
+ ],
+ "provenance": [
+  {
+   "dataset": "AMI Meeting Corpus (Mix-Headset)",
+   "license": "CC BY 4.0",
+   "mirror": "ggfox00000/dia-AMICorpus-all@a249db53de253a3a0a864c93a51d613159dfec7c",
+   "sha256": "07c2891ae6ad7c507b2a4f15b2dcd0a2343491df9e4e6a58f9db0d0b2c5e1382",
+   "window_s": [
+    1130.0,
+    1205.0
+   ],
+   "annotation": "AMI manual annotations v1.6.2 words",
+   "files": {
+    "IS1009b.A.words.xml": "f7ff17ddfcf4b40b3a4420ced4abdaefb86f669259f0bb98b65f14bd35dc84cc",
+    "IS1009b.B.words.xml": "2a612ee0514cb11e32e85841592f720af6f19d75b30807b058db74f84f454574",
+    "IS1009b.C.words.xml": "5058eaaf1b13f8272455745f3ff8b52e84dd798a38a939e11397f83e2784c5db",
+    "IS1009b.D.words.xml": "d142766bd0cf1bdab96bbe226367c319ae4a5b9536175c187a05375fc50fd242"
+   }
+  }
+ ]
+}

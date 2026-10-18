@@ -1,0 +1,99 @@
+{
+ "schema": "diarization-bench/reference/v1",
+ "case_id": "ls_short_b_between_a",
+ "category": "short_interjection",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Short real female turns (about 1.6 s) between longer male turns.",
+ "audio": {
+  "file": "ls_short_b_between_a.wav",
+  "pcm_sha256": "b1bf6fed1692eaacad0ac0286b41102694f4a6fc4188c116a10137ed47143efb",
+  "samples": 347520,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 6.22,
+   "text": "after early nightfall the yellow lamps would light up here and there the squalid quarter of the brothels",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 6.37,
+   "end": 7.95,
+   "text": "at another time harald asked",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 8.1,
+   "end": 13.96,
+   "text": "the chaos in which his ardour extinguished itself was a cold indifferent knowledge of himself",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 14.11,
+   "end": 15.71,
+   "text": "he is but a boy the men said",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 15.86,
+   "end": 20.72,
+   "text": "number ten fresh nelly is waiting on you good night husband",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0002.flac",
+   "sha256": "66277a3fa3df407261dc2a3ce685a7ceef19999ab0c10531bee5257cb64cb59d",
+   "id": "1089-134686-0002"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 101120,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/5142/33396/5142-33396-0000.flac",
+   "sha256": "affea3ba915b515b68d50cd2ffa7df646e7f4958e3aa5b9ebe1271691d0fd057",
+   "id": "5142-33396-0000"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 128800,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0008.flac",
+   "sha256": "1bdf7eede41ca2cc8883defb66bbd2e59ec93bf2d587327cb051d0ae427495ae",
+   "id": "1089-134686-0008"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 224960,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/5142/33396/5142-33396-0013.flac",
+   "sha256": "ea451cc900ebf08a20e618c095cb2d06e1ce265921f1838119c1603b429d13e2",
+   "id": "5142-33396-0013"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 252960,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0004.flac",
+   "sha256": "5658bd6183a1360eca5f58d618ca2efbb5f1fdcd74332b849549e722cc65d6fe",
+   "id": "1089-134686-0004"
+  }
+ ]
+}
