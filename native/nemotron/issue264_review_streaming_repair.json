@@ -1,0 +1,208 @@
+{
+  "RESULT": "repair_failed",
+  "DOMAIN": "Bounded REPAIR_VERIFY of accepted SR1–SR4 and their coupled publication, native mapping, capture-history and claim-disposal callers",
+  "range": {
+    "original_review_baseline": "09b938803a7c45c332547b7c81afc6a862bd2270",
+    "original_review_candidate_and_repair_baseline": "e4e85c093a03013f60346680eadbd168c7dbdef6",
+    "repaired_candidate": "3d541b18867d586892f2b1a5e58cf236e1432282",
+    "checkout_observed": "3d541b18867d586892f2b1a5e58cf236e1432282",
+    "original_findings": "native/nemotron/issue264_review_streaming.json",
+    "repair_evidence": "native/nemotron/issue264_streaming_review_repair.json",
+    "buffer_evidence": "native/nemotron/issue264_buffer_disposal_repair.json"
+  },
+  "assessment": "SR1, SR2 and SR3 are repaired within the declared bounded scope. SR4's original wrapper-buffer leak is repaired, but the new engine disposal integration can prematurely release contribution-stage claims still owned by an in-flight accepted delivery. This remaining reachable defect prevents repair_verified. It is not a missing hardware observation or a request for an unrelated full audit.",
+  "dispositions": [
+    {
+      "id": "SR1",
+      "disposition": "repair_verified",
+      "decisive_locations": [
+        "src/puripuly_heart/core/stt/session_projection.py:176-215",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:128-143,247-310,1149-1153"
+      ],
+      "basis": "The request is registered before inner begin_turn, and the synchronous on_native_event callback freezes released timing at native publication before buffer admission. A consumer without the publication observation records an unavailable fence rather than borrowing a later cursor. Existing timing fences are not overwritten. Unreleased updates do not freeze.",
+      "evidence": "Inspected the processed/queued/in-flight installed-adapter regressions at tests/core/test_issue264_streaming_review_repair.py:69-125 and the lawful unreleased/missing-publication controls at 128-193. These are included in the recorded normal-configuration 694-pass barrier. The original accepted e4 failure was reused, not rerun."
+    },
+    {
+      "id": "SR2",
+      "disposition": "repair_verified",
+      "decisive_locations": [
+        "src/puripuly_heart/core/stt/streaming_speaker.py:256-310,337-411,425-458",
+        "src/puripuly_heart/providers/stt/qwen_audio.py:785-875"
+      ],
+      "basis": "Each authoritative native timing binds one qualified own origin and retains that origin's immutable coverage. Native mapping uses that coverage instead of the later task-wide union and separately intersects it with successful global occurrences between the turn start and publication fence. Clock/task/contribution mismatches or absent binding remain unavailable. Composition-only surrounding whitespace is accommodated without inventing source correspondence.",
+      "evidence": "Reviewed the controlled real Qwen sentence-protocol tests at tests/core/test_issue264_streaming_review_repair.py:196-280 and earlier-publication binding tests at 732-876. They retain the older contribution's failure/fallback, allow the valid second separator-bearing sentence, and distinguish task-local coordinates from unrelated earlier global input. All are covered by the recorded barrier."
+    },
+    {
+      "id": "SR3",
+      "disposition": "repair_verified",
+      "decisive_locations": [
+        "src/puripuly_heart/core/speaker/evidence.py:42-59,72-77",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:99-119,163-190,482-496",
+        "src/puripuly_heart/core/stt/batch_speaker.py:214-271,314-336"
+      ],
+      "basis": "The shared view retains one monotonic capture-activation/epoch and opaque ownership fact, not another occurrence/range cache. Same-scope producer replacement or failed/unknown input cannot regain complete-history trust through an old owner or speaker-only reset. A genuinely newer capture scope can start fresh. Existing current maps may still prove covered replay; uncovered context becomes unavailable when earlier history is unknown. Main-source retries remain eligible. Independent forwarding records the send-owned scope captured before await and conservatively claims no mapped history.",
+      "evidence": "Reviewed the streaming/batch/independent/failed producer matrix through normalized real Peer admission at tests/core/test_issue264_streaming_review_repair.py:322-477, fresh-capture/onset positives at 663-729, monotonic/reset negatives at 283-300, and independent overlapping-send scope checks at 879-928. The recorded barrier executes these controls and preserves two source/context/translation units and adjacent No. progress."
+    },
+    {
+      "id": "SR4",
+      "disposition": "repair_failed",
+      "original_failure_closure": "The original annotated-terminal rejection leak is closed: the buffer now reports actual rejected/evicted events after its final admission decision, wrapper callbacks dispose otherwise-unreferenced request-stage pins, accepted queued aliases are retained, and healthy close still drains. The actual parent-plus-two-parts regression at tests/core/test_issue264_streaming_review_repair.py:480-564 covers the accepted original failure.",
+      "remaining_failure": "The engine callback uses published=True while protecting only tokens referenced by events still in its queue. An accepted event already dequeued and awaiting its sink is absent from that retained snapshot. Rejecting another event sharing its tokens can therefore delete that accepted delivery's contribution-stage pins before SourceChild adoption. See SR4-R1 below."
+    }
+  ],
+  "findings": [
+    {
+      "id": "SR4-R1",
+      "severity": "P2",
+      "title": "Engine buffer disposal releases claims still owned by an in-flight accepted delivery",
+      "violated_contract": "#264 R1 and accepted SR4: transfer claims through request/contribution/source ownership without a pruning gap; dispose rejected claims without destroying a lawful already-transferred presentation opportunity.",
+      "exact_locations": [
+        "src/puripuly_heart/core/stt/scoped_engine.py:1711-1715 — engine discard passes published=True and only the buffer's retained events",
+        "src/puripuly_heart/core/stt/scoped_event_buffer.py:60-68,111-118 — retained snapshot contains queued events, not an event already dequeued for delivery",
+        "src/puripuly_heart/core/stt/backend.py:116-128 — protection is exclusively retained_tokens, then release_unadopted(..., published=True)",
+        "src/puripuly_heart/core/stt/scoped_engine.py:2786-2800 — accepted delivery can await its sink after leaving the queue",
+        "src/puripuly_heart/core/orchestrator/translation_turn.py:1084-1097 — real admission can await the channel admission lock before on_parent_admitted",
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py:797-809 and src/puripuly_heart/core/speaker_identity.py:123-131,192-200 — source adoption occurs later; a missing unresolved claim settles unavailable"
+      ],
+      "reachable_path": "An accepted source release is dequeued by the deferred engine dispatcher and waits before source adoption. A later cumulative release/terminal can reference the same parent/part claims. Under buffer pressure, the later event is rejected; its discard callback sees no queued reference to the earlier in-flight delivery and releases the shared contribution-stage tokens. When the accepted delivery resumes, adoption cannot restore those tokens. Text need not be lost, but the source's lawful late-speaker opportunity is destroyed.",
+      "decisive_executed_evidence": {
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver retained in this review transcript>",
+        "probe_title": "Probing in-flight contribution pin protection",
+        "controlled_boundaries": "Production ScopedRecognitionEngine, STTProviderEventBuffer and SpeakerEvidenceView; existing production-shaped parent/part fixture. The asynchronous sink was deliberately gated before adoption. No model, actual provider service or GUI execution.",
+        "outcome": "Exit 0. Before rejection all three tokens were contribution-stage. After rejecting the later extension, has_proof was [false,false,false]. The accepted prefix then resumed with prefix_text='One ' and proof_exists_at_admission=false.",
+        "positive_control": "A second isolated control adopted the first part before the same rejection. Stages were [contribution,source,contribution]; afterward has_proof was [false,true,false], and resumed admission still had its part token. Thus source-stage protection works; the missing protection is specifically the live contribution handoff."
+      },
+      "counterevidence_and_limits": [
+        "The 31-case generic buffer suite correctly protects accepted incoming and other queued owners. It does not represent an owner already removed from the queue and awaiting admission.",
+        "The new wrapper callbacks use published=False and correctly preserve contribution/source handoffs. The failure is in the engine integration's broader published=True cleanup.",
+        "tests/core/test_issue264_streaming_review_repair.py:637-660 protects a healthy queued terminal, not an in-flight sink. Its passing result does not contradict this observation.",
+        "The controlled sink establishes the ownership failure directly. Permanent conservative settlement in the real allocator follows from the cited source; this probe did not launch a renderer or measure acoustic/GUI incidence.",
+        "This is directly within SR4's coupled reachable ownership paths. No queue policy redesign, speaker wait or broad new resource framework is requested."
+      ]
+    }
+  ],
+  "COVERAGE": [
+    {
+      "item": "Exact original findings, repair range and immutable candidate",
+      "status": "inspected",
+      "basis": "Read the required skills, preserved original SR1–SR4 report, exact e4..3d541b diff, candidate HEAD, 16-file repair inventory and both repair records. No moving candidate was reviewed."
+    },
+    {
+      "item": "Synchronous on_native_event clean cutover",
+      "status": "inspected",
+      "basis": "Followed request definition, projection registration/publication/retirement, wrapper registration and upstream forwarding, batch terminal-only filtering, local CPU/GPU fixtures and production-shaped test provider migration. No old on_native_terminal or _snapshot_native_terminal product/test callsites remained in the searched surfaces; no compatibility shim or consumer-time fallback was added."
+    },
+    {
+      "item": "SR1 original failure and lawful unreleased progress",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Publication-time fence, queued/in-flight schedules, missing-publication conservative behavior and unfenced candidate progression are directly covered by the repair tests and recorded barrier. No diagnostic sent_until field was promoted to authority."
+    },
+    {
+      "item": "SR2 native own-final coverage and separate global occurrence fence",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Reviewed exact own-origin binding, immutable coverage, task/contribution/clock/rate matching, whitespace composition, global turn/input limits, complete-word fallback, unsupported binding negatives and valid later-sentence progress."
+    },
+    {
+      "item": "SR3 capture-lifetime continuity across streaming/batch/independent/failed writes",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Reviewed monotonic scope/opaque-owner fact, nonrestoration after speaker reset or stale owner, conservative unknown context, current-map replay, main-source retry, new-scope genuine onset and independent send-owned scope. No second PCM/probability/occurrence history was added."
+    },
+    {
+      "item": "SR4 generic rejected/evicted-event disposal and queue policy preservation",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Read the complete generic buffer delta and 31-case suite: coalescing, room eviction, count/byte overflow, retired/closed rejection, accepted/refused retirement, shared queued resources and healthy close/drain. Thresholds, event order and synthesized failure policy are preserved."
+    },
+    {
+      "item": "SR4 wrapper/engine request-contribution-source integration",
+      "status": "inspected; original additional probe executed",
+      "basis": "Original wrapper leak is closed and retained request/contribution/source controls are present. The in-flight engine contribution owner is not retained by the new disposal integration; SR4-R1 is an observed product failure, not an unfinished proof request."
+    },
+    {
+      "item": "Actual part generation, normalized Peer admission, source/context conservation and healthy adopted lifetime",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "The integrated No/He pressure/healthy test generates real parent/part pins, preserves two-gray children, drains healthy accepted output through Peer and a pure presenter, and retires the admitted claims. The replacement matrix preserves exact source/context/translation counts."
+    },
+    {
+      "item": "Original qualified coarse/fine enclosures and lexical negatives",
+      "status": "supported_by_prior_evidence; coupled changes inspected",
+      "basis": "Retain the original full review's complete-word enclosure, interword-audio, coarse-absent subword whole-span, unique junction, overlap/third-slot/missing/ambiguous-cut and no invented character-cut coverage. Reassessed the changed fence entry points; enclosure/lexical algorithms and their assertions were not weakened."
+    },
+    {
+      "item": "Immutable SourceChild projection and committed boundary marker",
+      "status": "supported_by_prior_evidence",
+      "basis": "The repair does not change recognition_units, source projection, translation segmentation or FinalSpeakerRun marker logic. Their prior complete coverage and affected 694-barrier tests remain applicable."
+    },
+    {
+      "item": "Legacy empty-part batch, SELF and prior F1–F5",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Reviewed batch callback/filter/continuity/disposal deltas and terminal-only local fixtures. Batch transition selection, probability thresholds, presenter/allocator algorithms and SELF routing remain unchanged. Prior one-time cut, native-frame corroboration, certified quiet, overflow identity and logical-application deadline coverage is retained; no broader invalidation was found."
+    },
+    {
+      "item": "Changed fixtures and preserved assertions",
+      "status": "inspected",
+      "basis": "Existing provider fixtures now publish through the production projection or migrated observer, rather than bypassing the new publication contract. Existing text/range/speaker/order/conservation assertions remain. Recorded initial fixture/style failures are retained; no skip, tolerance or expected-outcome weakening was used to close SR1–SR4."
+    },
+    {
+      "item": "Controlled four-tape reconstruction and normal-config integration barrier",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Reviewed the one-site emitter migration, unchanged native/PCM/evidence order and schedule limit, 16 source/context/translation outputs and zero retired claims. Reused the recorded 694 passes/213 warnings/zero skips and failures, rather than rerunning it to confirm the supplied observation."
+    },
+    {
+      "item": "Maintained architecture and plan",
+      "status": "inspected",
+      "basis": "Docs describe publication-time fencing, native-origin coverage, bounded continuity fact and stage-aware disposal and retain historical failures. The claim that handed-off contributions are protected is incomplete for the engine's in-flight path in SR4-R1."
+    },
+    {
+      "item": "Task-only observer migration",
+      "status": "not_applicable to this repair disposition",
+      "basis": "Separately assigned to the original evidence reviewer. Inspected the shared callback API/caller implications, but did not replace that owner's task-driver migration audit."
+    },
+    {
+      "item": "E5 actual hidden-reveal closure",
+      "status": "supported_by_prior_evidence",
+      "basis": "Accepted separate closure at e4 is retained. These source repairs do not change presenter preference/readability/deadline logic, and no concrete E5 invalidation was found. No rerun performed."
+    },
+    {
+      "item": "Fresh actual GPU/native-tape observations, profile choice and Goal acceptance",
+      "status": "unverified; separately pending",
+      "basis": "No cloud/model/GPU/GUI/VR execution. Actual changed-path observations remain the Director's later gate; their absence is not the reason for repair_failed. No profile optimum, remote approval or final #211/#264 acceptance is claimed."
+    }
+  ],
+  "verification": {
+    "reviewer_executed": [
+      {
+        "check": "In-flight contribution-stage shared-pin rejection",
+        "command": ".venv/Scripts/python.exe -B - <inline driver>",
+        "outcome": "Exit 0; observed accepted in-flight delivery losing all three contribution-stage claims when the later shared event was rejected."
+      },
+      {
+        "check": "Adopted-source positive control under identical rejection",
+        "command": ".venv/Scripts/python.exe -B - <inline driver>",
+        "outcome": "Exit 0; source-stage part survived while unreferenced contribution-stage parent/future part were disposed."
+      }
+    ],
+    "environment_and_cleanup": "Isolated subprocesses used -B/PYTHONDONTWRITEBYTECODE and temporary APPDATA/LOCALAPPDATA/XDG_CONFIG_HOME. Engine tasks were closed, isolated views reset and temporary directories removed. No product/tests/docs/Git/GitHub mutation.",
+    "recorded_checks_reused": [
+      {
+        "reference": "native/nemotron/issue264_streaming_review_repair.json: verification.final_checks",
+        "outcome": "Normal repository configuration: 694 passed, 213 dependency warnings, no failures/skips. Scoped Ruff passed and Black --check retained all 16 files. These are recorded executions, not new reviewer runs."
+      },
+      {
+        "reference": "native/nemotron/issue264_buffer_disposal_repair.json",
+        "outcome": "31 generic buffer tests passed in the isolated sibling run; its intentional plugin-isolation warning is preserved. The final coupled normal-config barrier also exercised these frozen files."
+      },
+      {
+        "reference": "native/nemotron/issue264_streaming_review_repair.json: replay",
+        "outcome": "Fresh controlled four-case reconstruction: 762 transport writes, 3944 evidence items, 16 sources/translations/context entries and all retired-claim counts zero. Recorded callback/lock timing was not reconstructed; the report appropriately separates the schedule-specific tests."
+      }
+    ],
+    "preserved_failures": "Accepted e4 SR1–SR4 failures, the invalid original pressure attempt, initial repair collection/fixture/lifetime/import-format failures and their corrections remain recorded. They were not rerun merely to reconfirm them or relabeled as current product passes.",
+    "not_run": "No repository-wide sweep, formatter, type checker, actual provider service, model/GPU, GUI/Flet, VR or E5 rerun by this reviewer."
+  },
+  "handoff": {
+    "required_repair": "Extend SR4's engine-side lifetime protection to claims referenced by accepted deliveries currently in progress, not only events still queued. Preserve existing queued aliases, source-stage protection, healthy drain and disposal of genuinely unreferenced rejected claims.",
+    "smallest_missing_regression": "Gate a real accepted deferred delivery before SourceChild adoption; reject a later cumulative release/terminal sharing its claims under pressure; then resume the earlier delivery. Its consumed source must retain the applicable proof and lawful late-resolution opportunity. Keep the adopted-source and genuinely-unreferenced disposal controls.",
+    "scope_and_authority": "This is a bounded SR4 repair follow-up. SR1–SR3 closure and unaffected original full-review coverage can be retained. No fresh unrelated FULL_REVIEW or new product-policy decision is required by the observed defect.",
+    "acceptance_limit": "The Director owns repair allocation, integration and acceptance. This repair_failed result is caused by the demonstrated source-claim ownership failure, not pending actual inference/GUI qualification."
+  }
+}

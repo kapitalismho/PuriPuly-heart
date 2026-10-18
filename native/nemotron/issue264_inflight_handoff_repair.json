@@ -1,0 +1,248 @@
+{
+  "schema": "issue264-inflight-handoff-repair-v1",
+  "created_at_utc": "2026-10-18T11:15:38.230550+00:00",
+  "status": "Frozen bounded SR4-R1 repair; awaiting independent bounded verification and Director pin",
+  "goal_acceptance_claimed": false,
+  "range": {
+    "baseline": "3d541b18867d586892f2b1a5e58cf236e1432282",
+    "original_goal_baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+    "candidate": "Exact working-tree bytes in inventory; Director owns Git/pin",
+    "accepted_finding": "native/nemotron/issue264_review_streaming_repair.json:SR4-R1"
+  },
+  "authority": "Director accepted only the remaining engine in-flight ownership defect. SR1-SR3 are independently repair_verified and not reopened. Generic buffer files/API/policy are frozen and unchanged.",
+  "before_evidence": {
+    "disposition": "Reused the original reviewer execution at frozen baseline; no execution of the known failing baseline was repeated.",
+    "command": ".venv/Scripts/python.exe -B - <the isolated inline source below>",
+    "original_outer_execution": "Temporary APPDATA/LOCALAPPDATA/XDG_CONFIG_HOME and PYTHONDONTWRITEBYTECODE=1; isolated subprocess with 30s timeout. Source and output extracted from the retained reviewer tool-result cell without execution.",
+    "transcript": "history://speaker-264-streaming-review, Eval title Probing in-flight contribution pin protection",
+    "driver_source": "\nimport asyncio, json, sys\nfrom dataclasses import replace\nfrom pathlib import Path\nsys.path.insert(0, str(Path.cwd() / 'src'))\nfrom puripuly_heart.core.speaker.evidence import SpeakerEvidenceView\nfrom puripuly_heart.core.stt.backend import STTAudioBoundary, STTProviderAudioBoundary, STTSourceRelease\nfrom puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine\nfrom puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer\nfrom tests.core.test_streaming_speaker import request\nfrom tests.core.test_issue264_streaming_review_repair import proof_event\nasync def main():\n    view, req = SpeakerEvidenceView(), request()\n    engine = ScopedRecognitionEngine(None, evidence_view=view)\n    engine._event_buffer = STTProviderEventBuffer(max_events=1, on_discard=engine._discard_buffered_event)\n    full, tokens = proof_event(req, view)\n    prefix = replace(full, source_release=STTSourceRelease('prefix', 0, 4, 'boundary'))\n    full = replace(full, sequence=2, source_release=STTSourceRelease('full', 0, 8, 'end'))\n    entered, release = asyncio.Event(), asyncio.Event()\n    observations = []\n    async def sink(event):\n        if getattr(event, 'source_release', None) is not None:\n            entered.set()\n            await release.wait()\n            token = event.source_audio[0].speaker_parts[0].speaker_proof_id\n            view.adopt(token)\n            observations.append({'prefix_text':event.text[:event.source_release.text_end], 'proof_exists_at_admission':view.has_proof(token)})\n    engine.bind_event_sink(sink)\n    try:\n        await engine._emit(prefix)\n        await asyncio.wait_for(entered.wait(), 1)\n        before = [view._proofs[token].stage for token in tokens]\n        await engine._emit(STTProviderAudioBoundary(req.identity, STTAudioBoundary('prefill', 7, 160, 1.0, 'speaker')))\n        await engine._emit(full)\n        during = [view.has_proof(token) for token in tokens]\n        release.set()\n        await asyncio.wait_for(engine._event_drained.wait(), 1)\n        print(json.dumps({'before_discard_stages':before, 'after_rejected_extension':during, 'admission':observations, 'live_sources':len(view._proofs)}))\n    finally:\n        release.set()\n        await engine.close()\n        view.reset()\nasyncio.run(main())\n",
+    "driver_sha256": "4afcd52d6c8f9014bd3c11d6eb9bcdce30e749cf870c982b88571ae0e0796379",
+    "observed_output": "returncode= 0\n{\"before_discard_stages\": [\"contribution\", \"contribution\", \"contribution\"], \"after_rejected_extension\": [false, false, false], \"admission\": [{\"prefix_text\": \"One \", \"proof_exists_at_admission\": false}], \"live_sources\": 0}",
+    "failure_classification": "Exit 0 was a successfully executed diagnostic observing a product failure, not a product pass. The accepted dequeued prefix lost all three contribution claims after later shared extension rejection, and adoption found the applicable proof missing.",
+    "adopted_source_control": {
+      "probe_title": "Checking adopted-source discard protection",
+      "observed_output": "returncode= 0\n{\"before_discard_stages\": [\"contribution\", \"source\", \"contribution\"], \"after_rejected_extension\": [false, true, false], \"admission\": [{\"prefix_text\": \"One \", \"proof_exists_at_admission\": true}], \"live_sources\": 1}",
+      "meaning": "Already-source-stage protection worked; missing protection was specifically an accepted live contribution handoff."
+    },
+    "original_finding": {
+      "id": "SR4-R1",
+      "severity": "P2",
+      "title": "Engine buffer disposal releases claims still owned by an in-flight accepted delivery",
+      "violated_contract": "#264 R1 and accepted SR4: transfer claims through request/contribution/source ownership without a pruning gap; dispose rejected claims without destroying a lawful already-transferred presentation opportunity.",
+      "exact_locations": [
+        "src/puripuly_heart/core/stt/scoped_engine.py:1711-1715 — engine discard passes published=True and only the buffer's retained events",
+        "src/puripuly_heart/core/stt/scoped_event_buffer.py:60-68,111-118 — retained snapshot contains queued events, not an event already dequeued for delivery",
+        "src/puripuly_heart/core/stt/backend.py:116-128 — protection is exclusively retained_tokens, then release_unadopted(..., published=True)",
+        "src/puripuly_heart/core/stt/scoped_engine.py:2786-2800 — accepted delivery can await its sink after leaving the queue",
+        "src/puripuly_heart/core/orchestrator/translation_turn.py:1084-1097 — real admission can await the channel admission lock before on_parent_admitted",
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py:797-809 and src/puripuly_heart/core/speaker_identity.py:123-131,192-200 — source adoption occurs later; a missing unresolved claim settles unavailable"
+      ],
+      "reachable_path": "An accepted source release is dequeued by the deferred engine dispatcher and waits before source adoption. A later cumulative release/terminal can reference the same parent/part claims. Under buffer pressure, the later event is rejected; its discard callback sees no queued reference to the earlier in-flight delivery and releases the shared contribution-stage tokens. When the accepted delivery resumes, adoption cannot restore those tokens. Text need not be lost, but the source's lawful late-speaker opportunity is destroyed.",
+      "decisive_executed_evidence": {
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver retained in this review transcript>",
+        "probe_title": "Probing in-flight contribution pin protection",
+        "controlled_boundaries": "Production ScopedRecognitionEngine, STTProviderEventBuffer and SpeakerEvidenceView; existing production-shaped parent/part fixture. The asynchronous sink was deliberately gated before adoption. No model, actual provider service or GUI execution.",
+        "outcome": "Exit 0. Before rejection all three tokens were contribution-stage. After rejecting the later extension, has_proof was [false,false,false]. The accepted prefix then resumed with prefix_text='One ' and proof_exists_at_admission=false.",
+        "positive_control": "A second isolated control adopted the first part before the same rejection. Stages were [contribution,source,contribution]; afterward has_proof was [false,true,false], and resumed admission still had its part token. Thus source-stage protection works; the missing protection is specifically the live contribution handoff."
+      },
+      "counterevidence_and_limits": [
+        "The 31-case generic buffer suite correctly protects accepted incoming and other queued owners. It does not represent an owner already removed from the queue and awaiting admission.",
+        "The new wrapper callbacks use published=False and correctly preserve contribution/source handoffs. The failure is in the engine integration's broader published=True cleanup.",
+        "tests/core/test_issue264_streaming_review_repair.py:637-660 protects a healthy queued terminal, not an in-flight sink. Its passing result does not contradict this observation.",
+        "The controlled sink establishes the ownership failure directly. Permanent conservative settlement in the real allocator follows from the cited source; this probe did not launch a renderer or measure acoustic/GUI incidence.",
+        "This is directly within SR4's coupled reachable ownership paths. No queue policy redesign, speaker wait or broad new resource framework is requested."
+      ]
+    }
+  },
+  "root_cause": "The buffer retained snapshot only describes queued owners. After dequeue, real admission may await its channel admission lock before SourceChild adoption. Engine published=True disposal ignored that accepted live owner. The same gap could affect concurrent aliases when another delivery failed or was cancelled.",
+  "mechanism": {
+    "location": "src/puripuly_heart/core/stt/scoped_engine.py",
+    "ownership": "One small private engine record per currently owned source-proof-bearing event, with queued and active reference counts. Event identity is retained by the record, so repeated identical event objects are counted without identity reuse or double-release gaps. This is current handoff ownership, not a temporal history/probability/PCM cache.",
+    "enqueue": "Register queued ownership synchronously before buffer.put. The frozen rejection/eviction callback removes only that queued reference, then existing proof disposal protects every remaining queued/active owner plus the callback retained snapshot.",
+    "dequeue": "Transfer queued ownership to active ownership before invoking the sink. Ownership therefore spans scoped-delivery filtering and every await, including the real translation admission lock.",
+    "direct": "Direct sink delivery registers active ownership before invocation. Concurrent same-object and distinct-object aliases remain protected while any sink call is live.",
+    "completion": "Both direct and deferred paths remove their active reference and dispose otherwise-unreferenced request/contribution claims in finally, on success, exception, cancellation or filtered/stale delivery. Existing SourceChild-stage protection remains authoritative.",
+    "shutdown": "Existing close/drain/cancellation timing is unchanged. Close retires abandoned queued owner references together before disposal, preserving still-active owners. Active calls unwind through their existing finally blocks; adopted source claims remain with their existing source owner.",
+    "bound": "Records exist only for events currently queued or in an active sink invocation. Their population/lifetime follows the existing bounded queue and active engine deliveries; completed/discarded records are removed, and abandoned queued records are removed at engine close. No new admission wait, queue limit, timeout, retry, acoustic policy or public framework/API is introduced.",
+    "unchanged_shared_owners": "Accepted evidence view, proof stages, SourceChild model, backend disposal helper, generic buffer callback/API and real Peer/presenter/allocator algorithms are unchanged."
+  },
+  "new_behavioral_regressions": [
+    {
+      "test": "test_admission_lock_handoff_survives_rejected_extension_and_resolves_in_place",
+      "cases": 2,
+      "boundaries": "Production engine + frozen buffer + shared view + normalization + real Peer translation admission lock + SourceChild/context/translation/output ownership + pure OverlayPresenter. Controlled translation provider; no model or GUI.",
+      "observed": "Accepted One prefix waits before SourceChild adoption; later cumulative extension is rejected under pressure. All three accepted contribution claims survive the wait. After release, One is delivered once with one translation/context entry; unused parent/future-part claims are disposed and the adopted part remains. Observed evidence at first-readable +250ms resolves gray to gold in the same card with identical text, ID, occupant, appearance order and expiration deadline. Already-adopted source-stage control also passes."
+    },
+    {
+      "test": "test_concurrent_direct_handoff_alias_outlives_other_delivery",
+      "cases": 12,
+      "observed": "Same-object and distinct-object aliases across success/failure/cancellation, with and without adopted source-stage claim. The other active delivery retains all shared proofs; unrelated rejected request pins are disposed immediately. Last completion disposes every unadopted claim while leaving the source-stage claim alone."
+    },
+    {
+      "test": "test_queued_alias_survives_active_dispatch_completion",
+      "cases": 6,
+      "observed": "Queued same-object/distinct-object alias survives active delivery success, failure or cancellation. Restarted existing dispatcher drains the queued alias without missing proof, and last completion clears all unadopted claims/owner records."
+    },
+    {
+      "test": "test_close_reclaims_abandoned_queued_handoffs_without_releasing_active_source",
+      "cases": 2,
+      "observed": "Existing close timeout/cancellation retires abandoned queued claims; active finally cleans contribution claims; adopted source claim survives until explicit source-owner release. Owner records finish empty."
+    }
+  ],
+  "verification": {
+    "configuration": "Normal repository pytest configuration and plugin autoload; no addopts override or whole-repository sweep.",
+    "executed_checks": [
+      {
+        "command": ".venv/Scripts/python.exe -m black src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_inflight_handoff_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_inflight_handoff_repair.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_inflight_handoff_repair.py",
+        "exit_code": 0,
+        "outcome": "Black reformatted only the new test module; source unchanged by Black. Ruff passed. 22 passed in0.81s; wall2.15s.",
+        "passed": 22,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "command": ".venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_inflight_handoff_repair.py tests/core/test_stt_scoped_engine.py tests/core/test_stt_event_buffer_disposal.py tests/core/test_speaker_session_cleanup.py tests/core/test_source_context_contract.py tests/core/test_translation_turn_owner.py tests/core/test_source_progressive_integration.py tests/core/test_issue264_shared_speaker.py tests/core/test_issue264_streaming_review_repair.py",
+        "exit_code": 0,
+        "outcome": "451 passed, 211 dependency warnings in27.13s; wall27.71s.",
+        "passed": 451,
+        "failed": 0,
+        "skipped": 0,
+        "warnings": {
+          "websockets_ConnectionClosed_reason_deprecation": 210,
+          "Deepgram_Pydantic_V1_Python314_compatibility": 1
+        }
+      },
+      {
+        "command": ".venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_inflight_handoff_repair.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_inflight_handoff_repair.py",
+        "exit_code": 0,
+        "outcome": "Ruff all checks passed; Black --check both files unchanged."
+      }
+    ],
+    "product_or_test_failures_this_followup": [],
+    "tooling_failure_retained": {
+      "step": "Original BEFORE report extraction, after successfully loading/parsing the retained probe",
+      "outcome": "NameError: name 'hashlib' is not defined while printing its checksum",
+      "repair": "Imported hashlib and repeated only the failed checksum/output-printing step. No product execution, file edit, BEFORE rerun or test result was affected."
+    },
+    "prior_failures_preserved": "All preceding accepted real/model, original SR1-SR4 and fixture/style failures remain in their original reports. The report above preserves the exact new SR4-R1 original probe and its logical failure; none is relabeled as a new-candidate pass."
+  },
+  "inventory": [
+    {
+      "path": "src/puripuly_heart/core/stt/scoped_engine.py",
+      "sha256": "facded726c6191b8472ee35acc4133ff72a94a82b895b4ac9eafc75a50302a0c",
+      "bytes": 136225
+    },
+    {
+      "path": "tests/core/test_issue264_inflight_handoff_repair.py",
+      "sha256": "ab0958cfb97e28249a4150433e79e03570b882ee6a3e4762fa528fb1d87f88f6",
+      "bytes": 11058
+    }
+  ],
+  "unchanged_prior_python_inventory": [
+    {
+      "path": "src/puripuly_heart/core/stt/backend.py",
+      "sha256": "9a0231e035d7a5c4a21d053f101f38e107088664ea8a7a47653da0bd18d7e7e4"
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/session_projection.py",
+      "sha256": "13693572c9acb1fe6c797957d5c1aee5b59d3777d2fd26e79a3a927acfb73e69"
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/streaming_speaker.py",
+      "sha256": "3b9a564c82516ce5559ecc069c1943bf8188eff5c51701304b79df3c34b1e8b4"
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/batch_speaker.py",
+      "sha256": "f221080a2818e5886eefd682719aa02ab338696ea768701ea7fb537ea3cdc796"
+    },
+    {
+      "path": "src/puripuly_heart/core/speaker/evidence.py",
+      "sha256": "ff6bb51e24a3ba4ab730737987f8050ffc7090965df32ab362402a60d08c8fd3"
+    },
+    {
+      "path": "tests/core/test_causal_batch_speaker.py",
+      "sha256": "d146d829952cd1693cac1b4011e26e2e6b19afe0b50301c13b8c5286c330736f"
+    },
+    {
+      "path": "tests/core/test_streaming_speaker.py",
+      "sha256": "df232ead3c4ec62caaaaddbff9482232f87f0c9f0bd5a89e6731ab300cd42a78"
+    },
+    {
+      "path": "tests/core/test_issue264_streaming_repair.py",
+      "sha256": "77718feffa2f5d0771a892e0869b41c681bdc68bb3199fcede880243b7de2855"
+    },
+    {
+      "path": "tests/core/test_stt_scoped_engine.py",
+      "sha256": "d7894db976882ddc0e6b64df40d5133a4593d30d1c06ffd4acd87be62c94a4af"
+    },
+    {
+      "path": "tests/core/test_stt_session_projection.py",
+      "sha256": "412ee24622b4145dd958daca7e9e1dadafd223e2f60076265efc06a827e38209"
+    },
+    {
+      "path": "tests/providers/test_local_cpu_backends.py",
+      "sha256": "1de6cc555d8c2892ec870d9d5296d2b62933e861845dd6b7772d9422b81a7df8"
+    },
+    {
+      "path": "tests/providers/test_local_gpu_backend.py",
+      "sha256": "e42cea8e6f34a07c5c2926ef0083dcfaf94849c1393db8908967f183bfaabaab"
+    },
+    {
+      "path": "tests/core/test_issue264_streaming_review_repair.py",
+      "sha256": "48c285284a0e9ac872f870e3289a9a345e4f6a4cbf426eae566077ccd3f7f077"
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+      "sha256": "78028a184866bda0a92f4d4d0de18ec70308d92ad12dd634ee6d51e0e4aba8c6"
+    },
+    {
+      "path": "tests/core/test_stt_event_buffer_disposal.py",
+      "sha256": "daebcd2214afe6328799120ee33027f81b19f0bd4ddea8909c3992bbca96eecb"
+    }
+  ],
+  "unchanged_buffer_files": [
+    {
+      "path": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+      "sha256": "78028a184866bda0a92f4d4d0de18ec70308d92ad12dd634ee6d51e0e4aba8c6"
+    },
+    {
+      "path": "tests/core/test_stt_event_buffer_disposal.py",
+      "sha256": "daebcd2214afe6328799120ee33027f81b19f0bd4ddea8909c3992bbca96eecb"
+    }
+  ],
+  "caller_contract_inspected": {
+    "location": "src/puripuly_heart/core/runtime/provider_handle.py:461-476",
+    "basis": "The actual bound deferred dispatch awaits handler(event); engine handoff ownership spans that await rather than assuming queue removal or callback invocation completes source adoption. No caller migration/API change is needed."
+  },
+  "preserved_reports": [
+    {
+      "path": "native/nemotron/issue264_review_streaming_repair.json",
+      "sha256": "69e2dca1c42bc911811c5dad06b9e5f12a220ed13b6d519e8547c1fc0a53f5bb"
+    },
+    {
+      "path": "native/nemotron/issue264_streaming_review_repair.json",
+      "sha256": "34941dc4fc809cb36758357ab3ce0c8eaf204a3597c1621c34074f6e239f7d23"
+    },
+    {
+      "path": "native/nemotron/issue264_buffer_disposal_repair.json",
+      "sha256": "8edb292fe0b5c6edfb4add655c27a1d6187db3cbb515cbd2d40a5a4f8d61ecfc"
+    },
+    {
+      "path": "native/nemotron/issue264_review_streaming.json",
+      "sha256": "1fb927d5b8a233027d7003eb8a7ad9273aa1e6f782e12510c6d4c8f4ea3d63f5"
+    }
+  ],
+  "limits_and_residuals": [
+    "This is only accepted SR4-R1. No publication frontier/native mapping/capture producer continuity, acoustic segmentation, thresholds, models, providers, profiles, dependencies, wire/capability, SourceChild or late-deadline policy changes.",
+    "No known failing baseline rerun. No actual provider service, cloud/model/GPU/Gemma/Flet/GUI/VR execution, full actual matrix, four-tape rerun or E5 rerun. Director frozen-candidate 1GPU+4 native-tape actual work remains held until pin/review.",
+    "Pure presenter assertions prove controlled logical late-resolution opportunity and in-place snapshot behavior, not physical renderer/actual acoustic latency. Historical actual executions retain their original candidate qualifications.",
+    "Existing acoustic/coverage unknownness and original conservative gray residuals are untouched; no forced identity or acceptance/Goal claim.",
+    "Git/index/history/GitHub and maintained documentation are Director-owned and not mutated. Historical reports are unchanged; no temporary script/scaffold files were created."
+  ],
+  "director_documentation_handoff": "Clarify that engine handoff ownership spans accepted queue residence and the entire awaited delivery/admission, including concurrent aliases; only the final ended dependency permits unadopted disposal. Existing drain/cancel timing is unchanged.",
+  "freeze": {
+    "product_and_test_bytes_frozen": true,
+    "further_mutations_planned": false,
+    "next_owner": "Director pins and originating reviewer performs bounded verification of SR4-R1; no reopened SR1-SR3 review requested."
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "RESULT": "repair_verified",
+  "DOMAIN": "Bounded task-observer migration readiness only: e4e85c093a03013f60346680eadbd168c7dbdef6 → 3d541b18867d586892f2b1a5e58cf236e1432282. SR1–SR4 product correctness review remains separately owned.",
+  "assessment": "The task observer cleanly follows the new synchronous producer callback without moving observation to the consumer boundary, suppressing parent failures or changing failure accounting. No material task-readiness gap was found for the intended one-GPU/four-tape observations, subject to the independent source verdict and Director readiness.",
+  "affected_surfaces": [
+    {
+      "path": "native/nemotron/issue264_validation_runtime.py",
+      "sha256": "ae4af00c0d1361ca8d63797971d49865e51fa00daddf3ad4f9b19077475774ed",
+      "delta": "Only _snapshot_native_terminal → _snapshot_native_event, matching super delegation, and a non-terminal return before task-only native-final observation."
+    },
+    {
+      "path": "native/nemotron/issue264_validation_hook_migration.json",
+      "sha256": "a57c72b48aa514bdac2c4c9d5f7ce2f08aaf6a9d255269085f15d53601a200e0",
+      "delta": "Preparation/check provenance and retained formatting failure; does not claim product or actual-runtime verification."
+    }
+  ],
+  "COVERAGE": [
+    {
+      "item": "Hook registration and ordering",
+      "status": "verified by inspection and isolated checks",
+      "basis": "ObservedBatch:188-203 calls the real parent outside the observer catch, exactly once, before task observation. Batch request construction supplies this callback through on_native_event. Non-terminal events delegate but do not create own_native_final_attribution records; no old-name alias or consumer-time fallback remains."
+    },
+    {
+      "item": "Failure isolation and unchanged accounting",
+      "status": "verified by isolated controls; prior E4 coverage retained",
+      "basis": "Parent exceptions propagate unchanged for terminal/update fixtures. Observation-only exceptions are recorded separately and invalidate surviving-output runs. Native-failure, completed-pipeline and empty-content statuses remain distinct. The migration does not modify the shared native_failures authority, launcher, presentation or observation body."
+    },
+    {
+      "item": "Native replay enters the producer parser/publication boundary",
+      "status": "inspected at exact pinned code",
+      "basis": "RecordedInputCoordinator.apply:583-601 requires native._sent_samples to equal the canonical receipt cursor, then feeds the saved raw-result structure to the actual provider _DeepgramSDKSession._build_transcript_event. That parser constructs its own stable update and terminal through _handle_scoped_result / _terminalize_scoped and STTSessionEventProjection.put_update/terminal. Projection invokes registered callbacks synchronously before buffer.put, not when SessionTrace/normalizer consumes events. StreamingSpeakerSession registers its producer callback through request replacement. No normalized STT update is injected by the replay driver."
+    },
+    {
+      "item": "Successful write frontier and replay isolation",
+      "status": "inspected; unaffected prior provenance retained",
+      "basis": "RecordedSession verifies exact canonical PCM bytes and control/cursor sequence. Inherited Deepgram.send_turn_audio advances _sent_samples only after _write_payload returns. Replay checks capture availability and that frontier before parser admission. Live transport/startup is intentionally replaced; this is actual provider-parser processing of recorded payloads, not a fresh cloud call or validation of WebSocket/SDK JSON decoding."
+    },
+    {
+      "item": "GPU producer terminal projection",
+      "status": "inspected at exact pinned code",
+      "basis": "The GPU route uses ObservedBatch over the normal LocalGpu session. LocalGpu._terminalize_scoped calls production STTSessionEventProjection.terminal, whose callback occurs before terminal buffer publication. SessionTrace forwards the original request and records native_result only afterward during consumption."
+    },
+    {
+      "item": "Exact pin and check evidence",
+      "status": "independently checked",
+      "basis": "Every inspected task/parser/projection/batch/streaming/GPU/helper file matches its exact3d541b Git object. Runtime/report hashes match the assigned values; checker and source-archive hashes match the report. Independently ran the retained task-only checker: exit0, all six groups passed, product_modules_imported=[]. Its parent is an explicit fixture, not product execution. Retained initial Black failure is not relabelled; Ruff/Black were not rerun."
+    },
+    {
+      "item": "E5 and historical evidence preservation",
+      "status": "retained",
+      "basis": "This observer-only change does not execute on the direct synthetic caption path. E5 actual repair_verified and unaffected E1–E4 coverage remain applicable. No previous execution source, actual report, failure or matrix observation was rewritten or rerun."
+    }
+  ],
+  "limits": "Only task-control checks and read-only code/hash/Git-object inspection were performed. No product module was imported by the executed checker; no actual inference, Flet, cloud, VR, credentials, edits or Git mutation. Producer-path conclusions above are source inspection, not a new runtime measurement. The source reviewer owns SR1–SR4 correctness; the five actual runs and terminal Goal acceptance remain pending their separate gates.",
+  "handoff": "Task migration is ready at3d541b18867d586892f2b1a5e58cf236e1432282. This bounded verdict is not authorization to launch the held observations or a whole-product/Goal acceptance."
+}
