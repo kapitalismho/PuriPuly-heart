@@ -128,9 +128,9 @@ async def test_modal_lists_models_by_purpose_and_shows_actions_for_the_selection
     assert t("settings.model_assets") in texts
     assert t("model_assets.group.asr") in texts
     assert t("model_assets.group.translation") in texts
-    assert f"2.0 GB · {t('model_assets.status.missing')}" in texts
+    assert f"2.0 GB ({t('model_assets.status.missing')})" in texts
     assert dialog.selected_model_id == "asr"
-    assert t("model_assets.description.qwen_cpu") in texts
+    assert "·" not in " ".join(texts)
     assert texts.count("Qwen CPU") == 1
     assert [label for card in dialog._actions.controls for label in _texts(card)] == [
         t("model_assets.action.download")
@@ -139,7 +139,7 @@ async def test_modal_lists_models_by_purpose_and_shows_actions_for_the_selection
     dialog.select("gemma")
     actions = _texts(dialog._actions)
     assert t("model_assets.action.import") in actions
-    assert t("model_assets.import_files", files="model.gguf, draft.gguf") in actions
+    assert "model.gguf" not in " ".join(actions)
 
 
 @pytest.mark.asyncio
@@ -171,6 +171,9 @@ async def test_progress_replaces_actions_and_other_models_wait_for_the_running_t
     dialog.open()
 
     assert t("model_assets.status.downloading", percent=42) in _texts(dialog._actions)
+    assert f"2.0 GB ({t('model_assets.status.downloading', percent=42)})" in _texts(
+        dialog.dialog.content
+    )
     _action(dialog, t("model_assets.action.cancel")).on_click(None)
     await _run(tasks)
     assert ("cancel", "asr") in app.calls
@@ -178,7 +181,10 @@ async def test_progress_replaces_actions_and_other_models_wait_for_the_running_t
     dialog.select("gemma")
     download = _action(dialog, t("model_assets.action.download"))
     assert download.disabled is True
-    assert t("model_assets.busy_other") in _texts(dialog._actions)
+    assert _texts(dialog._actions) == [
+        t("model_assets.action.download"),
+        t("model_assets.action.import"),
+    ]
 
 
 @pytest.mark.asyncio

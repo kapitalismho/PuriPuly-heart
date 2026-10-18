@@ -76,20 +76,24 @@ class LocalGpuSTTBackend(STTBackend):
                 raise RuntimeError("Local GPU STT backend is closed")
             if self._quarantined_session is not None:
                 raise RuntimeError("Local GPU STT resource is awaiting decode cleanup")
-            if not self._active:
-                operation_id = operation_id if operation_id is not None else self.operation_id
-                request_id = request_id if request_id is not None else self.request_id
-                self.operation_id = self.request_id = None
-                await self.runtime.activate_channel(
-                    self.channel,
-                    owner=self._resource_owner,
-                    model_path=self.model_path,
-                    model_id=self.model_id,
-                    device_id=self.device_id,
-                    operation_id=operation_id,
-                    request_id=request_id,
-                )
-                self._active = True
+            if self._active:
+                return
+            operation_id = operation_id if operation_id is not None else self.operation_id
+            request_id = request_id if request_id is not None else self.request_id
+            self.operation_id = self.request_id = None
+        await self.runtime.activate_channel(
+            self.channel,
+            owner=self._resource_owner,
+            model_path=self.model_path,
+            model_id=self.model_id,
+            device_id=self.device_id,
+            operation_id=operation_id,
+            request_id=request_id,
+        )
+        async with self._lock:
+            if self._closed or self._closing:
+                raise asyncio.CancelledError
+            self._active = True
 
     async def open_session(
         self,

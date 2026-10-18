@@ -383,11 +383,12 @@ class ManagedGemmaTranslationOwner:
     async def deactivate(self, *, linger: bool = False) -> None:
         self._generation += 1
         self._active_generation = None
-        self.cancel()
         task = self._prepare_task
+        preparing = task is not None and not task.done()
+        self.cancel()
         if task is not None and task is not asyncio.current_task():
             await asyncio.gather(task, return_exceptions=True)
-        if linger and not self._closed:
+        if linger and not preparing and not self._closed:
             self._publish("idle", backend=None, progress_percent=None)
             self._schedule_linger(self._idle_linger_s)
             return

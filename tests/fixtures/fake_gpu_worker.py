@@ -87,6 +87,17 @@ for raw in reader:
             }
         )
     elif request_type == "activate":
+        if os.environ.get("FAKE_GPU_WORKER_BLOCK_ACTIVATION") == "1":
+            send(
+                {
+                    "type": "event",
+                    "event": "activation_progress",
+                    "request_id": request_id,
+                    "fields": {"phase": "loading"},
+                }
+            )
+            while True:
+                time.sleep(60)
         if os.environ.get("FAKE_GPU_WORKER_ACTIVATION_FAILURE") == "1":
             send(
                 {

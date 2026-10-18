@@ -34,10 +34,15 @@ from puripuly_heart.core.audio.ownership import (
 from puripuly_heart.core.gpu_worker import (
     GpuWorkerActivation,
     GpuWorkerDevice,
+    GpuWorkerEvent,
     GpuWorkerRequestError,
     GpuWorkerTranscription,
 )
-from puripuly_heart.core.runtime.gpu_asr import GpuASRDiagnostic
+from puripuly_heart.core.runtime.gpu_asr import (
+    GpuASRDiagnostic,
+    GpuASRRuntimeState,
+    SharedGpuASRRuntime,
+)
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
 )
@@ -56,6 +61,8 @@ from puripuly_heart.core.stt.scoped_engine import (
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
+from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
+from tests.core.runtime.test_gpu_asr import FakeGpuWorkerClient, FakeGpuWorkerFactory
 from tests.helpers.lifecycle import assert_lifecycle_structure
 
 GPU_DEVICE = GpuWorkerDevice(
@@ -515,6 +522,103 @@ async def test_owner_dispatches_warmup_and_vad_without_exposing_provider() -> No
     assert not hasattr(owner.snapshot, "provider")
 
     await owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("attached_before_warmup", [False, True])
+async def test_abort_releases_loading_gpu_provider_before_readiness_and_allows_retry(
+    tmp_path: Path,
+    attached_before_warmup: bool,
+) -> None:
+    gate = asyncio.Event()
+    loading_client = FakeGpuWorkerClient(activation_gate=gate)
+    replacement_client = FakeGpuWorkerClient()
+    process_factory = FakeGpuWorkerFactory(
+        [FakeGpuWorkerClient(), loading_client, replacement_client]
+    )
+    runtimes = []
+
+    def create_runtime(sink):
+        runtime = SharedGpuASRRuntime(process_factory=process_factory, diagnostic_sink=sink)
+        runtimes.append(runtime)
+        return runtime
+
+    class ProviderFactory:
+        async def create(self, request, *, gpu_runtime, on_terminal_failure=None):
+            backend = LocalGpuSTTBackend(
+                runtime=gpu_runtime,
+                channel=request.channel,
+                model_path=tmp_path / "qwen3-asr-1.7b.gguf",
+                model_id=LOCAL_QWEN_GPU_MODEL_ID,
+                device_id=request.gpu_device_id,
+            )
+            return ScopedRecognitionEngine(
+                session_factory=lambda _settings, _epoch: backend.open_session(),
+                event_sink=lambda _event: None,
+                backend_prepare=backend.prepare,
+                backend_close=backend.close,
+            )
+
+    owner = LocalASRProviderRuntimeOwner(
+        provider_factory=ProviderFactory(),
+        gpu_runtime_factory=create_runtime,
+        provisioning=FakeProvisioningPort(),
+    )
+    request = ProviderRuntimeBuildRequest(
+        config=_resolved_config("self", "local_qwen_gpu"),
+        model_id=LOCAL_QWEN_GPU_MODEL_ID,
+        gpu_device_id="vulkan:0",
+        warmup=not attached_before_warmup,
+    )
+    if attached_before_warmup:
+        result = await owner.replace_provider(request, start=False)
+        assert result.status == "applied"
+        preparing = asyncio.create_task(owner.warmup_channel("self"))
+    else:
+        preparing = asyncio.create_task(owner.replace_provider(request, start=False))
+    try:
+        await asyncio.wait_for(loading_client.activation_started.wait(), timeout=1)
+        await loading_client._events.put(
+            GpuWorkerEvent(
+                name="activation_progress",
+                request_id=None,
+                fields={"phase": "loading"},
+            )
+        )
+        await _wait_until(lambda: owner.snapshot.gpu.phase == "loading")
+
+        await asyncio.wait_for(owner.release_channel("self", mode="abort"), timeout=1)
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(preparing, timeout=1)
+        assert not gate.is_set()
+        assert loading_client.is_closed
+        assert loading_client.force_close_calls == 1
+        assert runtimes[0].state == GpuASRRuntimeState.STOPPED
+        snapshot = owner.snapshot
+        assert snapshot.channel_for("self").provider_id is None
+        assert snapshot.channel_for("self").phase == "inactive"
+        assert snapshot.gpu.phase == "inactive"
+        assert snapshot.gpu.worker_pid is None
+        assert snapshot.gpu.active_channels == frozenset()
+        assert snapshot.gpu.model_resident is False
+        assert snapshot.gpu.startup_cleanup["close_complete"] is True
+        assert not any(event.event == "activation_ready" for event in owner.diagnostics)
+
+        retry = ProviderRuntimeBuildRequest(
+            config=request.config,
+            model_id=LOCAL_QWEN_GPU_MODEL_ID,
+            gpu_device_id="vulkan:0",
+            warmup=True,
+        )
+        result = await asyncio.wait_for(owner.replace_provider(retry, start=False), timeout=1)
+        assert result.status == "applied"
+        assert owner.snapshot.gpu.phase == "ready"
+        assert owner.snapshot.gpu.model_resident is True
+        assert process_factory.modes == ["discovery", "persistent", "persistent"]
+    finally:
+        gate.set()
+        await owner.close()
+        await asyncio.gather(preparing, return_exceptions=True)
 
 
 @pytest.mark.asyncio

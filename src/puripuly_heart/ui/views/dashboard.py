@@ -331,8 +331,9 @@ class DashboardView(ft.Column):
             self.on_toggle_stt(self.is_stt_on)
 
     def _toggle_translation(self):
-        if self.is_translation_on:
+        if self._translation_is_starting or self.is_translation_on:
             self.is_translation_on = False
+            self._translation_is_starting = False
             self._translation_showing_warning = False
         elif self._translation_showing_warning:
             self._translation_showing_warning = False
@@ -971,7 +972,9 @@ class DashboardView(ft.Column):
             if selected != "gpu" or gpu_action is None
             else lambda: self._run_gpu_notice_action(gpu_action)
         )
-        yields_to_content = selected in OVERLAY_YIELDING_NOTICE_SOURCES
+        yields_to_content = (
+            selected in OVERLAY_YIELDING_NOTICE_SOURCES or selected == download_source
+        )
         try:
             self.display_card.set_notice(
                 text,

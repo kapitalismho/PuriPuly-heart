@@ -53,7 +53,7 @@ from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
-from puripuly_heart.ui.i18n import t
+from puripuly_heart.ui.i18n import set_locale, t, t_for_locale
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
@@ -3214,7 +3214,11 @@ async def test_audio_test_opens_two_column_modal_with_live_channels_and_saved_th
     callbacks[0]("peer", (SimpleNamespace(probability=0.8, level=0.3),))
     snapshot["value"] = _audio_snapshot(
         "degraded",
-        self_={"state": "failed", "failure_reason": "input_route_unavailable"},
+        self_={
+            "state": "failed",
+            "failure_reason": "input_route_unavailable",
+            "device": {"name": "USB Mic", "host_api": "Windows WASAPI"},
+        },
         peer={
             "state": "ready",
             "speech_detected": True,
@@ -3225,11 +3229,42 @@ async def test_audio_test_opens_two_column_modal_with_live_channels_and_saved_th
     dialog.refresh()
 
     texts = _dialog_text_values(app.page.opened[0])
-    assert t("audio_test.state.speech") in texts
+    assert t("audio_test.state.speech") not in texts
+    assert t("audio_test.state.listening") not in texts
+    assert dialog.panel("peer").status_row.visible is False
+    assert dialog.panel("self").status_row.visible is True
     assert t("audio_test.error.input_route_unavailable") in texts
     assert t("audio_test.device.process", name="VRChat.exe") in texts
     assert dialog.panel("peer").history[-1] == (0.8, 0.3)
-    assert dialog._notice_text.visible is True
+    assert "USB Mic" in texts
+    assert all("·" not in text for text in texts)
+
+
+@pytest.mark.asyncio
+async def test_audio_test_modal_reopens_in_the_current_language() -> None:
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return True
+
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
+    )
+    app = _audio_test_app(controller)
+    set_locale("ko")
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+    app._audio_test_dialog.close()
+
+    set_locale("en")
+    app._on_start_audio_test()
+    await app.page.tasks[-1]()
+
+    texts = _dialog_text_values(app.page.opened[-1])
+    for key in ("audio_test.threshold", "audio_test.channel.self", "audio_test.channel.peer"):
+        assert t_for_locale("en", key) in texts
+        assert t_for_locale("ko", key) not in texts
 
 
 @pytest.mark.asyncio

@@ -319,6 +319,30 @@ async def test_linger_deactivate_keeps_runtime_until_timer_elapses() -> None:
 
 
 @pytest.mark.asyncio
+async def test_deactivate_during_preparation_releases_runtime_without_idle_linger() -> None:
+    started = asyncio.Event()
+
+    async def prepare(**_kwargs: object) -> ManagedGemmaReadiness:
+        started.set()
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+    runtime = RecordingRuntime(prepare)
+    owner = ManagedGemmaTranslationOwner(runtime=runtime, idle_linger_s=60.0)
+    preparation = asyncio.create_task(owner.prepare(_selection()))
+    await started.wait()
+
+    await asyncio.wait_for(owner.deactivate(linger=True), timeout=1.0)
+
+    with pytest.raises(GemmaProvisioningCancelled):
+        await preparation
+    assert runtime.release_count == 1
+    assert owner.active_model_id is None
+    assert owner.snapshot.state == "idle"
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_prepare_during_linger_cancels_shutdown_and_reuses_runtime() -> None:
     runtime = RecordingRuntime(lambda **kwargs: _readiness(str(kwargs["backend"])))
     owner = ManagedGemmaTranslationOwner(runtime=runtime, idle_linger_s=0.2)

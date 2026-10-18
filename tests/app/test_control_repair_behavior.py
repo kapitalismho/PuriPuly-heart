@@ -2229,3 +2229,248 @@ async def test_failed_26b_enable_stays_off_without_implicit_retry_and_recovers_e
         await runtime.close()
     assert all(process.returncode == 0 for process in processes)
     assert closed == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("start_surface", ("gui", "control"))
+@pytest.mark.parametrize("stop_surface", ("gui", "control"))
+async def test_translation_loading_stop_preempts_owner_and_orders_fresh_enable(
+    offline, start_surface, stop_surface
+):
+    settings = json.loads(offline.read_text(encoding="utf-8"))
+    settings["intent"]["translation"].update(model="managed_gemma_26b", connection="gpu")
+    settings["intent"]["stt"]["provider"] = "soniox"
+    settings["intent"]["peer_stt"]["provider"] = "soniox"
+    settings["intent"]["telemetry"]["enabled"] = False
+    offline.write_text(json.dumps(settings), encoding="utf-8")
+    entered = asyncio.Event()
+    stopping = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    released = asyncio.Event()
+    load_completion = asyncio.Event()
+    attempts = []
+    load_task = None
+
+    async def load():
+        entered.set()
+        try:
+            await load_completion.wait()
+        finally:
+            stopping.set()
+            await release_cleanup.wait()
+            released.set()
+
+    async def warmup():
+        nonlocal load_task
+        attempts.append("load")
+        if len(attempts) == 1:
+            load_task = asyncio.create_task(load())
+            await asyncio.shield(load_task)
+
+    async def teardown():
+        if load_task is not None and not load_task.done():
+            load_task.cancel()
+            await asyncio.gather(load_task, return_exceptions=True)
+
+    app = compose_headless_application(offline)
+    gui_tasks = []
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(f"loading-{start_surface}-{stop_surface}")
+        app._input_runtime.translation.warmup = warmup
+        app._input_runtime.translation.teardown = teardown
+        if start_surface == "gui":
+            initial_task = asyncio.create_task(app.set_translation_enabled(True))
+            gui_tasks.append(initial_task)
+        else:
+            initial = await control.submit(
+                "translation.set", {"enabled": True}, request_id="initial-on"
+            )
+        await asyncio.wait_for(entered.wait(), 5)
+        assert app.state().translation_enabled is True
+        revision = (await control.query("settings.current", {}))["revision"]
+        rejected = await control.submit(
+            "translation.set",
+            {"enabled": False},
+            request_id="rejected-off",
+            expected_revision=revision + 1,
+        )
+        rejection = await control.wait(rejected["operation_id"], timeout=5)
+        assert rejection["status"] == "rejected"
+        assert rejection["error"]["code"] == "revision_conflict"
+        assert not stopping.is_set()
+        assert app.state().translation_enabled is True
+        older_on = await control.submit(
+            "translation.set", {"enabled": True}, request_id="older-queued-on"
+        )
+        unrelated = await control.submit(
+            "settings.apply",
+            {"changes": {"locale": "ja"}},
+            request_id="ordered-locale",
+        )
+        if stop_surface == "gui":
+            off_task = asyncio.create_task(app.set_translation_enabled(False))
+            gui_tasks.append(off_task)
+        else:
+            off = await control.submit(
+                "translation.set", {"enabled": False}, request_id="off-during-load"
+            )
+        await asyncio.wait_for(stopping.wait(), 5)
+        assert app.state().translation_enabled is False
+        assert not released.is_set()
+        assert not load_completion.is_set()
+        repeated_off = await control.submit(
+            "translation.set", {"enabled": False}, request_id="repeated-off-during-cleanup"
+        )
+        fresh = await control.submit(
+            "translation.set", {"enabled": True}, request_id="fresh-on-during-cleanup"
+        )
+        assert (await control.wait(fresh["operation_id"], timeout=0.01))["terminal"] is False
+        assert (await control.wait(unrelated["operation_id"], timeout=0.01))["terminal"] is False
+        assert (await control.wait(repeated_off["operation_id"], timeout=0.01))["terminal"] is False
+        assert attempts == ["load"]
+        release_cleanup.set()
+        if stop_surface == "gui":
+            assert await asyncio.wait_for(off_task, 5) is False
+        else:
+            receipt = await control.wait(off["operation_id"], timeout=5)
+            assert receipt["status"] == "applied"
+            assert receipt["translation_enabled"] is False
+        if start_surface == "gui":
+            result = await asyncio.gather(initial_task, return_exceptions=True)
+            assert isinstance(result[0], asyncio.CancelledError)
+        else:
+            receipt = await control.wait(initial["operation_id"], timeout=5)
+            assert receipt["status"] == "cancelled"
+            assert receipt["terminal"] is True
+        assert released.is_set()
+        assert (await control.wait(repeated_off["operation_id"], timeout=5))["status"] == "applied"
+        assert (await control.wait(older_on["operation_id"], timeout=5))["status"] == "cancelled"
+        ordered = await control.wait(unrelated["operation_id"], timeout=5)
+        assert ordered["status"] in {"applied", "degraded"}
+        assert ordered["transaction"]["status"] in {
+            "settings_commit_success_runtime_applied",
+            "settings_commit_success_runtime_degraded",
+        }
+        assert ordered["revision"] > revision
+        assert (await control.wait(fresh["operation_id"], timeout=5))["status"] == "applied"
+        load_completion.set()
+        await asyncio.sleep(0)
+        assert app.state().translation_enabled is True
+        assert attempts == ["load", "load"]
+        current = (await control.query("settings.current", {}))["settings"]["intent"]
+        assert current["translation"]["model"] == "managed_gemma_26b"
+        assert current["ui"]["locale"] == "ja"
+        assert json.loads(offline.read_text(encoding="utf-8"))["intent"]["ui"]["locale"] == "ja"
+    finally:
+        release_cleanup.set()
+        load_completion.set()
+        for task in gui_tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*gui_tasks, return_exceptions=True)
+        await app.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("surface", ("gui", "control"))
+@pytest.mark.parametrize("admission_phase", ("loading", "pending"))
+@pytest.mark.parametrize("channel", ("self", "peer"))
+async def test_capture_loading_stop_reaches_real_capture_owner(
+    offline, monkeypatch, surface, admission_phase, channel
+):
+    from puripuly_heart.core.peer_capture import (
+        PeerCaptureAdmission,
+        PeerCaptureAdmissionStatus,
+    )
+    from puripuly_heart.core.self_capture import (
+        SelfCaptureAdmission,
+        SelfCaptureAdmissionStatus,
+    )
+
+    settings = json.loads(offline.read_text(encoding="utf-8"))
+    settings["intent"]["stt"]["provider"] = "local_qwen_gpu" if channel == "self" else "soniox"
+    settings["intent"]["peer_stt"]["provider"] = "local_qwen_gpu" if channel == "peer" else "soniox"
+    settings["state"]["peer_translation"]["eula_accepted"] = True
+    settings["intent"]["telemetry"]["enabled"] = False
+    offline.write_text(json.dumps(settings), encoding="utf-8")
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    release = asyncio.Event()
+    admission_type, admission_status = (
+        (SelfCaptureAdmission, SelfCaptureAdmissionStatus)
+        if channel == "self"
+        else (PeerCaptureAdmission, PeerCaptureAdmissionStatus)
+    )
+
+    class LoadingAdmission:
+        async def admit(self, config):
+            assert config.provider_id == "local_qwen_gpu"
+            entered.set()
+            if admission_phase == "pending":
+                return admission_type(admission_status.PENDING)
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+            return admission_type(admission_status.ADMITTED)
+
+    async def begin_overlay_start():
+        control.peer().state.overlay_owner_provider().state = "starting"
+
+    app = compose_headless_application(offline)
+    initial_task = None
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance(f"capture-loading-{surface}-{admission_phase}-{channel}")
+        monkeypatch.setattr(control.peer().owner, "begin_overlay_start", begin_overlay_start)
+        capture = (
+            control.pipeline.self_capture
+            if channel == "self"
+            else control.pipeline.current.peer_capture
+        )
+        set_enabled = app.set_stt_enabled if channel == "self" else app.set_peer_translation_enabled
+        capture._admission = LoadingAdmission()
+        if surface == "gui":
+            initial_task = asyncio.create_task(set_enabled(True))
+        else:
+            initial = await control.submit(
+                "capture.set",
+                {"channel": channel, "enabled": True},
+                request_id="capture-on",
+            )
+        await asyncio.wait_for(entered.wait(), 5)
+        assert capture.snapshot.desired_active is True
+        if surface == "gui":
+            await asyncio.wait_for(set_enabled(False), 5)
+        else:
+            off = await control.submit(
+                "capture.set",
+                {"channel": channel, "enabled": False},
+                request_id="capture-off",
+            )
+            receipt = await control.wait(off["operation_id"], timeout=5)
+            assert receipt["status"] == "applied"
+            assert (await control.wait(initial["operation_id"], timeout=5))["status"] == "cancelled"
+        snapshot = capture.snapshot
+        assert snapshot.desired_active is False
+        assert snapshot.effective_active is False
+        assert not snapshot.has_loop_task
+        assert not snapshot.has_source
+        assert not release.is_set()
+        if admission_phase == "loading":
+            assert cancelled.is_set()
+        release.set()
+        await asyncio.sleep(0)
+        assert capture.snapshot.desired_active is False
+        assert capture.snapshot.effective_active is False
+    finally:
+        release.set()
+        if initial_task is not None:
+            if not initial_task.done():
+                initial_task.cancel()
+            await asyncio.gather(initial_task, return_exceptions=True)
+        await app.stop()

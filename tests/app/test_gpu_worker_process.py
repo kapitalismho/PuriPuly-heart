@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
 
 import puripuly_heart.app.adapters.gpu_worker_process as gpu_worker_process_module
 from puripuly_heart.app.adapters.gpu_worker_process import (
@@ -16,6 +17,9 @@ from puripuly_heart.app.ports.gpu_worker import (
     GpuWorkerClosedError,
     GpuWorkerRequestError,
 )
+from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+from puripuly_heart.core.runtime.gpu_asr import GpuASRRuntimeState, SharedGpuASRRuntime
+from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 
 FAKE_WORKER = Path(__file__).parents[1] / "fixtures" / "fake_gpu_worker.py"
 
@@ -241,6 +245,180 @@ async def test_close_forces_process_termination_after_cooperative_timeout(
     await asyncio.wait_for(client.close(), timeout=2.0)
 
     assert client.returncode is not None
+
+
+@pytest.mark.parametrize("during_close", [False, True])
+async def test_connection_reset_is_expected_only_during_owned_worker_close(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    during_close: bool,
+) -> None:
+    client = await _factory().start(mode="persistent")
+    await client.next_event()
+    terminate = gpu_worker_process_module._terminate_process
+
+    async def reset_transport_before_termination(process, **kwargs):
+        client.reader.set_exception(ConnectionResetError("injected transport reset"))
+        await asyncio.sleep(0)
+        await terminate(process, **kwargs)
+
+    try:
+        with caplog.at_level(logging.ERROR, logger=gpu_worker_process_module.logger.name):
+            if during_close:
+                monkeypatch.setattr(
+                    gpu_worker_process_module,
+                    "_terminate_process",
+                    reset_transport_before_termination,
+                )
+                await asyncio.wait_for(client.force_close(), timeout=2)
+                assert client.lifecycle_receipt()["primary_code"] is None
+            else:
+                client.reader.set_exception(ConnectionResetError("injected transport reset"))
+                with pytest.raises(GpuWorkerClosedError) as caught:
+                    await asyncio.wait_for(client.next_event(), timeout=1)
+                assert caught.value.code == "frame_reader_failed"
+                assert client.lifecycle_receipt()["primary_code"] == "frame_reader_failed"
+            codes = {
+                getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].code
+                for record in caplog.records
+                if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            }
+            assert ("frame_reader_failed" in codes) is not during_close
+    finally:
+        monkeypatch.setattr(gpu_worker_process_module, "_terminate_process", terminate)
+        await asyncio.wait_for(client.force_close(), timeout=2)
+    assert client.returncode is not None
+    assert client.lifecycle_receipt()["close_complete"] is True
+
+
+async def test_disable_during_worker_authentication_cleans_started_process_without_readiness(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_GPU_WORKER_SKIP_AUTH", "1")
+    monkeypatch.setattr(gpu_worker_process_module.tempfile, "tempdir", str(tmp_path))
+    spawned = asyncio.Event()
+    processes = []
+    authenticate = DefaultGpuWorkerProcessFactory._accept_authenticated_connection
+
+    async def observe_spawn(factory, queue, *, process, **kwargs):
+        processes.append(process)
+        spawned.set()
+        return await authenticate(factory, queue, process=process, **kwargs)
+
+    monkeypatch.setattr(
+        DefaultGpuWorkerProcessFactory, "_accept_authenticated_connection", observe_spawn
+    )
+    runtime = SharedGpuASRRuntime(
+        process_factory=_factory(startup_timeout_s=60),
+    )
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "qwen3-asr-1.7b.gguf",
+        model_id=LOCAL_QWEN_GPU_MODEL_ID,
+        device_id="vulkan:0",
+    )
+    preparing = asyncio.create_task(backend.prepare())
+    try:
+        await asyncio.wait_for(spawned.wait(), timeout=3)
+        assert processes[0].returncode is None
+        assert runtime.startup_cleanup_snapshot["pending_startups"] == 1
+
+        await asyncio.wait_for(backend.close(), timeout=3)
+        with pytest.raises(asyncio.CancelledError):
+            await preparing
+        assert processes[0].returncode is not None
+        assert runtime.startup_cleanup_snapshot["pending_startups"] == 0
+        assert runtime.startup_cleanup_snapshot["close_complete"] is True
+        assert runtime.state == GpuASRRuntimeState.STOPPED
+        assert runtime.worker_pid is None
+        assert runtime.active_channels == frozenset()
+        assert tuple(tmp_path.iterdir()) == ()
+    finally:
+        await backend.close()
+        await runtime.close()
+        await asyncio.gather(preparing, return_exceptions=True)
+
+
+async def test_disabling_gpu_1_7b_during_blocked_load_terminates_process_and_can_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_GPU_WORKER_BLOCK_ACTIVATION", "1")
+    clients = []
+    start = DefaultGpuWorkerProcessFactory.start
+
+    async def record_start(factory, **kwargs):
+        client = await start(factory, **kwargs)
+        clients.append(client)
+        return client
+
+    monkeypatch.setattr(DefaultGpuWorkerProcessFactory, "start", record_start)
+    loading = asyncio.Event()
+    diagnostics = []
+
+    def observe(diagnostic):
+        diagnostics.append(diagnostic)
+        if diagnostic.kind == "worker_lifecycle" and diagnostic.fields.get("phase") == "loading":
+            loading.set()
+
+    runtime = SharedGpuASRRuntime(
+        process_factory=_factory(cooperative_shutdown_s=60, request_timeout_s=60),
+        diagnostic_sink=observe,
+        force_close_seconds=5,
+    )
+    backend = LocalGpuSTTBackend(
+        runtime=runtime,
+        channel="self",
+        model_path=tmp_path / "qwen3-asr-1.7b.gguf",
+        model_id=LOCAL_QWEN_GPU_MODEL_ID,
+        device_id="vulkan:0",
+    )
+    preparing = asyncio.create_task(backend.prepare())
+    try:
+        await asyncio.wait_for(loading.wait(), timeout=3)
+        assert runtime.state == GpuASRRuntimeState.STARTING
+        assert runtime.worker_pid == clients[0].pid
+        worker_root = clients[0].temporary_directory_path
+
+        await asyncio.wait_for(backend.close(), timeout=3)
+        with pytest.raises(asyncio.CancelledError):
+            await preparing
+        assert clients[0].returncode is not None
+        assert clients[0].is_closed
+        receipt = clients[0].lifecycle_receipt()
+        assert receipt["close_complete"] is True
+        assert receipt["writer_closed"] is True
+        assert receipt["server_closed"] is True
+        assert receipt["tasks_closed"] is True
+        assert receipt["temporary_directory_closed"] is True
+        assert not worker_root.exists()
+        assert runtime.worker_pid is None
+        assert runtime.active_channels == frozenset()
+        assert runtime.state == GpuASRRuntimeState.STOPPED
+        assert runtime.startup_cleanup_snapshot["close_complete"] is True
+        assert not any(event.kind == "activation_ready" for event in diagnostics)
+
+        monkeypatch.delenv("FAKE_GPU_WORKER_BLOCK_ACTIVATION")
+        replacement = LocalGpuSTTBackend(
+            runtime=runtime,
+            channel="self",
+            model_path=backend.model_path,
+            model_id=LOCAL_QWEN_GPU_MODEL_ID,
+            device_id="vulkan:0",
+        )
+        try:
+            await asyncio.wait_for(replacement.prepare(), timeout=3)
+            assert len(clients) == 2
+            assert runtime.state == GpuASRRuntimeState.READY
+            assert runtime.worker_pid == clients[1].pid
+        finally:
+            await replacement.close()
+    finally:
+        await backend.close()
+        await runtime.close()
+        await asyncio.gather(preparing, return_exceptions=True)
 
 
 async def test_invalid_authentication_is_rejected(

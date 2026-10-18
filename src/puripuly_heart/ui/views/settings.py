@@ -319,7 +319,6 @@ _TRANSLATION_CONNECTION_LABEL_KEYS = {
     TranslationConnection.CUSTOM_HTTP: "settings.translation_connection.custom_http",
 }
 _TRANSLATION_CONNECTION_DESCRIPTION_KEYS = {
-    TranslationConnection.PUBLIC_API: "settings.translation_connection.public_api.description",
     TranslationConnection.CHATGPT: "settings.translation_connection.chatgpt.description",
 }
 _TRANSLATION_MODELS = (

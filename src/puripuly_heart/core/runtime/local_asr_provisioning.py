@@ -701,7 +701,9 @@ class LocalASRProvisioningOwner:
             backend=request.backend,
             model_id=model_id,
             origin=request.origin,
-            progress_percent=update.percent,
+            progress_percent=(
+                update.percent if update.percent is not None else activity.progress_percent
+            ),
             generation=generation,
         )
         if update.status == "downloading":

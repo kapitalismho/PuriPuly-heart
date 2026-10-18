@@ -93,6 +93,7 @@ class LocalASRProviderRuntimeOwner:
         "_gpu_recovery_lock",
         "_gpu_discovery_task",
         "_operation_tasks",
+        "_provider_build_tasks",
         "_callback_tasks",
         "_scope",
         "pending provider handoffs",
@@ -156,6 +157,7 @@ class LocalASRProviderRuntimeOwner:
         self._pending_candidates: dict[ProviderRuntimeChannel, object] = {}
         self._pending_requests: dict[ProviderRuntimeChannel, ProviderRuntimeBuildRequest] = {}
         self._operation_tasks: dict[asyncio.Task[object], int] = {}
+        self._provider_build_tasks: dict[ProviderRuntimeChannel, set[asyncio.Task[object]]] = {}
         self._callback_tasks: set[asyncio.Task[object]] = set()
         self._scope = LifecycleScope("local-asr-provider-runtime")
         self._gpu_generation = 0
@@ -662,6 +664,17 @@ class LocalASRProviderRuntimeOwner:
         self._require_open("release provider channel")
         self._validate_channel(channel)
         async with self._operation():
+            if mode == "abort":
+                current = asyncio.current_task()
+                builds = tuple(
+                    task
+                    for task in self._provider_build_tasks.get(channel, ())
+                    if task is not current and not task.done()
+                )
+                for task in builds:
+                    task.cancel()
+                if builds:
+                    await asyncio.gather(*builds, return_exceptions=True)
             handle = self._handles[channel]
             if mode == "drain":
                 await handle.drain_for_toggle_off(
@@ -1256,10 +1269,13 @@ class LocalASRProviderRuntimeOwner:
         channel = request.channel
         previous_phase = self._channel_phases[channel]
         self._channel_phases[channel] = "building"
-        await self._publish_state()
+        task = asyncio.current_task()
+        if task is not None and request.provider_id == _GPU_PROVIDER_ID:
+            self._provider_build_tasks.setdefault(channel, set()).add(task)
         provider: object | None = None
         failure_stage = "provider_build"
         try:
+            await self._publish_state()
             if request.provider_id == "qwen_audio":
                 failure_stage = "provider_reclaim"
                 await self._handles[channel].reclaim_qwen_resources(
@@ -1323,6 +1339,12 @@ class LocalASRProviderRuntimeOwner:
                 failure_stage,
                 failure_diagnostics,
             )
+        finally:
+            builds = self._provider_build_tasks.get(channel)
+            if builds is not None and task is not None:
+                builds.discard(task)
+                if not builds:
+                    self._provider_build_tasks.pop(channel)
 
     async def _discard_pending_candidate(
         self,
@@ -1409,6 +1431,9 @@ class LocalASRProviderRuntimeOwner:
             self._gpu_phase = "discovery_pending"
         elif diagnostic.kind == "activation_ready":
             self._gpu_phase = "ready"
+            self._gpu_failure_code = None
+        elif diagnostic.kind == "worker_stopped":
+            self._gpu_phase = "inactive"
             self._gpu_failure_code = None
         elif diagnostic.kind in {"activation_failed", "worker_failed"}:
             self._gpu_phase = "failed"

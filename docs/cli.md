@@ -156,6 +156,10 @@ Capture/provider/output states in command receipts are runtime observations, not
 
 In `app.status`, `translation_runtime_ready` means a provider is attached; it can be true while translation is disabled or a managed model has not loaded. Check the operation receipt and `models.status` for managed preparation success or failure. If the current translation-enable attempt fails or is cancelled during warmup, effective translation turns off while the selected model and failure details remain. Superseded work does not change newer intent. After correcting the cause, explicitly run `translation set on` again.
 
+While a local translation model is loading, `translation set off` cancels the pending startup or exclusive prefix warmup without waiting for loading to finish. The GUI Trans button supports the same action while its loading indicator is visible. An older queued enable cannot turn it back on; a new explicit enable waits for cancellation cleanup.
+
+For Qwen3-ASR 1.7B GPU loading, `capture set self off` or `capture set peer off` revokes that channel's pending activation. If no other channel still needs the model, the application terminates the loading worker and confirms cleanup instead of waiting for initialization. Shared demand keeps its worker. These runtime controls do not replace `models cancel` for an explicit asset download/import.
+
 ### CPU model repair
 
 To repair an outdated Qwen3-ASR 0.6B CPU installation and verify the downloaded files:
@@ -186,6 +190,7 @@ puripuly.exe models delete --model-id <model-id>
 - Gemma imports verify the required files before replacement. Explicit Gemma download/repair also checks installed file integrity.
 - Only one model task runs at a time. Conflicts, including `gemma.prepare`, return `failed` with `task_busy`; deleting an in-use model returns `model_in_use`.
 - `models cancel` requests cancellation; wait for the original operation to settle before retrying conflicts. Runtime demand changes do not cancel transfers; shutdown drains owned work.
+- In the desktop dashboard, download progress follows the provisioning owner's current snapshot. Completion or cancellation clears the download notice; failure replaces it with the installation error. Download notices, including managed translation checks and preparation, yield to new recognition and translation content instead of hiding it.
 
 ### Peer capture and consent
 
@@ -390,9 +395,9 @@ A file-based command can also express both channels explicitly:
 - A successful persistence receipt does not prove that a provider is attached or active.
 - Inspect `asr status` / `providers.status` and its selected, runtime, capture-attached, activity, pending-handoff, and failure fields.
 
-### Index public translation
+### Index official translation
 
-Apply `translation.model: index_translate_35b` and `translation.connection: public_api` together through `settings apply`. This connection needs no API key and is the default for new installations; existing selections are preserved.
+Apply `translation.model: index_translate_35b` and `translation.connection: public_api` together through `settings apply`. This is the official no-key API and the default for new installations; existing selections are preserved.
 
 - Startup and Index selection check availability in the background. `translation set on` waits for a pending check.
 - If Index is unavailable, the app saves a switch to `gemma4_26b_31b` / `managed`. It selects `openrouter` instead only when the applicable Managed allowance is confirmed exhausted. The saved selection survives restart; selecting Index again is explicit.

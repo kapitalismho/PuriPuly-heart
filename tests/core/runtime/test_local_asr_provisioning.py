@@ -266,11 +266,14 @@ async def test_targeted_cpu_repair_preserves_valid_models_and_reports_progress()
     assert result.snapshot.cpu_auto_available is True
     assert result.snapshot.state_for(PARAKEET_V3_MODEL_ID).status == "ready"
     assert result.snapshot.state_for(LOCAL_STT_MODEL_ID).status == "ready"
-    assert any(
-        snapshot.activity_for("cpu") is not None
-        and snapshot.activity_for("cpu").progress_percent == 37
+    progress = [
+        snapshot.activity_for("cpu").progress_percent
         for snapshot in snapshots
-    )
+        if snapshot.activity_for("cpu") is not None
+    ]
+    assert progress[-1] == 37
+    assert all(percent is not None for percent in progress)
+    assert result.snapshot.activities == ()
     assert [
         diagnostic.outcome for diagnostic in owner.diagnostics if diagnostic.event == "install"
     ] == ["started", "ready"]

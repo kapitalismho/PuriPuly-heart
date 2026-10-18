@@ -24,10 +24,10 @@ class ModelAssetChoice:
 def model_asset_choices() -> tuple[ModelAssetChoice, ...]:
     choices = []
     for model_id, name, key in (
-        (LOCAL_STT_MODEL_ID, "Qwen3 ASR 0.6B · CPU", "qwen_cpu"),
-        (PARAKEET_V3_MODEL_ID, "Parakeet TDT 0.6B v3 · CPU", "parakeet"),
-        (PARAKEET_JAPANESE_MODEL_ID, "Parakeet TDT/CTC 0.6B · CPU", "parakeet_ja"),
-        (LOCAL_QWEN_GPU_MODEL_ID, "Qwen3 ASR 1.7B Q6_K · GPU", "qwen_gpu"),
+        (LOCAL_STT_MODEL_ID, "Qwen3 ASR 0.6B", "qwen_cpu"),
+        (LOCAL_QWEN_GPU_MODEL_ID, "Qwen3 ASR 1.7B Q6_K", "qwen_gpu"),
+        (PARAKEET_V3_MODEL_ID, "Parakeet TDT 0.6B v3", "parakeet"),
+        (PARAKEET_JAPANESE_MODEL_ID, "Parakeet TDT/CTC 0.6B", "parakeet_ja"),
     ):
         manifest = load_local_stt_asset_manifest(model_id)
         choices.append(
@@ -40,7 +40,7 @@ def model_asset_choices() -> tuple[ModelAssetChoice, ...]:
             )
         )
     for spec, name, key in (
-        (e4b_gemma_spec(), "Gemma 4 E4B + MTP", "gemma_e4b"),
+        (e4b_gemma_spec(), "Gemma 4 E4B", "gemma_e4b"),
         (gemma_26b_spec(), "Gemma 4 26B A4B", "gemma_26b"),
     ):
         choices.append(

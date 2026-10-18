@@ -183,6 +183,7 @@ class SharedGpuASRRuntime:
         self._event_task: asyncio.Task[None] | None = None
         self._reaper_task: asyncio.Task[None] | None = None
         self._activation_task: asyncio.Task[_ActivationOutcome] | None = None
+        self._activation_waiters: dict[tuple[GpuASRChannel, object], set[asyncio.Future[None]]] = {}
         self._temporary_directory: tempfile.TemporaryDirectory[str] | None = None
         self._temporary_cleanup_debt: list[
             tuple[tempfile.TemporaryDirectory[str], ErrorDiagnostics | None, int]
@@ -326,7 +327,20 @@ class SharedGpuASRRuntime:
                 task = self._activation_task
             else:
                 raise GpuASRRuntimeError(f"GPU runtime is {self._state.value}")
-        return await self._await_activation(task)
+            key = (channel, owner)
+            revoked: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+            self._activation_waiters.setdefault(key, set()).add(revoked)
+        try:
+            await asyncio.wait({task, revoked}, return_when=asyncio.FIRST_COMPLETED)
+            if revoked.done():
+                raise asyncio.CancelledError
+            return await self._await_activation(task)
+        finally:
+            waiters = self._activation_waiters.get(key)
+            if waiters is not None:
+                waiters.discard(revoked)
+                if not waiters:
+                    self._activation_waiters.pop(key)
 
     async def retry(self) -> GpuWorkerActivation:
         async with self._lock:
@@ -429,6 +443,9 @@ class SharedGpuASRRuntime:
             owners = self._active_channels.get(channel)
             if owners is not None and owner in owners:
                 owners.remove(owner)
+                for waiter in self._activation_waiters.pop((channel, owner), ()):
+                    if not waiter.done():
+                        waiter.set_result(None)
                 if owners:
                     return
                 self._active_channels.pop(channel)
@@ -858,6 +875,7 @@ class SharedGpuASRRuntime:
             stop_error, terminal, forced = await self._stop_client_bounded(
                 client,
                 request_id=active.request_id if active is not None else None,
+                force=self._activation_task is not None,
             )
         if not terminal:
             self._state = GpuASRRuntimeState.FAILED
@@ -896,10 +914,11 @@ class SharedGpuASRRuntime:
         client: GpuWorkerClientPort,
         *,
         request_id: str | None,
+        force: bool = False,
     ) -> tuple[Exception | None, bool, bool]:
         errors: list[Exception] = []
         pending_tasks: list[asyncio.Task[None]] = []
-        force_required = False
+        force_required = force
         already_closed = False
         if request_id is not None:
             cancel_task = start_lifecycle_task(

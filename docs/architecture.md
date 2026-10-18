@@ -167,6 +167,7 @@ GUI and headless hosts share application owners, runtime resources and turn-even
   - Queries distinguish persisted intent from effective runtime state.
   - `translation_runtime_ready` reports provider attachment, not successful native-model preparation. Managed readiness and failures belong to `models.status`.
   - Translation enablement publishes preparation demand before warmup. A current-generation warmup failure or cancellation rolls effective enablement off without discarding the selected provider or its actionable failure. Later explicit enablement retries; superseded work cannot overwrite newer intent.
+  - Matching translation or capture stops may preempt an in-flight start without opening unrelated mutations to concurrent execution. The superseded start retains its ordering barrier through stop cleanup; older queued starts are fenced and later explicit starts wait for cleanup.
   - Operations belong to the application, not the requesting client connection.
 - **Local control host**
   - The host owns authenticated same-user access and instance identity.
@@ -298,6 +299,7 @@ Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestra
 - **Slots and lifecycle**
   - A request retains its slot through native completion or cancellation settlement. Prefix preparation, restore, save and LRU eviction cannot overwrite a busy slot.
   - Model, device and backend transitions drain active work before replacing the server and reject results from superseded state. A failed request cannot terminate another valid request merely to reclaim its slot.
+  - Cancelling exclusive startup or prefix warmup aborts the owned server instead of waiting for model readiness or idle linger. Prefix cancellation with another admitted translation preserves that request and drains the shared work.
   - Prefix compatibility includes model/artifact, runtime/executable, effective backend/profile, prompt/template and language pair.
 - **Backend policy**
   - E4B preserves serialized CPU MTP and its internal GPU-to-CPU fallback; fallback uses CPU admission and the CPU profile.
@@ -501,6 +503,7 @@ Shutdown order:
   - Runtime shutdown invokes that factory's explicit cleanup port.
   - Supplied admission operation/request identities reach process startup before first failure retention.
   - Neither an absent client nor a failed termination attempt establishes completed resource release.
+  - Revoking a pending GPU activation releases that owner's waiter immediately. Remaining channel demand retains shared activation; removing the final demand force-stops a loading worker without waiting for native model initialization and confirms resource cleanup before restart.
 - **Output cleanup**
   - Independent output destinations continue cleanup when one destination fails.
 

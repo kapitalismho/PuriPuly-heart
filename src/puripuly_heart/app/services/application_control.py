@@ -6,7 +6,8 @@ import json
 import math
 import os
 from collections import OrderedDict
-from collections.abc import AsyncIterator, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -429,6 +430,22 @@ def _redact(value: object) -> object:
     return value
 
 
+@dataclass(frozen=True, slots=True)
+class _RuntimeToggleIntent:
+    resource: str
+    enabled: bool
+    sequence: int
+
+
+@dataclass(slots=True)
+class _StartingRuntimeToggle:
+    resource: str
+    task: asyncio.Task
+    stops: list[asyncio.Event] = field(default_factory=list)
+    stop_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    cancel_requested: bool = False
+
+
 @dataclass(slots=True)
 class _Operation:
     receipt: dict
@@ -438,6 +455,7 @@ class _Operation:
     install_started: bool = False
     interrupt_requested: bool = False
     audio_test_revision: int | None = None
+    runtime_toggle: _RuntimeToggleIntent | None = None
 
 
 class InvalidArgumentsError(ValueError):
@@ -476,9 +494,149 @@ class ApplicationControlOwner:
     _open: bool = True
     _lock_owner: asyncio.Task | None = None
     _auth_challenge: dict | None = None
+    _runtime_toggle_sequence: int = 0
+    _runtime_toggle_stops: dict[str, int] = field(default_factory=dict)
+    _operation_runtime_toggles: dict[asyncio.Task, _RuntimeToggleIntent] = field(
+        default_factory=dict
+    )
+    _starting_runtime_toggle: _StartingRuntimeToggle | None = None
+    _runtime_toggle_changed: asyncio.Event = field(default_factory=asyncio.Event)
+    _preempting_runtime_stops: set[asyncio.Task] = field(default_factory=set)
 
     def lock_owned_by_current_task(self) -> bool:
-        return self._lock_owner is asyncio.current_task()
+        task = asyncio.current_task()
+        return self._lock_owner is task or task in self._preempting_runtime_stops
+
+    def admit_runtime_toggle(self, resource: str, enabled: bool) -> _RuntimeToggleIntent:
+        self._runtime_toggle_sequence += 1
+        return _RuntimeToggleIntent(resource, enabled, self._runtime_toggle_sequence)
+
+    def runtime_toggle_intent(self, resource: str, enabled: bool) -> _RuntimeToggleIntent:
+        intent = self._operation_runtime_toggles.get(asyncio.current_task())
+        if intent is not None and intent.resource == resource and intent.enabled == enabled:
+            return intent
+        return self.admit_runtime_toggle(resource, enabled)
+
+    def runtime_toggle_is_current(self, intent: _RuntimeToggleIntent) -> bool:
+        return not intent.enabled or intent.sequence > self._runtime_toggle_stops.get(
+            intent.resource, 0
+        )
+
+    def _notify_runtime_toggle_changed(self) -> None:
+        self._runtime_toggle_changed.set()
+        self._runtime_toggle_changed = asyncio.Event()
+
+    @asynccontextmanager
+    async def runtime_toggle_lock(self, intent: _RuntimeToggleIntent):
+        if self.lock_owned_by_current_task():
+            yield
+            return
+        task = asyncio.current_task()
+        acquired_resource = False
+        acquired_mutation = False
+        preempted = None
+        stop_finished = None
+        acquired_stop = False
+
+        async def acquire() -> None:
+            nonlocal acquired_resource, acquired_mutation
+            try:
+                if intent.enabled or intent.resource == "translation":
+                    await self._resource_lock.acquire()
+                    acquired_resource = True
+                await self._lock.acquire()
+                acquired_mutation = True
+            except BaseException:
+                if acquired_resource:
+                    self._resource_lock.release()
+                    acquired_resource = False
+                raise
+
+        acquisition = asyncio.create_task(
+            acquire(), name=f"control:{intent.resource}:toggle-acquire"
+        )
+        changed = None
+        try:
+            while not acquisition.done():
+                starting = self._starting_runtime_toggle
+                if (
+                    not intent.enabled
+                    and starting is not None
+                    and starting.resource == intent.resource
+                ):
+                    preempted = starting
+                    stop_finished = asyncio.Event()
+                    starting.stops.append(stop_finished)
+                    self._preempting_runtime_stops.add(task)
+                    acquisition.cancel()
+                    await asyncio.gather(acquisition, return_exceptions=True)
+                    break
+                changed = asyncio.create_task(
+                    self._runtime_toggle_changed.wait(),
+                    name=f"control:{intent.resource}:toggle-changed",
+                )
+                await asyncio.wait((acquisition, changed), return_when=asyncio.FIRST_COMPLETED)
+                changed.cancel()
+                await asyncio.gather(changed, return_exceptions=True)
+                changed = None
+            if preempted is None:
+                await acquisition
+                self._lock_owner = task
+            else:
+                await preempted.stop_lock.acquire()
+                acquired_stop = True
+            yield
+        finally:
+            if changed is not None:
+                changed.cancel()
+                await asyncio.gather(changed, return_exceptions=True)
+            if not acquisition.done():
+                acquisition.cancel()
+                await asyncio.gather(acquisition, return_exceptions=True)
+            if stop_finished is not None:
+                stop_finished.set()
+                preempted.stops.remove(stop_finished)
+                self._preempting_runtime_stops.discard(task)
+                if acquired_stop:
+                    preempted.stop_lock.release()
+                if preempted.cancel_requested and not preempted.stops:
+                    preempted.task.cancel()
+            if self._lock_owner is task:
+                self._lock_owner = None
+            if acquired_mutation:
+                self._lock.release()
+            if acquired_resource:
+                self._resource_lock.release()
+
+    async def run_runtime_toggle(
+        self, intent: _RuntimeToggleIntent, apply: Callable[[], Awaitable[object]]
+    ) -> object:
+        async with self.runtime_toggle_lock(intent):
+            if not self.runtime_toggle_is_current(intent):
+                return False
+            if not intent.enabled:
+                self._runtime_toggle_stops[intent.resource] = max(
+                    intent.sequence, self._runtime_toggle_stops.get(intent.resource, 0)
+                )
+                starting = self._starting_runtime_toggle
+                if starting is not None and starting.resource == intent.resource:
+                    starting.cancel_requested = True
+                return await apply()
+            starting = self._starting_runtime_toggle
+            if starting is not None and starting.task is asyncio.current_task():
+                return await apply()
+            starting = _StartingRuntimeToggle(intent.resource, asyncio.current_task())
+            self._starting_runtime_toggle = starting
+            self._notify_runtime_toggle_changed()
+            try:
+                return await apply()
+            finally:
+                try:
+                    while starting.stops:
+                        await asyncio.gather(*(stop.wait() for stop in starting.stops))
+                finally:
+                    self._starting_runtime_toggle = None
+                    self._notify_runtime_toggle_changed()
 
     def bind_instance(self, instance_id: str) -> None:
         if not instance_id or (self.instance_id is not None and self.instance_id != instance_id):
@@ -1328,10 +1486,22 @@ class ApplicationControlOwner:
             "terminal": False,
             "revision": self._current_revision(),
         }
+        runtime_toggle = None
+        if command in {"translation.set", "capture.set"}:
+            try:
+                _validate_command_args(command, arguments, locale_choices=self.locale_choices)
+            except InvalidArgumentsError:
+                pass
+            else:
+                runtime_toggle = self.admit_runtime_toggle(
+                    "translation" if command == "translation.set" else arguments["channel"],
+                    arguments["enabled"],
+                )
         self._operations[operation_id] = _Operation(
             receipt,
             backend=arguments.get("backend", "gpu") if command == "models.install" else None,
             request_signature=signature,
+            runtime_toggle=runtime_toggle,
             audio_test_revision=(
                 self.application.audio_test_start_revision()
                 if command == "audio.test" and arguments.get("enabled") is True
@@ -1361,9 +1531,17 @@ class ApplicationControlOwner:
     async def _execute(
         self, command: str, arguments: dict, expected_revision: int | None, operation_id: str
     ) -> None:
-        receipt = self._operations[operation_id].receipt
-        with diagnostic_operation(self.instance_id, operation_id, receipt["request_id"]):
-            await self._execute_owned(command, arguments, expected_revision, operation_id)
+        operation = self._operations[operation_id]
+        task = asyncio.current_task()
+        if operation.runtime_toggle is not None:
+            self._operation_runtime_toggles[task] = operation.runtime_toggle
+        try:
+            with diagnostic_operation(
+                self.instance_id, operation_id, operation.receipt["request_id"]
+            ):
+                await self._execute_owned(command, arguments, expected_revision, operation_id)
+        finally:
+            self._operation_runtime_toggles.pop(task, None)
 
     @staticmethod
     def _text_admission_data(admission) -> dict:
@@ -1551,6 +1729,7 @@ class ApplicationControlOwner:
             resource_lock = (
                 None
                 if independent_stop
+                or operation.runtime_toggle is not None
                 or safe_capture_off
                 or safe_locale
                 or command == "secrets.verify"
@@ -1563,10 +1742,15 @@ class ApplicationControlOwner:
                 deferred = None
                 while True:
                     refresh_preparation = False
-                    async with asyncio.Lock() if independent_stop else self._lock:
+                    mutation_lock = (
+                        self.runtime_toggle_lock(operation.runtime_toggle)
+                        if operation.runtime_toggle is not None
+                        else asyncio.Lock() if independent_stop else self._lock
+                    )
+                    async with mutation_lock:
                         if not self._open and command != "app.stop":
                             raise asyncio.CancelledError
-                        if not independent_stop:
+                        if not independent_stop and operation.runtime_toggle is None:
                             self._lock_owner = asyncio.current_task()
                         revision = self._current_revision()
                         if expected_revision is not None and expected_revision != revision:
@@ -1574,6 +1758,10 @@ class ApplicationControlOwner:
                                 status="rejected",
                                 error={"code": "revision_conflict", "current_revision": revision},
                             )
+                        elif operation.runtime_toggle is not None and (
+                            not self.runtime_toggle_is_current(operation.runtime_toggle)
+                        ):
+                            raise asyncio.CancelledError
                         elif translation_enable and (
                             self.application.translation_preparation_needs_refresh(preparation)
                         ):
@@ -1602,6 +1790,22 @@ class ApplicationControlOwner:
                             ):
                                 raise InvalidArgumentsError("text must be non-empty")
                             deferred = ("text", arguments["text"])
+                        elif operation.runtime_toggle is not None:
+                            result = await self.run_runtime_toggle(
+                                operation.runtime_toggle,
+                                lambda: (
+                                    self._dispatch(
+                                        command,
+                                        arguments,
+                                        operation_id=operation_id,
+                                        translation_preparation=preparation,
+                                    )
+                                    if preparation is not None
+                                    else self._dispatch(
+                                        command, arguments, operation_id=operation_id
+                                    )
+                                ),
+                            )
                         elif preparation is not None:
                             result = await self._dispatch(
                                 command,

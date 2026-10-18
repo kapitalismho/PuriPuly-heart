@@ -390,21 +390,32 @@ class ManagedGemmaRuntimeOwner:
         while self._busy_slots:
             await self._wait_slot_change_locked()
 
-    async def _await_server_work(self, work: Awaitable[_ServerResult]) -> _ServerResult:
+    async def _await_server_work(
+        self, work: Awaitable[_ServerResult], *, abort_on_cancel: bool = False
+    ) -> _ServerResult:
         task = asyncio.ensure_future(work)
         self._server_tasks.add(task)
         cancellation: asyncio.CancelledError | None = None
+        abort_requested = False
         try:
             while not task.done():
                 try:
                     await asyncio.shield(task)
                 except asyncio.CancelledError as exc:
                     cancellation = exc
+                    if abort_on_cancel and not abort_requested and not task.done():
+                        abort_requested = True
+                        task.cancel()
                 except BaseException:
                     break
             if cancellation is not None:
                 if not task.cancelled():
-                    task.exception()
+                    failure = task.exception()
+                    if abort_requested and failure is not None:
+                        raise BaseExceptionGroup(
+                            "managed Gemma preparation cancellation cleanup failed",
+                            [cancellation, failure],
+                        )
                 raise cancellation
             return task.result()
         finally:
@@ -552,7 +563,8 @@ class ManagedGemmaRuntimeOwner:
                 raise ManagedGemmaRuntimeError("managed Gemma transport is unavailable")
             try:
                 await self._await_server_work(
-                    self._prepare_prefix(transport, identity, slot_id, rendered_prompt)
+                    self._prepare_prefix(transport, identity, slot_id, rendered_prompt),
+                    abort_on_cancel=not self._busy_slots,
                 )
             except Exception as exc:
                 self._transitioning = True
@@ -589,7 +601,8 @@ class ManagedGemmaRuntimeOwner:
                         raise ManagedGemmaRuntimeError("managed Gemma transport is unavailable")
                     try:
                         await self._await_server_work(
-                            self._prepare_prefix(transport, identity, slot_id, rendered_prompt)
+                            self._prepare_prefix(transport, identity, slot_id, rendered_prompt),
+                            abort_on_cancel=not self._busy_slots,
                         )
                     except BaseException:
                         await self._stop_locked()
@@ -647,6 +660,11 @@ class ManagedGemmaRuntimeOwner:
                 await transport.prepare_prefix(system_prompt=prompt, slot_id=slot_id)
                 self._ensure_process_alive()
                 await self._save_prefix_locked(transport, identity, slot_id)
+        except asyncio.CancelledError:
+            current = asyncio.current_task()
+            if current is not None and current.cancelling() and not self._busy_slots:
+                await self._stop_locked()
+            raise
         except Exception:
             try:
                 await transport.wait_slot_idle(slot_id=slot_id)

@@ -11,7 +11,18 @@ from puripuly_heart.core.local_stt_assets import (
 )
 
 from puripuly_heart.app.services.model_assets import ModelAssetsApplication, ModelAssetsError
-from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice
+from puripuly_heart.app.services.model_assets_catalog import ModelAssetChoice, model_asset_choices
+
+
+def test_model_manager_names_drop_runtime_suffixes_and_place_qwen_gpu_second() -> None:
+    choices = model_asset_choices()
+    asr = [choice.name for choice in choices if choice.purpose == "asr"]
+    assert asr[:2] == ["Qwen3 ASR 0.6B", "Qwen3 ASR 1.7B Q6_K"]
+    assert [choice.name for choice in choices if choice.purpose == "translation"][0] == (
+        "Gemma 4 E4B"
+    )
+    assert all("·" not in choice.name and "+ MTP" not in choice.name for choice in choices)
+
 
 GEMMA_ID = "gemma-test"
 CHOICES = (

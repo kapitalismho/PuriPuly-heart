@@ -185,6 +185,18 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
             if method.__name__ == "start_audio_test" and kwargs.get("admission_revision") is None:
                 kwargs["admission_revision"] = self.audio_test_start_revision()
             control = self._control
+            toggle_resource = {
+                "set_translation_enabled": "translation",
+                "set_stt_enabled": "self",
+                "set_peer_translation_enabled": "peer",
+            }.get(method.__name__)
+            toggle_intent = (
+                control.runtime_toggle_intent(
+                    toggle_resource, args[0] if args else kwargs.get("enabled")
+                )
+                if control is not None and toggle_resource is not None
+                else None
+            )
             if method.__name__ == "set_translation_enabled":
                 preparation = kwargs.get("preparation")
                 if preparation is not None:
@@ -215,28 +227,26 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                         self._admit_application_intent(method.__name__)
                         if control is None:
                             return await method(self, *args, **kwargs)
-                        async with control._resource_lock:
-                            async with control._lock:
-                                if intent != self._translation_selection_intent:
-                                    return False
-                                if not self.translation_preparation_needs_refresh(preparation):
-                                    return await method(self, *args, **kwargs)
+                        async with control.runtime_toggle_lock(toggle_intent):
+                            if intent != self._translation_selection_intent:
+                                return False
+                            if not self.translation_preparation_needs_refresh(preparation):
+                                return await control.run_runtime_toggle(
+                                    toggle_intent, lambda: method(self, *args, **kwargs)
+                                )
+            if toggle_intent is not None:
+                return await control.run_runtime_toggle(
+                    toggle_intent, lambda: method(self, *args, **kwargs)
+                )
             if (
                 method.__name__ not in _ORDERED_INTENTS
                 or control is None
                 or control.lock_owned_by_current_task()
             ):
                 return await method(self, *args, **kwargs)
-            capture_off = (
-                method.__name__ in {"set_stt_enabled", "set_peer_translation_enabled"}
-                and (args[0] if args else kwargs.get("enabled")) is False
-            )
-            if not capture_off:
-                async with control._resource_lock:
-                    async with control._lock:
-                        return await method(self, *args, **kwargs)
-            async with control._lock:
-                return await method(self, *args, **kwargs)
+            async with control._resource_lock:
+                async with control._lock:
+                    return await method(self, *args, **kwargs)
 
         return invoke_async
 

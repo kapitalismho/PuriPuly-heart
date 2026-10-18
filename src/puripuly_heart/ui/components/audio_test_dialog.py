@@ -9,6 +9,18 @@ import flet as ft
 import flet.canvas as cv
 
 from puripuly_heart.config.resolved import VAD_ONSET_MAX, VAD_ONSET_MIN
+from puripuly_heart.ui.components.modal_kit import (
+    CARD_DETAIL_SIZE,
+    CARD_HEIGHT,
+    CARD_LABEL_SIZE,
+    CARD_PADDING,
+    CARD_RADIUS,
+    CARD_SPACING,
+    MODAL_COLUMN_SPACING,
+    build_modal_dialog,
+    build_modal_surface,
+    build_section_header,
+)
 from puripuly_heart.ui.flet_runtime import update_control_if_mounted
 from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
@@ -16,7 +28,6 @@ from puripuly_heart.ui.theme import (
     COLOR_NEUTRAL_DARK,
     COLOR_PRIMARY,
     COLOR_SECONDARY,
-    COLOR_SURFACE,
     COLOR_WARNING,
 )
 
@@ -27,6 +38,10 @@ RENDER_INTERVAL_S = 1 / 12
 SILENCE_FILL_AFTER_S = 0.3
 _GRAPH_WIDTH = 360
 _GRAPH_HEIGHT = 300
+_GRAPH_PADDING = 16
+_DEVICE_LINE_HEIGHT = 44
+_THRESHOLD_VALUE_SIZE = 32
+_THRESHOLD_VALUE_WIDTH = 80
 _CHANNEL_TITLE_KEYS = {
     "self": "audio_test.channel.self",
     "peer": "audio_test.channel.peer",
@@ -57,21 +72,32 @@ class _ChannelPanel:
         self.last_sample_at: float | None = None
         self.threshold = 0.5
         self.dirty = True
-        self.device_text = ft.Text("", size=14, color=COLOR_NEUTRAL_DARK, max_lines=1)
-        self.warning_text = ft.Text("", size=13, color=COLOR_WARNING, visible=False)
-        self.status_dot = ft.Container(
-            width=12,
-            height=12,
-            border_radius=6,
-            bgcolor=COLOR_NEUTRAL_DARK,
-        )
-        self.status_text = ft.Text(
-            t("audio_test.state.pending"),
-            size=16,
+        self.device_text = ft.Text(
+            "",
+            size=CARD_DETAIL_SIZE,
             weight=ft.FontWeight.BOLD,
             color=COLOR_NEUTRAL_DARK,
-            expand=True,
-            no_wrap=False,
+            max_lines=2,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        )
+        self.status_text = ft.Text(
+            "",
+            size=CARD_LABEL_SIZE,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_NEUTRAL_DARK,
+            text_align=ft.TextAlign.CENTER,
+        )
+        self.status_row = ft.Container(
+            content=self.status_text,
+            left=0,
+            top=0,
+            right=0,
+            bottom=0,
+            padding=ft.Padding.all(CARD_PADDING),
+            alignment=ft.Alignment.CENTER,
+            bgcolor=COLOR_BACKGROUND,
+            border_radius=CARD_RADIUS,
+            visible=False,
         )
         self.canvas = cv.Canvas(
             shapes=[],
@@ -91,57 +117,70 @@ class _ChannelPanel:
         )
         self.threshold_text = ft.Text(
             f"{self.threshold:.2f}",
-            size=14,
+            size=_THRESHOLD_VALUE_SIZE,
             weight=ft.FontWeight.BOLD,
-            color=COLOR_NEUTRAL_DARK,
-            width=40,
+            color=COLOR_PRIMARY,
+            width=_THRESHOLD_VALUE_WIDTH,
             text_align=ft.TextAlign.RIGHT,
         )
+        self.title_text = build_section_header("")
+        self.threshold_label = ft.Text(
+            "",
+            size=CARD_LABEL_SIZE,
+            weight=ft.FontWeight.BOLD,
+            color=COLOR_NEUTRAL_DARK,
+            max_lines=1,
+        )
+        self.apply_locale()
         self.control = self._build()
 
     def _build(self) -> ft.Column:
-        graph = ft.Container(
-            content=self.canvas,
+        graph = ft.Stack(
+            controls=[
+                ft.Container(
+                    content=self.canvas,
+                    bgcolor=COLOR_BACKGROUND,
+                    border_radius=CARD_RADIUS,
+                    padding=ft.Padding.all(_GRAPH_PADDING),
+                    alignment=ft.Alignment.CENTER,
+                ),
+                self.status_row,
+            ],
+        )
+        threshold = ft.Container(
+            content=ft.Row(
+                controls=[
+                    self.threshold_label,
+                    self.slider,
+                    self.threshold_text,
+                ],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            height=CARD_HEIGHT,
+            padding=ft.Padding.symmetric(horizontal=CARD_PADDING),
             bgcolor=COLOR_BACKGROUND,
-            border_radius=16,
-            padding=ft.Padding.all(16),
-            alignment=ft.Alignment.CENTER,
+            border_radius=CARD_RADIUS,
         )
         return ft.Column(
             controls=[
-                ft.Text(
-                    t(_CHANNEL_TITLE_KEYS[self.channel]),
-                    size=18,
-                    weight=ft.FontWeight.BOLD,
-                    color=COLOR_SECONDARY,
+                self.title_text,
+                ft.Container(
+                    content=self.device_text,
+                    height=_DEVICE_LINE_HEIGHT,
+                    alignment=ft.Alignment.CENTER_LEFT,
                 ),
-                self.device_text,
                 graph,
-                ft.Row(
-                    controls=[self.status_dot, self.status_text],
-                    spacing=10,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                ft.Row(
-                    controls=[
-                        ft.Text(
-                            t("audio_test.threshold"),
-                            size=14,
-                            weight=ft.FontWeight.BOLD,
-                            color=COLOR_NEUTRAL_DARK,
-                        ),
-                        self.slider,
-                        self.threshold_text,
-                    ],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                self.warning_text,
+                threshold,
             ],
-            spacing=12,
+            spacing=CARD_SPACING,
             expand=True,
             horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
         )
+
+    def apply_locale(self) -> None:
+        self.title_text.value = t(_CHANNEL_TITLE_KEYS[self.channel])
+        self.threshold_label.value = t("audio_test.threshold")
 
     def set_threshold(self, value: float) -> None:
         self.threshold = float(value)
@@ -171,10 +210,13 @@ class _ChannelPanel:
     def apply_snapshot(self, snapshot: Mapping[str, object]) -> None:
         state = str(snapshot.get("state") or "off")
         device = snapshot.get("device")
-        self.device_text.value = _device_label(device if isinstance(device, Mapping) else {})
         fallback = isinstance(device, Mapping) and bool(device.get("default_fallback"))
-        self.warning_text.value = t("audio_test.device.default_fallback") if fallback else ""
-        self.warning_text.visible = fallback
+        if fallback:
+            self.device_text.value = t("audio_test.device.default_fallback")
+            self.device_text.color = COLOR_WARNING
+        else:
+            self.device_text.value = _device_label(device if isinstance(device, Mapping) else {})
+            self.device_text.color = COLOR_NEUTRAL_DARK
         if state == "failed":
             reason = str(snapshot.get("failure_reason") or "")
             key = (
@@ -183,24 +225,10 @@ class _ChannelPanel:
                 else _FAILURE_KEYS.get(reason, "audio_test.error.generic")
             )
             self.status_text.value = t(key)
-            self.status_text.color = COLOR_NEUTRAL_DARK
-            self.status_dot.bgcolor = COLOR_WARNING
-        elif state == "ready" and snapshot.get("speech_detected"):
-            self.status_text.value = t("audio_test.state.speech")
-            self.status_text.color = COLOR_PRIMARY
-            self.status_dot.bgcolor = COLOR_PRIMARY
-        elif state == "ready":
-            self.status_text.value = t("audio_test.state.listening")
-            self.status_text.color = COLOR_NEUTRAL_DARK
-            self.status_dot.bgcolor = COLOR_NEUTRAL_DARK
-        elif state in {"pending", "stopping"}:
-            self.status_text.value = t("audio_test.state.pending")
-            self.status_text.color = COLOR_NEUTRAL_DARK
-            self.status_dot.bgcolor = COLOR_NEUTRAL_DARK
+            self.status_row.visible = True
         else:
-            self.status_text.value = t("audio_test.state.stopped")
-            self.status_text.color = COLOR_NEUTRAL_DARK
-            self.status_dot.bgcolor = COLOR_NEUTRAL_DARK
+            self.status_text.value = ""
+            self.status_row.visible = False
 
     def render(self) -> None:
         if not self.dirty:
@@ -240,12 +268,6 @@ class AudioTestDialog:
             channel: _ChannelPanel(channel, on_threshold_change=on_threshold_change)
             for channel in AUDIO_TEST_CHANNELS
         }
-        self._notice_text = ft.Text(
-            t("audio_test.capture_paused"),
-            size=14,
-            color=COLOR_NEUTRAL_DARK,
-            visible=False,
-        )
         self._content: ft.Container | None = None
         self._dialog: ft.AlertDialog | None = None
         self._is_open = False
@@ -269,6 +291,7 @@ class AudioTestDialog:
             return
         self._start_failed = False
         for channel, panel in self._panels.items():
+            panel.apply_locale()
             panel.history.extend([(0.0, 0.0)] * HISTORY_SAMPLES)
             panel.last_sample_at = None
             if thresholds is not None and channel in thresholds:
@@ -276,7 +299,6 @@ class AudioTestDialog:
             panel.apply_snapshot({"state": "pending"})
             panel.dirty = True
             panel.render()
-        self._notice_text.visible = False
         self._close_notified = False
         self._dialog = self._build_dialog()
         self._is_open = True
@@ -322,8 +344,6 @@ class AudioTestDialog:
             if isinstance(channel_snapshot, Mapping) and channel_snapshot.get("state") == "ready":
                 panel.fill_silence(now)
             panel.render()
-        restore = snapshot.get("restore_capture")
-        self._notice_text.visible = bool(restore)
         if self._content is not None:
             update_control_if_mounted(self._content)
 
@@ -342,37 +362,13 @@ class AudioTestDialog:
     def _build_dialog(self) -> ft.AlertDialog:
         columns = ft.Row(
             controls=[panel.control for panel in self._panels.values()],
-            spacing=32,
+            spacing=MODAL_COLUMN_SPACING,
             vertical_alignment=ft.CrossAxisAlignment.START,
             expand=True,
         )
-        self._content = ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Text(
-                        t("settings.audio_test"),
-                        size=24,
-                        weight=ft.FontWeight.BOLD,
-                        color=COLOR_SECONDARY,
-                    ),
-                    ft.Container(height=16),
-                    columns,
-                    self._notice_text,
-                ],
-                spacing=20,
-                horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
-            ),
-            width=880,
-            height=700,
-            padding=ft.Padding.symmetric(horizontal=32, vertical=32),
-            bgcolor=COLOR_SURFACE,
-            border_radius=28,
-        )
-        return ft.AlertDialog(
-            modal=False,
-            content=self._content,
-            content_padding=0,
-            bgcolor=ft.Colors.TRANSPARENT,
+        self._content = build_modal_surface(t("settings.audio_test"), columns)
+        return build_modal_dialog(
+            self._content,
             semantics_label=t("settings.audio_test"),
             on_dismiss=self._handle_dismiss,
         )
@@ -400,8 +396,7 @@ def _device_label(device: Mapping[str, object]) -> str:
         return t("audio_test.device.unknown")
     if device.get("kind") == "process":
         return t("audio_test.device.process", name=name)
-    host_api = str(device.get("host_api") or "").strip()
-    return f"{name} · {host_api}" if host_api else name
+    return name
 
 
 def _graph_shapes(history: Sequence[tuple[float, float]], threshold: float) -> list[cv.Shape]:

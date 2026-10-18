@@ -456,7 +456,7 @@ async def test_preparation_and_session_open_share_one_resource(tmp_path: Path) -
         await runtime.close()
 
 
-async def test_cancelled_preparation_releases_only_self_during_shared_activation(
+async def test_closing_preparation_releases_only_self_during_shared_activation(
     tmp_path: Path,
 ) -> None:
     client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
@@ -479,10 +479,9 @@ async def test_cancelled_preparation_releases_only_self_during_shared_activation
         async with asyncio.timeout(1):
             while "self" not in runtime.active_channels:
                 await asyncio.sleep(0)
-        self_preparing.cancel()
+        await asyncio.wait_for(backends["self"].close(), timeout=1)
         with pytest.raises(asyncio.CancelledError):
-            await self_preparing
-        await backends["self"].close()
+            await asyncio.wait_for(self_preparing, timeout=1)
         assert runtime.active_channels == frozenset({"peer"})
         assert client.close_calls == 0
         assert not peer_preparing.done()
@@ -502,7 +501,9 @@ async def test_cancelled_preparation_releases_only_self_during_shared_activation
         await runtime.close()
 
 
-async def test_close_serializes_with_resource_preparation(tmp_path: Path) -> None:
+async def test_close_aborts_preparation_and_session_open_without_model_readiness(
+    tmp_path: Path,
+) -> None:
     client = FakeGpuWorkerClient(activation_gate=asyncio.Event())
     runtime = SharedGpuASRRuntime(process_factory=FakeGpuWorkerFactory([client]))
     backend = LocalGpuSTTBackend(
@@ -514,16 +515,25 @@ async def test_close_serializes_with_resource_preparation(tmp_path: Path) -> Non
     )
     preparing = asyncio.create_task(backend.prepare())
     await asyncio.wait_for(client.activation_started.wait(), timeout=1)
-    closing = asyncio.create_task(backend.close())
-    client.activation_gate.set()
+    opening = asyncio.create_task(backend.open_session(projection=SCOPED_PROJECTION))
+    await asyncio.sleep(0)
     try:
-        await asyncio.wait_for(preparing, timeout=1)
-        await asyncio.wait_for(closing, timeout=1)
+        await asyncio.wait_for(backend.close(), timeout=1)
+        for pending in (preparing, opening):
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(pending, timeout=1)
+        assert not client.activation_gate.is_set()
         assert runtime.active_channels == frozenset()
         assert client.close_calls == 1
+        assert client.force_close_calls == 1
+        assert client.is_closed
+        assert runtime.worker_pid is None
+        assert runtime.state == GpuASRRuntimeState.STOPPED
         with pytest.raises(RuntimeError, match="backend is closed"):
             await backend.prepare()
     finally:
+        client.activation_gate.set()
+        await asyncio.gather(preparing, opening, return_exceptions=True)
         await backend.close()
         await runtime.close()
 

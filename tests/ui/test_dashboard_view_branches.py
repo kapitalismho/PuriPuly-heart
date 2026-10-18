@@ -1322,6 +1322,38 @@ def test_dashboard_overlay_notices_yield_to_content_while_others_block(
     assert osc_view.display_card.notice_yields[-1] is False
 
 
+@pytest.mark.parametrize("source", ["local_stt", "gpu", "managed_gemma"])
+def test_model_progress_yields_to_source_and_translation(
+    source: str,
+) -> None:
+    from puripuly_heart.app.ports.ui_models import ManagedGemmaDashboardNotice
+
+    view = dashboard_module.DashboardView()
+
+    def progress(percent: int) -> None:
+        if source == "local_stt":
+            view.set_local_stt_notice("downloading", percent=percent)
+        elif source == "gpu":
+            view.set_gpu_notice(GpuDashboardNotice(status="installing", progress_percent=percent))
+        else:
+            view.set_managed_gemma_notice(
+                ManagedGemmaDashboardNotice(status="downloading", progress_percent=percent)
+            )
+
+    progress(37)
+    assert "37%" in view.display_card._display_text.value
+
+    view.set_display_text("새 인식문")
+    assert view.display_card._display_text.value == "새 인식문"
+    progress(63)
+    assert view.display_card._display_text.value == "새 인식문"
+
+    view.set_display_translation_text("New translation")
+    assert view.display_card._display_text.value == "New translation"
+    progress(100)
+    assert view.display_card._display_text.value == "New translation"
+
+
 def test_dashboard_overlay_failure_notice_relocalizes_on_apply_locale(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1717,6 +1749,41 @@ def test_dashboard_talk_starting_clears_when_stt_becomes_enabled(
     assert view.is_stt_on is True
     assert view._stt_is_starting is False
     assert "is_starting" not in view.stt_button.states[-1]
+
+
+@pytest.mark.parametrize("effective_enabled", (False, True))
+def test_dashboard_trans_loading_click_requests_off_and_clears_starting(
+    monkeypatch: pytest.MonkeyPatch, effective_enabled: bool
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    requests: list[bool] = []
+    view.on_toggle_translation = requests.append
+    view.set_translation_enabled(effective_enabled)
+    view.set_translation_starting(True)
+
+    view.trans_button.on_click()
+
+    assert requests == [False]
+    assert view.is_translation_on is False
+    assert view._translation_is_starting is False
+    assert view.trans_button.states[-1]["is_on"] is False
+    assert "is_starting" not in view.trans_button.states[-1]
+
+
+def test_dashboard_talk_loading_click_requests_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    view = _make_dashboard(monkeypatch)
+    requests: list[bool] = []
+    view.on_toggle_stt = requests.append
+    view.set_stt_enabled(False)
+    view.set_stt_starting(True)
+
+    view.stt_button.on_click()
+
+    assert requests == [False]
+    assert view.is_stt_on is False
+    assert view._stt_is_starting is False
 
 
 def test_dashboard_self_swap_keeps_the_secondary_target(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from dataclasses import replace
 
 import pytest
 from puripuly_heart.core.local_asr_provider_runtime import (
@@ -12,6 +13,8 @@ from puripuly_heart.core.local_asr_provider_runtime import (
 from puripuly_heart.core.local_asr_provisioning import (
     LocalASRInstallRequest,
     LocalASRInstallResult,
+    LocalASRModelProvisioningState,
+    LocalASRProvisioningActivity,
     LocalASRProvisioningSnapshot,
 )
 from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
@@ -181,3 +184,58 @@ async def test_validate_activation_starts_install_when_model_is_missing(
         )
     ]
     await asyncio.sleep(0)
+
+
+@pytest.mark.parametrize(
+    ("integrity", "operation", "expected_state", "expected_notice"),
+    [
+        ("ready", "idle", "installed", None),
+        ("missing", "download_failed", "install_failed", "install_failed"),
+        ("missing", "cancelled", "not_installed", None),
+        ("ready", "cancelled", "installed", None),
+        ("invalid", "cancelled", "invalid", None),
+    ],
+)
+def test_model_manager_gpu_download_settles_dashboard_notice(
+    integrity: str,
+    operation: str,
+    expected_state: str,
+    expected_notice: str | None,
+) -> None:
+    owner, presentations = _owner(PhaseRuntime("inactive"))
+    model = LocalASRModelProvisioningState(
+        model_id=LOCAL_QWEN_GPU_MODEL_ID,
+        backend="gpu",
+        integrity="missing",
+        operation="downloading",
+    )
+    snapshot = LocalASRProvisioningSnapshot(
+        models=(model,),
+        required_cpu_model_ids=(),
+        gpu_model_id=LOCAL_QWEN_GPU_MODEL_ID,
+    )
+    for percent in (0, 37, 100):
+        owner.observe_provisioning(
+            replace(
+                snapshot,
+                activities=(
+                    LocalASRProvisioningActivity(
+                        backend="gpu",
+                        model_id=LOCAL_QWEN_GPU_MODEL_ID,
+                        origin="model_assets",
+                        progress_percent=percent,
+                        generation=1,
+                    ),
+                ),
+            )
+        )
+        assert presentations[-1].notice.progress_percent == percent
+
+    owner.observe_provisioning(
+        replace(snapshot, models=(replace(model, integrity=integrity, operation=operation),))
+    )
+
+    assert presentations[-1].state == expected_state
+    notice = presentations[-1].notice
+    assert (notice.status if notice is not None else None) == expected_notice
+    assert presentations[-1].publish_notice is (expected_notice is not None)

@@ -63,6 +63,11 @@ TASK_CREATION_REVIEWS = (
         "ApplicationControlOwner retains each operation independently of its client; freeze_ingress interrupts operations and drain_operations gathers them",
     ),
     *_reviews(
+        "app/services/application_control.py",
+        {"ApplicationControlOwner.runtime_toggle_lock": 2},
+        "Each toggle-lock invocation retains at most one acquisition task and one change waiter; its finally cancels and gathers both before releasing acquired locks or the matching stop barrier",
+    ),
+    *_reviews(
         "app/services/application_shutdown.py",
         {
             "ApplicationShutdownCoordinator.shutdown": 1,

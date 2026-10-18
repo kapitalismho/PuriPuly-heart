@@ -478,6 +478,105 @@ async def test_prefix_cancellation_keeps_settled_runtime_available_for_retry(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("phase", ["startup", "prefix"])
+@pytest.mark.parametrize(
+    ("backend", "spec"),
+    [("cpu", e4b_gemma_spec()), ("gpu", e4b_gemma_spec()), ("gpu", gemma_26b_spec())],
+)
+async def test_cancel_exclusive_warmup_stops_process_without_finishing_load(
+    tmp_path: Path, phase: str, backend: str, spec: GemmaModelSpec
+) -> None:
+    started = asyncio.Event()
+    finish_loading = asyncio.Event()
+    block_loading = True
+
+    class LoadingTransport(FakeTransport):
+        async def wait_until_ready(self, *, timeout_s: float) -> None:
+            if block_loading and phase == "startup":
+                started.set()
+                await finish_loading.wait()
+            await super().wait_until_ready(timeout_s=timeout_s)
+
+        async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
+            if block_loading and phase == "prefix":
+                started.set()
+                await finish_loading.wait()
+            await super().prepare_prefix(system_prompt=system_prompt, slot_id=slot_id)
+
+    owner, commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=LoadingTransport
+    )
+    arguments = dict(
+        backend=backend,
+        spec=spec,
+        source_language="ko",
+        target_language="en",
+        system_prompt="translate",
+    )
+    preparation = asyncio.create_task(owner.prepare(**arguments))
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    preparation.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(preparation, timeout=1.0)
+
+    assert not finish_loading.is_set()
+    assert processes[0].returncode is not None
+    assert transports[0].closed
+    assert owner.readiness is None
+    assert len(commands) == 1
+
+    block_loading = False
+    readiness = await owner.prepare(**arguments)
+    assert readiness.requested_backend == backend
+    assert readiness.effective_backend == ("vulkan" if backend == "gpu" else "cpu")
+    assert processes[1].returncode is None
+    await owner.close()
+
+
+@pytest.mark.asyncio
+async def test_cancel_exclusive_prefix_retains_cleanup_failure_until_release_retry(
+    tmp_path: Path,
+) -> None:
+    started = asyncio.Event()
+
+    class LoadingTransport(FailOnceCloseTransport):
+        async def prepare_prefix(self, *, system_prompt: str, slot_id: int) -> None:
+            started.set()
+            await asyncio.Event().wait()
+
+    owner, _commands, processes, transports, _calls, _logs = _runtime(
+        tmp_path, transport_builder=LoadingTransport
+    )
+    preparation = asyncio.create_task(
+        owner.prepare(
+            backend="cpu",
+            source_language="ko",
+            target_language="en",
+            system_prompt="translate",
+        )
+    )
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+
+    preparation.cancel()
+    with pytest.raises(BaseExceptionGroup) as failure:
+        await asyncio.wait_for(preparation, timeout=1.0)
+
+    assert any(isinstance(error, asyncio.CancelledError) for error in failure.value.exceptions)
+    assert any(
+        isinstance(error, RuntimeError) and str(error) == "close failed"
+        for error in failure.value.exceptions
+    )
+    assert owner.readiness is None
+    assert processes[0].returncode is not None
+    assert not transports[0].closed
+
+    await owner.release()
+    assert transports[0].closed
+    await owner.close()
+
+
+@pytest.mark.asyncio
 async def test_repeated_gpu_request_reuses_cpu_fallback_and_prefix(tmp_path: Path) -> None:
     owner, commands, _processes, transports, provision_calls, _logs = _runtime(
         tmp_path,

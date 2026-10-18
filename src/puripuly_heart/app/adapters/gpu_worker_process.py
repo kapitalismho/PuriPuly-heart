@@ -801,6 +801,8 @@ class _DefaultGpuWorkerClient(GpuWorkerClientPort):
         except BaseException as exc:
             if isinstance(exc, (KeyboardInterrupt, SystemExit)):
                 raise
+            if self._closing and isinstance(exc, (ConnectionError, OSError)):
+                return
             error = GpuWorkerClosedError(
                 "worker frame reader failed",
                 code="frame_reader_failed",
