@@ -1,0 +1,83 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "ls_same_speaker_long",
+ "category": "same_speaker",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "One speaker for about 17 s with 200 ms internal pauses (false-split and rollover control).",
+ "audio": {
+  "file": "ls_same_speaker_long.wav",
+  "pcm_sha256": "e46bb3de9ed2df6514d8b8f33b37bf7e3e09cb8d5dea9fa0577024143006a537",
+  "samples": 307520,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 3.64,
+   "text": "mister edison was a leader far ahead of the time",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 3.84,
+   "end": 7.02,
+   "text": "there seems no good reason for believing that it will change",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 7.22,
+   "end": 11.92,
+   "text": "the paris plant like that at the crystal palace was a temporary exhibit",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 12.12,
+   "end": 18.22,
+   "text": "why if we erect a station at the falls it is a great economy to get it up to the city",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/2300/131720/2300-131720-0014.flac",
+   "sha256": "0473046a9ab311b5e9e51981a01b0dde7be9a8c34afb48643caa05d12a3f69c2",
+   "id": "2300-131720-0014"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 60640,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/2300/131720/2300-131720-0006.flac",
+   "sha256": "f027efc2156257442c4bfc0aa585f034bf9179655a0792b37c548da80dbe8520",
+   "id": "2300-131720-0006"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 115200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/2300/131720/2300-131720-0000.flac",
+   "sha256": "84cb3f03857e7a68d5811c2f07f14725f8583a61d3a280816e30ec44956d8d7e",
+   "id": "2300-131720-0000"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 193120,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/2300/131720/2300-131720-0005.flac",
+   "sha256": "0a754ffc8d86480e82057e7c2e4d9d6cd6d9d35e5a919b1ccd5643d7bf088280",
+   "id": "2300-131720-0005"
+  }
+ ]
+}

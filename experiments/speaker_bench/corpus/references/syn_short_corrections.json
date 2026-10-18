@@ -1,0 +1,131 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "syn_short_corrections",
+ "category": "short_interjection",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": true,
+ "description": "Female speaker interrupted by short synthetic male corrections (No. / No, three. / Okay.).",
+ "audio": {
+  "file": "syn_short_corrections.wav",
+  "pcm_sha256": "7fd14170bcd9586eca0971aa47ae66e58eb2b9a8d6511c6ec9193171576824ff",
+  "samples": 322880,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 4.02,
+   "text": "hussy woman and bond tie",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 4.17,
+   "end": 4.43,
+   "text": "No.",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 4.58,
+   "end": 8.26,
+   "text": "angor pain painful to hear",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 8.41,
+   "end": 9.43,
+   "text": "No, three.",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 9.58,
+   "end": 13.42,
+   "text": "hose man's excuse for wetting the walk",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 13.57,
+   "end": 13.97,
+   "text": "Okay.",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 14.12,
+   "end": 19.18,
+   "text": "harangue the tiresome product of a tireless tongue",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/121/121726/121-121726-0012.flac",
+   "sha256": "6d1fab44fd2e6930a69e1f6f7e52a141ed5290b9a45f56df5e0c3177fa05c6ba",
+   "id": "121-121726-0012"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 65920,
+   "dataset": "Windows SAPI synthetic speech",
+   "voice": "Microsoft David Desktop",
+   "text": "No.",
+   "sha256": "3f8da451d1ef4d9815b6e32857161081c43e5884791a32257c5caf361eb7ae02",
+   "synthetic_voice": true
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 72480,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/121/121726/121-121726-0002.flac",
+   "sha256": "5d461a2020d7c302d607d3b5a6a8f81a01d29e2b29041faccc7925ee098d6dc7",
+   "id": "121-121726-0002"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 133760,
+   "dataset": "Windows SAPI synthetic speech",
+   "voice": "Microsoft David Desktop",
+   "text": "No, three.",
+   "sha256": "b5e53414a15df1276eba166e9ec6840f8497fd6ed129a6342eb04789bccbee1a",
+   "synthetic_voice": true
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 152480,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/121/121726/121-121726-0008.flac",
+   "sha256": "dbcd6ca85d3bc5f6cdc3b658fced5c03a1b4b43a473f721ce7b3a63489c04e1e",
+   "id": "121-121726-0008"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 216320,
+   "dataset": "Windows SAPI synthetic speech",
+   "voice": "Microsoft David Desktop",
+   "text": "Okay.",
+   "sha256": "691c38c3c652fad9c69670d17d94baaa351adf22d7532a98a758037a623cdb8e",
+   "synthetic_voice": true
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 225120,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/121/121726/121-121726-0001.flac",
+   "sha256": "4d4459266056fcd052ced71563e093ecf74a420abfa3a402283fb6b8eb848441",
+   "id": "121-121726-0001"
+  }
+ ]
+}

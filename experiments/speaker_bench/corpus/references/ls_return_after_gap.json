@@ -1,0 +1,147 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "ls_return_after_gap",
+ "category": "returning_speaker",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Speaker A returns after about 37 s of two other speakers.",
+ "audio": {
+  "file": "ls_return_after_gap.wav",
+  "pcm_sha256": "44af02db2de038b2e15f814daaf27ba123ff03042fa8d21faaf38ea83beded77",
+  "samples": 808320,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 3.6,
+   "text": "now you'll stay cried van say polly won't you",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 3.9,
+   "end": 10.8,
+   "text": "this outward mutability indicated and did not more than fairly express the various properties of her inner life",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 11.1,
+   "end": 16.52,
+   "text": "she ceasd and smild in tears then sat down in her silver shrine",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 16.82,
+   "end": 24.8,
+   "text": "hester prynne nevertheless the loving mother of this one child ran little risk of erring on the side of undue severity",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 25.1,
+   "end": 31.82,
+   "text": "like the doves voice like transient day like music in the air ah",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 32.12,
+   "end": 41.98,
+   "text": "as to any other kind of discipline whether addressed to her mind or heart little pearl might or might not be within its reach in accordance with the caprice that ruled the moment",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 42.28,
+   "end": 45.52,
+   "text": "asked phronsie with her little face close to polly's own",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 45.82,
+   "end": 49.52,
+   "text": "there there he said soothingly patting her brown fuzzy head",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/237/126133/237-126133-0009.flac",
+   "sha256": "a9f43fd43b170f06ea1043de35bfd6db3a120a4a454db002bc0d8bb66271e770",
+   "id": "237-126133-0009"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 61600,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0004.flac",
+   "sha256": "0c9ef992cd12b597219de360d086cd1638170c61640049fd3ebcb21918bf1009",
+   "id": "1221-135766-0004"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 176800,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/908/157963/908-157963-0010.flac",
+   "sha256": "68fa552b7a4150272cc4ab9cf92433deb9e4ae3566876e251c5cf7b9750c9385",
+   "id": "908-157963-0010"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 268320,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0007.flac",
+   "sha256": "c52eccd918531dd78a4ebea822faa6c7018c33781ac95b9865338e9738e4bfd8",
+   "id": "1221-135766-0007"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 400800,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/908/157963/908-157963-0005.flac",
+   "sha256": "82f60bcb9b1368b5d395895b738cb7aa9a9b9f100b1b315c3478f51c91bb5b21",
+   "id": "908-157963-0005"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 513920,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0009.flac",
+   "sha256": "2b71373e9479f8c30d7ef90f67ce562bf0664ffb9d05e13dd3f840e6852e2ce9",
+   "id": "1221-135766-0009"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 675680,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/237/126133/237-126133-0008.flac",
+   "sha256": "274f9733bf02f7e3d25f28148f15308c1aab9fb16c4016ffa21d5833387daf71",
+   "id": "237-126133-0008"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 732320,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/237/126133/237-126133-0012.flac",
+   "sha256": "6e0f6631bcb740eedc4f6f96b9d0ff6eee8c5e0eec7ae402d722bf51dac722c8",
+   "id": "237-126133-0012"
+  }
+ ]
+}

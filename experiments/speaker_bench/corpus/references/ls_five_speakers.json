@@ -1,0 +1,131 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "ls_five_speakers",
+ "category": "palette_overflow",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Five speakers (one more than the four colors), then two return.",
+ "audio": {
+  "file": "ls_five_speakers.wav",
+  "pcm_sha256": "8a3b3b87c33a30eef8435a0ecba9bd3edfea4dc8ee34959b1196b495d24ebdbd",
+  "samples": 359040,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 3.02,
+   "text": "stuff it into you his belly counselled him",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 3.22,
+   "end": 5.88,
+   "text": "better go he had counselled sententiously",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 6.08,
+   "end": 8.54,
+   "text": "one might be with less reason than now",
+   "words": null
+  },
+  {
+   "speaker": "D",
+   "start": 8.74,
+   "end": 11.18,
+   "text": "he's been wanting to marry hilda these three years and more",
+   "words": null
+  },
+  {
+   "speaker": "E",
+   "start": 11.38,
+   "end": 15.06,
+   "text": "do not therefore think that the gothic school is an easy one",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 15.26,
+   "end": 18.58,
+   "text": "a cold lucid indifference reigned in his soul",
+   "words": null
+  },
+  {
+   "speaker": "D",
+   "start": 18.78,
+   "end": 21.44,
+   "text": "mainhall liked alexander because he was an engineer",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0001.flac",
+   "sha256": "3fc09ec6d4cc496c530b2019b17bd8fc8ef8a43d6697090971dd1d52cc3d4d89",
+   "id": "1089-134686-0001"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 50720,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0003.flac",
+   "sha256": "dcdd947d0f230e0e2a96fbb0501c185d6c262739c140c7f600939f58e606c8fb",
+   "id": "1995-1826-0003"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 96480,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/260/123286/260-123286-0004.flac",
+   "sha256": "46cbbaccc19339e94c7a02871260ffc66981c80d97ee2ff0d8c1cc0652253d99",
+   "id": "260-123286-0004"
+  },
+  {
+   "speaker": "D",
+   "offset_samples": 139040,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/4446/2271/4446-2271-0006.flac",
+   "sha256": "3200c0a32ca92ebec7843fa7679299aae7a9bd0836b6c5b7a7b62255b2ad467a",
+   "id": "4446-2271-0006"
+  },
+  {
+   "speaker": "E",
+   "offset_samples": 181280,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1188/133604/1188-133604-0014.flac",
+   "sha256": "23d118b9f76dcac8c2d5889e9a977a0560f21872337bd81fdbf9c0fa1544446a",
+   "id": "1188-133604-0014"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 243360,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0007.flac",
+   "sha256": "c310a0558d2a9f3698a25675ce61c6ba1de232f2acb35ee8d096e504d0fe4299",
+   "id": "1089-134686-0007"
+  },
+  {
+   "speaker": "D",
+   "offset_samples": 299680,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/4446/2271/4446-2271-0000.flac",
+   "sha256": "a557057a06b5042c4f3221db043d570d0f1d1e18c3a8fce01e51248277806996",
+   "id": "4446-2271-0000"
+  }
+ ]
+}

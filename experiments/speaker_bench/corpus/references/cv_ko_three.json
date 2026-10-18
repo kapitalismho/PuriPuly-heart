@@ -1,0 +1,124 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "cv_ko_three",
+ "category": "multi_speaker",
+ "language": "ko",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Korean three speakers with 0/150/300 ms gaps and a returning speaker.",
+ "audio": {
+  "file": "cv_ko_three.wav",
+  "pcm_sha256": "6f4df14aaaa8d510cbeb63d35f19c5a89a3dbb9fe32a34258eeadacc9a134431",
+  "samples": 295840,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 2.68,
+   "text": "백두산 기상을 다 안고",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 2.68,
+   "end": 4.94,
+   "text": "아버님은 분명히 살아 계셨습니다.",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 5.09,
+   "end": 7.15,
+   "text": "모릅니다, 뭐 발광했단 말이 있었는데",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 7.45,
+   "end": 9.73,
+   "text": "그러다가는 다시 의혹이 생기기 시작 하였다.",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 9.73,
+   "end": 11.81,
+   "text": "술 못 마신다고 하지 않았던가?",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 11.96,
+   "end": 14.56,
+   "text": "사법권은 법관으로 구성된 법원에 속한다.",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 14.71,
+   "end": 17.49,
+   "text": "이마와 뺨에 입을 맞추어 주었다.",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_36545191.mp3",
+   "sha256": "f09f6e02b9f548cd9131e73048cf1ef1d340870f856a4c6c1be9a7bea07636df"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 42080,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_36549549.mp3",
+   "sha256": "d68c1912d59e2579bbaa14ea2b0ff2186fa5f45f53bffb1862c587de00c1fd88"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 80640,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_35845838.mp3",
+   "sha256": "17eec68f0bf2a4a5cafe2a93dc2221aee31c98a96534accc230092137d6c2c91"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 118400,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_36545186.mp3",
+   "sha256": "3eb6871f5e312f17e90caab6b63ffce10db0a0e1a31ec6976b4b4c1f7c0f2fe2"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 154880,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_36549583.mp3",
+   "sha256": "daaf1557246fb2f499603db319dd7a10a1e1c26f865746b3d870be30c59774c9"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 190560,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_35845804.mp3",
+   "sha256": "43496768679126d793cdaa556685c7ec87f20d670791d6fa3ccb343836df618b"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 234560,
+   "dataset": "Common Voice 17.0",
+   "license": "CC0-1.0",
+   "relative_path": "clips/common-voice-17.0/ko/common_voice_ko_36545196.mp3",
+   "sha256": "d3a931e6c5dd3a3d041a3b74becffbcc2d2e00550675350eaa4eb2525a9b259f"
+  }
+ ]
+}

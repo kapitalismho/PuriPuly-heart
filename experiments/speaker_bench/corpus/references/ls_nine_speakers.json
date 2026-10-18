@@ -1,0 +1,195 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "ls_nine_speakers",
+ "category": "slot_overflow",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Nine speakers (one more than eight diarizer slots), then two return.",
+ "audio": {
+  "file": "ls_nine_speakers.wav",
+  "pcm_sha256": "7f63c7f915b48aad6d882f361751c6aa9c36457509466dd3ff6f8f95926a7345",
+  "samples": 459200,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 3.02,
+   "text": "stuff it into you his belly counselled him",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 3.22,
+   "end": 5.88,
+   "text": "better go he had counselled sententiously",
+   "words": null
+  },
+  {
+   "speaker": "C",
+   "start": 6.08,
+   "end": 8.22,
+   "text": "truly this sea is of infinite width",
+   "words": null
+  },
+  {
+   "speaker": "D",
+   "start": 8.42,
+   "end": 10.26,
+   "text": "it's tremendously well put on too",
+   "words": null
+  },
+  {
+   "speaker": "E",
+   "start": 10.46,
+   "end": 12.5,
+   "text": "it must remember be one or the other",
+   "words": null
+  },
+  {
+   "speaker": "F",
+   "start": 12.7,
+   "end": 15.48,
+   "text": "thirty men one after another raised their horns and said",
+   "words": null
+  },
+  {
+   "speaker": "G",
+   "start": 15.68,
+   "end": 18.14,
+   "text": "o life of this our spring",
+   "words": null
+  },
+  {
+   "speaker": "H",
+   "start": 18.34,
+   "end": 20.56,
+   "text": "if spoken to she would not speak again",
+   "words": null
+  },
+  {
+   "speaker": "I",
+   "start": 20.76,
+   "end": 23.0,
+   "text": "oh that made him so angry",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 23.2,
+   "end": 25.2,
+   "text": "hello bertie any good in your mind",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 25.4,
+   "end": 27.7,
+   "text": "might learn something useful down there",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0001.flac",
+   "sha256": "3fc09ec6d4cc496c530b2019b17bd8fc8ef8a43d6697090971dd1d52cc3d4d89",
+   "id": "1089-134686-0001"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 50720,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0003.flac",
+   "sha256": "dcdd947d0f230e0e2a96fbb0501c185d6c262739c140c7f600939f58e606c8fb",
+   "id": "1995-1826-0003"
+  },
+  {
+   "speaker": "C",
+   "offset_samples": 96480,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/260/123286/260-123286-0014.flac",
+   "sha256": "38a749f3aeb6772b34ab0fbfb2fbfa8fc8be28b0c89eb56d21b0fe7b7d905481",
+   "id": "260-123286-0014"
+  },
+  {
+   "speaker": "D",
+   "offset_samples": 133920,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/4446/2271/4446-2271-0002.flac",
+   "sha256": "034e3b62317d0c1edc0248cb9e5012b83aa9c814f6da44359b354b49a55dd25d",
+   "id": "4446-2271-0002"
+  },
+  {
+   "speaker": "E",
+   "offset_samples": 166560,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1188/133604/1188-133604-0013.flac",
+   "sha256": "5febd6b89261544bc20d3083f67dd0db777ed2bf37a807865cf82accaedc65c4",
+   "id": "1188-133604-0013"
+  },
+  {
+   "speaker": "F",
+   "offset_samples": 202400,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/5142/33396/5142-33396-0014.flac",
+   "sha256": "88ce9941abbbe0153492fda043106f2c03bc56859d9c798651e8a1e7ad717065",
+   "id": "5142-33396-0014"
+  },
+  {
+   "speaker": "G",
+   "offset_samples": 250080,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/908/157963/908-157963-0001.flac",
+   "sha256": "4a4bc2758178b370e452343ba5496f28efa77908f473e64153ae20dffc62df3d",
+   "id": "908-157963-0001"
+  },
+  {
+   "speaker": "H",
+   "offset_samples": 292640,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1221/135766/1221-135766-0015.flac",
+   "sha256": "01ec78f2b3c2b1f1324ae7d19be5ba20f39c48959fe22cd295ea59e232cd3c26",
+   "id": "1221-135766-0015"
+  },
+  {
+   "speaker": "I",
+   "offset_samples": 331360,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/672/122797/672-122797-0005.flac",
+   "sha256": "c283668706b834e2e5e746ce1ec380a009977422680c8407762309bef73d6fa4",
+   "id": "672-122797-0005"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 370400,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1089/134686/1089-134686-0003.flac",
+   "sha256": "d8692f61518fe07b45d4dad54e026c1d04f3fc016b0d39923d05fcbcff684563",
+   "id": "1089-134686-0003"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 405600,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/1995/1826/1995-1826-0004.flac",
+   "sha256": "20daf9f52570d9bbefb8fab39eaa0dcd3e666aeac5231b3cbe13c68f815bfff9",
+   "id": "1995-1826-0004"
+  }
+ ]
+}

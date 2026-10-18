@@ -1,0 +1,115 @@
+{
+ "schema": "speaker-bench/reference/v1",
+ "case_id": "ls_transfer_gap300_mm",
+ "category": "continuous_transfer",
+ "language": "en",
+ "synthetic": true,
+ "synthetic_voice": false,
+ "description": "Male/male alternation with 300 ms gaps.",
+ "audio": {
+  "file": "ls_transfer_gap300_mm.wav",
+  "pcm_sha256": "226ff9dd424e0aad8a564ca71eeec9be0dca96718c5d08311adc3697028c0f81",
+  "samples": 368640,
+  "sample_rate_hz": 16000
+ },
+ "turns": [
+  {
+   "speaker": "A",
+   "start": 0.5,
+   "end": 2.96,
+   "text": "one might be with less reason than now",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 3.26,
+   "end": 7.36,
+   "text": "to give an idea of these conversations i will report one of them in full",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 7.66,
+   "end": 10.66,
+   "text": "therefore don't talk to me about views and prospects",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 10.96,
+   "end": 16.14,
+   "text": "della had a young sister named maria and a cousin whose name was jane",
+   "words": null
+  },
+  {
+   "speaker": "A",
+   "start": 16.44,
+   "end": 20.0,
+   "text": "nothing new weather unchanged the wind freshens",
+   "words": null
+  },
+  {
+   "speaker": "B",
+   "start": 20.3,
+   "end": 22.04,
+   "text": "by reason and affection",
+   "words": null
+  }
+ ],
+ "provenance": [
+  {
+   "speaker": "A",
+   "offset_samples": 7200,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/260/123286/260-123286-0004.flac",
+   "sha256": "46cbbaccc19339e94c7a02871260ffc66981c80d97ee2ff0d8c1cc0652253d99",
+   "id": "260-123286-0004"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 51360,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/7021/79740/7021-79740-0003.flac",
+   "sha256": "758a320b5aa421050fb27349b02c74093e8a70e475ef5905016936f0f377cc90",
+   "id": "7021-79740-0003"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 121760,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/260/123286/260-123286-0008.flac",
+   "sha256": "735769549e4dbbfb3f4ba43f89866cde8085933d8b16e67550cc65264bf84fc3",
+   "id": "260-123286-0008"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 174560,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/7021/79740/7021-79740-0001.flac",
+   "sha256": "fcdac2daf26f4f7ac00c3bf3070cfb1ab01b52388ce8e7e1ac2b629b5dae28c5",
+   "id": "7021-79740-0001"
+  },
+  {
+   "speaker": "A",
+   "offset_samples": 262240,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/260/123286/260-123286-0011.flac",
+   "sha256": "74bd87692b3a14a2866ac51228b3c78cbb3c170119f4408e37f8664655b88ac2",
+   "id": "260-123286-0011"
+  },
+  {
+   "speaker": "B",
+   "offset_samples": 324000,
+   "dataset": "LibriSpeech test-clean",
+   "license": "CC BY 4.0",
+   "url": "https://huggingface.co/datasets/JinchuanTian/librispeech-test-clean-plain-tts/resolve/4ce3c2c3808c492a9b0761f7cd704b74e7c494f7/audio/7021/79730/7021-79730-0002.flac",
+   "sha256": "eefba0de833896a7da8c9252f168a117c00e182c82320720e6ab2b3aa79b2fb2",
+   "id": "7021-79730-0002"
+  }
+ ]
+}
