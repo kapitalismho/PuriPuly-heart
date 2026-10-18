@@ -110,7 +110,7 @@ def timed_final(req, text, words, *, result_start, result_end, qualified=True):
 
 
 async def admit(harness, session, provider, req, snapshot, event):
-    provider.events.put(event)
+    provider.emit(event)
     outgoing = await next_text(session.turn_events())
     outgoing = STTScopedTurnNormalizer(req.identity).apply_update(outgoing)
     engine = ScopedRecognitionEngine(
@@ -235,7 +235,7 @@ async def test_unusable_coarse_span_does_not_repair_incomplete_or_unqualified_wo
             await send(session, req, 4800, 9600, 2)
         else:
             await send(session, req, 0, 9600, 1)
-        provider.events.put(event)
+        provider.emit(event)
         result = await next_text(session.turn_events())
         assert result.text == "One two."
         assert result.source_audio[0].speaker_proof_id is None
@@ -263,7 +263,7 @@ async def test_word_envelope_retains_foreign_interword_audio_and_valid_coarse_ma
                 result_start=0,
                 result_end=coarse_end,
             )
-            provider.events.put(event)
+            provider.emit(event)
             result = await next_text(session.turn_events())
             audio = result.source_audio[0]
             assert (
@@ -422,7 +422,7 @@ async def test_uncertainty_junction_rejects_unsupported_correspondence(failure):
         await send(session, req, 1728, 9728, 1, context=True)
         await send(session, req, 9728, 84992, 2)
         await session.observe_speaker_evidence(proof)
-        provider.events.put(event)
+        provider.emit(event)
         result = await next_text(session.turn_events())
         assert len(result.final_speaker_runs) == 1
         assert result.final_speaker_runs[0].text == event.text
@@ -483,7 +483,7 @@ async def test_partial_release_repin_terminal_replay_and_adopted_part_dispositio
         assert view.has_proof(first_token) and view.has_proof(second_token)
         assert [item.source_child.raw_text for item in trace.items] == ["No. ", "He washed"]
         await harness.peer_owner.handle_provider_turn_update(snapshot, full)
-        provider.events.put(
+        provider.emit(
             STTProviderTurnTerminal(
                 req.identity,
                 "final",
@@ -689,7 +689,7 @@ async def test_successful_capture_replay_is_not_new_support_but_genuine_onset_is
                 seal_reason="delivery_deadline",
                 observed_trailing_silence_ms=0,
             )
-            provider.events.put(STTProviderTurnTerminal(first.identity, "empty"))
+            provider.emit(STTProviderTurnTerminal(first.identity, "empty"))
             for _ in range(10):
                 await asyncio.sleep(0)
             while session._events.depth:
@@ -718,7 +718,7 @@ async def test_successful_capture_replay_is_not_new_support_but_genuine_onset_is
             result_start=offset,
             result_end=offset + 0.44,
         )
-        provider.events.put(event)
+        provider.emit(event)
         outgoing = await next_text(session.turn_events())
         assert "".join(run.text for run in outgoing.final_speaker_runs) == "A. No."
         if mode == "late_context":
@@ -800,10 +800,10 @@ async def test_later_successful_input_does_not_repair_own_final_overhang():
     try:
         await session.begin_turn(req)
         await send(session, req, 0, 9600, 1)
-        provider.events.put(event)
+        provider.emit(event)
         first = await next_text(session.turn_events())
         await send(session, req, 9600, 11200, 2)
-        provider.events.put(
+        provider.emit(
             STTProviderTurnTerminal(
                 req.identity,
                 "final",

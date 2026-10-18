@@ -16,6 +16,7 @@ from puripuly_heart.core.stt.backend import (
     STTSourceAudio,
     STTSourceRelease,
     STTTextContribution,
+    discard_source_audio_proofs,
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.speaker_attribution import (
@@ -53,6 +54,7 @@ class _Slice:
     speaker: FinalSpeakerRun | None = None
     evidence_valid: bool = True
     result: STTProviderTurnTerminal | None = None
+    requires_input_history: bool = False
 
 
 class CausalBatchSession:
@@ -63,12 +65,13 @@ class CausalBatchSession:
     def __init__(self, inner, *, clock=time.monotonic, evidence_view=None):
         self.inner = inner
         self.clock = clock
-        self._events = STTProviderEventBuffer()
+        self._events = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._parents = deque()
         self._active = None
         self._slices = {}
         self.evidence = evidence_view if evidence_view is not None else SpeakerEvidenceView()
         self._owns_evidence = evidence_view is None
+        self._input_owner = object()
         self._submitted_ranges = deque(maxlen=self.MAX_SUBMITTED_RANGES)
         self._evidence_generation = self.evidence.generation
         self._closed = False
@@ -211,6 +214,10 @@ class CausalBatchSession:
         context = tuple(span for _, ranges, context in selected if context for span in ranges)
         child_id = replace(parent.request.identity, provider_turn_id=uuid4().hex)
         unique_context, replayed_context = partition_replay(context, self._submitted_ranges)
+        identity = parent.request.identity.segment
+        history_valid = not unique_context or self.evidence.input_history_complete(
+            (identity.activation_generation, identity.capture_epoch), self._input_owner
+        )
         native_backend = parent.request.native_options
         if not hasattr(native_backend, "provider_id"):
             native_backend = getattr(self.inner, "backend", None)
@@ -219,11 +226,19 @@ class CausalBatchSession:
             source,
             context,
             parent.request.display_group_id,
-            speaker_proof_id=self.evidence.pin(
-                (*source, *unique_context), replayed=replayed_context
+            speaker_proof_id=(
+                self.evidence.pin((*source, *unique_context), replayed=replayed_context)
+                if history_valid
+                else None
             ),
         )
-        child = _Slice(parent, child_id, audio)
+        child = _Slice(
+            parent,
+            child_id,
+            audio,
+            evidence_valid=history_valid,
+            requires_input_history=bool(unique_context),
+        )
         parent.children.append(child)
         self._slices[child_id] = child
         await self.inner.begin_turn(
@@ -231,18 +246,28 @@ class CausalBatchSession:
                 parent.request,
                 identity=child_id,
                 isolate_failure=True,
-                on_native_terminal=self._snapshot_native_terminal,
+                on_native_event=self._snapshot_native_event,
             )
         )
         sequence = 0
         for data, ranges, is_context in selected:
             sequence += 1
-            await self.inner.send_turn_audio(
-                child_id,
-                data,
-                payload_sequence=sequence,
-                source_ranges=ranges,
-                context_only=is_context,
+            try:
+                await self.inner.send_turn_audio(
+                    child_id,
+                    data,
+                    payload_sequence=sequence,
+                    source_ranges=ranges,
+                    context_only=is_context,
+                )
+            except BaseException:
+                if data:
+                    self.evidence.record_input_owner(
+                        (identity.activation_generation, identity.capture_epoch), None
+                    )
+                raise
+            self.evidence.record_input_owner(
+                (identity.activation_generation, identity.capture_epoch), self._input_owner
             )
         await self.inner.seal_turn(
             child_id,
@@ -283,10 +308,22 @@ class CausalBatchSession:
             self._active = None
             await self._release()
 
-    def _snapshot_native_terminal(self, event):
+    def _discard_buffered_event(self, event, retained):
+        discard_source_audio_proofs(event, self.evidence, retained=retained)
+
+    def _snapshot_native_event(self, event):
+        if not isinstance(event, STTProviderTurnTerminal):
+            return
         child = self._slices.get(event.identity)
         if child is None or child.parent.cancelled or child.speaker is not None:
             return
+        identity = child.identity.segment
+        if child.requires_input_history and not self.evidence.input_history_complete(
+            (identity.activation_generation, identity.capture_epoch), self._input_owner
+        ):
+            self.evidence.release_unadopted(child.audio.speaker_proof_id)
+            child.audio = replace(child.audio, speaker_proof_id=None)
+            child.evidence_valid = False
         child.speaker = (
             self.evidence.resolve(child.audio.speaker_proof_id)
             if child.evidence_valid

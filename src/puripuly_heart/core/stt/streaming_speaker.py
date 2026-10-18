@@ -19,6 +19,7 @@ from puripuly_heart.core.stt.backend import (
     STTSourceRelease,
     STTSpeakerAudioPart,
     STTTextContribution,
+    discard_source_audio_proofs,
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import STTNormalizationError, STTScopedTurnNormalizer
@@ -28,6 +29,13 @@ from puripuly_heart.core.stt.speaker_attribution import (
     partition_replay,
 )
 from puripuly_heart.domain.models import FinalSpeakerRun
+
+
+@dataclass(frozen=True, slots=True)
+class _TimingFence:
+    sent_until: int | None
+    clock_id: str | None
+    native_coverage: tuple | None = None
 
 
 @dataclass(slots=True)
@@ -66,8 +74,10 @@ class StreamingSpeakerSession:
         self._maps = deque(maxlen=self.MAX_MAP_PIECES)
         self._timeline = evidence_view if evidence_view is not None else SpeakerEvidenceView()
         self._owns_evidence = evidence_view is None
+        self._input_owner = object()
+        self._stream_scope = None
         self._turns = {}
-        self._events = STTProviderEventBuffer()
+        self._events = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._closed = False
         self._lock = asyncio.Lock()
         self._cleanup_complete = False
@@ -89,12 +99,21 @@ class StreamingSpeakerSession:
 
     async def begin_stream(self, stream):
         await self.inner.begin_stream(stream)
+        self._stream_scope = (stream.activation_generation, stream.capture_epoch)
 
     async def send_stream_audio(self, pcm16le, *, source_ranges):
-        await self.inner.send_stream_audio(pcm16le, source_ranges=source_ranges)
+        scope = self._stream_scope
+        try:
+            await self.inner.send_stream_audio(pcm16le, source_ranges=source_ranges)
+        finally:
+            if pcm16le and scope is not None:
+                self._timeline.record_input_owner(scope, None)
 
     async def end_stream(self, *, reason):
+        scope = self._stream_scope
         await self.inner.end_stream(reason=reason)
+        if self._stream_scope == scope:
+            self._stream_scope = None
 
     def recognition_source_covers(self, ranges):
         covers = getattr(self.inner, "recognition_source_covers", None)
@@ -110,10 +129,18 @@ class StreamingSpeakerSession:
         async with self._lock:
             if len(self._turns) >= self.MAX_TURNS:
                 raise RuntimeError("streaming speaker request capacity exceeded")
-            await self.inner.begin_turn(request)
-            self._turns[request.identity] = _Turn(
+            turn = _Turn(
                 request, STTScopedTurnNormalizer(request.identity), sent_start=self.sent_until
             )
+            self._turns[request.identity] = turn
+            try:
+                await self.inner.begin_turn(
+                    replace(request, on_native_event=self._snapshot_native_event)
+                )
+            except BaseException:
+                self._turns.pop(request.identity, None)
+                self._release_proofs(turn)
+                raise
             self._record_boundaries()
 
     async def send_turn_audio(
@@ -134,6 +161,11 @@ class StreamingSpeakerSession:
                     context_only=context_only,
                 )
             except BaseException:
+                if pcm16le:
+                    self._timeline.record_input_owner(
+                        (identity.segment.activation_generation, identity.segment.capture_epoch),
+                        None,
+                    )
                 self._timeline.release(turn.input_proof)
                 turn.input_proof = None
                 raise
@@ -151,6 +183,11 @@ class StreamingSpeakerSession:
                     self._maps.append((cursor, end, span, context_only))
                     cursor = end
             self.sent_until += count
+            if count:
+                self._timeline.record_input_owner(
+                    (identity.segment.activation_generation, identity.segment.capture_epoch),
+                    self._input_owner,
+                )
             target = turn.context if context_only else turn.content
             target.extend(source_ranges)
             if len(turn.content) + len(turn.context) > self.MAX_MAP_PIECES:
@@ -204,6 +241,74 @@ class StreamingSpeakerSession:
     def _mapped(self, turn, timing):
         return tuple(span for span, _ in self._mapped_pieces(turn, timing))
 
+    def _discard_buffered_event(self, event, retained):
+        discard_source_audio_proofs(event, self._timeline, retained=retained)
+
+    def _snapshot_native_event(self, event):
+        turn = self._turns.get(event.identity)
+        if turn is None:
+            return
+        self._freeze_timings(turn, event, publication=True)
+        observer = turn.request.on_native_event
+        if observer is not None:
+            observer(event)
+
+    def _freeze_timings(self, turn, event, *, publication):
+        release = event.source_release if isinstance(event, STTProviderTurnUpdate) else None
+        if isinstance(event, STTProviderTurnUpdate) and release is None:
+            return
+        provenances = (
+            (event.provenance,) if isinstance(event, STTProviderTurnUpdate) else event.provenance
+        )
+        candidates = (timing for provenance in provenances for timing in provenance.text_timing)
+        for timings in (candidates, turn.timings.values()):
+            for timing in timings:
+                if release is not None and not (
+                    release.text_start <= timing.text_start and timing.text_end <= release.text_end
+                ):
+                    continue
+                key = (timing.contribution_id, timing.text_start, timing.text_end)
+                if key in turn.timing_frontiers:
+                    continue
+                if len(turn.timing_frontiers) >= self.MAX_TIMINGS:
+                    turn.timing_frontiers.clear()
+                    turn.mapping_available = False
+                    return
+                native = None
+                if publication:
+                    for origin in event.recognition_origins:
+                        candidate = origin.native
+                        if (
+                            origin.source_binding == "local_segment"
+                            and (
+                                origin.text_start <= timing.text_start
+                                and timing.text_end <= origin.text_end
+                                or (
+                                    isinstance(event, STTProviderTurnTerminal)
+                                    or event.assembly == "replace"
+                                )
+                                and timing.text_start < origin.text_end
+                                and origin.text_start < timing.text_end
+                                and not event.text[timing.text_start : origin.text_start].strip()
+                                and not event.text[origin.text_end : timing.text_end].strip()
+                            )
+                            and origin.contribution_id in (None, timing.contribution_id)
+                            and candidate is not None
+                            and candidate.native_task_id == timing.clock_id
+                            and candidate.timestamp_basis == "task_relative_estimated"
+                            and candidate.input_sample_rate_hz
+                            == turn.request.settings.target_sample_rate_hz
+                        ):
+                            if native is not None:
+                                native = None
+                                break
+                            native = candidate
+                turn.timing_frontiers[key] = _TimingFence(
+                    self.sent_until if publication else None,
+                    timing.clock_id,
+                    native.audio_coverage if native is not None else None,
+                )
+
     def _remember_native_inputs(self, turn, event):
         for origin in event.recognition_origins:
             native = origin.native
@@ -243,9 +348,24 @@ class StreamingSpeakerSession:
         if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
             return ()
         cursor, stop = math.floor(start), math.ceil(end)
+        fence = turn.timing_frontiers.get(
+            (timing.contribution_id, timing.text_start, timing.text_end)
+        )
+        if fence is not None and (
+            fence.sent_until is None
+            or fence.clock_id != timing.clock_id
+            or fence.native_coverage is None
+        ):
+            return ()
+        coverage = (
+            fence.native_coverage
+            if fence is not None
+            else tuple(turn.native_inputs[timing.clock_id].values())
+        )
+        frontier = fence.sent_until if fence is not None else self.sent_until
         ranges = []
         for item in sorted(
-            turn.native_inputs[timing.clock_id].values(),
+            coverage,
             key=lambda item: (item.input_start_sample, item.input_end_sample),
         ):
             left, right = max(cursor, item.input_start_sample), min(stop, item.input_end_sample)
@@ -262,11 +382,22 @@ class StreamingSpeakerSession:
                 return ()
             source_start = item.normalized_start_sample + left - item.input_start_sample
             source_end = item.normalized_start_sample + right - item.input_start_sample
-            owned = turn.context if item.context_only else turn.content
-            for span in owned:
+            for sent_start, sent_end, span, context_only in self._maps:
+                if span is None or context_only != item.context_only:
+                    continue
+                committed_start = max(sent_start, turn.sent_start)
+                committed_end = min(sent_end, frontier)
+                if committed_start >= committed_end:
+                    continue
                 a, b = (
-                    max(source_start, span.normalized_start_sample),
-                    min(source_end, span.normalized_end_sample),
+                    max(
+                        source_start,
+                        span.normalized_start_sample + committed_start - sent_start,
+                    ),
+                    min(
+                        source_end,
+                        span.normalized_start_sample + committed_end - sent_start,
+                    ),
                 )
                 if span.capture_epoch != item.capture_epoch or a >= b:
                     continue
@@ -279,14 +410,12 @@ class StreamingSpeakerSession:
             cursor = right
         return tuple(ranges) if cursor == stop else ()
 
-    def _remember_timings(self, turn, provenance, *, final):
+    def _remember_timings(self, turn, provenance):
         for clock in provenance.audio_clocks:
             turn.clocks[clock.clock_id] = clock
         for timing in provenance.text_timing:
             key = (timing.contribution_id, timing.text_start, timing.text_end)
             turn.timings[key] = timing
-            if final:
-                turn.timing_frontiers.setdefault(key, self.sent_until)
         if len(turn.timings) > self.MAX_TIMINGS or len(turn.clocks) > 64:
             turn.timings.clear()
             turn.timing_frontiers.clear()
@@ -320,10 +449,12 @@ class StreamingSpeakerSession:
             return ()
         start = clock.origin_sent_sample + math.floor(raw_start)
         end = clock.origin_sent_sample + math.ceil(raw_end)
-        frontier = turn.timing_frontiers.get(
-            (timing.contribution_id, timing.text_start, timing.text_end), self.sent_until
+        fence = turn.timing_frontiers.get(
+            (timing.contribution_id, timing.text_start, timing.text_end)
         )
-        if end > frontier:
+        if fence is not None and (
+            fence.sent_until is None or fence.clock_id != timing.clock_id or end > fence.sent_until
+        ):
             return ()
         cursor, ranges = start, []
         for left, right, span, context_only in self._maps:
@@ -357,6 +488,11 @@ class StreamingSpeakerSession:
         if any(span is None for span in previous):
             return None
         unique, replayed = partition_replay(context, previous)
+        identity = turn.request.identity.segment
+        if unique and not self._timeline.input_history_complete(
+            (identity.activation_generation, identity.capture_epoch), self._input_owner
+        ):
+            return None
         return source + unique, replayed
 
     def _attribute_ranges(self, turn, source, context):
@@ -1001,6 +1137,7 @@ class StreamingSpeakerSession:
             provenance=replace(event.provenance, native_event_id=None),
             source_release=release,
         )
+        self._freeze_timings(turn, outgoing, publication=True)
         self._events.put(self._annotate(turn, outgoing))
 
     async def _consume(self):
@@ -1012,9 +1149,8 @@ class StreamingSpeakerSession:
                         if turn is None:
                             continue
                         self._remember_native_inputs(turn, event)
-                        self._remember_timings(
-                            turn, event.provenance, final=event.source_release is not None
-                        )
+                        self._remember_timings(turn, event.provenance)
+                        self._freeze_timings(turn, event, publication=False)
                         try:
                             normalized = turn.normalizer.apply_update(
                                 replace(event, final_speaker_runs=())
@@ -1045,7 +1181,8 @@ class StreamingSpeakerSession:
                         if turn is not None:
                             self._remember_native_inputs(turn, event)
                             for provenance in event.provenance:
-                                self._remember_timings(turn, provenance, final=True)
+                                self._remember_timings(turn, provenance)
+                            self._freeze_timings(turn, event, publication=False)
                             try:
                                 event = turn.normalizer.apply_terminal(
                                     replace(event, final_speaker_runs=())

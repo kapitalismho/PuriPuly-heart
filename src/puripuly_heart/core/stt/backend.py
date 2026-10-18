@@ -70,8 +70,8 @@ class STTProviderTurnRequest:
     isolate_failure: bool = False
     native_options: object | None = None
     optional_cutoff_at_monotonic_s: float | None = None
-    on_native_terminal: Callable[[STTProviderTurnTerminal], None] | None = field(
-        default=None, compare=False, repr=False
+    on_native_event: Callable[[STTProviderTurnUpdate | STTProviderTurnTerminal], None] | None = (
+        field(default=None, compare=False, repr=False)
     )
 
 
@@ -111,6 +111,21 @@ class STTSourceAudio:
     def __post_init__(self) -> None:
         if not self.contribution_id:
             raise ValueError("batch audio requires a contribution identity")
+
+
+def discard_source_audio_proofs(event, evidence, *, retained=(), published=False):
+    if evidence is None:
+        return
+    retained_tokens = {
+        token
+        for queued in retained
+        for audio in getattr(queued, "source_audio", ())
+        for token in audio.speaker_proof_ids
+    }
+    for audio in getattr(event, "source_audio", ()):
+        for token in audio.speaker_proof_ids:
+            if token not in retained_tokens:
+                evidence.release_unadopted(token, published=published)
 
 
 @dataclass(frozen=True, slots=True)

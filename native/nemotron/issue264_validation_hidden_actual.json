@@ -1,0 +1,202 @@
+{
+  "schema": "issue264-e5-actual-one-case-1",
+  "candidate": "e4e85c093a03013f60346680eadbd168c7dbdef6",
+  "status": "One authorized corrected hidden-reveal observation completed; assertions and qualified inspected pixels support this boundary. Independent closure/acceptance remains Director/reviewer-owned.",
+  "command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate e4e85c093a03013f60346680eadbd168c7dbdef6 --probe caption --cases hidden_reveal --output build/issue264-validation-streaming-after-hidden-01",
+  "requested_executed": {
+    "requested": [
+      "hidden_reveal"
+    ],
+    "executed": [
+      "hidden_reveal"
+    ],
+    "authorized_all_cases_executed": false,
+    "attempts": 1,
+    "repeats": 0,
+    "model_calls": 0,
+    "translation_service_calls": 0,
+    "cloud_calls": 0
+  },
+  "unchanged_before": {
+    "original_matrix_snapshot": "6670a009d15bfc3431e0c7b8eba201da4bc650ca",
+    "original_matrix_sha256": "a960013ac022ce4ce8987e2a61df0ae8750fbd95bc6b39e5462dc51dddb9d4e8",
+    "old_raw_caption": "build/issue264-validation-repaired-caption-02/caption.json",
+    "old_hidden_qualification": "FAILED_TASK_COVERAGE; ordinary late source-only evidence, not repaired or relabelled by this new run.",
+    "prep_record": "native/nemotron/issue264_validation_hidden_repair.json"
+  },
+  "gate_confirmation": {
+    "requested_candidate": "e4e85c093a03013f60346680eadbd168c7dbdef6",
+    "task_hashes": {
+      "native/nemotron/issue264_validation_launch.py": "7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5",
+      "native/nemotron/issue264_validation_runtime.py": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+      "native/nemotron/issue264_validation_caption.py": "3ce1e50a71eb4a8061823d7f742caf02e59b4e89a972506cdee03a421887c347",
+      "native/nemotron/issue264_validation_summary.py": "8298c7c64a581f1229b7301bdef8185ebd5b432c19dd4ce79c05a52671149ae5"
+    },
+    "reported_changed_product_hashes_matched": 8,
+    "unchanged_e5_path_source_hashes_matched": 27,
+    "gate_limit": "Read-only bytes/metadata only; launcher must still enforce actual HEAD and clean pinned src before any imports/services. GPU/tapes remain HOLD."
+  },
+  "actual_imports": {
+    "file_backed_product_modules_all_under_checkout_src": true,
+    "product_import_count": 348,
+    "source_manifest_entries": 599,
+    "archived_src_modules": 585,
+    "helpers_sha256": {
+      "tests/core/test_issue264_shared_speaker.py": "98bfe9f2d6cb21cd415d7c1aa6a34189330e1b62cb4ef31e47b2ce87792abd44",
+      "tests/core/test_causal_batch_speaker.py": "412f7bd7576203d600690464296b8724d353215e6f0295ccb8676591e00ea585",
+      "tests/helpers/overlay_source_cards.py": "7bafb000f24bb98b0cb6b413e547091a333cb637a319b6b7f3db595138c60d1c"
+    }
+  },
+  "timing": {
+    "source_output_started": 148659.7700701,
+    "output_application_barrier_completed": 148659.7710175,
+    "hidden_interval_started": 148659.7710178,
+    "hidden_interval_completed": 148660.8872781,
+    "minimum_sustained_hidden_s": 1.1162603000120725,
+    "hidden_checkpoints": 20,
+    "no_readable_state_through_final_pre_reveal_check_s": 1.425821500015445,
+    "all_hidden_checks_empty_without_first_readable_or_any_deadline": true,
+    "reveal_requested": 148661.1968446,
+    "first_readable_at": 148661.1969367,
+    "reveal_completed": 148661.1998949,
+    "assignment_deadline": 148662.1969367,
+    "synthetic_proof_delivered": 148661.5072587,
+    "authority_one_shot_resolution_delay_s": 0.31081260001519695,
+    "style_snapshot_submitted": 148661.5078934,
+    "style_snapshot_delay_s": 0.3109567000064999,
+    "gray_qualified_readback": 148661.4287091,
+    "gold_qualified_readback": 148661.8774516,
+    "gold_software_readback_upper_bound_s": 0.6805149000138044,
+    "band_distinction": "Authority/application resolves within500ms; actual gold software readback is observed within1s, not claimed within500ms. No photon onset claim."
+  },
+  "in_place_conservation": {
+    "card_id": "peer:edfb9ae2-2543-55cb-bdaf-f314bdc66b97",
+    "source_text": "source 107",
+    "only_changed_block_fields": {
+      "card_revision": [
+        1,
+        2
+      ],
+      "speaker_style": [
+        "gray",
+        "gold"
+      ]
+    },
+    "appearance_seq": 1,
+    "expiration_before": 148669.1968529,
+    "expiration_after": 148669.1968529,
+    "ttl_unchanged": true,
+    "canonical_assignment": {
+      "attribution": {
+        "state": "identified",
+        "key": {
+          "source": "nemotron",
+          "speaker_scope_id": "11",
+          "local_speaker_id": "0"
+        },
+        "source": "nemotron",
+        "speaker_scope_id": "11"
+      },
+      "scope_order": [
+        1,
+        107,
+        0
+      ],
+      "palette_index": 0,
+      "palette_overflow": false,
+      "source_text_range": null,
+      "source_text_revision": null,
+      "revision": 1,
+      "settled": true
+    },
+    "remaining_proofs_at_completion": 0,
+    "meaning": "Synthetic metadata proof identifies fixture slot0; not acoustic speaker accuracy or a model result. TTL unchanged across metadata update, not a TTL-expiry photography claim."
+  },
+  "inspected_owned_images": [
+    {
+      "path": "build/issue264-validation-streaming-after-hidden-01/controlled_hidden_107.png",
+      "sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0",
+      "visibility_valid": true,
+      "width": 1344,
+      "height": 336,
+      "pixel_counts": {
+        "gold": 0,
+        "cyan": 0,
+        "gray": 0
+      }
+    },
+    {
+      "path": "build/issue264-validation-streaming-after-hidden-01/commit_1.png",
+      "sha256": "78cd94cbe494dce2728e1267d2e509f8f1892f85b05cb3c8b02eb6d22890d3d8",
+      "visibility_valid": true,
+      "width": 1344,
+      "height": 336,
+      "pixel_counts": {
+        "gold": 0,
+        "cyan": 0,
+        "gray": 1568
+      }
+    },
+    {
+      "path": "build/issue264-validation-streaming-after-hidden-01/commit_2.png",
+      "sha256": "dc5d6fd47f6462a51b950211a2b25fe9434cf3884555f7ffad7ff8b95bd7559e",
+      "visibility_valid": true,
+      "width": 1344,
+      "height": 336,
+      "pixel_counts": {
+        "gold": 1568,
+        "cyan": 0,
+        "gray": 0
+      }
+    }
+  ],
+  "image_observations": [
+    "Protected hidden image inspected: only checkerboard, no source text/card. Owned overlay/backdrop uncloaked before/after capture.",
+    "Qualified revision1 image inspected: readable gray source107.",
+    "Qualified revision2 image inspected: same source107/card/placement gold."
+  ],
+  "qualified_automatic_readbacks": 2,
+  "invalid_automatic_readbacks": 0,
+  "hidden_named_capture_qualified_visibility": true,
+  "cleanup": {
+    "runtime_exit_code": 0,
+    "renderer_errors": [],
+    "policy_rejections": [],
+    "owned_children_after_runtime_cleanup": [],
+    "owned_children_unreaped": [],
+    "owned_temp_removed": true,
+    "product_sources_unchanged": true,
+    "actual_flet_pid": 81720,
+    "actual_backdrop_pid": 77700,
+    "flet_client_sha256": "b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28",
+    "service_listener_addresses": [
+      "127.0.0.1:61236",
+      "[::1]:61236"
+    ],
+    "scope": "Only owned child/window resources stopped; no source/settings/model/shared-cache mutation. Evidence retained."
+  },
+  "raw_records": {
+    "caption_json": "build/issue264-validation-streaming-after-hidden-01/caption.json",
+    "caption_sha256": "16684bc89c488ec41403c82fdf01b4fc6a4780f86f655183f149b92449f93413",
+    "isolation_json": "build/issue264-validation-streaming-after-hidden-01/isolation.json",
+    "isolation_sha256": "ff665eeb51f121a64467043f83d18bae979a4684911db2dc64fbbffe4054be6c",
+    "executed_sources": "build/issue264-validation-streaming-after-hidden-01/execution_sources.zip",
+    "executed_sources_sha256": "381865a2bb194994a2b4d9b1fb673bd58ede1f0cd6b79521e2d2e135e63e3f87"
+  },
+  "remaining_hold": "GPU and four native-tape actual runs remain HOLD pending independent streaming review and explicit Director readiness. This no-model E5 observation is independent of those changed-path claims.",
+  "retained_local_summary": {
+    "path": "build/issue264-validation-streaming-after-hidden-01/e5_actual_summary.json",
+    "sha256": "a80f10e677502b67dcbce5fcc1c4ae516c3fa141df7cb4dd74fd941c15d8e19b",
+    "copy_scope": "All original compact summary fields preserved exactly; only this provenance and Director inspection fact added. No original raw record or task code mutation."
+  },
+  "director_independent_inspection": {
+    "source": "Director Main explicit message after the one authorized actual E5 observation",
+    "images": [
+      "build/issue264-validation-streaming-after-hidden-01/controlled_hidden_107.png",
+      "build/issue264-validation-streaming-after-hidden-01/commit_1.png",
+      "build/issue264-validation-streaming-after-hidden-01/commit_2.png"
+    ],
+    "observed": "Blank protected surface, then gray source107, then the same gold card; all match the stated visible sequence.",
+    "scope": "Director image-inspection fact only; independent bounded E5 closure/terminal acceptance is not fabricated."
+  }
+}

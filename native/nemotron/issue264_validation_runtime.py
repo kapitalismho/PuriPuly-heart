@@ -185,8 +185,10 @@ class ObservedBatch(CausalBatchSession):
         super().__init__(inner, evidence_view=evidence_view)
         self.observation_trace = trace
 
-    def _snapshot_native_terminal(self, event):
-        super()._snapshot_native_terminal(event)
+    def _snapshot_native_event(self, event):
+        super()._snapshot_native_event(event)
+        if not isinstance(event, STTProviderTurnTerminal):
+            return
         try:
             self._observe_native_terminal(event)
         except Exception as error:

@@ -1490,14 +1490,14 @@ async def test_synchronous_terminal_during_seal_snapshots_without_reentering_wra
     session = CausalBatchSession(inner)
     req = request()
     snapshots = []
-    snapshot = session._snapshot_native_terminal
+    snapshot = session._snapshot_native_event
 
     def observe_native_terminal(event):
         assert session._lock.locked()
         snapshot(event)
         snapshots.append(session._slices[event.identity].speaker)
 
-    session._snapshot_native_terminal = observe_native_terminal
+    session._snapshot_native_event = observe_native_terminal
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 16000, 1)
@@ -1533,7 +1533,7 @@ async def test_retired_request_native_callback_cannot_touch_speaker_evidence(ret
             await session.abort_turn(req.identity, reason="cancelled")
         else:
             await session.close()
-        native_request.on_native_terminal(
+        native_request.on_native_event(
             STTProviderTurnTerminal(native_request.identity, "final", "late")
         )
         assert child.speaker is None

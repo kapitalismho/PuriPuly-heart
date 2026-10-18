@@ -39,6 +39,24 @@ class SpeakerEvidenceView:
         self.generation = 0
         self._proofs = {}
         self._listeners = set()
+        self._input_scope = None
+        self._input_owner = None
+
+    def record_input_owner(self, scope, owner):
+        if self._input_scope is None or scope > self._input_scope:
+            self._input_scope = scope
+            self._input_owner = owner
+        elif scope == self._input_scope and self._input_owner is not owner:
+            self._input_owner = None
+
+    def input_history_complete(self, scope, owner):
+        return (
+            self._input_scope is None
+            or scope > self._input_scope
+            or scope == self._input_scope
+            and self._input_owner is not None
+            and self._input_owner is owner
+        )
 
     def subscribe(self, listener):
         self._listeners.add(listener)

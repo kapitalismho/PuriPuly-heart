@@ -1,0 +1,413 @@
+{
+  "result": "assigned_generic_buffer_repair_complete_and_frozen",
+  "scope": {
+    "accepted_finding": "SR4",
+    "finding_source": "native/nemotron/issue264_review_streaming.json",
+    "product_baseline": "e4e85c093a03013f60346680eadbd168c7dbdef6",
+    "owned_product": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+    "owned_tests": "tests/core/test_stt_event_buffer_disposal.py",
+    "task_local_report": "native/nemotron/issue264_buffer_disposal_repair.json",
+    "excluded": [
+      "wrapper callback integration",
+      "actual speaker-claim lifecycle tests",
+      "all other product/tests/docs",
+      "Git/index/history mutations",
+      "GitHub mutations"
+    ],
+    "goal_acceptance": false
+  },
+  "api": {
+    "constructor": "STTProviderEventBuffer(*, max_events: int = MAX_EVENTS, on_discard: Callable[[STTProviderTurnEvent, tuple[STTProviderTurnEvent, ...]], None] | None = None) -> None",
+    "callback": "on_discard(discarded_event, retained_events) -> None; synchronous and optional",
+    "timing": "Callbacks run after the complete admission/eviction decision. For closed-buffer puts the unchanged queue snapshot is passed before STTProviderEventBufferClosed is raised.",
+    "retained_events": "Immutable tuple snapshot of final queued ownership, in delivery order, including the incoming event if accepted and any synthesized overflow terminal. Shared resources can therefore survive provisional replacement, room-making eviction, rejection and retirement.",
+    "notifications": "Every rejected incoming event (including closed and retired-epoch puts) and every actually removed queued event is collected for disposal. Refused retirement does not report speculative removals. Successfully delivered events and healthy close/drain are not discarded.",
+    "errors": "Owner callback exceptions propagate without suppression; the queue decision has already completed. A raising callback interrupts normal callback iteration.",
+    "speaker_independence": "The buffer does not inspect tokens, resource stages or speaker policy. Owners decide disposal from the discarded event and retained references.",
+    "default_cost": "No discard list or retained tuple is allocated when on_discard is None."
+  },
+  "implementation": {
+    "changes": [
+      "Added optional constructor callback and a post-decision put notification boundary.",
+      "Threaded an optional discarded-event accumulator through provisional coalescing, room-making eviction and overflow/retirement helpers.",
+      "Only successful retirement admissions commit their candidate removals to notifications."
+    ],
+    "preserved": [
+      "Existing count/byte admission ordering and thresholds",
+      "Returned admission booleans, except an owner callback may explicitly raise",
+      "Closed-buffer exception when callback succeeds",
+      "Scoped failed-terminal and epoch-retirement overflow outputs",
+      "Provisional replacement and oldest-provisional room-making rules",
+      "Accepted event order",
+      "Healthy close and drain without disposal"
+    ],
+    "comments_added": false,
+    "maintained_guidance_or_docs": "Not edited under sole-file ownership. This task-local report records the API contract for Director integration.",
+    "architecture_drift": "None intended: generic buffer notifications only; speaker policy remains with its owner.",
+    "user_visible_effect": "No change to healthy accepted-event delivery. A configured owner can now reclaim discarded-event resources while preserving retained shared resources; actual speaker integration is owned separately."
+  },
+  "frozen": {
+    "recorded_at_utc": "2026-10-18T10:02:00.259128+00:00",
+    "owned_files": [
+      {
+        "path": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+        "sha256": "78028a184866bda0a92f4d4d0de18ec70308d92ad12dd634ee6d51e0e4aba8c6",
+        "bytes": 10100
+      },
+      {
+        "path": "tests/core/test_stt_event_buffer_disposal.py",
+        "sha256": "daebcd2214afe6328799120ee33027f81b19f0bd4ddea8909c3992bbca96eecb",
+        "bytes": 22977
+      }
+    ],
+    "baseline_buffer_sha256": "f7bd0e33984a97a634b9c976748dcb0ddd4e58681d65e37350f713a223b7b247",
+    "archive": "build/issue264-validation-streaming-after-hidden-01/execution_sources.zip",
+    "archive_sha256": "381865a2bb194994a2b4d9b1fb673bd58ede1f0cd6b79521e2d2e135e63e3f87",
+    "archive_candidate_provenance": "execution_sources.zip:execution_provenance.json declares e4e85c093a03013f60346680eadbd168c7dbdef6",
+    "archive_source_file_count": 585,
+    "archive_source_inventory_sha256": "e259c83853a69854c7831e3683d9589dc16db2b7e302ac598c1184eb49c4c67c",
+    "archive_source_inventory_hash_encoding": "UTF-8 JSON list of path/sha256 objects sorted by archive member path; json.dumps(sort_keys=True,separators=(comma,colon)). Archive hash pins the complete underlying 585-source inventory.",
+    "executed_product_module_count": 36,
+    "executed_product_module_inventory": [
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart",
+        "path": "src/puripuly_heart/__init__.py",
+        "sha256": "e82b93c3a41e3070283ece19702b0f34b22b019557b45e3d29e6758e5fa8f0d4"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart._compat",
+        "path": "src/puripuly_heart/_compat.py",
+        "sha256": "4d134193af56e1482155d53626bfcda0ef51c8a67531cb7f9729c2f92dc053d6"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core",
+        "path": "src/puripuly_heart/core/__init__.py",
+        "sha256": "b017f233b0d332ec3764756252ccdad0fb3999a6f94ba665cd7ccf391a2f0f3a"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.audio",
+        "path": "src/puripuly_heart/core/audio/__init__.py",
+        "sha256": "dbe975323dee39f3047cf0d12aa6ba01f291d842fcef67fb23412dd935b013c5"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.audio.format",
+        "path": "src/puripuly_heart/core/audio/format.py",
+        "sha256": "4eca0a5c1617cd46e3f56d90b90ab10e2686440896680ee4865d0f027af02ca7"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.audio.ownership",
+        "path": "src/puripuly_heart/core/audio/ownership.py",
+        "sha256": "a3c22e417cf471a0f8b6d2aa9bc39726c43f5ed1f01fa3e99ad59d4131dbd39c"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.discord_managed_oauth",
+        "path": "src/puripuly_heart/core/discord/discord_managed_oauth.py",
+        "sha256": "fd576aff1387bbc00625ccca7a2500c9559cca689b707a85f49052cdced3edba"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.discord_oauth_loopback",
+        "path": "src/puripuly_heart/core/discord/discord_oauth_loopback.py",
+        "sha256": "d5ab603dff8aa50add5b98e1b80fcf3de1a2beb8b670c90aec090c887de40fec"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.lifecycle",
+        "path": "src/puripuly_heart/core/lifecycle.py",
+        "sha256": "94cf50ac822ad53cde598a91363661f41fd28d7d7f28f371e6b07e2f30633cc0"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_asr_provider_runtime",
+        "path": "src/puripuly_heart/core/local_asr/local_asr_provider_runtime.py",
+        "sha256": "5f3b4cd72c5f0b87f0c1ac34f11ec81a731f9739d7f5824051995d47dc35d9b2"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_asr_provisioning",
+        "path": "src/puripuly_heart/core/local_asr/local_asr_provisioning.py",
+        "sha256": "03e2cf011a02f5ad04997574a587df6b2c03a32eeff7dac3813e5092a5b8b82b"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_gpu_assets",
+        "path": "src/puripuly_heart/core/local_asr/local_gpu_assets.py",
+        "sha256": "5f203b1d0ac58b1ca3953cfc62aa5bec43b54ece3f847537e6da83f6e6b0a8c3"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_qwen_runtime",
+        "path": "src/puripuly_heart/core/local_asr/local_qwen_runtime.py",
+        "sha256": "8efda0f64ad245a98e2dec9d1e2a5f40a67e1621d21e8d0fddf04a561380b1e3"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_stt_assets",
+        "path": "src/puripuly_heart/core/local_asr/local_stt_assets.py",
+        "sha256": "9391315ad5d88249a58436828db3676062461fae24584c9c46a692b84368b390"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_stt_catalog",
+        "path": "src/puripuly_heart/core/local_asr/local_stt_catalog.py",
+        "sha256": "98ea34f8656ee40f88700d1862d3d8a6d25560b8f9565ac04780083c7c1e76b4"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_stt_download_port",
+        "path": "src/puripuly_heart/core/local_asr/local_stt_download_port.py",
+        "sha256": "6c958ef73625c454459403fca6001f25202830c7895122fa76ae1d1483527f67"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_stt_huggingface_xet_adapter",
+        "path": "src/puripuly_heart/core/local_asr/local_stt_huggingface_xet_adapter.py",
+        "sha256": "2c871010e882679a7e2d1a71b1f77e6296d0a394b892d484b9bd483520cd3f7b"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.local_stt_runtime_installer",
+        "path": "src/puripuly_heart/core/local_asr/local_stt_runtime_installer.py",
+        "sha256": "123b769922fa313b36d0bb68b1daac1d242d6b6a52e56301f090db56b722eb73"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.managed_openrouter_broker_client",
+        "path": "src/puripuly_heart/core/openrouter/managed_openrouter_broker_client.py",
+        "sha256": "b7c2e8d42f147c41c05b955775d00703d343d713f809faccc61940d788d581cf"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.managed_openrouter_release",
+        "path": "src/puripuly_heart/core/openrouter/managed_openrouter_release.py",
+        "sha256": "d38758d5afaa48e7b75b6f664a21636e739ce4b4eb084a3d20d6579ddbfc689b"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.messages",
+        "path": "src/puripuly_heart/core/messages.py",
+        "sha256": "18d1a46727613a324cf233bd69dcb7926d115ad6659736f9d4f23c268d2feb30"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.oauth_callback_page",
+        "path": "src/puripuly_heart/core/discord/oauth_callback_page.py",
+        "sha256": "f4551336305fd59cc751c5040e4d6a9f1a4ff2d65b84eae7747a283f22c9bfde"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.observability",
+        "path": "src/puripuly_heart/core/observability.py",
+        "sha256": "d133778993b7c27f291a3c80f53fd01936e9054e3a850ed86a08b50af1684261"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.openrouter_credentials",
+        "path": "src/puripuly_heart/core/openrouter/openrouter_credentials.py",
+        "sha256": "987434bdb78fcfdeb6bf29655eee9bb3c36fc423f3ace7fe7cf25b72fdb97620"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.openrouter_handoff",
+        "path": "src/puripuly_heart/core/openrouter/openrouter_handoff.py",
+        "sha256": "639f7e068e56da499d42aa957aee18f22ce7d05cb43579fdfafbbc1d91c6f4e0"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.openrouter_metadata",
+        "path": "src/puripuly_heart/core/openrouter/openrouter_metadata.py",
+        "sha256": "5753f0dec403ab0c8a7fe5f89dee5fdd9364fd25ad32fe06d03099bd92f748a2"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.openrouter_pkce",
+        "path": "src/puripuly_heart/core/openrouter/openrouter_pkce.py",
+        "sha256": "7b785d44505a69b40d839a4ac5751034a53b32c8da26bfbaecdad4a96191ecba"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.runtime",
+        "path": "src/puripuly_heart/core/runtime/__init__.py",
+        "sha256": "428e057dd8c09f0b41fad8bed9ca633f6a563ab819d0a5e8843826dc006a7c31"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.runtime.local_asr_transition",
+        "path": "src/puripuly_heart/core/runtime/local_asr_transition.py",
+        "sha256": "9b37a4c732a9a73fd1d62c409626bffb86334bc64503833f4cfaa6381213bba5"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.speech_boundary",
+        "path": "src/puripuly_heart/core/speech_boundary.py",
+        "sha256": "d53aa4d7652a857efc97986b242bde3272f347e8094eaa5b088d4bd4d783525e"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.stt",
+        "path": "src/puripuly_heart/core/stt/__init__.py",
+        "sha256": "3752df74c452baa93c6a8dfc47f9aee44dd4e9e3d4b687f2b87df3051f93711d"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.core.stt.backend",
+        "path": "src/puripuly_heart/core/stt/backend.py",
+        "sha256": "34d20a823fb466c217e41a58fcf2edb9b824145feb61ae2826b7cc047904288e"
+      },
+      {
+        "boundary": "current_owned_buffer",
+        "module": "puripuly_heart.core.stt.scoped_event_buffer",
+        "path": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+        "sha256": "78028a184866bda0a92f4d4d0de18ec70308d92ad12dd634ee6d51e0e4aba8c6"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.domain",
+        "path": "src/puripuly_heart/domain/__init__.py",
+        "sha256": "19378821ceaf8bd39c7583db6f55f1de1cdba62edb634abe1986f125a3705be1"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.domain.models",
+        "path": "src/puripuly_heart/domain/models.py",
+        "sha256": "cf23c8f3f91ed8149005093f5027082455a7d39cd73186d69f466b598afe1837"
+      },
+      {
+        "boundary": "frozen_e4e85c_dependency",
+        "module": "puripuly_heart.domain.recognition",
+        "path": "src/puripuly_heart/domain/recognition.py",
+        "sha256": "2bf156afacdb87e914f2c6c99bbe8aec7c7eec4cdaaa0e272f5b98525d3695f2"
+      }
+    ],
+    "freeze_notification": "Director Main and source worker speaker-264-boundary-repair were notified directly. No further product/test edits without assignment."
+  },
+  "validation_design": {
+    "promised_result": "Dispose generic buffer drops only after final ownership is known, without premature release of a cached resource shared with accepted or queued events.",
+    "consumer": "A minimal bounded ResourceConsumer holds actual BytesIO resources. Discard closes unretained handles, delivery reads the expected bytes, successful consumption frees resources, and capacity is reused by later valid events. It is not a mock of the callback or a substitute for actual speaker claims.",
+    "concrete_gaps_closed": [
+      "Shared tokens retained by the accepted incoming provisional and by another queued event remain readable through delivery.",
+      "Exact accepted-event and synthesized failure/retirement sequences are asserted alongside resource closure and valid subsequent progress.",
+      "A full buffer rejects an audio boundary without evicting an otherwise deliverable provisional snapshot.",
+      "Retired-epoch and closed-buffer rejections preserve a healthy queued owner sharing a resource.",
+      "Default callback absence preserves healthy coalescing/order/drain."
+    ],
+    "discard_paths_covered": [
+      "Superseded provisional snapshots",
+      "Room-making provisional eviction",
+      "Nonretiring provisional and boundary rejection",
+      "Scoped overflow dropping same-epoch updates/boundaries",
+      "Independent input/recognition overflow",
+      "Oversized recognition/unit/update/terminal rejection",
+      "Retired-epoch rejection for all seven event variants",
+      "Accepted and refused epoch retirement",
+      "Closed-buffer put rejection"
+    ]
+  },
+  "executed_checks": [
+    {
+      "command": ".venv/Scripts/python.exe -m black src/puripuly_heart/core/stt/scoped_event_buffer.py tests/core/test_stt_event_buffer_disposal.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/scoped_event_buffer.py tests/core/test_stt_event_buffer_disposal.py",
+      "exit_code": 0,
+      "outcome": "Black reformatted both owned files; Ruff passed."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B -c <isolated_driver>",
+      "stage": "initial 29-case suite before two additional preservation/sharing tests",
+      "exit_code": 0,
+      "outcome": "29 passed, 1 warning in 0.12s; superseded by final 31-case run.",
+      "failures": [],
+      "skips": [],
+      "warning": "PytestConfigWarning: Unknown config option: asyncio_mode (plugin autoload intentionally disabled; owned tests use asyncio.run and do not need pytest-asyncio)."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -m black --check src/puripuly_heart/core/stt/scoped_event_buffer.py tests/core/test_stt_event_buffer_disposal.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/stt/scoped_event_buffer.py tests/core/test_stt_event_buffer_disposal.py",
+      "exit_code": 0,
+      "outcome": "Both files unchanged by Black check; Ruff passed on final code/tests."
+    },
+    {
+      "command": ".venv/Scripts/python.exe -B -c <isolated_driver>",
+      "stage": "final frozen owned files",
+      "exit_code": 0,
+      "outcome": "31 passed, 1 warning in 0.12s.",
+      "collected_and_executed": 31,
+      "failures": [],
+      "skips": [],
+      "interrupted": false,
+      "warning": "PytestConfigWarning: Unknown config option: asyncio_mode (intentional plugin isolation).",
+      "passed_nodeids": [
+        "tests/core/test_stt_event_buffer_disposal.py::test_default_callback_preserves_coalescing_order_and_healthy_close",
+        "tests/core/test_stt_event_buffer_disposal.py::test_healthy_close_preserves_queued_resources_until_delivery",
+        "tests/core/test_stt_event_buffer_disposal.py::test_superseded_provisional_protects_incoming_shared_resource_and_reuses_capacity",
+        "tests/core/test_stt_event_buffer_disposal.py::test_room_making_eviction_protects_final_queued_owners[incoming]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_room_making_eviction_protects_final_queued_owners[queued]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_nonretiring_rejection_preserves_healthy_shared_owner[provisional_replace]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_nonretiring_rejection_preserves_healthy_shared_owner[provisional_append]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_nonretiring_rejection_preserves_healthy_shared_owner[boundary]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_scoped_overflow_releases_removed_updates_boundaries_and_rejected_resources[update]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_scoped_overflow_releases_removed_updates_boundaries_and_rejected_resources[terminal]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[update]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[terminal]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[boundary]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[input]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[unit]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[unit_terminal]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejects_every_event_kind_and_allows_other_epoch_progress[epoch]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_independent_count_overflow_preserves_queued_delivery_and_retires_epoch[input]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_independent_count_overflow_preserves_queued_delivery_and_retires_epoch[unit]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_independent_count_overflow_preserves_queued_delivery_and_retires_epoch[unit_terminal]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_byte_overflow_releases_evictions_and_rejection_but_preserves_other_epoch[unit]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_byte_overflow_releases_evictions_and_rejection_but_preserves_other_epoch[unit_terminal]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_byte_overflow_releases_evictions_and_rejection_but_preserves_other_epoch[update]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_byte_overflow_releases_evictions_and_rejection_but_preserves_other_epoch[terminal]",
+        "tests/core/test_stt_event_buffer_disposal.py::test_recognition_byte_budget_is_recovered_by_consumption",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retirement_admission_and_refusal_only_discard_actual_removals",
+        "tests/core/test_stt_event_buffer_disposal.py::test_accepted_retirement_disposes_epoch_updates_and_boundaries",
+        "tests/core/test_stt_event_buffer_disposal.py::test_closed_put_releases_rejection_without_releasing_healthy_queued_owner",
+        "tests/core/test_stt_event_buffer_disposal.py::test_disposal_exception_propagates_after_final_admission_state",
+        "tests/core/test_stt_event_buffer_disposal.py::test_full_buffer_rejects_boundary_without_evicting_deliverable_provisional",
+        "tests/core/test_stt_event_buffer_disposal.py::test_retired_epoch_rejection_protects_shared_queued_resource"
+      ]
+    }
+  ],
+  "controlled_boundary": {
+    "method": "Fresh .venv Python subprocess, archive/src first on sys.path, frozen backend/package imported first, then exactly the current owned scoped_event_buffer module injected under its canonical module name. Pytest runs only the new test file with --noconftest, no cache provider and no configured pythonpath. Plugin autoload and bytecode writes are disabled.",
+    "assertions": "Post-run inventory rejects every puripuly_heart import not from execution_sources.zip except the exact owned buffer path. Observed 35 frozen dependency modules and one owned buffer; no moving sibling product imported.",
+    "environment": {
+      "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+      "pytest": "9.1.1",
+      "black": "26.5.1",
+      "ruff": "0.16.1"
+    },
+    "environment_overrides": {
+      "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    },
+    "inline_driver": "import hashlib\nimport importlib.util\nimport json\nimport sys\nimport zipfile\nfrom pathlib import Path\n\nroot = Path.cwd()\narchive = root / \"build/issue264-validation-streaming-after-hidden-01/execution_sources.zip\"\nsys.path.insert(0, str(archive) + \"/src\")\nimport puripuly_heart.core.stt.backend\nimport puripuly_heart.core.stt\n\nname = \"puripuly_heart.core.stt.scoped_event_buffer\"\nsource = root / \"src/puripuly_heart/core/stt/scoped_event_buffer.py\"\nspec = importlib.util.spec_from_file_location(name, source)\nmodule = importlib.util.module_from_spec(spec)\nsys.modules[name] = module\nspec.loader.exec_module(module)\nsetattr(puripuly_heart.core.stt, \"scoped_event_buffer\", module)\n\nimport pytest\nresult = pytest.main([\n    \"--noconftest\", \"-p\", \"no:cacheprovider\", \"-o\", \"pythonpath=\",\n    \"-o\", \"addopts=\", \"-q\", \"-rA\",\n    \"tests/core/test_stt_event_buffer_disposal.py\",\n])\ninventory = []\nwith zipfile.ZipFile(archive) as frozen:\n    for imported_name, imported in sorted(sys.modules.items()):\n        if imported_name != \"puripuly_heart\" and not imported_name.startswith(\"puripuly_heart.\"):\n            continue\n        origin = getattr(imported, \"__file__\", None)\n        if origin is None:\n            raise RuntimeError(\"untracked product namespace: \" + imported_name)\n        normalized = origin.replace(\"\\\\\", \"/\")\n        if imported_name == name:\n            assert Path(origin).resolve() == source.resolve()\n            relative = source.relative_to(root).as_posix()\n            payload = source.read_bytes()\n            boundary = \"current_owned_buffer\"\n        else:\n            marker = \"execution_sources.zip/\"\n            if marker not in normalized:\n                raise RuntimeError(\"moving or untracked product import: \" + imported_name + \": \" + origin)\n            relative = normalized.split(marker, 1)[1]\n            payload = frozen.read(relative)\n            boundary = \"frozen_e4e85c_dependency\"\n        inventory.append({\"module\": imported_name, \"path\": relative, \"sha256\": hashlib.sha256(payload).hexdigest(), \"boundary\": boundary})\nprint(\"ISSUE264_BUFFER_INVENTORY=\" + json.dumps(inventory, sort_keys=True))\nprint(\"ISSUE264_BUFFER_TEST_EXIT=\" + str(result))\nraise SystemExit(result)",
+    "prohibited_boundaries": "No model/GPU/Gemma/Flet/cloud/VR/network/private configuration accessed. No app/provider/session startup; no test conftest loaded. Only local in-memory synthetic resources used.",
+    "cleanup": "No temporary source copies or throwaway scripts created. BytesIO resources are consumed/closed with fixture-finally cleanup, and pytest cache and bytecode generation are disabled."
+  },
+  "limits_and_handoff": {
+    "not_exercised": [
+      "Moving current product dependencies",
+      "Wrapper on_discard integration",
+      "Actual shared speaker-view parent/part claim stages and adopted handoffs",
+      "Final frozen candidate coupled/source tests",
+      "Repository-wide tests",
+      "Type checker",
+      "Actual application or hardware runtime"
+    ],
+    "director_checks": [
+      "At the integration barrier run tests/core/test_stt_event_buffer_disposal.py against final frozen candidate sources using normal repository test configuration.",
+      "Run the source worker's actual speaker-claim rejection/eviction/retained-handoff tests with the integrated callback.",
+      "Run existing scoped-buffer count/byte/provisional/close regression tests with the final candidate."
+    ],
+    "acceptance": "This report completes only the assigned generic buffer portion of SR4. Integration, independent review and Goal acceptance remain with the Director/assigned owners.",
+    "decisions_needed": []
+  }
+}

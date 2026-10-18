@@ -44,7 +44,7 @@ class STTSessionEventProjection:
         self._payload_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._update_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._sealed_identities: set[STTProviderTurnIdentity] = set()
-        self._native_terminal_observers = {}
+        self._native_event_observers = {}
         self._draining_identities: set[STTProviderTurnIdentity] = set()
         self._retired = False
         self._epoch_ended = False
@@ -110,8 +110,8 @@ class STTSessionEventProjection:
         self._payload_sequences[request.identity] = 0
         self._update_sequences[request.identity] = 0
         self.channel = request.channel
-        if request.on_native_terminal is not None:
-            self._native_terminal_observers[request.identity] = request.on_native_terminal
+        if request.on_native_event is not None:
+            self._native_event_observers[request.identity] = request.on_native_event
 
     def require_open(self, identity: STTProviderTurnIdentity) -> None:
         self._require_scoped_projection()
@@ -177,19 +177,24 @@ class STTSessionEventProjection:
         if not self.is_current(event.identity):
             return False
         buffer = self._scoped_buffer()
+        observer = self._native_event_observers.get(event.identity)
         try:
-            accepted = buffer.put(event)
-        except STTProviderEventBufferClosed:
-            return False
-        if not accepted and event.stability != "provisional":
-            self._retire_after_overflow(event.identity)
+            if observer is not None:
+                observer(event)
+        finally:
+            try:
+                accepted = buffer.put(event)
+            except STTProviderEventBufferClosed:
+                accepted = False
+            if not accepted and event.stability != "provisional":
+                self._retire_after_overflow(event.identity)
         return accepted
 
     def terminal(self, event: STTProviderTurnTerminal | STTProviderInputTerminal) -> bool:
         if self._closed or not self.can_terminal(event.identity):
             return False
         buffer = self._scoped_buffer()
-        observer = self._native_terminal_observers.pop(event.identity, None)
+        observer = self._native_event_observers.pop(event.identity, None)
         self._payload_sequences.pop(event.identity, None)
         self._update_sequences.pop(event.identity, None)
         self._sealed_identities.discard(event.identity)
@@ -227,7 +232,7 @@ class STTSessionEventProjection:
     def retire(self) -> None:
         self._retired = True
         self._draining_identities.clear()
-        self._native_terminal_observers.clear()
+        self._native_event_observers.clear()
 
     def end_epoch(
         self,
@@ -246,7 +251,7 @@ class STTSessionEventProjection:
         self._retired = True
         self._epoch_ended = True
         self._draining_identities.clear()
-        self._native_terminal_observers.clear()
+        self._native_event_observers.clear()
         event = STTProviderEpochEnded(
             provider_epoch_id=epoch_id,
             orderly=orderly,
@@ -283,7 +288,7 @@ class STTSessionEventProjection:
         if self._closed:
             return
         self._closed = True
-        self._native_terminal_observers.clear()
+        self._native_event_observers.clear()
         if self._legacy_events is not None:
             self._legacy_events.put_nowait(None)
         if self._scoped_events is not None:
@@ -305,7 +310,7 @@ class STTSessionEventProjection:
         self._update_sequences.pop(identity, None)
         self._sealed_identities.discard(identity)
         self._draining_identities.discard(identity)
-        self._native_terminal_observers.pop(identity, None)
+        self._native_event_observers.pop(identity, None)
         if self._active_identity == identity:
             self._active_identity = None
 

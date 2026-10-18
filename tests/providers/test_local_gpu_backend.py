@@ -183,10 +183,12 @@ async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
     native_terminals = []
 
     def observe_native_terminal(event):
+        if not isinstance(event, STTProviderTurnTerminal):
+            return
         assert session._event_projection.scoped_event_depth == 0
         native_terminals.append(event)
 
-    first = replace(_scoped_request(1), on_native_terminal=observe_native_terminal)
+    first = replace(_scoped_request(1), on_native_event=observe_native_terminal)
     await session.begin_turn(first)
     await session.send_turn_audio(
         first.identity,
@@ -209,7 +211,7 @@ async def test_gpu_scoped_terminal_preserves_identity_and_expiry_is_not_empty(
     assert native_terminals == [terminal]
 
     runtime.submit_failures.append(GpuASRWorkExpired("expired"))
-    second = replace(_scoped_request(2), on_native_terminal=observe_native_terminal)
+    second = replace(_scoped_request(2), on_native_event=observe_native_terminal)
     await session.begin_turn(second)
     await session.send_turn_audio(
         second.identity,

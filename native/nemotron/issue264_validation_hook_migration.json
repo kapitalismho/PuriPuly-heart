@@ -1,0 +1,73 @@
+{
+  "schema": "issue264.task_hook_migration.v1",
+  "status": "task_preparation_complete_actual_execution_on_hold",
+  "authorization": "Director authorized clean ObservedBatch producer-hook migration and isolated task-only behavior checks; no moving-product imports or actual runtime execution",
+  "product_candidate": null,
+  "product_candidate_note": "Source repairs remain Director-owned and await an exact readiness pin; this record is not product verification",
+  "delta": {
+    "path": "native/nemotron/issue264_validation_runtime.py",
+    "before_sha256": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+    "after_sha256": "ae4af00c0d1361ca8d63797971d49865e51fa00daddf3ad4f9b19077475774ed",
+    "changes": [
+      "Rename ObservedBatch._snapshot_native_terminal to _snapshot_native_event",
+      "Delegate super()._snapshot_native_event(event) outside the observer exception handler and before the task-only terminal guard",
+      "Return without task-native-final observation unless isinstance(event, STTProviderTurnTerminal)"
+    ],
+    "compatibility_alias": false,
+    "consumer_time_fallback": false,
+    "observation_body_changed": false,
+    "failure_accounting_changed": false,
+    "scope_proof": "Replacing only the new method/delegate names and two-line terminal guard with their predecessor reproduces the exact before_sha256 in memory"
+  },
+  "isolated_checks": {
+    "classification": "AST-extracted task observation code against isolated fixtures, not product validation or actual acoustics",
+    "script": "build/issue264-validation-hook-migration-01/check.py",
+    "script_sha256": "f762604c17e98eaacbf283f60b1f7a1d7e151b5eb9fff2d3aac764153abece59",
+    "command": ".venv/Scripts/python.exe -B build/issue264-validation-hook-migration-01/check.py",
+    "exit_code": 0,
+    "status": "passed",
+    "groups": [
+      "Exact rename/delegate/guard delta only, with predecessor hash and no old-name class alias",
+      "Parent delegated exactly once before terminal observation; observed result contains the parent snapshot",
+      "Stable/provisional updates and a non-STTProviderTurnTerminal input-terminal fixture delegate without native-final observation",
+      "Native parent exceptions propagate unchanged for terminal and update events; no observer exception record suppresses them",
+      "Observer-only exception is separately recorded and invalidates a nonempty-source pipeline",
+      "Existing native-failure, pipeline-completion and empty-content statuses remain distinct; pipeline completion is not quality acceptance"
+    ],
+    "product_modules_imported": [],
+    "sources_archive": "build/issue264-validation-hook-migration-01/isolated_check_sources.zip",
+    "sources_archive_sha256": "928170a239952e1073701ec1123bd7eb06868d358a9a60b3e83900934e176350"
+  },
+  "lint_and_format": {
+    "ruff_command": ".venv/Scripts/python.exe -m ruff check native/nemotron/issue264_validation_runtime.py build/issue264-validation-hook-migration-01/check.py",
+    "ruff_exit_code": 0,
+    "ruff_output": "All checks passed!",
+    "black_command": ".venv/Scripts/python.exe -m black --check native/nemotron/issue264_validation_runtime.py build/issue264-validation-hook-migration-01/check.py",
+    "black_exit_code": 0,
+    "black_result": "2 files would be left unchanged",
+    "initial_attempt": {
+      "black_exit_code": 1,
+      "result": "Only the throwaway check script needed two expression-formatting changes; runtime was already unchanged. Ruff and all six isolated behavior groups passed on that initial script as well",
+      "initial_script_sha256": "4ee51d2acb9f9060f404fb3ba07357471464956e7c23f58d64b69eeaf611c8ec",
+      "archive": "build/issue264-validation-hook-migration-01/initial_format_attempt.zip",
+      "archive_sha256": "581595517f948ba35ec927fe34c16b74130311a986916119aec7e4758288687d",
+      "archive_contents": "Exact initial check.py plus command/exit/output disposition; initial formatting failure was not an acoustic or product observation",
+      "format_delta_command": ".venv/Scripts/python.exe -m black --diff build/issue264-validation-hook-migration-01/check.py",
+      "format_delta_exit_code": 0,
+      "repair": "Applied only the two displayed formatting changes to the throwaway script, then reran final targeted Ruff/Black and isolated behavior checks"
+    }
+  },
+  "preservation_and_limits": {
+    "prior_actual_records_rewritten": false,
+    "prior_executed_sources_rewritten": false,
+    "prior_matrix_or_E4_stopping_behavior_changed": false,
+    "E5": "Unchanged and independently closed; no rerun",
+    "models_launched": 0,
+    "Flet_launched": 0,
+    "cloud_calls": 0,
+    "product_imports": 0,
+    "product_changes_by_validation_worker": 0,
+    "GPU_and_tapes": "HOLD pending exact repaired product/task pin, bounded independent review, and explicit actual execution readiness",
+    "owned_resources": "Only task-local check/report/source archives were created; no long-lived process was launched"
+  }
+}

@@ -20,6 +20,7 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnRequest,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
+    STTSessionProjection,
     STTSourceCapabilities,
     STTSourceRelease,
     STTTextContribution,
@@ -27,6 +28,7 @@ from puripuly_heart.core.stt.backend import (
 )
 from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBuffer
 from puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer
+from puripuly_heart.core.stt.session_projection import STTSessionEventProjection
 from puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession
 from puripuly_heart.domain.models import FinalSpeakerRun
 from tests.helpers.speaker_evidence import temporal_frames
@@ -78,21 +80,29 @@ class Provider:
         self.sent = []
         self.sealed = []
         self.observer = None
+        self.projections = {}
 
     def set_source_mapping_observer(self, observer):
         self.observer = observer
 
     async def begin_turn(self, request):
         self.request = request
+        projection = STTSessionEventProjection(
+            STTSessionProjection("scoped", request.identity.provider_epoch_id)
+        )
+        projection._scoped_events = self.events
+        projection.begin(request)
+        self.projections[request.identity] = projection
 
     async def send_turn_audio(self, identity, pcm16le, **kwargs):
         self.sent.append((identity, pcm16le, kwargs))
 
     async def seal_turn(self, identity, **kwargs):
         self.sealed.append((identity, kwargs))
+        self.projections[identity].seal(identity)
 
     async def abort_turn(self, identity, **kwargs):
-        pass
+        self.projections[identity].retire()
 
     async def turn_events(self):
         async for event in self.events.events():
@@ -103,6 +113,15 @@ class Provider:
 
     async def close(self):
         self.events.close()
+        for projection in self.projections.values():
+            projection.close()
+
+    def emit(self, event):
+        if isinstance(event, STTProviderTurnUpdate):
+            return self.projections[event.identity].put_update(event)
+        if isinstance(event, STTProviderTurnTerminal):
+            return self.projections[event.identity].terminal(event)
+        return self.events.put(event)
 
 
 async def send(session, req, start, end, seq, *, context=False):
@@ -158,7 +177,7 @@ async def test_supported_prefix_releases_before_end_and_successor_progresses():
         )
         assert session.audio_boundaries[0][1].normalized_sample == 1600
         assert not provider.sealed
-        provider.events.put(update(req, "短い。 "))
+        provider.emit(update(req, "短い。 "))
         events = session.turn_events()
         stable = await next_text(events)
         early = await next_text(events)
@@ -173,7 +192,7 @@ async def test_supported_prefix_releases_before_end_and_successor_progresses():
         await send(session, req, 3200, 4800, 2)
         assert session.sent_until == 4800
         assert len(provider.sent) == 2
-        provider.events.put(
+        provider.emit(
             STTProviderTurnTerminal(
                 req.identity, "final", "短い。 残り", text_authority="authoritative"
             )
@@ -214,7 +233,7 @@ async def test_consumed_text_preserves_later_audio_boundary_and_pending_successo
         await session.observe_speaker_evidence(
             temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
         )
-        provider.events.put(update(req, first_text))
+        provider.emit(update(req, first_text))
         normalizer.apply_update(await next_text(events))
         first_release = normalizer.apply_update(await next_text(events))
         await harness.peer_owner.handle_provider_turn_update(snapshot, first_release)
@@ -232,7 +251,7 @@ async def test_consumed_text_preserves_later_audio_boundary_and_pending_successo
         assert boundary.boundary.observed_at_monotonic_s == 4.0
 
         event = update(req, successor_text if assembly == "append" else text)
-        provider.events.put(
+        provider.emit(
             replace(
                 event,
                 sequence=2,
@@ -285,7 +304,7 @@ async def test_consumed_text_preserves_later_audio_boundary_and_pending_successo
         ]
         assert [item.source_child.speaker.speaker_id for item in trace.items] == ["0", "2"]
 
-        provider.events.put(
+        provider.emit(
             STTProviderTurnTerminal(
                 identity, "final", text + "Tail!", text_authority="authoritative"
             )
@@ -322,9 +341,7 @@ async def test_unknown_clock_or_point_never_becomes_interval(semantics, qualifie
         await session.observe_speaker_evidence(
             temporal_frames((evidence(0, 1600, 0), evidence(1600, 3200, 1)))
         )
-        provider.events.put(
-            update(req, "No.", qualified=qualified, semantics=semantics, release=True)
-        )
+        provider.emit(update(req, "No.", qualified=qualified, semantics=semantics, release=True))
         result = await next_text(session.turn_events())
         assert result.source_release.reason == "end"
         assert result.final_speaker_runs[0].speaker_id is None
@@ -347,7 +364,7 @@ async def test_untimed_considers_all_replayed_context(context_slot, expected):
         await session.observe_speaker_evidence(
             temporal_frames((evidence(0, 800, context_slot), evidence(800, 1600, 0)))
         )
-        provider.events.put(update(req, "No.", policy="whole_span", release=True))
+        provider.emit(update(req, "No.", policy="whole_span", release=True))
         result = await next_text(session.turn_events())
         assert result.source_audio[0].context_ranges == (span(0, 800),)
         assert result.source_audio[0].speaker_attribution.state == expected
@@ -364,7 +381,7 @@ async def test_unknown_actual_backend_does_not_inherit_request_purity():
         await session.begin_turn(req)
         await send(session, req, 0, 1600, 1)
         await session.observe_speaker_evidence(temporal_frames((evidence(0, 1600, 0),)))
-        provider.events.put(update(req, "No.", policy="unknown", release=True))
+        provider.emit(update(req, "No.", policy="unknown", release=True))
         result = await next_text(session.turn_events())
         assert result.source_audio[0].speaker_attribution.state == "unavailable"
         assert result.final_speaker_runs[0].speaker_id is None
@@ -434,7 +451,7 @@ async def test_native_ids_cannot_change_actual_admitted_source_units():
                     transcription=NativeTranscriptionEvidence(speaker_label=native_id),
                 ),
             )
-            provider.events.put(event)
+            provider.emit(event)
             result = await next_text(session.turn_events())
             pieces = STTContributionConsumptionLedger().consume_parts(result)
             return (
@@ -474,7 +491,7 @@ async def test_explicit_clock_reset_and_synthetic_input_do_not_guess_offsets():
                 text_timing=(replace(event.provenance.text_timing[0], clock_id="task-reset"),),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         result = await next_text(session.turn_events())
         assert session.sent_until == 4000
         assert result.final_speaker_runs[0].speaker_id == "0"
@@ -537,7 +554,7 @@ async def test_independent_stream_protocol_origin_and_request_reclamation():
         await session.send_stream_audio(bytes(3200), source_ranges=(span(0, 1600),))
         assert session.recognition_source_covers((span(0, 1600),))
         await session.begin_turn(req)
-        provider.events.put(STTProviderInputTerminal(req.identity, "submitted", "peer"))
+        provider.emit(STTProviderInputTerminal(req.identity, "submitted", "peer"))
         unit = STTRecognitionUnit(
             RecognitionUnitIdentity(stream, uuid4(), 1),
             "Independent",
@@ -545,7 +562,7 @@ async def test_independent_stream_protocol_origin_and_request_reclamation():
                 capabilities=STTSourceCapabilities("gemini", "actual-model", "unknown")
             ),
         )
-        provider.events.put(unit)
+        provider.emit(unit)
         events = session.turn_events()
         assert isinstance(await anext(events), STTProviderInputTerminal)
         result = await anext(events)
@@ -670,7 +687,7 @@ async def test_same_speaker_word_pieces_create_one_complete_source_not_word_jobs
                 ),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         result = await next_text(session.turn_events())
         result = STTScopedTurnNormalizer(identity).apply_update(result)
         await harness.peer_owner.handle_provider_turn_update(snapshot, result)
@@ -808,7 +825,7 @@ async def replay_captured_fragmentation(*, complete_words=True):
                 control_sent_sample=captured["control_sent_sample"],
                 native_model_metadata=tuple(tuple(value) for value in captured["model_metadata"]),
             )
-            provider.events.put(
+            provider.emit(
                 STTProviderTurnUpdate(
                     identity,
                     captured["sequence"],
@@ -961,7 +978,7 @@ async def test_uncertain_transition_is_retained_but_cannot_release_identified_so
                 text_timing=(replace(event.provenance.text_timing[0], raw_end=0.15),),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         result = await next_text(session.turn_events())
         assert result.source_release is None
         assert result.final_speaker_runs[0].speaker_id is None
@@ -1067,7 +1084,7 @@ async def test_internal_split_requires_both_established_audio_and_complete_text_
                 ),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         outgoing = STTScopedTurnNormalizer(identity).apply_update(
             await next_text(session.turn_events())
         )
@@ -1161,7 +1178,7 @@ async def test_fine_complete_word_prefix_preserves_crossing_group_and_terminal_r
                 ),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         available = normalizer.apply_update(await next_text(events))
         assert available.source_release is None
         early = normalizer.apply_update(await next_text(events))
@@ -1173,7 +1190,7 @@ async def test_fine_complete_word_prefix_preserves_crossing_group_and_terminal_r
         assert first.speaker.speaker_id == "0"
         assert first.origins[0].contribution_range == (0, prefix_end)
         await send(session, req, session.sent_until, session.sent_until + 512, 3)
-        provider.events.put(
+        provider.emit(
             replace(
                 event,
                 sequence=2,
@@ -1198,7 +1215,7 @@ async def test_fine_complete_word_prefix_preserves_crossing_group_and_terminal_r
             (prefix_end, successor_start),
             (successor_start, len(text)),
         ]
-        provider.events.put(
+        provider.emit(
             STTProviderTurnTerminal(
                 identity, "final", text + "Tail!", text_authority="authoritative"
             )
@@ -1279,7 +1296,7 @@ async def test_lexical_cuts_without_qualified_audio_partition_do_not_create_word
                 ),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         result = await next_text(session.turn_events())
         assert len(result.final_speaker_runs) == 1
         assert result.final_speaker_runs[0].text == event.text
@@ -1363,7 +1380,7 @@ async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translati
             cursor = end
         event = update(req, text, qualified=qualified, release=True)
         event = replace(event, provenance=replace(event.provenance, text_timing=tuple(positions)))
-        provider.events.put(event)
+        provider.emit(event)
         result = STTScopedTurnNormalizer(identity).apply_update(
             await next_text(session.turn_events())
         )
@@ -1437,7 +1454,7 @@ async def test_final_phrase_preserves_very_short_clear_no_between_returning_spea
                 ),
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         result = STTScopedTurnNormalizer(identity).apply_update(
             await next_text(session.turn_events())
         )
@@ -1541,7 +1558,7 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
                 sent_until_sample=96000,
             ),
         )
-        provider.events.put(event)
+        provider.emit(event)
         outgoing = await next_text(session.turn_events())
         assert outgoing.identity == identity
         assert outgoing.source_release.text_start == 0

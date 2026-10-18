@@ -200,7 +200,7 @@ async def test_native_terminal_observer_runs_once_before_enqueue_and_reentry_is_
         assert not projection.terminal(event)
         observed.append(event)
 
-    request = replace(_request(), on_native_terminal=observe)
+    request = replace(_request(), on_native_event=observe)
     projection.begin(request)
     terminal = STTProviderTurnTerminal(request.identity, "final", "Alpha.")
     assert projection.terminal(terminal)
@@ -217,7 +217,7 @@ async def test_native_terminal_observer_error_propagates_and_conserves_terminal(
     def observe(event):
         raise ValueError("native snapshot failed")
 
-    request = replace(_request(), on_native_terminal=observe)
+    request = replace(_request(), on_native_event=observe)
     projection.begin(request)
     terminal = STTProviderTurnTerminal(request.identity, "final", "Alpha.")
     with pytest.raises(ValueError, match="native snapshot failed"):
@@ -231,7 +231,7 @@ async def test_native_terminal_observer_error_propagates_and_conserves_terminal(
 def test_stale_native_terminal_never_invokes_request_observer(retirement):
     projection = STTSessionEventProjection(STTSessionProjection("scoped", "epoch-1"))
     observed = []
-    request = replace(_request(), on_native_terminal=observed.append)
+    request = replace(_request(), on_native_event=observed.append)
     projection.begin(request)
     if retirement == "end_epoch":
         projection.end_epoch(orderly=False, reason="reset")
@@ -239,5 +239,5 @@ def test_stale_native_terminal_never_invokes_request_observer(retirement):
         getattr(projection, retirement)()
     assert not projection.terminal(STTProviderTurnTerminal(request.identity, "final", "late"))
     assert not observed
-    assert not projection._native_terminal_observers
+    assert not projection._native_event_observers
     projection.close()

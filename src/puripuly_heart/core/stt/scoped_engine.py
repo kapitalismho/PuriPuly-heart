@@ -41,6 +41,7 @@ from puripuly_heart.core.stt.backend import (
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     STTScopedTurnSession,
+    discard_source_audio_proofs,
     scoped_event_for_delivery,
 )
 from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_failure_diagnostics
@@ -343,7 +344,7 @@ class ScopedRecognitionEngine:
         self._abort_lock = asyncio.Lock()
         self._turn_resolved = asyncio.Event()
         self._turn_resolved.set()
-        self._event_buffer = STTProviderEventBuffer()
+        self._event_buffer = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._event_drained = asyncio.Event()
         self._event_drained.set()
 
@@ -1707,11 +1708,11 @@ class ScopedRecognitionEngine:
             self._notify_terminal_failure(last_error)
         return False
 
+    def _discard_buffered_event(self, event, retained) -> None:
+        discard_source_audio_proofs(event, self.evidence_view, retained=retained, published=True)
+
     def _discard_speaker_proofs(self, event, *, published=False) -> None:
-        if self.evidence_view is not None:
-            for audio in getattr(event, "source_audio", ()):
-                for token in audio.speaker_proof_ids:
-                    self.evidence_view.release_unadopted(token, published=published)
+        discard_source_audio_proofs(event, self.evidence_view, published=published)
 
     def _publish_speaker_proofs(self, event) -> None:
         if self.evidence_view is not None and (

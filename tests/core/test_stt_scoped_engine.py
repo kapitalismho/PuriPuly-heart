@@ -65,7 +65,7 @@ class ControlledScopedSession:
     calls: list[tuple[object, ...]]
     terminal_on_seal: tuple[str, str] | None = None
     allows_sealed_turn_overlap: bool = False
-    native_terminal_callbacks: dict[STTProviderTurnIdentity, Any] = field(default_factory=dict)
+    native_event_callbacks: dict[STTProviderTurnIdentity, Any] = field(default_factory=dict)
 
     def __init__(self) -> None:
         self.buffer = STTProviderEventBuffer()
@@ -79,12 +79,12 @@ class ControlledScopedSession:
         self.calls = []
         self.terminal_on_seal = None
         self.allows_sealed_turn_overlap = False
-        self.native_terminal_callbacks = {}
+        self.native_event_callbacks = {}
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         self.requests.append(request)
-        if request.on_native_terminal is not None:
-            self.native_terminal_callbacks[request.identity] = request.on_native_terminal
+        if request.on_native_event is not None:
+            self.native_event_callbacks[request.identity] = request.on_native_event
         self.calls.append(("begin", request.identity))
         await self.begin_gate.wait()
         self.calls.append(("begin_done", request.identity))
@@ -136,7 +136,7 @@ class ControlledScopedSession:
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
         self.calls.append(("abort", identity, reason))
-        self.native_terminal_callbacks.pop(identity, None)
+        self.native_event_callbacks.pop(identity, None)
 
     async def turn_events(self):
         async for event in self.buffer.events():
@@ -148,13 +148,17 @@ class ControlledScopedSession:
     async def close(self) -> None:
         self.calls.append(("close",))
         self.buffer.close()
-        self.native_terminal_callbacks.clear()
+        self.native_event_callbacks.clear()
 
     def emit(self, event: object) -> bool:
         observer = (
-            self.native_terminal_callbacks.pop(event.identity, None)
+            self.native_event_callbacks.pop(event.identity, None)
             if isinstance(event, STTProviderTurnTerminal)
-            else None
+            else (
+                self.native_event_callbacks.get(event.identity)
+                if isinstance(event, STTProviderTurnUpdate)
+                else None
+            )
         )
         try:
             if observer is not None:

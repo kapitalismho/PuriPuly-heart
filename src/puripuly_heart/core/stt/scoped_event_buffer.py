@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 
 from puripuly_heart.core.stt.backend import (
     STTProviderAudioBoundary,
@@ -24,10 +24,18 @@ class STTProviderEventBuffer:
     MAX_EVENTS = 256
     MAX_RECOGNITION_BYTES = 1024 * 1024
 
-    def __init__(self, *, max_events: int = MAX_EVENTS) -> None:
+    def __init__(
+        self,
+        *,
+        max_events: int = MAX_EVENTS,
+        on_discard: (
+            Callable[[STTProviderTurnEvent, tuple[STTProviderTurnEvent, ...]], None] | None
+        ) = None,
+    ) -> None:
         if max_events <= 0 or max_events > self.MAX_EVENTS:
             raise ValueError(f"max_events must be between 1 and {self.MAX_EVENTS}")
         self._max_events = max_events
+        self._on_discard = on_discard
         self._events: deque[STTProviderTurnEvent] = deque()
         self._recognition_bytes = 0
         self._wake = asyncio.Event()
@@ -44,34 +52,53 @@ class STTProviderEventBuffer:
         return self._max_events
 
     def put(self, event: STTProviderTurnEvent) -> bool:
+        on_discard = self._on_discard
         if self._closed:
+            if on_discard is not None:
+                on_discard(event, tuple(self._events))
             raise STTProviderEventBufferClosed("provider event buffer is closed")
+        discarded: list[STTProviderTurnEvent] | None = [] if on_discard is not None else None
+        accepted = self._put(event, discarded)
+        if discarded is not None and on_discard is not None:
+            if not accepted:
+                discarded.append(event)
+            if discarded:
+                retained_events = tuple(self._events)
+                for discarded_event in discarded:
+                    on_discard(discarded_event, retained_events)
+        return accepted
+
+    def _put(
+        self,
+        event: STTProviderTurnEvent,
+        discarded: list[STTProviderTurnEvent] | None,
+    ) -> bool:
         epoch_id = _event_epoch_id(event)
         if epoch_id in self._retired_epochs:
             return False
         size = _recognition_bytes(event)
         if size + self._recognition_bytes > self.MAX_RECOGNITION_BYTES:
-            self._fail_epoch(epoch_id)
+            self._fail_epoch(epoch_id, discarded)
             return False
         if isinstance(event, STTProviderAudioBoundary) and len(self._events) >= self._max_events:
             return False
         if _is_provisional_snapshot(event):
-            self._remove_matching_provisional_snapshots(event)
+            self._remove_matching_provisional_snapshots(event, discarded)
         if len(self._events) >= self._max_events:
-            self._discard_provisional_snapshots_until_room()
+            self._discard_provisional_snapshots_until_room(discarded)
         if len(self._events) >= self._max_events:
             if isinstance(event, STTProviderTurnUpdate) and event.stability == "provisional":
                 return False
             if isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal)):
-                self._fail_scoped_turn(event)
+                self._fail_scoped_turn(event, discarded)
                 return False
             if isinstance(
                 event, (STTProviderInputTerminal, STTRecognitionUnit, STTRecognitionUnitTerminal)
             ):
-                self._fail_epoch(epoch_id)
+                self._fail_epoch(epoch_id, discarded)
                 return False
             if isinstance(event, STTProviderEpochEnded):
-                return self._append_retirement(event, event.provider_epoch_id)
+                return self._append_retirement(event, event.provider_epoch_id, discarded)
         self._events.append(event)
         self._recognition_bytes += size
         self._wake.set()
@@ -104,21 +131,32 @@ class STTProviderEventBuffer:
             except STTProviderEventBufferClosed:
                 return
 
-    def _remove_matching_provisional_snapshots(self, incoming: STTProviderTurnUpdate) -> None:
-        self._events = deque(
-            event
-            for event in self._events
-            if not (_is_provisional_snapshot(event) and event.identity == incoming.identity)
-        )
+    def _remove_matching_provisional_snapshots(
+        self,
+        incoming: STTProviderTurnUpdate,
+        discarded: list[STTProviderTurnEvent] | None,
+    ) -> None:
+        retained: deque[STTProviderTurnEvent] = deque()
+        for event in self._events:
+            if _is_provisional_snapshot(event) and event.identity == incoming.identity:
+                if discarded is not None:
+                    discarded.append(event)
+            else:
+                retained.append(event)
+        self._events = retained
         self._recognition_bytes = sum(_recognition_bytes(event) for event in self._events)
 
-    def _discard_provisional_snapshots_until_room(self) -> None:
+    def _discard_provisional_snapshots_until_room(
+        self, discarded: list[STTProviderTurnEvent] | None
+    ) -> None:
         retained: deque[STTProviderTurnEvent] = deque()
         removed = False
         while self._events:
             event = self._events.popleft()
             if not removed and _is_provisional_snapshot(event):
                 removed = True
+                if discarded is not None:
+                    discarded.append(event)
                 continue
             retained.append(event)
         self._events = retained
@@ -127,6 +165,7 @@ class STTProviderEventBuffer:
     def _fail_scoped_turn(
         self,
         event: STTProviderTurnUpdate | STTProviderTurnTerminal,
+        discarded: list[STTProviderTurnEvent] | None,
     ) -> None:
         identity = event.identity
         self._append_retirement(
@@ -139,25 +178,36 @@ class STTProviderEventBuffer:
                 is_current=event.is_current,
             ),
             identity.provider_epoch_id,
+            discarded,
         )
 
-    def _fail_epoch(self, epoch_id: str) -> None:
+    def _fail_epoch(self, epoch_id: str, discarded: list[STTProviderTurnEvent] | None) -> None:
         self._append_retirement(
             STTProviderEpochEnded(epoch_id, orderly=False, reason="provider_event_buffer_overflow"),
             epoch_id,
+            discarded,
         )
 
-    def _append_retirement(self, event: STTProviderTurnEvent, epoch_id: str) -> bool:
-        retained = deque(
-            queued
-            for queued in self._events
-            if not (
-                _event_epoch_id(queued) == epoch_id
-                and isinstance(queued, (STTProviderTurnUpdate, STTProviderAudioBoundary))
-            )
-        )
+    def _append_retirement(
+        self,
+        event: STTProviderTurnEvent,
+        epoch_id: str,
+        discarded: list[STTProviderTurnEvent] | None,
+    ) -> bool:
+        retained: deque[STTProviderTurnEvent] = deque()
+        removed: list[STTProviderTurnEvent] | None = [] if discarded is not None else None
+        for queued in self._events:
+            if _event_epoch_id(queued) == epoch_id and isinstance(
+                queued, (STTProviderTurnUpdate, STTProviderAudioBoundary)
+            ):
+                if removed is not None:
+                    removed.append(queued)
+            else:
+                retained.append(queued)
         if len(retained) >= self._max_events + 1:
             return False
+        if discarded is not None and removed is not None:
+            discarded.extend(removed)
         self._events = retained
         self._events.append(event)
         self._recognition_bytes = sum(_recognition_bytes(queued) for queued in self._events)

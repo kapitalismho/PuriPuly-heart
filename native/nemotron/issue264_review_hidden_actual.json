@@ -1,0 +1,51 @@
+{
+  "RESULT": "repair_verified",
+  "DOMAIN": "E5 actual hidden-to-readable closure at recorded candidate e4e85c093a03013f60346680eadbd168c7dbdef6, using previously reviewed caption3ce1… and launcher7ca24…. Streaming product FULL_REVIEW is excluded.",
+  "assessment": "The corrected one-case actual observation closes E5. Processed output remained genuinely hidden before reveal; first readability and the one-second window began at reveal; one bounded in-place assignment followed. The original caption02 false-positive remains historical and is not relabelled.",
+  "decisive_evidence": {
+    "durable_report": "native/nemotron/issue264_validation_hidden_actual.json",
+    "durable_report_sha256": "ee8b07b437d82161e8cf6d70848af4a00f66b47bf043b04477b381a7ee06ac7f",
+    "original_local_summary": "build/issue264-validation-streaming-after-hidden-01/e5_actual_summary.json",
+    "local_summary_sha256": "a80f10e677502b67dcbce5fcc1c4ae516c3fa141df7cb4dd74fd941c15d8e19b",
+    "raw_records": "Same directory: caption.json, isolation.json and execution_sources.zip; all recorded hashes independently matched. Durable report preserves every original local-summary field exactly and adds only provenance/Director inspection metadata."
+  },
+  "COVERAGE": [
+    {
+      "item": "Exact execution candidate, task/helpers and instance",
+      "status": "verified",
+      "basis": "All 585 archived product sources match recorded manifests and exact e4e85 Git blobs. Archived launcher/runtime/caption/summary and three fixture-helper hashes match the declared execution. File-backed imports resolve under checkout src. No moving product code was imported or exercised by this reviewer."
+    },
+    {
+      "item": "Processed sustained hidden interval",
+      "status": "verified from original records and inspected pixels",
+      "basis": "The real output-processing barrier completed before measurement. Twenty checkpoints retain empty blocks and absent first-readable/source/owner deadlines. Hidden duration was1.116260s, with another clean post-photo check at1.425822s. No nonempty outgoing snapshot preceded reveal. Independently inspected protected hidden image contains checkerboard only, with valid owned uncloaked before/after visibility."
+    },
+    {
+      "item": "Reveal-time clock and bounded assignment",
+      "status": "verified",
+      "basis": "First readability148661.1969367 falls within reveal request/completion[148661.1968446,148661.1998949]. Every readable public authority record retains deadline=first_readable+1.000s. Synthetic proof arrives only afterward. Exactly one settled assignment revision/resolution is recorded, with proof claims released."
+    },
+    {
+      "item": "Application timing versus software pixels",
+      "status": "verified with distinct boundaries",
+      "basis": "Authority resolution delay310.813ms; style snapshot submission310.957ms; qualified gold software-readback upper bound680.515ms. Logical assignment is within500ms; gold pixels are observed within1s, not claimed within500ms or as photon onset."
+    },
+    {
+      "item": "In-place card/content/TTL and visible gray→gold",
+      "status": "verified",
+      "basis": "Independent original-snapshot comparison finds only speaker_style gray→gold and card_revision1→2 changed. Card id, text source107, placement/order/appearance and expiration148669.1968529 are unchanged. Independently inspected commit1 gray and commit2 gold match that sequence. Both automatic readbacks qualify; zero invalid automatic readbacks. All three blank/gray/gold image hashes and owned visibility/revision safeguards match their records."
+    },
+    {
+      "item": "One-case inventory, controlled boundaries and cleanup",
+      "status": "verified",
+      "basis": "Exactly hidden_reveal requested/executed; full-ten completion=false. This uses synthetic metadata and the actual SystemClock/OutputRuntime/presenter/Flet path, not acoustic identity or translation inference. Model/translation/cloud calls=0. Exit0, no policy or renderer errors, owned children reaped, temporary roots removed and product sources unchanged."
+    },
+    {
+      "item": "Historical separation and unaffected coverage",
+      "status": "retained",
+      "basis": "Original caption02 still contains the premature readable gold hidden_before_reveal and its ten original assertion statuses. Original matrix6670/a960 is not rescued or rewritten. E1–E4 closure, nine other caption boundaries and prior matrix evidence carry forward within their already stated limits."
+    }
+  ],
+  "verification_performed": "Read-only original-record, archive/Git-object and saved-image inspection, plus offline hash/timing/conservation/inventory comparisons. No GUI/model/cloud/VR rerun, credential access, product review, file mutation or Git mutation.",
+  "limits_and_handoff": "This verifies the repaired E5 boundary only. It does not qualify synthetic slot0 as acoustic accuracy, prove TTL-expiry photography, complete the newer streaming repairs, select a profile or grant terminal/remote acceptance. GPU and four native-tape execution remain subject to their separate review/readiness gate. Director may integrate this separately identified E5 closure into the forthcoming final evidence/docs pin."
+}

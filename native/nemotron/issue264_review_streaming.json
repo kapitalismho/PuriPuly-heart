@@ -1,0 +1,261 @@
+{
+  "RESULT": "findings",
+  "DOMAIN": "Fresh independent focused FULL_REVIEW of streaming mapping, proof projection, lexical composition, replay qualification and interacting source-admission/lifecycle paths",
+  "range": {
+    "baseline": "09b938803a7c45c332547b7c81afc6a862bd2270",
+    "candidate": "e4e85c093a03013f60346680eadbd168c7dbdef6",
+    "original_goal_baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+    "checkout_observed": "e4e85c093a03013f60346680eadbd168c7dbdef6",
+    "authority": [
+      "https://github.com/kapitalismho/PuriPuly-heart/issues/264",
+      "https://github.com/kapitalismho/PuriPuly-heart/issues/211"
+    ],
+    "independence": "Initial assessment came from authority, the exact product/test/documentation diff, definitions and consumers before consulting implementation reports or prior review conclusions."
+  },
+  "summary": "Assigned focused coverage is complete. Four supported P2 findings remain: the authoritative frontier can freeze after queued-final input progress; native-task mappings bypass that frontier; replacing an ASR wrapper turns missing replay history into new support; and output-buffer rejection orphans the new part claims. Positive lexical/source conservation and ordinary adopted-claim retirement paths are supported by inspected code and the recorded focused evidence. This is not terminal Goal acceptance.",
+  "findings": [
+    {
+      "id": "SR1",
+      "severity": "P2",
+      "title": "An already-emitted authoritative final can acquire a later successful-input frontier before the consumer processes it",
+      "violated_contract": "#264 R1/R2 and the declared frontier repair: later PCM must not retrospectively make an own-final overhang valid. Unreleased candidates may progress; authoritative releases may not.",
+      "locations": [
+        "src/puripuly_heart/core/stt/streaming_speaker.py:119-161 — input mutation holds the same lock used by the result consumer",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:282-289 — freezes self.sent_until when processing the event",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:1008-1017 — dequeues the event and only then acquires the lock/freezes timing",
+        "src/puripuly_heart/providers/stt/deepgram.py:269-280,808-820 — native final construction and subsequent successful input writes are distinct events"
+      ],
+      "reachable_conditions_and_impact": "A final with end 0.6000003 s is emitted after 9600 samples, then another input write completes before the wrapper consumer acquires its lock. The final freezes at 11200 rather than its earlier successful-input boundary and its previously invalid coarse interval maps through sample 9601. This can widen the immutable source/proof footprint to input unavailable at the final instead of retaining the qualified word fallback.",
+      "decisive_executed_evidence": {
+        "check": "Authoritative-frontier scheduling probe; isolated synthetic Provider, production StreamingSpeakerSession, no inference/provider service",
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver>",
+        "outcome": "Exit 0. With final processed before later input: frozen frontiers [9600,9600,9600], source [[1600,8000]]. With the identical final queued before later input but processed afterward: frozen frontiers [11200,11200,11200], source [[0,9600],[9600,9601]]. The native event retained sent_until_sample=9600 in both cases."
+      },
+      "counterevidence_and_limits": [
+        "The existing test at tests/core/test_issue264_streaming_repair.py:786-828 correctly prevents healing after the final has already been consumed. It does not cover input progress between native publication and consumer processing.",
+        "The unreleased-candidate control retained no frozen frontiers and lawfully used the expanded input; that positive behavior must remain.",
+        "Provider sent_until_sample is not automatically a replacement authority merely because this probe supplies it accurately. The finding is the missing event-time successful-input fence, not a recommendation to trust arbitrary diagnostic fields.",
+        "Scheduling was controlled. No incidence, cloud timing or acoustic consequence was measured."
+      ]
+    },
+    {
+      "id": "SR2",
+      "severity": "P2",
+      "title": "Native-task coverage can heal a frozen authoritative interval because its mapping branch never checks the frontier",
+      "violated_contract": "The same authoritative-frontier invariant applies to native-task correspondence as to stream clocks. A later sentence's successful input cannot validate an older final's overhang.",
+      "locations": [
+        "src/puripuly_heart/core/stt/streaming_speaker.py:207-227 — unions native coverage by task across origins",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:232-280 — native mapping has no timing-frontier check",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:296-298 — returns through native mapping before the stream-clock check at 323-327",
+        "src/puripuly_heart/providers/stt/qwen_audio.py:749-767,883-919 — later sentence origins contribute later task coverage"
+      ],
+      "reachable_conditions_and_impact": "An authoritative first sentence has a coarse interval ending one sample beyond its then-submitted native coverage. After a second sentence contributes adjacent coverage for the same task, the task-wide union makes the old coarse interval mappable even though its timing_frontiers entry remains 9600. The wrapper can then create a new claim for the older contribution using the later input.",
+      "decisive_executed_evidence": {
+        "check": "Two-sentence native-task coverage probe using separate, unchanged first-sentence and later-sentence origins",
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver>",
+        "outcome": "Exit 0. First old contribution: bounds [[0,9600]], claim null. After a later sentence adds coverage [9600,11200): old contribution bounds [[0,9600],[9600,9601]], claim_present true. Frozen frontiers remained [9600,9600,9600,11200]. Received text was exactly 'One two. More.'."
+      },
+      "counterevidence_and_limits": [
+        "The first sentence used incomplete lexical-boundary flags, matching the conservative native-word case: no complete-word fallback was claimed before later coverage arrived.",
+        "The stream-clock branch does enforce its frozen cursor after consumption; this finding is specifically the early native-task dispatch.",
+        "The existing stream_clock/native_task subword tests exercise complete enclosure, invalid intervals and foreign gaps, but not later coverage from another sentence repairing an older authoritative interval.",
+        "This is a deterministic native-origin composition check, not an actual hosted Qwen call."
+      ]
+    },
+    {
+      "id": "SR3",
+      "severity": "P2",
+      "title": "Ordinary wrapper replacement treats missing prior input history as proof that replayed context is genuine onset",
+      "violated_contract": "#264 R1/R2 and the declared replay mechanism: replay qualification is capture-scoped; missing ownership cannot establish new support; ordinary ASR retirement is not a capture/speaker reset.",
+      "locations": [
+        "src/puripuly_heart/core/stt/streaming_speaker.py:61-68,109-116 — each replacement starts a fresh sent cursor/map and turn fence",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:351-360 — an empty prior-occurrence tuple makes all context unique",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:1087-1092 — clears occurrence maps while preserving the externally owned evidence view",
+        "src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py:128,174-192 — each provider connection gets a fresh wrapper over the same capture evidence owner",
+        "src/puripuly_heart/core/stt/scoped_engine.py:2500-2577 — ordinary provider retirement permits replacement independently of speaker/capture lifetime"
+      ],
+      "reachable_conditions_and_impact": "Previously submitted [0,4800) is replayed as context in a successor turn. Keeping the wrapper correctly excludes it from unique support. Closing/replacing only the ASR wrapper loses those occurrences, so the same context becomes primary support and can turn an otherwise uncertain source into an established identity. Its late pin repeats the same incorrect footprint.",
+      "decisive_executed_evidence": {
+        "check": "Same-capture, same-evidence replay control with and without producer-wrapper retirement",
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver>",
+        "outcome": "Exit 0. Same wrapper: 'A. ' uncertain, primary [[4800,5440]], replayed [[0,4800]]. Replacement wrapper sharing the same evidence owner: 'A. ' identified as 0, primary [[0,4800],[4800,5440]], replayed []. In both controls the legitimate adjacent 'No.' remained identified as 1 and all text was preserved."
+      },
+      "counterevidence_and_limits": [
+        "The new tests correctly cover full/partial replay, genuine first onset, main-source retries, different capture epochs, pruned history, unmapped history and non-prefix context within one wrapper.",
+        "The missing-history and pressure guards only recognize a gap in the current wrapper's retained map; a new wrapper starts at zero and passes those guards.",
+        "A main/source retry must remain eligible as required. This finding concerns context-only replay whose previous occurrences became unreachable through ASR lifetime replacement.",
+        "No new history/cache design is prescribed. A conservative unavailable disposition when capture history is unknown would avoid fabricating new support; any ownership integration must retain the assignment's bounded-state constraints."
+      ]
+    },
+    {
+      "id": "SR4",
+      "severity": "P2",
+      "title": "The wrapper marks part pins transferred before buffer admission and never reclaims them when the buffer rejects the terminal",
+      "violated_contract": "#264 R1 and the declared parent/part lifecycle: unused or rejected claims must be released, while genuinely adopted presentation claims survive ordinary producer retirement.",
+      "locations": [
+        "src/puripuly_heart/core/stt/streaming_speaker.py:751-773 — transferred tokens are exempted from producer cleanup",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:891-909,919-927 — marks part/parent pins transferred during annotation",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:1043-1060 — releases producer state, then ignores output-buffer put rejection",
+        "src/puripuly_heart/core/stt/scoped_event_buffer.py:60-67,127-142,150-166 — overflow substitutes a failed terminal without the rejected source_audio claims",
+        "src/puripuly_heart/core/speaker/evidence.py:61-73,88-95 — leaked claims consume the shared 128-proof bound"
+      ],
+      "reachable_conditions_and_impact": "If the wrapper's result buffer is full when an annotated No/He terminal is queued, the parent and two part tokens have already been marked transferred. Overflow produces a failure without source_audio, the turn is gone, and neither downstream enumeration nor producer close can identify and release the rejected claims. They remain until unrelated evidence pruning/reset and consume shared late-resolution capacity.",
+      "decisive_executed_evidence": {
+        "check": "Bounded result-buffer rejection with the configured capacity reduced to one for a minimal deterministic pressure case",
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver>",
+        "outcome": "Exit 0. Observed failed terminal with reason provider_event_buffer_overflow and zero source_audio entries. Three claims remained, all stage='request', with zero live turns. All three still remained after producer close over the shared view."
+      },
+      "counterevidence_and_limits": [
+        "Successful Peer admission finally-cleanup, explicit sink rejection/cancellation, future-part repinning and adopted-source survival are correctly addressed by this delta and its focused tests.",
+        "The parent-token exposure predates this delta; the two new part tokens now inherit the same rejected-transfer hole. This finding specifically concerns completion of the new part lifecycle, not a request for general queue redesign.",
+        "The initial pressure-driver attempt accidentally drained its prefill before the consumer queued the terminal and did not exercise overflow. It was retained as an invalid pressure observation; the corrected scheduling produced the failure and leak above.",
+        "The shared view is bounded, so this is retained-capacity debt, not an unbounded-memory claim. The probe explicitly reset its isolated view during cleanup."
+      ]
+    }
+  ],
+  "COVERAGE": [
+    {
+      "item": "Authority, scope exclusions and exact checkpoint",
+      "status": "inspected",
+      "basis": "Read both required skills, AGENTS.md, #264, current #211 R5 amendment, architecture map, exact baseline-to-candidate diff and candidate HEAD. No profile optimum, final Goal acceptance or reopening of accepted Parakeet omissions was inferred."
+    },
+    {
+      "item": "All eight product files and interacting callers/consumers",
+      "status": "inspected",
+      "basis": "Reviewed the complete delta in backend, streaming_speaker, recognition_units, scoped_normalizer, scoped_engine, peer_translation_channel, translation_turn and models; followed evidence ownership, provider timing producers, factory routing, source construction, assignment adoption and ordinary retirement."
+    },
+    {
+      "item": "Valid coarse mappings and unusable-coarse complete exact word fallback",
+      "status": "inspected",
+      "basis": "Valid coarse mapping remains first in _annotate. Word fallback requires exact text coverage, complete word boundaries, one clock/unit, finite monotonic intervals, individually mapped words and the full first-to-last audio enclosure. Foreign interword audio is retained. SR1/SR2 identify frontier exceptions, not permission to clamp or change rounding."
+    },
+    {
+      "item": "Coarse-absent character/subword whole-span behavior",
+      "status": "inspected",
+      "basis": "_interval_enclosure validates complete text coverage and every mapped interval before mapping the enclosure; non-word fine attribution uses that same enclosure. Character/subword/token evidence does not establish new lexical cuts. Reviewed both stream-clock/native-task positives and incomplete/NaN/unqualified/foreign-gap negatives."
+    },
+    {
+      "item": "Authoritative frontier versus lawful unreleased progress",
+      "status": "inspected",
+      "basis": "Existing consumed-final freeze and pending-candidate progress are preserved in the ordinary stream-clock schedule. Original scheduling and later-native-sentence probes establish SR1/SR2; existing tests can pass while those cases remain broken."
+    },
+    {
+      "item": "Unique confirmed uncertainty-band lexical junction and adjacent positive witnesses",
+      "status": "inspected",
+      "basis": "Followed complete native-word correspondence, same contribution/clock/unit, whitespace-only separator, unique in-band junction, full band coverage, epoch/discontinuity fences, overlap/third-slot rejection and positive adjacent clear witnesses. Confirmed transitions remain the unchanged shared native-frame rule; ambiguity is not forced identity."
+    },
+    {
+      "item": "Immutable source admission, bounded part projection and unchanged parent provenance",
+      "status": "inspected",
+      "basis": "STTSpeakerAudioPart creation is capped at 128; projection validates contiguous contribution coverage, integer bounds, nonempty positive contained ranges and source/context roles. Sliced origins carry selected footprints before SourceChild construction. Malformed parts remove claims conservatively without rewriting text or mutating parent/native provenance."
+    },
+    {
+      "item": "Committed boundary marker through normalization, slicing and coalescing",
+      "status": "inspected",
+      "basis": "Reviewed _annotate marker creation, normalizer merge guard/preservation, speaker-only sliced_runs handling and _final_transcript_segments merge fencing. The clear and two-gray No/He cases preserve distinct source/context/translation units. Confidence-only changes do not set markers; language-run slicing remains separate."
+    },
+    {
+      "item": "Pin publication, source adoption, future-part repin and unused/rejected/cancelled cleanup",
+      "status": "inspected",
+      "basis": "Parent/part tokens are enumerated and deduplicated; Peer finally cleanup preserves source-stage claims and releases unused parent/future claims; _proof_for repins missing future footprints. Direct/deferred sink cancellation cleanup is present. SR4 identifies the earlier wrapper-buffer rejection hole before those owners can see the claims."
+    },
+    {
+      "item": "Ordinary producer retirement and adopted presentation ownership",
+      "status": "inspected",
+      "basis": "Shared-view wrapper close does not reset adopted claims; source settlement, expiry, cancellation/reset and retirement retain their existing ownership. Reviewed the recorded returning-prefix late-claim case and partial-release lifecycle tests. SR3 concerns input-occurrence lifetime, not destruction of adopted presentation tokens."
+    },
+    {
+      "item": "Replay eligibility, partial overlap, epochs, retries and missing history",
+      "status": "inspected",
+      "basis": "Within one wrapper, prior successful capture occurrences are partitioned at turn.sent_start; source/main retries remain unique, full and partial context overlap is replay, capture epochs separate correspondence, pruned/unmapped history is unavailable and late/non-prefix context invalidates mapping. SR3 covers the missing cross-wrapper lifetime case."
+    },
+    {
+      "item": "Historical attribution and late presentation footprint consistency",
+      "status": "inspected",
+      "basis": "_attribute_ranges and _proof_for both call _proof_ranges, including narrowed parts. Original replay controls observed matching classifier/pin distinctions. That shared use also propagates SR3's mistaken new-support qualification into late claims."
+    },
+    {
+      "item": "Legacy empty-part batch and SELF callers",
+      "status": "inspected",
+      "basis": "Empty parts preserve the original parent-token enumeration/projection. Batch policy is unchanged; new markers default false. Factory routes SELF directly without a speaker wrapper; translation segmentation uses split_speakers only for Peer, preserving SELF protection. Reviewed shared engine cleanup and source/context consumers rather than assuming the complete batch workflow was unchanged."
+    },
+    {
+      "item": "Altered provider fixtures/tests and retained promises",
+      "status": "inspected",
+      "basis": "The two provider fixtures now expand actual temporal frames for positive confirmation and add explicit unconfirmed single-frame negatives. Original exact text, punctuation, source/translation count, speaker and duplicate/terminal conservation assertions remain; this is not a weakened short-turn or phrase-preservation guarantee."
+    },
+    {
+      "item": "Prior F1–F5 coverage",
+      "status": "supported_by_prior_evidence",
+      "basis": "After the independent initial assessment, read issue264_review_product.json and issue264_repair_review_product.json. Retain their bounded repair closure for batch one-time actuation, native-frame corroboration, overflow metadata, certified omitted quiet and logical-application expiry. Their evidence does not substitute for this review of new mapping/part/replay mechanisms."
+    },
+    {
+      "item": "Thresholds, batch algorithm, evidence/presenter ownership, profiles and wire",
+      "status": "inspected",
+      "basis": "No delta changes those owners, numeric probability/ambiguity/confirmation thresholds, profile geometry or wire 16. Followed their relevant interfaces and reused unaffected prior coverage; did not propose tuning or a new cache/model."
+    },
+    {
+      "item": "Architecture and maintained plan fidelity",
+      "status": "inspected",
+      "basis": "New guidance accurately separates controlled reconstruction from actual qualification and documents immutable parts/markers. Its unconditional frontier/replay-history/disposal claims are not fully implemented under SR1–SR4."
+    },
+    {
+      "item": "New controlled evidence and archived before/after reconstruction",
+      "status": "inspected",
+      "basis": "Read issue264_streaming_repair.json after initial assessment, including executable driver, original coordinates, retained invalid/failed attempts, three meaningful frozen-archive before failures, final four-case results, proof-availability events and final 570-pass record. Its controlled boundaries exclude new inference and GUI qualification."
+    },
+    {
+      "item": "New GPU/native-tape/hidden-reveal actual validation",
+      "status": "unverified",
+      "basis": "The separately pending one GPU + four native tapes + corrected hidden-reveal observations were not executed or treated as a code-review failure solely for being pending. The b98 matrix remains before evidence for this delta; no final Goal/profile acceptance is claimed."
+    }
+  ],
+  "executed_checks": {
+    "environment": "Candidate checkout, isolated short-lived Python subprocesses with -B/PYTHONDONTWRITEBYTECODE and temporary APPDATA/LOCALAPPDATA/XDG_CONFIG_HOME. Synthetic event providers only; no actual model, GPU, GUI, cloud, VR or provider-service execution.",
+    "commands": "Each original probe used .venv/Scripts/python.exe -B - with an inline driver retained in this review's tool transcript. No repository test/product/docs files were created or edited.",
+    "outcomes": [
+      {
+        "check": "Authoritative final scheduling with processed-before-input, queued-before-input and unreleased-candidate controls",
+        "outcome": "Exit 0; established SR1 while retaining lawful candidate progress."
+      },
+      {
+        "check": "Native-task later-coverage probe",
+        "outcome": "Exit 0; first fallback [1600,8000] later widened to [0,9601] despite an earlier frozen frontier. A subsequent stronger two-distinct-sentence probe avoided replacing the first sentence's native metadata and independently established SR2."
+      },
+      {
+        "check": "Two-distinct-sentence native coverage composition",
+        "outcome": "Exit 0; old authoritative contribution gained a claim using sample 9601 after the later sentence arrived; exact text conserved."
+      },
+      {
+        "check": "Replay with same wrapper versus ordinary producer-wrapper retirement",
+        "outcome": "Exit 0; uncertain versus identified-A difference came solely from lost input history; adjacent No remained identified and text was conserved."
+      },
+      {
+        "check": "Initial pressure observation",
+        "outcome": "Exit 0 but invalid as overflow evidence: the reporting consumer drained the prefill too soon. Not counted as a product pass or failure."
+      },
+      {
+        "check": "Correctly scheduled bounded-buffer rejection",
+        "outcome": "Exit 0; failed overflow terminal had no claim metadata, while parent plus two unadopted part claims survived producer close."
+      }
+    ],
+    "cleanup": "All created subprocesses completed; wrapper tasks were closed; temporary user-data directories were removed. The pressure probe reset only its isolated shared view. No Git/index/history/GitHub/docs/product mutations were performed."
+  },
+  "evidence_reused": {
+    "new_streaming_record": "native/nemotron/issue264_streaming_repair.json: recorded final 570 passed, 213 warnings, zero skips/failures across 11 affected modules; 10 changed Python files passed Ruff/Black. These were inspected/reused, not rerun or relabeled as reviewer executions.",
+    "controlled_reconstruction": "The same record retains three meaningful frozen-archive before failures and passing reconstructed four-case after evidence: 16 source/context/translation units, exact supplied native text, bounded cleanup and returning-prefix proof availability at +174/+187 ms. Those are controlled reconstruction/availability claims, not new presentation latency or inference.",
+    "historical_actual": "The b98 actual matrix remains historical before evidence. Its failures, recognition insertions/rollover repetitions, gray tails and invalid original hidden-reveal control are not erased by deterministic tests.",
+    "prior_reviews": "Original F1–F5 findings and their bounded repair_verified disposition remain in their owning records; no prior conclusion was borrowed for the new coupled mechanisms."
+  },
+  "handoff": {
+    "director_action": "Adjudicate SR1–SR4 and allocate repair without changing thresholds, weakening negative controls, suppressing text, inventing lexical cuts or introducing a second history/probability cache.",
+    "broader_allocation_needed": "SR3 needs an explicit decision about input-occurrence continuity versus conservative unknown-history handling across ASR wrapper replacement. SR4 may require a narrow dropped-event ownership/disposal integration with scoped_event_buffer.py, outside the eight-file product inventory; allocate that boundary explicitly rather than silently widening repair scope.",
+    "focused_repair_checks": [
+      "Capture the authoritative successful-input fence before queued-final scheduling can advance it; preserve the pending-unreleased positive control.",
+      "Apply the same first-authoritative fence to native-task coverage, including later sentences that add adjacent input for the same task.",
+      "Distinguish genuine first onset from unknown history after producer replacement, while preserving main-source retries, partial replay and distinct capture epochs.",
+      "Reject/evict an annotated terminal under buffer pressure and release every unadopted parent/part token; retain the adopted-source ordinary-retirement positive case."
+    ],
+    "acceptance_limit": "Independent code review findings only. Integration decisions, repair authorization, actual changed-path validation, evidence acceptance and final Goal acceptance remain with the Director and assigned owners."
+  }
+}
