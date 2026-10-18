@@ -1,0 +1,40 @@
+{
+  "status": "bounded_read_only_pixel_diagnosis_complete",
+  "original_evidence_preserved": true,
+  "delivery_and_rendering": {
+    "established": [
+      "Exact nonempty bilingual source/translation blocks reached the Python DesktopOverlayRenderer through authenticated snapshot ingress. Revisions1–5 were each committed, not stale/superseded: slot/line counts1/2 then2/4, surface_visible=true; revision6 was intentional empty cleanup.",
+      "Revision3 contains cyan Gentlemen plus gray returning-A prefix; revision4 preserves that text/card/order while changing returning-A to gold. Revision5 adds the gray tail. These are correct host-side records, not pixel claims.",
+      "Host dispatch returned without recorded renderer/startup/runtime error. Actual production dispatch_snapshot calls _render_page, updates retained Flet controls and calls page.update()."
+    ],
+    "not_established": "The original record does not prove per-revision patches reached or were applied/painted by the native Flet client. No native-client control-tree/paint acknowledgement or socket-patch/drain trace was captured.",
+    "critical_ACK_semantics": "render_commit_acknowledgement is a diagnostic HOST acknowledgement, not native Flutter paint acknowledgement: issue218_experiment.py:118-126 immediately acknowledges the DiagnosticLocalRendererPort envelope; desktop_overlay.py:3303-3335 waits for that local acknowledgement after dispatch_snapshot returns. Installed Flet page.update synchronously generates patches, but flet_socket_server.py:425-445 queues outbound frames and312-335 asynchronously writes/drains them; those per-revision transport/native application results are absent from this run.",
+    "source_pointers": [
+      "native/nemotron/issue218_experiment.py:179-195",
+      "src/puripuly_heart/ui/desktop_overlay.py:1099-1105,1450-1512,3242-3335",
+      ".venv/Lib/site-packages/flet/controls/page.py:727-762",
+      ".venv/Lib/site-packages/flet/messaging/session.py:594-608",
+      ".venv/Lib/site-packages/flet/messaging/flet_socket_server.py:312-335,425-445"
+    ]
+  },
+  "window_and_capture": {
+    "identity": "Recorded intended native Flet PID42304 matches desktop.pid, owned flet.exe resource identity and every captured overlay PID/HWND18025442. Owned backdrop PID81460/HWND4458784. No wrong/unowned-window evidence.",
+    "client": "Actual verified existing Flet1.0.0 client build758f21506fbb, SHA256 b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28; startup reached native-ready/visible-confirmed and owned process later exited cleanly.",
+    "capture_established": "Exact owned1344×336 client crop [32,32,1376,368], opaque owned checkerboard covers it; foreign_intersection=false. Before/after flags visible=true, iconic=false, cloaked=0; no recovery attempts. Existing helper reasserts only owned z-order, calls DwmFlush and BitBlt with CAPTUREBLT.",
+    "failure": "All five automatic PNGs and final named PNG contain only the checkerboard, zero requested caption pixels. Rev1/2/3/5 retained stable requested revision yet failed pixels; rev4 additionally changed current revision4→5 during capture. No image is rescued by later records.",
+    "limit": "DWM/window flags establish eligible owned windows, not actual caption composition. Existing evidence cannot distinguish dropped/missing native delivery or native painting from a capture/composition limitation. Neither product rendering defect nor capture-only cause is established."
+  },
+  "next_discriminating_control": {
+    "proposal": "One separately authorized NO-MODEL actual Flet replay of this GPU run's exact authoritative revisions1–6, retaining original intervals, blocks/text/styles/cards and using the same qualified owned-window safeguards. No ASR/Nemotron/Gemma/source admission/history inference. Inspect decisive original revision3→4 plus coherent Gentlemen pixels.",
+    "interpretation": "Qualified replay pixels would establish these recorded snapshots can render through the same presentation path without coupled model load; it would not qualify any original invalid image or recover original coupled latency, and would not by itself establish the original cause. If replay remains blank, stop; native-client transport/application versus desktop composition requires separately authorized observation, not another timing retry.",
+    "existing_helper_limit": "issue264_validation_caption_replay.py currently hardcodes the old linguistic_correction/0.64 trace and two snapshots with candidate equality. It cannot replay this run unchanged; requires an explicitly authorized narrow task-only source/case/profile selection adaptation or a separately approved task-local driver."
+  },
+  "actions": {
+    "new_processes": 0,
+    "model_UI_runs": 0,
+    "task_product_edits": 0,
+    "capture_retries": 0,
+    "four_tapes": "Still held briefly, not cancelled/reduced.",
+    "E5": "Unchanged and closed."
+  }
+}

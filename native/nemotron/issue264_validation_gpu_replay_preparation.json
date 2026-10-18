@@ -1,0 +1,75 @@
+{
+  "schema": "issue264-gpu-presentation-replay-preparation-v1",
+  "status": "prepared_frozen_not_executed",
+  "execution_candidate": null,
+  "release_gate": "Director must pin these task bytes and obtain original evidence review before explicitly releasing the single no-model UI control",
+  "scope": "One presentation-only replay of exact original GPU revisions1-6, preserving relative intervals, blocks, text, styles and card identities. No model/cloud/source-admission/translation/history inference or E5 repeat. This is not a retry of the acoustic scenario or recovery of original pixel/timing evidence",
+  "source": {
+    "trace": "build/issue264-validation-streaming-after-gpu-01/trace.json",
+    "trace_sha256": "10f1c8f4fcdb6457231682dafbd91addc0aebf00c4691ca30408420450c15b49",
+    "candidate": "6c826f420205fd748a65431108cceb845da56eab",
+    "case": "distinct_repeated_A_B_A",
+    "profile": "1.04",
+    "revisions": [1, 2, 3, 4, 5, 6],
+    "block_counts": [1, 2, 2, 2, 2, 0],
+    "relative_intervals_s": [0.0, 0.4842814000148792, 1.6080509000166785, 2.244244000001345, 2.3735756000096444, 3.9098609999928158],
+    "preservation": "Original trace, five failed automatic images and failed final image remain untouched; no later control qualifies them"
+  },
+  "task_delta": {
+    "path": "native/nemotron/issue264_validation_caption_replay.py",
+    "before_sha256": "7825c1bfcdfb1f930bd6024324e2907f7121dd3ffeb218d1fb879653620fd116",
+    "after_sha256": "6b1fe0d320ddc8e7f44ecee6dc248952e7de2495d5135e83948eb3a4bb74f888",
+    "selection": "Remove hardcoded old SOURCE/correction selection. Require explicit source trace/hash/candidate/case/profile, preserving old correction0.64 selection through the same explicit interface. The only active caller is the unchanged generic launcher, which already forwards these arguments",
+    "payload": "Replay every selected snapshot, including final clear. Decoder round-trip and all fields except permitted top-level transport revision are checked. GPU source revisions1-6 remain1-6. Original expiration metadata is retained, not reinterpreted as a replayed source TTL test",
+    "timing": "Request original relative submission intervals; record actual intervals separately. No per-snapshot extra wait for pixels, timing-band retry or model execution",
+    "failures": "Failed pixel qualification remains failure; native writer exceptions propagate unchanged; observer errors are separately recorded; cleanup/observer-restore errors preserve the report"
+  },
+  "passive_diagnostics": {
+    "transport": "Observe only the already-owned Flet StreamWriter instance reached through the verified installed Session/FletSocketServer seam. Wrap its original write/drain calls exactly once, preserve results and exceptions, and restore original instance attributes in finally. No global StreamWriter patch or unrelated writer interception",
+    "records": "Actual write return/drain return or failure, host revision correlation, byte length/hash and hashes of public caption strings present in outbound bytes. No raw socket payload or token is published",
+    "boundary_limit": "Socket write/drain and host diagnostic ACK are NOT native client control application, rasterization or paint ACK",
+    "window": "Read-only owned HWND/PID/client and window rectangles, z-order indices, DWM visibility/cloak state, extended style flags and available layered-window alpha/color-key facts. New diagnostics do not activate, reposition, recolor or change opacity of any window; existing protected capture safeguards are reused",
+    "native_prerequisites_limit": "Actual writer attachment and native Win32 facts remain unexercised until the authorized control; static/pure preparation is not a native compatibility result"
+  },
+  "unchanged_isolation": {
+    "launcher_sha256": "7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5",
+    "runtime_sha256": "ae4af00c0d1361ca8d63797971d49865e51fa00daddf3ad4f9b19077475774ed",
+    "controls": "Reuse existing pinned-candidate/source gate, secret scrubbing, task-local temp/appdata, child-local verified FLET_VIEW_PATH, exact temporary non-listening Flet bind exception, loopback-only services and owned-child cleanup. No new provisioning or shared/global settings mutation"
+  },
+  "checks": {
+    "classification": "Pure AST/fixture preparation only, no product imports, sockets, models or GUI",
+    "script": "build/issue264-validation-gpu-replay-prepare-01/check.py",
+    "script_sha256": "3a1f823a5cbd903c875493430a630806eaea055e8585ad2218258d055cf92f5f",
+    "command": ".venv/Scripts/python.exe -B build/issue264-validation-gpu-replay-prepare-01/check.py",
+    "exit_code": 0,
+    "groups_passed": [
+      "Exact real original trace hash; select all six revisions and final clear",
+      "Reject wrong source candidate, duplicate/missing case/profile, intermediate empty output and reordered snapshots",
+      "Old-correction-shaped fixture remains selectable; permit transport-only revision rebasing and reject text/style/card/calibration payload changes",
+      "Explicit source selectors parse through unchanged launcher forwarding interface",
+      "Reject missing readiness, non-task source path, wrong trace hash and wrong source candidate before UI construction",
+      "Only owned writer intercepted; original calls/results/failures retained; instance attributes restored; observer exceptions isolated",
+      "Window diagnostic API surface read-only; original source hash and accepted launcher isolation unchanged; zero product imports"
+    ],
+    "ruff_command": ".venv/Scripts/python.exe -m ruff check native/nemotron/issue264_validation_caption_replay.py build/issue264-validation-gpu-replay-prepare-01/check.py",
+    "ruff_exit_code": 0,
+    "black_command": ".venv/Scripts/python.exe -m black --check native/nemotron/issue264_validation_caption_replay.py build/issue264-validation-gpu-replay-prepare-01/check.py",
+    "black_exit_code": 0,
+    "initial_format_attempt": "Initial Black exit1 affected only throwaway check.py; helper was already unchanged. Initial Ruff and seven behavior groups passed. Applied only displayed fixture formatting changes, then all three final checks passed",
+    "initial_script_sha256": "1569e413e0f5187dc2d58d810c3b07c475498eb5b15fc5fc6a600b3cab43d28c",
+    "initial_archive": "build/issue264-validation-gpu-replay-prepare-01/initial_format_attempt.zip",
+    "initial_archive_sha256": "d55cb94648403a5ed57fe67e4c2778e0db34bf128d2ed4534a59e6cf56a7a44a",
+    "final_sources_archive": "build/issue264-validation-gpu-replay-prepare-01/prepared_sources.zip",
+    "final_sources_archive_sha256": "63e415f00f86c9925cce1c923b47a6b2f7c94959594263027edf21df970e20a9"
+  },
+  "prepared_command_template": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate <DIRECTOR_NEXT_PIN> --probe caption_replay --source-trace build/issue264-validation-streaming-after-gpu-01/trace.json --source-trace-sha256 10f1c8f4fcdb6457231682dafbd91addc0aebf00c4691ca30408420450c15b49 --source-candidate 6c826f420205fd748a65431108cceb845da56eab --source-case distinct_repeated_A_B_A --source-profile 1.04 --output build/issue264-validation-streaming-after-presentation-01",
+  "output_directory": "Confirmed absent during preparation",
+  "after_preparation": {
+    "model_UI_service_runs": 0,
+    "product_or_maintained_docs_or_Git_mutations": 0,
+    "prior_records_rewritten": false,
+    "E5": "Closed, unchanged, no rerun",
+    "four_tapes": "Still required and held only for this presentation prerequisite decision",
+    "stop_rule": "Only one separately released no-model control; if blank, report the discriminating records and stop without a second UI run"
+  }
+}

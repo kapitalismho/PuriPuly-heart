@@ -1,0 +1,165 @@
+{
+  "RESULT": "repair_verified",
+  "DOMAIN": "Bounded SR4-R2 REPAIR_VERIFY plus the explicitly authorized producer private-queue/yield acquisition seam",
+  "range": {
+    "baseline": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+    "candidate": "6c826f420205fd748a65431108cceb845da56eab",
+    "checkout_observed": "6c826f420205fd748a65431108cceb845da56eab",
+    "accepted_finding": "native/nemotron/issue264_review_inflight_handoff.json:SR4-R2",
+    "repair_record": "native/nemotron/issue264_shared_handoff_repair.json",
+    "repair_record_sha256_supplied": "a90876ce2e0e976b7590a31bf251fec7f9381100ab05d862122c401c656ac3fb"
+  },
+  "assessment": "The shared pin now enforces live handoff dependencies across unchanged Peer, provider and engine cleanup calls. The accepted queued extension retains its future-part opportunity; rejected or otherwise unused output is reclaimed after its last dependency ends. Streaming and batch producers acquire custody before private queue admission and retain it through suspended yield delivery, closing the separately confirmed acquisition gap. Source adoption, explicit source retirement and conservative invalidation remain distinct. No remaining material defect was found in the assigned bounded scope; no broader review invalidation is required.",
+  "findings": [],
+  "dispositions": [
+    {
+      "item": "SR4-R2: Peer prefix cleanup deleting an accepted queued extension's future claim",
+      "disposition": "repair_verified",
+      "decisive_locations": [
+        "src/puripuly_heart/core/speaker/evidence.py:99-138",
+        "src/puripuly_heart/core/speaker/evidence.py:355-417",
+        "src/puripuly_heart/core/stt/scoped_engine.py:1714-1727 and delivery/dispatch integration",
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py:491-516 — unchanged cleanup now passes through shared pin authority"
+      ],
+      "basis": "Ordinary request/contribution release sets release_pending while a live handoff remains. Peer finally-cleanup can no longer bypass another owner's dependency. The last ended dependency reclaims an unused pending pin, while adoption changes it to source stage and cancels stale pending unadopted disposal.",
+      "decisive_evidence": "The retained exact original SR4-R2 driver now records both source texts/translations once, applicable part claims present after both admissions, late assignment states identified/identified and keys 0/1, with zero remaining engine handoffs. The stronger accepted-versus-rejected regression also waits for applied assignment metrics and pure-presenter style, rather than only inspecting candidate keys."
+    },
+    {
+      "item": "Authorized producer queue/yield acquisition gap",
+      "disposition": "repair_verified",
+      "decisive_locations": [
+        "src/puripuly_heart/core/stt/streaming_speaker.py:245-251,1144-1207,1222-1233",
+        "src/puripuly_heart/core/stt/batch_speaker.py:312-318,389-425,451-462",
+        "src/puripuly_heart/core/speaker/evidence.py:363-404"
+      ],
+      "basis": "Both wrappers begin shared custody synchronously before the unchanged buffer admits output. Queue removal transfers queued custody to active custody before yield. The generator finally ends that dependency only after downstream resumes/closes it; the engine acquires its own dependency before awaited admission. Rejection/eviction ends only the rejected queued dependency.",
+      "decisive_evidence": "The real streaming regression retains the future He washed token while its annotated native terminal is still in the producer queue and the No. prefix completes real Peer admission. Later terminal delivery preserves exactly two source/context/translation units and applied keys 1/0. Separate streaming/batch controls cover healthy close, private queue, suspended yield, engine acquisition, cancellation and rejected output."
+    },
+    {
+      "item": "Original SR4 wrapper rejection leak and exact SR4-R1 engine-discard closure",
+      "disposition": "retained_verified",
+      "basis": "The shared helper replaces—not duplicates—the engine-only authority. Existing rejected-extension, queued/active aliases, concurrent direct calls, failure/cancellation and abandoned engine-queue tests execute under the centralized pin implementation. The original generic buffer and its policy/API are unchanged."
+    },
+    {
+      "item": "SR1–SR3 and unaffected full-review coverage",
+      "disposition": "retained_verified",
+      "basis": "No change to synchronous native publication fences, own-final native mapping/global occurrence fences, capture/opaque-owner continuity, lexical algorithms, immutable SourceChild projection, presenter deadlines, profiles, numeric thresholds or wire policy. Prior closures remain applicable."
+    }
+  ],
+  "COVERAGE": [
+    {
+      "item": "Immutable range, actual product delta and authority",
+      "status": "inspected",
+      "basis": "Confirmed candidate HEAD and reviewed the complete baseline-to-candidate diff. Four product files and five affected test surfaces match the assigned repair. Read the report's complete relevant mechanism, before-state, migration, failure/recovery, inventory, integration and controlled-smoke fields."
+    },
+    {
+      "item": "Central ordinary release across Peer/provider/engine callers",
+      "status": "inspected",
+      "basis": "Followed unchanged release_unadopted callers into the shared release predicate. Both request and contribution stages defer while held; engine-local retained-token scans and duplicate lifecycle authority are removed."
+    },
+    {
+      "item": "Accepted versus rejected future release",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "tests/core/test_issue264_shared_handoff_repair.py:29-129 uses the real admission lock, normalizer, Peer, translation/context owners and pure presenter. Accepted extension preserves both opportunities; rejected extension preserves only the admitted prefix and reclaims its unused future part. Text, counts, placement and TTL assertions remain meaningful."
+    },
+    {
+      "item": "Producer acquisition before private queue admission",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "All streaming/batch output publications use _put_event. Its hold precedes buffer.put, and the existing discard callback ends only that queued reference. The confirmed No./He producer failure is covered directly without relying on later engine registration."
+    },
+    {
+      "item": "Queue-to-yield-to-engine transfer",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "Shared queued/active counts preserve same-object and distinct-object aliases; activation does not drop/reacquire the pin. Generator finally releases the producer dependency after downstream custody is acquired. Real streaming/batch smoke covers both boundaries."
+    },
+    {
+      "item": "Adoption, last unused release and explicit source retirement",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "Adoption clears pending unadopted disposal. Source-stage ordinary unadopted cleanup is still ignored; explicit source-owner release remains final even with stale event custody. Pending request/contribution claims disappear after the final hold ends."
+    },
+    {
+      "item": "Reset, epoch, release_claims and hard frame pressure",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "Reset/epoch/release_claims clear proofs immediately. Frame-pressure invalidation now directly removes affected pins instead of deferring through ordinary release. Stale handoff endings neither resurrect removed UUIDs nor affect newly pinned replacements."
+    },
+    {
+      "item": "Bounds and cleanup",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "Existing limits remain 2048 frames, 128 pins, 4096 range pieces and unchanged generic queue/byte bounds. Holds add scalar state to those pins; helper records describe current queued/active events only. Reviewed last-alias completion, failure/cancellation, engine abandoned queues, closed producer-generator abandonment and pin-pressure recovery."
+    },
+    {
+      "item": "Healthy close versus explicit abandonment",
+      "status": "inspected; supported_by_recorded_execution",
+      "basis": "Healthy shared-view producer close preserves accepted drainable output. Draining or explicitly abandoning the closed generator ends queued/yielded custody. Engine cleanup still stops/closes the producer before cancelling/joining its consumer. No new wait, timeout or drain policy was added."
+    },
+    {
+      "item": "Affected fixture migrations and preserved guarantees",
+      "status": "inspected",
+      "basis": "Read all migration diffs. Raw queue operations that bypassed custody now use wrapper publication/iteration and real engine delivery. The historical native-final fixture now retains its generator through explicit source adoption, while preserving historical-final immutability, post-close proof survival and later resolution assertions. It is accurately described as a controlled adopting sink; separate regressions exercise real Peer admission."
+    },
+    {
+      "item": "Prior exact SR4-R1 alias and finally coverage",
+      "status": "supported_by_prior_and_recorded_execution",
+      "basis": "The unchanged 22-case module runs against the shared implementation, retaining direct/deferred same/distinct-object alias, success/failure/cancel, dispatcher restart and close protections."
+    },
+    {
+      "item": "Maintained guidance",
+      "status": "inspected",
+      "basis": "Architecture and plan now describe shared pin authority, producer acquisition, pending ordinary disposal and final source/reset/pressure invalidation. They preserve historical findings and separate controlled logical presentation from actual inference/renderer qualification."
+    },
+    {
+      "item": "Worker replacement and evidence provenance",
+      "status": "inspected",
+      "basis": "The interrupted owner's inherited changes were preserved, not restarted or relabelled. The producer BEFORE is explicitly baseline20a plus uncommitted central changes, with its exact hashes/script and failure retained—not a plain20a execution. Final-current integration was performed after the replacement completed custody-fixture migration."
+    },
+    {
+      "item": "SR1–SR3, original SR4, exact SR4-R1 and unaffected full scope",
+      "status": "supported_by_prior_evidence",
+      "basis": "Retain prior closures and full-review coverage outside the changed handoff lifetime mechanism. No unrelated audit, provider policy or acoustic/profile review was reopened."
+    },
+    {
+      "item": "E5 and actual1GPU+4 gate",
+      "status": "not_applicable to bounded code closure; actual gate unverified",
+      "basis": "E5's separate accepted closure is retained. No concrete changed-path invalidation was found. Actual inference/renderer observations remain the Director's separately held gate, not proof supplied by this review."
+    }
+  ],
+  "decisive_evidence": {
+    "original_SR4_R2_before": {
+      "candidate": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+      "source": "Preserved original reviewer observation in the repair record",
+      "outcome": "One / two texts and translations were conserved, but the second late assignment remained unavailable after its future token was deleted.",
+      "qualification": "Known-failing baseline was reused, not rerun."
+    },
+    "producer_before": {
+      "candidate": "20a3872d plus the explicitly inventoried uncommitted central repair",
+      "outcome": "Real streaming terminal's future-part token was missing before producer queue drain; retained test failed at that direct assertion.",
+      "qualification": "Not relabelled as plain20a. Its premature-evidence late-metric fixture issue is distinguished from the valid pre-drain missing-proof observation."
+    },
+    "final_original_driver": {
+      "reference": "native/nemotron/issue264_shared_handoff_repair.json:verification.controlled_smoke.runs[original_SR4_R2_driver_current_bytes]",
+      "outcome": "Exit0; texts/translations One / two conserved; post-admission proof presence [false,true,true]; late states identified/identified; keys0/1; zero engine handoffs."
+    },
+    "producer_and_application_controls": {
+      "reference": "Same record: real_streaming_batch_custody and the two new regression modules",
+      "outcome": "Streaming and batch each preserve one source/translation/context unit across private queue, healthy close, yield and real admission; pure presenter gray→gold at synthetic+250ms with unchanged card/text/appearance/TTL, zero residual pins/holds. The No./He test preserves both late source assignments. Eight closed-abandoned alias smoke controls reclaim unused output while preserving adopted source ownership."
+    }
+  },
+  "verification": {
+    "reviewer_activity": "Read-only pinned diff/source/caller/test/evidence review. No new tests, build, formatter, type checker, model or GUI execution was run by this reviewer in this bounded pass; supplied execution observations were reused rather than rerun to reconfirm them.",
+    "recorded_execution_reused": {
+      "reference": "native/nemotron/issue264_shared_handoff_repair.json:verification.final_integration",
+      "command_scope": "Normal repository configuration across14 affected modules, including shared/producer/in-flight regressions, engine/buffer/cleanup, source/context/translation, prior streaming repairs and batch/streaming paths.",
+      "outcome": "634 passed,211 dependency warnings,0 failed,0 skipped; scoped Ruff passed; Black --check left all9 affected Python files unchanged.",
+      "controlled_smokes": "Two isolated fresh-process smoke runs exited0. Their recorded imported module hashes match the final product inventory; Python networking/process guards recorded no rejected attempts and temporary roots were removed.",
+      "limits": "Controlled native/translation boundaries, synthetic/recorded evidence and FakeClock/pure-presenter snapshots are not actual model, Flet/native renderer, physical latency or full-app qualification."
+    },
+    "preserved_failures": "The record retains original SR4-R2 and intermediate producer failures, initial candidate-versus-applied observation errors, raw-buffer fixture custody mismatch, premature-evidence late-metric mismatch and orphaned temporary-generator fixture failure. Their later fixes preserve the original positive/negative assertions rather than introducing skips or weaker tolerances.",
+    "type_check": "Not run; no type-check claim.",
+    "mutations": "None by this reviewer: no product/tests/docs/Git/index/history/GitHub changes."
+  },
+  "handoff": {
+    "disposition": "Bounded shared-handoff repair is verified at6c826f420205fd748a65431108cceb845da56eab. No remaining repair allocation or broader review is requested from this pass.",
+    "remaining_gate": "The Director may proceed with the separately authorized actual1GPU+4 validation decision. This verdict does not itself authorize execution or establish its outcomes.",
+    "acceptance_limit": "Implementation repair closure only. No final Goal/#264 acceptance, profile optimum, production enablement, publication, push, PR or merge approval is implied."
+  }
+}
