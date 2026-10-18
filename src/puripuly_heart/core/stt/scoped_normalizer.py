@@ -429,6 +429,7 @@ class STTScopedTurnNormalizer:
                 continue
             if (
                 merged
+                and not item.source_boundary_before
                 and merged[-1].speaker_id == item.speaker_id
                 and merged[-1].session_scope == item.session_scope
                 and merged[-1].source == item.source
@@ -444,6 +445,7 @@ class STTScopedTurnNormalizer:
                     overlaps_previous=previous.overlaps_previous or item.overlaps_previous,
                     source=previous.source,
                     attribution_state=previous.attribution_state,
+                    source_boundary_before=previous.source_boundary_before,
                 )
             else:
                 merged.append(item)

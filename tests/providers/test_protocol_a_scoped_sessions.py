@@ -1184,7 +1184,7 @@ async def test_real_soniox_shared_engine_preserves_trailing_token_separator() ->
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("provider_id", ["deepgram", "elevenlabs_scribe"])
-@pytest.mark.parametrize("boundary_case", ["clean", "crossing", "unproven"])
+@pytest.mark.parametrize("boundary_case", ["clean", "crossing", "unproven", "unconfirmed"])
 async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
     provider_id: str,
     boundary_case: str,
@@ -1203,7 +1203,7 @@ async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
         harness_for,
         source_fixture,
     )
-    from tests.core.test_streaming_speaker import evidence, next_text, send, span
+    from tests.core.test_streaming_speaker import evidence, next_text, send, span, temporal_frames
 
     async def write(_session, _payload):
         return None
@@ -1233,12 +1233,15 @@ async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
     try:
         await wrapper.begin_turn(request)
         await send(wrapper, request, 0, 4800, 1)
+        speaker_evidence = (
+            evidence(0, 1600, 0),
+            evidence(1600, 2400, None),
+            evidence(2400, 4800, 1),
+        )
         await wrapper.observe_speaker_evidence(
-            (
-                evidence(0, 1600, 0),
-                evidence(1600, 2400, None),
-                evidence(2400, 4800, 1),
-            )
+            speaker_evidence
+            if boundary_case == "unconfirmed"
+            else temporal_frames(speaker_evidence)
         )
         if provider_id == "deepgram":
             result = _deepgram_result(raw_text, duration=0.28)
@@ -1313,7 +1316,7 @@ async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
         await finish(harness)
         sources = [item.source_child for item in trace.items]
         assert "".join(source.raw_text for source in sources) == raw_text
-        if boundary_case == "unproven":
+        if boundary_case in ("unproven", "unconfirmed"):
             assert len(sources) == 1
             assert sources[0].speaker.speaker_id is None
         else:

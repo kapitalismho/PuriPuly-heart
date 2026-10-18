@@ -86,6 +86,7 @@ class FinalSpeakerRun:
     overlaps_previous: bool = False
     source: str = ""
     attribution_state: SpeakerAttributionState = "unavailable"
+    source_boundary_before: bool = False
 
     @property
     def attribution(self) -> SpeakerAttribution:

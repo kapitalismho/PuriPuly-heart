@@ -1,0 +1,51 @@
+{
+  "RESULT": "repair_failed",
+  "DOMAIN": "E5 bounded pre-execution REPAIR_VERIFY, exact 6670a009d15bfc3431e0c7b8eba201da4bc650ca..09b938803a7c45c332547b7c81afc6a862bd2270.",
+  "assessment": "The task-code/control repair is ready for the bounded one-case no-model observation after the Director supplies the forthcoming product/task pin and explicit readiness. No remaining pre-execution task-code blocker was found. E5 remains OPEN solely because actual corrected hidden/reveal/assignment evidence has not executed; this is not a new product defect or rejection of the prepared harness.",
+  "harness_readiness": {
+    "ready_for_bounded_one_case": true,
+    "arguments": [
+      "--probe",
+      "caption",
+      "--cases",
+      "hidden_reveal"
+    ],
+    "reviewed_caption_sha256": "3ce1e50a71eb4a8061823d7f742caf02e59b4e89a972506cdee03a421887c347",
+    "conditions": "Use the Director-pinned product/task candidate and unchanged isolated launcher controls. Do not run the other nine cases or any model/provider for E5. This review does not itself authorize execution."
+  },
+  "COVERAGE": [
+    {
+      "item": "Supported hidden configuration and actual processing barrier",
+      "status": "inspected; ready for actual observation",
+      "basis": "caption.py:106-112 enables translation presentation only for hidden_reveal while hiding peer original, matching the existing pinned hidden-source test. :184-190 awaits real OutputRuntime.wait_for_peer_output_idle before and during the interval. Inspection of the archived pinned barrier confirms it waits for the peer-overlay worker and UI delivery, rather than merely testing queue admission."
+    },
+    {
+      "item": "Sustained hidden invariants and photo boundary",
+      "status": "inspected; protocol controls passed",
+      "basis": "For at least1.1 monotonic seconds, :189-212 repeatedly requires no presenter blocks, public first_readable_at/source deadline/owner deadline, any nonempty outgoing snapshot or premature proof delivery. All invariants are rechecked after the guarded blank-photo attempt. A not_captured photo is explicitly not treated as pixel absence."
+    },
+    {
+      "item": "Reveal clock, bounded one-shot assignment and conservation",
+      "status": "inspected; actual execution unverified",
+      "basis": "First readability must fall within the actual update_display_preferences call and source deadline must equal first_readable+1s. Proof remains scheduled from first readability+0.30s. First snapshot must be gray; gold application must be within1s; exactly one resolution delay, unchanged card/text/order/appearance/TTL and released proof are asserted. No manual mark_readable, forced identity or deadline override was added."
+    },
+    {
+      "item": "One-case selector and execution inventory",
+      "status": "inspected; independently exercised",
+      "basis": "--cases hidden_reveal selects only that canonical case. Empty/unknown/duplicate selections reject. Authorized/requested/executed inventories and requested_assertions_passed distinguish a selected one-case run from the full ten-case suite; absent/failed/extra selected execution is rejected."
+    },
+    {
+      "item": "Six task-only AST/protocol groups and retained checker failure",
+      "status": "independently exercised",
+      "basis": "All six groups completed with exit0 in an isolated read-only Python wrapper, retaining every assertion and omitting only the report overwrite. Controls reject readable-on-application, mid-interval/post-photo leakage, premature proof, stale first-readable/deadline and incorrect completion inventory. Product modules imported=0. Caption/checker hashes match the preparation record. The initial checker StopIteration and its AST-discovery-only correction remain preserved. Ruff/Black results were read, not rerun."
+    },
+    {
+      "item": "Versioned assessment correction, original review and maintained plan",
+      "status": "independently checked",
+      "basis": "The exact original Git6670 report hashes to a960013ac022ce4ce8987e2a61df0ae8750fbd95bc6b39e5462dc51dddb9d4e8. Removing only the additive assessment root and three E5 metadata fields from the new report yields the original JSON exactly. Original caption02 still has all ten recorded assertion-pass statuses and the premature readable gold hidden_before_reveal. The verbatim original review retains repair_failed/E5; the plan now withdraws hidden qualification and requires the corrected observation. No historical outcome is converted to a pass."
+    }
+  ],
+  "decisive_remaining_observation": "In one newly identified run, observe processed output remaining logically unreadable with no source/owner clock or readable bridge history throughout >1.1s, including after the guarded photo. Then correlate reveal-time first readability, gray presentation, one in-place gold assignment within1s, unchanged expiration/content/card placement, qualified/invalid readbacks, inspected images and cleanup. Missing or unqualified blank/gray/gold pixels must remain explicit rather than being rescued by assertion status.",
+  "retained_scope": "E1–E4 closure, the fourteen prior pipelines and nine other caption boundaries, original invalid readbacks, native residuals and all unaffected6670 coverage carry forward. New streaming product repair and terminal Goal acceptance remain separately owned.",
+  "limits": "No actual E5/Flet/model/cloud/VR operation, credential access, moving-product import, source/report edit or Git mutation. Only read-only source/archive/Git-object inspection and an isolated pure-task protocol check were performed. Actual E5 closure awaits subsequent pinned execution evidence."
+}

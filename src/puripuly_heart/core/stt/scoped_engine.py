@@ -1710,7 +1710,8 @@ class ScopedRecognitionEngine:
     def _discard_speaker_proofs(self, event, *, published=False) -> None:
         if self.evidence_view is not None:
             for audio in getattr(event, "source_audio", ()):
-                self.evidence_view.release_unadopted(audio.speaker_proof_id, published=published)
+                for token in audio.speaker_proof_ids:
+                    self.evidence_view.release_unadopted(token, published=published)
 
     def _publish_speaker_proofs(self, event) -> None:
         if self.evidence_view is not None and (
@@ -1719,7 +1720,8 @@ class ScopedRecognitionEngine:
             and event.source_release is not None
         ):
             for audio in event.source_audio:
-                self.evidence_view.publish(audio.speaker_proof_id)
+                for token in audio.speaker_proof_ids:
+                    self.evidence_view.publish(token)
 
     async def _consume_session_events(
         self,
@@ -2751,6 +2753,9 @@ class ScopedRecognitionEngine:
                 result = sink(event)
                 if inspect.isawaitable(result):
                     await result
+            except asyncio.CancelledError:
+                self._discard_speaker_proofs(event, published=True)
+                raise
             except Exception as exc:
                 self._discard_speaker_proofs(event, published=True)
                 self._record_delivery_failure(exc, getattr(event, "identity", None))
@@ -2792,6 +2797,9 @@ class ScopedRecognitionEngine:
                 result = sink(event)
                 if inspect.isawaitable(result):
                     await result
+            except asyncio.CancelledError:
+                self._discard_speaker_proofs(original_event, published=True)
+                raise
             except Exception as exc:
                 self._discard_speaker_proofs(original_event, published=True)
                 diagnostics = recognition_failure_diagnostics(

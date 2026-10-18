@@ -490,9 +490,8 @@ class PeerTranslationChannelOwner:
 
     def _discard_unadmitted_speaker_proofs(self, event) -> None:
         for audio in event.source_audio:
-            self._speaker_identities.evidence.release_unadopted(
-                audio.speaker_proof_id, published=True
-            )
+            for token in audio.speaker_proof_ids:
+                self._speaker_identities.evidence.release_unadopted(token, published=True)
 
     async def handle_provider_turn_update(
         self, snapshot: AudioSegmentSnapshot, update: STTProviderTurnUpdate
@@ -502,17 +501,19 @@ class PeerTranslationChannelOwner:
             return None
         if snapshot.identity != update.identity.segment:
             raise ValueError("contribution source request identity mismatch")
-        pieces = self._stt_consumption.consume_parts(update)
-        if not pieces:
+        try:
+            pieces = self._stt_consumption.consume_parts(update)
+            if not pieces:
+                return None
+            order = self._allocate_publication_order(snapshot.identity.activation_generation)
+            transcript = contribution_transcript(
+                snapshot, update, pieces, created_at=self.clock.now(), publication_order=order
+            )
+            event = STTFinalEvent(transcript.utterance_id, transcript)
+            await self.handle_stt_event(event)
+            return event
+        finally:
             self._discard_unadmitted_speaker_proofs(update)
-            return None
-        order = self._allocate_publication_order(snapshot.identity.activation_generation)
-        transcript = contribution_transcript(
-            snapshot, update, pieces, created_at=self.clock.now(), publication_order=order
-        )
-        event = STTFinalEvent(transcript.utterance_id, transcript)
-        await self.handle_stt_event(event)
-        return event
 
     async def handle_provider_turn_terminal(
         self,
@@ -546,25 +547,28 @@ class PeerTranslationChannelOwner:
                 )
             )
             return None
-        pieces = self._stt_consumption.consume_parts(terminal)
-        if not pieces:
+        try:
+            pieces = self._stt_consumption.consume_parts(terminal)
+            if not pieces:
+                return None
+            transcript = contribution_transcript(
+                receipt.segment,
+                terminal,
+                pieces,
+                created_at=self.clock.now(),
+                publication_order=self._allocate_publication_order(
+                    receipt.identity.activation_generation,
+                    source_order=receipt.identity.segment_order,
+                ),
+            )
+            event = STTFinalEvent(
+                utterance_id=transcript.utterance_id,
+                transcript=transcript,
+            )
+            await self.handle_stt_event(event)
+            return event
+        finally:
             self._discard_unadmitted_speaker_proofs(terminal)
-            return None
-        transcript = contribution_transcript(
-            receipt.segment,
-            terminal,
-            pieces,
-            created_at=self.clock.now(),
-            publication_order=self._allocate_publication_order(
-                receipt.identity.activation_generation, source_order=receipt.identity.segment_order
-            ),
-        )
-        event = STTFinalEvent(
-            utterance_id=transcript.utterance_id,
-            transcript=transcript,
-        )
-        await self.handle_stt_event(event)
-        return event
 
     async def clear_language_runtime_state(self, *, channel: ChannelId) -> None:
         if channel != "peer":

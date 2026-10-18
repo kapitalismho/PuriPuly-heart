@@ -6,13 +6,14 @@ from uuid import uuid5
 
 from puripuly_heart.core.audio.ownership import AudioSegmentSnapshot
 from puripuly_heart.core.stt.backend import (
+    MAX_SPEAKER_AUDIO_PARTS,
     STTConsumedContribution,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
 )
-from puripuly_heart.domain.models import Transcript
+from puripuly_heart.domain.models import FinalSpeakerRun, SpeakerAttribution, Transcript
 from puripuly_heart.domain.recognition import (
     RecognitionStreamIdentity,
     RecognitionTextOrigin,
@@ -90,6 +91,61 @@ def recognition_transcript(
     )
 
 
+def _speaker_audio_selections(audio, contribution, piece):
+    if audio is None or not audio.speaker_parts:
+        return ((piece.text_start, piece.text_end, audio),)
+    cursor = contribution.text_start
+    valid = len(audio.speaker_parts) <= MAX_SPEAKER_AUDIO_PARTS
+    for part in audio.speaker_parts:
+        valid &= (
+            isinstance(part.text_start, int)
+            and not isinstance(part.text_start, bool)
+            and isinstance(part.text_end, int)
+            and not isinstance(part.text_end, bool)
+            and part.text_start == cursor
+            and part.text_start < part.text_end <= contribution.text_end
+            and bool(part.source_ranges or part.context_ranges)
+            and all(
+                any(
+                    parent.capture_epoch == span.capture_epoch
+                    and parent.normalized_sample_rate_hz == span.normalized_sample_rate_hz
+                    and parent.normalized_start_sample is not None
+                    and span.normalized_start_sample is not None
+                    and parent.normalized_start_sample <= span.normalized_start_sample
+                    and span.normalized_end_sample is not None
+                    and parent.normalized_end_sample is not None
+                    and span.normalized_start_sample < span.normalized_end_sample
+                    and span.normalized_end_sample <= parent.normalized_end_sample
+                    for parent in parents
+                )
+                for spans, parents in (
+                    (part.source_ranges, audio.source_ranges),
+                    (part.context_ranges, audio.context_ranges),
+                )
+                for span in spans
+            )
+        )
+        cursor = part.text_end
+    if not valid or cursor != contribution.text_end:
+        return (
+            (
+                piece.text_start,
+                piece.text_end,
+                replace(
+                    audio,
+                    speaker_attribution=SpeakerAttribution("unavailable"),
+                    speaker_proof_id=None,
+                    speaker_parts=(),
+                ),
+            ),
+        )
+    return tuple(
+        (max(piece.text_start, part.text_start), min(piece.text_end, part.text_end), part)
+        for part in audio.speaker_parts
+        if part.text_start < piece.text_end and piece.text_start < part.text_end
+    )
+
+
 def contribution_transcript(
     snapshot: AudioSegmentSnapshot,
     event: STTProviderTurnUpdate | STTProviderTurnTerminal,
@@ -156,36 +212,67 @@ def contribution_transcript(
                 else event.provenance
             ),
         )
-        if event.recognition_origins:
-            for origin in slice_recognition_origins(
-                event.recognition_origins, piece.text_start, piece.text_end
-            ):
-                if origin.source_binding == "composition":
-                    origins.append(
-                        replace(
-                            origin,
-                            text_start=offset + origin.text_start,
-                            text_end=offset + origin.text_end,
+        declared = next(
+            (
+                item
+                for item in event.included_contributions
+                if item.contribution_id == piece.contribution_id
+            ),
+            piece,
+        )
+        for left, right, selected in _speaker_audio_selections(audio, declared, piece):
+            projected = replace(
+                request_origin,
+                text_start=offset + left - piece.text_start,
+                text_end=offset + right - piece.text_start,
+                contribution_range=(left, right),
+                source_ranges=(
+                    selected.source_ranges if selected is not None else request_origin.source_ranges
+                ),
+                context_ranges=(
+                    selected.context_ranges
+                    if selected is not None
+                    else request_origin.context_ranges
+                ),
+                speaker_attribution=(
+                    selected.speaker_attribution
+                    if selected is not None
+                    else request_origin.speaker_attribution
+                ),
+                speaker_proof_id=(
+                    selected.speaker_proof_id
+                    if selected is not None
+                    else request_origin.speaker_proof_id
+                ),
+            )
+            if event.recognition_origins:
+                for origin in slice_recognition_origins(event.recognition_origins, left, right):
+                    if origin.source_binding == "composition":
+                        origins.append(
+                            replace(
+                                origin,
+                                text_start=projected.text_start + origin.text_start,
+                                text_end=projected.text_start + origin.text_end,
+                            )
                         )
-                    )
-                else:
-                    origins.append(
-                        replace(
-                            request_origin,
-                            identity=origin.identity,
-                            text_start=offset + origin.text_start,
-                            text_end=offset + origin.text_end,
-                            native=origin.native,
-                            source_binding=origin.source_binding,
-                            order_basis=origin.order_basis,
-                            contribution_range=(
-                                piece.text_start + origin.text_start,
-                                piece.text_start + origin.text_end,
-                            ),
+                    else:
+                        origins.append(
+                            replace(
+                                projected,
+                                identity=origin.identity,
+                                text_start=projected.text_start + origin.text_start,
+                                text_end=projected.text_start + origin.text_end,
+                                native=origin.native,
+                                source_binding=origin.source_binding,
+                                order_basis=origin.order_basis,
+                                contribution_range=(
+                                    left + origin.text_start,
+                                    left + origin.text_end,
+                                ),
+                            )
                         )
-                    )
-        else:
-            origins.append(request_origin)
+            else:
+                origins.append(projected)
         offset += len(piece.text)
 
     def sliced_runs(runs):
@@ -196,7 +283,17 @@ def contribution_transcript(
                 end = cursor + len(run.text)
                 left, right = max(cursor, piece.text_start), min(end, piece.text_end)
                 if left < right:
-                    result.append(replace(run, text=run.text[left - cursor : right - cursor]))
+                    if isinstance(run, FinalSpeakerRun):
+                        result.append(
+                            replace(
+                                run,
+                                text=run.text[left - cursor : right - cursor],
+                                source_boundary_before=run.source_boundary_before
+                                and left == cursor,
+                            )
+                        )
+                    else:
+                        result.append(replace(run, text=run.text[left - cursor : right - cursor]))
                 cursor = end
         return tuple(result)
 

@@ -39,6 +39,16 @@ The recorded Deepgram cases preserved `Gentlemen of the press.` as one useful so
 
 Any necessary text-scoped proof parts belong to the existing source-audio handoff before immutable source admission. Keep parent provenance intact, bound and dispose of every claim, and do not widen a child's eligible footprint back to the entire contribution. These repairs require their own fixed-candidate review and targeted replay; the earlier actual matrix is not evidence that they have already succeeded.
 
+### Frozen streaming repair awaiting actual integration
+
+The [streaming repair record](../native/nemotron/issue264_streaming_repair.json) implements the qualified enclosure and unique uncertainty-band junction within the existing owners. Bounded text-scoped audio parts retain their own claims through source admission. An explicit committed-boundary marker survives gray coalescing. Parent/part disposal covers publication, admission, rejection, cancellation and ordinary producer retirement. Replay uses existing successful-input occurrences, preserving genuine onset and main-source retries without counting proven replay as unique support.
+
+The repair also preserves complete coarse-absent character/subword enclosures without treating them as lexical cuts. Its authoritative mapping frontier cannot advance retrospectively merely because later PCM arrived. Numeric acoustic limits and full profile geometries are unchanged.
+
+Controlled production-class replay preserved native text exactly across four recorded cases, with 16 source/context/translation units and no retained claims after retirement. The returning-prefix footprint became eligible for A 174/187 ms after the recorded raw update; this is evidence availability, not newly measured presentation timing. The short case's first A still contains immutable foreign evidence and remains conservative. The final affected suite executed 570 tests with 213 warnings and no skips; all 10 changed Python files passed Ruff and Black checks. Earlier failures and fixture corrections remain recorded.
+
+The next gate is a fresh pinned coupled-code review, then one full-1.04 GPU repeated-A-B-A regression, four native-tape observations and the corrected no-model hidden-reveal case. The single GPU regression covers changed shared engine/Peer disposal and default-false boundary handling for legacy empty-part callers; it is not a repeat of the full matrix. The earlier actual matrix remains before evidence for these new repairs.
+
 ### Current Gemini disposition
 
 The two approved #264 control differentials are complete: automatic activity detection without the intermediate audio-stream-end marker, and explicit manual activity boundaries. Each sent the same 93,404 samples in 168 archived audio writes to `gemini-3.5-transcribe-live`, using only the designated `GOOGLE_API_KEY2`. In both, interim text contained A+B, but the sole authoritative final was `Gentlemen of the press.` (B). Neither raw final supplied an audio start/end offset; raw-to-SDK final preservation was exact.

@@ -86,6 +86,7 @@ class _FinalTranscriptSegment:
     attribution_state: str = "unavailable"
     source_text_start: int = 0
     source_text_end: int = 0
+    source_boundary_before: bool = False
 
 
 def _final_transcript_segments(
@@ -143,9 +144,11 @@ def _final_transcript_segments(
             speaker.attribution_state,
             start,
             end,
+            speaker.source_boundary_before and start == speaker_end - len(speaker.text),
         )
         if (
             raw
+            and not segment.source_boundary_before
             and raw[-1].language == segment.language
             and raw[-1].speaker_id == segment.speaker_id
             and raw[-1].speaker_session_scope == segment.speaker_session_scope

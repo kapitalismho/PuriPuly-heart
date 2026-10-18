@@ -27,6 +27,8 @@ from puripuly_heart.domain.recognition import (
     validate_recognition_origins,
 )
 
+MAX_SPEAKER_AUDIO_PARTS = 128
+
 
 class PermanentSTTScopedSessionError(RuntimeError):
     __slots__ = ()
@@ -74,6 +76,16 @@ class STTProviderTurnRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class STTSpeakerAudioPart:
+    text_start: int
+    text_end: int
+    source_ranges: tuple[AudioCaptureSpan, ...]
+    context_ranges: tuple[AudioCaptureSpan, ...]
+    speaker_attribution: SpeakerAttribution
+    speaker_proof_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class STTSourceAudio:
     contribution_id: str
     source_ranges: tuple[AudioCaptureSpan, ...]
@@ -81,6 +93,20 @@ class STTSourceAudio:
     display_group_id: UUID | None = None
     speaker_attribution: SpeakerAttribution | None = None
     speaker_proof_id: str | None = None
+    speaker_parts: tuple[STTSpeakerAudioPart, ...] = ()
+
+    @property
+    def speaker_proof_ids(self) -> tuple[str, ...]:
+        return tuple(
+            dict.fromkeys(
+                token
+                for token in (
+                    self.speaker_proof_id,
+                    *(part.speaker_proof_id for part in self.speaker_parts),
+                )
+                if token is not None
+            )
+        )
 
     def __post_init__(self) -> None:
         if not self.contribution_id:
