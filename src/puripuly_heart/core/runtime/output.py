@@ -22,6 +22,7 @@ from puripuly_heart.core.diagnostics import (
     safe_exception_fields,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
 from puripuly_heart.core.output.models import (
     OUTPUT_ROUTE_CONVERSATION_FEED,
     OUTPUT_ROUTE_SELF_CHATBOX,
@@ -54,6 +55,7 @@ from puripuly_heart.core.runtime.output_batch import (
     DestinationBatchAdmission,
     OutputDestination,
 )
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.domain.models import ChannelId, OSCMessage
 
 OutputRuntimeState = Literal["open", "closing", "closed"]
@@ -63,6 +65,9 @@ logger = logging.getLogger(__name__)
 
 
 class ChatboxQueue(Protocol):
+    def bind_delivery_observer(self, observer: Callable[[OSCMessage, str], None]) -> None: ...
+    def enqueue_self_turn(self, message: OSCMessage, *, final: bool) -> OSCMessage | None: ...
+    def promote_self_turn(self, utterance_id: UUID, revision: int) -> None: ...
     def enqueue(self, message: OSCMessage) -> OSCMessage | None: ...
     def send_immediate(self, text: str) -> tuple[bool, ErrorDiagnostics | None]: ...
     def send_typing(self, is_typing: bool) -> None: ...
@@ -126,6 +131,20 @@ class _PeerOverlayBatch:
 
 
 @dataclass(slots=True)
+class _SelfStreamDelivery:
+    snapshot: SelfTurnPresentation
+    configuration: TranslationRuntimeConfig
+    offered_revision: int = -1
+    offered_source_revision: int = 0
+    promotion_revision: int = -1
+    offered_fingerprint: tuple[object, ...] | None = None
+    sent_fingerprint: tuple[object, ...] | None = None
+    receipt: str | None = None
+    settled: bool = False
+    batch: DestinationBatch | None = None
+
+
+@dataclass(slots=True)
 class OutputRuntime:
     chatbox: ChatboxQueue
     clock: Clock = field(default_factory=SystemClock)
@@ -167,12 +186,17 @@ class OutputRuntime:
     _peer_writer_cancel_reason: str | None = None
     _ui_delivery: UiDeliveryLifecyclePort | None = None
     _peer_overlay_delivery_observer: Callable[[OutputRoutingDecision], None] | None = None
+    _self_stream_delivery_observer: Callable[[OutputRoutingDecision], None] | None = None
     _batch_admission: DestinationBatchAdmission = field(default_factory=DestinationBatchAdmission)
     _routing_decisions: deque[OutputRoutingDecision] = field(init=False)
     _diagnostic_history_evictions: int = field(init=False, default=0)
     _observer_failure_count: int = field(init=False, default=0)
     _last_observer_failure_type: str | None = field(init=False, default=None)
     _observer_failure_diagnostics: ErrorDiagnostics | None = field(init=False, default=None)
+    _self_streams: OrderedDict[UUID, _SelfStreamDelivery] = field(default_factory=OrderedDict)
+    _self_stream_completed: OrderedDict[UUID, None] = field(default_factory=OrderedDict)
+    _self_stream_flush_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    _self_stream_flush_task: asyncio.Task[Any] | None = field(default=None, init=False, repr=False)
 
     resource_fields = (
         "_chatbox_flush_task",
@@ -192,6 +216,9 @@ class OutputRuntime:
         self._routing_decisions = deque(maxlen=self.diagnostics_capacity)
         if self.overlay_event_adapter is None:
             self.overlay_event_adapter = OverlayEventAdapter(clock=self.clock)
+        bind_receipts = getattr(self.chatbox, "bind_delivery_observer", None)
+        if bind_receipts is not None:
+            bind_receipts(self._observe_self_stream_delivery)
 
     @property
     def state(self) -> OutputRuntimeState:
@@ -382,6 +409,11 @@ class OutputRuntime:
             raise RuntimeError("peer overlay delivery observer is already bound")
         self._peer_overlay_delivery_observer = observer
 
+    def bind_self_stream_delivery_observer(
+        self, observer: Callable[[OutputRoutingDecision], None]
+    ) -> None:
+        self._self_stream_delivery_observer = observer
+
     @staticmethod
     def chatbox_is_eligible(channel: ChannelId) -> bool:
         return channel == "self"
@@ -552,6 +584,234 @@ class OutputRuntime:
             _raise_output_runtime_failures(failures)
         self._state = "closed"
 
+    async def publish_self_turn(
+        self, snapshot: SelfTurnPresentation, configuration: TranslationRuntimeConfig
+    ) -> None:
+        if snapshot.utterance_id in self._self_stream_completed:
+            return
+        state = self._self_streams.get(snapshot.utterance_id)
+        if state is None:
+            state = _SelfStreamDelivery(snapshot, configuration)
+            self._self_streams[snapshot.utterance_id] = state
+            async with self._batch_admission.lock:
+                self._batch_admission.admit_parent(
+                    parent_id=str(snapshot.utterance_id),
+                    channel="self",
+                    origin="self",
+                    turn_generation=snapshot.turn_generation,
+                    turn_order=snapshot.turn_order,
+                    payloads=self._batch_admission.normalized_payloads((snapshot.source_text,)),
+                    destination_targets={"chatbox": frozenset({0})},
+                )
+                state.batch = self._batch_admission.batches.get(
+                    ("self:chatbox", str(snapshot.utterance_id))
+                )
+            if state.batch is None:
+                state.settled = True
+        elif snapshot.revision <= state.snapshot.revision:
+            return
+        else:
+            state.snapshot = snapshot
+            state.configuration = configuration
+        if snapshot.status == "cancelled":
+            state.settled = True
+        if state.batch is not None and state.batch.disposition is None:
+            payloads = (
+                snapshot.source_text,
+                *(
+                    target.translation.text
+                    for target in snapshot.targets
+                    if target.translation is not None
+                ),
+            )
+            async with self._batch_admission.lock:
+                self._batch_admission.resize_parent(
+                    parent_id=str(snapshot.utterance_id),
+                    origin="self",
+                    payloads=self._batch_admission.normalized_payloads(payloads),
+                    destinations=("chatbox",),
+                    replace_payloads=True,
+                )
+        await self._flush_self_streams()
+
+    def _observe_self_stream_delivery(self, message: OSCMessage, status: str) -> None:
+        state = self._self_streams.get(message.utterance_id)
+        if state is None or message.presentation_revision != state.offered_revision:
+            return
+        state.receipt = status
+        if status == "first_page_sent":
+            state.sent_fingerprint = state.offered_fingerprint
+        result = self._observe_result(
+            status=(
+                OUTPUT_ROUTING_DECISION_PUBLISHED
+                if status == "first_page_sent"
+                else OUTPUT_ROUTING_DECISION_SKIPPED
+            ),
+            route=OUTPUT_ROUTE_SELF_CHATBOX,
+            publication_id=str(message.utterance_id),
+            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+            reason=status,
+            metadata={
+                "stage": "self_stream_delivery",
+                "physical_ack": False,
+                "presentation_revision": message.presentation_revision,
+                "source_revision": state.offered_source_revision,
+                "turn_generation": message.turn_generation,
+                "turn_order": message.turn_order,
+            },
+        )
+        if self._self_stream_delivery_observer is not None:
+            self._self_stream_delivery_observer(result.decision)
+        if self._state == "open" and (
+            self._self_stream_flush_task is None or self._self_stream_flush_task.done()
+        ):
+            task = self._create_task(self._flush_self_streams(), task_name="self-stream-delivery")
+            self._self_stream_flush_task = task
+            self._active_delivery_tasks.add(task)
+            task.add_done_callback(self._active_delivery_tasks.discard)
+
+    async def _flush_self_streams(self) -> None:
+        async with self._self_stream_flush_lock:
+            blocked = False
+            ordered = sorted(
+                self._self_streams.values(),
+                key=lambda state: (state.snapshot.turn_generation, state.snapshot.turn_order),
+            )
+            for state in ordered:
+                snapshot = state.snapshot
+                if state.batch is not None and state.batch.disposition is not None:
+                    state.settled = True
+                if state.settled:
+                    continue
+                ready = tuple(
+                    (index, target)
+                    for index, target in enumerate(snapshot.targets)
+                    if target.status == "ready"
+                    and target.translation is not None
+                    and target.translation.text.strip()
+                    and target.source_revision == snapshot.source_revision
+                )
+                terminal = snapshot.status != "active"
+                source_only = (
+                    terminal
+                    and not ready
+                    and any(
+                        target.status == "source_only"
+                        or (
+                            target.status == "failed"
+                            and len(snapshot.targets) == 1
+                            and state.configuration.fallback_transcript_only
+                        )
+                        or (
+                            target.status == "ready"
+                            and target.translation is not None
+                            and not target.translation.text.strip()
+                        )
+                        for target in snapshot.targets
+                    )
+                )
+                if terminal and not ready and not source_only:
+                    state.settled = True
+                    continue
+                if not blocked and (ready or source_only):
+                    translation_text = (
+                        "\n".join(
+                            target.translation.text
+                            for _, target in ready
+                            if target.translation is not None
+                        )
+                        if ready
+                        else None
+                    )
+                    indexes = tuple(index for index, _ in ready)
+                    languages = tuple(target.target_language for _, target in ready)
+                    payload = self._merge_chatbox_text(
+                        transcript_text=snapshot.source_text,
+                        translation_text=translation_text,
+                        include_source=(
+                            state.configuration.chatbox_include_source
+                            and len(snapshot.targets) == 1
+                        ),
+                    )
+                    fingerprint = (payload, snapshot.source_text, indexes, languages)
+                    if (
+                        terminal
+                        and state.offered_fingerprint == fingerprint
+                        and state.promotion_revision != snapshot.revision
+                        and (state.sent_fingerprint == fingerprint or state.receipt is None)
+                    ):
+                        promote = getattr(self.chatbox, "promote_self_turn", None)
+                        if promote is not None:
+                            promote(snapshot.utterance_id, state.offered_revision)
+                        state.promotion_revision = snapshot.revision
+                        result = self._observe_result(
+                            status=OUTPUT_ROUTING_DECISION_PUBLISHED,
+                            route=OUTPUT_ROUTE_SELF_CHATBOX,
+                            publication_id=str(snapshot.utterance_id),
+                            publication_kind=PUBLICATION_KIND_SELF_UTTERANCE,
+                            reason="status_promoted",
+                            metadata={
+                                "stage": "self_turn_status_promoted",
+                                "physical_ack": False,
+                                "reused_preview_send": state.sent_fingerprint == fingerprint,
+                                "queued_payload": state.receipt is None,
+                                "presentation_revision": snapshot.revision,
+                                "preview_revision": state.offered_revision,
+                                "source_revision": snapshot.source_revision,
+                            },
+                        )
+                        if self._self_stream_delivery_observer is not None:
+                            self._self_stream_delivery_observer(result.decision)
+                    if state.sent_fingerprint == fingerprint:
+                        if terminal:
+                            state.settled = True
+                    elif state.offered_revision != snapshot.revision:
+                        same_pending = (
+                            state.offered_fingerprint == fingerprint and state.receipt is None
+                        )
+                        if not same_pending:
+                            state.offered_revision = snapshot.revision
+                            state.offered_source_revision = snapshot.source_revision
+                            state.offered_fingerprint = fingerprint
+                            state.receipt = None
+                            result = await self.publish_chatbox(
+                                publication_id=snapshot.utterance_id,
+                                channel="self",
+                                transcript_text=snapshot.source_text,
+                                translation_text=translation_text,
+                                include_source=(
+                                    state.configuration.chatbox_include_source
+                                    and len(snapshot.targets) == 1
+                                ),
+                                presentation_revision=snapshot.revision,
+                                turn_generation=snapshot.turn_generation,
+                                turn_order=snapshot.turn_order,
+                                target_indexes=indexes,
+                                target_languages=languages,
+                                self_speech=True,
+                                self_turn_final=terminal,
+                            )
+                            if result.decision.decision != OUTPUT_ROUTING_DECISION_PUBLISHED:
+                                state.receipt = "destination_publish_failed"
+                            elif not hasattr(self.chatbox, "bind_delivery_observer"):
+                                state.receipt = "destination_receipt_unavailable"
+                        if terminal and state.receipt is not None:
+                            state.settled = True
+                    elif terminal and state.receipt is not None:
+                        state.settled = True
+                if snapshot.source_closed and not state.settled:
+                    blocked = True
+            for state in ordered:
+                if state.settled and state.batch is not None and state.batch.disposition is None:
+                    async with self._batch_admission.lock:
+                        self._batch_admission.release(state.batch, state.receipt or "applied")
+                if state.settled and state.snapshot.status != "active":
+                    parent_id = state.snapshot.utterance_id
+                    self._self_streams.pop(parent_id, None)
+                    self._self_stream_completed[parent_id] = None
+            while len(self._self_stream_completed) > _COMPLETED_PUBLICATION_LIMIT:
+                self._self_stream_completed.popitem(last=False)
+
     async def publish_chatbox(
         self,
         *,
@@ -567,6 +827,7 @@ class OutputRuntime:
         target_indexes: tuple[int, ...] = (),
         target_languages: tuple[str, ...] = (),
         self_speech: bool = False,
+        self_turn_final: bool | None = None,
         operation_id: str | None = None,
         request_id: str | None = None,
     ) -> OutputPublicationResult:
@@ -647,7 +908,12 @@ class OutputRuntime:
             return duplicate
 
         try:
-            evicted = self.chatbox.enqueue(message)
+            enqueue_stream = getattr(self.chatbox, "enqueue_self_turn", None)
+            evicted = (
+                enqueue_stream(message, final=self_turn_final)
+                if self_turn_final is not None and enqueue_stream is not None
+                else self.chatbox.enqueue(message)
+            )
         except Exception as exc:
             return self._observe_result(
                 status=OUTPUT_ROUTING_DECISION_SKIPPED,
@@ -894,12 +1160,40 @@ class OutputRuntime:
             },
         )
 
+    async def submit_self_overlay_event(
+        self,
+        event: OverlayEventUnion,
+        *,
+        on_failure: Callable[[], None] | None = None,
+    ) -> None:
+        if event.channel != "self":
+            raise ValueError("Self overlay handoff requires a Self event")
+        admitted = asyncio.Event()
+
+        async def deliver() -> OutputPublicationResult:
+            try:
+                result = await self.publish_overlay_event(event, _admission_ready=admitted)
+                if (
+                    result.decision.reason == "destination_publish_failed"
+                    and on_failure is not None
+                ):
+                    on_failure()
+                return result
+            finally:
+                admitted.set()
+
+        task = self._create_task(deliver(), task_name="self-overlay-delivery")
+        self._active_delivery_tasks.add(task)
+        task.add_done_callback(self._active_delivery_tasks.discard)
+        await admitted.wait()
+
     async def publish_overlay_event(
         self,
         event: OverlayEventUnion,
         *,
         publication_generation: int | None = None,
         source_order: int | None = None,
+        _admission_ready: asyncio.Event | None = None,
     ) -> OutputPublicationResult:
         if not isinstance(event, OverlayEvent):
             raise TypeError("event must implement the overlay event contract")
@@ -973,6 +1267,8 @@ class OutputRuntime:
                     publication_kind=publication_kind,
                     reason=rejection_reason,
                 )
+        if _admission_ready is not None:
+            _admission_ready.set()
 
         if batch is None:
             raise RuntimeError("overlay batch admission did not produce an owner")

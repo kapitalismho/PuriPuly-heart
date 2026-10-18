@@ -6,7 +6,7 @@ import logging
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
-from typing import Literal, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 from uuid import UUID, uuid5
 
 from puripuly_heart.core.diagnostics import emit_failure
@@ -22,6 +22,7 @@ from puripuly_heart.core.translation_policy import (
     TranslationContextPolicy,
     TranslationRuntimePolicy,
 )
+from puripuly_heart.domain.events import SelfTurnPresentation, SelfTurnTargetPresentation
 from puripuly_heart.domain.models import (
     ChannelId,
     FinalLanguageRun,
@@ -31,6 +32,10 @@ from puripuly_heart.domain.models import (
     Translation,
 )
 from puripuly_heart.domain.recognition import slice_recognition_origins
+
+if TYPE_CHECKING:
+    from puripuly_heart.core.orchestrator.translation_request import PreparedTranslationRequest
+
 
 logger = logging.getLogger(__name__)
 
@@ -189,14 +194,6 @@ class TerminalTranslationFailure:
 
 
 @dataclass(frozen=True, slots=True)
-class _PrestartedTranslation:
-    task: asyncio.Task[TranslationTurnProcessResult]
-    child_utterance_id: UUID
-    provider_generation: int
-    config_snapshot: TranslationRuntimeConfigSnapshot
-
-
-@dataclass(frozen=True, slots=True)
 class TranslationTurnRequest:
     transcript: Transcript
     source: str
@@ -206,11 +203,6 @@ class TranslationTurnRequest:
     precomputed_translation: Translation | None = None
     precomputed_failure: TerminalTranslationFailure | None = field(
         default=None, repr=False, compare=False
-    )
-    prestarted_secondary_translation: _PrestartedTranslation | None = field(
-        default=None,
-        repr=False,
-        compare=False,
     )
     operation_id: str | None = None
     request_id: str | None = None
@@ -245,28 +237,6 @@ class TranslationTurnRequest:
             )
             if len(nonempty_runs) > 1:
                 raise ValueError("precomputed translation requires exactly one language run")
-        if self.prestarted_secondary_translation is not None:
-            runs = self.transcript.final_language_runs or (
-                FinalLanguageRun(text=self.transcript.text, language=""),
-            )
-            nonempty_runs = tuple(run for run in runs if run.text.strip())
-            if len(normalized_targets) != 2:
-                raise ValueError("prestarted secondary translation requires two target languages")
-            if self.turn_kind != "self" or len(nonempty_runs) != 1:
-                raise ValueError(
-                    "prestarted secondary translation requires exactly one language run"
-                )
-            child_id = _translation_turn_child_id(
-                self.transcript.utterance_id,
-                turn_kind=self.turn_kind,
-                run_index=next(index for index, run in enumerate(runs) if run.text.strip()),
-                target_index=1,
-                run_language=nonempty_runs[0].language,
-                target_language=normalized_targets[1],
-                primary_uses_parent_identity=True,
-            )
-            if self.prestarted_secondary_translation.child_utterance_id != child_id:
-                raise ValueError("prestarted secondary translation identity mismatch")
         object.__setattr__(self, "target_languages", normalized_targets)
 
 
@@ -290,13 +260,15 @@ class TranslationTurnChild:
         default=None, repr=False, compare=False
     )
     parent_output_count: int = 1
-    prestarted_translation: _PrestartedTranslation | None = field(
-        default=None,
-        repr=False,
-        compare=False,
-    )
     operation_id: str | None = None
     request_id: str | None = None
+    draft: bool = False
+    provider_generation: int | None = None
+    prepared_request: PreparedTranslationRequest | None = field(
+        default=None, repr=False, compare=False
+    )
+    preparation_failure: Exception | None = field(default=None, repr=False, compare=False)
+    canonical_attempt: bool = False
 
     @property
     def channel(self) -> ChannelId:
@@ -398,6 +370,28 @@ class _TranslationTurnParent:
     closed_event: asyncio.Event = field(default_factory=asyncio.Event)
     closed: bool = False
     failure_diagnostics: ErrorDiagnostics | None = None
+    source_closed: bool = True
+    source_revision: int = 0
+    presentation_revision: int = 0
+    draft_request: TranslationTurnRequest | None = None
+    source_closed_event: asyncio.Event = field(default_factory=asyncio.Event)
+    results_changed: asyncio.Event = field(default_factory=asyncio.Event)
+    operations: dict[int, asyncio.Task[TranslationTurnProcessResult]] = field(default_factory=dict)
+    results: dict[int, TranslationTurnProcessResult] = field(default_factory=dict)
+    result_revisions: dict[int, int] = field(default_factory=dict)
+    speculative_targets: set[int] = field(default_factory=set)
+    final_attempts: set[int] = field(default_factory=set)
+    retiring_operations: set[asyncio.Task[TranslationTurnProcessResult]] = field(
+        default_factory=set
+    )
+    secondary_eligible: bool = False
+    speculative_occupancy: bool = False
+    canonical_slot: bool = False
+    terminal_status: Literal["cancelled", "expired", "failed"] | None = None
+
+    def operation_retired(self, task: asyncio.Task[TranslationTurnProcessResult]) -> None:
+        self.retiring_operations.discard(task)
+        self.results_changed.set()
 
     @property
     def child_ids(self) -> tuple[UUID, ...]:
@@ -433,6 +427,11 @@ class TranslationTurnLifecycleOwner:
     turn_generation_observer: TurnGenerationAdvanced | None = None
     output: TranslationOutputSubmissionPort | None = None
     config_snapshot: TranslationRuntimeConfigSnapshotPort = _default_config_snapshot
+    on_draft_updated: (
+        Callable[[SelfTurnPresentation, TranslationTurnRequest], Awaitable[None]] | None
+    ) = None
+    prepare_draft_child: Callable[[TranslationTurnChild], TranslationTurnChild] | None = None
+    _speculative_parent_id: UUID | None = field(default=None, init=False)
     policy: TranslationRuntimePolicy = field(default_factory=TranslationRuntimePolicy)
     _parents: dict[UUID, _TranslationTurnParent] = field(default_factory=dict)
     peer_waiting_capacity: int = 8
@@ -492,6 +491,10 @@ class TranslationTurnLifecycleOwner:
     def is_parent_active(self, parent_utterance_id: UUID) -> bool:
         return parent_utterance_id in self._parents
 
+    def is_draft_parent(self, parent_id: UUID) -> bool:
+        parent = self._parents.get(parent_id)
+        return parent is not None and parent.draft_request is not None
+
     def is_child_cancellation_requested(self, child: TranslationTurnChild) -> bool:
         return (
             self._closed
@@ -537,6 +540,428 @@ class TranslationTurnLifecycleOwner:
         await self._cancel_channel(channel)
         self._blocked_channels.add(channel)
 
+    async def revise_draft(
+        self,
+        request: TranslationTurnRequest,
+        *,
+        provider_generation: int,
+        compatible: Callable[[str, str], bool],
+        configuration_compatible: (
+            Callable[[TranslationRuntimeConfig, TranslationRuntimeConfig], bool] | None
+        ) = None,
+    ) -> None:
+        parent_id = request.transcript.utterance_id
+        if not self.channel_ingress_open("self") or parent_id in self._closed_parent_ids:
+            return
+        parent = self._parents.get(parent_id)
+        if parent is None:
+            generation = self._channel_turn_generations["self"]
+            order = self._channel_next_turn_orders["self"]
+            self._channel_next_turn_orders["self"] = order + 1
+            parent = _TranslationTurnParent(
+                parent_id,
+                "self",
+                (),
+                generation,
+                order,
+                0.0,
+                source_closed=False,
+                draft_request=request,
+            )
+            self._parents[parent_id] = parent
+            task = start_lifecycle_task(
+                self._scope,
+                self._run_parent(parent, None),
+                name=f"parent:{parent_id}",
+                eager_start=True,
+            )
+            if not task.done():
+                self._parent_tasks[parent_id] = task
+        elif parent.source_closed:
+            raise ValueError("cannot revise a source-closed turn")
+        previous = parent.draft_request
+        if previous is not None:
+            request = replace(
+                request,
+                transcript=replace(request.transcript, created_at=previous.transcript.created_at),
+            )
+        children = tuple(
+            replace(child, draft=True, provider_generation=provider_generation)
+            for child in self._build_children(
+                request, turn_generation=parent.turn_generation, turn_order=parent.turn_order
+            )
+        )
+        reusable = bool(
+            previous is not None
+            and parent.children
+            and (
+                configuration_compatible(
+                    previous.config_snapshot.value, request.config_snapshot.value
+                )
+                if configuration_compatible is not None
+                else previous.config_snapshot.value == request.config_snapshot.value
+            )
+            and parent.children[0].provider_generation == provider_generation
+            and compatible(previous.transcript.text, request.transcript.text)
+            and previous.target_languages == request.target_languages
+        )
+        changed = previous is None or previous.transcript.text != request.transcript.text
+        if not parent.children or changed or not reusable:
+            parent.source_revision += 1
+        if not reusable:
+            for task in parent.operations.values():
+                if not task.done():
+                    task.cancel()
+                    parent.retiring_operations.add(task)
+                    task.add_done_callback(parent.operation_retired)
+            parent.operations.clear()
+            parent.results.clear()
+            parent.speculative_targets.clear()
+            parent.final_attempts.clear()
+            parent.result_revisions.clear()
+            parent.secondary_eligible = False
+        else:
+            for index in parent.results:
+                parent.result_revisions[index] = parent.source_revision
+        parent.children = children
+        parent.draft_request = request
+        await self._publish_draft(parent)
+        self._start_current_draft()
+
+    def prestart_draft_secondary(self, parent_id: UUID) -> None:
+        parent = self._parents.get(parent_id)
+        if (
+            parent is None
+            or parent.source_closed
+            or parent.turn_generation != self._channel_turn_generations["self"]
+            or self._parent_cancellation_requested(parent)
+        ):
+            return
+        parent.secondary_eligible = True
+        if parent.speculative_occupancy:
+            self._start_draft_operations(parent, secondary=True)
+
+    async def seal_draft(self, parent_id: UUID) -> tuple[UUID, ...]:
+        parent = self._parents.get(parent_id)
+        if parent is None or parent.draft_request is None or parent.source_closed:
+            return ()
+        parent.source_closed = True
+        if self.prepare_draft_child is not None:
+            parent.children = tuple(
+                self.prepare_draft_child(
+                    replace(child, prepared_request=None, canonical_attempt=True)
+                )
+                for child in parent.children
+            )
+        parent.admitted_at_monotonic_s = asyncio.get_running_loop().time()
+        lock = self._channel_admission_locks.setdefault("self", asyncio.Lock())
+        async with lock:
+            if self.on_parent_admitted is not None:
+                await self.on_parent_admitted(parent.children)
+        if not self._self_speech_slots.locked():
+            await self._self_speech_slots.acquire()
+            parent.canonical_slot = True
+            self._mark_parent_execution_started(parent)
+            self._release_speculative_occupancy(parent)
+        else:
+            parent.waiting_expiry_task = start_lifecycle_task(
+                self._scope,
+                self._expire_waiting_parent(parent),
+                name=f"self-speech-waiting-expiry:{parent_id}",
+                eager_start=True,
+            )
+        for waiting in self._self_speech_waiting_parents()[: -self.self_speech_waiting_capacity]:
+            if not waiting.speculative_occupancy:
+                await self._retire_waiting_parent(
+                    waiting, "source_only", failure_code="translation_overload"
+                )
+        await self._publish_draft(parent)
+        parent.source_closed_event.set()
+        return parent.child_ids
+
+    def _start_current_draft(self) -> None:
+        if not self.channel_ingress_open("self"):
+            return
+        parent = max(
+            (
+                candidate
+                for candidate in self._parents.values()
+                if candidate.channel == "self"
+                and candidate.draft_request is not None
+                and candidate.draft_request.turn_kind == "self"
+                and candidate.children
+                and not candidate.closed
+                and candidate.turn_generation == self._channel_turn_generations["self"]
+            ),
+            key=lambda candidate: candidate.turn_order,
+            default=None,
+        )
+        if (
+            parent is None
+            or parent.source_closed
+            or self._parent_cancellation_requested(parent)
+            or self._speculative_parent_id not in (None, parent.parent_utterance_id)
+        ):
+            return
+        self._speculative_parent_id = parent.parent_utterance_id
+        parent.speculative_occupancy = True
+        self._start_draft_operations(parent, secondary=parent.secondary_eligible)
+
+    def _release_speculative_occupancy(self, parent: _TranslationTurnParent) -> None:
+        parent.speculative_occupancy = False
+        if self._speculative_parent_id == parent.parent_utterance_id:
+            self._speculative_parent_id = None
+            self._start_current_draft()
+
+    def _start_draft_operations(self, parent: _TranslationTurnParent, *, secondary: bool) -> None:
+        for child in parent.children:
+            index = child.target_index
+            if index > 0 and not secondary:
+                continue
+            if index in parent.operations:
+                continue
+            if not child.canonical_attempt:
+                parent.speculative_targets.add(index)
+            if self.prepare_draft_child is not None and child.prepared_request is None:
+                child = self.prepare_draft_child(child)
+                parent.children = tuple(
+                    child if candidate.target_index == index else candidate
+                    for candidate in parent.children
+                )
+            task = start_lifecycle_task(
+                self._scope,
+                self._process_draft_operation(parent, child, parent.source_revision),
+                name=f"child:{child.utterance_id}:{parent.source_revision}",
+                eager_start=True,
+            )
+            parent.operations[index] = task
+
+    async def _process_draft_operation(
+        self,
+        parent: _TranslationTurnParent,
+        child: TranslationTurnChild,
+        source_revision: int,
+    ) -> TranslationTurnProcessResult:
+        result = await self._process_child(child)
+        current = parent.children[child.target_index]
+        if (
+            parent.closed
+            or self.is_child_cancellation_requested(child)
+            or current.provider_generation != child.provider_generation
+            or (
+                source_revision != parent.source_revision
+                and parent.operations.get(child.target_index) is not asyncio.current_task()
+            )
+        ):
+            return result
+        parent.results[child.target_index] = result
+        parent.result_revisions[child.target_index] = parent.source_revision
+        if child.canonical_attempt:
+            parent.final_attempts.add(child.target_index)
+        await self._publish_draft(parent)
+        parent.results_changed.set()
+        return result
+
+    async def _publish_draft(self, parent: _TranslationTurnParent) -> None:
+        request = parent.draft_request
+        if request is None or self.on_draft_updated is None:
+            return
+        parent.presentation_revision += 1
+        targets = []
+        for child in parent.children:
+            result = parent.results.get(child.target_index)
+            status = (
+                (parent.terminal_status or "pending")
+                if result is None
+                else {
+                    "translated": "ready",
+                    "source_only": "source_only",
+                    "failed": "failed",
+                    "cancelled": "cancelled",
+                }[result.outcome]
+            )
+            if (
+                parent.terminal_status is None
+                and parent.source_closed
+                and result is not None
+                and result.outcome == "failed"
+                and child.target_index in parent.speculative_targets
+                and child.target_index not in parent.final_attempts
+            ):
+                status = "pending"
+            targets.append(
+                SelfTurnTargetPresentation(
+                    child.target_language,
+                    parent.result_revisions.get(child.target_index, parent.source_revision),
+                    status,
+                    (
+                        result.output.translation
+                        if result is not None and result.output is not None and status == "ready"
+                        else None
+                    ),
+                )
+            )
+        settled = bool(targets) and all(target.status != "pending" for target in targets)
+        status = parent.terminal_status or (
+            ("failed" if any(target.status == "failed" for target in targets) else "complete")
+            if parent.source_closed and settled
+            else "active"
+        )
+        await self.on_draft_updated(
+            SelfTurnPresentation(
+                parent.parent_utterance_id,
+                parent.turn_generation,
+                parent.turn_order,
+                parent.presentation_revision,
+                parent.source_revision,
+                request.transcript.text,
+                request.config_snapshot.value.source_language,
+                parent.source_closed,
+                status,
+                tuple(targets),
+                request.transcript.created_at,
+            ),
+            request,
+        )
+
+    async def _admit_draft_execution(self, parent: _TranslationTurnParent) -> None:
+        if parent.canonical_slot:
+            return
+        if not parent.speculative_occupancy:
+            await self._self_speech_slots.acquire()
+            parent.canonical_slot = True
+            return
+        acquire = start_lifecycle_task(
+            self._scope,
+            self._self_speech_slots.acquire(),
+            name=f"self-speech-slot:{parent.parent_utterance_id}",
+            eager_start=True,
+        )
+        changed: asyncio.Task[bool] | None = None
+        try:
+            while True:
+                if acquire.done():
+                    await acquire
+                    parent.canonical_slot = True
+                    return
+                if not parent.retiring_operations and all(
+                    child.target_index in parent.results
+                    and parent.results[child.target_index].outcome in {"translated", "source_only"}
+                    for child in parent.children
+                ):
+                    return
+                if (
+                    parent.speculative_occupancy
+                    and not parent.retiring_operations
+                    and all(task.done() for task in parent.operations.values())
+                ):
+                    self._release_speculative_occupancy(parent)
+                    for waiting in self._self_speech_waiting_parents()[
+                        : -self.self_speech_waiting_capacity
+                    ]:
+                        await self._retire_waiting_parent(
+                            waiting, "source_only", failure_code="translation_overload"
+                        )
+                    if parent.closed:
+                        return
+                    if (
+                        asyncio.get_running_loop().time()
+                        >= parent.admitted_at_monotonic_s + self.self_speech_waiting_ttl_s
+                    ):
+                        await self._retire_waiting_parent(
+                            parent, "source_only", failure_code="translation_timeout"
+                        )
+                        return
+                    if parent.waiting_expiry_task is None or parent.waiting_expiry_task.done():
+                        parent.waiting_expiry_task = start_lifecycle_task(
+                            self._scope,
+                            self._expire_waiting_parent(parent),
+                            name=f"self-speech-waiting-expiry:{parent.parent_utterance_id}",
+                            eager_start=True,
+                        )
+                parent.results_changed.clear()
+                changed = start_lifecycle_task(
+                    self._scope,
+                    parent.results_changed.wait(),
+                    name=f"self-result-ready:{parent.parent_utterance_id}",
+                    eager_start=True,
+                )
+                await asyncio.wait((acquire, changed), return_when=asyncio.FIRST_COMPLETED)
+                if not changed.done():
+                    changed.cancel()
+                    await asyncio.gather(changed, return_exceptions=True)
+                changed = None
+        finally:
+            if changed is not None and not changed.done():
+                changed.cancel()
+                await asyncio.gather(changed, return_exceptions=True)
+            if not parent.canonical_slot:
+                if not acquire.done():
+                    acquire.cancel()
+                await asyncio.gather(acquire, return_exceptions=True)
+                if not acquire.cancelled() and acquire.exception() is None:
+                    self._self_speech_slots.release()
+
+    async def _run_draft_parent(self, parent: _TranslationTurnParent) -> None:
+        try:
+            await parent.source_closed_event.wait()
+            if parent.closed or self._parent_cancellation_requested(parent):
+                raise asyncio.CancelledError
+            await self._admit_draft_execution(parent)
+            if parent.closed:
+                return
+            self._mark_parent_execution_started(parent)
+            self._release_speculative_occupancy(parent)
+            self._start_draft_operations(parent, secondary=True)
+
+            async def finish(child: TranslationTurnChild) -> None:
+                result = await parent.operations[child.target_index]
+                if result.outcome == "failed" and child.target_index in parent.speculative_targets:
+                    result = await self._process_child(
+                        replace(child, precomputed_failure=result.terminal_failure)
+                    )
+                    parent.results[child.target_index] = result
+                    parent.result_revisions[child.target_index] = parent.source_revision
+                    parent.final_attempts.add(child.target_index)
+                    await self._publish_draft(parent)
+                if result.output is not None:
+                    result = replace(
+                        result,
+                        output=replace(
+                            result.output,
+                            source_text=child.transcript.text,
+                        ),
+                    )
+                await self._publish_child_result(child, result)
+
+            await asyncio.gather(*(finish(child) for child in parent.children))
+        except asyncio.CancelledError:
+            if parent.terminal_status is None:
+                parent.terminal_status = "cancelled"
+            await self._publish_draft(parent)
+            await self._terminalize_parent_remaining(parent, "cancelled")
+            raise
+        except Exception as exc:
+            self._record_parent_failure(
+                parent, exc, "translation.parent_execution_failed", "parent_execution"
+            )
+            parent.terminal_status = "failed"
+            try:
+                await self._publish_draft(parent)
+            finally:
+                await self._terminalize_parent_remaining(parent, "failed")
+        finally:
+            tasks = tuple(parent.operations.values()) + tuple(parent.retiring_operations)
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            self._release_speculative_occupancy(parent)
+            if parent.canonical_slot:
+                parent.canonical_slot = False
+                self._self_speech_slots.release()
+            self._parent_tasks.pop(parent.parent_utterance_id, None)
+
     async def submit(
         self,
         request: TranslationTurnRequest,
@@ -545,7 +970,6 @@ class TranslationTurnLifecycleOwner:
     ) -> tuple[UUID, ...]:
         parent_id = request.transcript.utterance_id
         if parent_id in self._closed_parent_ids or parent_id in self._parents:
-            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._reject_parent(request)
             return ()
         if (
@@ -553,7 +977,6 @@ class TranslationTurnLifecycleOwner:
             or self._closed
             or request.transcript.channel in self._blocked_channels
         ):
-            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._reject_parent(request)
             return ()
         channel = request.transcript.channel
@@ -575,7 +998,6 @@ class TranslationTurnLifecycleOwner:
         )
         self._parents[parent_id] = parent
         if not children:
-            await self._cancel_prestarted_translation(request.prestarted_secondary_translation)
             await self._close_parent(parent)
             return ()
         try:
@@ -782,13 +1204,11 @@ class TranslationTurnLifecycleOwner:
                         parent_task.cancel()
                         tasks_to_await.append(parent_task)
                     parents_to_await.append(parent)
-                if tasks_to_await:
-                    await asyncio.gather(*tasks_to_await, return_exceptions=True)
-                await self._terminalize_selected_unfinished(selected_parents, "cancelled")
-                if parents_to_await:
-                    await asyncio.gather(
-                        *(parent.closed_event.wait() for parent in parents_to_await)
-                    )
+            if tasks_to_await:
+                await asyncio.gather(*tasks_to_await, return_exceptions=True)
+            await self._terminalize_selected_unfinished(selected_parents, "cancelled")
+            if parents_to_await:
+                await asyncio.gather(*(parent.closed_event.wait() for parent in parents_to_await))
         finally:
             if turn_kinds is None:
                 self._blocked_channels.discard(channel)
@@ -917,9 +1337,6 @@ class TranslationTurnLifecycleOwner:
                         request.precomputed_failure if target_index == 0 else None
                     ),
                     parent_output_count=len(child_specs),
-                    prestarted_translation=(
-                        request.prestarted_secondary_translation if target_index == 1 else None
-                    ),
                     config_snapshot=request.config_snapshot,
                     operation_id=request.operation_id,
                     request_id=request.request_id,
@@ -932,6 +1349,9 @@ class TranslationTurnLifecycleOwner:
         parent: _TranslationTurnParent,
         predecessor: _TranslationTurnParent | None,
     ) -> None:
+        if parent.draft_request is not None:
+            await self._run_draft_parent(parent)
+            return
         speech_slot = False
         try:
             is_dual_target_self = (
@@ -1425,6 +1845,8 @@ class TranslationTurnLifecycleOwner:
                 for parent in self._parents.values()
                 if parent.channel == "self"
                 and not parent.closed
+                and parent.source_closed
+                and not parent.speculative_occupancy
                 and not parent.execution_started
                 and any(child.turn_kind == "self" for child in parent.children)
             ),
@@ -1442,6 +1864,8 @@ class TranslationTurnLifecycleOwner:
         await asyncio.sleep(max(0.0, deadline - loop.time()))
         if parent.closed or parent.execution_started:
             return
+        if parent.speculative_occupancy:
+            return
         await self._retire_waiting_parent(
             parent,
             "source_only",
@@ -1457,6 +1881,19 @@ class TranslationTurnLifecycleOwner:
     ) -> None:
         if parent.closed or parent.execution_started:
             return
+        if parent.draft_request is not None:
+            parent.terminal_status = (
+                "expired" if failure_code == "translation_timeout" else "failed"
+            )
+            if outcome == "source_only":
+                parent.results = {
+                    child.target_index: TranslationTurnProcessResult("source_only")
+                    for child in parent.children
+                }
+                parent.result_revisions = {
+                    child.target_index: parent.source_revision for child in parent.children
+                }
+            await self._publish_draft(parent)
         try:
             if outcome == "source_only" and self.output is not None:
                 for child in parent.children:
@@ -1581,11 +2018,6 @@ class TranslationTurnLifecycleOwner:
         parent = self._parents.get(child.parent_utterance_id)
         if parent is None or parent.closed or child.utterance_id in parent.completed_child_ids:
             return
-        if (
-            child.prestarted_translation is not None
-            and child.prestarted_translation.task is not asyncio.current_task()
-        ):
-            await self._cancel_prestarted_translation(child.prestarted_translation)
         try:
             await self.on_child_terminal(child, outcome)
         except Exception as exc:
@@ -1602,17 +2034,6 @@ class TranslationTurnLifecycleOwner:
             self._mark_child_semantic_done(child)
             if parent.completed_child_ids == set(parent.child_ids):
                 await self._close_parent(parent)
-
-    @staticmethod
-    async def _cancel_prestarted_translation(
-        prestarted: _PrestartedTranslation | None,
-    ) -> None:
-        if prestarted is None:
-            return
-        task = prestarted.task
-        if not task.done():
-            task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
 
     async def _close_parent(self, parent: _TranslationTurnParent) -> None:
         if parent.closed:

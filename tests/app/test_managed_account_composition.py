@@ -199,16 +199,7 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
 ) -> None:
     owner = compose_settings_owner(tmp_path / "settings.json")
     managed = _managed_settings()
-    owner.canonical = replace(
-        managed,
-        state=replace(
-            managed.state,
-            managed_connection=replace(
-                managed.state.managed_connection,
-                referral_id=" 7kq9m2 ",
-            ),
-        ),
-    )
+    owner.canonical = managed
     store = SecretStore()
 
     secret_store_calls: list[tuple[object, object]] = []
@@ -261,7 +252,6 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     assert isinstance(components.pkce, OpenRouterPkceApplicationOwner)
     assert components.pkce.results is results
     assert components.auth.dashboard_action() == "prompt"
-    assert components.usage.current_referral_id == "7KQ9M2"
     translation_state = components.translation.state_provider()
     assert translation_state.managed_selected is True
     assert translation_state.runtime_available is False

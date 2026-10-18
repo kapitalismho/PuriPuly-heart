@@ -8,7 +8,12 @@ from dataclasses import dataclass, field, replace
 from typing import Literal, Protocol
 from uuid import UUID, uuid4
 
-from puripuly_heart.core.audio.ownership import OwnedStreamInput, OwnedVadEvent
+from puripuly_heart.core.audio.ownership import (
+    AudioSegmentIdentity,
+    AudioSegmentTerminalReceipt,
+    OwnedStreamInput,
+    OwnedVadEvent,
+)
 from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.diagnostics import current_diagnostic_operation
 from puripuly_heart.core.lifecycle import LifecycleScope, start_lifecycle_task
@@ -19,8 +24,6 @@ from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
     _MergeBuffer,
-    _SpeculativeAttempt,
-    _SpeculativeAttemptStatus,
 )
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -43,9 +46,7 @@ from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationUiMessage,
 )
 from puripuly_heart.core.orchestrator.translation_request import (
-    DirectTranslationRequest,
     PreparedTranslationRequest,
-    StaleProviderCompletion,
     TranslationProcessRequest,
     TranslationRequestPort,
 )
@@ -58,13 +59,12 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
     TranslationTurnRequest,
-    _PrestartedTranslation,
-    _translation_turn_child_id,
 )
 from puripuly_heart.core.runtime.output import SELF_SPEECH_TYPING_REASON
 from puripuly_heart.core.stt.backend import (
     STTContributionConsumptionLedger,
     STTProviderEpochEnded,
+    STTProviderInputTerminal,
     STTProviderTurnIdentity,
     STTProviderTurnTerminal,
     STTProviderTurnUpdate,
@@ -75,6 +75,7 @@ from puripuly_heart.core.stt.diagnostics import recognition_cause, recognition_f
 from puripuly_heart.core.stt.recognition_units import recognition_transcript
 from puripuly_heart.core.vad.gating import SpeechChunk, SpeechEnd, SpeechStart, VadEvent
 from puripuly_heart.domain.events import (
+    SelfTurnPresentation,
     STTErrorEvent,
     STTFinalEvent,
     STTPartialEvent,
@@ -121,6 +122,16 @@ class SelfTranslationChannelPort(Protocol):
 
 
 @dataclass(slots=True)
+class _AcousticContinuation:
+    utterance_id: UUID
+    started_at: float
+    recognition_scope: tuple[object, ...] | None
+    chunk_count: int = 0
+    ended_at: float | None = None
+    timeout_task: asyncio.Task[None] | None = None
+
+
+@dataclass(slots=True)
 class SelfTranslationChannelOwner:
     runtime: ChannelRuntime = field(repr=False)
     config_snapshot: TranslationRuntimeConfigSnapshotPort = field(repr=False)
@@ -147,12 +158,17 @@ class SelfTranslationChannelOwner:
     _scoped_terminal_reports: OrderedDict[STTProviderTurnIdentity, None] = field(
         default_factory=OrderedDict
     )
+    _acoustic_continuations: dict[AudioSegmentIdentity | UUID, _AcousticContinuation] = field(
+        default_factory=dict
+    )
     _task_scope: LifecycleScope = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.runtime.channel != "self":
             raise ValueError("Self translation owner requires the Self channel runtime")
         self._task_scope = LifecycleScope("SelfTranslationChannelOwner")
+        self.translation_turns.on_draft_updated = self._on_draft_updated
+        self.translation_turns.prepare_draft_child = self._prepare_draft_child
 
     @property
     def merge_buffer(self) -> _MergeBuffer | None:
@@ -188,22 +204,7 @@ class SelfTranslationChannelOwner:
         if channel != "self":
             raise ValueError("Self translation owner cannot reset a non-Self channel")
         self.output_projection.retire_self_ui_speech()
-        merge_buffer = self.runtime.merge_buffer
-        speculative_attempt = merge_buffer.speculative_attempt if merge_buffer is not None else None
-        secondary_task = (
-            speculative_attempt.secondary_task if speculative_attempt is not None else None
-        )
-        await self.translation_turns.cancel_pending(
-            channel="self",
-            turn_kinds=frozenset({"self"}),
-        )
-        if secondary_task is not None:
-            if not secondary_task.done():
-                secondary_task.cancel()
-            await asyncio.gather(secondary_task, return_exceptions=True)
-            for utterance_id, task in tuple(self.runtime.translation_tasks.items()):
-                if task is secondary_task:
-                    self.runtime.translation_tasks.pop(utterance_id, None)
+        await self.translation_turns.cancel_pending(channel="self", turn_kinds=frozenset({"self"}))
         await self.output_projection.reset_overlay_preview()
         await self.runtime.clear_self_speech_state()
         self._clear_scoped_recognition_state()
@@ -251,10 +252,27 @@ class SelfTranslationChannelOwner:
             raise TypeError("Self translation owner received an invalid VAD event")
         resume_overlay_resync_buffer: _MergeBuffer | None = None
         low_latency_mode = self.config_snapshot().value.low_latency_mode
+        source_identity = owned.segment.identity if owned is not None else None
+        recognition_scope = (
+            (
+                owned.segment.settings.provider_id,
+                owned.segment.settings.provider_signature,
+                owned.segment.settings.runtime_signature,
+            )
+            if owned is not None
+            else None
+        )
         if isinstance(vad_event, SpeechStart) and low_latency_mode:
-            self._mark_resume_pending(vad_event)
+            self._mark_resume_pending(
+                vad_event,
+                source_identity=source_identity,
+                recognition_scope=recognition_scope,
+            )
         if isinstance(vad_event, SpeechChunk) and low_latency_mode:
-            resume_overlay_resync_buffer = self._maybe_confirm_resume(vad_event)
+            resume_overlay_resync_buffer = self._maybe_confirm_resume(
+                vad_event,
+                source_identity=source_identity,
+            )
         if (
             isinstance(vad_event, SpeechEnd)
             and vad_event.utterance_id not in self._retired_local_vad_ids
@@ -295,7 +313,10 @@ class SelfTranslationChannelOwner:
             if low_latency_mode:
                 self._maybe_update_buffer_end_time(vad_event.utterance_id)
                 self._maybe_start_finalize_wait(vad_event.utterance_id)
-                await self._maybe_clear_resume_on_end(vad_event)
+                await self._maybe_clear_resume_on_end(
+                    vad_event,
+                    source_identity=source_identity,
+                )
                 buffer = self.merge_buffer
                 if buffer is not None:
                     await self._evaluate_speculative_next_action(
@@ -341,7 +362,25 @@ class SelfTranslationChannelOwner:
             reason=reason,
         )
 
-    def release_input_segment(self, segment_id: UUID) -> None:
+    async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None:
+        if receipt.outcome not in {"cancelled", "failed", "expired"}:
+            return
+        if receipt.identity not in self._acoustic_continuations:
+            return
+        self._settle_acoustic_continuation(receipt.identity)
+        buffer = self.merge_buffer
+        if buffer is not None:
+            await self._evaluate_speculative_next_action(buffer, reason="source_segment_retired")
+
+    def release_input_segment(self, event: STTProviderInputTerminal) -> None:
+        segment_id = event.identity.segment.segment_id
+        if event.independent_recognition:
+            observation = self._acoustic_continuations.get(event.identity.segment)
+            if (
+                observation is not None
+                and observation.recognition_scope == event.identity.settings_scope
+            ):
+                self._settle_acoustic_continuation(event.identity.segment)
         self._clear_runtime_latency_bookkeeping(segment_id)
         self._scoped_endpoint_publication_ids.pop(segment_id, None)
         self._retired_local_vad_ids[segment_id] = None
@@ -586,6 +625,7 @@ class SelfTranslationChannelOwner:
         origins: tuple[RecognitionTextOrigin, ...] = (),
     ) -> None:
         recognition_scope = self._recognition_scope(identity)
+        self._settle_acoustic_continuation(identity.segment)
         buffer = self.merge_buffer
         if (
             buffer is not None
@@ -636,10 +676,12 @@ class SelfTranslationChannelOwner:
                 recognition_origins=self._scoped_publication_origins[identity],
             ),
             recognition_scope=recognition_scope,
+            source_identity=identity.segment,
         )
 
     async def _settle_scoped_terminal(self, identity: STTProviderTurnIdentity) -> None:
         acoustic_id = identity.segment.segment_id
+        self._settle_acoustic_continuation(identity.segment)
         buffer = self.merge_buffer
         if buffer is None:
             return
@@ -671,6 +713,9 @@ class SelfTranslationChannelOwner:
         self,
         buffer: _MergeBuffer,
     ) -> None:
+        for key, observation in tuple(self._acoustic_continuations.items()):
+            if observation.recognition_scope == buffer.recognition_scope:
+                self._settle_acoustic_continuation(key)
         self._cancel_awaiting_vad_timeout(buffer)
         self._cancel_finalize_wait(buffer)
         self._clear_resume_state(buffer)
@@ -710,6 +755,8 @@ class SelfTranslationChannelOwner:
         return True
 
     def _clear_scoped_recognition_state(self) -> None:
+        for key in tuple(self._acoustic_continuations):
+            self._settle_acoustic_continuation(key)
         for identity in tuple(self._scoped_publication_ids):
             self._stt_consumption.retire(identity)
         self._scoped_publication_ids.clear()
@@ -733,6 +780,8 @@ class SelfTranslationChannelOwner:
     async def on_child_created(self, child: TranslationTurnChild) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
+        if child.draft:
+            return
         if child.target_index != 0:
             self.runtime.get_or_create_bundle(child.utterance_id).with_transcript(child.transcript)
             self.runtime.remember_source(child.utterance_id, child.source)
@@ -753,6 +802,23 @@ class SelfTranslationChannelOwner:
     ) -> None:
         if any(child.channel != "self" for child in children):
             raise ValueError("Self translation owner received a non-Self parent")
+        if children and children[0].draft:
+            if not self.translation_requests.provider_available:
+                return
+            for child in children:
+                prepared = child.prepared_request
+                if prepared is None or not child.config_snapshot.value.translation_enabled:
+                    continue
+                self.translation_requests.remember_context(
+                    child.transcript.text,
+                    self.clock.now(),
+                    channel="self",
+                    config_snapshot=child.config_snapshot,
+                    source_language=prepared.source_language,
+                    target_language=child.target_language,
+                    origin="self",
+                )
+            return
         if not self.output_projection.admit_self_turn(children):
             raise RuntimeError("Self translation projection rejected parent admission")
         if not await self.output_projection.admit_translation_parent(children):
@@ -774,6 +840,23 @@ class SelfTranslationChannelOwner:
         request = self._process_request_for_child(child)
         target_language = request.target_language
         prepared = self._admitted_requests.pop(child.utterance_id, None)
+        if child.draft:
+            prepared = child.prepared_request
+            if child.preparation_failure is not None:
+                raise child.preparation_failure
+            request = replace(
+                request,
+                expected_provider_generation=(
+                    self.translation_requests.provider_generation
+                    if child.canonical_attempt
+                    else child.provider_generation
+                ),
+                prestarted=not child.canonical_attempt,
+            )
+            if child.canonical_attempt and prepared is not None:
+                prepared = replace(
+                    prepared, provider_generation=self.translation_requests.provider_generation
+                )
         if child.precomputed_translation is not None:
             if prepared is None:
                 self.translation_requests.remember_context(
@@ -807,44 +890,6 @@ class SelfTranslationChannelOwner:
                     context_texts=None if prepared is None else prepared.context_texts,
                 ),
             )
-        if child.prestarted_translation is not None:
-            prestarted = child.prestarted_translation
-            result = await prestarted.task
-            if cancellation_requested():
-                raise asyncio.CancelledError
-            prestart_matches = (
-                prestarted.provider_generation == self.translation_requests.provider_generation
-                and self._translation_config_matches(
-                    prestarted.config_snapshot.value,
-                    child.config_snapshot.value,
-                )
-            )
-            if prestart_matches and result.terminal_failure is not None:
-                request = replace(request, terminal_failure=result.terminal_failure)
-            if result.outcome != "translated" or result.output is None or not prestart_matches:
-                self._clear_latency_timeline(child.utterance_id)
-                result = await self.translation_requests.process(
-                    request,
-                    cancellation_requested=cancellation_requested,
-                    prepared=prepared,
-                )
-            elif result.output is not None:
-                result = replace(
-                    result,
-                    output=replace(
-                        result.output,
-                        source=child.source,
-                        source_text=child.transcript.text,
-                        config_snapshot=child.config_snapshot,
-                        turn_generation=child.turn_generation,
-                        turn_order=child.turn_order,
-                        turn_kind=child.turn_kind,
-                        parent_output_count=child.parent_output_count,
-                    ),
-                )
-            if cancellation_requested():
-                raise asyncio.CancelledError
-            return result
         result = await self.translation_requests.process(
             request,
             cancellation_requested=cancellation_requested,
@@ -861,6 +906,8 @@ class SelfTranslationChannelOwner:
     ) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
+        if child.draft:
+            return
         self.runtime.translation_tasks[child.utterance_id] = task
         if len(child.config_snapshot.value.self_target_languages) == 2:
             presentation_revision = self.output_projection.self_turn_presentation_revision(child)
@@ -870,7 +917,7 @@ class SelfTranslationChannelOwner:
                         "[Diagnostic][Translation] translation_target_started "
                         "parent_utterance_id=%s turn_generation=%s turn_order=%s "
                         "target_index=%s target_language=%s presentation_revision=%s "
-                        "precomputed=%s prestarted=%s"
+                        "precomputed=%s"
                     ),
                     args=(
                         child.parent_utterance_id,
@@ -880,7 +927,6 @@ class SelfTranslationChannelOwner:
                         child.target_language,
                         presentation_revision,
                         child.precomputed_translation is not None,
-                        child.prestarted_translation is not None,
                     ),
                     diagnostic_only=True,
                 )
@@ -893,6 +939,13 @@ class SelfTranslationChannelOwner:
     ) -> None:
         if child.channel != "self":
             raise ValueError("Self translation owner received a non-Self child")
+        if child.draft:
+            if child.canonical_attempt and not self.translation_turns.child_output_was_submitted(
+                child.utterance_id
+            ):
+                self.output_projection.record_child_terminal_conversation(child, outcome)
+            self._clear_runtime_latency_bookkeeping(child.utterance_id)
+            return
         prepared = self._admitted_requests.pop(child.utterance_id, None)
         self.runtime.translation_tasks.pop(child.utterance_id, None)
         if not self.translation_turns.child_output_was_submitted(child.utterance_id):
@@ -952,6 +1005,9 @@ class SelfTranslationChannelOwner:
     async def submit_translation_output(self, submission: TranslationOutputSubmission) -> None:
         if submission.channel != "self":
             raise ValueError("Self translation owner received non-Self output")
+        if self.translation_turns.is_draft_parent(submission.parent_utterance_id):
+            self.output_projection.record_final_self_submission(submission)
+            return
         submission = self._with_prepared_context(submission)
         translation = submission.translation
         dual_target = len(submission.config_snapshot.value.self_target_languages) == 2
@@ -1044,6 +1100,7 @@ class SelfTranslationChannelOwner:
                     utterance_id=transcript.utterance_id,
                     payload=transcript,
                     source=source,
+                    parent_utterance_id=parent_utterance_id,
                     operation_id=operation_id,
                     request_id=request_id,
                 )
@@ -1085,7 +1142,6 @@ class SelfTranslationChannelOwner:
         turn_kind: TranslationTurnKind = "self",
         precomputed_translation: Translation | None = None,
         precomputed_failure: TerminalTranslationFailure | None = None,
-        prestarted_secondary_translation: _PrestartedTranslation | None = None,
         wait_for_parent: bool = False,
         config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
         operation_id: str | None = None,
@@ -1101,17 +1157,12 @@ class SelfTranslationChannelOwner:
                 target_languages=config_snapshot.value.self_target_languages,
                 precomputed_translation=precomputed_translation,
                 precomputed_failure=precomputed_failure,
-                prestarted_secondary_translation=prestarted_secondary_translation,
                 config_snapshot=config_snapshot,
                 operation_id=operation_id,
                 request_id=request_id,
             ),
             wait_for_parent=wait_for_parent,
         )
-        if not child_ids and prestarted_secondary_translation is not None:
-            for utterance_id, task in tuple(self.runtime.translation_tasks.items()):
-                if task is prestarted_secondary_translation.task:
-                    self.runtime.translation_tasks.pop(utterance_id, None)
         return child_ids
 
     def _process_request_for_child(
@@ -1340,6 +1391,32 @@ class SelfTranslationChannelOwner:
         buffer.parts.append(text)
         buffer.utterance_ids.append(utterance_id)
 
+    def _settle_acoustic_continuation(self, key: AudioSegmentIdentity | UUID) -> None:
+        observation = self._acoustic_continuations.pop(key, None)
+        if observation is None:
+            return
+        task = observation.timeout_task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+        self._refresh_resume_state()
+
+    def _refresh_resume_state(self) -> None:
+        buffer = self.merge_buffer
+        if buffer is None:
+            return
+        self._clear_resume_state(buffer)
+        observation = next(reversed(self._acoustic_continuations.values()), None)
+        if observation is None:
+            return
+        buffer.resume_pending = True
+        buffer.resume_confirmed = observation.chunk_count >= 3
+        buffer.resume_utterance_id = observation.utterance_id
+        buffer.resume_chunk_count = observation.chunk_count
+        buffer.resume_started_at = observation.started_at
+        if observation.timeout_task is not None:
+            buffer.resume_end_utterance_id = observation.utterance_id
+            buffer.resume_end_timeout_task = observation.timeout_task
+
     def _clear_resume_state(self, buffer: _MergeBuffer) -> None:
         buffer.resume_pending = False
         buffer.resume_confirmed = False
@@ -1347,77 +1424,6 @@ class SelfTranslationChannelOwner:
         buffer.resume_chunk_count = 0
         buffer.resume_started_at = None
         self._cancel_resume_end_timeout(buffer)
-
-    def _clear_spec_latency_state(self, buffer: _MergeBuffer) -> None:
-        attempt = buffer.speculative_attempt
-        if attempt is not None:
-            attempt.latency_stage_times.clear()
-
-    def _record_spec_latency_stage(
-        self,
-        buffer: _MergeBuffer,
-        *,
-        stage: str,
-        timestamp: float | None = None,
-    ) -> None:
-        attempt = buffer.speculative_attempt
-        if attempt is None:
-            return
-        attempt.latency_stage_times[stage] = self.clock.now() if timestamp is None else timestamp
-
-    def _promote_spec_latency_to_output(self, buffer: _MergeBuffer) -> None:
-        attempt = buffer.speculative_attempt
-        if attempt is None or not attempt.latency_stage_times:
-            return
-        for stage in ("llm_request_start", "llm_first_chunk", "llm_done"):
-            timestamp = attempt.latency_stage_times.get(stage)
-            if timestamp is None:
-                continue
-            self._record_latency_stage(
-                utterance_id=buffer.merge_id,
-                stage=stage,
-                timestamp=timestamp,
-                publish_now=False,
-            )
-        self._clear_spec_latency_state(buffer)
-        self._finalize_latency_timeline(buffer.merge_id)
-
-    def _clear_spec_state(self, buffer: _MergeBuffer, *, reason: str) -> bool:
-        attempt = buffer.speculative_attempt
-        if attempt is None:
-            return False
-        attempt.status = _SpeculativeAttemptStatus.CANCELLED
-        attempt.terminal_failure = None
-        if (
-            attempt.task is not None
-            and not attempt.task.done()
-            and attempt.task is not asyncio.current_task()
-        ):
-            attempt.task.cancel()
-            self._emit_metric(
-                "[Metric] spec_cancel id=%s reason=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-            )
-        elif attempt.result is not None:
-            self._emit_metric(
-                "[Metric] spec_cancel id=%s reason=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-            )
-        if attempt.secondary_task is not None and not attempt.secondary_task.done():
-            attempt.secondary_task.cancel()
-        if (
-            attempt.secondary_utterance_id is not None
-            and self.runtime.translation_tasks.get(attempt.secondary_utterance_id)
-            is attempt.secondary_task
-        ):
-            self.runtime.translation_tasks.pop(attempt.secondary_utterance_id, None)
-        if attempt.secondary_utterance_id is not None:
-            self._clear_latency_timeline(attempt.secondary_utterance_id)
-        attempt.latency_stage_times.clear()
-        buffer.speculative_attempt = None
-        return True
 
     def _maybe_update_buffer_end_time(self, utterance_id: UUID) -> None:
         buffer = self.merge_buffer
@@ -1492,7 +1498,11 @@ class SelfTranslationChannelOwner:
 
     def _cancel_resume_end_timeout(self, buffer: _MergeBuffer) -> None:
         task = buffer.resume_end_timeout_task
-        if task is not None and task is not asyncio.current_task():
+        acoustic_owned = task is not None and any(
+            observation.timeout_task is task
+            for observation in self._acoustic_continuations.values()
+        )
+        if not acoustic_owned and task is not None and task is not asyncio.current_task():
             if not task.done():
                 task.cancel()
         buffer.resume_end_timeout_task = None
@@ -1500,45 +1510,46 @@ class SelfTranslationChannelOwner:
 
     def _start_resume_end_timeout(
         self,
-        buffer: _MergeBuffer,
-        utterance_id: UUID,
+        key: AudioSegmentIdentity | UUID,
     ) -> None:
-        self._cancel_resume_end_timeout(buffer)
-        buffer.resume_end_utterance_id = utterance_id
+        observation = self._acoustic_continuations.get(key)
         timeout_s = self.config_snapshot().value.low_latency_awaiting_vad_timeout_s
-        buffer.resume_end_timeout_task = asyncio.create_task(
-            self._resume_end_timeout(buffer.merge_id, utterance_id, timeout_s)
+        if observation is None or observation.timeout_task is not None:
+            return
+        observation.timeout_task = start_lifecycle_task(
+            self._task_scope,
+            self._resume_end_timeout(key, timeout_s),
+            name=f"self-resume-end:{observation.utterance_id}",
         )
+        self._refresh_resume_state()
 
     async def _resume_end_timeout(
         self,
-        merge_id: UUID,
-        utterance_id: UUID,
+        key: AudioSegmentIdentity | UUID,
         timeout_s: float,
     ) -> None:
         try:
             await asyncio.sleep(timeout_s)
         except asyncio.CancelledError:
             return
+        observation = self._acoustic_continuations.get(key)
         buffer = self.merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
+        if observation is None or observation.timeout_task is not asyncio.current_task():
             return
-        if buffer.resume_end_utterance_id != utterance_id:
-            return
-        if not buffer.resume_confirmed:
-            return
+        utterance_id = observation.utterance_id
+        self._settle_acoustic_continuation(key)
         self._emit_metric(
             "[Metric] resume_end_timeout id=%s vad_id=%s timeout_s=%s",
-            str(merge_id)[:8],
+            str(buffer.merge_id)[:8] if buffer is not None else "none",
             str(utterance_id)[:8],
             timeout_s,
         )
-        self._clear_resume_state(buffer)
-        self._cancel_finalize_wait(buffer)
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="resume_end_timeout",
-        )
+        if buffer is not None:
+            self._cancel_finalize_wait(buffer)
+            await self._evaluate_speculative_next_action(
+                buffer,
+                reason="resume_end_timeout",
+            )
 
     def _restart_post_end_grace(self, buffer: _MergeBuffer) -> None:
         wait_ms = self.config_snapshot().value.low_latency_finalize_wait_ms
@@ -1587,81 +1598,89 @@ class SelfTranslationChannelOwner:
             reason="post_end_grace",
         )
 
-    def _mark_resume_pending(self, event: SpeechStart) -> None:
-        buffer = self.merge_buffer
-        if buffer is None:
+    def _mark_resume_pending(
+        self,
+        event: SpeechStart,
+        *,
+        source_identity: AudioSegmentIdentity | None = None,
+        recognition_scope: tuple[object, ...] | None = None,
+    ) -> None:
+        key = source_identity or event.utterance_id
+        if key in self._acoustic_continuations:
             return
-        if buffer.resume_pending and buffer.resume_utterance_id == event.utterance_id:
-            return
-        self._cancel_resume_end_timeout(buffer)
-        buffer.resume_pending = True
-        buffer.resume_confirmed = False
-        buffer.resume_utterance_id = event.utterance_id
-        buffer.resume_chunk_count = 0
-        buffer.resume_started_at = self.clock.now()
-        self._emit_metric(
-            "[Metric] resume_pending id=%s vad_id=%s",
-            str(buffer.merge_id)[:8],
-            str(event.utterance_id)[:8],
+        self._acoustic_continuations[key] = _AcousticContinuation(
+            utterance_id=event.utterance_id,
+            started_at=self.clock.now(),
+            recognition_scope=recognition_scope,
         )
-
-    def _maybe_confirm_resume(self, event: SpeechChunk) -> _MergeBuffer | None:
+        self._refresh_resume_state()
         buffer = self.merge_buffer
-        if buffer is None or not buffer.resume_pending:
+        if buffer is not None:
+            self._emit_metric(
+                "[Metric] resume_pending id=%s vad_id=%s",
+                str(buffer.merge_id)[:8],
+                str(event.utterance_id)[:8],
+            )
+
+    def _maybe_confirm_resume(
+        self,
+        event: SpeechChunk,
+        *,
+        source_identity: AudioSegmentIdentity | None = None,
+    ) -> _MergeBuffer | None:
+        observation = self._acoustic_continuations.get(source_identity or event.utterance_id)
+        if observation is None or observation.ended_at is not None or observation.chunk_count >= 3:
             return None
-        if buffer.resume_utterance_id != event.utterance_id:
+        observation.chunk_count += 1
+        self._refresh_resume_state()
+        buffer = self.merge_buffer
+        if observation.chunk_count < 3 or buffer is None:
             return None
-        if buffer.resume_confirmed:
-            return None
-        buffer.resume_chunk_count += 1
-        if buffer.resume_chunk_count < 3:
-            return None
-        buffer.resume_confirmed = True
-        confirm_ms = 0
-        if buffer.resume_started_at is not None:
-            confirm_ms = int((self.clock.now() - buffer.resume_started_at) * 1000)
         self._emit_metric(
             "[Metric] resume_confirmed id=%s confirm_ms=%s chunk_count=%s",
             str(buffer.merge_id)[:8],
-            confirm_ms,
-            buffer.resume_chunk_count,
+            int((self.clock.now() - observation.started_at) * 1000),
+            observation.chunk_count,
         )
-        cleared_spec_state = self._clear_spec_state(buffer, reason="resume_confirmed")
-        if not cleared_spec_state:
-            return None
         return buffer
 
-    async def _maybe_clear_resume_on_end(self, event: SpeechEnd) -> None:
+    async def _maybe_clear_resume_on_end(
+        self,
+        event: SpeechEnd,
+        *,
+        source_identity: AudioSegmentIdentity | None = None,
+    ) -> None:
+        key = source_identity or event.utterance_id
+        observation = self._acoustic_continuations.get(key)
         buffer = self.merge_buffer
-        if buffer is None:
+        if observation is None:
             return
-        if buffer.resume_utterance_id != event.utterance_id:
+        if observation.ended_at is None:
+            observation.ended_at = self.clock.now()
+        if observation.chunk_count >= 3:
+            self._start_resume_end_timeout(key)
             return
-        if buffer.resume_confirmed:
-            self._start_resume_end_timeout(buffer, event.utterance_id)
-            return
-        if not buffer.resume_pending:
-            return
-        false_ms = 0
-        if buffer.resume_started_at is not None:
-            false_ms = int((self.clock.now() - buffer.resume_started_at) * 1000)
-        self._emit_metric(
-            "[Metric] resume_false_start id=%s false_ms=%s chunk_count=%s",
-            str(buffer.merge_id)[:8],
-            false_ms,
-            buffer.resume_chunk_count,
-        )
-        self._clear_resume_state(buffer)
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="resume_false_start",
-        )
+        false_ms = int((self.clock.now() - observation.started_at) * 1000)
+        chunk_count = observation.chunk_count
+        self._settle_acoustic_continuation(key)
+        if buffer is not None:
+            self._emit_metric(
+                "[Metric] resume_false_start id=%s false_ms=%s chunk_count=%s",
+                str(buffer.merge_id)[:8],
+                false_ms,
+                chunk_count,
+            )
+            await self._evaluate_speculative_next_action(
+                buffer,
+                reason="resume_false_start",
+            )
 
     async def _handle_low_latency_final(
         self,
         transcript: Transcript,
         *,
         recognition_scope: tuple[object, ...] | None = None,
+        source_identity: AudioSegmentIdentity | None = None,
     ) -> None:
         text = transcript.text if transcript.recognition_origins else transcript.text.strip()
         if not text:
@@ -1680,22 +1699,26 @@ class SelfTranslationChannelOwner:
         )
 
         now = self.clock.now()
+        self._settle_acoustic_continuation(source_identity or transcript.utterance_id)
         buffer = self.merge_buffer
         if buffer is None:
             buffer = _MergeBuffer(merge_id=uuid4(), start_time=now, last_final_at=now)
             self.merge_buffer = buffer
+            self._refresh_resume_state()
         if recognition_scope is not None:
             if buffer.recognition_scope is None:
                 buffer.recognition_scope = recognition_scope
             elif buffer.recognition_scope != recognition_scope:
                 raise RuntimeError("recognition configuration barrier was not applied")
-        if buffer.resume_pending or buffer.resume_confirmed:
+        acoustic_id = (
+            source_identity.segment_id if source_identity is not None else transcript.utterance_id
+        )
+        if buffer.resume_utterance_id == acoustic_id:
             self._clear_resume_state(buffer)
         self._upsert_merge_part(buffer, transcript.utterance_id, text)
         if transcript.recognition_origins:
             buffer.recognition_origins[transcript.utterance_id] = transcript.recognition_origins
         buffer.last_final_at = now
-        await self._sync_overlay_active_self(buffer, created_at=transcript.created_at)
 
         end_time = self.runtime.utterance_start_times.get(transcript.utterance_id)
         speech_already_ended = transcript.utterance_id in self.runtime.speech_ended_ids
@@ -1734,88 +1757,11 @@ class SelfTranslationChannelOwner:
     async def _commit_merge(self, buffer: _MergeBuffer, *, reason: str) -> None:
         if self.merge_buffer is not buffer:
             return
-        attempt = buffer.speculative_attempt
         blocker = self._continuation_blocker(buffer)
         if blocker is not None:
             self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
             return
-        self._cancel_finalize_wait(buffer)
-        buffer.awaiting_vad_end = False
-        buffer.awaiting_vad_utterance_id = None
-        for utterance_id in buffer.utterance_ids:
-            self.runtime.utterance_start_times.pop(utterance_id, None)
-            self.runtime.speech_ended_ids.discard(utterance_id)
-            self.runtime.remember_low_latency_committed_utterance(utterance_id)
-        if self.merge_buffer is buffer:
-            self.merge_buffer = None
-
-        final_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
-        if not final_text:
-            await self.output_projection.reset_overlay_preview()
-            return
-
-        current_config_snapshot = self.config_snapshot()
-        prestarted_secondary_translation = self._take_prestarted_secondary_translation(
-            attempt,
-            final_text=final_text,
-            config_snapshot=current_config_snapshot,
-        )
-        precomputed_failure = (
-            attempt.terminal_failure
-            if attempt is not None
-            and attempt.status is _SpeculativeAttemptStatus.FAILED
-            and attempt.source_text == final_text
-            and attempt.provider_generation == self.translation_requests.provider_generation
-            and attempt.config_snapshot.value == current_config_snapshot.value
-            else None
-        )
-        if attempt is not None:
-            attempt.terminal_failure = None
-        reuse_mode = None
-        if (
-            attempt is not None
-            and attempt.status is _SpeculativeAttemptStatus.READY
-            and isinstance(attempt.result, Translation)
-            and attempt.provider_generation == self.translation_requests.provider_generation
-            and self._translation_config_matches(
-                attempt.config_snapshot.value,
-                current_config_snapshot.value,
-            )
-        ):
-            reuse_mode = self.output_projection.soft_reuse_mode(
-                attempt.source_text,
-                final_text,
-            )
-
-        if self.output_projection.should_blank_stale_active_secondary(
-            final_text=final_text,
-            reuse_mode=reuse_mode,
-        ):
-            configuration = self.config_snapshot().value
-            source_language, target_language = (
-                self.output_projection.self_overlay_languages_for_utterance(
-                    utterance_id=buffer.merge_id,
-                    source_language=configuration.source_language,
-                    target_language=configuration.target_language,
-                )
-            )
-            await self.output_projection.blank_active_self(
-                utterance_id=buffer.merge_id,
-                text=final_text,
-                source_language=source_language,
-                target_language=target_language,
-                created_at=self.clock.now(),
-            )
-
-        if (
-            attempt is not None
-            and attempt.task is not None
-            and not attempt.task.done()
-            and attempt.task is not asyncio.current_task()
-        ):
-            attempt.status = _SpeculativeAttemptStatus.CANCELLED
-            attempt.task.cancel()
-
+        await self._maybe_restart_spec(buffer)
         if buffer.last_end_time is not None:
             self.runtime.utterance_start_times[buffer.merge_id] = buffer.last_end_time
         elif buffer.start_time is not None:
@@ -1824,131 +1770,20 @@ class SelfTranslationChannelOwner:
             output_utterance_id=buffer.merge_id,
             source_utterance_ids=tuple(buffer.utterance_ids),
         )
+        self._cancel_finalize_wait(buffer)
+        self._cancel_awaiting_vad_timeout(buffer)
+        buffer.awaiting_vad_end = False
+        buffer.awaiting_vad_utterance_id = None
         for utterance_id in buffer.utterance_ids:
+            self.runtime.utterance_start_times.pop(utterance_id, None)
+            self.runtime.speech_ended_ids.discard(utterance_id)
+            self.runtime.remember_low_latency_committed_utterance(utterance_id)
             self._clear_latency_timeline(utterance_id)
-
-        transcript = Transcript(
-            utterance_id=buffer.merge_id,
-            text=final_text,
-            is_final=True,
-            created_at=self.clock.now(),
-            recognition_origins=self._merged_origins(buffer),
-        )
-        await self._handle_transcript(transcript, is_final=True, source="Mic")
-        config_snapshot = (
-            attempt.config_snapshot
-            if reuse_mode is not None and attempt is not None and attempt.result is not None
-            else current_config_snapshot
-        )
-
-        if (
-            not self.translation_requests.provider_available
-            or not config_snapshot.value.translation_enabled
-        ):
-            await self._ensure_translation(
-                transcript,
-                turn_kind="self",
-                prestarted_secondary_translation=prestarted_secondary_translation,
-                config_snapshot=config_snapshot,
-            )
-            return
-
-        reuse_spec = reuse_mode is not None
-        commit_delay_ms = 0
-        if buffer.start_time is not None:
-            commit_delay_ms = int((self.clock.now() - buffer.start_time) * 1000)
-        self._emit_metric(
-            "[Metric] merge_commit id=%s used_spec=%s parts=%s text_len=%s commit_delay_ms=%s reason=%s",
-            str(buffer.merge_id)[:8],
-            reuse_spec,
-            len(buffer.parts),
-            len(final_text),
-            commit_delay_ms,
-            reason,
-        )
-        if reuse_spec:
-            translation = attempt.result if attempt is not None else None
-            if isinstance(translation, Translation):
-                attempt.terminal_action_started = True
-                self._promote_spec_latency_to_output(buffer)
-                self._emit_metric(
-                    "[Metric] spec_reuse id=%s translation_len=%s after_final=%s",
-                    str(buffer.merge_id)[:8],
-                    len(translation.text),
-                    True,
-                )
-                await self._ensure_translation(
-                    transcript,
-                    turn_kind="self",
-                    precomputed_translation=translation,
-                    prestarted_secondary_translation=prestarted_secondary_translation,
-                    config_snapshot=config_snapshot,
-                )
-                return
-
-        if attempt is not None and attempt.result is not None and reuse_mode is None:
-            self._clear_spec_latency_state(buffer)
-            self._emit_metric(
-                "[Metric] spec_cancel id=%s reason=final_mismatch",
-                str(buffer.merge_id)[:8],
-            )
-
-        await self._ensure_translation(
-            transcript,
-            turn_kind="self",
-            precomputed_failure=precomputed_failure,
-            prestarted_secondary_translation=prestarted_secondary_translation,
-            config_snapshot=config_snapshot,
-        )
-
-    def _take_prestarted_secondary_translation(
-        self,
-        attempt: _SpeculativeAttempt | None,
-        *,
-        final_text: str,
-        config_snapshot: TranslationRuntimeConfigSnapshot,
-    ) -> _PrestartedTranslation | None:
-        if attempt is None or attempt.secondary_task is None:
-            return None
-        target_languages = config_snapshot.value.self_target_languages
-        reusable = (
-            self.translation_requests.provider_available
-            and config_snapshot.value.translation_enabled
-            and len(target_languages) == 2
-            and target_languages[0] != target_languages[1]
-            and attempt.secondary_target_language == target_languages[1]
-            and attempt.provider_generation == self.translation_requests.provider_generation
-            and self._translation_config_matches(
-                attempt.config_snapshot.value,
-                config_snapshot.value,
-            )
-            and self.output_projection.soft_reuse_mode(attempt.source_text, final_text) is not None
-        )
-        task = attempt.secondary_task
-        attempt.secondary_task = None
-        if reusable:
-            if attempt.secondary_utterance_id is None:
-                task.cancel()
-                return None
-            return _PrestartedTranslation(
-                task=task,
-                child_utterance_id=attempt.secondary_utterance_id,
-                provider_generation=attempt.provider_generation,
-                config_snapshot=attempt.config_snapshot,
-            )
-        if not task.done():
-            task.cancel()
-        if (
-            attempt.secondary_utterance_id is not None
-            and self.runtime.translation_tasks.get(attempt.secondary_utterance_id) is task
-        ):
-            self.runtime.translation_tasks.pop(attempt.secondary_utterance_id, None)
-        if attempt.secondary_utterance_id is not None:
-            self._clear_latency_timeline(attempt.secondary_utterance_id)
-        return None
+        self.merge_buffer = None
+        await self.translation_turns.seal_draft(buffer.merge_id)
 
     def _continuation_blocker(self, buffer: _MergeBuffer) -> str | None:
-        if buffer.resume_pending or buffer.resume_confirmed:
+        if self._acoustic_continuations or buffer.resume_pending or buffer.resume_confirmed:
             return "resume"
         if buffer.awaiting_vad_end:
             return "await_vad_end"
@@ -1957,93 +1792,68 @@ class SelfTranslationChannelOwner:
         return None
 
     def _emit_continuation_blocker(
-        self,
-        buffer: _MergeBuffer,
-        *,
-        blocker: str,
-        reason: str,
+        self, buffer: _MergeBuffer, *, blocker: str, reason: str
     ) -> None:
-        attempt = buffer.speculative_attempt
-        hold_ms = 0
-        if blocker == "resume" and attempt is not None and attempt.completed_at is not None:
-            hold_ms = int((self.clock.now() - attempt.completed_at) * 1000)
-        elif buffer.finalize_wait_started_at is not None:
-            hold_ms = int((self.clock.now() - buffer.finalize_wait_started_at) * 1000)
         self._emit_metric(
-            "[Metric] commit_blocked id=%s blocker=%s reason=%s hold_ms=%s",
+            "[Metric] commit_blocked id=%s blocker=%s reason=%s",
             str(buffer.merge_id)[:8],
             blocker,
             reason,
-            hold_ms,
         )
 
     async def _maybe_restart_spec(self, buffer: _MergeBuffer) -> None:
-        config_snapshot = self.config_snapshot()
+        text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
+        if not text:
+            return
+        self._inherit_latency_for_output(
+            output_utterance_id=buffer.merge_id,
+            source_utterance_ids=tuple(buffer.utterance_ids),
+        )
+        await self.translation_turns.revise_draft(
+            TranslationTurnRequest(
+                transcript=Transcript(
+                    utterance_id=buffer.merge_id,
+                    text=text,
+                    is_final=True,
+                    created_at=(
+                        buffer.start_time if buffer.start_time is not None else self.clock.now()
+                    ),
+                    channel="self",
+                    recognition_origins=self._merged_origins(buffer),
+                ),
+                source="Mic",
+                turn_kind="self",
+                target_languages=self.config_snapshot().value.self_target_languages,
+                config_snapshot=self.config_snapshot(),
+            ),
+            provider_generation=self.translation_requests.provider_generation,
+            compatible=lambda left, right: self.output_projection.soft_reuse_mode(left, right)
+            is not None,
+            configuration_compatible=self._translation_config_matches,
+        )
+
+    def _prepare_draft_child(self, child: TranslationTurnChild) -> TranslationTurnChild:
         if (
             not self.translation_requests.provider_available
-            or not config_snapshot.value.translation_enabled
+            or not child.config_snapshot.value.translation_enabled
         ):
-            return
-
-        merged_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
-        if not merged_text:
-            return
-
-        attempt = buffer.speculative_attempt
-        if attempt is not None:
-            normalized_text = self.output_projection.normalize_soft_reuse_text(merged_text)
-            if attempt.source_text == merged_text:
-                reuse_mode = "exact"
-            elif attempt.normalized_text and attempt.normalized_text == normalized_text:
-                reuse_mode = "soft_boundary"
-            else:
-                reuse_mode = None
-            config_matches = self._translation_config_matches(
-                attempt.config_snapshot.value,
-                config_snapshot.value,
+            return replace(child, prepared_request=None, preparation_failure=None)
+        try:
+            prepared = self.translation_requests.prepare(
+                child.transcript.text,
+                channel="self",
+                target_language=child.target_language,
+                context_policy=child.context_policy,
+                config_snapshot=child.config_snapshot,
+                parent_utterance_id=child.parent_utterance_id,
+                target_index=child.target_index,
             )
-            provider_matches = (
-                attempt.provider_generation == self.translation_requests.provider_generation
-            )
-            if reuse_mode is not None and config_matches and provider_matches:
-                self._emit_metric(
-                    "[Metric] spec_preserve id=%s reason=%s status=%s attempt=%s",
-                    str(buffer.merge_id)[:8],
-                    reuse_mode,
-                    attempt.status.value,
-                    attempt.sequence,
-                )
-                return
-            if not provider_matches:
-                restart_reason = "provider_changed"
-            elif not config_matches:
-                restart_reason = "config_changed"
-            else:
-                restart_reason = "source_changed"
-            self._clear_spec_state(buffer, reason=restart_reason)
-
-        buffer.speculative_sequence += 1
-        attempt = _SpeculativeAttempt(
-            source_text=merged_text,
-            normalized_text=self.output_projection.normalize_soft_reuse_text(merged_text),
-            config_snapshot=config_snapshot,
-            provider_generation=self.translation_requests.provider_generation,
-            sequence=buffer.speculative_sequence,
-            started_at=self.clock.now(),
-        )
-        buffer.speculative_attempt = attempt
-        self._emit_metric(
-            "[Metric] spec_start id=%s text_len=%s attempt=%s",
-            str(buffer.merge_id)[:8],
-            len(merged_text),
-            attempt.sequence,
-        )
-        attempt.task = asyncio.create_task(
-            self._run_spec_translation(
-                buffer.merge_id,
-                merged_text,
-                attempt.sequence,
-            )
+        except Exception as exc:
+            return replace(child, prepared_request=None, preparation_failure=exc)
+        return replace(
+            child,
+            prepared_request=replace(prepared, provider_generation=child.provider_generation),
+            preparation_failure=None,
         )
 
     @staticmethod
@@ -2083,340 +1893,43 @@ class SelfTranslationChannelOwner:
             right.integrated_context_max_entries,
         )
 
-    async def _run_spec_translation(
-        self,
-        merge_id: UUID,
-        text: str,
-        attempt: int,
-        *,
-        config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-    ) -> None:
-        if not self.translation_requests.provider_available:
+    async def _evaluate_speculative_next_action(self, buffer: _MergeBuffer, *, reason: str) -> None:
+        if self.merge_buffer is not buffer:
             return
-        buffer = self.merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        current_attempt = buffer.speculative_attempt
-        if (
-            current_attempt is None
-            or current_attempt.source_text != text
-            or current_attempt.sequence != attempt
-        ):
-            return
-        config_snapshot = (
-            config_snapshot or current_attempt.config_snapshot or self.config_snapshot()
-        )
-        current_attempt.config_snapshot = config_snapshot
-        self._record_spec_latency_stage(buffer, stage="llm_request_start")
-        try:
-            translation = await self.translation_requests.translate(
-                DirectTranslationRequest(
-                    utterance_id=merge_id,
-                    text=text,
-                    record_latency=False,
-                    config_snapshot=config_snapshot,
-                    expected_provider_generation=current_attempt.provider_generation,
-                )
-            )
-        except asyncio.CancelledError:
-            return
-        except StaleProviderCompletion:
-            await self._handle_stale_spec_translation(merge_id, text, attempt)
-            return
-        except Exception as exc:
-            self._log_translation_failure(
-                stage="spec",
-                exc=exc,
-                diagnostic_only=True,
-            )
-            buffer = self.merge_buffer
-            if buffer is None or buffer.merge_id != merge_id:
-                return
-            current_attempt = buffer.speculative_attempt
-            if (
-                current_attempt is None
-                or current_attempt.source_text != text
-                or current_attempt.sequence != attempt
-            ):
-                return
-            self._clear_spec_latency_state(buffer)
-            current_attempt.terminal_failure = self.translation_requests.capture_terminal_failure(
-                exc,
-                provider_generation=current_attempt.provider_generation,
-                utterance_id=merge_id,
-                text=text,
-                channel="self",
-                source_language=self.translation_requests.source_language_for(
-                    "self", config_snapshot.value
-                ),
-                target_language=self.translation_requests.target_language_for(
-                    "self", config_snapshot.value
-                ),
-                configuration=config_snapshot.value,
-            )
-            current_attempt.status = _SpeculativeAttemptStatus.FAILED
-            current_attempt.completed_at = self.clock.now()
-            await self._evaluate_speculative_next_action(
-                buffer,
-                reason="spec_failed",
-            )
-            return
-
-        buffer = self.merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        current_attempt = buffer.speculative_attempt
-        if (
-            current_attempt is None
-            or current_attempt.source_text != text
-            or current_attempt.sequence != attempt
-        ):
-            return
-
-        self._record_spec_latency_stage(buffer, stage="llm_done")
-        current_attempt.result = translation
-        current_attempt.status = _SpeculativeAttemptStatus.READY
-        current_attempt.completed_at = self.clock.now()
-        if current_attempt.started_at is None:
-            latency_ms = 0
-        else:
-            latency_ms = int((self.clock.now() - current_attempt.started_at) * 1000)
-        self._emit_metric(
-            "[Metric] spec_done id=%s spec_latency_ms=%s translation_len=%s",
-            str(merge_id)[:8],
-            latency_ms,
-            len(translation.text),
-        )
-        await self._sync_overlay_active_self(buffer, created_at=translation.created_at)
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="spec_done",
-        )
-
-    async def _handle_stale_spec_translation(
-        self,
-        merge_id: UUID,
-        text: str,
-        attempt: int,
-    ) -> None:
-        buffer = self.merge_buffer
-        if buffer is None or buffer.merge_id != merge_id:
-            return
-        current_attempt = buffer.speculative_attempt
-        if (
-            current_attempt is None
-            or current_attempt.source_text != text
-            or current_attempt.sequence != attempt
-        ):
-            return
-        self._clear_spec_latency_state(buffer)
-        current_attempt.result = None
-        current_attempt.terminal_failure = None
-        current_attempt.status = _SpeculativeAttemptStatus.STALE
-        current_attempt.completed_at = self.clock.now()
-        await self._evaluate_speculative_next_action(
-            buffer,
-            reason="spec_stale",
-        )
-
-    async def _evaluate_speculative_next_action(
-        self,
-        buffer: _MergeBuffer,
-        *,
-        reason: str,
-    ) -> None:
-        if self.merge_buffer is None or self.merge_buffer is not buffer:
-            return
-        attempt = buffer.speculative_attempt
-        final_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
-        if not final_text:
-            return
-
-        config_snapshot = self.config_snapshot()
-        translation_active = (
-            self.translation_requests.provider_available
-            and config_snapshot.value.translation_enabled
-        )
         blocker = self._continuation_blocker(buffer)
+        if blocker == "post_end_grace" or blocker is None:
+            self.translation_turns.prestart_draft_secondary(buffer.merge_id)
         if blocker is not None:
-            if (
-                blocker == "post_end_grace"
-                and attempt is not None
-                and not attempt.terminal_action_started
-            ):
-                self._maybe_prestart_secondary_translation(
-                    buffer,
-                    attempt=attempt,
-                    final_text=final_text,
-                    config_snapshot=config_snapshot,
-                    translation_active=translation_active,
-                )
             self._emit_continuation_blocker(buffer, blocker=blocker, reason=reason)
             return
-        if attempt is None:
-            await self._commit_merge(buffer, reason=reason)
-            return
-
-        if attempt.terminal_action_started:
-            self._emit_metric(
-                "[Metric] spec_terminal_duplicate_prevented id=%s reason=%s status=%s attempt=%s",
-                str(buffer.merge_id)[:8],
-                reason,
-                attempt.status.value,
-                attempt.sequence,
-            )
-            return
-
-        self._maybe_prestart_secondary_translation(
-            buffer,
-            attempt=attempt,
-            final_text=final_text,
-            config_snapshot=config_snapshot,
-            translation_active=translation_active,
-        )
-
-        if translation_active and attempt.status is _SpeculativeAttemptStatus.RUNNING:
-            return
-
-        reuse_mode = self.output_projection.soft_reuse_mode(
-            attempt.source_text,
-            final_text,
-        )
-        config_matches = self._translation_config_matches(
-            attempt.config_snapshot.value,
-            config_snapshot.value,
-        )
-        provider_matches = (
-            attempt.provider_generation == self.translation_requests.provider_generation
-        )
-        reuse_ready = (
-            translation_active
-            and attempt.status is _SpeculativeAttemptStatus.READY
-            and isinstance(attempt.result, Translation)
-            and reuse_mode is not None
-            and config_matches
-            and provider_matches
-        )
-        action = "reuse" if reuse_ready else "fallback"
-        if not translation_active:
-            action = "source_only"
-        attempt.terminal_action_started = True
-        self._emit_metric(
-            "[Metric] spec_terminal id=%s action=%s reason=%s status=%s attempt=%s",
-            str(buffer.merge_id)[:8],
-            action,
-            reason,
-            attempt.status.value,
-            attempt.sequence,
-        )
         await self._commit_merge(buffer, reason=reason)
 
-    def _maybe_prestart_secondary_translation(
-        self,
-        buffer: _MergeBuffer,
-        *,
-        attempt: _SpeculativeAttempt,
-        final_text: str,
-        config_snapshot: TranslationRuntimeConfigSnapshot,
-        translation_active: bool,
-    ) -> None:
-        target_languages = config_snapshot.value.self_target_languages
-        if (
-            not translation_active
-            or len(target_languages) != 2
-            or target_languages[0] == target_languages[1]
-            or attempt.secondary_task is not None
-            or attempt.provider_generation != self.translation_requests.provider_generation
-            or not self._translation_config_matches(
-                attempt.config_snapshot.value,
-                config_snapshot.value,
-            )
-            or self.output_projection.soft_reuse_mode(attempt.source_text, final_text) is None
-        ):
-            return
-        target_language = target_languages[1]
-        child_id = _translation_turn_child_id(
-            buffer.merge_id,
-            turn_kind="self",
-            run_index=0,
-            target_index=1,
-            run_language="",
-            target_language=target_language,
-            primary_uses_parent_identity=True,
-        )
-        request = TranslationProcessRequest(
-            parent_utterance_id=buffer.merge_id,
-            utterance_id=child_id,
-            sequence=1,
-            text=attempt.source_text,
-            channel="self",
-            source=self.runtime.get_source(buffer.merge_id) or "Mic",
-            target_language=target_language,
-            context_policy=self.translation_turns.policy.context_policy,
-            config_snapshot=config_snapshot,
-            target_index=1,
-            expected_provider_generation=attempt.provider_generation,
-            prestarted=True,
-        )
-        try:
-            prepared = self.translation_requests.prepare(
-                request.text,
-                channel="self",
-                target_language=target_language,
-                context_policy=request.context_policy,
-                config_snapshot=config_snapshot,
-                parent_utterance_id=buffer.merge_id,
-                target_index=1,
-            )
-        except Exception:
-            return
-        attempt.secondary_target_language = target_language
-        attempt.secondary_utterance_id = child_id
-        attempt.secondary_task = start_lifecycle_task(
-            self._task_scope,
-            self.translation_requests.process(request, prepared=prepared),
-            name=f"secondary-prestart:{child_id}:{attempt.sequence}",
-        )
-        self.runtime.translation_tasks[child_id] = attempt.secondary_task
-        self._emit_metric(
-            "[Metric] secondary_prestart id=%s target_language=%s",
-            str(buffer.merge_id)[:8],
-            target_language,
-        )
-
     async def _sync_overlay_active_self(
-        self,
-        buffer: _MergeBuffer,
-        *,
-        created_at: float | None = None,
+        self, buffer: _MergeBuffer, *, created_at: float | None = None
     ) -> None:
-        active_text = self._merge_text(buffer.parts, preserve_text=bool(buffer.recognition_origins))
-        if not active_text:
-            return
-        attempt = buffer.speculative_attempt
         configuration = self.config_snapshot().value
         await self.output_projection.sync_active_self(
             ActiveSelfProjection(
                 merge_id=buffer.merge_id,
-                active_text=active_text,
-                spec_text=attempt.source_text if attempt is not None else None,
-                spec_translation=(
-                    attempt.result
-                    if attempt is not None and isinstance(attempt.result, Translation)
-                    else None
+                active_text=self._merge_text(
+                    buffer.parts, preserve_text=bool(buffer.recognition_origins)
                 ),
-                source_language=self.translation_requests.source_language_for(
-                    "self",
-                    configuration,
-                ),
-                target_language=self.translation_requests.target_language_for(
-                    "self",
-                    configuration,
-                ),
+                spec_text=None,
+                spec_translation=None,
+                source_language=configuration.source_language,
+                target_language=configuration.target_language,
                 resume_pending=buffer.resume_pending,
                 resume_confirmed=buffer.resume_confirmed,
                 created_at=created_at,
-            )
+            ),
+            handoff=True,
+        )
+
+    async def _on_draft_updated(
+        self, snapshot: SelfTurnPresentation, request: TranslationTurnRequest
+    ) -> None:
+        await self.output_projection.project_self_turn(
+            snapshot, request.config_snapshot, source=request.source
         )
 
 

@@ -57,6 +57,7 @@ class ProviderRuntimeState:
 ProviderRuntimeStateProvider = Callable[[object], ProviderRuntimeState]
 ProviderRuntimeCommonEffect = Callable[[object], None]
 ProviderRuntimeAsyncEffect = Callable[[], Awaitable[None]]
+ProviderRuntimeSettingsEffect = Callable[[object], Awaitable[None]]
 ProviderRuntimeGpuEffect = Callable[
     [object, ProviderRuntimeApplyPlan],
     Awaitable[None],
@@ -128,7 +129,16 @@ class LlmProviderRebuildOwner:
     )
 
     async def rebuild(self, *, propagate_failure: bool = False) -> bool:
-        context = self.context_provider()
+        return await self.rebuild_with_context(
+            self.context_provider(), propagate_failure=propagate_failure
+        )
+
+    async def rebuild_with_context(
+        self,
+        context: LlmProviderRebuildContext | None,
+        *,
+        propagate_failure: bool = False,
+    ) -> bool:
         if context is None:
             return False
         try:
@@ -164,10 +174,10 @@ class LlmProviderRebuildOwner:
 class ProviderRuntimeOwner:
     state_provider: ProviderRuntimeStateProvider
     common_effect: ProviderRuntimeCommonEffect
-    rebuild_llm: ProviderRuntimeAsyncEffect
+    rebuild_llm: ProviderRuntimeSettingsEffect
     recover_gpu: ProviderRuntimeGpuEffect
-    refresh_peer: ProviderRuntimeAsyncEffect
-    refresh_self_stt: ProviderRuntimeAsyncEffect
+    refresh_peer: ProviderRuntimeSettingsEffect
+    refresh_self_stt: ProviderRuntimeSettingsEffect
     signature_sink: ProviderRuntimeSignatureSink
     current_settings_provider: ProviderRuntimeSettingsProvider
     signature_cache_provider: ProviderRuntimeSignatureCacheProvider
@@ -231,12 +241,12 @@ class ProviderRuntimeOwner:
         self,
         settings: object,
         plan: ProviderRuntimeApplyPlan,
-    ) -> None:
+    ) -> object:
         self.common_effect(settings)
         llm_error: Exception | None = None
         if plan.should_rebuild_llm:
             try:
-                await self.rebuild_llm()
+                await self.rebuild_llm(settings)
             except Exception as exc:
                 llm_error = exc
         try:
@@ -244,9 +254,9 @@ class ProviderRuntimeOwner:
                 await self.recover_gpu(settings, plan)
             else:
                 if plan.should_refresh_peer:
-                    await self.refresh_peer()
+                    await self.refresh_peer(settings)
                 if plan.should_refresh_self_stt:
-                    await self.refresh_self_stt()
+                    await self.refresh_self_stt(settings)
             self._require_stt_runtime_convergence(settings)
             self.signature_sink(settings)
         except Exception as exc:
@@ -255,6 +265,7 @@ class ProviderRuntimeOwner:
             raise
         if llm_error is not None:
             raise llm_error
+        return settings
 
     def _require_stt_runtime_convergence(self, settings: object) -> None:
         if self.self_runtime_convergence(settings) is False:
@@ -605,7 +616,7 @@ def _ui_prompt_clipboard_state_save_failed_transaction_result(
 @dataclass(slots=True)
 class ProviderRuntimeApplyAdapter:
     owner: ProviderRuntimeOwner
-    settings: object
+    settings_provider: ProviderRuntimeSettingsProvider
     plan: ProviderRuntimeApplyPlan
     surface: str = "translation_provider"
     operation: str = "apply_provider_runtime"
@@ -616,7 +627,10 @@ class ProviderRuntimeApplyAdapter:
         if self.authority_guard is not None and not self.authority_guard():
             raise asyncio.CancelledError
         try:
-            await self.owner.apply(self.settings, self.plan)
+            current = self.settings_provider()
+            if current is None:
+                raise RuntimeError("provider runtime has no admitted settings")
+            settings = await self.owner.apply(current, self.plan)
         except Exception as exc:
             primary = exc.primary if isinstance(exc, _ProviderRuntimeApplyFailures) else exc
             diagnostics = _settings_mutation_diagnostics(
@@ -648,7 +662,7 @@ class ProviderRuntimeApplyAdapter:
             )
         unavailable_result = _provider_runtime_apply_unavailable_result(
             owner=self.owner,
-            settings=self.settings,
+            settings=settings,
             plan=self.plan,
             operation=self.operation,
             surface=self.surface,

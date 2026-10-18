@@ -13,15 +13,16 @@ from puripuly_heart.config.runtime_resolution import (
     TranslationRuntimeIntent,
     resolve_llm_config,
 )
+from puripuly_heart.core.clock import SystemClock
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.index_translate import is_index_service_failure
-from puripuly_heart.core.orchestrator.channel_runtime import _SpeculativeAttemptStatus
+from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import Transcript
 from puripuly_heart.providers.llm import index_translate
 from tests.app.test_index_translation_attempts import ForbiddenSecrets, ManualDelay
-from tests.helpers.fakes import RecordingOscQueue
+from tests.helpers.fakes import FakeSender
 from tests.helpers.translation_owners import compose_translation_test_harness
 
 
@@ -30,10 +31,7 @@ def success(text="Valid translation"):
         200,
         json={
             "choices": [
-                {
-                    "finish_reason": "stop",
-                    "message": {"role": "assistant", "content": text},
-                }
+                {"finish_reason": "stop", "message": {"role": "assistant", "content": text}}
             ]
         },
     )
@@ -71,11 +69,8 @@ def build_owner(monkeypatch):
             return provider
 
         provider = provider_factory()
-        osc = RecordingOscQueue()
-        harness = compose_translation_test_harness(
-            stt=None,
-            llm=provider,
-            osc=osc,
+        sender = FakeSender()
+        values = dict(
             low_latency_mode=True,
             low_latency_finalize_wait_ms=0,
             low_latency_awaiting_vad_timeout_s=60,
@@ -83,9 +78,15 @@ def build_owner(monkeypatch):
             target_language="es",
             chatbox_include_source=False,
             system_prompt="${sourceName}|${targetName}",
-            **configuration,
         )
-        return harness, provider, provider_factory, delay, osc, clients
+        values.update(configuration)
+        harness = compose_translation_test_harness(
+            stt=None,
+            llm=provider,
+            osc=ChatboxPaginator(sender=sender, clock=SystemClock()),
+            **values,
+        )
+        return harness, provider, provider_factory, delay, sender, clients
 
     return build
 
@@ -108,11 +109,20 @@ def error_events(harness):
     return events
 
 
+async def target_snapshot(harness, target_index, status):
+    async with asyncio.timeout(2):
+        while True:
+            event = await harness.ui_events.get()
+            assert event.type is not UIEventType.ERROR
+            if event.type is UIEventType.SELF_TURN_UPDATED:
+                if event.payload.targets[target_index].status == status:
+                    return event.payload
+
+
 async def close_owner(harness, clients):
     await harness.self_owner.close()
     await harness.stop()
-    assert clients
-    assert all(client.is_closed for client in clients)
+    assert clients and all(client.is_closed for client in clients)
 
 
 @pytest.mark.parametrize("duplicate_outcome", ["service_failure", "winner", "request_limit"])
@@ -131,13 +141,11 @@ async def test_unchanged_speculative_result_keeps_one_index_request_budget(
             dispatched[min(len(sent) - 1, 1)].set()
             if len(sent) == 2 and duplicate_outcome == "winner":
                 return success()
-            if duplicate_outcome == "request_limit":
-                return httpx.Response(413)
-            return httpx.Response(503)
+            return httpx.Response(413 if duplicate_outcome == "request_limit" else 503)
         finally:
             active -= 1
 
-    harness, provider, _, delay, osc, clients = build_owner(handler)
+    harness, provider, _, delay, sender, clients = build_owner(handler)
     failures = []
 
     def settled(exception):
@@ -149,36 +157,29 @@ async def test_unchanged_speculative_result_keeps_one_index_request_budget(
     utterance_id = uuid4()
     try:
         await send_final(harness, utterance_id)
-        attempt = harness.self_owner.merge_buffer.speculative_attempt
         await asyncio.wait_for(dispatched[0].wait(), 1)
         await asyncio.wait_for(delay.scheduled.wait(), 1)
         await delay.advance_to(1.299)
         assert sent == [0.0]
-        assert not attempt.task.done()
         await delay.advance_to(1.3)
-        await asyncio.wait_for(dispatched[1].wait(), 1)
-        await asyncio.wait_for(attempt.task, 1)
+        await target_snapshot(harness, 0, "ready" if duplicate_outcome == "winner" else "failed")
         assert sent == [0.0, 1.3]
         assert failures == []
         assert error_events(harness) == []
-        assert osc.messages == []
-
+        assert sender.sent == (["Valid translation"] if duplicate_outcome == "winner" else [])
         await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
         await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1)
         await delay.advance_to(100)
-
         assert harness.self_owner.merge_buffer is None
-        assert attempt.terminal_failure is None
         assert sent == [0.0, 1.3]
         if duplicate_outcome == "winner":
             assert failures == []
-            assert len(osc.messages) == 1
-            assert osc.messages[0].text == "Valid translation"
+            assert sender.sent == ["Valid translation"]
             assert error_events(harness) == []
         else:
             assert len(failures) == 1
             assert is_index_service_failure(failures[0]) == (duplicate_outcome == "service_failure")
-            assert osc.messages == []
+            assert sender.sent == []
             assert len(error_events(harness)) == 1
         assert [entry.text for entry in harness.self_runtime.translation_history] == [
             "Synthetic hello"
@@ -209,7 +210,9 @@ async def test_secondary_prestarted_failure_keeps_its_index_budget_until_final_a
         finally:
             active[target] -= 1
 
-    harness, _, _, delay, osc, clients = build_owner(handler, self_target_languages=("es", "ja"))
+    harness, _, _, delay, sender, clients = build_owner(
+        handler, self_target_languages=("es", "ja"), low_latency_finalize_wait_ms=1000
+    )
     failures = []
 
     def settled(exception):
@@ -221,29 +224,22 @@ async def test_secondary_prestarted_failure_keeps_its_index_budget_until_final_a
     try:
         await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
         await send_final(harness, utterance_id)
-        attempt = harness.self_owner.merge_buffer.speculative_attempt
         await asyncio.wait_for(started["primary"].wait(), 1)
         await asyncio.wait_for(started["secondary"].wait(), 1)
         await asyncio.wait_for(delay.scheduled.wait(), 1)
         await delay.advance_to(1.299)
         assert sent == {"primary": [0.0], "secondary": [0.0]}
         await delay.advance_to(1.3)
-        prestarted = await asyncio.wait_for(asyncio.shield(attempt.secondary_task), 1)
-        assert prestarted.outcome == "failed"
-        assert prestarted.terminal_failure is not None
-        assert failures == []
-        assert error_events(harness) == []
+        snapshot = await target_snapshot(harness, 1, "failed")
+        assert not snapshot.source_closed
+        assert failures == [] and error_events(harness) == []
         primary_release.set()
-        await asyncio.wait_for(attempt.task, 1)
-        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1)
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 2)
         await delay.advance_to(100)
-
         assert sent == {"primary": [0.0, 1.3], "secondary": [0.0, 1.3]}
-        assert len(failures) == 1
-        assert is_index_service_failure(failures[0])
+        assert len(failures) == 1 and is_index_service_failure(failures[0])
         assert len(error_events(harness)) == 1
-        assert len(osc.messages) == 1
-        assert osc.messages[0].text == "Primary translation"
+        assert sender.sent == ["Primary translation"]
     finally:
         primary_release.set()
         await close_owner(harness, clients)
@@ -261,7 +257,7 @@ async def test_changed_request_or_new_turn_gets_its_own_index_budget(build_owner
         primary_started.set()
         return success("New request winner") if len(sent) == 4 else httpx.Response(503)
 
-    harness, _, provider_factory, delay, osc, clients = build_owner(handler)
+    harness, _, provider_factory, delay, sender, clients = build_owner(handler)
     failures = []
     harness.translation_requests.settled_failure_sink = failures.append
     utterance_id = uuid4()
@@ -269,14 +265,12 @@ async def test_changed_request_or_new_turn_gets_its_own_index_budget(build_owner
         await send_final(harness, utterance_id)
         await asyncio.wait_for(primary_started.wait(), 1)
         await asyncio.wait_for(delay.scheduled.wait(), 1)
-        old_attempt = harness.self_owner.merge_buffer.speculative_attempt
         await delay.advance_to(1.3)
-        await asyncio.wait_for(old_attempt.task, 1)
-        assert old_attempt.terminal_failure is not None
+        await target_snapshot(harness, 0, "failed")
         assert failures == []
         text = "Synthetic hello"
         if change == "source":
-            text = "Synthetic hello changed"
+            text += " changed"
         elif change == "soft_source":
             text += "..."
         elif change == "configuration":
@@ -286,8 +280,7 @@ async def test_changed_request_or_new_turn_gets_its_own_index_budget(build_owner
         else:
             await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
             await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1)
-            assert len(failures) == 1
-            assert len(error_events(harness)) == 1
+            assert len(failures) == 1 and len(error_events(harness)) == 1
             utterance_id = uuid4()
         primary_started.clear()
         delay.scheduled.clear()
@@ -298,18 +291,12 @@ async def test_changed_request_or_new_turn_gets_its_own_index_budget(build_owner
         await delay.advance_to(2.599)
         assert sent == [0.0, 1.3, 1.3]
         await delay.advance_to(2.6)
-        buffer = harness.self_owner.merge_buffer
-        if buffer is not None:
-            await asyncio.wait_for(buffer.speculative_attempt.task, 1)
         await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1)
         await delay.advance_to(100)
-
         assert sent == [0.0, 1.3, 1.3, 2.6]
         assert len(failures) == (1 if change == "new_turn" else 0)
         assert error_events(harness) == []
-        assert old_attempt.terminal_failure is None
-        assert len(osc.messages) == 1
-        assert osc.messages[0].text == "New request winner"
+        assert sender.sent == ["New request winner"]
     finally:
         await close_owner(harness, clients)
 
@@ -324,27 +311,20 @@ async def test_self_retirement_discards_index_failure_and_pending_duplicate(buil
         primary_started.set()
         return httpx.Response(503)
 
-    harness, _, _, delay, osc, clients = build_owner(handler)
+    harness, _, _, delay, sender, clients = build_owner(handler)
     failures = []
     harness.translation_requests.settled_failure_sink = failures.append
     try:
         await send_final(harness, uuid4())
         await asyncio.wait_for(primary_started.wait(), 1)
         await asyncio.wait_for(delay.scheduled.wait(), 1)
-        attempt = harness.self_owner.merge_buffer.speculative_attempt
         if settled:
             await delay.advance_to(1.3)
-            await asyncio.wait_for(attempt.task, 1)
-            assert attempt.terminal_failure is not None
+            await target_snapshot(harness, 0, "failed")
         await harness.self_owner.reset_provider_channel()
         await delay.advance_to(100)
-
-        assert attempt.status is _SpeculativeAttemptStatus.CANCELLED
-        assert attempt.terminal_failure is None
         assert harness.self_owner.merge_buffer is None
         assert len(sent) == (2 if settled else 1)
-        assert failures == []
-        assert error_events(harness) == []
-        assert osc.messages == []
+        assert failures == [] and error_events(harness) == [] and sender.sent == []
     finally:
         await close_owner(harness, clients)

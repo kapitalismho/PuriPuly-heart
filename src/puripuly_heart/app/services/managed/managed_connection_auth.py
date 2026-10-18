@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
@@ -12,7 +11,6 @@ from puripuly_heart.app.ports.broker_client import (
     BrokerClientPort,
     BrokerIssueRequest,
     BrokerIssueResult,
-    ManagedKeyDeliveryAckRequest,
     ManagedKeyDeliveryAckResult,
     ManagedOperationResumeRequest,
     ManagedOperationStatusRequest,
@@ -64,15 +62,12 @@ from .managed_auth_claims import (
     ManagedAuthClaimGuard,
 )
 from .managed_key_delivery_ack import (
+    ACK_RECONCILIATION_STATUSES,
     ACK_SOURCE_DISCORD,
     ManagedKeyDeliveryAckService,
-    ManagedKeyDeliveryAckTokenStoreError,
-    apply_ack_referral_to_managed_state,
-    clear_pending_ack_in_settings_values,
     other_source_pending_delivery_ack,
     read_any_pending_delivery_ack,
     secret_key_for_ack_source,
-    store_pending_ack_in_settings_values,
 )
 from .managed_operation import (
     DEFAULT_MAX_STATUS_POLL_INTERVAL_MS,
@@ -82,6 +77,7 @@ from .managed_operation import (
     MANAGED_OPERATION_SOURCE_DISCORD,
     MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS,
     ManagedOperationIdentity,
+    ManagedOperationTokenReadError,
     ManagedOperationTokenStoreError,
     ProgressSink,
     clear_pending_operation_if_source,
@@ -221,6 +217,31 @@ class ManagedConnectionAuthService:
         broker_result: BrokerIssueResult,
         settings_values: Mapping[str, object],
     ) -> TransactionResult:
+        metadata = broker_result.delivery_ack
+        if metadata is None or (
+            metadata.source != ACK_SOURCE_DISCORD
+            or metadata.managed_credential_ref != broker_result.managed_credential_ref
+            or not metadata.managed_credential_ref
+            or not metadata.delivery_id
+            or not metadata.delivery_ack_token
+        ):
+            return TransactionResult(
+                status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+                message=_operation_message("discord_auth.error.action_required"),
+                diagnostics=_metadata_diagnostics(
+                    operation="validate_managed_delivery",
+                    code=(
+                        "managed_delivery_contract_missing"
+                        if metadata is None
+                        else "managed_delivery_contract_mismatch"
+                    ),
+                    fields={
+                        "phase": "broker_issue",
+                        "secret_write_succeeded": False,
+                        "settings_commit_succeeded": False,
+                    },
+                ),
+            )
         if not broker_result.managed_secret_key:
             return _remote_active_local_missing_result(
                 request=request,
@@ -244,181 +265,101 @@ class ManagedConnectionAuthService:
                 message=broker_result.message,
             )
 
-        settings_values = _settings_values_with_broker_issue(
-            settings_values,
-            broker_result,
-        )
-        commit_result: TransactionResult | None = None
-        if broker_result.delivery_ack is not None:
-            try:
-                settings_values = await store_pending_ack_in_settings_values(
-                    settings_values=settings_values,
-                    secret_store=self.secret_store,
-                    metadata=broker_result.delivery_ack,
-                )
-            except ManagedKeyDeliveryAckTokenStoreError:
-                return _remote_active_local_missing_result(
-                    request=request,
-                    broker_result=broker_result,
-                    operation="store_delivery_ack_token",
-                    code="delivery_ack_token_store_failed_before_local_key_write",
-                    phase="delivery_ack_token_store",
-                    secret_write_succeeded=False,
-                    settings_commit_succeeded=False,
-                    cause=broker_result.diagnostics,
-                    message=broker_result.message,
-                )
-            commit_result = await self._commit_settings(
-                request=request,
-                broker_result=broker_result,
-                settings_values=settings_values,
-                secret_message=None,
-                secret_diagnostics=None,
-            )
-            if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                return commit_result
-
         secret_write_result = await self._write_local_managed_secret(
-            request=request,
-            broker_result=broker_result,
+            request=request, broker_result=broker_result
         )
         if isinstance(secret_write_result, TransactionResult):
-            if broker_result.delivery_ack is not None:
-                with contextlib.suppress(Exception):
-                    await self.secret_store.clear_secret(
-                        secret_key_for_ack_source(broker_result.delivery_ack.source)
-                    )
             return secret_write_result
-
-        await self._store_managed_user_identifier(
-            identity_result=identity_result,
-            broker_result=broker_result,
-        )
-
-        if broker_result.delivery_ack is None:
-            commit_result = await self._commit_settings(
-                request=request,
-                broker_result=broker_result,
-                settings_values=_settings_values_without_pending_operation(settings_values),
-                secret_message=secret_write_result.message,
-                secret_diagnostics=secret_write_result.diagnostics,
+        state = self._managed_state()
+        state_snapshot = state.snapshot() if state is not None else None
+        service = self.delivery_ack_service
+        if service is None and state is not None:
+            service = ManagedKeyDeliveryAckService(
+                broker_client=self.broker_client,
+                secret_store=self.secret_store,
+                managed_state=state,
             )
-            if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                return commit_result
-        assert commit_result is not None
-
-        if broker_result.delivery_ack is not None:
-            ack_result = await self.broker_client.acknowledge_managed_key_delivery(
-                ManagedKeyDeliveryAckRequest(
-                    delivery_id=broker_result.delivery_ack.delivery_id,
-                    managed_credential_ref=broker_result.delivery_ack.managed_credential_ref,
-                    delivery_ack_token=broker_result.delivery_ack.delivery_ack_token,
-                )
-            )
-            self._emit_ack_result(request, ack_result)
-            if not ack_result.succeeded:
+        metadata = broker_result.delivery_ack
+        if metadata is not None:
+            if service is None:
                 return _delivery_ack_pending_result(
                     request=request,
                     broker_result=broker_result,
-                    ack_status=ack_result.status,
-                    cause=ack_result.diagnostics,
-                    message=ack_result.message or commit_result.message,
+                    ack_status="credential_binding_unavailable",
+                    cause=None,
+                    message=None,
                 )
             try:
-                clear_result = await self.secret_store.clear_secret(
-                    secret_key_for_ack_source(broker_result.delivery_ack.source)
-                )
+                await service.bind_credential(metadata, broker_result.managed_secret_key)
+                await service.store_pending(metadata)
             except Exception as exc:
                 return _delivery_ack_pending_result(
                     request=request,
                     broker_result=broker_result,
-                    ack_status="token_clear_failed",
-                    cause=None,
-                    message=commit_result.message,
+                    ack_status="credential_binding_store_failed",
+                    cause=getattr(exc, "diagnostics", None),
+                    message=None,
                     exception=exc,
                 )
-            if not clear_result.succeeded:
-                return _delivery_ack_pending_result(
-                    request=request,
-                    broker_result=broker_result,
-                    ack_status="token_clear_failed",
-                    cause=clear_result.diagnostics,
-                    message=clear_result.message or commit_result.message,
-                )
-            self._apply_ack_referral(ack_result, broker_result.delivery_ack.source)
-            settings_values = _settings_values_with_ack_referral(
-                settings_values, ack_result, broker_result.delivery_ack.source
+        managed = {
+            "installation_id": identity_result.local_identity_revision,
+            "active_managed_credential_ref": broker_result.managed_credential_ref,
+            "active_managed_expires_at": broker_result.expires_at,
+        }
+        if state is not None and (
+            state.active_managed_credential_ref != broker_result.managed_credential_ref
+        ):
+            managed["founder_letter_seen_credential_ref"] = None
+        values = {"state": {"managed_connection": managed}}
+        if metadata is not None:
+            managed.update(
+                pending_delivery_ack_source=metadata.source,
+                pending_delivery_ack_delivery_id=metadata.delivery_id,
+                pending_delivery_ack_managed_credential_ref=metadata.managed_credential_ref,
+                pending_delivery_ack_expires_at=metadata.expires_at,
             )
-            cleared_values = _settings_values_without_pending_operation(
-                clear_pending_ack_in_settings_values(settings_values)
-            )
-            clear_commit = await self._commit_settings(
-                request=request,
-                broker_result=broker_result,
-                settings_values=cleared_values,
-                secret_message=commit_result.message,
-                secret_diagnostics=commit_result.diagnostics,
-            )
-            if clear_commit.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
-                restoration_cause = None
-                try:
-                    restore_result = await self.secret_store.set_secret(
-                        secret_key_for_ack_source(broker_result.delivery_ack.source),
-                        broker_result.delivery_ack.delivery_ack_token,
-                    )
-                    token_restored = restore_result.succeeded
-                except Exception as exc:
-                    token_restored = False
-                    restoration_cause = _metadata_diagnostics(
-                        operation="restore_delivery_ack_token",
-                        code="delivery_ack_token_restore_failed",
-                        fields={"phase": "restore_delivery_ack_token"},
-                        exception=exc,
-                    )
-                else:
-                    if not token_restored:
-                        restoration_cause = restore_result.diagnostics or _metadata_diagnostics(
-                            operation="restore_delivery_ack_token",
-                            code="delivery_ack_token_restore_failed",
-                            fields={"phase": "restore_delivery_ack_token"},
-                        )
-                return _delivery_ack_pending_result(
-                    request=request,
-                    broker_result=broker_result,
-                    ack_status=(
-                        "metadata_clear_failed" if token_restored else "token_restore_failed"
-                    ),
-                    cause=clear_commit.diagnostics,
-                    message=clear_commit.message or commit_result.message,
-                    secondary_diagnostics=(
-                        *clear_commit.secondary_diagnostics,
-                        *(
-                            (
-                                replace(
-                                    restoration_cause,
-                                    cause_id=(
-                                        clear_commit.diagnostics.diagnostic_id
-                                        if clear_commit.diagnostics is not None
-                                        else restoration_cause.cause_id
-                                    ),
-                                ),
-                            )
-                            if restoration_cause is not None
-                            else ()
-                        ),
-                    ),
-                    secondary_omitted_count=clear_commit.secondary_omitted_count,
-                )
-            commit_result = clear_commit
-
-        claim_persist_result = self._record_successful_claim_after_commit(
+        commit_result = await self._commit_settings(
             request=request,
             broker_result=broker_result,
-            message=commit_result.message,
+            settings_values=values,
+            secret_message=secret_write_result.message,
+            secret_diagnostics=secret_write_result.diagnostics,
         )
-        if claim_persist_result is not None:
-            return claim_persist_result
-        await self._clear_terminal_operation_safe()
+        if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+            if state is not None and state_snapshot is not None:
+                try:
+                    state.restore(state_snapshot)
+                except Exception as exc:
+                    _observe_managed_failure("managed_authentication", exc)
+            return commit_result
+        if state is not None:
+            state.active_managed_credential_ref = broker_result.managed_credential_ref
+            state.active_managed_expires_at = broker_result.expires_at
+            state.persist()
+        await self._store_managed_user_identifier(
+            identity_result=identity_result, broker_result=broker_result
+        )
+        if metadata is not None:
+            assert service is not None
+            recovered = await service.retry_pending()
+            if recovered.ack_result is not None:
+                self._emit_ack_result(request, recovered.ack_result)
+            if not recovered.succeeded:
+                return _delivery_ack_pending_result(
+                    request=request,
+                    broker_result=broker_result,
+                    ack_status=recovered.status,
+                    cause=recovered.diagnostics,
+                    message=commit_result.message,
+                    secondary_diagnostics=recovered.secondary_diagnostics,
+                    secondary_omitted_count=recovered.secondary_omitted_count,
+                )
+        claim_result = self._record_successful_claim_after_commit(
+            request=request, broker_result=broker_result, message=commit_result.message
+        )
+        if claim_result is not None:
+            return claim_result
+        await self._clear_terminal_operation_safe(preserve_active_credential=True)
         return commit_result
 
     def _managed_state(self) -> ManagedIdentityStatePort | None:
@@ -445,16 +386,6 @@ class ManagedConnectionAuthService:
         if callable(sink):
             sink(ack_result)
 
-    def _apply_ack_referral(
-        self,
-        ack_result: ManagedKeyDeliveryAckResult,
-        source: str,
-    ) -> None:
-        state = self._managed_state()
-        if state is None:
-            return
-        apply_ack_referral_to_managed_state(state, ack_result, source)
-
     def _max_polls(self, request: ManagedConnectionAuthRequest) -> int:
         if request.max_status_polls is not None and request.max_status_polls >= 0:
             return request.max_status_polls
@@ -465,27 +396,37 @@ class ManagedConnectionAuthService:
             return request.status_poll_interval_ms
         return DEFAULT_STATUS_POLL_INTERVAL_MS
 
-    async def _local_secret_present(self, request: ManagedConnectionAuthRequest) -> bool:
-        try:
-            stored = await self.secret_store.get_secret(request.local_secret_key)
-        except Exception as exc:
-            _observe_managed_failure("managed_authentication", exc)
-            return False
-        return stored is not None and bool(stored.value)
-
-    async def _clear_terminal_operation(self, state: ManagedIdentityStatePort) -> None:
+    async def _clear_terminal_operation(
+        self, state: ManagedIdentityStatePort, *, preserve_active_credential: bool = False
+    ) -> None:
         cleared = False
+        previous = state.snapshot()
         try:
+            if not preserve_active_credential:
+                service = self.delivery_ack_service or ManagedKeyDeliveryAckService(
+                    broker_client=self.broker_client,
+                    secret_store=self.secret_store,
+                    managed_state=state,
+                )
+                await service.clear_failed_credential_projection(ACK_SOURCE_DISCORD)
             cleared = clear_pending_operation_if_source(state, MANAGED_OPERATION_SOURCE_DISCORD)
             if cleared:
+                if state.pending_delivery_ack_source == ACK_SOURCE_DISCORD:
+                    state.pending_delivery_ack_source = None
+                    state.pending_delivery_ack_delivery_id = None
+                    state.pending_delivery_ack_managed_credential_ref = None
+                    state.pending_delivery_ack_expires_at = None
                 state.persist()
         except Exception as exc:
             _observe_managed_failure("managed_authentication", exc)
-            pass
+            state.restore(previous)
+            return
         if not cleared:
             return
         try:
             await clear_resume_token(self.secret_store)
+            if previous.pending_delivery_ack_source == ACK_SOURCE_DISCORD:
+                await self.secret_store.clear_secret(secret_key_for_ack_source(ACK_SOURCE_DISCORD))
         except Exception as exc:
             _observe_managed_failure("managed_authentication", exc)
             pass
@@ -518,7 +459,17 @@ class ManagedConnectionAuthService:
                 cause=None,
             )
         pending = read_pending_operation(state)
-        existing_token = await read_resume_token(self.secret_store)
+        try:
+            existing_token = await read_resume_token(self.secret_store)
+        except ManagedOperationTokenReadError as exc:
+            return _pre_issue_failed_result(
+                request=request,
+                operation="read_resume_token",
+                code="managed_operation_token_read_failed",
+                phase="secret_observation",
+                message=_operation_message("discord_auth.error.action_required"),
+                cause=exc.diagnostics,
+            )
         if (
             pending is not None
             and pending.installation_id == installation_id
@@ -576,12 +527,34 @@ class ManagedConnectionAuthService:
         installation_id = identity_result.local_identity_revision or state.installation_id
         installation_id = installation_id.strip() if isinstance(installation_id, str) else ""
         if not installation_id or pending.installation_id != installation_id:
-            await self._clear_terminal_operation(state)
-            return None
-        resume_token = await read_resume_token(self.secret_store)
+            return _operation_action_required_result(
+                request,
+                operation=pending,
+                probe=ManagedOperationStatusResult(
+                    succeeded=False,
+                    operation_status="CREATE_UNKNOWN",
+                    client_action="action_required",
+                ),
+                code="managed_operation_installation_mismatch",
+            )
+        try:
+            resume_token = await read_resume_token(self.secret_store)
+        except ManagedOperationTokenReadError as exc:
+            return replace(
+                _operation_recovery_pending_result(request, operation=pending, polls=0),
+                diagnostics=exc.diagnostics,
+            )
         if resume_token is None:
-            await self._clear_terminal_operation(state)
-            return None
+            return _operation_action_required_result(
+                request,
+                operation=pending,
+                probe=ManagedOperationStatusResult(
+                    succeeded=False,
+                    operation_status="CREATE_UNKNOWN",
+                    client_action="action_required",
+                ),
+                code="managed_operation_resume_token_missing",
+            )
         emit_progress(request.progress_sink, "recovering")
         return await self._drive_operation_recovery(
             request,
@@ -607,6 +580,11 @@ class ManagedConnectionAuthService:
         settings_values: Mapping[str, object],
     ) -> TransactionResult:
         unknown = _issue_failure_unknown_outcome(issue_result)
+        if issue_result.diagnostics is not None and (
+            issue_result.diagnostics.fields.get("dispatch_certainty") == "not_dispatched"
+        ):
+            await self._clear_terminal_operation_safe()
+            return issue_result
         try:
             first_probe = await self._fetch_operation_status(
                 operation.operation_id,
@@ -616,6 +594,15 @@ class ManagedConnectionAuthService:
         except Exception as exc:
             _observe_managed_failure("managed_authentication", exc)
             first_probe = None
+        if first_probe is not None and (
+            first_probe.operation_status == "FAILED"
+            or first_probe.client_action == "action_required"
+        ):
+            if first_probe.operation_status == "FAILED":
+                await self._clear_terminal_operation_safe()
+            return _operation_action_required_result(
+                request, operation=operation, probe=first_probe
+            )
         if first_probe is None or (
             not first_probe.succeeded
             and first_probe.operation_status != MANAGED_OPERATION_UNKNOWN_OPERATION_STATUS
@@ -629,10 +616,10 @@ class ManagedConnectionAuthService:
                     operation=operation,
                     resume_token=resume_token,
                     settings_values=settings_values,
-                    first_probe=None,
+                    first_probe=first_probe,
                     unknown_outcome=True,
                     original_failure=None,
-                    initial_probe_failures=1,
+                    initial_probe_failures=0,
                 )
             return issue_result
         if (
@@ -673,7 +660,17 @@ class ManagedConnectionAuthService:
             )
         except Exception as exc:
             _observe_managed_failure("managed_authentication", exc)
-            return None
+            return ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="CREATE_UNKNOWN",
+                client_action="wait",
+                diagnostics=_metadata_diagnostics(
+                    operation="managed_operation_status",
+                    code="managed_operation_status_failed",
+                    fields={"phase": "managed_operation_status"},
+                    exception=exc,
+                ),
+            )
 
     async def _call_resume(
         self,
@@ -691,7 +688,17 @@ class ManagedConnectionAuthService:
             )
         except Exception as exc:
             _observe_managed_failure("managed_authentication", exc)
-            return None
+            return ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="CREATE_UNKNOWN",
+                client_action="wait",
+                diagnostics=_metadata_diagnostics(
+                    operation="managed_operation_resume",
+                    code="managed_operation_resume_failed",
+                    fields={"phase": "managed_operation_resume"},
+                    exception=exc,
+                ),
+            )
 
     async def _drive_operation_recovery(
         self,
@@ -711,6 +718,7 @@ class ManagedConnectionAuthService:
         base_interval = self._poll_interval_ms(request)
         polls = 0
         consecutive_probe_failures = initial_probe_failures
+        last_diagnostics = first_probe.diagnostics if first_probe is not None else None
         pending_probe: ManagedOperationStatusResult | None | str = first_probe or "fetch"
         reissue_used = False
         resume_authorized_seen = False
@@ -719,7 +727,7 @@ class ManagedConnectionAuthService:
             if pending_probe == "fetch":
                 if polls >= max_polls:
                     return _operation_recovery_pending_result(
-                        request, operation=operation, polls=polls
+                        request, operation=operation, polls=polls, cause=last_diagnostics
                     )
                 if polls > 0:
                     await asyncio.sleep(
@@ -736,6 +744,12 @@ class ManagedConnectionAuthService:
                 probe = pending_probe
                 pending_probe = "fetch"
             assert isinstance(probe, ManagedOperationStatusResult) or probe is None
+            if probe is not None and (
+                probe.operation_status == "FAILED" or probe.client_action == "action_required"
+            ):
+                if probe.operation_status == "FAILED":
+                    await self._clear_terminal_operation_safe()
+                return _operation_action_required_result(request, operation=operation, probe=probe)
             if probe is None or not probe.succeeded:
                 if (
                     probe is not None
@@ -773,9 +787,11 @@ class ManagedConnectionAuthService:
                         return None
                     continue
                 consecutive_probe_failures += 1
+                if probe is not None and probe.diagnostics is not None:
+                    last_diagnostics = probe.diagnostics
                 if consecutive_probe_failures >= MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES:
                     return _operation_recovery_pending_result(
-                        request, operation=operation, polls=polls
+                        request, operation=operation, polls=polls, cause=last_diagnostics
                     )
                 if original_failure is not None and first_iteration and not unknown_outcome:
                     return original_failure
@@ -827,6 +843,17 @@ class ManagedConnectionAuthService:
             if probe.client_action == "retry_authorized":
                 resume_authorized_seen = True
                 resumed = await self._call_resume(operation, resume_token)
+                if resumed is not None and resumed.diagnostics is not None:
+                    last_diagnostics = resumed.diagnostics
+                if resumed is not None and (
+                    resumed.operation_status == "FAILED"
+                    or resumed.client_action == "action_required"
+                ):
+                    if resumed.operation_status == "FAILED":
+                        await self._clear_terminal_operation_safe()
+                    return _operation_action_required_result(
+                        request, operation=operation, probe=resumed
+                    )
                 if resumed is not None and resumed.succeeded:
                     if resumed.operation_status == "FAILED":
                         await self._clear_terminal_operation_safe()
@@ -867,16 +894,19 @@ class ManagedConnectionAuthService:
                 pending_probe = "fetch"
                 continue
             if probe.client_action == "action_required":
-                await self._clear_terminal_operation_safe()
                 return _operation_action_required_result(request, operation=operation, probe=probe)
             emit_progress(request.progress_sink, "recovering")
             pending_probe = "fetch"
 
-    async def _clear_terminal_operation_safe(self) -> None:
+    async def _clear_terminal_operation_safe(
+        self, *, preserve_active_credential: bool = False
+    ) -> None:
         state = self._managed_state()
         if state is None:
             return
-        await self._clear_terminal_operation(state)
+        await self._clear_terminal_operation(
+            state, preserve_active_credential=preserve_active_credential
+        )
 
     async def _recover_active_operation(
         self,
@@ -886,15 +916,47 @@ class ManagedConnectionAuthService:
         operation: ManagedOperationIdentity,
         probe: ManagedOperationStatusResult,
     ) -> TransactionResult:
-        if not await self._local_secret_present(request):
-            await self._clear_terminal_operation_safe()
+        service = self.delivery_ack_service
+        if service is None:
+            return _operation_action_required_result(
+                request, operation=operation, probe=probe, code="credential_binding_unavailable"
+            )
+        try:
+            binding, credential = await service.credential_binding(ACK_SOURCE_DISCORD)
+        except Exception as exc:
+            return replace(
+                _operation_recovery_pending_result(request, operation=operation, polls=0),
+                diagnostics=_metadata_diagnostics(
+                    operation="secret_observation",
+                    code="managed_secret_read_failed",
+                    fields={"phase": "secret_observation"},
+                    exception=exc,
+                ),
+            )
+        remote_ref = probe.managed_credential_ref or (
+            probe.attempt.managed_credential_ref if probe.attempt is not None else None
+        )
+        if (
+            not remote_ref
+            or binding is None
+            or not binding.matches(
+                credential=credential,
+                source=ACK_SOURCE_DISCORD,
+                installation_id=operation.installation_id,
+                operation_id=operation.operation_id,
+                managed_credential_ref=remote_ref,
+            )
+        ):
             return _operation_action_required_result(
                 request,
                 operation=operation,
                 probe=probe,
-                code="managed_operation_active_key_missing",
+                code="managed_operation_active_key_unbound",
             )
-        self._apply_status_referral(probe)
+        state = self._managed_state()
+        if state is not None:
+            state.active_managed_credential_ref = binding.managed_credential_ref
+            state.persist()
         if self.claim_guard is not None:
             self.claim_guard.record_success(MANAGED_AUTH_CLAIM_SOURCE_DISCORD)
             try:
@@ -902,7 +964,7 @@ class ManagedConnectionAuthService:
             except Exception as exc:
                 _observe_managed_failure("managed_authentication", exc)
                 return _operation_recovery_pending_result(request, operation=operation, polls=0)
-        await self._clear_terminal_operation_safe()
+        await self._clear_terminal_operation_safe(preserve_active_credential=True)
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
             message=None,
@@ -920,15 +982,6 @@ class ManagedConnectionAuthService:
             ),
         )
 
-    def _apply_status_referral(self, probe: ManagedOperationStatusResult) -> None:
-        state = self._managed_state()
-        if state is None:
-            return
-        normalized_referral_id = _normalize_optional_text(probe.referral_id)
-        if normalized_referral_id is not None:
-            state.referral_id = normalized_referral_id
-            state.referral_source = MANAGED_OPERATION_SOURCE_DISCORD
-
     async def _recover_acknowledge_delivery(
         self,
         request: ManagedConnectionAuthRequest,
@@ -940,12 +993,12 @@ class ManagedConnectionAuthService:
         probe: ManagedOperationStatusResult,
     ) -> TransactionResult | None:
         service = self.delivery_ack_service
-        if (
-            service is not None
-            and service.managed_state.pending_delivery_ack_source == ACK_SOURCE_DISCORD
-            and await self._local_secret_present(request)
-        ):
-            recovered = await service.retry_pending()
+        recovered = (
+            await service.recover_operation_delivery(ACK_SOURCE_DISCORD, probe)
+            if service is not None
+            else None
+        )
+        if recovered is not None:
             if recovered.ack_result is not None:
                 self._emit_ack_result(request, recovered.ack_result)
             if recovered.succeeded:
@@ -958,7 +1011,7 @@ class ManagedConnectionAuthService:
                         return _operation_recovery_pending_result(
                             request, operation=operation, polls=0
                         )
-                await self._clear_terminal_operation_safe()
+                await self._clear_terminal_operation_safe(preserve_active_credential=True)
                 return TransactionResult(
                     status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                     message=(
@@ -977,8 +1030,17 @@ class ManagedConnectionAuthService:
                         },
                     ),
                 )
-            return _operation_recovery_pending_result(request, operation=operation, polls=0)
+            if recovered.status not in ACK_RECONCILIATION_STATUSES:
+                return _operation_recovery_pending_result(
+                    request, operation=operation, polls=0, cause=recovered.diagnostics
+                )
         resumed = await self._call_resume(operation, resume_token)
+        if resumed is not None and (
+            resumed.operation_status == "FAILED" or resumed.client_action == "action_required"
+        ):
+            if resumed.operation_status == "FAILED":
+                await self._clear_terminal_operation_safe()
+            return _operation_action_required_result(request, operation=operation, probe=resumed)
         if resumed is not None and resumed.succeeded:
             converted = _status_result_to_issue_result(resumed)
             if converted is not None:
@@ -1008,6 +1070,17 @@ class ManagedConnectionAuthService:
             self._emit_ack_result(request, result.ack_result)
         message = result.ack_result.message if result.ack_result is not None else None
         if not result.succeeded:
+            if (
+                result.status in ACK_RECONCILIATION_STATUSES
+                and read_pending_operation(service.managed_state) is not None
+            ):
+                return None
+            if result.status in ACK_RECONCILIATION_STATUSES:
+                return TransactionResult(
+                    status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
+                    message=_operation_message("discord_auth.error.action_required"),
+                    diagnostics=result.diagnostics,
+                )
             return _delivery_ack_recovery_pending_result(
                 request=request,
                 ack_status=result.status,
@@ -1590,6 +1663,8 @@ def _delivery_ack_pending_result(
     message: UserMessageRef | None,
     secondary_diagnostics: tuple[ErrorDiagnostics, ...] = (),
     secondary_omitted_count: int = 0,
+    secret_write_succeeded: bool | None = None,
+    settings_commit_succeeded: bool | None = None,
 ) -> TransactionResult:
     fields: dict[str, DiagnosticFieldValue] = {
         "phase": "remote_delivery_ack",
@@ -1597,8 +1672,8 @@ def _delivery_ack_pending_result(
         "remote_active": ack_status
         in {"token_clear_failed", "metadata_clear_failed", "token_restore_failed"},
         "broker_issue_succeeded": True,
-        "secret_write_succeeded": True,
-        "settings_commit_succeeded": True,
+        "secret_write_succeeded": secret_write_succeeded,
+        "settings_commit_succeeded": settings_commit_succeeded,
         "delivery_ack_status": ack_status,
     }
     safe_cause = sanitize_diagnostics(cause) if cause is not None else None
@@ -1679,47 +1754,6 @@ def pending_operation_settings_values(
     return values
 
 
-def _settings_values_without_pending_operation(
-    settings_values: Mapping[str, object],
-) -> dict[str, object]:
-    values = _copy_settings_values(settings_values)
-    state = values.get("state")
-    if not isinstance(state, dict):
-        return values
-    managed = state.get("managed_connection")
-    if not isinstance(managed, dict):
-        return values
-    for key in (
-        "pending_managed_operation_id",
-        "pending_managed_operation_source",
-        "pending_managed_operation_installation_id",
-        "pending_managed_operation_state",
-    ):
-        managed.pop(key, None)
-    return values
-
-
-def _settings_values_with_ack_referral(
-    settings_values: Mapping[str, object],
-    ack_result: ManagedKeyDeliveryAckResult,
-    source: str,
-) -> dict[str, object]:
-    values = _copy_settings_values(settings_values)
-    state = values.setdefault("state", {})
-    if not isinstance(state, dict):
-        state = {}
-        values["state"] = state
-    managed = state.setdefault("managed_connection", {})
-    if not isinstance(managed, dict):
-        managed = {}
-        state["managed_connection"] = managed
-    if source in {ACK_SOURCE_DISCORD}:
-        managed["referral_source"] = source
-        if _normalize_optional_text(ack_result.referral_id) is not None:
-            managed["referral_id"] = _normalize_optional_text(ack_result.referral_id)
-    return values
-
-
 def _issue_failure_unknown_outcome(issue_result: TransactionResult) -> bool:
     diagnostics = issue_result.diagnostics
     if diagnostics is None:
@@ -1735,6 +1769,7 @@ def _operation_recovery_pending_result(
     request: ManagedConnectionAuthRequest,
     operation: ManagedOperationIdentity,
     polls: int,
+    cause: ErrorDiagnostics | None = None,
 ) -> TransactionResult:
     return TransactionResult(
         status=TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
@@ -1742,14 +1777,15 @@ def _operation_recovery_pending_result(
         diagnostics=_metadata_diagnostics(
             operation="recover_managed_operation",
             code="managed_operation_recovery_pending",
+            cause=cause,
             fields={
                 "phase": "remote_managed_operation_recovery",
                 "local_secret_key": request.local_secret_key,
                 "managed_operation_id": operation.operation_id,
                 "managed_operation_state": operation.last_known_state,
                 "status_polls": polls,
-                "secret_write_succeeded": True,
-                "settings_commit_succeeded": True,
+                "secret_write_succeeded": None,
+                "settings_commit_succeeded": None,
             },
         ),
     )
@@ -1774,8 +1810,8 @@ def _operation_action_required_result(
         "managed_operation_id": operation.operation_id,
         "operation_status": probe.operation_status,
         "client_action": probe.client_action,
-        "secret_write_succeeded": True,
-        "settings_commit_succeeded": True,
+        "secret_write_succeeded": None,
+        "settings_commit_succeeded": None,
     }
     if failed_reason is not None:
         fields["failed_reason"] = failed_reason
@@ -1786,6 +1822,7 @@ def _operation_action_required_result(
             operation="recover_managed_operation",
             code=resolved_code,
             fields=fields,
+            cause=probe.diagnostics,
         ),
     )
 
@@ -1805,35 +1842,9 @@ def _status_result_to_issue_result(
         managed_credential_ref=probe.managed_credential_ref,
         expires_at=probe.expires_at,
         openrouter_user_id=probe.openrouter_user_id,
-        referral_id=probe.referral_id,
-        referral_bonus_applied=probe.referral_bonus_applied,
-        pass_status=probe.pass_status,
         delivery_ack=probe.delivery_ack,
         unknown_outcome=False,
     )
-
-
-def _settings_values_with_broker_issue(
-    settings_values: Mapping[str, object],
-    broker_result: BrokerIssueResult,
-) -> dict[str, object]:
-    values = _copy_settings_values(settings_values)
-    state = values.setdefault("state", {})
-    if not isinstance(state, dict):
-        state = {}
-        values["state"] = state
-    managed = state.setdefault("managed_connection", {})
-    if not isinstance(managed, dict):
-        managed = {}
-        state["managed_connection"] = managed
-    managed_credential_ref = broker_result.managed_credential_ref
-    if managed_credential_ref:
-        managed["active_managed_credential_ref"] = managed_credential_ref
-    if broker_result.expires_at:
-        managed["active_managed_expires_at"] = broker_result.expires_at
-    if broker_result.referral_id:
-        managed["referral_id"] = broker_result.referral_id
-    return values
 
 
 def _copy_settings_values(values: Mapping[str, object]) -> dict[str, object]:
@@ -1857,7 +1868,9 @@ def _metadata_diagnostics(
     exception: BaseException | None = None,
 ) -> ErrorDiagnostics:
     if cause is None and exception is not None:
-        candidate = getattr(exception, "diagnostics", None)
+        candidate = getattr(exception, "failure_diagnostics", None) or getattr(
+            exception, "diagnostics", None
+        )
         cause = candidate if isinstance(candidate, ErrorDiagnostics) else None
     cause = sanitize_diagnostics(cause) if cause is not None else None
     diagnostics = ErrorDiagnostics(

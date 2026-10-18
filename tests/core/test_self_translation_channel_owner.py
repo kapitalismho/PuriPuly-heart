@@ -12,7 +12,7 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.messages import UserErrorReport
-from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry, _MergeBuffer
+from puripuly_heart.core.orchestrator.channel_runtime import ContextEntry
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
@@ -37,9 +37,13 @@ from puripuly_heart.domain.events import (
     STTSessionStateEvent,
     UIEventType,
 )
-from puripuly_heart.domain.models import OSCMessage, Transcript
+from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
-from tests.core.test_self_translation_low_latency import BlockingLLMProvider, FakeLLMProvider
+from tests.core.test_self_translation_low_latency import (
+    BlockingLLMProvider,
+    FakeLLMProvider,
+    RecordingOverlaySink,
+)
 from tests.core.test_translation_owner_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
@@ -47,7 +51,6 @@ from tests.core.test_translation_owner_branch_coverage import (
 from tests.helpers.fakes import FakeSender, RecordingOscQueue
 from tests.helpers.translation_owners import (
     compose_translation_test_harness,
-    make_speculative_attempt,
 )
 
 
@@ -165,6 +168,111 @@ async def test_self_owner_rejects_closed_ingress_and_non_self_events() -> None:
                 ),
             )
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retirement", ["admission", "speech_reset", "turn_channel"])
+async def test_draft_drain_and_destructive_retirement_are_distinct(retirement) -> None:
+    cancellation_observed = asyncio.Event()
+    late_returned = asyncio.Event()
+
+    class LateResultProvider(BlockingLLMProvider):
+        async def translate(self, **kwargs):
+            try:
+                return await super().translate(**kwargs)
+            except asyncio.CancelledError:
+                cancellation_observed.set()
+            while not self.release.is_set():
+                try:
+                    await self.release.wait()
+                except asyncio.CancelledError:
+                    cancellation_observed.set()
+            late_returned.set()
+            return Translation(utterance_id=kwargs["utterance_id"], text=self.response_text)
+
+    llm = LateResultProvider(response_text="late translation")
+    sink = RecordingOverlaySink()
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        osc=osc,
+        overlay_sink=sink,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+    )
+    source_id = uuid4()
+    callback_complete = asyncio.Event()
+    original = harness.translation_turns.on_draft_updated
+    assert original is not None
+
+    async def observe(snapshot, request):
+        await original(snapshot, request)
+        if snapshot.status != "active" or any(
+            target.translation is not None for target in snapshot.targets
+        ):
+            callback_complete.set()
+
+    harness.translation_turns.on_draft_updated = observe
+    retirement_task = None
+    try:
+        await harness.self_owner.handle_stt_event(
+            STTFinalEvent(
+                source_id, Transcript(utterance_id=source_id, text="pending", is_final=True)
+            )
+        )
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        if retirement == "admission":
+            await harness.self_owner.close_ingress()
+            rejected_id = uuid4()
+            with pytest.raises(RuntimeError, match="closed"):
+                await harness.self_owner.handle_stt_event(
+                    STTFinalEvent(
+                        rejected_id,
+                        Transcript(utterance_id=rejected_id, text="rejected", is_final=True),
+                    )
+                )
+        else:
+            operation = (
+                harness.self_owner.reset_provider_channel()
+                if retirement == "speech_reset"
+                else harness.translation_turns.close_channel_ingress("self")
+            )
+            retirement_task = asyncio.create_task(operation)
+            await asyncio.wait_for(cancellation_observed.wait(), timeout=1.0)
+        llm.release.set()
+        if retirement_task is not None:
+            await asyncio.wait_for(retirement_task, timeout=1.0)
+            await asyncio.wait_for(late_returned.wait(), timeout=1.0)
+            await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        await asyncio.wait_for(callback_complete.wait(), timeout=1.0)
+        if retirement == "admission":
+            assert [message.text for message in osc.messages] == ["pending (late translation)"]
+            assert any(
+                getattr(event, "secondary_text", "") == "late translation" for event in sink.events
+            )
+            await harness.self_owner.open_ingress()
+            await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
+            await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+            assert [entry.text for entry in harness.self_runtime.translation_history] == ["pending"]
+            assert len(llm.calls) == 1
+        else:
+            assert osc.messages == []
+            assert not any(
+                getattr(event, "secondary_text", "") == "late translation" for event in sink.events
+            )
+            events = [harness.ui_events.get_nowait() for _ in range(harness.ui_events.qsize())]
+            assert not any(
+                event.type == UIEventType.SELF_TURN_UPDATED
+                and (event.delivery_authority is None or event.delivery_authority.is_current())
+                and any(target.translation is not None for target in event.payload.targets)
+                for event in events
+            )
+    finally:
+        llm.release.set()
+        if retirement_task is not None:
+            await asyncio.gather(retirement_task, return_exceptions=True)
+        await harness.stop()
 
 
 @pytest.mark.asyncio
@@ -299,6 +407,7 @@ async def test_self_native_input_failure_disconnects_only_current_stream() -> No
         "self",
         "provider_send_failed",
         "retire",
+        independent_recognition=True,
     )
     await callbacks.self_event_handler(failed)
     assert harness.stt_session_state() is STTSessionState.DISCONNECTED
@@ -369,6 +478,7 @@ async def test_self_latest_submitted_epoch_end_disconnects_before_its_first_fina
             ),
             "submitted",
             "self",
+            independent_recognition=True,
         )
 
     def native(
@@ -450,6 +560,7 @@ async def test_self_late_accepted_native_finals_preserve_text_without_reviving_o
             ),
             outcome,
             "self",
+            independent_recognition=True,
         )
 
     try:
@@ -542,6 +653,7 @@ async def test_self_native_input_terminal_retires_only_local_vad_timing() -> Non
                     ),
                     "failed" if order == 1 else "submitted",
                     "self",
+                    independent_recognition=True,
                 )
             )
             if order == 1:
@@ -771,15 +883,19 @@ async def test_late_speech_end_measures_already_committed_translation(scoped: bo
         clock.advance(2.9)
         paginator.process_due()
 
-        expected_text = "world (translated)" if scoped else "hello (translated)"
-        assert sender.sent[-1] == expected_text
+        assert sender.sent[-1] == "hello (translated)"
+        if scoped:
+            async with asyncio.timeout(1.0):
+                while sender.sent[-1] != "world (translated)":
+                    await asyncio.sleep(0)
+            assert sender.sent[-2:] == ["hello (translated)", "world (translated)"]
         summaries = [
             message
             for message in _runtime_log_messages(stream)
             if message.startswith("[Basic][Latency]")
         ]
-        assert len(summaries) == 1
-        assert "last_speech_to_chatbox_send_ms=3500" in summaries[0]
+        assert len(summaries) == (2 if scoped else 1)
+        assert all("last_speech_to_chatbox_send_ms=3500" in summary for summary in summaries)
         assert not any("[Metric]" in message for message in _runtime_log_messages(stream))
         assert not harness.translation_diagnostics.snapshot().timeline_keys
     finally:
@@ -912,28 +1028,44 @@ async def test_recognition_configuration_change_is_merge_barrier_but_epoch_rotat
 
 
 @pytest.mark.asyncio
-async def test_self_owner_close_cancels_and_awaits_owned_runtime_tasks() -> None:
-    harness = compose_translation_test_harness(stt=None, llm=None, osc=RecordingOscQueue())
-    owner = harness.self_owner
-    utterance_id = uuid4()
-    translation_task = asyncio.create_task(asyncio.sleep(60.0))
-    spec_task = asyncio.create_task(asyncio.sleep(60.0))
-    finalize_task = asyncio.create_task(asyncio.sleep(60.0))
-    owner.runtime.translation_tasks[utterance_id] = translation_task
-    owner.merge_buffer = _MergeBuffer(
-        merge_id=uuid4(),
-        utterance_ids=[utterance_id],
-        speculative_attempt=make_speculative_attempt(task=spec_task),
-        finalize_wait_task=finalize_task,
+async def test_composed_shutdown_cancels_and_awaits_draft_provider_work() -> None:
+    cancelled = asyncio.Event()
+
+    class CancellationObservedProvider(BlockingLLMProvider):
+        async def translate(self, **kwargs):
+            try:
+                return await super().translate(**kwargs)
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+    llm = CancellationObservedProvider()
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=llm,
+        osc=osc,
+        low_latency_mode=True,
     )
-
-    await owner.close()
-
-    assert translation_task.done()
-    assert spec_task.done()
-    assert finalize_task.done()
-    assert owner.merge_buffer is None
-    assert not owner.accepting_events
+    owner = harness.self_owner
+    source_id = uuid4()
+    try:
+        await harness.start(auto_flush_osc=False)
+        await owner.handle_stt_event(
+            STTFinalEvent(
+                source_id, Transcript(utterance_id=source_id, text="pending", is_final=True)
+            )
+        )
+        await asyncio.wait_for(llm.started.wait(), timeout=1.0)
+        await asyncio.wait_for(harness.stop(), timeout=1.0)
+        assert cancelled.is_set()
+        assert len(llm.calls) == 1
+        assert owner.merge_buffer is None
+        assert not owner.accepting_events
+        assert osc.messages == []
+    finally:
+        llm.release.set()
+        await harness.stop()
 
 
 @pytest.mark.asyncio

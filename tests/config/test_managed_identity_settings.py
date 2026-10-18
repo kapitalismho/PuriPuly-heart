@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
@@ -51,62 +52,63 @@ def test_managed_identity_settings_round_trip_includes_handoff_fields() -> None:
     assert restored.state.managed_connection.founder_letter_seen_credential_ref == "hash_123"
 
 
-def test_managed_identity_referral_id_defaults_to_none_and_round_trips() -> None:
-    settings = AppSettingsVNext()
+def test_loading_and_writing_old_referral_settings_preserves_managed_authority(tmp_path) -> None:
+    from puripuly_heart.config.settings_vnext import compat
 
-    assert settings.state.managed_connection.referral_id is None
-    assert settings.state.managed_connection.referral_source is None
-
-    default_payload = serialization.to_dict(settings)
-    assert default_payload["state"]["managed_connection"]["referral_id"] is None
-    assert default_payload["state"]["managed_connection"]["referral_source"] is None
-
-    settings = _with_managed_connection(settings, referral_id="7KQ9M2", referral_source="qq")
-    restored = serialization.from_dict(serialization.to_dict(settings))
-
-    assert restored.state.managed_connection.referral_id == "7KQ9M2"
-    assert restored.state.managed_connection.referral_source == "qq"
-    payload = serialization.to_dict(restored)["state"]["managed_connection"]
-    assert payload["referral_id"] == "7KQ9M2"
-    assert payload["referral_source"] == "qq"
-
-
-def test_managed_identity_referral_source_defaults_to_discord_when_referral_id_is_set() -> None:
-    settings = _with_managed_connection(AppSettingsVNext(), referral_id="7KQ9M2")
-
-    assert settings.state.managed_connection.referral_source == "discord"
-
-
-def test_managed_identity_settings_do_not_persist_talk_together_pass_status() -> None:
-    settings = _with_managed_connection(AppSettingsVNext(), referral_id="7KQ9M2")
-
-    serialized = serialization.to_dict(settings)
-    managed_identity = serialized["state"]["managed_connection"]
-
-    assert managed_identity["referral_id"] == "7KQ9M2"
-    assert "talk_together_pass" not in managed_identity
-    assert "invite_count" not in managed_identity
-    assert "invite_limit" not in managed_identity
-
-    loaded = serialization.from_dict(
-        {
-            **serialized,
-            "state": {
-                **serialized["state"],
-                "managed_connection": {
-                    **managed_identity,
-                    "talk_together_pass": {"pass_id": "7KQ9M2", "invite_count": 1},
-                    "invite_count": 1,
-                    "invite_limit": 3,
-                },
-            },
-        }
+    settings = _with_managed_connection(
+        AppSettingsVNext(),
+        installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
+        release_token="release-1",
+        release_token_expires_at="2026-12-08T06:00:45.000Z",
+        verified_hardware_hash="hardware-hash-1",
+        verified_hardware_hash_salt_version=7,
+        active_managed_credential_ref="managed-ref-qq",
+        active_managed_expires_at="2026-12-17T12:34:56Z",
+        founder_letter_seen_credential_ref="managed-ref-qq",
+        local_managed_claim_sources=("discord", "qq"),
+        pending_delivery_ack_source="qq",
+        pending_delivery_ack_delivery_id="delivery-qq",
+        pending_delivery_ack_managed_credential_ref="managed-ref-qq",
+        pending_delivery_ack_expires_at="2026-12-17T12:34:56Z",
+        pending_managed_operation_id="ph-mop-v1_0123456789abcdef0123456789abcdef",
+        pending_managed_operation_source="qq",
+        pending_managed_operation_installation_id="01961ad7-a7c1-7000-8000-0123456789ab",
+        pending_managed_operation_state="DELIVERY_PENDING",
     )
+    payload = serialization.to_dict(settings)
+    payload["settings_version"] = 52
+    obsolete = {
+        "referral_id": "7KQ9M2",
+        "referral_source": "qq",
+        "talk_together_pass": {"pass_id": "7KQ9M2", "invite_count": 1},
+        "invite_count": 1,
+        "invite_limit": 3,
+    }
+    payload["state"]["managed_connection"].update(obsolete)
+    payload["state"]["managed_connection"]["unrelated_extension"] = {"retained": True}
+    payload["managed_identity"] = {**obsolete, "unrelated_extension": "identity"}
+    payload["managed_connection"] = {**obsolete, "unrelated_extension": "connection"}
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
-    assert loaded.state.managed_connection.referral_id == "7KQ9M2"
-    assert not hasattr(loaded.state.managed_connection, "talk_together_pass")
-    assert not hasattr(loaded.state.managed_connection, "invite_count")
-    assert not hasattr(loaded.state.managed_connection, "invite_limit")
+    loaded = compat.load_vnext_settings(path)
+
+    assert loaded.settings is not None
+    assert loaded.settings.state.managed_connection == settings.state.managed_connection
+    saved = compat.save_vnext_settings(path, loaded.settings)
+    assert saved.ok
+    written = json.loads(path.read_text(encoding="utf-8"))
+    managed = written["state"]["managed_connection"]
+    assert managed == {
+        **json.loads(json.dumps(serialization.to_dict(settings)))["state"]["managed_connection"],
+        "unrelated_extension": {"retained": True},
+    }
+    assert written["managed_identity"] == {"unrelated_extension": "identity"}
+    assert written["managed_connection"] == {"unrelated_extension": "connection"}
+    assert not set(obsolete).intersection(managed)
+    reloaded = compat.load_vnext_settings(path)
+    assert reloaded.settings is not None
+    assert reloaded.settings.state.managed_connection == settings.state.managed_connection
 
 
 def test_openrouter_selected_source_round_trip() -> None:

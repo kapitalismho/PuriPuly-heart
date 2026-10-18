@@ -14,6 +14,7 @@ from puripuly_heart.app.ports.ui_models import (
 )
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
 from puripuly_heart.core.language import get_all_language_options
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.components.language_card import LanguageCard
 from puripuly_heart.ui.components.language_modal import LanguageModal
@@ -764,6 +765,50 @@ class DashboardView(ft.Column):
             font_family=face.font_family,
             letter_spacing=face.letter_spacing,
             debug_prefix=debug_prefix,
+        )
+
+    def set_self_turn(self, snapshot: SelfTurnPresentation) -> None:
+        previous = getattr(self, "_self_turn_snapshot", None)
+        if previous is not None:
+            order = (snapshot.turn_generation, snapshot.turn_order)
+            previous_order = (previous.turn_generation, previous.turn_order)
+            if order < previous_order or (
+                snapshot.utterance_id == previous.utterance_id
+                and snapshot.revision <= previous.revision
+            ):
+                return
+        self._self_turn_snapshot = snapshot
+        self._primary_display_revision += 1
+        self._current_display_text = snapshot.source_text
+        ready = [
+            target
+            for target in snapshot.targets
+            if target.status == "ready"
+            and target.source_revision == snapshot.source_revision
+            and target.translation is not None
+            and snapshot.status not in ("cancelled", "expired")
+        ]
+        translation_text = "\n".join(
+            (
+                f"{language_name(target.target_language)}: {target.translation.text}"
+                if len(snapshot.targets) > 1
+                else target.translation.text
+            )
+            for target in ready
+        )
+        status_key = snapshot.status
+        if status_key == "active":
+            status_key = "translating" if snapshot.source_closed else "preview"
+        self.display_card.set_turn(
+            snapshot.source_text,
+            translation_text or None,
+            source_face=self._typeface(snapshot.source_language),
+            translation_face=self._typeface(
+                ready[0].target_language if ready else snapshot.source_language
+            ),
+            status=status_key,
+            new_turn=previous is None or previous.utterance_id != snapshot.utterance_id,
+            target_count=len(snapshot.targets),
         )
 
     def set_managed_auth_pending(self, pending: bool) -> None:

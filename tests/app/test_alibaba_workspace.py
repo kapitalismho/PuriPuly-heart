@@ -236,10 +236,10 @@ async def test_runtime_plan_replaces_only_affected_qwen_clients() -> None:
     owner = ProviderRuntimeOwner(
         state_provider=lambda _: ProviderRuntimeState(True, True, True, True, True, True),
         common_effect=lambda _: events.append("settings"),
-        rebuild_llm=lambda: record("llm"),
+        rebuild_llm=lambda _settings: record("llm"),
         recover_gpu=lambda _settings, _plan: record("gpu"),
-        refresh_peer=lambda: record("peer"),
-        refresh_self_stt=lambda: record("self"),
+        refresh_peer=lambda _settings: record("peer"),
+        refresh_self_stt=lambda _settings: record("self"),
         signature_sink=lambda _: events.append("signatures"),
         current_settings_provider=lambda: previous,
         signature_cache_provider=lambda: (

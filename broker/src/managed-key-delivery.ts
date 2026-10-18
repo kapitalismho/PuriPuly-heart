@@ -56,7 +56,7 @@ export async function createManagedKeyDelivery(
   const deliveryAckToken = randomBase64Url(ACK_TOKEN_RANDOM_BYTES);
   const ackTokenHash = await hashDeliveryAckToken(deliveryAckToken);
 
-  await db
+  const result = await db
     .prepare(
       `INSERT INTO managed_key_deliveries (
           delivery_id,
@@ -70,7 +70,15 @@ export async function createManagedKeyDelivery(
           expires_at,
           operation_id,
           attempt_index
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)`,
+        ) SELECT ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?
+          WHERE ? IS NULL OR EXISTS (
+            SELECT 1 FROM managed_operations operation
+            JOIN managed_operation_attempts attempt ON attempt.operation_id = operation.operation_id
+             AND attempt.attempt_index = ?
+            WHERE operation.operation_id = ? AND operation.current_attempt_index = attempt.attempt_index
+             AND operation.state = 'CREATING' AND attempt.cleanup_token IS NULL
+             AND attempt.outcome = 'created' AND attempt.managed_credential_ref = ?
+          )`,
     )
     .bind(
       deliveryId,
@@ -83,8 +91,13 @@ export async function createManagedKeyDelivery(
       input.expiresAt.toISOString(),
       input.operationId ?? null,
       input.attemptIndex ?? null,
+      input.operationId ?? null,
+      input.attemptIndex ?? null,
+      input.operationId ?? null,
+      input.managedCredentialRef,
     )
     .run();
+  if (Number(result.meta.changes ?? 0) !== 1) throw new Error('managed delivery attempt is no longer owned');
 
   return { deliveryId, deliveryAckToken, ackTokenHash };
 }
@@ -232,7 +245,7 @@ export async function listStalePendingManagedKeyDeliveries(
   const result = await db
     .prepare(
       `SELECT delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
-              ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason
+              ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason, operation_id, attempt_index
          FROM managed_key_deliveries
         WHERE (
                 status = 'pending'
@@ -243,6 +256,7 @@ export async function listStalePendingManagedKeyDeliveries(
                 AND failure_reason = ?
                 AND failed_at <= ?
               )
+           OR status = 'cleanup_required'
         ORDER BY expires_at ASC
         LIMIT ?`,
     )
@@ -280,40 +294,26 @@ export async function claimStaleManagedKeyDeliveryCleanup(
               AND status = 'active'
               AND delivered_at IS NOT NULL
          )`;
-  const statement =
-    input.delivery.status === 'pending'
-      ? db
-          .prepare(
-            `UPDATE managed_key_deliveries
-                SET status = 'expired', failed_at = ?, failure_reason = ?
-              WHERE delivery_id = ?
-                AND status = 'pending'
-                AND expires_at <= ?
-                ${activeOwnerGuard}`,
-          )
-          .bind(
-            input.claimedAt,
-            STALE_DELIVERY_CLEANUP_CLAIM_REASON,
-            input.delivery.delivery_id,
-            input.claimedAt,
-            input.delivery.managed_credential_ref,
-          )
-      : db
-          .prepare(
-            `UPDATE managed_key_deliveries
-                SET failed_at = ?
-              WHERE delivery_id = ?
-                AND status = 'expired'
-                AND failure_reason = ?
-                AND failed_at IS ?`,
-          )
-          .bind(
-            input.claimedAt,
-            input.delivery.delivery_id,
-            STALE_DELIVERY_CLEANUP_CLAIM_REASON,
-            input.delivery.failed_at,
-          );
-  const result = await statement.run();
+  const result = await db.prepare(
+    `UPDATE managed_key_deliveries
+        SET status = 'expired', failed_at = ?, failure_reason = ?
+      WHERE delivery_id = ? AND managed_credential_ref = ?
+        AND (
+          (status = 'pending' AND expires_at <= ?)
+          OR status = 'cleanup_required'
+          OR (status = 'expired' AND failure_reason = ? AND failed_at IS ?)
+        )
+        ${activeOwnerGuard}`,
+  ).bind(
+    input.claimedAt,
+    STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+    input.delivery.delivery_id,
+    input.delivery.managed_credential_ref,
+    input.claimedAt,
+    STALE_DELIVERY_CLEANUP_CLAIM_REASON,
+    input.delivery.failed_at,
+    input.delivery.managed_credential_ref,
+  ).run();
 
   return (result.meta?.changes ?? 0) === 1;
 }
@@ -385,7 +385,6 @@ export async function handleManagedKeyDeliveryAck(
   });
 
   if (validation.ok) {
-    let ackDetails: Record<string, unknown> = {};
     let status: 'acknowledged' | 'already_acknowledged';
     try {
       if (validation.delivery.issue_source === 'discord') {
@@ -395,9 +394,6 @@ export async function handleManagedKeyDeliveryAck(
           acknowledgedAt,
         });
         status = result.acknowledgementStatus;
-        if (result.referralBonusApplied) {
-          ackDetails = { referral_bonus_applied: true };
-        }
       } else {
         const result = await finalizeQqManagedKeyDeliveryAck(c, {
           deliveryId,
@@ -405,17 +401,11 @@ export async function handleManagedKeyDeliveryAck(
           acknowledgedAt,
         });
         status = result.acknowledgementStatus;
-        ackDetails = {
-          ...(result.referralId ? { referral_id: result.referralId } : {}),
-          ...(result.talkTogetherPass
-            ? { talk_together_pass: result.talkTogetherPass }
-            : {}),
-        };
       }
     } catch {
       return ackErrorResponse(c, 409, 'failed', 'delivery acknowledgement cannot be applied');
     }
-    return c.json({ ok: true, status, ...ackDetails });
+    return c.json({ ok: true, status });
   }
 
   if (validation.reason === 'expired') {
@@ -448,7 +438,7 @@ async function getManagedKeyDelivery(
   return db
     .prepare(
       `SELECT delivery_id, issue_source, subject_ref, installation_id, managed_credential_ref,
-              ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason
+              ack_token_hash, status, created_at, expires_at, acknowledged_at, failed_at, failure_reason, operation_id, attempt_index
          FROM managed_key_deliveries
         WHERE delivery_id = ?`,
     )

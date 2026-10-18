@@ -171,9 +171,22 @@ TASK_CREATION_REVIEWS = (
         classification="legacy_exception",
     ),
     *_reviews(
+        "core/local_asr/local_stt_runtime_installer.py",
+        {"_owned_io": 1},
+        "The ASR installation call shield-awaits its I/O worker; cancellation signals and drains it before staging cleanup and provisioning lease release",
+    ),
+    *_reviews(
         "core/local_translation/provisioning.py",
         {"_await_download_cleanup": 1},
         "Gemma download boundary signals cancellation or cancels the download and waits until it settles before releasing staging ownership",
+    ),
+    *_reviews(
+        "core/local_translation/provisioning.py",
+        {
+            "LocalGemmaDownloadAdapter.validate_inputs": 1,
+            "LocalGemmaDownloadAdapter.download": 1,
+        },
+        "The local Gemma adapter shield-awaits each validation or copy worker; cancellation signals and gathers it before the owning installation releases staging resources",
     ),
     *_reviews(
         "core/local_translation/runtime.py",
@@ -294,9 +307,9 @@ TASK_CREATION_REVIEWS = (
         "LocalSTTDownloadRuntime is the named lifecycle owner for download tasks",
     ),
     *_reviews(
-        "core/runtime/mic_test.py",
-        {"MicTestRuntime.start": 1, "MicTestRuntime.create_frame_task": 1},
-        "MicTestRuntime is the named lifecycle owner for microphone test tasks",
+        "core/runtime/audio_test.py",
+        {"AudioTestCaptureRuntime.start": 1, "AudioTestCaptureRuntime.create_frame_task": 1},
+        "AudioTestCaptureRuntime is the named lifecycle owner for each audio test channel's tasks",
     ),
     *_reviews(
         "core/runtime/oauth.py",
@@ -659,7 +672,7 @@ def test_order38_named_owner_allowlist_preserves_installer_legacy_task_debt() ->
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
     assert (
-        "src/puripuly_heart/core/runtime/mic_test.py",
+        "src/puripuly_heart/core/runtime/audio_test.py",
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
@@ -688,29 +701,6 @@ def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
         "src/puripuly_heart/core/runtime/vrchat_osc_presence.py",
         ASYNCIO_CREATE_TASK,
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
-
-
-def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
-    controller_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-    )
-    owner_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed" / "managed_usage.py"
-    )
-    controller_methods = {
-        node.name: ast.unparse(node)
-        for node in ast.walk(ast.parse(controller_path.read_text(encoding="utf-8")))
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-    owner_methods = {
-        node.name: ast.unparse(node)
-        for node in ast.walk(ast.parse(owner_path.read_text(encoding="utf-8")))
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-
-    assert "_schedule_owned_referral_id_status_refresh" not in controller_methods
-    assert "schedule_status_refresh" in owner_methods["schedule_status_refresh"]
-    assert "schedule_trial_usage_refresh" in owner_methods["schedule_usage_refresh"]
 
 
 def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:

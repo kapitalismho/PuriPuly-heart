@@ -77,6 +77,9 @@ class SelfCaptureSessionConfig:
     local_gpu: bool = False
     release_backend_after: float | None = None
     warmup: bool = True
+    provider_context: object | None = None
+    model_id: str | None = None
+    gpu_device_id: str = "auto"
 
 
 @dataclass(frozen=True, slots=True)

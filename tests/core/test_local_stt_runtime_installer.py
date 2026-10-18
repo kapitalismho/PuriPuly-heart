@@ -217,6 +217,25 @@ def _write_manifest_file(path: Path, payload: InstalledLocalSTTManifest) -> None
     path.write_text(json.dumps(payload.to_dict(), indent=2), encoding="utf-8")
 
 
+class _MirrorDownloader:
+    def __init__(self, base_url: str) -> None:
+        self.base_url = base_url
+        self.requests = []
+
+    async def download(self, request, **kwargs):
+        self.requests.append(request)
+        assert request.endpoint == "https://hf-mirror.net"
+        assert request.repo_id == "example/repo"
+        assert request.revision == "hf-rev-1"
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.get(f"{self.base_url}/mirror/{request.remote_path}")
+            response.raise_for_status()
+        target = request.local_dir / request.remote_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(response.content)
+        return target
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("locale", "preferred_source", "expected_source"),
@@ -254,20 +273,24 @@ async def test_http_mirror_selection_respects_locale_and_explicit_preference(
             "hf_mirror": LocalSTTAssetSource(
                 name="hf_mirror",
                 revision="hf-rev-1",
-                download_url_template=f"{base_url}/mirror/{{path}}",
+                repo_id="example/repo",
+                download_url_template="https://hf-mirror.net/example/repo/resolve/hf-rev-1/{path}",
             ),
         },
     )
     model_root = temp_dir / "appdata" / "models"
+    downloader = _MirrorDownloader(base_url)
 
     installed = await ensure_local_stt_installed(
         locale=locale,
         preferred_source=preferred_source,
         model_root=model_root,
         manifest=manifest,
+        huggingface_downloader=downloader,
     )
 
     assert installed.selected_source == expected_source
+    assert len(downloader.requests) == (2 if expected_source == "hf_mirror" else 0)
     install_dir = model_root / manifest.install_dirname
     assert (install_dir / "model.int8.onnx").read_bytes() == model_bytes
     assert (install_dir / "tokenizer" / "tokens.txt").read_bytes() == token_bytes
@@ -299,19 +322,23 @@ async def test_http_mirror_corruption_falls_back_to_verified_huggingface_assets(
             "hf_mirror": LocalSTTAssetSource(
                 name="hf_mirror",
                 revision="hf-rev-1",
-                download_url_template=f"{base_url}/mirror/{{path}}",
+                repo_id="example/repo",
+                download_url_template="https://hf-mirror.net/example/repo/resolve/hf-rev-1/{path}",
             ),
         },
     )
     model_root = temp_dir / "appdata" / "models"
+    downloader = _MirrorDownloader(base_url)
 
     installed = await ensure_local_stt_installed(
         locale="zh-CN",
         model_root=model_root,
         manifest=manifest,
+        huggingface_downloader=downloader,
     )
 
     assert installed.selected_source == "huggingface"
+    assert len(downloader.requests) == 1
     assert (model_root / manifest.install_dirname / "model.int8.onnx").read_bytes() == model_bytes
     assert list(model_root.glob(f"{manifest.install_dirname}.staging-*")) == []
 
@@ -400,7 +427,7 @@ async def test_ensure_local_stt_installed_downloads_preferred_source_successfull
 
 
 @pytest.mark.asyncio
-async def test_ensure_local_stt_installed_falls_back_once_when_preferred_source_fails(
+async def test_ensure_local_stt_installed_falls_back_to_next_source_in_locale_order(
     temp_dir: Path,
     file_server,
 ) -> None:
@@ -419,7 +446,7 @@ async def test_ensure_local_stt_installed_falls_back_once_when_preferred_source_
     )
 
     installed = await ensure_local_stt_installed(
-        preferred_source="huggingface",
+        locale="en",
         model_root=temp_dir / "appdata" / "models",
         manifest=manifest,
     )

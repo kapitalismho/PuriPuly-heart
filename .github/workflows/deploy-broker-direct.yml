@@ -363,8 +363,9 @@ jobs:
           post_backfill_migrations_dir='.deploy-direct/staged-migrations-post-backfill'
           deferred_migrations='0021_network_identity_purge.sql 0024_allow_unattributed_request_events.sql'
           held_migration='0025_drop_legacy_translation_telemetry.sql'
+          referral_retirement_migration='0027_remove_managed_referrals.sql'
 
-          for migration_name in $deferred_migrations $held_migration; do
+          for migration_name in $deferred_migrations $held_migration $referral_retirement_migration; do
             test -f "migrations/$migration_name"
           done
           mkdir -p "$pre_backfill_migrations_dir" "$post_backfill_migrations_dir"
@@ -380,7 +381,7 @@ jobs:
                 ;;
             esac
 
-            if [[ "$migration_name" != "$held_migration" ]]; then
+            if [[ "$migration_name" != "$held_migration" && "$migration_name" != "$referral_retirement_migration" ]]; then
               cp "$migration_path" "$post_backfill_migrations_dir/$migration_name"
             fi
 
@@ -391,7 +392,7 @@ jobs:
                 break
               fi
             done
-            if [[ "$deferred_match" != '1' && "$migration_name" != "$held_migration" ]]; then
+            if [[ "$deferred_match" != '1' && "$migration_name" != "$held_migration" && "$migration_name" != "$referral_retirement_migration" ]]; then
               cp "$migration_path" "$pre_backfill_migrations_dir/$migration_name"
             fi
           done
@@ -405,6 +406,8 @@ jobs:
           done
           test ! -e "$pre_backfill_migrations_dir/$held_migration"
           test ! -e "$post_backfill_migrations_dir/$held_migration"
+          test ! -e "$pre_backfill_migrations_dir/$referral_retirement_migration"
+          test ! -e "$post_backfill_migrations_dir/$referral_retirement_migration"
 
       - name: Validate rendered Wrangler config
         working-directory: broker
@@ -422,6 +425,46 @@ jobs:
         run: >-
           pnpm exec wrangler types --config
           "${{ steps.render.outputs.post_backfill_config_path }}"
+
+      - name: Require completed privacy migration before referral-free deployment
+        id: privacy_prerequisite
+        shell: bash
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          schema_json="$(pnpm exec wrangler d1 execute \
+            puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('installations', 'broker_config');" \
+            --json)"
+          first_install="$(python3 - "$schema_json" <<'PY'
+          import json
+          import sys
+          rows = json.loads(sys.argv[1])[0]['results']
+          names = {row['name'] for row in rows}
+          if names and names != {'installations', 'broker_config'}:
+              raise SystemExit('Incomplete existing Broker schema; repair it before deployment.')
+          print('false' if names else 'true')
+          PY
+          )"
+          echo "first_install=$first_install" >> "$GITHUB_OUTPUT"
+          if [[ "$first_install" == 'false' ]]; then
+            journal_json="$(pnpm exec wrangler d1 execute \
+              puripuly-heart-broker --remote --config "${{ steps.render.outputs.config_path }}" \
+              --command "SELECT name FROM d1_migrations;" --json)"
+            python3 - "$journal_json" <<'PY'
+          import json
+          import sys
+          applied = {row['name'] for row in json.loads(sys.argv[1])[0]['results']}
+          required = {'0021_network_identity_purge.sql', '0024_allow_unattributed_request_events.sql'}
+          if not required <= applied:
+              raise SystemExit(
+                  'Complete 0021/0024 privacy migration with the prior supported Worker before '
+                  'deploying referral removal. This workflow does not bypass the historical gate.'
+              )
+          PY
+          fi
 
       - name: Export pre-migration production D1 backup
         id: d1_backup
@@ -455,6 +498,17 @@ jobs:
           pnpm exec wrangler d1 migrations apply
           puripuly-heart-broker --remote --config
           "${{ steps.render.outputs.pre_backfill_config_path }}"
+
+      - name: Complete empty-database privacy schema before first deployment
+        if: steps.privacy_prerequisite.outputs.first_install == 'true'
+        working-directory: broker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >-
+          pnpm exec wrangler d1 migrations apply
+          puripuly-heart-broker --remote --config
+          "${{ steps.render.outputs.post_backfill_config_path }}"
 
       - name: Bootstrap fingerprint salt while the migration placeholder is still present
         working-directory: broker

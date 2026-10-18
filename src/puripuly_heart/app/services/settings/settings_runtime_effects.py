@@ -30,10 +30,7 @@ from puripuly_heart.app.services.overlay_application import (
 from puripuly_heart.app.services.provider.provider_runtime_apply import (
     ProviderRuntimeConvergenceError,
 )
-from puripuly_heart.app.wiring_microphone_test import (
-    MicrophoneTestAudioSettings,
-    MicrophoneTestRuntime,
-)
+from puripuly_heart.app.wiring_audio_test import AudioTestRuntime
 from puripuly_heart.app.wiring_peer_application import PeerApplicationRuntime
 from puripuly_heart.app.wiring_provider_runtime import (
     ProviderRuntimeSignatures,
@@ -51,7 +48,7 @@ from puripuly_heart.app.wiring_translation_runtime_configuration import (
     replace_translation_runtime_settings,
 )
 from puripuly_heart.config.prompts import resolve_system_prompt
-from puripuly_heart.config.provider_values import STT_INTERNAL_SAMPLE_RATE_HZ, LLMProviderName
+from puripuly_heart.config.provider_values import LLMProviderName
 from puripuly_heart.config.resolved import OVERLAY_TARGET_DESKTOP
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import (
@@ -70,7 +67,7 @@ from .settings_projection import SettingsProjectionOwner
 
 @dataclass(slots=True)
 class SettingsRuntimeEffectsState:
-    microphone_audio_signature: object | None = None
+    audio_test_signature: object | None = None
 
 
 def managed_gemma_prefix_refresh_required(
@@ -112,7 +109,7 @@ class SettingsRuntimeEffectsAdapter:
         runtime_logging: ApplicationRuntimeLoggingOwner,
         pipeline: RuntimePipelineHandle,
         runtime_signatures: ProviderRuntimeSignatures,
-        microphone: MicrophoneTestRuntime,
+        audio_test: AudioTestRuntime,
         clipboard: ClipboardAutoTranslationOwner,
         provisioning: LocalASRProvisioningPort,
         gpu: GpuRuntimeInteractionOwner,
@@ -135,7 +132,7 @@ class SettingsRuntimeEffectsAdapter:
         self._runtime_logging = runtime_logging
         self._pipeline = pipeline
         self._runtime_signatures = runtime_signatures
-        self._microphone = microphone
+        self._audio_test = audio_test
         self._clipboard = clipboard
         self._provisioning = provisioning
         self._gpu = gpu
@@ -151,20 +148,6 @@ class SettingsRuntimeEffectsAdapter:
         self._clear_local_pending = clear_local_pending
         self._replace_self_stt = replace_self_stt
         self._rebuild_managed_gemma = rebuild_managed_gemma
-
-    @staticmethod
-    def _microphone_audio(
-        settings: AppSettingsVNext | None,
-    ) -> MicrophoneTestAudioSettings | None:
-        if settings is None:
-            return None
-        audio = settings.intent.audio
-        return MicrophoneTestAudioSettings(
-            input_host_api=audio.input_host_api,
-            input_device=audio.input_device,
-            internal_sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
-            internal_channels=1,
-        )
 
     async def preserve_before_replace(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         preserved = await self._github_prompt().preserve_before_settings_replace(settings)
@@ -185,20 +168,15 @@ class SettingsRuntimeEffectsAdapter:
         current_settings: AppSettingsVNext | None,
         next_settings: AppSettingsVNext,
     ) -> SettingsRuntimeTransition[AppSettingsVNext]:
-        microphone_owner = self._microphone.owner_if_created
-        previous_microphone_signature = (
-            self._state.microphone_audio_signature
-            or (microphone_owner.audio_signature if microphone_owner is not None else None)
-            or self._microphone.audio_signature(self._microphone_audio(current_settings))
+        previous_audio_test_signature = (
+            self._state.audio_test_signature or self._audio_test.audio_signature(current_settings)
         )
-        next_microphone_signature = self._microphone.audio_signature(
-            self._microphone_audio(next_settings)
-        )
+        next_audio_test_signature = self._audio_test.audio_signature(next_settings)
         if (
-            previous_microphone_signature is not None
-            and previous_microphone_signature != next_microphone_signature
+            previous_audio_test_signature is not None
+            and previous_audio_test_signature != next_audio_test_signature
         ):
-            await self._microphone.stop()
+            await self._audio_test.stop()
 
         previous_locale = self._presentation.current_locale()
         previous_overlay_enabled = self._settings.overlay_enabled()
@@ -378,9 +356,7 @@ class SettingsRuntimeEffectsAdapter:
         transition: SettingsRuntimeTransition[object],
     ) -> None:
         settings = transition.settings
-        self._state.microphone_audio_signature = self._microphone.audio_signature(
-            self._microphone_audio(settings)
-        )
+        self._state.audio_test_signature = self._audio_test.audio_signature(settings)
         self._calibration.sync_from_settings(settings)
         self._desktop_overlay.sync_from_settings(settings)
 
@@ -401,7 +377,6 @@ class SettingsRuntimeEffectsAdapter:
 
     def restore_memory(self, settings: AppSettingsVNext) -> None:
         restored_settings = copy.deepcopy(settings)
-        self._settings.canonical = restored_settings
         self.apply_activation_notice(restored_settings)
         self._calibration.sync_from_settings(restored_settings)
         config_owner = self._pipeline.translation_runtime_configuration
@@ -510,6 +485,7 @@ class SettingsRuntimeEffectsAdapter:
         *,
         strict_runtime_errors: bool,
         reload_settings_view: bool,
+        rebuild_managed_gemma: bool = True,
     ) -> None:
         settings = transition.settings
         self.apply_activation_notice(settings)
@@ -550,10 +526,11 @@ class SettingsRuntimeEffectsAdapter:
                 strict_runtime_errors=strict_runtime_errors,
             )
 
-        await refresh_managed_gemma_prefix(
-            transition,
-            rebuild=self._rebuild_managed_gemma,
-        )
+        if rebuild_managed_gemma:
+            await refresh_managed_gemma_prefix(
+                transition,
+                rebuild=self._rebuild_managed_gemma,
+            )
 
         presenter = self._overlay.current_presenter()
         if presenter is not None:
@@ -694,9 +671,7 @@ class SettingsRuntimeEffectsAdapter:
             peer=self._peer.owner,
             peer_translation_enabled=self._settings.peer_translation_enabled(),
         )
-        self._state.microphone_audio_signature = self._microphone.audio_signature(
-            self._microphone_audio(settings)
-        )
+        self._state.audio_test_signature = self._audio_test.audio_signature(settings)
 
     def _sync_effective_translation_flags(self, settings: AppSettingsVNext) -> None:
         self._peer.owner.sync_effective_flags(self._peer.state_for(None))

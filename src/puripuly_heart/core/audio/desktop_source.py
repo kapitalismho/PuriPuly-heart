@@ -16,6 +16,7 @@ from puripuly_heart.core.audio.source import (
     CaptureProgressionSnapshot,
     PhysicalCaptureProgression,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime_logging import emit_basic_log
 
 logger = logging.getLogger(__name__)
@@ -249,21 +250,24 @@ class DesktopLoopbackAudioSource:
             return
         self._closed = True
 
-        with contextlib.suppress(Exception):
-            self._stream.stop_stream()
-        with contextlib.suppress(Exception):
-            self._stream.close()
-        with contextlib.suppress(Exception):
-            self._manager.terminate()
+        def close_native() -> None:
+            with contextlib.suppress(Exception):
+                self._stream.stop_stream()
+            with contextlib.suppress(Exception):
+                self._stream.close()
+            with contextlib.suppress(Exception):
+                self._manager.terminate()
 
         try:
-            self._queue.sync_q.put_nowait(None)
-        except Exception:
-            pass
-
-        self._queue.close()
-        with contextlib.suppress(Exception):
-            await self._queue.wait_closed()
+            await run_owned_thread_call(close_native)
+        finally:
+            try:
+                self._queue.sync_q.put_nowait(None)
+            except Exception:
+                pass
+            self._queue.close()
+            with contextlib.suppress(Exception):
+                await self._queue.wait_closed()
 
 
 def _import_pyaudiowpatch() -> Any:

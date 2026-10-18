@@ -47,7 +47,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     sub = parser.add_subparsers(dest="command")
-
     desktop_overlay = sub.add_parser(
         "run-desktop-overlay",
         help="Run the desktop Flet overlay renderer",

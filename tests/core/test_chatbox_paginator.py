@@ -581,6 +581,10 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
     )
 
     paginator.enqueue(_message("system!!", clock))
+    receipts: list[tuple[int, str]] = []
+    paginator.bind_delivery_observer(
+        lambda message, status: receipts.append((message.presentation_revision, status))
+    )
     paginator.enqueue(
         _message(
             "old",
@@ -601,10 +605,27 @@ def test_newer_pending_revision_replaces_in_place_behind_system_message() -> Non
             presentation_revision=2,
         )
     )
+    assert receipts == [(1, "output_superseded")]
+    paginator.enqueue(
+        _message(
+            "stale",
+            clock,
+            utterance_id=parent_id,
+            turn_generation=0,
+            turn_order=1,
+            presentation_revision=0,
+        )
+    )
+    assert receipts == [(1, "output_superseded"), (0, "output_superseded")]
     clock.advance(3.0)
     paginator.process_due()
 
     assert sender.sent == ["syst", "em!!", "new"]
+    assert receipts == [
+        (1, "output_superseded"),
+        (0, "output_superseded"),
+        (2, "first_page_sent"),
+    ]
 
 
 def test_newer_turn_prunes_active_pages_and_preserves_system_disclosure() -> None:

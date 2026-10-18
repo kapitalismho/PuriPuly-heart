@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Literal, Protocol
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
@@ -84,7 +85,12 @@ class UiSettingsRuntimePort(Protocol):
         settings: AppSettingsVNext,
     ) -> AppSettingsVNext: ...
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> object: ...
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> object: ...
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None: ...
 
@@ -100,6 +106,17 @@ class UiSettingsRuntimePort(Protocol):
 
 
 class UiProviderRuntimePort(Protocol):
+    def model_asset_entries(self) -> tuple[object, ...]: ...
+
+    async def refresh_model_assets(self) -> tuple[object, ...]: ...
+
+    async def download_model_asset(self, model_id: str, *, source: str | None = None) -> object: ...
+
+    async def import_model_asset(self, model_id: str, directory: Path) -> object: ...
+
+    async def cancel_model_asset(self, model_id: str) -> bool: ...
+
+    async def delete_model_asset(self, model_id: str) -> object: ...
     async def apply_providers(
         self,
         settings: AppSettingsVNext | None = None,
@@ -189,18 +206,20 @@ class UiProviderRuntimePort(Protocol):
     ) -> object: ...
 
 
-class UiMicrophoneRuntimePort(Protocol):
-    async def start_microphone_test(
+class UiAudioTestRuntimePort(Protocol):
+    async def start_audio_test(
         self,
         *,
-        meter_callback: Callable[[float], None] | None = None,
+        observation_callback: Callable[[str, tuple[object, ...]], object] | None = None,
     ) -> bool: ...
 
-    def microphone_test_snapshot(self) -> dict[str, object]: ...
+    def audio_test_snapshot(self) -> dict[str, object]: ...
 
-    async def wait_microphone_test_ready(self) -> bool: ...
+    async def wait_audio_test_ready(self) -> bool: ...
 
-    async def stop_microphone_test(self) -> None: ...
+    async def stop_audio_test(self) -> None: ...
+
+    def release_audio_test_capture_restore(self, channel: str) -> None: ...
 
 
 class UiOverlayRuntimePort(Protocol):
@@ -233,6 +252,8 @@ class UiManagedRuntimePort(Protocol):
     def dashboard_managed_auth_prompt_kind(self) -> str: ...
 
     def managed_auth_last_failure_kind(self) -> str: ...
+
+    def managed_auth_last_message_key(self) -> str | None: ...
 
     async def start_qq_managed_auth_from_dialog(
         self,
@@ -282,11 +303,11 @@ class UiDiagnosticsRuntimePort(Protocol):
 
 
 __all__ = [
+    "UiAudioTestRuntimePort",
     "UiDiagnosticsRuntimePort",
     "UiEngagementRuntimePort",
     "UiInputRuntimePort",
     "UiManagedRuntimePort",
-    "UiMicrophoneRuntimePort",
     "UiOverlayRuntimePort",
     "UiPeerCaptureRuntimePort",
     "UiProviderRuntimePort",

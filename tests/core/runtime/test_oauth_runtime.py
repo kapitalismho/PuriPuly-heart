@@ -63,6 +63,9 @@ class ExternalTaskHandle:
         self.cancel_calls += 1
         self.cancelled = True
 
+    def done(self) -> bool:
+        return self.cancelled
+
 
 @pytest.mark.asyncio
 async def test_oauth_runtime_close_unblocks_attached_loopback_listener_wait() -> None:
@@ -144,16 +147,19 @@ async def test_oauth_runtime_close_returns_when_auth_task_suppresses_cancellatio
             except asyncio.CancelledError:
                 cancel_seen.set()
 
-    runtime.create_auth_task(stubborn_auth_task(), task_name="stubborn")
+    auth_task = runtime.create_auth_task(stubborn_auth_task(), task_name="stubborn")
     await auth_started.wait()
 
     close_task = asyncio.create_task(runtime.close())
     try:
-        await asyncio.wait_for(asyncio.shield(close_task), timeout=0.2)
+        with pytest.raises(RuntimeError, match="auth tasks did not settle"):
+            await asyncio.wait_for(asyncio.shield(close_task), timeout=0.2)
+        assert runtime.active_task_names == ("stubborn",)
     finally:
         release_stubborn_auth.set()
         with contextlib.suppress(Exception):
             await close_task
+        await auth_task
 
     assert cancel_seen.is_set() is True
     assert runtime.active_task_names == ()
@@ -279,3 +285,129 @@ def test_oauth_runtime_task_runner_failure_does_not_mutate_external_state() -> N
         )
 
     assert runtime.external_task_names == ()
+
+
+@pytest.mark.asyncio
+async def test_external_cancel_retains_and_joins_underlying_settlement() -> None:
+    from concurrent.futures import Future
+
+    runtime = OAuthRuntime()
+    entered = asyncio.Event()
+    cancelling = asyncio.Event()
+    release = asyncio.Event()
+    handles: list[asyncio.Task] = []
+    outer = Future()
+
+    async def work():
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelling.set()
+            await release.wait()
+            raise
+
+    def runner(factory):
+        handles.append(asyncio.create_task(factory()))
+        return outer
+
+    runtime.start_external_task(task_runner=runner, task_factory=work, task_name="managed-dialog")
+    await entered.wait()
+    outer.cancel()
+    assert runtime.external_task_names == ("managed-dialog",)
+    runtime.cancel_external_task(outer, task_name="managed-dialog")
+    await cancelling.wait()
+    runtime.cancel_external_task(outer, task_name="managed-dialog")
+    closing = asyncio.create_task(runtime.close())
+    await asyncio.sleep(0)
+    assert not closing.done()
+    assert not handles[0].done()
+    assert runtime.external_task_names == ("managed-dialog",)
+    release.set()
+    await closing
+    assert handles[0].done()
+    assert runtime.external_task_names == ()
+
+
+@pytest.mark.asyncio
+async def test_external_settlement_timeout_retains_ownership_until_done() -> None:
+    runtime = OAuthRuntime(auth_task_timeout_s=0.01)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    tasks: list[asyncio.Task] = []
+
+    async def work():
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            await release.wait()
+
+    def runner(factory):
+        task = asyncio.create_task(factory())
+        tasks.append(task)
+        return task
+
+    runtime.start_external_task(task_runner=runner, task_factory=work, task_name="managed")
+    await entered.wait()
+    with pytest.raises(RuntimeError, match="external auth tasks did not settle"):
+        await runtime.close()
+    assert runtime.external_task_names == ("managed",)
+    assert not tasks[0].done()
+    release.set()
+    await tasks[0]
+    await runtime.close()
+    assert runtime.external_task_names == ()
+
+
+def test_external_runner_without_admission_does_not_leave_pending_task() -> None:
+    runtime = OAuthRuntime()
+    with pytest.raises(RuntimeError, match="not admitted"):
+        runtime.start_external_task(
+            task_runner=lambda _factory: None,
+            task_factory=lambda: asyncio.sleep(0),
+            task_name="managed",
+        )
+    assert runtime.external_task_names == ()
+
+
+@pytest.mark.asyncio
+async def test_cancelled_external_work_blocks_replacement_until_actual_settlement() -> None:
+    runtime = OAuthRuntime()
+    entered = asyncio.Event()
+    cancelling = asyncio.Event()
+    release = asyncio.Event()
+    tasks: list[asyncio.Task] = []
+
+    async def work():
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelling.set()
+            await release.wait()
+
+    def runner(factory):
+        task = asyncio.create_task(factory())
+        tasks.append(task)
+        return task
+
+    handle = runtime.start_external_task(task_runner=runner, task_factory=work, task_name="managed")
+    await entered.wait()
+    runtime.cancel_external_task(handle, task_name="managed")
+    await cancelling.wait()
+    runtime.clear_external_task("managed", handle)
+    with pytest.raises(RuntimeError, match="already owns external task"):
+        runtime.start_external_task(
+            task_runner=runner, task_factory=lambda: asyncio.sleep(0), task_name="managed"
+        )
+    assert len(tasks) == 1
+    release.set()
+    await tasks[0]
+    assert runtime.external_task_names == ()
+    runtime.start_external_task(
+        task_runner=runner, task_factory=lambda: asyncio.sleep(0), task_name="managed"
+    )
+    await tasks[1]
+    assert runtime.external_task_names == ()
+    await runtime.close()

@@ -52,6 +52,7 @@ from tests.providers.test_qwen_audio_configuration import ControlledSmartTurn, R
 from tests.providers.test_qwen_audio_delivery_recovery import (
     BoundRuntimeFactory,
     HeldManualProvider,
+    final_sources,
     require_final_source,
     self_capture_pipeline,
     spoken_turn,
@@ -640,10 +641,7 @@ async def test_healthy_qwen_retained_expiry_stays_owned_until_native_drain_then_
             )
             assert len(source.recognition_origins) == 5
             assert not any("EXPIRED" in call["text"] for call in env.llm.calls)
-            assert not any(
-                event.type is UIEventType.TRANSCRIPT_FINAL and "EXPIRED" in event.payload.text
-                for event in env.harness.ui_events._queue
-            )
+            assert all("EXPIRED" not in source.text for source in final_sources(env))
             assert env.owner.snapshot.effective_active
         finally:
             for socket in transport.sockets:

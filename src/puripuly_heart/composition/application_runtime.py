@@ -16,11 +16,11 @@ from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicatio
 from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
+    UiAudioTestRuntimeAdapter,
     UiDiagnosticsRuntimeAdapter,
     UiEngagementRuntimeAdapter,
     UiInputRuntimeAdapter,
     UiManagedRuntimeAdapter,
-    UiMicrophoneRuntimeAdapter,
     UiOverlayRuntimeAdapter,
     UiPeerCaptureRuntimeAdapter,
     UiProviderRuntimeAdapter,
@@ -108,6 +108,7 @@ from puripuly_heart.app.services.manual_local_asr_fallback import (
     ManualLocalASRFallbackOwner,
 )
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.model_assets import ModelAssetsApplication
 from puripuly_heart.app.services.osc.control_runtime import OscControlIntegrationOwner
 from puripuly_heart.app.services.osc.state_publisher import state_from_settings
 from puripuly_heart.app.services.overlay_application import (
@@ -181,6 +182,11 @@ from puripuly_heart.app.wiring.wiring_provider_runtime_policy import (
 from puripuly_heart.app.wiring_application_runtime_logging import (
     compose_application_runtime_logging,
 )
+from puripuly_heart.app.wiring_audio_test import (
+    AudioTestCaptureControl,
+    AudioTestRuntime,
+    compose_audio_test_runtime,
+)
 from puripuly_heart.app.wiring_capture_runtime import CaptureOwnerFactory
 from puripuly_heart.app.wiring_composition import (
     create_desktop_overlay_policy,
@@ -201,10 +207,6 @@ from puripuly_heart.app.wiring_managed_account import (
     ManagedOpenRouterReleaseRuntime,
     ManagedTranslationRuntimeAccess,
     compose_managed_account,
-)
-from puripuly_heart.app.wiring_microphone_test import (
-    MicrophoneTestAudioSettings,
-    MicrophoneTestRuntime,
 )
 from puripuly_heart.app.wiring_peer_application import (
     PeerApplicationRuntime,
@@ -234,7 +236,6 @@ from puripuly_heart.composition.application_state import ApplicationUiStateAdapt
 from puripuly_heart.config.alibaba_connection import resolve_alibaba_connection
 from puripuly_heart.config.paths import default_http_extensions_dir, user_config_dir
 from puripuly_heart.config.provider_values import (
-    STT_INTERNAL_SAMPLE_RATE_HZ,
     LLMProviderName,
     OpenRouterCredentialSource,
     QwenRegion,
@@ -503,7 +504,7 @@ def compose_application_runtime(
     local_asr_diagnostics: LocalASRDiagnosticsOwner | None = None
     audio_diagnostics: AudioDiagnosticsApplicationOwner | None = None
     self_application: SelfCaptureApplicationOwner | None = None
-    microphone: MicrophoneTestRuntime | None = None
+    audio_test: AudioTestRuntime | None = None
     last_self_capture_lifecycle: str | None = None
     vrc_mic_sync: OscControlIntegrationOwner | None = None
     manual_typing: ManualTypingOwner | None = None
@@ -541,17 +542,6 @@ def compose_application_runtime(
             eula_accepted=canonical.state.peer_translation.eula_accepted,
             overlay_intent_enabled=settings.overlay_enabled(),
             provider_id=canonical.intent.peer_stt.provider,
-        )
-
-    def microphone_audio_settings() -> MicrophoneTestAudioSettings | None:
-        canonical = settings.canonical
-        if canonical is None:
-            return None
-        return MicrophoneTestAudioSettings(
-            input_host_api=canonical.intent.audio.input_host_api,
-            input_device=canonical.intent.audio.input_device,
-            internal_sample_rate_hz=STT_INTERNAL_SAMPLE_RATE_HZ,
-            internal_channels=1,
         )
 
     def current_canonical() -> AppSettingsVNext:
@@ -858,6 +848,7 @@ def compose_application_runtime(
                 log_basic=log_basic,
                 log_diagnostic=log_diagnostic,
                 translation_demand_sink=sync_local_translation_demand,
+                stop_audio_test=lambda: require_audio_test().stop(),
             )
         return peer
 
@@ -894,7 +885,7 @@ def compose_application_runtime(
             return
         await require_gpu_recovery().recover(
             lambda: gpu_recovery_request(
-                current_canonical(),
+                settings.require_committed(),
                 reason="manual_retry",
                 plan=None,
                 peer_enabled=settings.peer_translation_enabled(),
@@ -1049,7 +1040,9 @@ def compose_application_runtime(
                 error_sink=lambda key: show_short_message(key, is_error=True),
                 notice_sink=presentation.set_dashboard_local_stt_notice,
                 rebuild_self_provider=lambda: (
-                    require_runtime_components().provider_runtime.effects.rebuild_self_stt()
+                    require_runtime_components().provider_runtime.effects.rebuild_self_stt(
+                        settings.require_committed()
+                    )
                 ),
                 resume_self=resume_self_after_cpu_repair,
                 resume_peer=resume_peer_after_cpu_repair,
@@ -1254,16 +1247,28 @@ def compose_application_runtime(
             )
         return vrc_mic_sync
 
-    def require_microphone() -> MicrophoneTestRuntime:
-        nonlocal microphone
-        if microphone is None:
-            microphone = MicrophoneTestRuntime(
-                audio_provider=microphone_audio_settings,
-                self_capture_provider=lambda: pipeline.self_capture,
-                local_pending_provider=lambda: require_local_asr().self_pending,
-                disable_self_capture=stop_self_capture,
-                clock=clock,
+    async def set_peer_capture_enabled(enabled: bool) -> object:
+        return await require_peer().owner.set_enabled(enabled)
+
+    def peer_capture_session() -> object | None:
+        components = pipeline.current
+        return components.resource_owner.peer_capture if components is not None else None
+
+    def require_audio_test() -> AudioTestRuntime:
+        nonlocal audio_test
+        if audio_test is None:
+            audio_test = compose_audio_test_runtime(
+                settings_provider=lambda: settings.canonical,
+                capture_control=AudioTestCaptureControl(
+                    self_capture_provider=lambda: pipeline.self_capture,
+                    local_pending_provider=lambda: require_local_asr().self_pending,
+                    set_self_enabled=require_self_application().set_enabled,
+                    peer_owner_provider=lambda: peer.owner if peer is not None else None,
+                    peer_capture_provider=peer_capture_session,
+                    set_peer_enabled=set_peer_capture_enabled,
+                ),
                 log_sink=log_basic,
+                log_diagnostic=log_diagnostic,
                 diagnostic_sink=lambda message, level, exception: log_diagnostic(
                     message,
                     level=level,
@@ -1271,7 +1276,7 @@ def compose_application_runtime(
                 ),
                 error_sink=log_error,
             )
-        return microphone
+        return audio_test
 
     def require_manual_typing() -> ManualTypingOwner:
         nonlocal manual_typing
@@ -1424,7 +1429,7 @@ def compose_application_runtime(
                     runtime_logging=runtime_logging,
                     pipeline=pipeline,
                     runtime_signatures=signatures,
-                    microphone=require_microphone(),
+                    audio_test=require_audio_test(),
                     clipboard=require_clipboard(),
                     provisioning=require_provisioning(),
                     gpu=require_gpu(),
@@ -1520,9 +1525,7 @@ def compose_application_runtime(
         )
 
     def sync_non_provider_signatures(_value=None) -> None:
-        effects_state.microphone_audio_signature = MicrophoneTestRuntime.audio_signature(
-            microphone_audio_settings()
-        )
+        effects_state.audio_test_signature = AudioTestRuntime.audio_signature(settings.canonical)
 
     def sync_stt_signature_caches(value) -> None:
         signatures.sync_stt(
@@ -1730,6 +1733,13 @@ def compose_application_runtime(
                 gpu_device_id=gpu_device_id,
                 warmup=True,
             ),
+            ensure_self_switch=lambda: replace_self_stt_for_settings(canonical, True),
+            refresh_self=lambda: (
+                require_runtime_components().provider_runtime.effects.refresh_self_stt(canonical)
+            ),
+            refresh_peer=lambda: (
+                require_runtime_components().provider_runtime.effects.refresh_peer(canonical)
+            ),
             should_refresh_self=bool(plan is not None and plan.should_refresh_self_stt),
             should_refresh_peer=bool(plan is not None and plan.should_refresh_peer),
         )
@@ -1780,11 +1790,6 @@ def compose_application_runtime(
                 self_owner_factory=(require_runtime_components().self_capture_owner),
                 peer_owner_provider=lambda: require_peer().owner.runtime,
                 self_state_sink=on_self_capture_state,
-                ensure_self_switch=require_self_application().run_switch,
-                refresh_self=(
-                    require_runtime_components().provider_runtime.effects.refresh_self_stt
-                ),
-                refresh_peer=(require_runtime_components().provider_runtime.effects.refresh_peer),
                 diagnostic_sink=on_gpu_recovery_diagnostic,
             )
         return gpu_recovery
@@ -1835,6 +1840,19 @@ def compose_application_runtime(
     async def refresh_managed_usage() -> None:
         await require_managed_account().usage.refresh_best_effort()
 
+    async def refresh_peer_for_settings(value: AppSettingsVNext) -> None:
+        peer_runtime = require_peer()
+        await peer_runtime.owner.refresh_runtime_with_config(
+            build_peer_capture_session_config_from_vnext(canonical_settings(value)),
+            state=peer_runtime.state_for(peer_application_settings(value)),
+        )
+
+    async def replace_self_stt_for_settings(value: AppSettingsVNext, smooth: bool) -> None:
+        await require_self_application().replace_provider_with_config(
+            build_self_capture_session_config_from_vnext(canonical_settings(value)),
+            smooth_local=smooth,
+        )
+
     async def recover_gpu(value, plan: ProviderRuntimeApplyPlan) -> None:
         await require_gpu_recovery().recover(
             lambda: gpu_recovery_request(
@@ -1884,6 +1902,10 @@ def compose_application_runtime(
             if verification_provider is not None:
                 entry = getattr(current.state.provider_verification, verification_provider)
                 needs_key = needs_key or entry.status != "verified"
+            elif needs_key:
+                auth_state = require_managed_account().auth_runtime.state()
+                if auth_state.managed_selected:
+                    needs_key = not auth_state.local_key_available
         presentation.set_dashboard_translation_needs_key(needs_key)
         llm_connection_readiness.sync()
 
@@ -1899,7 +1921,7 @@ def compose_application_runtime(
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
-        peer_desired=peer_runtime_desired,
+        peer_state=lambda value: require_peer().state_for(peer_application_settings(value)),
         canonical_settings=canonical_settings,
         clear_local_pending=lambda: (
             require_local_asr().cpu_repair.clear_if_provider_switched_away()
@@ -1910,10 +1932,8 @@ def compose_application_runtime(
         dashboard_managed_pending_sink=(presentation.set_dashboard_managed_auth_pending),
         sync_effective_flags=sync_effective_flags,
         refresh_overlay=refresh_overlay_presentation,
-        refresh_peer_runtime=lambda: require_peer().owner.refresh_runtime(),
-        replace_self_stt=lambda smooth: require_self_application().replace_provider(
-            smooth_local=smooth
-        ),
+        refresh_peer_runtime=refresh_peer_for_settings,
+        replace_self_stt=replace_self_stt_for_settings,
         self_state_sink=on_self_capture_state,
         self_availability=require_self_application().project_availability,
         gpu_recovery=recover_gpu,
@@ -1934,8 +1954,6 @@ def compose_application_runtime(
         presentation.set_settings_managed_key_state(
             visible=state.visible,
             remaining_percent=state.remaining_percent,
-            referral_id=state.referral_id,
-            pass_status=state.pass_status,
         )
 
     def maybe_show_founder_letter(launch_source: str) -> None:
@@ -2019,6 +2037,7 @@ def compose_application_runtime(
         mark_llm_retry=signatures.mark_llm_retry,
         rolling_stt_secret_rebind=provider_runtime.effects.rebind_rolling_stt_secret,
     )
+    require_settings_application().provider_runtime = provider_runtime.runtime
 
     def selected_translation_runtime_applied() -> bool:
         current = settings.canonical
@@ -2262,14 +2281,40 @@ def compose_application_runtime(
         vrc_mic_sync=lambda: vrc_mic_sync,
         github_prompt=lambda: github_prompt,
         clipboard=lambda: clipboard,
-        microphone=lambda: microphone,
+        audio_test=lambda: audio_test,
         close_managed_gemma_owner=managed_gemma.close,
         local_asr_provisioning=lambda: provisioning,
     )
 
+    def model_assets_active_ids() -> frozenset[str]:
+        from puripuly_heart.core.local_stt_assets import LOCAL_QWEN_GPU_MODEL_ID
+
+        active: set[str] = set()
+        runtime = pipeline.local_asr_runtime
+        snapshot = getattr(runtime, "snapshot", None) if runtime is not None else None
+        if snapshot is not None:
+            active.update(
+                channel.model_id
+                for channel in snapshot.channels
+                if channel.model_id and channel.has_resources
+            )
+            if snapshot.gpu.model_resident:
+                active.add(LOCAL_QWEN_GPU_MODEL_ID)
+        if managed_gemma.active_model_id is not None:
+            active.add(managed_gemma.active_model_id)
+        return frozenset(active)
+
+    model_assets = ModelAssetsApplication(
+        provisioning=lambda: provisioning,
+        gemma=lambda: managed_gemma,
+        locale=lambda: (
+            settings.canonical.intent.ui.locale if settings.canonical is not None else None
+        ),
+        active_model_ids=model_assets_active_ids,
+    )
     overlay_owner = require_overlay()
     peer_runtime = require_peer()
-    microphone_runtime = require_microphone()
+    audio_test_runtime = require_audio_test()
     desktop_owner = require_desktop()
     calibration_owner = require_calibration()
     settings_owner = require_settings_application()
@@ -2309,14 +2354,12 @@ def compose_application_runtime(
             managed_gemma=managed_gemma,
             chatgpt=chatgpt_account,
             connection_readiness=llm_connection_readiness,
+            model_assets=model_assets,
             llm_devices_sink=lambda devices: presentation.set_dashboard_llm_gpu_devices(
                 devices=devices
             ),
         ),
-        microphone=UiMicrophoneRuntimeAdapter(
-            microphone=microphone_runtime,
-            level_log_interval_seconds=1.0,
-        ),
+        audio_test=UiAudioTestRuntimeAdapter(audio_test=audio_test_runtime),
         overlay=UiOverlayRuntimeAdapter(
             overlay=overlay_owner,
             desktop=desktop_owner,
@@ -2346,7 +2389,7 @@ def compose_application_runtime(
                 desktop_overlay=desktop_owner,
                 managed=managed_account,
                 calibration=calibration_owner,
-                microphone=lambda: microphone,
+                audio_test=lambda: audio_test,
             ),
         ),
         runtime_shutdown=runtime_shutdown,

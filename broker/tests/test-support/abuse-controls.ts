@@ -56,12 +56,6 @@ export interface StoredAbuseControls {
     maxRequests: number;
     windowMinutes: number;
   };
-  qqAuthStatusIp: {
-    endpoint: string;
-    scope: 'ip';
-    maxRequests: number;
-    windowMinutes: number;
-  };
   managedOperationStatusIp: {
     endpoint: string;
     scope: 'ip';
@@ -111,28 +105,6 @@ export interface StoredAbuseControls {
     requestEventSafetyMarginDays: number;
     issueSuccessDays: number;
     runtimeAuditDays: number;
-    referralSkippedDays: number;
-    referralFailedDays: number;
-  };
-  referralAttempts: {
-    validShaped: {
-      maxPerInstallation: number;
-      maxPerIp: number;
-      windowMinutes: number;
-    };
-    unknown: {
-      maxPerInstallation: number;
-      maxPerIp: number;
-      windowMinutes: number;
-    };
-    perReferralIdVelocity: {
-      maxAttempts: number;
-      windowMinutes: number;
-    };
-    perReferrerRewardVelocity: {
-      maxRewards: number;
-      windowMinutes: number;
-    };
   };
   dailyReport: {
     enabled: boolean;
@@ -213,12 +185,6 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
     maxRequests: 20,
     windowMinutes: 15,
   },
-  qqAuthStatusIp: {
-    endpoint: 'POST /v1/auth/qq/status',
-    scope: 'ip',
-    maxRequests: 30,
-    windowMinutes: 15,
-  },
   managedOperationStatusIp: {
     endpoint: 'POST /v1/providers/openrouter/managed-operation/status',
     scope: 'ip',
@@ -268,28 +234,6 @@ export const TEST_DEFAULT_ABUSE_CONTROLS: StoredAbuseControls = {
     requestEventSafetyMarginDays: 1,
     issueSuccessDays: 30,
     runtimeAuditDays: 90,
-    referralSkippedDays: 7,
-    referralFailedDays: 30,
-  },
-  referralAttempts: {
-    validShaped: {
-      maxPerInstallation: 8,
-      maxPerIp: 30,
-      windowMinutes: 15,
-    },
-    unknown: {
-      maxPerInstallation: 3,
-      maxPerIp: 10,
-      windowMinutes: 15,
-    },
-    perReferralIdVelocity: {
-      maxAttempts: 25,
-      windowMinutes: 60,
-    },
-    perReferrerRewardVelocity: {
-      maxRewards: 5,
-      windowMinutes: 1440,
-    },
   },
   dailyReport: {
     enabled: true,
@@ -474,7 +418,6 @@ function normalizeAbuseControls(value: unknown): StoredAbuseControls {
     value.discordOpenrouterIssueInstallation,
   );
   assignRecord(normalized.qqAuthAssertIp, value.qqAuthAssertIp);
-  assignRecord(normalized.qqAuthStatusIp, value.qqAuthStatusIp);
   assignRecord(normalized.pendingDiscordOAuthSessions, value.pendingDiscordOAuthSessions);
   assignRecord(normalized.newActiveEntitlementsPerDay, value.newActiveEntitlementsPerDay);
   assignRecord(normalized.immediateAlerts, value.immediateAlerts);
@@ -483,19 +426,6 @@ function normalizeAbuseControls(value: unknown): StoredAbuseControls {
     brake: normalized.immediateAlerts.brake,
   };
   assignRecord(normalized.retention, value.retention);
-  assignRecord(normalized.referralAttempts, value.referralAttempts);
-  if (isRecord(value.referralAttempts)) {
-    assignRecord(normalized.referralAttempts.validShaped, value.referralAttempts.validShaped);
-    assignRecord(normalized.referralAttempts.unknown, value.referralAttempts.unknown);
-    assignRecord(
-      normalized.referralAttempts.perReferralIdVelocity,
-      value.referralAttempts.perReferralIdVelocity,
-    );
-    assignRecord(
-      normalized.referralAttempts.perReferrerRewardVelocity,
-      value.referralAttempts.perReferrerRewardVelocity,
-    );
-  }
   assignRecord(normalized.dailyReport, value.dailyReport);
 
   return normalized;

@@ -480,14 +480,22 @@ async def test_custom_vocabulary_change_reaches_native_tasks_and_fresh_consumer(
                 await complete(first, "Fresh source.")
                 expected = "Fresh source."
             transcript = await require_final_source(env, expected)
-            completed = [
-                event
-                for event in env.harness.ui_events._queue
-                if event.type is UIEventType.TRANSLATION_DONE
-                and event.utterance_id == transcript.utterance_id
-            ]
+            completed = list(
+                {
+                    target.translation.update_id: target.translation
+                    for event in env.harness.ui_events._queue
+                    if event.type is UIEventType.SELF_TURN_UPDATED
+                    and event.utterance_id == transcript.utterance_id
+                    and event.payload.source_closed
+                    and event.payload.status == "complete"
+                    for target in event.payload.targets
+                    if target.status == "ready"
+                    and target.source_revision == event.payload.source_revision
+                    and target.translation is not None
+                }.values()
+            )
             assert len(completed) == 1
-            assert completed[0].payload.text == env.llm.response_text
+            assert completed[0].text == env.llm.response_text
             assert all(record["terms"] == ["Puripuly", "VRChat"] for record in connections[offset:])
             values = (0.3, 0.4) if provider is STTProviderName.QWEN_AUDIO else (0.3,)
             assert [record["pcm"] for record in connections[offset:]] == [
@@ -508,7 +516,7 @@ async def test_custom_vocabulary_change_reaches_native_tasks_and_fresh_consumer(
                     "native_terms": [record["terms"] for record in connections],
                     "pcm_bytes": [len(record["pcm"]) for record in connections],
                     "fresh_source": transcript.text,
-                    "completed_translation": completed[0].payload.text,
+                    "completed_translation": completed[0].text,
                     "recognition_origins": len(transcript.recognition_origins),
                     "old_pending_and_late_source_rejected": provider is STTProviderName.QWEN_AUDIO,
                     "all_connections_closed": all(

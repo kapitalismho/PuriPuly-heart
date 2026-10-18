@@ -401,16 +401,20 @@ class TranslationLatencyDiagnosticsOwner:
             except ValueError:
                 pass
             else:
-                if event == "page_send":
+                if event == "page_send" and fields.get("first_successful_page", True):
                     self.record_output_latency_stage(
                         LatencyStageDiagnostic(
                             channel="self",
                             utterance_id=utterance_id,
-                            stage="self_chatbox_send",
+                            stage=(
+                                "self_chatbox_preview_send"
+                                if fields.get("self_turn_final") is False
+                                else "self_chatbox_send"
+                            ),
                             overwrite=False,
                         )
                     )
-                else:
+                elif event == "message_terminal":
                     self.abandon_pending_latency_output("self", utterance_id)
         recorder = self.overlay_diagnostics
         if recorder is None:

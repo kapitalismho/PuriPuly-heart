@@ -1665,6 +1665,7 @@ class SessionRuntimeLoggingService:
                 ),
                 channel=record.speaker_channel,
                 utterance_id=record.utterance_id,
+                parent_utterance_id=metadata.get("parent_utterance_id"),
                 source_text=record.transcript_text,
                 translated_text=record.translation_text,
                 source_language=record.source_language,

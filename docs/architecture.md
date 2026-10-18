@@ -59,8 +59,10 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Self capture owner      | Microphone source and capture lifecycle                    | `core/runtime/self_capture.py`                       |
 | Self translation owner  | Self STT events, turns, state, output projection           | `core/orchestrator/self_translation_channel.py`      |
 | Peer capture owner      | Peer audio source, segmentation, and capture lifecycle | `core/runtime/peer_channel.py`                       |
+| Audio test owner        | VAD-only audio testing and capture restoration | `app/services/audio_test.py`, `core/runtime/audio_test.py` |
 | Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_runtime.py`         |
 | Managed local translation | Local model provisioning and runtime lifecycle | `app/services/managed_gemma_translation.py` and `core/local_translation/runtime.py` |
+| Model assets application | Explicit local-model asset operations and provisioning coordination | `app/services/model_assets.py` |
 | Translation turn owner  | Request lifecycle, cancellation, stale-result rejection    | `core/orchestrator/translation_turn.py`                 |
 | Index selection owner | Availability checks and persisted fallback selection | `app/services/index_selection.py`, `app/wiring/wiring_index_selection.py` |
 | Output runtime          | Routing, delivery tasks, destinations, delivery history    | `core/runtime/output.py`                              |
@@ -95,12 +97,25 @@ Peer:   loopback / process audio → capture / segmentation → recognition
 - Self and Peer share audio contracts. Each channel retains its own endpoint policies.
 - Capture authority determines which audio may enter recognition.
 - Source completion drains admitted input. Stop or discontinuity invalidates affected work.
+- The application boundary owns audio-test admission and restoration. VAD-only tests exclude normal capture; stopping revokes pending starts and drains owned inputs before restoring authorized capture.
 
 Implementation: `core/audio/ownership.py`, `core/audio/listen_delivery.py`.
 
 ### Managed translation
 
 Managed authentication → Broker entitlement or credential release → provider activation → normal translation request path.
+
+Referral codes and Talk Together Pass are not part of this path. Ordinary usage and exhaustion presentation remains; retiring referral state does not revoke existing credentials or lower previously applied provider allowances.
+
+- `SettingsOwner` is the canonical managed-identity authority. Complete canonical commits serialize current-state rebasing, focused mutation, physical persistence and canonical/committed-state finalization. Failed writes settle their rollback before another commit enters; a retained service or factory bag cannot replace newer settings.
+- Observer publication follows commit order outside the commit critical section. A notification failure is secondary to an already durable commit. Runtime restoration does not assign canonical state; compensation is another owner-controlled commit.
+- The encrypted credential receipt binds source, installation, logical operation, delivery, credential reference and the exact stored key digest. ACK and ACTIVE recovery require this proof, not merely a nonempty source-specific key slot. Modern issuance must provide the complete delivery contract before replacing credentials.
+- A failed final settings commit does not authorize discarding an already-durable modern credential, receipt or ACK token. Authentication and translation preparation can reconstruct missing ACK metadata through `SettingsOwner` only when the exact receipt/key agrees with the same operation's authoritative, unexpired pending delivery; persistence must complete before ACK.
+- Receipt-bearing modern credentials are executable only with matching canonical active authority and no same-source pending operation or delivery. Only a proven absent receipt uses legacy readiness; malformed or unreadable proof does not. Terminal cleanup invalidates only the exact failed operation's active projection, while successful ACK/ACTIVE recovery preserves it. Clearing an operation cannot promote its retained, unacknowledged key through legacy fallback.
+- Unknown secret reads retain authority. An unusable pending ACK reaches the same logical operation's status/resume path; it does not authorize a new operation or destructive identity regeneration.
+- Authentication completion and provider activation are separate outcomes. Saved resumable authority is also distinct from an actively owned task or a usable local credential.
+
+Implementation: `app/services/managed/`, `app/services/qq_managed_auth.py`, `app/wiring/wiring_managed_auth_factory.py`, `core/managed_credential.py`, `core/openrouter/managed_openrouter_release.py`.
 
 ### VRChat scene context
 
@@ -144,7 +159,7 @@ Composition may construct resources, but must transfer long-lived ownership to a
 
 ## Local Application Control
 
-GUI and headless hosts share application owners and runtime resources. Presentation adapters determine whether there is a main window.
+GUI and headless hosts share application owners, runtime resources and turn-event contracts. Presentation adapters determine whether there is a main window.
 
 - **Operations and queries**
   - `ApplicationControlOwner` exposes typed operations and owner-backed queries.
@@ -191,11 +206,25 @@ Settings changes follow this path:
 3. The result proceeds to persistence and runtime application.
 
 - Settings persistence owns intent. Runtime owners own its application.
+- Transactional runtime application admits the settings owner's current committed snapshot, not a bag captured before persistence. Runtime effects never assign canonical settings.
+- Selection guards are checked at atomic commit admission. If cancellation arrives after an admitted physical save, settle the save and report committed intent with interrupted runtime application; do not undo the durable commit or start cancelled runtime work.
+- Explicit runtime-only overrides remain ephemeral. Their admitted configuration flows through LLM construction, self/peer capture requests and GPU recovery; factories must not substitute a different canonical selection. Applied-resource identity and availability describe that same admitted configuration.
+- Asynchronous Gemma construction rejects a canonical translation selection changed since admission, not an intentional difference between canonical intent and an admitted runtime-only override. Dispose obsolete completed backends without replacing the current provider.
 - The provider-apply boundary coordinates capture and Local ASR owners.
+- Mixed settings changes share one persistence transaction. After general effects, transactional provider application still admits the current committed snapshot. Runtime owners retain their own application results; provider retry authority remains explicit.
 - Failed or incomplete application must not appear as successfully applied runtime state.
-- LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.
+- LLM applied-profile signatures and retry state follow actual provider attachment or replacement. Initial attachment uses the exact launch snapshot; an absent provider remains retryable. Replacement records its outcome before usage refresh or STT convergence. Generic settings-effect, restoration and post-transaction cache updates are STT-only and cannot assert LLM application. Provider application advances STT signatures only after STT convergence, so an independent STT failure can leave the overall transaction committed but runtime-degraded without losing the actual LLM binding.
 
-Implementation: `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_stt_provider_apply_vertical.py`.
+Implementation: `app/services/settings/settings_application.py`, `app/services/provider/provider_runtime_apply.py`. Behavior: `tests/app/test_application_control_contract.py`, `tests/app/test_stt_provider_apply_vertical.py`.
+
+### Secret persistence
+
+- Secret-store instances are views of the current backend, not independent credential snapshots.
+- The encrypted-file backend serializes initialization and read/modify/replace across instances and processes. Each mutation preserves unrelated entries; retained readers observe the latest committed file.
+- Its adjacent `.lock` file has a stable lifetime so separate processes coordinate on the same lock. A missing, corrupt, unreadable or replaced-salt document is an observation failure, not proof that credentials are absent.
+- The asynchronous adapter retains ownership until a started synchronous operation settles, including caller cancellation. Identity and authentication owners remain responsible for their multi-step durable transitions.
+
+Implementation: `core/storage/secrets.py`, `app/adapters/sync_secret_store.py`, `core/owned_thread.py`. Behavior: `tests/core/test_encrypted_secret_store.py`, `tests/app/test_sync_secret_store_adapter.py`, `tests/core/test_chatgpt_session.py`.
 
 ## Provider Boundaries
 
@@ -245,6 +274,16 @@ Implementation: `core/stt/scoped_engine.py`, `core/stt/session_projection.py`. B
   - A heuristic decision is not evidence of a known diagnostic cause.
 
 Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/translation_request.py`, `core/runtime/provider_rebuild.py`. Behavior: `tests/core/test_translation_turn_owner.py`, `tests/core/test_translation_request_owner.py`.
+
+### Progressive Self turns
+
+- `SelfTranslationChannelOwner` owns source reconciliation, acoustic continuation, grace, and source closure independently of translation completion.
+- `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests when source closes.
+- Freed speculative capacity resumes only the current open draft; sealed turns retain normal bounded admission.
+- Speculative context is not accepted history. Canonical source is admitted once; logical cancellation does not release occupied provider capacity.
+- `SelfTurnPresentation` carries authoritative turn identity, revisions, and per-target status independently of overlay display state.
+
+Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestrator/translation_turn.py`, `domain/events.py`. Behavior: `tests/core/test_self_stream_233.py`.
 
 ### Managed local translation
 
@@ -296,6 +335,13 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
 - **Identity and delivery health**
   - Publication/turn identities and explicitly admitted operation/request identities cross each destination boundary unchanged.
   - Optional observer failure is separate delivery-health evidence, not a new translation failure.
+- **Progressive Self publication**
+  - Chatbox updates are independent of the overlay; newer revisions can replace unsent updates within the same turn.
+  - Earlier required corrections retain a sending opportunity without blocking successor translation. Manual bypass and normal pagination supersession remain.
+  - Identical successfully sent compatible previews are promoted to final without resending or restarting pagination.
+- **Application turn presentation**
+  - Views update turns by identity, revision, and target status. Older results may update their history without replacing the current dashboard turn.
+  - Preview rendering is separate from final-only accepted logging and context admission.
 - **OSC recovery**
   - OSC owners retain a failed publication obligation until actual local sends complete it.
   - An empty or unrelated delta and old cache equality cannot establish recovery.
@@ -407,6 +453,7 @@ Build policy and validation: `scripts/ci/build-native-experimental.ps1`, `releas
 - **Provisioning lifecycle**
   - Setup provisions required CPU ASR assets before app replacement. Provisioning failure blocks installation.
   - Managed Gemma and optional GPU ASR keep on-demand runtime preparation.
+  - Explicit asset work has a cancellation lifetime independent of runtime preparation. Provisioning exclusion lasts until owned work settles.
   - Adding mirrors does not change these lifecycle owners.
 
 Implementation: `core/local_asr/local_stt_runtime_installer.py`, `core/local_translation/provisioning.py`, `installer.iss`. Behavior: `tests/core/test_local_stt_runtime_installer.py`, `tests/core/local_translation/test_gemma_provisioning.py`, `tests/scripts/test_install_local_stt_model.py`.
@@ -429,6 +476,8 @@ Every task, process, source, and provider session has an owner. That owner is re
 - Replacement revokes retired authority before it can affect the new runtime.
 - Retired resources remain owned until cleanup completes.
 - Source-ordered recognition handoff evaluates cleanup debt after backend shutdown, not after channel-only close.
+- Managed authentication admits one source-owned task before changing the GUI generation or waiting state. A rejected duplicate does not supersede that task.
+- `OAuthRuntime` retains external authentication work until the actual asyncio task settles; cancellation of its outer future is not completion. Bounded shutdown failure retains visible cleanup debt and prevents replacement under the same task identity.
 
 ### Shutdown
 

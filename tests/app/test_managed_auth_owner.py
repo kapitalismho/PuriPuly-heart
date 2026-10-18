@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from puripuly_heart.app.services.managed_auth import (
     ManagedAuthExecutionResult,
     ManagedAuthOwner,
     ManagedAuthState,
 )
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
@@ -42,7 +43,6 @@ def _owner(
     discord_result: ManagedAuthExecutionResult | None = None,
     pending: list[bool] | None = None,
     runtime_modes: list[str] | None = None,
-    views: list[tuple[str | None, TalkTogetherPassStatus | None]] | None = None,
     refreshes: list[str] | None = None,
     messages: list[tuple[str, dict[str, object]]] | None = None,
     results: list[TransactionResult] | None = None,
@@ -51,7 +51,6 @@ def _owner(
 ) -> ManagedAuthOwner:
     pending_sink = pending if pending is not None else []
     runtime_sink = runtime_modes if runtime_modes is not None else []
-    view_sink = views if views is not None else []
     refresh_sink = refreshes if refreshes is not None else []
     message_sink = messages if messages is not None else []
     result_sink = results if results is not None else []
@@ -60,12 +59,10 @@ def _owner(
     async def execute_qq(
         _qq_identity: str,
         _credential: str,
-        _referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         return qq_result or ManagedAuthExecutionResult(succeeded=True)
 
     async def execute_discord(
-        _referral_id: str | None,
         callback: object,
         _on_recovery_started: object = None,
     ) -> ManagedAuthExecutionResult:
@@ -83,9 +80,6 @@ def _owner(
         qq_executor=execute_qq,
         discord_executor=execute_discord,
         runtime_ensurer=ensure_runtime,
-        usage_view_sink=lambda referral_id, pass_status: view_sink.append(
-            (referral_id, pass_status)
-        ),
         usage_refresh_sink=lambda: refresh_sink.append("refresh"),
         message_sink=lambda key, values: message_sink.append((key, dict(values))),
         result_sink=result_sink.append,
@@ -133,8 +127,9 @@ async def test_qq_success_clears_pending_and_routes_runtime_rebuild() -> None:
 
     assert await owner.start_qq(qq_identity="qq", credential="credential") is True
 
-    assert pending == [False]
+    assert pending == [True, False]
     assert runtime_modes == ["if_missing"]
+    assert owner.last_failure_kind == "none"
 
 
 @pytest.mark.asyncio
@@ -151,6 +146,7 @@ async def test_qq_failure_maps_service_message_at_owner_boundary() -> None:
         qq_identity="qq",
         credential="credential",
     ) == ("qq_auth.error.credential_mismatch", {"retry_after_ms": 10})
+    assert owner.last_failure_kind == "failed"
 
 
 @pytest.mark.asyncio
@@ -177,21 +173,16 @@ async def test_committed_qq_auth_remains_successful_after_runtime_rebuild_error(
     assert results[-1].diagnostics.fields["exception_class"] == "RuntimeError"
     assert results[-1].diagnostics.fields["phase"] == "runtime_apply"
     assert "sensitive-rebuild-error" not in caplog.text
+    assert owner.last_failure_kind == "runtime_degraded"
 
 
 @pytest.mark.asyncio
 async def test_discord_success_sequences_pending_result_runtime_view_and_refresh() -> None:
     pending: list[bool] = []
     runtime_modes: list[str] = []
-    views: list[tuple[str | None, TalkTogetherPassStatus | None]] = []
     refreshes: list[str] = []
     results: list[TransactionResult] = []
     callbacks: list[str] = []
-    pass_status = TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=2,
-        invite_limit=3,
-    )
     transaction = TransactionResult(
         status=TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
         message=None,
@@ -202,14 +193,10 @@ async def test_discord_success_sequences_pending_result_runtime_view_and_refresh
         discord_result=ManagedAuthExecutionResult(
             succeeded=True,
             transaction_result=transaction,
-            referral_bonus_applied=True,
-            referral_id="7KQ9M2",
-            pass_status=pass_status,
             runtime_rebuild="always",
         ),
         pending=pending,
         runtime_modes=runtime_modes,
-        views=views,
         refreshes=refreshes,
         results=results,
     )
@@ -225,11 +212,10 @@ async def test_discord_success_sequences_pending_result_runtime_view_and_refresh
     assert pending == [True, False]
     assert results == [transaction]
     assert runtime_modes == ["always"]
-    assert views == [("7KQ9M2", pass_status)]
     assert refreshes == ["refresh"]
-    assert owner.last_referral_bonus_applied is True
     assert owner.discord_in_progress is False
     assert owner.callback_received_hook is None
+    assert owner.last_failure_kind == "none"
 
 
 @pytest.mark.asyncio
@@ -259,40 +245,30 @@ async def test_discord_failure_contains_safe_message_and_restores_state() -> Non
     ]
     assert owner.discord_in_progress is False
     assert owner.callback_received_hook is None
+    assert owner.last_failure_kind == "failed"
 
 
 @pytest.mark.asyncio
-async def test_discord_delivery_ack_pending_keeps_issued_pass_visible_and_refreshes() -> None:
-    views: list[tuple[str | None, TalkTogetherPassStatus | None]] = []
-    refreshes: list[str] = []
-    pass_status = TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=0,
-        invite_limit=3,
-    )
+async def test_discord_delivery_ack_pending_is_idle_and_explicitly_resumable() -> None:
     owner = _owner(
         [_state()],
         discord_result=ManagedAuthExecutionResult(
             succeeded=False,
             delivery_ack_pending=True,
-            referral_id="7KQ9M2",
-            pass_status=pass_status,
-            message_key="discord_auth.error.retry",
+            message_key="discord_auth.error.recovery_pending",
         ),
-        views=views,
-        refreshes=refreshes,
     )
 
     assert await owner.start_discord() is False
-
-    assert views == [("7KQ9M2", pass_status)]
-    assert refreshes == ["refresh"]
+    assert owner.pending is False
+    assert owner.dashboard_action() == "prompt"
+    assert owner.last_failure_kind == "idle_resumable"
+    assert owner.last_message_key == "discord_auth.error.recovery_pending"
 
 
 @pytest.mark.asyncio
-async def test_discord_runtime_failure_does_not_publish_usage_state() -> None:
+async def test_discord_runtime_failure_preserves_authentication_and_refreshes_usage() -> None:
     messages: list[tuple[str, dict[str, object]]] = []
-    views: list[tuple[str | None, TalkTogetherPassStatus | None]] = []
     refreshes: list[str] = []
     owner = _owner(
         [_state()],
@@ -301,16 +277,16 @@ async def test_discord_runtime_failure_does_not_publish_usage_state() -> None:
             runtime_rebuild="always",
         ),
         messages=messages,
-        views=views,
         refreshes=refreshes,
         runtime_ready=False,
     )
 
-    assert await owner.start_discord() is False
+    assert await owner.start_discord() is True
 
-    assert messages == [("discord_auth.error.retry", {})]
-    assert views == []
-    assert refreshes == []
+    assert owner.last_failure_kind == "runtime_degraded"
+    assert owner.pending is False
+    assert messages == []
+    assert refreshes == ["refresh"]
 
 
 @pytest.mark.asyncio
@@ -378,3 +354,118 @@ async def test_qq_recovery_messages_map_to_finite_dialog_copy(
         qq_identity="qq",
         credential="credential",
     ) == (dialog_key, {})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_auth_single_flight_keeps_admitted_work_and_source_authority(source: str) -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    calls: list[str] = []
+    states = [_state(managed_china=source == "qq")]
+    pending: list[bool] = []
+    owner = _owner(states, pending=pending)
+
+    async def execute(*_args, **_kwargs):
+        calls.append(source)
+        entered.set()
+        await release.wait()
+        return ManagedAuthExecutionResult(succeeded=True)
+
+    owner.qq_executor = execute
+    owner.discord_executor = execute
+
+    def original_hook():
+        return None
+
+    admitted = asyncio.create_task(
+        owner.start_qq(qq_identity="original", credential="original")
+        if source == "qq"
+        else owner.start_discord(on_callback_received=original_hook)
+    )
+    await entered.wait()
+    assert owner.pending is True
+    assert owner.dashboard_action() == "in_progress"
+    assert owner.last_failure_kind == "none"
+    states[0] = _state(managed_china=source != "qq")
+    assert await owner.start_discord() is False
+    assert await owner.start_qq(qq_identity="retry", credential="retry") == (
+        "qq_auth.error.other_source_pending",
+        {},
+    )
+    assert calls == [source]
+    assert owner.callback_received_hook is (original_hook if source == "discord" else None)
+    assert owner.last_failure_kind == "none"
+    assert pending == [True]
+    release.set()
+    assert await admitted is True
+    assert owner.pending is False
+    assert owner.callback_received_hook is None
+    assert owner.dashboard_action() == "prompt"
+    assert pending == [True, False]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_cancelled_auth_stays_pending_until_executor_mutation_settles(source: str) -> None:
+    entered = asyncio.Event()
+    cancelling = asyncio.Event()
+    release = asyncio.Event()
+    settled: list[str] = []
+    owner = _owner([_state(managed_china=source == "qq")])
+
+    async def execute(*_args, **_kwargs):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelling.set()
+            await release.wait()
+            settled.append("mutation")
+            raise
+
+    owner.qq_executor = execute
+    owner.discord_executor = execute
+    task = asyncio.create_task(
+        owner.start_qq(qq_identity="qq", credential="credential")
+        if source == "qq"
+        else owner.start_discord()
+    )
+    await entered.wait()
+    task.cancel()
+    await cancelling.wait()
+    assert not task.done()
+    assert owner.pending is True
+    assert owner.dashboard_action() == "in_progress"
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert settled == ["mutation"]
+    assert owner.last_failure_kind == "cancelled"
+    assert owner.pending is False
+    assert owner.dashboard_action() == "prompt"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_executor_exception_clears_progress_and_retains_safe_retry(source: str) -> None:
+    results: list[TransactionResult] = []
+    owner = _owner([_state(managed_china=source == "qq")], results=results)
+
+    async def execute(*_args, **_kwargs):
+        raise RuntimeError("private provider response")
+
+    owner.qq_executor = execute
+    owner.discord_executor = execute
+    if source == "qq":
+        assert await owner.start_qq(qq_identity="qq", credential="credential") == (
+            "qq_auth.error.retry",
+            {},
+        )
+    else:
+        assert await owner.start_discord() is False
+    assert owner.pending is False
+    assert owner.last_failure_kind == "failed"
+    assert owner.last_message_key == f"{source}_auth.error.retry"
+    assert results[-1].diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "private provider response" not in repr(results)

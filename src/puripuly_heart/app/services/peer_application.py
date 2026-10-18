@@ -531,7 +531,24 @@ class PeerApplicationOwner:
         *,
         stop_mode: Literal["retain", "release"] = "retain",
     ) -> None:
-        state = self.state_provider()
+        await self._refresh_runtime(self.state_provider(), self.config_factory, stop_mode=stop_mode)
+
+    async def refresh_runtime_with_config(
+        self,
+        config: PeerCaptureSessionConfig,
+        *,
+        state: PeerApplicationState,
+        stop_mode: Literal["retain", "release"] = "retain",
+    ) -> None:
+        await self._refresh_runtime(state, lambda: config, stop_mode=stop_mode)
+
+    async def _refresh_runtime(
+        self,
+        state: PeerApplicationState,
+        config_factory: PeerApplicationConfigFactory,
+        *,
+        stop_mode: Literal["retain", "release"],
+    ) -> None:
         if self._ingress_stopped or state.ingress_frozen:
             return
         runtime = self._runtime
@@ -539,7 +556,7 @@ class PeerApplicationOwner:
             return
         if self._should_hold_runtime_refresh(state):
             return
-        config = self.config_factory()
+        config = config_factory()
         desired_active = self.desired_active(state)
         previous_signature = getattr(runtime, "current_signature", None)
         peer_local_provider = bool(desired_active and config.local_provider)

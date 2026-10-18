@@ -70,13 +70,15 @@ class UnconfirmedExitProcess(FakeProcess):
 
 
 class FakeProcessJob:
-    def __init__(self) -> None:
+    def __init__(self, *, assignment_succeeds: bool = True) -> None:
+        self.assignment_succeeds = assignment_succeeds
+        self.failure_reason = None if assignment_succeeds else "job_assignment_rejected"
         self.assigned_pids: list[int] = []
         self.close_calls = 0
 
     def assign(self, pid: int) -> bool:
         self.assigned_pids.append(pid)
-        return True
+        return self.assignment_succeeds
 
     def close(self) -> None:
         self.close_calls += 1
@@ -262,34 +264,73 @@ async def test_owner_trace_reports_renderer_pid_as_flet_view_parent(tmp_path: Pa
 
 
 @pytest.mark.asyncio
-async def test_owner_escalates_from_graceful_close_to_terminate(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "job_assignment_succeeds", [True, False], ids=["job_assigned", "job_rejected"]
+)
+@pytest.mark.parametrize(
+    "graceful_close_requested", [True, False], ids=["close_timeout", "close_failed"]
+)
+async def test_owner_escalates_from_graceful_close_to_terminate(
+    tmp_path: Path,
+    job_assignment_succeeds: bool,
+    graceful_close_requested: bool,
+) -> None:
     process = FakeProcess()
     pid_file = _pid_file(tmp_path)
+    process_job = FakeProcessJob(assignment_succeeds=job_assignment_succeeds)
+    close_requester = FakeCloseRequester(requested=graceful_close_requested)
     events: list[str] = []
+    event_fields: dict[str, dict[str, object]] = {}
+    process_states: dict[str, tuple[int | None, bool]] = {}
+
+    def record_trace(event: str, fields: dict[str, object]) -> None:
+        events.append(event)
+        event_fields[event] = dict(fields)
+        process_states[event] = (process.returncode, pid_file.exists())
+
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.05,
         terminate_timeout_s=0.1,
-        trace_sink=lambda event, _fields: events.append(event),
-        close_requester=FakeCloseRequester(),
+        trace_sink=record_trace,
+        process_job=process_job,
+        close_requester=close_requester,
     )
-    await owner.attach(process, str(pid_file))
+    assert await owner.attach(process, str(pid_file)) is True
+    assert process_job.assigned_pids == [4321]
+    assert event_fields["process_started"]["kill_on_job_close"] is job_assignment_succeeds
+    assert event_fields["process_started"]["job_failure_reason"] == process_job.failure_reason
+    assert ("job_assignment_failed" in events) is (not job_assignment_succeeds)
+    if not job_assignment_succeeds:
+        assert event_fields["job_assignment_failed"]["reason"] == process_job.failure_reason
+    events.clear()
 
     await owner.close()
 
+    assert close_requester.requested_pids == [4321]
     assert process.terminate_calls == 1
     assert process.kill_calls == 0
+    assert process.returncode == 15
     assert not pid_file.exists()
-    assert events == [
-        "process_started",
-        "job_assignment_failed",
-        "stop_requested",
-        "graceful_close_requested",
-        "graceful_close_failed",
-        "graceful_close_timeout",
-        "terminate_requested",
-        "process_exited",
-        "pid_file_removed",
-    ]
+    assert owner.process_info is None
+    assert process_job.close_calls == 1
+    expected_events = ["stop_requested", "graceful_close_requested"]
+    if not graceful_close_requested:
+        expected_events.append("graceful_close_failed")
+    expected_events.extend(
+        [
+            "graceful_close_timeout",
+            "terminate_requested",
+            "process_exited",
+            "pid_file_removed",
+        ]
+    )
+    assert events == expected_events
+    if not graceful_close_requested:
+        assert event_fields["graceful_close_failed"]["reason"] == close_requester.failure_reason
+    assert process_states["graceful_close_requested"] == (None, True)
+    assert process_states["terminate_requested"] == (None, True)
+    assert process_states["process_exited"] == (15, True)
+    assert process_states["pid_file_removed"] == (15, False)
 
 
 @pytest.mark.asyncio
@@ -299,6 +340,7 @@ async def test_owner_escalates_from_failed_terminate_to_kill(tmp_path: Path) -> 
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.01,
         terminate_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     await owner.attach(process, str(pid_file))
@@ -318,6 +360,7 @@ async def test_owner_escalates_from_terminate_exception_to_kill(tmp_path: Path) 
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.01,
         terminate_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     await owner.attach(process, str(pid_file))
@@ -337,6 +380,7 @@ async def test_owner_repeated_close_is_idempotent(tmp_path: Path) -> None:
     close_requester = FakeCloseRequester()
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=close_requester,
     )
     await owner.attach(process, str(pid_file))
@@ -356,6 +400,7 @@ async def test_owner_finishes_cleanup_when_close_caller_is_cancelled(tmp_path: P
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.02,
         terminate_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     await owner.attach(process, str(pid_file))
@@ -446,6 +491,7 @@ async def test_owner_reports_unlink_failure_and_retries_retained_pid_file(
 async def test_owner_reaps_process_attached_after_close_started(tmp_path: Path) -> None:
     owner = FletDesktopViewProcessOwner(
         terminate_timeout_s=0.1,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     await owner.close()
@@ -469,6 +515,7 @@ async def test_renderer_startup_timeout_reaps_process_before_page_creation(
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.01,
         terminate_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     release_runner = asyncio.Event()
@@ -498,6 +545,7 @@ async def test_renderer_startup_exception_after_spawn_reaps_process(tmp_path: Pa
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.01,
         terminate_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
 
@@ -616,6 +664,7 @@ async def test_close_waits_for_in_flight_launch_reap(
     owner = FletDesktopViewProcessOwner(
         terminate_timeout_s=0.05,
         trace_sink=lambda event, _fields: events.append(event),
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     with flet_desktop_runtime.patch_hidden_view_launcher(process_owner=owner):
@@ -657,6 +706,7 @@ async def test_failed_rejected_reap_fails_close(
     owner = FletDesktopViewProcessOwner(
         graceful_timeout_s=0.01,
         terminate_timeout_s=0.01,
+        process_job=FakeProcessJob(),
         close_requester=FakeCloseRequester(),
     )
     with flet_desktop_runtime.patch_hidden_view_launcher(process_owner=owner):
@@ -697,7 +747,10 @@ async def test_cancelled_spawn_keeps_handle_and_fails_close(
         return process, str(pid_file)
 
     monkeypatch.setattr(flet_desktop_runtime, "open_hidden_view", stub_open)
-    owner = FletDesktopViewProcessOwner(close_requester=FakeCloseRequester())
+    owner = FletDesktopViewProcessOwner(
+        process_job=FakeProcessJob(),
+        close_requester=FakeCloseRequester(),
+    )
     with flet_desktop_runtime.patch_hidden_view_launcher(process_owner=owner):
         launch = module.open_flet_view_async
         launch_task = asyncio.create_task(launch("flet://cancelled", None, True))

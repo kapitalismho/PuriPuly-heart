@@ -13,6 +13,7 @@ from puripuly_heart.core.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthCallbackResult,
     DiscordOAuthLoopbackClosedError,
+    DiscordOAuthLoopbackUnavailableError,
     _DiscordOAuthHTTPServer,
     _send_success_callback_response,
     bind_first_available,
@@ -57,6 +58,7 @@ def test_bind_first_available_uses_fixed_loopback_redirect_uri() -> None:
 def test_success_callback_returns_completion_page_and_wait_returns_code_state() -> None:
     listener = bind_first_available(locale="ko")
     try:
+        listener.expect_state("state-1")
         status, content_type, body = _get_response(
             _callback_url(listener, code="discord-code-1", state="state-1")
         )
@@ -147,6 +149,7 @@ def test_success_callback_completion_page_matches_locale(
 ) -> None:
     listener = bind_first_available(locale=locale)
     try:
+        listener.expect_state("state-1")
         status, _content_type, body = _get_response(
             _callback_url(listener, code="discord-code-1", state="state-1")
         )
@@ -161,6 +164,7 @@ def test_success_callback_completion_page_matches_locale(
 def test_error_callback_returns_204_and_wait_raises_callback_error() -> None:
     listener = bind_first_available()
     try:
+        listener.expect_state("state-2")
         assert _get_status(_callback_url(listener, error="access_denied", state="state-2")) == 204
 
         with pytest.raises(DiscordOAuthCallbackError) as exc_info:
@@ -272,3 +276,48 @@ def test_occupied_configured_port_cannot_be_reused_and_falls_back_to_next_port(
     finally:
         if occupied is not None:
             occupied.close()
+
+
+def test_stale_callback_cannot_consume_current_callback() -> None:
+    listener = bind_first_available()
+    try:
+        assert _get_status(_callback_url(listener, code="stale", state="stale")) == 400
+        listener.expect_state("current")
+        assert _get_status(_callback_url(listener, code="stale", state="stale")) == 400
+        assert _get_status(_callback_url(listener, error="access_denied", state="stale")) == 400
+        with pytest.raises(TimeoutError):
+            listener.wait(timeout=0.01)
+        assert _get_status(_callback_url(listener, code="current-code", state="current")) == 200
+        assert listener.wait(timeout=1) == DiscordOAuthCallbackResult("current-code", "current")
+    finally:
+        listener.close()
+    assert not listener._thread.is_alive()
+
+
+def test_duplicate_state_and_conflicting_payload_do_not_consume_callback() -> None:
+    listener = bind_first_available()
+    try:
+        listener.expect_state("current")
+        assert _get_status(f"{listener.redirect_uri}?code=code&state=current&state=stale") == 400
+        assert (
+            _get_status(
+                _callback_url(listener, code="code", state="current", error="access_denied")
+            )
+            == 400
+        )
+        assert _get_status(_callback_url(listener, code="code", state="current")) == 200
+        assert listener.wait(timeout=1).code == "code"
+    finally:
+        listener.close()
+
+
+def test_all_ports_unavailable_has_typed_actionable_error(monkeypatch) -> None:
+    occupied = socket.socket()
+    occupied.bind(("127.0.0.1", 0))
+    occupied.listen(1)
+    monkeypatch.setattr(loopback, "DISCORD_OAUTH_LOOPBACK_PORTS", (occupied.getsockname()[1],))
+    try:
+        with pytest.raises(DiscordOAuthLoopbackUnavailableError):
+            bind_first_available()
+    finally:
+        occupied.close()

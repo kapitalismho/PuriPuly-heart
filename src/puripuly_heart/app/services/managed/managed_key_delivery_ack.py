@@ -9,18 +9,23 @@ from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckRequest,
     ManagedKeyDeliveryAckResult,
+    ManagedOperationStatusResult,
 )
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
 from puripuly_heart.app.services.managed.managed_operation import (
     clear_resume_token,
-    other_source_pending_operation,
 )
-from puripuly_heart.config.provider_values import normalize_owned_referral_id
 from puripuly_heart.core.diagnostics import (
     emit_failure,
     safe_exception_fields,
     sanitize_diagnostics,
+)
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+    delivery_expired,
+    managed_key_secret,
 )
 from puripuly_heart.core.messages import (
     CONTENT_POLICY_METADATA_ONLY,
@@ -29,11 +34,27 @@ from puripuly_heart.core.messages import (
     DiagnosticFieldValue,
     ErrorDiagnostics,
 )
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    clear_failed_managed_credential_projection,
+)
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 ACK_SOURCE_DISCORD = "discord"
 ACK_SOURCE_QQ = "qq"
 DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET = "openrouter_managed_delivery_ack_token"
 QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET = "openrouter_managed_qq_delivery_ack_token"
+ACK_RECONCILIATION_STATUSES = frozenset(
+    {
+        "pending_metadata_incomplete",
+        "managed_secret_missing",
+        "credential_binding_missing",
+        "missing_token",
+        "expired",
+        "invalid",
+        "mismatched",
+        "failed",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +93,55 @@ class ManagedKeyDeliveryAckService:
     secret_store: SecretStorePort
     managed_state: ManagedIdentityStatePort
 
+    async def bind_credential(
+        self, metadata: ManagedKeyDeliveryAckMetadata, credential: str
+    ) -> None:
+        state = self.managed_state
+        binding = ManagedCredentialBinding.create(
+            source=metadata.source,
+            installation_id=state.installation_id,
+            operation_id=state.pending_managed_operation_id or "",
+            delivery_id=metadata.delivery_id,
+            managed_credential_ref=metadata.managed_credential_ref,
+            credential=credential,
+        )
+        observed = await self.secret_store.get_secret(managed_key_secret(metadata.source))
+        if observed.diagnostics is not None or observed.value != credential:
+            raise ManagedKeyDeliveryAckTokenStoreError(
+                "managed credential persistence is unconfirmed", observed.diagnostics
+            )
+        result = await self.secret_store.set_secret(
+            credential_binding_secret(metadata.source), binding.encode()
+        )
+        if not result.succeeded:
+            raise ManagedKeyDeliveryAckTokenStoreError(
+                "managed credential binding store failed", result.diagnostics
+            )
+
+    async def credential_binding(
+        self, source: str
+    ) -> tuple[ManagedCredentialBinding | None, str | None]:
+        observed = await self.secret_store.get_secret(managed_key_secret(source))
+        receipt = await self.secret_store.get_secret(credential_binding_secret(source))
+        if observed.diagnostics is not None or receipt.diagnostics is not None:
+            raise ManagedKeyDeliveryAckTokenStoreError(
+                "managed credential observation failed",
+                observed.diagnostics or receipt.diagnostics,
+            )
+        return ManagedCredentialBinding.decode(receipt.value), observed.value
+
+    async def clear_failed_credential_projection(self, source: str) -> None:
+        state = self.managed_state
+        if (
+            not state.active_managed_credential_ref
+            or state.pending_managed_operation_source != source
+        ):
+            return
+        binding, credential = await self.credential_binding(source)
+        clear_failed_managed_credential_projection(
+            state, source=source, binding=binding, credential=credential
+        )
+
     async def store_pending(self, metadata: ManagedKeyDeliveryAckMetadata) -> None:
         key = secret_key_for_ack_source(metadata.source)
         try:
@@ -96,6 +166,84 @@ class ManagedKeyDeliveryAckService:
             metadata.managed_credential_ref
         )
         self.managed_state.pending_delivery_ack_expires_at = metadata.expires_at
+
+    async def recover_operation_delivery(
+        self, source: str, probe: ManagedOperationStatusResult
+    ) -> ManagedKeyDeliveryAckServiceResult | None:
+        state = self.managed_state
+        if state.pending_delivery_ack_source == source:
+            return await self.retry_pending()
+        delivery = probe.delivery
+        ref = probe.managed_credential_ref or (
+            probe.attempt.managed_credential_ref if probe.attempt is not None else None
+        )
+        if (
+            state.pending_delivery_ack_source is not None
+            or state.pending_managed_operation_source != source
+            or not state.pending_managed_operation_id
+            or state.pending_managed_operation_installation_id != state.installation_id
+            or not probe.succeeded
+            or probe.operation_status != "DELIVERY_PENDING"
+            or probe.client_action != "acknowledge_delivery"
+            or delivery is None
+            or delivery.status != "pending"
+            or not delivery.delivery_id
+            or not delivery.expires_at
+            or delivery_expired(delivery.expires_at)
+            or not ref
+        ):
+            return None
+        try:
+            binding, credential = await self.credential_binding(source)
+            token = await self.secret_store.get_secret(secret_key_for_ack_source(source))
+            if token.diagnostics is not None:
+                raise ManagedKeyDeliveryAckTokenStoreError(
+                    "delivery ACK token observation failed", token.diagnostics
+                )
+        except Exception as exc:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="managed_secret_read_failed",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="managed_secret_read_failed",
+                    fields={"source": source},
+                    exception=exc,
+                ),
+            )
+        if (
+            not token.value
+            or binding is None
+            or not binding.matches(
+                credential=credential,
+                source=source,
+                installation_id=state.installation_id,
+                operation_id=state.pending_managed_operation_id,
+                delivery_id=delivery.delivery_id,
+                managed_credential_ref=ref,
+            )
+        ):
+            return None
+        snapshot = state.snapshot()
+        state.pending_delivery_ack_source = source
+        state.pending_delivery_ack_delivery_id = delivery.delivery_id
+        state.pending_delivery_ack_managed_credential_ref = ref
+        state.pending_delivery_ack_expires_at = delivery.expires_at
+        try:
+            await run_owned_thread_call(state.persist)
+        except Exception as exc:
+            state.restore(snapshot)
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="pending_metadata_persist_failed",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="delivery_ack_metadata_persist_failed",
+                    fields={"source": source},
+                    exception=exc,
+                ),
+            )
+        return await self.retry_pending()
 
     async def recover_pending(
         self,
@@ -123,7 +271,7 @@ class ManagedKeyDeliveryAckService:
         except Exception as exc:
             return ManagedKeyDeliveryAckServiceResult(
                 succeeded=False,
-                status="managed_secret_missing",
+                status="managed_secret_read_failed",
                 diagnostics=_diagnostics(
                     operation="recover_managed_key_delivery",
                     code="delivery_ack_managed_secret_missing",
@@ -149,8 +297,54 @@ class ManagedKeyDeliveryAckService:
         delivery_id = self.managed_state.pending_delivery_ack_delivery_id
         managed_credential_ref = self.managed_state.pending_delivery_ack_managed_credential_ref
         expires_at = self.managed_state.pending_delivery_ack_expires_at
-        if not source or not delivery_id or not managed_credential_ref:
+        if not source:
             return ManagedKeyDeliveryAckServiceResult(succeeded=True, status="none")
+        if not delivery_id or not managed_credential_ref:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False, status="pending_metadata_incomplete"
+            )
+        try:
+            binding, credential = await self.credential_binding(source)
+        except Exception as exc:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="managed_secret_read_failed",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="managed_secret_read_failed",
+                    fields={"source": source},
+                    exception=exc,
+                ),
+            )
+        pending_source = self.managed_state.pending_managed_operation_source
+        pending_id = self.managed_state.pending_managed_operation_id
+        if binding is None or not binding.matches(
+            credential=credential,
+            source=source,
+            installation_id=self.managed_state.installation_id,
+            operation_id=pending_id if pending_source == source else None,
+            delivery_id=delivery_id,
+            managed_credential_ref=managed_credential_ref,
+        ):
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="credential_binding_missing",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="credential_binding_missing",
+                    fields={"source": source},
+                ),
+            )
+        if delivery_expired(expires_at):
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="expired",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="delivery_ack_expired",
+                    fields={"source": source},
+                ),
+            )
         try:
             token_read = await self.secret_store.get_secret(secret_key_for_ack_source(source))
         except Exception as exc:
@@ -163,6 +357,10 @@ class ManagedKeyDeliveryAckService:
                     fields={"source": source, "token_present": None},
                     exception=exc,
                 ),
+            )
+        if token_read.diagnostics is not None:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False, status="token_read_failed", diagnostics=token_read.diagnostics
             )
         if not token_read.value:
             return ManagedKeyDeliveryAckServiceResult(
@@ -198,8 +396,7 @@ class ManagedKeyDeliveryAckService:
                 ),
             )
         if ack_result.succeeded and ack_result.status in {"acknowledged", "already_acknowledged"}:
-            previous_referral_id = self.managed_state.referral_id
-            previous_referral_source = self.managed_state.referral_source
+            self.managed_state.active_managed_credential_ref = binding.managed_credential_ref
             previous_operation_id = self.managed_state.pending_managed_operation_id
             previous_operation_source = self.managed_state.pending_managed_operation_source
             previous_operation_installation_id = (
@@ -220,9 +417,8 @@ class ManagedKeyDeliveryAckService:
                     ),
                     ack_result=ack_result,
                 )
-            apply_ack_referral_to_managed_state(self.managed_state, ack_result, source)
-            preserve_operation = (
-                other_source_pending_operation(self.managed_state, source=source) is not None
+            preserve_operation = pending_source is not None and (
+                pending_source != source or pending_id != binding.operation_id
             )
             if not preserve_operation:
                 self.managed_state.pending_managed_operation_id = None
@@ -258,8 +454,6 @@ class ManagedKeyDeliveryAckService:
                     managed_credential_ref
                 )
                 self.managed_state.pending_delivery_ack_expires_at = expires_at
-                self.managed_state.referral_id = previous_referral_id
-                self.managed_state.referral_source = previous_referral_source
                 self.managed_state.pending_managed_operation_id = previous_operation_id
                 self.managed_state.pending_managed_operation_source = previous_operation_source
                 self.managed_state.pending_managed_operation_installation_id = (
@@ -465,28 +659,6 @@ def secret_key_for_ack_source(source: str) -> str:
     if source == ACK_SOURCE_QQ:
         return QQ_MANAGED_DELIVERY_ACK_TOKEN_SECRET
     return DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET
-
-
-def apply_ack_referral_to_managed_state(
-    managed_state: ManagedIdentityStatePort,
-    ack_result: ManagedKeyDeliveryAckResult,
-    source: str,
-) -> None:
-    if source not in {ACK_SOURCE_DISCORD, ACK_SOURCE_QQ}:
-        return
-    current_source = managed_state.referral_source
-    if current_source not in {ACK_SOURCE_DISCORD, ACK_SOURCE_QQ}:
-        current_source = (
-            ACK_SOURCE_DISCORD
-            if normalize_owned_referral_id(managed_state.referral_id) is not None
-            else None
-        )
-    if current_source is not None and current_source != source:
-        managed_state.referral_id = None
-    managed_state.referral_source = source
-    acknowledged_referral_id = normalize_owned_referral_id(ack_result.referral_id)
-    if acknowledged_referral_id is not None:
-        managed_state.referral_id = acknowledged_referral_id
 
 
 @dataclass(frozen=True, slots=True)

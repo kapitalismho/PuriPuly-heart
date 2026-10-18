@@ -44,7 +44,7 @@ def compose_settings_api_surface(
     )
 
     gpu_device_controls = ft.Row(
-        [slots.gpu_device, slots.gpu_llm, slots.gpu_refresh],
+        [slots.gpu_device, slots.gpu_llm, slots.model_assets],
         spacing=SETTINGS_ROW_SPACING,
         expand=True,
     )
@@ -111,7 +111,7 @@ def compose_settings_general_surface(
         slots.loopback,
     )
     vad_row = compose_settings_triple_row(
-        slots.microphone_test,
+        slots.audio_test,
         slots.self_vad,
         slots.peer_vad,
     )

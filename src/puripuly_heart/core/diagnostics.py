@@ -294,7 +294,7 @@ _ENUM_FIELDS = {
             "PeerApplicationOwner",
             "OpenRouterPkceFlowOwner",
             "LocalASRProvisioningRuntime",
-            "MicrophoneTestSessionOwner",
+            "AudioTestSessionOwner",
             "PeerCaptureSessionOwner",
             "VrchatSceneService",
             "ApplicationRuntimeLoggingOwner",
@@ -550,7 +550,7 @@ _BOUNDARIES = (
             "capture.set",
             "translation.set",
             "text.submit",
-            "microphone.test",
+            "audio.test",
             "audio.target.set",
             "audio.retry",
             "settings.apply",
@@ -701,6 +701,7 @@ _BOUNDARIES = (
     )
     | frozenset(LIFECYCLE_SHUTDOWN_PHASE_ORDER)
     | QQ_STAGES
+    | TRANSPORT_ENUM_FIELDS["stage"]
 )
 _NATIVE_REASONS = frozenset(
     {

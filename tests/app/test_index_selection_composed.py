@@ -6,12 +6,17 @@ import json
 import logging
 import os
 import socket
+import threading
 from dataclasses import replace
 from types import SimpleNamespace
 
 import httpx
 import pytest
 
+from puripuly_heart.app.ports.settings_repository import SettingsCommitRequest
+from puripuly_heart.app.services.canonical_settings_persistence import (
+    CanonicalSettingsPatchRepository,
+)
 from puripuly_heart.app.wiring import wiring_runtime_pipeline
 from puripuly_heart.composition import application_runtime
 from puripuly_heart.composition.application_runtime import compose_application_runtime
@@ -632,6 +637,103 @@ async def test_later_explicit_auth_completion_activates_the_persisted_managed_de
         == "synthetic-managed-reference"
     )
     assert persisted.state.managed_connection.pending_delivery_ack_source is None
+
+
+@pytest.mark.asyncio
+async def test_queued_fallback_rechecks_retired_guard_and_next_generation_progresses(
+    composed, monkeypatch
+):
+    path, http, create = composed
+    app, presentation = create()
+    await app.start()
+    await asyncio.wait_for(http.index_entered.wait(), 5)
+    owner = app.control().settings
+    baseline = owner.require_committed()
+    backend = app.control().pipeline.llm_runtime.provider
+    writing, release, queued = threading.Event(), threading.Event(), threading.Event()
+    guarded_results = []
+    original_persist = type(owner.persistence).persist
+    original_save = CanonicalSettingsPatchRepository._save
+
+    def hold_owned_commit(self, path, settings):
+        if settings.intent.ui.locale == "ja" and not release.is_set():
+            writing.set()
+            assert release.wait(8)
+        return original_persist(self, path, settings)
+
+    def observe_guarded_save(self, request):
+        if self.commit_guard is not None:
+            queued.set()
+        result = original_save(self, request)
+        if self.commit_guard is not None:
+            guarded_results.append(result)
+        return result
+
+    monkeypatch.setattr(type(owner.persistence), "persist", hold_owned_commit)
+    monkeypatch.setattr(CanonicalSettingsPatchRepository, "_save", observe_guarded_save)
+    repository = owner.create_canonical_patch_repository(
+        base_settings=baseline,
+        committed_settings=baseline,
+        surface="ui_prompt_clipboard_state",
+    )
+    ordinary = asyncio.create_task(
+        repository.save(
+            SettingsCommitRequest(
+                values={"intent.ui.locale": "ja"},
+                expected_revision=None,
+                reason="queued_fallback_neighbor",
+            )
+        )
+    )
+    try:
+        assert await asyncio.to_thread(writing.wait, 5)
+        http.index_status = 503
+        http.index_release.set()
+        assert await asyncio.to_thread(queued.wait, 5)
+        retired = app._index_selection._work_task
+        app._index_selection.selection_changed(
+            replace(
+                baseline,
+                intent=replace(
+                    baseline.intent,
+                    translation=replace(
+                        baseline.intent.translation, model="local_llm", connection="ollama"
+                    ),
+                ),
+            )
+        )
+        assert not retired.done()
+    finally:
+        release.set()
+        ordinary_result = await asyncio.wait_for(ordinary, 5)
+    await wait_until(lambda: guarded_results)
+    await wait_until(retired.done)
+    assert ordinary_result.succeeded
+    assert len(guarded_results) == 1
+    assert not guarded_results[0].succeeded
+    assert guarded_results[0].diagnostics.code == "settings_selection_superseded"
+    assert owner.require_canonical().intent.ui.locale == "ja"
+    assert owner.require_committed().intent.translation.model == "index_translate_35b"
+    assert app.control().pipeline.llm_runtime.provider is backend
+    assert presentation.messages == []
+    persisted = json.loads(path.read_text(encoding="utf-8"))["intent"]
+    assert persisted["ui"]["locale"] == "ja"
+    assert persisted["translation"]["model"] == "index_translate_35b"
+    app._index_selection.selection_changed(owner.require_committed())
+    enabled = await operation(app, "translation.set", {"enabled": True}, "valid-after-retired")
+    assert enabled["status"] == "action_required"
+    assert len(guarded_results) == 2
+    assert guarded_results[1].succeeded
+    selected = owner.require_committed().intent.translation
+    assert (selected.model, selected.connection) == ("gemma4_26b_31b", "managed")
+    assert owner.require_committed().intent.ui.locale == "ja"
+    assert app.state().translation_enabled is False
+    assert [key for key, _ in presentation.messages].count(
+        "messages.index_api_fallback_managed"
+    ) == 1
+    persisted = json.loads(path.read_text(encoding="utf-8"))["intent"]
+    assert persisted["ui"]["locale"] == "ja"
+    assert persisted["translation"]["connection"] == "managed"
 
 
 @pytest.mark.asyncio

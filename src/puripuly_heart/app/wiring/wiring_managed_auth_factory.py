@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import copy
 import inspect
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, replace
 from functools import partial
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from puripuly_heart.app.adapters.sync_secret_store import SyncSecretStoreAdapter
 from puripuly_heart.app.ports.broker_client import (
@@ -20,7 +19,6 @@ from puripuly_heart.app.ports.broker_client import (
     ManagedOperationResumeRequest,
     ManagedOperationStatusRequest,
     ManagedOperationStatusResult,
-    QqManagedAssertionResult,
 )
 from puripuly_heart.app.ports.discord_auth import DiscordAuthRequest, DiscordAuthResult
 from puripuly_heart.app.ports.managed_identity import (
@@ -33,6 +31,7 @@ from puripuly_heart.app.ports.managed_identity_state import (
 )
 from puripuly_heart.app.ports.settings_repository import (
     SettingsCommitRequest,
+    SettingsCommitResult,
     SettingsRepositoryPort,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
@@ -69,7 +68,6 @@ from puripuly_heart.config.llm_profiles import (
 from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterSelectionAlias,
-    normalize_owned_referral_id,
     parse_openrouter_llm_model,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
@@ -77,7 +75,13 @@ from puripuly_heart.config.translation_values import (
     TranslationConnection,
     TranslationModel,
 )
-from puripuly_heart.core.discord_managed_oauth import run_discord_oauth_callback_flow
+from puripuly_heart.core.diagnostics import safe_exception_fields, sanitize_diagnostics
+from puripuly_heart.core.discord.discord_managed_oauth import (
+    DiscordOAuthBrowserLaunchError,
+    DiscordOAuthStateError,
+    register_discord_oauth_expected_state,
+    run_discord_oauth_callback_flow,
+)
 from puripuly_heart.core.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthLoopbackClosedError,
@@ -96,7 +100,6 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterReleaseBehavior,
     ManagedOpenRouterReleaseError,
     OpenRouterReleaseRuntimeConfig,
-    TalkTogetherPassStatus,
     format_managed_openrouter_diagnostics,
 )
 from puripuly_heart.core.messages import (
@@ -117,13 +120,13 @@ from puripuly_heart.core.messages import (
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_MANAGED_API_KEY_SECRET,
     OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
     OPENROUTER_MANAGED_USER_ID_SECRET,
     OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET,
     OpenRouterCredentialRuntimeConfig,
     resolve_openrouter_credentials,
 )
 from puripuly_heart.core.openrouter_handoff import mark_founder_letter_shown
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.qq_auth_diagnostics import exception_fields, log_qq_auth
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.storage.secrets import SecretStore
@@ -145,8 +148,6 @@ class ManagedIdentityRecord(Protocol):
     active_managed_credential_ref: str | None
     active_managed_expires_at: str | None
     founder_letter_seen_credential_ref: str | None
-    referral_id: str | None
-    referral_source: str | None
     local_managed_claim_sources: tuple[str, ...]
     pending_delivery_ack_source: str | None
     pending_delivery_ack_delivery_id: str | None
@@ -158,252 +159,40 @@ class ManagedIdentityRecord(Protocol):
     pending_managed_operation_state: str | None
 
 
-@dataclass(slots=True)
 class ManagedIdentityStateAdapter:
-    """Boundary adapter that exposes managed-identity fields as a
-    ``ManagedIdentityStatePort``.
-    """
-
-    _identity: ManagedIdentityRecord
-    _persist: Callable[..., None]
-    _settings_bag: object | None = field(init=False, default=None, repr=False)
-
-    def __post_init__(self) -> None:
-        managed = getattr(self._identity, "managed_identity", None)
+    def __init__(self, identity: ManagedIdentityRecord, persist: Callable[..., None]) -> None:
+        object.__setattr__(self, "_settings_bag", None)
+        managed = getattr(identity, "managed_identity", None)
         if managed is not None:
-            self._settings_bag = self._identity
-            self._identity = managed
+            object.__setattr__(self, "_settings_bag", identity)
+            identity = managed
+        object.__setattr__(self, "_identity", identity)
+        object.__setattr__(self, "_persist", persist)
 
-    @property
-    def installation_id(self) -> str:
-        return self._identity.installation_id
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._identity, name)
 
-    @installation_id.setter
-    def installation_id(self, value: str) -> None:
-        self._identity.installation_id = value
-
-    @property
-    def release_token(self) -> str | None:
-        return self._identity.release_token
-
-    @release_token.setter
-    def release_token(self, value: str | None) -> None:
-        self._identity.release_token = value
-
-    @property
-    def release_token_expires_at(self) -> str | None:
-        return self._identity.release_token_expires_at
-
-    @release_token_expires_at.setter
-    def release_token_expires_at(self, value: str | None) -> None:
-        self._identity.release_token_expires_at = value
-
-    @property
-    def verified_hardware_hash(self) -> str | None:
-        return self._identity.verified_hardware_hash
-
-    @verified_hardware_hash.setter
-    def verified_hardware_hash(self, value: str | None) -> None:
-        self._identity.verified_hardware_hash = value
-
-    @property
-    def verified_hardware_hash_salt_version(self) -> int | None:
-        return self._identity.verified_hardware_hash_salt_version
-
-    @verified_hardware_hash_salt_version.setter
-    def verified_hardware_hash_salt_version(self, value: int | None) -> None:
-        self._identity.verified_hardware_hash_salt_version = value
-
-    @property
-    def active_managed_credential_ref(self) -> str | None:
-        return self._identity.active_managed_credential_ref
-
-    @active_managed_credential_ref.setter
-    def active_managed_credential_ref(self, value: str | None) -> None:
-        self._identity.active_managed_credential_ref = value
-
-    @property
-    def active_managed_expires_at(self) -> str | None:
-        return self._identity.active_managed_expires_at
-
-    @active_managed_expires_at.setter
-    def active_managed_expires_at(self, value: str | None) -> None:
-        self._identity.active_managed_expires_at = value
-
-    @property
-    def founder_letter_seen_credential_ref(self) -> str | None:
-        return self._identity.founder_letter_seen_credential_ref
-
-    @founder_letter_seen_credential_ref.setter
-    def founder_letter_seen_credential_ref(self, value: str | None) -> None:
-        self._identity.founder_letter_seen_credential_ref = value
-
-    @property
-    def referral_id(self) -> str | None:
-        return self._identity.referral_id
-
-    @referral_id.setter
-    def referral_id(self, value: str | None) -> None:
-        self._identity.referral_id = value
-
-    @property
-    def referral_source(self) -> str | None:
-        return getattr(self._identity, "referral_source", None)
-
-    @referral_source.setter
-    def referral_source(self, value: str | None) -> None:
-        self._identity.referral_source = value
-
-    @property
-    def local_managed_claim_sources(self) -> tuple[str, ...]:
-        return self._identity.local_managed_claim_sources
-
-    @local_managed_claim_sources.setter
-    def local_managed_claim_sources(self, value: tuple[str, ...]) -> None:
-        self._identity.local_managed_claim_sources = value
-
-    @property
-    def pending_delivery_ack_source(self) -> str | None:
-        return getattr(self._identity, "pending_delivery_ack_source", None)
-
-    @pending_delivery_ack_source.setter
-    def pending_delivery_ack_source(self, value: str | None) -> None:
-        self._identity.pending_delivery_ack_source = value
-
-    @property
-    def pending_delivery_ack_delivery_id(self) -> str | None:
-        return getattr(self._identity, "pending_delivery_ack_delivery_id", None)
-
-    @pending_delivery_ack_delivery_id.setter
-    def pending_delivery_ack_delivery_id(self, value: str | None) -> None:
-        self._identity.pending_delivery_ack_delivery_id = value
-
-    @property
-    def pending_delivery_ack_managed_credential_ref(self) -> str | None:
-        return getattr(
-            self._identity,
-            "pending_delivery_ack_managed_credential_ref",
-            None,
-        )
-
-    @pending_delivery_ack_managed_credential_ref.setter
-    def pending_delivery_ack_managed_credential_ref(self, value: str | None) -> None:
-        self._identity.pending_delivery_ack_managed_credential_ref = value
-
-    @property
-    def pending_delivery_ack_expires_at(self) -> str | None:
-        return getattr(self._identity, "pending_delivery_ack_expires_at", None)
-
-    @pending_delivery_ack_expires_at.setter
-    def pending_delivery_ack_expires_at(self, value: str | None) -> None:
-        self._identity.pending_delivery_ack_expires_at = value
-
-    @property
-    def pending_managed_operation_id(self) -> str | None:
-        return getattr(self._identity, "pending_managed_operation_id", None)
-
-    @pending_managed_operation_id.setter
-    def pending_managed_operation_id(self, value: str | None) -> None:
-        self._identity.pending_managed_operation_id = value
-
-    @property
-    def pending_managed_operation_source(self) -> str | None:
-        return getattr(self._identity, "pending_managed_operation_source", None)
-
-    @pending_managed_operation_source.setter
-    def pending_managed_operation_source(self, value: str | None) -> None:
-        self._identity.pending_managed_operation_source = value
-
-    @property
-    def pending_managed_operation_installation_id(self) -> str | None:
-        return getattr(self._identity, "pending_managed_operation_installation_id", None)
-
-    @pending_managed_operation_installation_id.setter
-    def pending_managed_operation_installation_id(self, value: str | None) -> None:
-        self._identity.pending_managed_operation_installation_id = value
-
-    @property
-    def pending_managed_operation_state(self) -> str | None:
-        return getattr(self._identity, "pending_managed_operation_state", None)
-
-    @pending_managed_operation_state.setter
-    def pending_managed_operation_state(self, value: str | None) -> None:
-        self._identity.pending_managed_operation_state = value
+    def __setattr__(self, name: str, value: object) -> None:
+        setattr(self._identity, name, value)
 
     def persist(self) -> None:
         if self._settings_bag is not None:
-            try:
-                self._persist(self._settings_bag)
-                return
-            except TypeError:
-                pass
-        self._persist()
+            self._persist(self._settings_bag)
+        else:
+            self._persist()
 
     def snapshot(self) -> ManagedIdentitySnapshot:
-        managed = self._identity
+        from dataclasses import fields
+
         return ManagedIdentitySnapshot(
-            installation_id=managed.installation_id,
-            release_token=managed.release_token,
-            release_token_expires_at=managed.release_token_expires_at,
-            verified_hardware_hash=managed.verified_hardware_hash,
-            verified_hardware_hash_salt_version=managed.verified_hardware_hash_salt_version,
-            active_managed_credential_ref=managed.active_managed_credential_ref,
-            active_managed_expires_at=managed.active_managed_expires_at,
-            founder_letter_seen_credential_ref=managed.founder_letter_seen_credential_ref,
-            referral_id=managed.referral_id,
-            referral_source=getattr(managed, "referral_source", None),
-            local_managed_claim_sources=managed.local_managed_claim_sources,
-            pending_delivery_ack_source=getattr(managed, "pending_delivery_ack_source", None),
-            pending_delivery_ack_delivery_id=getattr(
-                managed, "pending_delivery_ack_delivery_id", None
-            ),
-            pending_delivery_ack_managed_credential_ref=getattr(
-                managed,
-                "pending_delivery_ack_managed_credential_ref",
-                None,
-            ),
-            pending_delivery_ack_expires_at=getattr(
-                managed,
-                "pending_delivery_ack_expires_at",
-                None,
-            ),
-            pending_managed_operation_id=getattr(managed, "pending_managed_operation_id", None),
-            pending_managed_operation_source=getattr(
-                managed, "pending_managed_operation_source", None
-            ),
-            pending_managed_operation_installation_id=getattr(
-                managed, "pending_managed_operation_installation_id", None
-            ),
-            pending_managed_operation_state=getattr(
-                managed, "pending_managed_operation_state", None
-            ),
+            **{item.name: getattr(self, item.name) for item in fields(ManagedIdentitySnapshot)}
         )
 
     def restore(self, snapshot: ManagedIdentitySnapshot) -> None:
-        managed = self._identity
-        managed.installation_id = snapshot.installation_id
-        managed.release_token = snapshot.release_token
-        managed.release_token_expires_at = snapshot.release_token_expires_at
-        managed.verified_hardware_hash = snapshot.verified_hardware_hash
-        managed.verified_hardware_hash_salt_version = snapshot.verified_hardware_hash_salt_version
-        managed.active_managed_credential_ref = snapshot.active_managed_credential_ref
-        managed.active_managed_expires_at = snapshot.active_managed_expires_at
-        managed.founder_letter_seen_credential_ref = snapshot.founder_letter_seen_credential_ref
-        managed.referral_id = snapshot.referral_id
-        managed.referral_source = snapshot.referral_source
-        managed.local_managed_claim_sources = snapshot.local_managed_claim_sources
-        managed.pending_delivery_ack_source = snapshot.pending_delivery_ack_source
-        managed.pending_delivery_ack_delivery_id = snapshot.pending_delivery_ack_delivery_id
-        managed.pending_delivery_ack_managed_credential_ref = (
-            snapshot.pending_delivery_ack_managed_credential_ref
-        )
-        managed.pending_delivery_ack_expires_at = snapshot.pending_delivery_ack_expires_at
-        managed.pending_managed_operation_id = snapshot.pending_managed_operation_id
-        managed.pending_managed_operation_source = snapshot.pending_managed_operation_source
-        managed.pending_managed_operation_installation_id = (
-            snapshot.pending_managed_operation_installation_id
-        )
-        managed.pending_managed_operation_state = snapshot.pending_managed_operation_state
+        from dataclasses import fields
+
+        for item in fields(snapshot):
+            setattr(self, item.name, getattr(snapshot, item.name))
 
 
 def build_managed_identity_state_port(
@@ -412,75 +201,58 @@ def build_managed_identity_state_port(
 ) -> ManagedIdentityStatePort:
     """Build a ``ManagedIdentityStatePort`` adapter at the wiring boundary."""
 
-    return ManagedIdentityStateAdapter(identity, persist)
+    return cast(ManagedIdentityStatePort, ManagedIdentityStateAdapter(identity, persist))
+
+
+class CanonicalManagedIdentityStateAdapter:
+    def __init__(self, owner: SettingsOwner) -> None:
+        object.__setattr__(self, "_owner", owner)
+        object.__setattr__(self, "_changes", {})
+
+    def __getattr__(self, name: str) -> object:
+        changes = self._changes
+        if name in changes:
+            return changes[name]
+        return getattr(self._owner.require_canonical().state.managed_connection, name)
+
+    def __setattr__(self, name: str, value: object) -> None:
+        current = self._owner.require_canonical().state.managed_connection
+        if not hasattr(current, name):
+            raise AttributeError(name)
+        self._changes[name] = value
+
+    def persist(self) -> None:
+        current = self._owner.require_canonical()
+        managed = current.state.managed_connection
+        updated = replace(
+            current,
+            state=replace(current.state, managed_connection=replace(managed, **self._changes)),
+        )
+        self._owner.persist_managed_identity(updated, bound_managed_snapshot=managed)
+        self._changes.clear()
+
+    def snapshot(self) -> ManagedIdentitySnapshot:
+        from dataclasses import fields
+
+        return ManagedIdentitySnapshot(
+            **{item.name: getattr(self, item.name) for item in fields(ManagedIdentitySnapshot)}
+        )
+
+    def restore(self, snapshot: ManagedIdentitySnapshot) -> None:
+        for name in tuple(self._changes):
+            value = getattr(snapshot, name)
+            current = getattr(self._owner.require_canonical().state.managed_connection, name)
+            if value == current:
+                self._changes.pop(name, None)
+            else:
+                self._changes[name] = value
 
 
 def managed_identity_state_port_from_vnext(
     owner: SettingsOwner,
     settings: AppSettingsVNext,
 ) -> ManagedIdentityStatePort:
-    from dataclasses import asdict, fields, replace
-    from types import SimpleNamespace
-
-    from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
-
-    bag = SimpleNamespace(**asdict(settings.state.managed_connection))
-
-    def persist() -> None:
-        live = owner.canonical or settings
-        values = {field.name: getattr(bag, field.name) for field in fields(ManagedConnectionState)}
-        next_settings = replace(
-            live,
-            state=replace(
-                live.state,
-                managed_connection=ManagedConnectionState(**values),
-            ),
-        )
-        owner.persist_managed_identity(next_settings)
-
-    return ManagedIdentityStateAdapter(bag, persist)
-
-
-def _vnext_with_managed_identity(
-    settings: AppSettingsVNext,
-    managed_state: ManagedIdentityStatePort,
-) -> AppSettingsVNext:
-    from dataclasses import replace
-
-    from puripuly_heart.config.settings_vnext.schema import ManagedConnectionState
-
-    snapshot = managed_state.snapshot()
-    return replace(
-        settings,
-        state=replace(
-            settings.state,
-            managed_connection=ManagedConnectionState(
-                installation_id=snapshot.installation_id,
-                release_token=snapshot.release_token,
-                release_token_expires_at=snapshot.release_token_expires_at,
-                verified_hardware_hash=snapshot.verified_hardware_hash,
-                verified_hardware_hash_salt_version=snapshot.verified_hardware_hash_salt_version,
-                active_managed_credential_ref=snapshot.active_managed_credential_ref,
-                active_managed_expires_at=snapshot.active_managed_expires_at,
-                founder_letter_seen_credential_ref=snapshot.founder_letter_seen_credential_ref,
-                referral_id=snapshot.referral_id,
-                referral_source=snapshot.referral_source,
-                local_managed_claim_sources=snapshot.local_managed_claim_sources,
-                pending_delivery_ack_source=snapshot.pending_delivery_ack_source,
-                pending_delivery_ack_delivery_id=snapshot.pending_delivery_ack_delivery_id,
-                pending_delivery_ack_managed_credential_ref=(
-                    snapshot.pending_delivery_ack_managed_credential_ref
-                ),
-                pending_delivery_ack_expires_at=snapshot.pending_delivery_ack_expires_at,
-                pending_managed_operation_id=snapshot.pending_managed_operation_id,
-                pending_managed_operation_source=snapshot.pending_managed_operation_source,
-                pending_managed_operation_installation_id=(
-                    snapshot.pending_managed_operation_installation_id
-                ),
-                pending_managed_operation_state=snapshot.pending_managed_operation_state,
-            ),
-        ),
-    )
+    return cast(ManagedIdentityStatePort, CanonicalManagedIdentityStateAdapter(owner))
 
 
 @dataclass(slots=True)
@@ -519,10 +291,8 @@ class ManagedIdentityPreflightAdapter:
 
     async def ensure_bundle(self) -> ManagedIdentityBundle:
         if self._bundle is None:
-            self._bundle = await asyncio.to_thread(
-                ensure_managed_identity_bundle,
-                self.managed_state,
-                self.secrets,
+            self._bundle = await run_owned_thread_call(
+                partial(ensure_managed_identity_bundle, self.managed_state, self.secrets)
             )
         return self._bundle
 
@@ -537,7 +307,6 @@ class DiscordOAuthAuthAdapter:
     oauth_runtime: OAuthRuntime
     listener_factory: DiscordOAuthListenerFactory
     callback_runner: DiscordOAuthCallbackRunner
-    referral_id: str | None = None
     on_callback_received: Callable[[], None] | None = None
 
     async def start_discord_auth(self, request: DiscordAuthRequest) -> DiscordAuthResult:
@@ -545,16 +314,53 @@ class DiscordOAuthAuthAdapter:
         listener: DiscordOAuthLoopbackListener | None = None
         try:
             bundle = await self.identity.ensure_bundle()
-            listener = self.listener_factory()
+            try:
+                listener = self.listener_factory()
+            except OSError as exc:
+                return _discord_auth_failure(
+                    "discord_loopback_unavailable",
+                    message_key="discord_auth.error.loopback_unavailable",
+                    operation="discord_start",
+                    stage="listener_start",
+                    error=exc,
+                )
             self.oauth_runtime.attach_loopback_listener(listener, listener_name="discord-loopback")
             start_response = await self._start_discord_oauth(bundle, listener)
             if start_response.redirect_uri != listener.redirect_uri:
                 return _discord_auth_failure("discord_redirect_mismatch")
-            code, state = await self.callback_runner(
-                listener,
-                start_response.authorization_url,
-                start_response.oauth_session_expires_at,
-            )
+            register_discord_oauth_expected_state(listener, start_response.authorization_url)
+            try:
+                code, state = await self.callback_runner(
+                    listener,
+                    start_response.authorization_url,
+                    start_response.oauth_session_expires_at,
+                )
+            except TimeoutError as exc:
+                return _discord_auth_failure(
+                    "discord_oauth_timeout",
+                    operation="discord_callback",
+                    stage="callback_wait",
+                    error=exc,
+                )
+            except DiscordOAuthBrowserLaunchError as exc:
+                return _discord_auth_failure(
+                    "discord_browser_launch_failed",
+                    message_key="discord_auth.error.browser_launch_failed",
+                    operation="discord_callback",
+                    stage="browser_launch",
+                    error=exc,
+                )
+            except (DiscordOAuthCallbackError, DiscordOAuthLoopbackClosedError) as exc:
+                return _discord_auth_failure(
+                    (
+                        "discord_oauth_callback_error"
+                        if isinstance(exc, DiscordOAuthCallbackError)
+                        else "discord_oauth_callback_closed"
+                    ),
+                    operation="discord_callback",
+                    stage="callback_wait",
+                    error=exc,
+                )
             if self.on_callback_received is not None:
                 with contextlib.suppress(Exception):
                     self.on_callback_received()
@@ -573,14 +379,15 @@ class DiscordOAuthAuthAdapter:
             )
         except ManagedOpenRouterReleaseError as exc:
             return _discord_auth_failure_from_release_error(exc)
-        except (
-            DiscordOAuthCallbackError,
-            DiscordOAuthLoopbackClosedError,
-            TimeoutError,
-        ):
-            return _discord_auth_failure("discord_callback_failed")
-        except Exception:
-            return _discord_auth_failure("discord_auth_exception")
+        except DiscordOAuthStateError as exc:
+            return _discord_auth_failure(
+                "discord_oauth_state_invalid",
+                operation="discord_start",
+                stage="discord_start",
+                error=exc,
+            )
+        except Exception as exc:
+            return _discord_auth_failure("discord_auth_exception", error=exc)
         finally:
             if listener is not None:
                 await self.oauth_runtime.close_loopback_listener(
@@ -599,7 +406,6 @@ class DiscordOAuthAuthAdapter:
             device_public_key=bundle.device_public_key,
             redirect_uri=listener.redirect_uri,
             app_version=self.app_version,
-            referral_id=self.referral_id,
         )
 
     async def _hardware_hash(self, start_response: ManagedOpenRouterDiscordStartSuccess) -> str:
@@ -661,7 +467,6 @@ class DiscordManagedBrokerClientAdapter:
         except Exception:
             return _broker_issue_failure("discord_issue_exception", unknown_outcome=True)
         self.last_issue_response = issue
-        apply_discord_issue_result_to_managed_state(self.identity.managed_state, issue)
         return BrokerIssueResult(
             succeeded=True,
             broker_connection_id=issue.managed_credential_ref,
@@ -672,9 +477,6 @@ class DiscordManagedBrokerClientAdapter:
             managed_credential_ref=issue.managed_credential_ref,
             expires_at=issue.expires_at,
             openrouter_user_id=issue.openrouter_user_id,
-            referral_id=issue.referral_id,
-            referral_bonus_applied=issue.referral_bonus_applied,
-            pass_status=issue.pass_status,
             delivery_ack=_delivery_ack_metadata_from_issue(issue, source="discord"),
         )
 
@@ -714,40 +516,6 @@ class DiscordManagedBrokerClientAdapter:
                 operation="managed_operation_resume",
             )
         return await resume(request)
-
-
-def apply_discord_issue_result_to_managed_state(
-    managed_state: ManagedIdentityStatePort,
-    issue: ManagedOpenRouterIssueSuccess,
-) -> None:
-    current_ref = managed_state.active_managed_credential_ref
-    next_ref = (
-        _normalize_optional_text(issue.managed_credential_ref)
-        or current_ref
-        or _normalize_optional_text(issue.expires_at)
-        or managed_state.installation_id
-        or "managed-entitlement"
-    )
-    if current_ref != next_ref:
-        managed_state.founder_letter_seen_credential_ref = None
-    managed_state.active_managed_credential_ref = next_ref
-    managed_state.active_managed_expires_at = _normalize_optional_text(issue.expires_at)
-    referral_id = _normalize_owned_referral_id(issue.referral_id)
-    current_referral_id = _normalize_owned_referral_id(managed_state.referral_id)
-    current_referral_source = _normalize_optional_text(managed_state.referral_source)
-    if current_referral_source is not None:
-        current_referral_source = current_referral_source.lower()
-    if current_referral_source not in {"discord", "qq"}:
-        current_referral_source = "discord" if current_referral_id is not None else None
-    if current_referral_source != "discord":
-        managed_state.referral_id = None
-    managed_state.referral_source = "discord"
-    if referral_id is not None:
-        managed_state.referral_id = referral_id
-    managed_state.release_token = None
-    managed_state.release_token_expires_at = None
-    managed_state.verified_hardware_hash = None
-    managed_state.verified_hardware_hash_salt_version = None
 
 
 def _delivery_ack_metadata_from_issue(
@@ -811,21 +579,40 @@ def _discord_auth_failure_from_release_error(
             category=DIAGNOSTIC_CATEGORY_AUTH,
             subcode=error.subcode,
             retry_after_ms=error.retry_after_ms,
+            cause=error.failure_diagnostics,
         ),
     )
 
 
-def _discord_auth_failure(code: str) -> DiscordAuthResult:
+def _discord_auth_failure(
+    code: str,
+    *,
+    message_key: str = "discord_auth.error.retry",
+    operation: str = "discord_auth",
+    stage: str | None = None,
+    error: Exception | None = None,
+) -> DiscordAuthResult:
+    diagnostics = _diagnostics(
+        component="managed_auth",
+        operation=operation,
+        code=code,
+        category=DIAGNOSTIC_CATEGORY_AUTH,
+    )
+    diagnostics = sanitize_diagnostics(
+        replace(
+            diagnostics,
+            fields={
+                **diagnostics.fields,
+                **(safe_exception_fields(error) if error is not None else {}),
+                **({"stage": stage} if stage is not None else {}),
+            },
+        )
+    )
     return DiscordAuthResult(
         succeeded=False,
         discord_user_id=None,
-        message=_message("discord_auth.error.retry"),
-        diagnostics=_diagnostics(
-            component="discord_managed_auth",
-            operation="discord_auth",
-            code=code,
-            category=DIAGNOSTIC_CATEGORY_AUTH,
-        ),
+        message=_message(message_key),
+        diagnostics=diagnostics,
     )
 
 
@@ -845,8 +632,14 @@ def _broker_issue_failure_from_release_error(
             category=DIAGNOSTIC_CATEGORY_SERVICE_UNAVAILABLE,
             subcode=error.subcode,
             retry_after_ms=error.retry_after_ms,
+            cause=error.failure_diagnostics,
         ),
-        unknown_outcome=error.error_class == "retryable",
+        unknown_outcome=error.error_class == "retryable"
+        and error.subcode not in {"oauth_session_expired", "discord_oauth_session_expired"}
+        and not (
+            error.failure_diagnostics is not None
+            and error.failure_diagnostics.fields.get("dispatch_certainty") == "not_dispatched"
+        ),
     )
 
 
@@ -868,6 +661,17 @@ def _broker_issue_failure(code: str, *, unknown_outcome: bool = False) -> Broker
 
 
 def _discord_message_key_for_release_error(error: ManagedOpenRouterReleaseError) -> str:
+    if error.code == "discord_browser_launch_failed":
+        return "discord_auth.error.browser_launch_failed"
+    if error.failure_diagnostics is not None and (
+        error.failure_diagnostics.fields.get("configuration_error")
+        in {
+            "unsupported_proxy_configuration",
+            "invalid_proxy_configuration",
+            "invalid_tls_configuration",
+        }
+    ):
+        return "discord_auth.error.network_configuration"
     if error.subcode == "discord_email_unverified":
         return "discord_auth.error.email_unverified"
     if error.subcode == "discord_account_too_new":
@@ -878,7 +682,7 @@ def _discord_message_key_for_release_error(error: ManagedOpenRouterReleaseError)
         return "discord_auth.error.hardware_duplicate"
     if error.subcode == "global_cap_reached":
         return "discord_auth.error.daily_cap"
-    if error.subcode == "oauth_session_expired":
+    if error.subcode in {"oauth_session_expired", "discord_oauth_session_expired"}:
         return "discord_auth.error.expired"
     if error.code == "discord_loopback_unavailable":
         return "discord_auth.error.loopback_unavailable"
@@ -897,10 +701,18 @@ def _diagnostics(
     category: DiagnosticCategory,
     subcode: str | None = None,
     retry_after_ms: int | None = None,
+    cause: ErrorDiagnostics | None = None,
 ) -> ErrorDiagnostics:
     fields: dict[str, str | int | float | bool | None] = {"phase": operation}
     if subcode is not None:
         fields["subcode"] = subcode
+    if cause is not None:
+        safe = sanitize_diagnostics(cause)
+        return replace(
+            safe,
+            fields={**safe.fields, **fields},
+            retry_after_ms=retry_after_ms if retry_after_ms is not None else safe.retry_after_ms,
+        )
     return ErrorDiagnostics(
         component=component,
         operation=operation,
@@ -936,10 +748,6 @@ def _normalize_optional_text(value: object) -> str | None:
     return normalized or None
 
 
-def _normalize_owned_referral_id(value: object) -> str | None:
-    return normalize_owned_referral_id(value)
-
-
 def build_openrouter_credential_runtime_config_from_vnext(
     settings: AppSettingsVNext,
 ) -> OpenRouterCredentialRuntimeConfig:
@@ -951,6 +759,9 @@ def build_openrouter_credential_runtime_config_from_vnext(
         managed_credential_kind=_managed_credential_kind_from_connection(translation.connection),
         active_managed_credential_ref=identity.active_managed_credential_ref,
         active_managed_expires_at=identity.active_managed_expires_at,
+        pending_managed_operation_id=identity.pending_managed_operation_id,
+        pending_managed_operation_source=identity.pending_managed_operation_source,
+        pending_delivery_ack_source=identity.pending_delivery_ack_source,
     )
 
 
@@ -1046,6 +857,7 @@ DISCORD_AUTH_ERROR_KEY_BY_SUBCODE = {
     "hardware_duplicate": "discord_auth.error.hardware_duplicate",
     "global_cap_reached": "discord_auth.error.daily_cap",
     "oauth_session_expired": "discord_auth.error.expired",
+    "discord_oauth_session_expired": "discord_auth.error.expired",
     "loopback_unavailable": "discord_auth.error.loopback_unavailable",
 }
 
@@ -1054,6 +866,17 @@ ManagedAuthReleaseServiceProvider = Callable[[], object | None]
 ManagedAuthRuntimePresenceProvider = Callable[[], tuple[bool, bool]]
 ManagedAuthIngressProvider = Callable[[], bool]
 ManagedAuthSettingsRepositoryFactory = Callable[..., SettingsRepositoryPort]
+
+
+@dataclass(slots=True)
+class CurrentManagedSettingsRepository:
+    settings: SettingsOwner
+    factory: ManagedAuthSettingsRepositoryFactory
+
+    async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
+        current = self.settings.require_canonical()
+        repository = self.factory(current, current, "managed_connection_auth")
+        return await repository.save(request)
 
 
 @dataclass(slots=True)
@@ -1074,7 +897,7 @@ class ManagedAuthRuntimeAdapter:
         if state.pending_delivery_ack_source or state.pending_managed_operation_id:
             return {"status": "action_required", "action": "resolve_pending_managed_authorization"}
         keys = (
-            (OPENROUTER_MANAGED_QQ_API_KEY_SECRET, OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET)
+            (OPENROUTER_MANAGED_QQ_API_KEY_SECRET,)
             if provider == "qq"
             else (
                 OPENROUTER_MANAGED_API_KEY_SECRET,
@@ -1109,10 +932,6 @@ class ManagedAuthRuntimeAdapter:
                 founder_letter_seen_credential_ref=(
                     None if active_account else state.founder_letter_seen_credential_ref
                 ),
-                referral_id=None if state.referral_source == provider else state.referral_id,
-                referral_source=(
-                    None if state.referral_source == provider else state.referral_source
-                ),
             )
             updated = replace(
                 current, state=replace(current.state, managed_connection=updated_state)
@@ -1131,7 +950,6 @@ class ManagedAuthRuntimeAdapter:
                 for snapshot in reversed(cleared):
                     await store.restore_secret(snapshot)
                 return {"status": "persistence_failed", "provider": provider}
-            self.settings.complete()
         except BaseException:
             for snapshot in reversed(cleared):
                 await store.restore_secret(snapshot)
@@ -1171,7 +989,6 @@ class ManagedAuthRuntimeAdapter:
         self,
         qq_identity: str,
         credential: str,
-        referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         current = self.settings.canonical
         canonical = self.settings.canonical
@@ -1195,8 +1012,25 @@ class ManagedAuthRuntimeAdapter:
             )
         secret_store_port = SyncSecretStoreAdapter(secret_store)
         managed_state = managed_identity_state_port_from_vnext(self.settings, current)
-        assertion_results: list[QqManagedAssertionResult] = []
-        ack_results: list[ManagedKeyDeliveryAckResult] = []
+        await secret_store_port.clear_secret("openrouter_managed_qq_status_auth")
+        await secret_store_port.clear_secret("openrouter_managed_qq_operation_auth")
+        if not managed_state.installation_id and (
+            managed_state.pending_managed_operation_source in {None, "qq"}
+            and managed_state.pending_delivery_ack_source in {None, "qq"}
+        ):
+            initialized = await ManagedIdentityPreflightAdapter(
+                managed_state=managed_state, secrets=secret_store
+            ).preflight_managed_identity(
+                ManagedIdentityPreflightRequest(
+                    local_secret_key=OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
+                    correlation_id=None,
+                    metadata={},
+                )
+            )
+            if not initialized.succeeded:
+                return ManagedAuthExecutionResult(
+                    succeeded=False, message_key="qq_managed_auth.local_storage_unavailable"
+                )
         result = await QqManagedAuthService(
             broker_client=broker_client,
             secret_store=secret_store_port,
@@ -1205,64 +1039,32 @@ class ManagedAuthRuntimeAdapter:
                 managed_state=managed_state,
                 secret_store=secret_store_port,
             ),
-            assertion_result_sink=assertion_results.append,
-            ack_result_sink=ack_results.append,
         ).authenticate(
             QqManagedAuthRequest(
                 qq_identity=qq_identity,
                 credential=credential,
                 asserted_at=github_star_prompt_utc_timestamp(),
-                referral_id=referral_id,
                 metadata={"flow": "qq_managed_auth_dialog"},
             )
         )
         delivery_ack_pending = result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-        assertion_result = assertion_results[-1] if assertion_results else None
-        ack_result = ack_results[-1] if ack_results else None
-        projected_referral_id = (
-            normalize_owned_referral_id(getattr(ack_result, "referral_id", None))
-            or normalize_owned_referral_id(getattr(assertion_result, "referral_id", None))
-            or normalize_owned_referral_id(managed_state.referral_id)
-        )
-        projected_pass_status = getattr(ack_result, "pass_status", None)
-        if not isinstance(projected_pass_status, TalkTogetherPassStatus):
-            projected_pass_status = getattr(assertion_result, "pass_status", None)
-        if not isinstance(projected_pass_status, TalkTogetherPassStatus):
-            projected_pass_status = None
-        if (
-            projected_pass_status is not None
-            and projected_pass_status.pass_id != projected_referral_id
-        ):
-            projected_pass_status = None
         if _settings_mutation_committed(result):
-            runtime_owner_available, runtime_available = self.runtime_presence_provider()
             return ManagedAuthExecutionResult(
                 succeeded=True,
                 transaction_result=result,
-                referral_bonus_applied=(
-                    getattr(ack_result, "referral_bonus_applied", False) is True
-                    or getattr(assertion_result, "referral_bonus_applied", False) is True
-                ),
-                referral_id=projected_referral_id,
-                pass_status=projected_pass_status,
-                runtime_rebuild=(
-                    "if_missing" if runtime_owner_available and not runtime_available else "never"
-                ),
+                runtime_rebuild="always",
             )
         message = result.message
         return ManagedAuthExecutionResult(
             succeeded=False,
             transaction_result=result,
             delivery_ack_pending=delivery_ack_pending,
-            referral_id=projected_referral_id if delivery_ack_pending else None,
-            pass_status=projected_pass_status if delivery_ack_pending else None,
             message_key=(message.key if message is not None else "qq_managed_auth.error.retry"),
             message_kwargs=dict(message.params) if message is not None else {},
         )
 
     async def execute_discord(
         self,
-        referral_id: str | None,
         on_callback_received: Callable[[], None] | None,
         on_recovery_started: Callable[[], None] | None = None,
         *,
@@ -1281,11 +1083,9 @@ class ManagedAuthRuntimeAdapter:
                 )
             return await self._execute_legacy_discord(
                 release_service,
-                referral_id=referral_id,
             )
         return await self._execute_transaction_discord(
             release_service,
-            referral_id=referral_id,
             on_callback_received=on_callback_received,
             on_recovery_started=on_recovery_started,
             authorization_url_sink=authorization_url_sink,
@@ -1296,7 +1096,6 @@ class ManagedAuthRuntimeAdapter:
         self,
         release_service: object,
         *,
-        referral_id: str | None,
         on_callback_received: Callable[[], None] | None,
         on_recovery_started: Callable[[], None] | None = None,
         authorization_url_sink: Callable[[str], None] | None = None,
@@ -1306,7 +1105,7 @@ class ManagedAuthRuntimeAdapter:
         canonical = self.settings.canonical
         if current is None or canonical is None:
             return ManagedAuthExecutionResult(succeeded=False)
-        updated = copy.deepcopy(current)
+        updated = current
         secret_store = self.secret_store_factory(
             canonical.intent.secrets,
             config_path=self.config_path,
@@ -1338,7 +1137,6 @@ class ManagedAuthRuntimeAdapter:
                     authorization_url_sink=authorization_url_sink,
                 )
             ),
-            referral_id=referral_id,
             on_callback_received=on_callback_received,
         )
         broker = DiscordManagedBrokerClientAdapter(
@@ -1360,10 +1158,8 @@ class ManagedAuthRuntimeAdapter:
             discord_auth=discord_auth,
             broker_client=broker,
             secret_store=secret_store_port,
-            settings_repository=self.settings_repository_factory(
-                current,
-                updated,
-                "managed_connection_auth",
+            settings_repository=CurrentManagedSettingsRepository(
+                settings=self.settings, factory=self.settings_repository_factory
             ),
             claim_guard=ManagedAuthClaimGuard(
                 managed_state=managed_state,
@@ -1389,33 +1185,7 @@ class ManagedAuthRuntimeAdapter:
                 ack_result_sink=ack_results.append,
             )
         )
-        self.settings.complete()
         delivery_ack_pending = result.status == TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING
-        issue = broker.last_issue_response
-        ack_result = ack_results[-1] if ack_results else None
-        issued_referral_id = normalize_owned_referral_id(getattr(issue, "referral_id", None))
-        acknowledged_referral_id = normalize_owned_referral_id(
-            getattr(ack_result, "referral_id", None)
-        )
-        referral_id = (
-            acknowledged_referral_id
-            or issued_referral_id
-            or normalize_owned_referral_id(managed_state.referral_id)
-        )
-        pass_status = getattr(ack_result, "pass_status", None)
-        if not isinstance(pass_status, TalkTogetherPassStatus):
-            pass_status = getattr(issue, "pass_status", None)
-        if not isinstance(pass_status, TalkTogetherPassStatus):
-            pass_status = None
-        if getattr(pass_status, "pass_id", None) != referral_id:
-            pass_status = None
-        referral_bonus_applied = (
-            getattr(ack_result, "referral_bonus_applied", False) is True
-            or getattr(issue, "referral_bonus_applied", False) is True
-        )
-        updated = _vnext_with_managed_identity(updated, managed_state)
-        if delivery_ack_pending:
-            self.settings.canonical = updated
         if not _settings_mutation_committed(result):
             message = result.message
             diagnostics = result.diagnostics
@@ -1423,27 +1193,19 @@ class ManagedAuthRuntimeAdapter:
                 succeeded=False,
                 transaction_result=result,
                 delivery_ack_pending=delivery_ack_pending,
-                referral_id=referral_id if delivery_ack_pending else None,
-                pass_status=pass_status if delivery_ack_pending else None,
                 message_key=(message.key if message is not None else "discord_auth.error.retry"),
                 message_kwargs=dict(message.params) if message is not None else {},
                 error_class=getattr(diagnostics, "category", None),
             )
-        self.settings.canonical = updated
         return ManagedAuthExecutionResult(
             succeeded=True,
             transaction_result=result,
-            referral_bonus_applied=referral_bonus_applied,
-            referral_id=referral_id,
-            pass_status=pass_status,
             runtime_rebuild="always",
         )
 
     async def _execute_legacy_discord(
         self,
         release_service: object,
-        *,
-        referral_id: str | None,
     ) -> ManagedAuthExecutionResult:
         try:
             claim_guard = self.claim_guard()
@@ -1460,7 +1222,7 @@ class ManagedAuthRuntimeAdapter:
                 log_failure=False,
             )
         try:
-            result = await release_service.prepare_for_translation(referral_id=referral_id)
+            result = await release_service.prepare_for_translation()
         except Exception as exc:
             return ManagedAuthExecutionResult(
                 succeeded=False,
@@ -1473,9 +1235,6 @@ class ManagedAuthRuntimeAdapter:
                 claim_guard.managed_state.persist()
             return ManagedAuthExecutionResult(
                 succeeded=True,
-                referral_bonus_applied=(getattr(result, "referral_bonus_applied", False) is True),
-                referral_id=normalize_owned_referral_id(getattr(result, "referral_id", None)),
-                pass_status=getattr(result, "pass_status", None),
                 runtime_rebuild="if_missing",
             )
         diagnostics = result.diagnostics
@@ -1503,6 +1262,9 @@ class ManagedAuthRuntimeAdapter:
         )
 
     def _local_key_available(self, settings: AppSettingsVNext) -> bool:
+        managed = settings.state.managed_connection
+        if managed.pending_managed_operation_id or managed.pending_delivery_ack_source:
+            return False
         try:
             secrets = self.secret_store_factory(
                 settings.intent.secrets,
@@ -1580,8 +1342,6 @@ def _managed_connection_auth_settings_values(
                 "active_managed_credential_ref": managed.active_managed_credential_ref,
                 "active_managed_expires_at": managed.active_managed_expires_at,
                 "founder_letter_seen_credential_ref": (managed.founder_letter_seen_credential_ref),
-                "referral_id": managed.referral_id,
-                "referral_source": managed.referral_source,
                 "local_managed_claim_sources": list(managed.local_managed_claim_sources),
                 "pending_managed_operation_id": managed.pending_managed_operation_id,
                 "pending_managed_operation_source": managed.pending_managed_operation_source,

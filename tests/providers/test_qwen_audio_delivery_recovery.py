@@ -91,6 +91,40 @@ class HeldManualProvider(FakeLLMProvider):
         return await super().translate(**kwargs)
 
 
+class SelfSourceObserver:
+    def __init__(self, harness):
+        self.harness = harness
+        self.closed_transcripts = {}
+        original = harness.translation_turns.on_draft_updated
+        assert original is not None
+
+        async def observe(snapshot, request):
+            if snapshot.source_closed:
+                transcript = request.transcript
+                assert transcript.utterance_id == snapshot.utterance_id
+                assert transcript.text == snapshot.source_text
+                previous = self.closed_transcripts.setdefault(snapshot.utterance_id, transcript)
+                assert previous == transcript
+            await original(snapshot, request)
+
+        harness.translation_turns.on_draft_updated = observe
+
+    def final_sources(self):
+        accepted = []
+        seen = set()
+        for event in self.harness.ui_events._queue:
+            if event.type is UIEventType.TRANSCRIPT_FINAL:
+                accepted.append(event.payload)
+            elif event.type is UIEventType.SELF_TURN_UPDATED and event.payload.source_closed:
+                snapshot = event.payload
+                transcript = self.closed_transcripts[snapshot.utterance_id]
+                assert transcript.text == snapshot.source_text
+                if snapshot.utterance_id not in seen:
+                    seen.add(snapshot.utterance_id)
+                    accepted.append(transcript)
+        return accepted
+
+
 @asynccontextmanager
 async def self_capture_pipeline(
     transport, llm=None, *, provider_factory=None, peer_translation_enabled=False, settings=None
@@ -143,6 +177,7 @@ async def self_capture_pipeline(
         settings_box=settings_box,
         cursors={},
         sequence=0,
+        source_observer=SelfSourceObserver(harness),
     )
     try:
         await harness.start()
@@ -221,19 +256,41 @@ async def source_gap(env):
 
 
 def final_sources(env):
-    return [
-        event.payload
-        for event in env.harness.ui_events._queue
-        if event.type is UIEventType.TRANSCRIPT_FINAL
-    ]
+    return env.source_observer.final_sources()
 
 
 async def require_final_source(env, text):
-    await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+    try:
+        await wait_until(lambda: any(item.text == text for item in final_sources(env)), timeout=2)
+    except AssertionError as exc:
+        observed = [
+            (source.utterance_id, source.text, source.recognition_origins)
+            for source in final_sources(env)
+        ]
+        raise AssertionError(f"Expected sealed source {text!r}; observed {observed!r}") from exc
     await env.harness.translation_turns.wait_for_idle()
     assert sum(item.text == text for item in final_sources(env)) == 1
     assert any(call["text"] == text for call in env.llm.calls)
-    return next(item for item in final_sources(env) if item.text == text)
+    source = next(item for item in final_sources(env) if item.text == text)
+    await wait_until(
+        lambda: any(
+            event.type is UIEventType.SELF_TURN_UPDATED
+            and event.utterance_id == source.utterance_id
+            and event.payload.source_closed
+            and event.payload.status == "complete"
+            and event.payload.targets
+            and all(
+                target.status == "ready"
+                and target.source_revision == event.payload.source_revision
+                and target.translation is not None
+                and target.translation.text == env.llm.response_text
+                for target in event.payload.targets
+            )
+            for event in env.harness.ui_events._queue
+        ),
+        timeout=2,
+    )
+    return source
 
 
 @pytest.mark.asyncio

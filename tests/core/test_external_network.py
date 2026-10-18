@@ -103,9 +103,11 @@ def certificates(tmp_path):
 
 
 @contextmanager
-def http_server(context=None, *, ipv6=False):
+def http_server(context=None, *, ipv6=False, requests=None):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
+            if requests is not None:
+                requests.append(self.path)
             self.send_response(200)
             self.send_header("Content-Length", "2")
             self.end_headers()
@@ -557,3 +559,255 @@ async def test_https_proxy_wrong_hostname_is_rejected_without_direct_fallback(
         assert recorded == []
         assert caught.value.connection_diagnostics["tls_source"] == "explicit_file"
         assert caught.value.connection_diagnostics["proxy_source"] == "env"
+
+
+@pytest.mark.parametrize(
+    "proxy,expected",
+    [
+        ("socks4://private-user:private-password@127.0.0.1:9", "unsupported_proxy_configuration"),
+        ("http://private-proxy:invalid-port", "invalid_proxy_configuration"),
+        ("https://[private-malformed", "invalid_proxy_configuration"),
+    ],
+)
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_invalid_static_proxy_never_falls_back_and_correction_succeeds(
+    monkeypatch, asynchronous, proxy, expected
+):
+    from puripuly_heart.core.external_network import NetworkConfigurationError
+    from puripuly_heart.core.qq_auth_diagnostics import exception_fields, safe_fields
+
+    recorded = []
+    with http_server(requests=recorded) as port:
+        url = f"http://127.0.0.1:{port}/corrected"
+        monkeypatch.setattr(
+            external_network,
+            "_windows_proxy_settings",
+            lambda: ({"http": proxy}, ""),
+        )
+        with pytest.raises(NetworkConfigurationError) as caught:
+            if asynchronous:
+                async with network_clients.external_async_client() as client:
+                    await client.get(url)
+            else:
+                await asyncio.to_thread(_sync_get, url)
+        fields = safe_fields(exception_fields(caught.value))
+        assert fields["dispatch_certainty"] == "not_dispatched"
+        assert fields["configuration_error"] == expected
+        assert fields["proxy_source"] == "system"
+        assert recorded == []
+        assert "private-" not in repr(fields)
+        monkeypatch.setattr(external_network, "_windows_proxy_settings", lambda: ({}, ""))
+        if asynchronous:
+            async with network_clients.external_async_client() as client:
+                assert (await client.get(url)).text == "ok"
+        else:
+            assert await asyncio.to_thread(_sync_get, url) == "ok"
+        assert recorded == ["/corrected"]
+
+
+@pytest.mark.parametrize("secure", [False, True])
+@pytest.mark.parametrize("body", [False, True])
+@pytest.mark.parametrize("asynchronous", [False, True])
+async def test_header_and_body_stalls_keep_selected_route_and_tls(
+    certificates, monkeypatch, secure, body, asynchronous
+):
+    from puripuly_heart.core.qq_auth_diagnostics import exception_fields, safe_fields
+
+    root, _, contexts = certificates
+    if secure:
+        monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    received = []
+    release = asyncio.Event()
+    connections = set()
+
+    async def respond(reader, writer):
+        connections.add(asyncio.current_task())
+        try:
+            received.append(await reader.readuntil(b"\r\n\r\n"))
+            if body:
+                writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nx")
+                await writer.drain()
+            await release.wait()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            connections.discard(asyncio.current_task())
+
+    server = await asyncio.start_server(
+        respond, "127.0.0.1", 0, ssl=contexts["valid"] if secure else None
+    )
+    try:
+        scheme = "https" if secure else "http"
+        url = f"{scheme}://localhost:{server.sockets[0].getsockname()[1]}"
+        timeout = httpx.Timeout(2.0, read=0.1)
+
+        def synchronous_get():
+            with network_clients.external_client(timeout=timeout) as client:
+                return client.get(url)
+
+        with pytest.raises(httpx.ReadTimeout) as caught:
+            if asynchronous:
+                async with network_clients.external_async_client(timeout=timeout) as client:
+                    await client.get(url)
+            else:
+                await asyncio.to_thread(synchronous_get)
+        assert len(received) == 1
+        fields = safe_fields(exception_fields(caught.value))
+        assert fields["network_error_kind"] == "timeout"
+        assert fields["transport"] == scheme
+        assert fields["proxy_source"] == "direct"
+        assert fields["tls_source"] == ("explicit_file" if secure else "none")
+        assert fields["tls_backend"] == ("openssl" if secure else "none")
+        assert fields["stage"] == ("response_body" if body else "request_send")
+        assert fields["dispatch_certainty"] == ("response_received" if body else "possible")
+        if body:
+            assert fields["http_status"] == 200
+    finally:
+        release.set()
+        server.close()
+        await server.wait_closed()
+        await asyncio.gather(*connections)
+
+
+@pytest.mark.parametrize("name", ["SSL_CERT_FILE", "SSL_CERT_DIR"])
+def test_invalid_ca_is_safe_local_configuration_and_valid_ca_recovers(certificates, tmp_path, name):
+    from puripuly_heart.core.external_network import NetworkConfigurationError
+    from puripuly_heart.core.qq_auth_diagnostics import exception_fields, safe_fields
+
+    with pytest.raises(NetworkConfigurationError) as caught:
+        select_tls(environment={name: str(tmp_path / "private-ca-path")})
+    fields = safe_fields(exception_fields(caught.value))
+    assert fields["configuration_error"] == "invalid_tls_configuration"
+    assert fields["dispatch_certainty"] == "not_dispatched"
+    assert fields["stage"] == "client_configuration"
+    assert fields["tls_source"] == (
+        "explicit_file" if name == "SSL_CERT_FILE" else "explicit_directory"
+    )
+    assert "private-ca-path" not in repr(fields)
+    root, ca_dir, _ = certificates
+    selection = select_tls(environment={name: str(root if name == "SSL_CERT_FILE" else ca_dir)})
+    assert selection.context.verify_mode == ssl.CERT_REQUIRED
+
+
+async def test_http_proxy_denial_has_no_direct_fallback_and_corrected_route_works(monkeypatch):
+    target_requests = []
+    proxy_requests = []
+    handlers = set()
+
+    async def deny(reader, writer):
+        handlers.add(asyncio.current_task())
+        try:
+            proxy_requests.append(await reader.readuntil(b"\r\n\r\n"))
+            writer.write(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\n\r\n")
+            await writer.drain()
+        finally:
+            writer.close()
+            await writer.wait_closed()
+            handlers.discard(asyncio.current_task())
+
+    proxy = await asyncio.start_server(deny, "127.0.0.1", 0)
+    try:
+        monkeypatch.setenv("HTTP_PROXY", f"http://127.0.0.1:{proxy.sockets[0].getsockname()[1]}")
+        with http_server(requests=target_requests) as port:
+            url = f"http://127.0.0.1:{port}/expected"
+            async with network_clients.external_async_client() as client:
+                response = await client.get(url)
+            assert response.status_code == 403
+            assert len(proxy_requests) == 1
+            assert target_requests == []
+            assert response.extensions["connection_diagnostics"]["proxy_source"] == "env"
+            monkeypatch.delenv("HTTP_PROXY")
+            async with network_clients.external_async_client() as client:
+                assert (await client.get(url)).text == "ok"
+            assert target_requests == ["/expected"]
+    finally:
+        proxy.close()
+        await proxy.wait_closed()
+        await asyncio.gather(*handlers)
+
+
+@pytest.mark.parametrize("proxy_scheme", ["http", "https", "socks5"])
+async def test_actual_broker_oauth_start_retains_proxy_tls_rate_limit_and_valid_retry(
+    certificates, monkeypatch, proxy_scheme
+):
+    from puripuly_heart.core.managed_openrouter_broker_client import (
+        HttpManagedOpenRouterBrokerClient,
+    )
+    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterReleaseError
+
+    root, _, contexts = certificates
+    monkeypatch.setenv("SSL_CERT_FILE", str(root))
+    requests = []
+    success = {
+        "authorization_url": "https://discord.invalid/?state=synthetic-current",
+        "redirect_uri": "http://127.0.0.1:62187/discord/callback",
+        "oauth_session_expires_at": "2099-01-01T00:00:00Z",
+        "issue_nonce": "synthetic-nonce",
+        "fingerprint_salt": {"version": 1, "salt": "synthetic-salt"},
+        "fingerprint_salt_version": 1,
+    }
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_POST(self):
+            requests.append(
+                (self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+            )
+            body = (
+                b"<html>synthetic-limit</html>"
+                if len(requests) == 1
+                else json.dumps(success).encode()
+            )
+            self.send_response(429 if len(requests) == 1 else 200)
+            self.send_header("Retry-After", "7")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.socket = contexts["valid"].wrap_socket(server.socket, server_side=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        async with recording_proxy(
+            contexts["valid"] if proxy_scheme == "https" else None,
+            socks=proxy_scheme == "socks5",
+        ) as (proxy, recorded):
+            monkeypatch.setenv("HTTPS_PROXY", proxy)
+            client = HttpManagedOpenRouterBrokerClient(
+                f"https://localhost:{server.server_address[1]}"
+            )
+            kwargs = {
+                "installation_id": "synthetic-installation",
+                "device_public_key": "synthetic-device",
+                "redirect_uri": success["redirect_uri"],
+                "app_version": "synthetic-version",
+            }
+            try:
+                with pytest.raises(ManagedOpenRouterReleaseError) as caught:
+                    await client.start_discord_oauth(**kwargs)
+                diagnostics = caught.value.failure_diagnostics
+                assert diagnostics.status_code == 429
+                assert diagnostics.retry_after_ms == 7000
+                assert diagnostics.fields["proxy_source"] == "env"
+                assert diagnostics.fields["tls_source"] == "explicit_file"
+                assert diagnostics.fields["tls_backend"] == "openssl"
+                assert diagnostics.fields["response_shape"] == "non_json"
+                assert diagnostics.fields["dispatch_certainty"] == "response_received"
+                result = await client.start_discord_oauth(**kwargs)
+                assert result.authorization_url == success["authorization_url"]
+                assert result.redirect_uri == kwargs["redirect_uri"]
+                assert requests[0] == requests[1]
+                assert len(recorded) == 2
+                assert all(
+                    method == ("SOCKS5" if proxy_scheme == "socks5" else "CONNECT")
+                    for method, _ in recorded
+                )
+            finally:
+                await client.close()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

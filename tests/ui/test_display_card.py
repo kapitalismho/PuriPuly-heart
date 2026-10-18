@@ -29,12 +29,6 @@ def _mute_display_updates(monkeypatch: pytest.MonkeyPatch, card: DisplayCard) ->
     monkeypatch.setattr(type(card._display_text), "update", lambda self: None)
 
 
-def _input_row(card: DisplayCard):
-    main_content = card.content.content
-    _display_region, input_footer = main_content.controls
-    return input_footer.controls[1]
-
-
 def test_weighted_length_counts_cjk_as_two() -> None:
     assert display_card_module._weighted_len("abc") == 3
     assert display_card_module._weighted_len("한a") == 3
@@ -277,42 +271,6 @@ def test_only_the_source_colour_is_dimmed_relative_to_messages() -> None:
     assert display_card_module.DISPLAY_MESSAGE_WEIGHT == display_card_module.ft.FontWeight.BOLD
 
 
-def test_display_region_anchors_the_first_line_to_the_top() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    display_region = card.content.content.controls[0]
-
-    assert display_region.alignment == display_card_module.ft.Alignment.TOP_LEFT
-    assert (
-        display_region.content.vertical_alignment == display_card_module.ft.CrossAxisAlignment.START
-    )
-
-
-def test_the_first_line_anchor_is_independent_of_text_length_and_size(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    _mute_display_updates(monkeypatch, card)
-    display_region = card.content.content.controls[0]
-
-    def anchor() -> tuple[object, object, object]:
-        return (
-            display_region.alignment,
-            display_region.content.vertical_alignment,
-            display_region.padding,
-        )
-
-    card.set_display("hi")
-    short_anchor = anchor()
-    assert _visible_size(card) == 48
-
-    card.set_display("x" * 200)
-    assert _visible_size(card) == 24
-    assert anchor() == short_anchor
-
-    card.set_display_translation("y" * 200)
-    assert anchor() == short_anchor
-
-
 def test_translation_never_grows_the_text_beyond_its_source_size(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -522,14 +480,6 @@ def test_debug_prefix_applies_to_the_visible_text_only(monkeypatch: pytest.Monke
     card.set_status("connected")
     assert _visible_text(card) == display_card_module.t("display.connected")
     assert "[P 41c6" not in _visible_text(card)
-
-
-def test_input_row_holds_only_the_input_field() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    controls = _input_row(card).controls
-
-    assert controls == [card._input_field]
-    assert all(getattr(control, "value", None) != "•" for control in controls)
 
 
 def test_clear_input_empties_the_field(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -752,17 +702,20 @@ def test_input_and_hint_keep_each_language_typeface(
     assert card._input_field.text_style.letter_spacing == 0.4
 
 
-def test_input_footer_stays_outside_the_expanding_display_region() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
+def test_display_updates_preserve_unsubmitted_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    submitted: list[str] = []
+    card = DisplayCard(on_submit=submitted.append)
+    _mute_display_updates(monkeypatch, card)
+    card._input_field.value = "still editing"
 
-    padded_content_layer = card.content
-    main_content = padded_content_layer.content
-    display_region, input_footer = main_content.controls
-    divider_container = input_footer.controls[0]
+    for source, translated in (("short", "brief"), ("long source " * 30, "long result " * 30)):
+        card.set_display(source)
+        assert _visible_text(card) == source
+        assert card._input_field.value == "still editing"
+        card.set_display_translation(translated)
+        assert _visible_text(card) == translated
+        assert card._input_field.value == "still editing"
 
-    assert main_content.alignment == display_card_module.ft.MainAxisAlignment.START
-    assert display_region.expand is True
-    assert display_region.clip_behavior == display_card_module.ft.ClipBehavior.HARD_EDGE
-    assert divider_container.padding.bottom == 4
-    assert input_footer.expand is None
-    assert input_footer.tight is True
+    card.set_status("disconnected")
+    assert card._input_field.value == "still editing"
+    assert submitted == []

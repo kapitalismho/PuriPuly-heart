@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 from urllib.parse import parse_qs
 
 import httpx
@@ -22,7 +23,7 @@ from puripuly_heart.core.chatgpt.session import (
     CHATGPT_REFRESH_TOKEN_SECRET,
     ChatGptSession,
 )
-from puripuly_heart.core.storage.secrets import InMemorySecretStore
+from puripuly_heart.core.storage.secrets import EncryptedFileSecretStore, InMemorySecretStore
 
 WINDOWS_CREDENTIAL_MANAGER_MAX_CHARS = 1280
 REAL_ACCESS_TOKEN_LENGTH = 2105
@@ -183,3 +184,49 @@ async def test_sign_out_reports_unconfirmed_remote_revocation() -> None:
     assert result.diagnostics.operation == "remote_revoke"
     assert store.get(CHATGPT_REFRESH_TOKEN_SECRET) is None
     await session.close()
+
+
+async def test_refresh_rotation_preserves_concurrent_managed_delivery(tmp_path: Path) -> None:
+    path = tmp_path / "secrets.json"
+    retained = EncryptedFileSecretStore(path, passphrase="synthetic")
+    retained.set(CHATGPT_CLIENT_ID_SECRET, "oaiapp_client")
+    retained.set(CHATGPT_REFRESH_TOKEN_SECRET, "r0")
+    retained.set("unrelated", "keep")
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    server = _TokenServer()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        entered.set()
+        await release.wait()
+        return server.handler(request)
+
+    session = ChatGptSession(
+        secret_store=lambda: retained,
+        http_factory=lambda: httpx.AsyncClient(
+            transport=httpx.MockTransport(handler), trust_env=False
+        ),
+        clock=lambda: 1000.0,
+    )
+    refresh = asyncio.create_task(session.access_token())
+    managed_values = {
+        "openrouter_managed_qq_api_key": "managed-new",
+        "openrouter_managed_qq_delivery_ack_token": "ack-new",
+        "openrouter_managed_operation_resume_token": "resume-new",
+    }
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=10)
+        managed = EncryptedFileSecretStore(path, passphrase="synthetic")
+        for key, value in managed_values.items():
+            managed.set(key, value)
+        release.set()
+        assert await refresh == "a1" + "x" * REAL_ACCESS_TOKEN_LENGTH
+        fresh = EncryptedFileSecretStore(path, passphrase="synthetic")
+        assert fresh.get(CHATGPT_REFRESH_TOKEN_SECRET) == "r1"
+        assert fresh.get("unrelated") == "keep"
+        assert {key: fresh.get(key) for key in managed_values} == managed_values
+        assert {key: retained.get(key) for key in managed_values} == managed_values
+    finally:
+        release.set()
+        await asyncio.gather(refresh, return_exceptions=True)
+        await session.close()

@@ -44,6 +44,15 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
         ui_queue_maxsize=1,
         low_latency_mode=True,
     )
+    snapshots = []
+    on_draft_updated = harness.translation_turns.on_draft_updated
+    assert on_draft_updated is not None
+
+    async def observe_draft(snapshot, request):
+        await on_draft_updated(snapshot, request)
+        snapshots.append(snapshot)
+
+    harness.translation_turns.on_draft_updated = observe_draft
     ingress = None
     ui_entered = asyncio.Event()
     ui_release = asyncio.Event()
@@ -118,7 +127,25 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
             assert buffer is not None
             assert buffer.finalize_wait_task is not None
             await asyncio.wait_for(asyncio.shield(buffer.finalize_wait_task), 1.0)
-            assert harness.self_owner.merge_buffer is buffer
+            assert harness.self_owner.merge_buffer is None
+            closed = [snapshot for snapshot in snapshots if snapshot.source_closed]
+            assert closed
+            assert closed[-1].utterance_id == buffer.merge_id
+            assert closed[-1].source_text == "source"
+            assert closed[-1].status == "active"
+            assert all(target.status == "pending" for target in closed[-1].targets)
+            assert harness.translation_turns.is_parent_active(buffer.merge_id)
+            assert not llm.release.is_set()
+            current = overlay.snapshot().blocks[0]
+            assert (current.id, current.occupant_key, current.appearance_seq) == (
+                blocks[0].id,
+                blocks[0].occupant_key,
+                blocks[0].appearance_seq,
+            )
+            assert current.primary_text == "source"
+            assert current.secondary_text == ""
+            assert harness.ui_events.full()
+            assert not ui_release.is_set()
             assert len(llm.calls) == 1
         llm.release.set()
 

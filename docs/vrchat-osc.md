@@ -7,6 +7,13 @@
 - Manual: send `9000`, receive `9001` by default
 - Off: stop control traffic and preserve manual ports
 
+## Progressive Self chatbox translations
+
+- Self translations update the chatbox as speech is recognized, even when the VR overlay is off.
+- Later results can correct earlier previews. An identical final result is not resent if its compatible preview was already sent successfully.
+- Not every intermediate update or page is shown. Text already read by others cannot be retracted.
+- A successful local OSC send does not confirm that VRChat received or displayed the text.
+
 ## Expression Parameters
 
 - Add only the parameters you need to the avatar's Expression Parameters.

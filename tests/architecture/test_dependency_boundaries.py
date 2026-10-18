@@ -1321,7 +1321,7 @@ def test_gate1_existing_replacement_private_shims_are_removed() -> None:
         ),
         "src/puripuly_heart/core/runtime/local_stt_download.py": ("def adopt_legacy_state",),
         "src/puripuly_heart/core/runtime/clipboard.py": ("def adopt_legacy_state",),
-        "src/puripuly_heart/core/runtime/mic_test.py": ("def adopt_legacy_state",),
+        "src/puripuly_heart/core/runtime/audio_test.py": ("def adopt_legacy_state",),
         "src/puripuly_heart/core/runtime/output.py": ("_osc_flush_task",),
         "src/puripuly_heart/core/runtime/overlay.py": (
             "_overlay_presenter",
@@ -1478,7 +1478,7 @@ def test_a09_capture_overlay_application_wiring_reduces_dependency_debt_to_4() -
     a09_paths = (
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_capture_runtime.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_local_asr_application.py",
-        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_microphone_test.py",
+        SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_audio_test.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_overlay_factory.py",
         SOURCE_PACKAGE_ROOT / "app" / "wiring" / "wiring_peer_application.py",
         SOURCE_PACKAGE_ROOT / "app" / "services" / "capture" / "capture_target_settings.py",
@@ -1526,22 +1526,6 @@ def test_a10_composition_managed_secrets_wiring_reduces_dependency_debt_to_0() -
             )
         )
         assert "puripuly_heart.config.settings" not in imported_modules
-
-
-def test_a07_managed_broker_uses_the_pure_provider_value_owner() -> None:
-    broker_path = (
-        SOURCE_PACKAGE_ROOT / "core" / "openrouter" / "managed_openrouter_broker_client.py"
-    )
-    imported_modules = set(
-        _imported_modules(
-            _module_name_for_path(broker_path),
-            broker_path,
-            _internal_module_names(),
-        )
-    )
-
-    assert "puripuly_heart.config.settings" not in imported_modules
-    assert "puripuly_heart.config.provider_values" in imported_modules
 
 
 def test_a04_overlay_ui_uses_the_pure_canonical_value_owner() -> None:

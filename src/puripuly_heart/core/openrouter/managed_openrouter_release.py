@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import inspect
-import json
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import InitVar, dataclass, field, replace
 from datetime import UTC, datetime
 from enum import Enum
+from functools import partial
 from typing import Protocol
 from uuid import UUID
 
@@ -17,8 +17,6 @@ from puripuly_heart.app.ports.broker_client import (
     ManagedOperationResumeRequest,
     ManagedOperationStatusRequest,
     ManagedOperationStatusResult,
-    QqManagedStatusRequest,
-    QqManagedStatusResult,
 )
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.services.managed.managed_operation import (
@@ -36,9 +34,13 @@ from puripuly_heart.config.provider_values import (
     OpenRouterCredentialSource,
     OpenRouterLLMModel,
     OpenRouterSelectionAlias,
-    normalize_owned_referral_id,
 )
-from puripuly_heart.core.discord_managed_oauth import run_discord_oauth_callback_flow
+from puripuly_heart.core.discord.discord_managed_oauth import (
+    DiscordOAuthBrowserLaunchError,
+    DiscordOAuthStateError,
+    register_discord_oauth_expected_state,
+    run_discord_oauth_callback_flow,
+)
 from puripuly_heart.core.discord_oauth_loopback import (
     DiscordOAuthCallbackError,
     DiscordOAuthLoopbackClosedError,
@@ -48,22 +50,26 @@ from puripuly_heart.core.discord_oauth_loopback import (
 from puripuly_heart.core.error_messages import provider_failure_report
 from puripuly_heart.core.hardware_fingerprint import compute_hardware_hash
 from puripuly_heart.core.llm.provider import LLMProvider
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+    delivery_expired,
+    managed_key_secret,
+)
 from puripuly_heart.core.managed_identity import (
     ensure_managed_identity_bundle,
-    load_existing_managed_identity_bundle,
-    regenerate_managed_identity_bundle,
 )
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.openrouter.managed_operation_identity import is_valid_operation_id
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.domain.models import Translation
 
 from .openrouter_credentials import (
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET,
     OpenRouterCredentialRuntimeConfig,
     best_effort_store_managed_openrouter_user_identifier,
+    clear_failed_managed_credential_projection,
     clear_temporary_managed_release_state,
     resolve_openrouter_credentials,
 )
@@ -113,16 +119,6 @@ def _managed_release_auth_task_name(attr_name: str) -> str:
     if attr_name == "_issue_task":
         return "managed-openrouter-issue"
     return f"managed-openrouter-{attr_name.strip('_').replace('_', '-')}"
-
-
-def _record_close_task_result(
-    failures: list[BaseException],
-    result: object,
-) -> None:
-    if isinstance(result, asyncio.CancelledError):
-        return
-    if isinstance(result, BaseException):
-        failures.append(result)
 
 
 def _raise_close_failures(message: str, failures: list[BaseException]) -> None:
@@ -176,14 +172,6 @@ def format_managed_openrouter_diagnostics(
 
 
 @dataclass(frozen=True, slots=True)
-class TalkTogetherPassStatus:
-    pass_id: str
-    invite_count: int
-    invite_limit: int
-    bonus_translations_per_friend: int = 200
-
-
-@dataclass(frozen=True, slots=True)
 class ManagedOpenRouterReleaseResult:
     behavior: ManagedOpenRouterReleaseBehavior
     message_key: str | None = None
@@ -194,9 +182,6 @@ class ManagedOpenRouterReleaseResult:
     local_key_available: bool = False
     pending_issue: bool = False
     single_flight_reused: bool = False
-    referral_bonus_applied: bool = False
-    referral_id: str | None = None
-    pass_status: TalkTogetherPassStatus | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,26 +219,10 @@ class ManagedOpenRouterIssueSuccess:
     managed_credential_ref: str | None = None
     expires_at: str | None = None
     openrouter_user_id: str | None = None
-    referral_bonus_applied: bool = False
-    referral_id: str | None = None
-    pass_status: TalkTogetherPassStatus | None = None
     delivery_ack_required: bool = False
     delivery_id: str | None = None
     delivery_ack_token: str | None = field(default=None, repr=False)
     delivery_ack_expires_at: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ManagedOpenRouterTrialStatusSuccess:
-    referral_id: str | None = None
-    pass_status: TalkTogetherPassStatus | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ManagedOpenRouterStatusRefreshResult:
-    referral_id: str | None
-    pass_status: TalkTogetherPassStatus | None = None
-    succeeded: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,17 +256,14 @@ class ManagedOpenRouterReleaseError(Exception):
         return self.message or self.code
 
     def to_diagnostics(self) -> ManagedOpenRouterReleaseDiagnostics:
-        diagnostics = provider_failure_report(
-            self, provider="openrouter", operation="provider_build"
-        ).diagnostics
-        object.__setattr__(self, "failure_diagnostics", diagnostics)
+        diagnostics = self.failure_diagnostics
         return ManagedOpenRouterReleaseDiagnostics(
             operation=self.operation,
             code=self.code,
             error_class=self.error_class,
             subcode=self.subcode,
             retry_after_ms=self.retry_after_ms,
-            failure_diagnostics=self.failure_diagnostics,
+            failure_diagnostics=diagnostics,
         )
 
 
@@ -321,26 +287,12 @@ class ManagedOpenRouterReleaseClient(Protocol):
         device_public_key: str,
         redirect_uri: str,
         app_version: str,
-        referral_id: str | None = None,
     ) -> ManagedOpenRouterDiscordStartSuccess: ...
 
     async def issue_discord_managed_key(
         self,
         request: dict[str, object],
     ) -> ManagedOpenRouterIssueSuccess: ...
-
-    async def get_trial_status(
-        self,
-        *,
-        installation_id: str,
-        timestamp: str,
-        signature: str,
-    ) -> ManagedOpenRouterTrialStatusSuccess: ...
-
-    async def get_qq_managed_status(
-        self,
-        request: QqManagedStatusRequest,
-    ) -> QqManagedStatusResult: ...
 
     async def acknowledge_managed_key_delivery(
         self,
@@ -383,9 +335,8 @@ class UnavailableManagedOpenRouterReleaseClient:
         device_public_key: str,
         redirect_uri: str,
         app_version: str,
-        referral_id: str | None = None,
     ) -> ManagedOpenRouterDiscordStartSuccess:
-        _ = installation_id, device_public_key, redirect_uri, app_version, referral_id
+        _ = installation_id, device_public_key, redirect_uri, app_version
         raise ManagedOpenRouterReleaseError(
             code="trial_unavailable",
             error_class="retryable",
@@ -403,36 +354,11 @@ class UnavailableManagedOpenRouterReleaseClient:
             message="managed OpenRouter release is unavailable",
         )
 
-    async def get_qq_managed_status(
-        self,
-        request: QqManagedStatusRequest,
-    ) -> QqManagedStatusResult:
-        _ = request
-        raise ManagedOpenRouterReleaseError(
-            code="trial_unavailable",
-            error_class="retryable",
-            message="managed OpenRouter release is unavailable",
-        )
-
     async def acknowledge_managed_key_delivery(
         self,
         request: ManagedKeyDeliveryAckRequest,
     ) -> object:
         _ = request
-        raise ManagedOpenRouterReleaseError(
-            code="trial_unavailable",
-            error_class="retryable",
-            message="managed OpenRouter release is unavailable",
-        )
-
-    async def get_trial_status(
-        self,
-        *,
-        installation_id: str,
-        timestamp: str,
-        signature: str,
-    ) -> ManagedOpenRouterTrialStatusSuccess:
-        _ = installation_id, timestamp, signature
         raise ManagedOpenRouterReleaseError(
             code="trial_unavailable",
             error_class="retryable",
@@ -463,11 +389,6 @@ class ManagedOpenRouterReleaseService:
     _issue_task: asyncio.Task[ManagedOpenRouterReleaseResult] | None = field(
         init=False,
         default=None,
-        repr=False,
-    )
-    _status_refresh_tasks: set[asyncio.Task[object]] = field(
-        init=False,
-        default_factory=set,
         repr=False,
     )
     _retry_after_deadline_ms: int | None = field(init=False, default=None, repr=False)
@@ -501,6 +422,9 @@ class ManagedOpenRouterReleaseService:
             managed_credential_kind=self.openrouter_config.managed_credential_kind,
             active_managed_credential_ref=self.managed_state.active_managed_credential_ref,
             active_managed_expires_at=self.managed_state.active_managed_expires_at,
+            pending_managed_operation_id=self.managed_state.pending_managed_operation_id,
+            pending_managed_operation_source=self.managed_state.pending_managed_operation_source,
+            pending_delivery_ack_source=self.managed_state.pending_delivery_ack_source,
         )
 
     def _uses_qq_managed_credentials(self) -> bool:
@@ -549,7 +473,6 @@ class ManagedOpenRouterReleaseService:
     async def prepare_for_translation(
         self,
         *,
-        referral_id: str | None = None,
         allow_authorization: bool = True,
     ) -> ManagedOpenRouterReleaseResult:
         if (
@@ -569,310 +492,122 @@ class ManagedOpenRouterReleaseService:
         task = self._start_shared_task(
             "_prepare_task",
             self._run_prepare_flow(
-                referral_id=referral_id,
                 allow_authorization=allow_authorization,
             ),
         )
         return await self._await_shared_task(task, single_flight_reused=False)
 
     async def ensure_key_for_llm_start(self) -> ManagedOpenRouterReleaseResult:
-        resolution = resolve_openrouter_credentials(
-            self._credential_runtime_config(), secrets=self.secrets
+        for task in (self._issue_task, self._prepare_task):
+            if task is not None and not task.done():
+                return await self._await_shared_task(task, single_flight_reused=True)
+        return await self.prepare_for_translation(allow_authorization=False)
+
+    def _managed_source(self) -> str:
+        return "qq" if self._uses_qq_managed_credentials() else "discord"
+
+    async def _reconcile_pending_delivery(self) -> ManagedOpenRouterReleaseResult:
+        if self.managed_state.pending_managed_operation_source == self._managed_source():
+            recovered = await self._recover_pending_managed_operation()
+            if recovered is not None:
+                return recovered
+        return self._managed_operation_action_required_result(
+            code="managed_delivery_reconciliation_required",
+            message_key=f"{'qq_managed_auth' if self._uses_qq_managed_credentials() else 'discord_auth'}.error.action_required",
+            operation_status=None,
         )
-        if resolution.selected_source != OpenRouterCredentialSource.MANAGED:
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.STOP,
-                message_key="managed_release.stop",
-            )
-        if resolution.api_key is not None:
-            pending_ack_result = await self._retry_pending_delivery_ack_if_needed()
-            if pending_ack_result is not None:
-                return pending_ack_result
-            self._clear_retry_after()
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.READY,
-                api_key=resolution.api_key,
-                local_key_available=True,
-            )
-        if self._uses_qq_managed_credentials():
-            return self._qq_managed_auth_required_result()
-
-        if self._prepare_task is not None and not self._prepare_task.done():
-            prepare_result = await self._await_shared_task(
-                self._prepare_task,
-                single_flight_reused=True,
-            )
-            if prepare_result.behavior != ManagedOpenRouterReleaseBehavior.READY:
-                return prepare_result
-            if prepare_result.local_key_available or prepare_result.api_key is not None:
-                return prepare_result
-
-        if self._issue_task is not None and not self._issue_task.done():
-            return await self._await_shared_task(self._issue_task, single_flight_reused=True)
-
-        if _normalize_optional_text(self.managed_state.release_token) is None:
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.RESTART,
-                message_key="managed_release.restart",
-            )
-
-        retry_result = self._result_for_retry_after_window()
-        if retry_result is not None:
-            return retry_result
-
-        return await self._await_or_start_issue_flow()
-
-    async def refresh_managed_status(self) -> ManagedOpenRouterStatusRefreshResult:
-        """Best-effort status refresh for owned Pass ID and live pass status."""
-
-        observed_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
-        observed_source = _managed_referral_source(
-            getattr(self.managed_state, "referral_source", None),
-            observed_referral_id,
-        )
-        observed_credential_ref = _normalize_optional_text(
-            self.managed_state.active_managed_credential_ref
-        )
-        if self._closed:
-            return ManagedOpenRouterStatusRefreshResult(
-                referral_id=observed_referral_id,
-                succeeded=False,
-            )
-        if self.openrouter_config.selected_source != OpenRouterCredentialSource.MANAGED:
-            return ManagedOpenRouterStatusRefreshResult(
-                referral_id=observed_referral_id,
-                succeeded=False,
-            )
-
-        current_task = asyncio.current_task()
-        if current_task is not None:
-            self._status_refresh_tasks.add(current_task)
-        try:
-            status_source = "qq" if observed_source == "qq" else "discord"
-            try:
-                if status_source == "qq":
-                    auth = _parse_qq_status_auth_secret(
-                        self.secrets.get(OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET)
-                    )
-                    if auth is None:
-                        return ManagedOpenRouterStatusRefreshResult(
-                            referral_id=observed_referral_id,
-                            succeeded=False,
-                        )
-                    qq_identity, credential, auth_credential_ref = auth
-                    if (
-                        auth_credential_ref is None
-                        or auth_credential_ref != observed_credential_ref
-                    ):
-                        return ManagedOpenRouterStatusRefreshResult(
-                            referral_id=observed_referral_id,
-                            succeeded=False,
-                        )
-                    status_response = await self.client.get_qq_managed_status(
-                        QqManagedStatusRequest(
-                            qq_identity=qq_identity,
-                            credential=credential,
-                            installation_id=_normalize_optional_text(
-                                self.managed_state.installation_id
-                            ),
-                        )
-                    )
-                else:
-                    bundle = load_existing_managed_identity_bundle(
-                        self.managed_state,
-                        self.secrets,
-                    )
-                    if bundle is None:
-                        return ManagedOpenRouterStatusRefreshResult(
-                            referral_id=observed_referral_id,
-                            succeeded=False,
-                        )
-                    signed_request = bundle.sign_status_request(timestamp=self.signed_at_provider())
-                    status_response = await self.client.get_trial_status(
-                        installation_id=signed_request["installation_id"],
-                        timestamp=signed_request["timestamp"],
-                        signature=signed_request["signature"],
-                    )
-            except Exception:
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=normalize_owned_referral_id(self.managed_state.referral_id),
-                    succeeded=False,
-                )
-
-            if self._closed:
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=normalize_owned_referral_id(self.managed_state.referral_id),
-                    succeeded=False,
-                )
-            returned_referral_id = normalize_owned_referral_id(
-                getattr(status_response, "referral_id", None)
-            )
-            latest_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
-            latest_source = _managed_referral_source(
-                getattr(self.managed_state, "referral_source", None),
-                latest_referral_id,
-            )
-            latest_credential_ref = _normalize_optional_text(
-                self.managed_state.active_managed_credential_ref
-            )
-            pass_status = getattr(status_response, "pass_status", None)
-            if not isinstance(pass_status, TalkTogetherPassStatus):
-                pass_status = None
-            if (
-                latest_referral_id != observed_referral_id
-                or latest_source != observed_source
-                or latest_credential_ref != observed_credential_ref
-            ):
-                if pass_status is not None and pass_status.pass_id != latest_referral_id:
-                    pass_status = None
-                return ManagedOpenRouterStatusRefreshResult(
-                    referral_id=latest_referral_id,
-                    pass_status=pass_status,
-                    succeeded=True,
-                )
-
-            final_referral_id = returned_referral_id or latest_referral_id
-            previous_referral_id = self.managed_state.referral_id
-            previous_source = getattr(self.managed_state, "referral_source", None)
-            self.managed_state.referral_id = final_referral_id
-            self.managed_state.referral_source = status_source
-            if (
-                previous_referral_id != self.managed_state.referral_id
-                or previous_source != self.managed_state.referral_source
-            ):
-                try:
-                    self.managed_state.persist()
-                except Exception:
-                    self.managed_state.referral_id = previous_referral_id
-                    self.managed_state.referral_source = previous_source
-                    return ManagedOpenRouterStatusRefreshResult(
-                        referral_id=latest_referral_id,
-                        succeeded=False,
-                    )
-
-            final_referral_id = normalize_owned_referral_id(self.managed_state.referral_id)
-            if pass_status is not None and pass_status.pass_id != final_referral_id:
-                pass_status = None
-            return ManagedOpenRouterStatusRefreshResult(
-                referral_id=final_referral_id,
-                pass_status=pass_status,
-                succeeded=True,
-            )
-        finally:
-            if current_task is not None:
-                self._status_refresh_tasks.discard(current_task)
 
     async def _retry_pending_delivery_ack_if_needed(
         self,
     ) -> ManagedOpenRouterReleaseResult | None:
-        source = _normalize_optional_text(
-            getattr(self.managed_state, "pending_delivery_ack_source", None)
-        )
-        delivery_id = _normalize_optional_text(
-            getattr(self.managed_state, "pending_delivery_ack_delivery_id", None)
-        )
-        managed_credential_ref = _normalize_optional_text(
-            getattr(self.managed_state, "pending_delivery_ack_managed_credential_ref", None)
-        )
-        expires_at = _normalize_optional_text(
-            getattr(self.managed_state, "pending_delivery_ack_expires_at", None)
-        )
-        if source is None and delivery_id is None and managed_credential_ref is None:
+        state = self.managed_state
+        source = state.pending_delivery_ack_source
+        if source is None:
             return None
-        if source not in {"discord", "qq"} or delivery_id is None or managed_credential_ref is None:
-            return self._delivery_ack_retry_result("pending_delivery_ack_metadata_incomplete")
-        token_key = _delivery_ack_token_secret_key(source)
+        if source != self._managed_source():
+            return self._managed_operation_action_required_result(
+                code="managed_other_source_pending",
+                message_key="discord_auth.error.other_source_pending",
+                operation_status=None,
+            )
+        delivery_id = state.pending_delivery_ack_delivery_id
+        ref = state.pending_delivery_ack_managed_credential_ref
         try:
-            token = self.secrets.get(token_key)
+            binding, credential, token = await run_owned_thread_call(
+                lambda: (
+                    ManagedCredentialBinding.decode(
+                        self.secrets.get(credential_binding_secret(source))
+                    ),
+                    self.secrets.get(managed_key_secret(source)),
+                    self.secrets.get(_delivery_ack_token_secret_key(source)),
+                )
+            )
         except Exception:
-            return self._delivery_ack_retry_result("pending_delivery_ack_token_read_failed")
-        if _normalize_optional_text(token) is None:
-            return self._delivery_ack_retry_result("pending_delivery_ack_token_missing")
+            return self._delivery_ack_retry_result("pending_delivery_observation_failed")
+        operation_source = state.pending_managed_operation_source
+        operation_id = state.pending_managed_operation_id
+        if (
+            not delivery_id
+            or not ref
+            or not token
+            or binding is None
+            or delivery_expired(state.pending_delivery_ack_expires_at)
+            or not binding.matches(
+                credential=credential,
+                source=source,
+                installation_id=state.installation_id,
+                operation_id=operation_id if operation_source == source else None,
+                delivery_id=delivery_id,
+                managed_credential_ref=ref,
+            )
+        ):
+            return await self._reconcile_pending_delivery()
         try:
-            ack_result = await self.client.acknowledge_managed_key_delivery(
+            ack = await self.client.acknowledge_managed_key_delivery(
                 ManagedKeyDeliveryAckRequest(
-                    delivery_id=delivery_id,
-                    managed_credential_ref=managed_credential_ref,
-                    delivery_ack_token=token,
+                    delivery_id=delivery_id, managed_credential_ref=ref, delivery_ack_token=token
                 )
             )
         except ManagedOpenRouterReleaseError as exc:
             return self._handle_release_error(exc, operation="managed_key_delivery_ack")
         except Exception:
             return self._delivery_ack_retry_result("pending_delivery_ack_request_failed")
-        if not (
-            getattr(ack_result, "succeeded", False) is True
-            and getattr(ack_result, "status", None) in {"acknowledged", "already_acknowledged"}
-        ):
-            return self._delivery_ack_retry_result(
-                _safe_diagnostic_scalar(getattr(ack_result, "status", None))
-                or "pending_delivery_ack_failed"
-            )
+        if not ack.succeeded:
+            if ack.status in {"expired", "invalid", "mismatched", "failed"}:
+                return await self._reconcile_pending_delivery()
+            return self._delivery_ack_retry_result(ack.status, diagnostics=ack.diagnostics)
+        snapshot = state.snapshot()
+        clear_operation = operation_source == source and operation_id == binding.operation_id
+        state.active_managed_credential_ref = binding.managed_credential_ref
+        state.pending_delivery_ack_source = None
+        state.pending_delivery_ack_delivery_id = None
+        state.pending_delivery_ack_managed_credential_ref = None
+        state.pending_delivery_ack_expires_at = None
+        if clear_operation:
+            state.pending_managed_operation_id = None
+            state.pending_managed_operation_source = None
+            state.pending_managed_operation_installation_id = None
+            state.pending_managed_operation_state = None
         try:
-            self.secrets.delete(token_key)
+            await run_owned_thread_call(state.persist)
+        except Exception:
+            state.restore(snapshot)
+            return self._delivery_ack_retry_result("pending_delivery_ack_clear_persist_failed")
+
+        def clear_tokens() -> None:
+            self.secrets.delete(_delivery_ack_token_secret_key(source))
+            if clear_operation:
+                self.secrets.delete(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+
+        try:
+            await run_owned_thread_call(clear_tokens)
         except Exception:
             return self._delivery_ack_retry_result("pending_delivery_ack_token_clear_failed")
-        previous_referral_id = self.managed_state.referral_id
-        previous_referral_source = getattr(self.managed_state, "referral_source", None)
-        previous_normalized_referral_id = normalize_owned_referral_id(previous_referral_id)
-        if source in {"discord", "qq"}:
-            if (
-                _managed_referral_source(
-                    previous_referral_source,
-                    previous_normalized_referral_id,
-                )
-                != source
-            ):
-                self.managed_state.referral_id = None
-            self.managed_state.referral_source = source
-            acknowledged_referral_id = normalize_owned_referral_id(
-                getattr(ack_result, "referral_id", None)
-            )
-            if acknowledged_referral_id is not None:
-                self.managed_state.referral_id = acknowledged_referral_id
-        self.managed_state.pending_delivery_ack_source = None
-        self.managed_state.pending_delivery_ack_delivery_id = None
-        self.managed_state.pending_delivery_ack_managed_credential_ref = None
-        self.managed_state.pending_delivery_ack_expires_at = None
-        previous_operation_id = getattr(self.managed_state, "pending_managed_operation_id", None)
-        previous_operation_source = getattr(
-            self.managed_state, "pending_managed_operation_source", None
-        )
-        previous_operation_installation_id = getattr(
-            self.managed_state, "pending_managed_operation_installation_id", None
-        )
-        previous_operation_state = getattr(
-            self.managed_state, "pending_managed_operation_state", None
-        )
-        self.managed_state.pending_managed_operation_id = None
-        self.managed_state.pending_managed_operation_source = None
-        self.managed_state.pending_managed_operation_installation_id = None
-        self.managed_state.pending_managed_operation_state = None
-        try:
-            self.managed_state.persist()
-        except Exception:
-            self.managed_state.referral_id = previous_referral_id
-            self.managed_state.referral_source = previous_referral_source
-            self.managed_state.pending_delivery_ack_source = source
-            self.managed_state.pending_delivery_ack_delivery_id = delivery_id
-            self.managed_state.pending_delivery_ack_managed_credential_ref = managed_credential_ref
-            self.managed_state.pending_delivery_ack_expires_at = expires_at
-            self.managed_state.pending_managed_operation_id = previous_operation_id
-            self.managed_state.pending_managed_operation_source = previous_operation_source
-            self.managed_state.pending_managed_operation_installation_id = (
-                previous_operation_installation_id
-            )
-            self.managed_state.pending_managed_operation_state = previous_operation_state
-            try:
-                self.secrets.set(token_key, token)
-            except Exception:
-                return self._delivery_ack_retry_result("pending_delivery_ack_token_restore_failed")
-            return self._delivery_ack_retry_result("pending_delivery_ack_clear_persist_failed")
-        with contextlib.suppress(Exception):
-            self.secrets.delete(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
         return None
 
-    def _delivery_ack_retry_result(self, code: str) -> ManagedOpenRouterReleaseResult:
+    def _delivery_ack_retry_result(
+        self, code: str, *, diagnostics: ErrorDiagnostics | None = None
+    ) -> ManagedOpenRouterReleaseResult:
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.RETRY,
@@ -881,20 +616,34 @@ class ManagedOpenRouterReleaseService:
                 operation="managed_key_delivery_ack",
                 code=code,
                 error_class="retryable",
+                failure_diagnostics=diagnostics,
             ),
         )
-
-    async def refresh_owned_referral_id_from_status(self) -> str | None:
-        """Best-effort signed status refresh for the persisted owned Referral ID."""
-
-        return (await self.refresh_managed_status()).referral_id
 
     async def _run_prepare_flow(
         self,
         *,
-        referral_id: str | None = None,
         allow_authorization: bool = True,
     ) -> ManagedOpenRouterReleaseResult:
+        if self.selected_source != OpenRouterCredentialSource.MANAGED:
+            return ManagedOpenRouterReleaseResult(behavior=ManagedOpenRouterReleaseBehavior.STOP)
+        pending_source = self.managed_state.pending_managed_operation_source
+        if (
+            pending_source is not None
+            and pending_source != self._managed_source()
+            and (self.managed_state.pending_delivery_ack_source != self._managed_source())
+        ):
+            return self._managed_operation_action_required_result(
+                code="managed_other_source_pending",
+                message_key="discord_auth.error.other_source_pending",
+                operation_status=None,
+            )
+        pending_ack_result = await self._retry_pending_delivery_ack_if_needed()
+        if pending_ack_result is not None:
+            return pending_ack_result
+        pending_operation_result = await self._recover_pending_managed_operation()
+        if pending_operation_result is not None:
+            return pending_operation_result
         resolution = resolve_openrouter_credentials(
             self._credential_runtime_config(),
             secrets=self.secrets,
@@ -918,10 +667,6 @@ class ManagedOpenRouterReleaseService:
         if self._uses_qq_managed_credentials():
             return self._qq_managed_auth_required_result()
 
-        pending_operation_result = await self._recover_pending_managed_operation()
-        if pending_operation_result is not None:
-            return pending_operation_result
-
         if (
             not allow_authorization
             and _normalize_optional_text(self.managed_state.release_token) is None
@@ -931,9 +676,8 @@ class ManagedOpenRouterReleaseService:
                 message_key="discord_auth.error.action_required",
             )
 
-        bundle = ensure_managed_identity_bundle(
-            self.managed_state,
-            self.secrets,
+        bundle = await run_owned_thread_call(
+            partial(ensure_managed_identity_bundle, self.managed_state, self.secrets)
         )
         retry_result = self._result_for_retry_after_window()
         if retry_result is not None:
@@ -975,7 +719,6 @@ class ManagedOpenRouterReleaseService:
                     device_public_key=bundle.device_public_key,
                     redirect_uri=listener.redirect_uri,
                     app_version=self.app_version,
-                    referral_id=referral_id,
                 )
             except ManagedOpenRouterReleaseError as exc:
                 return self._handle_release_error(exc, operation="discord_start")
@@ -986,6 +729,18 @@ class ManagedOpenRouterReleaseService:
                         code="discord_redirect_mismatch",
                         error_class="terminal",
                         message="Discord OAuth broker returned a different redirect URI",
+                        operation="discord_start",
+                    ),
+                    operation="discord_start",
+                )
+            try:
+                register_discord_oauth_expected_state(listener, start_response.authorization_url)
+            except DiscordOAuthStateError:
+                return self._handle_release_error(
+                    ManagedOpenRouterReleaseError(
+                        code="discord_oauth_state_invalid",
+                        error_class="terminal",
+                        message="Discord OAuth authorization state is invalid",
                         operation="discord_start",
                     ),
                     operation="discord_start",
@@ -1001,6 +756,16 @@ class ManagedOpenRouterReleaseService:
                 raise
             except ManagedOpenRouterReleaseError as exc:
                 return self._handle_release_error(exc, operation="discord_callback")
+            except DiscordOAuthBrowserLaunchError:
+                return self._handle_release_error(
+                    ManagedOpenRouterReleaseError(
+                        code="discord_browser_launch_failed",
+                        error_class="terminal",
+                        message="Discord authorization browser could not open",
+                        operation="discord_callback",
+                    ),
+                    operation="discord_callback",
+                )
             except (
                 DiscordOAuthCallbackError,
                 DiscordOAuthLoopbackClosedError,
@@ -1036,7 +801,9 @@ class ManagedOpenRouterReleaseService:
                 signed_at=self.signed_at_provider(),
             )
             issue_request["delivery_ack_supported"] = True
-            assured_operation = self._ensure_pending_managed_operation(bundle.installation_id)
+            assured_operation = await run_owned_thread_call(
+                partial(self._ensure_pending_managed_operation, bundle.installation_id)
+            )
             if assured_operation is None:
                 self._clear_retry_after()
                 return ManagedOpenRouterReleaseResult(
@@ -1049,12 +816,24 @@ class ManagedOpenRouterReleaseService:
             try:
                 issue_response = await self.client.issue_discord_managed_key(issue_request)
             except ManagedOpenRouterReleaseError as exc:
-                if exc.error_class == "retryable":
+                if (
+                    exc.error_class == "retryable"
+                    and exc.subcode
+                    not in {"oauth_session_expired", "discord_oauth_session_expired"}
+                    and not (
+                        exc.failure_diagnostics is not None
+                        and exc.failure_diagnostics.fields.get("dispatch_certainty")
+                        == "not_dispatched"
+                    )
+                ):
                     return self._managed_operation_recovering_result(
                         operation="discord_issue",
                         code="discord_issue_transport_failure",
                     )
-                self._clear_pending_managed_operation()
+                await run_owned_thread_call(self._clear_pending_managed_operation)
+                if exc.subcode in {"oauth_session_expired", "discord_oauth_session_expired"}:
+                    clear_temporary_managed_release_state(self.managed_state)
+                    await run_owned_thread_call(self.managed_state.persist)
                 return self._handle_release_error(exc, operation="discord_issue")
 
             return await self._persist_managed_issue_success(issue_response)
@@ -1090,10 +869,11 @@ class ManagedOpenRouterReleaseService:
             try:
                 stored_token = self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
             except Exception:
-                stored_token = None
+                return None
             if is_valid_resume_token(stored_token):
                 return (pending_id, stored_token)
-        self._clear_pending_managed_operation()
+        if pending_id is not None:
+            return None
         operation_id = new_managed_operation_id()
         resume_token = new_managed_operation_resume_token()
         try:
@@ -1112,15 +892,35 @@ class ManagedOpenRouterReleaseService:
             return None
         return (operation_id, resume_token)
 
-    def _clear_pending_managed_operation(self) -> None:
+    def _clear_pending_managed_operation(self, *, preserve_active_credential: bool = False) -> None:
+        source = self._managed_source()
+        if self.managed_state.pending_managed_operation_source not in {None, source}:
+            return
+        previous = self.managed_state.snapshot()
         try:
+            if not preserve_active_credential and self.managed_state.active_managed_credential_ref:
+                clear_failed_managed_credential_projection(
+                    self.managed_state,
+                    source=source,
+                    binding=ManagedCredentialBinding.decode(
+                        self.secrets.get(credential_binding_secret(source))
+                    ),
+                    credential=self.secrets.get(managed_key_secret(source)),
+                )
             self.managed_state.pending_managed_operation_id = None
             self.managed_state.pending_managed_operation_source = None
             self.managed_state.pending_managed_operation_installation_id = None
             self.managed_state.pending_managed_operation_state = None
             self.managed_state.persist()
+            if self.managed_state.pending_delivery_ack_source == source:
+                self.managed_state.pending_delivery_ack_source = None
+                self.managed_state.pending_delivery_ack_delivery_id = None
+                self.managed_state.pending_delivery_ack_managed_credential_ref = None
+                self.managed_state.pending_delivery_ack_expires_at = None
+                self.managed_state.persist()
         except Exception:
-            pass
+            self.managed_state.restore(previous)
+            return
         try:
             self.secrets.delete(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
         except Exception:
@@ -1159,10 +959,19 @@ class ManagedOpenRouterReleaseService:
                     operation_id=operation_id,
                     installation_id=installation_id,
                     resume_token=resume_token,
+                    source=self._managed_source(),
                 )
             )
-        except Exception:
-            return None
+        except Exception as exc:
+            return ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="CREATE_UNKNOWN",
+                client_action="wait",
+                diagnostics=getattr(exc, "failure_diagnostics", None)
+                or provider_failure_report(
+                    exc, provider="openrouter", operation="provider_build"
+                ).diagnostics,
+            )
 
     async def _resume_managed_operation(
         self, operation_id: str, resume_token: str, installation_id: str
@@ -1176,117 +985,211 @@ class ManagedOpenRouterReleaseService:
                     operation_id=operation_id,
                     installation_id=installation_id,
                     resume_token=resume_token,
+                    source=self._managed_source(),
                 )
             )
-        except Exception:
-            return None
+        except Exception as exc:
+            return ManagedOperationStatusResult(
+                succeeded=False,
+                operation_status="CREATE_UNKNOWN",
+                client_action="wait",
+                diagnostics=getattr(exc, "failure_diagnostics", None)
+                or provider_failure_report(
+                    exc, provider="openrouter", operation="provider_build"
+                ).diagnostics,
+            )
 
     async def _recover_pending_managed_operation(
         self,
     ) -> ManagedOpenRouterReleaseResult | None:
-        operation_id = _normalize_optional_text(
-            getattr(self.managed_state, "pending_managed_operation_id", None)
-        )
-        source = _normalize_optional_text(
-            getattr(self.managed_state, "pending_managed_operation_source", None)
-        )
-        installation_id = _normalize_optional_text(
-            getattr(self.managed_state, "pending_managed_operation_installation_id", None)
-        )
-        if (
-            not is_valid_operation_id(operation_id)
-            or source != MANAGED_OPERATION_SOURCE_DISCORD
-            or not installation_id
-        ):
+        state = self.managed_state
+        operation_id = state.pending_managed_operation_id
+        source = state.pending_managed_operation_source
+        installation_id = state.pending_managed_operation_installation_id
+        if not is_valid_operation_id(operation_id) or source != self._managed_source():
             return None
+        message_prefix = "qq_managed_auth" if source == "qq" else "discord_auth"
+        if not installation_id or installation_id != state.installation_id:
+            try:
+                await run_owned_thread_call(
+                    partial(ensure_managed_identity_bundle, state, self.secrets)
+                )
+            except Exception:
+                return self._managed_operation_action_required_result(
+                    code="managed_identity_recovery_required",
+                    message_key=f"{message_prefix}.error.action_required",
+                    operation_status=None,
+                )
+            if installation_id != state.installation_id:
+                return self._managed_operation_action_required_result(
+                    code="managed_operation_installation_mismatch",
+                    message_key=f"{message_prefix}.error.action_required",
+                    operation_status=None,
+                )
         try:
-            bundle = ensure_managed_identity_bundle(self.managed_state, self.secrets)
+            token = await run_owned_thread_call(
+                lambda: self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+            )
         except Exception:
-            return None
-        if bundle.installation_id != installation_id:
-            self._clear_pending_managed_operation()
-            return None
-        try:
-            resume_token = self.secrets.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
-        except Exception:
-            resume_token = None
-        if not is_valid_resume_token(resume_token):
-            self._clear_pending_managed_operation()
-            return None
-        status = await self._fetch_operation_status(operation_id, resume_token, installation_id)
+            return self._managed_operation_recovering_result(
+                operation="secret_observation", code="managed_operation_token_read_failed"
+            )
+        if not is_valid_resume_token(token):
+            return self._managed_operation_action_required_result(
+                code="managed_operation_resume_token_missing",
+                message_key=f"{message_prefix}.error.action_required",
+                operation_status=None,
+            )
+        status = await self._fetch_operation_status(operation_id, token, installation_id)
         if status is None:
             return self._managed_operation_recovering_result(
-                operation="managed_operation_status",
-                code="managed_operation_status_unavailable",
+                operation="managed_operation_status", code="managed_operation_status_unavailable"
+            )
+        if (
+            status.succeeded
+            and status.operation_status == "DELIVERY_PENDING"
+            and status.client_action == "acknowledge_delivery"
+            and state.pending_delivery_ack_source is None
+        ):
+            delivery = status.delivery
+            ref = status.managed_credential_ref or (
+                status.attempt.managed_credential_ref if status.attempt is not None else None
+            )
+            if (
+                delivery is not None
+                and delivery.status == "pending"
+                and delivery.delivery_id
+                and delivery.expires_at
+                and not delivery_expired(delivery.expires_at)
+                and ref
+            ):
+                try:
+                    binding, credential, ack_token = await run_owned_thread_call(
+                        lambda: (
+                            ManagedCredentialBinding.decode(
+                                self.secrets.get(credential_binding_secret(source))
+                            ),
+                            self.secrets.get(managed_key_secret(source)),
+                            self.secrets.get(_delivery_ack_token_secret_key(source)),
+                        )
+                    )
+                except Exception:
+                    return self._delivery_ack_retry_result("managed_secret_read_failed")
+                if (
+                    ack_token
+                    and binding is not None
+                    and binding.matches(
+                        credential=credential,
+                        source=source,
+                        installation_id=installation_id,
+                        operation_id=operation_id,
+                        delivery_id=delivery.delivery_id,
+                        managed_credential_ref=ref,
+                    )
+                ):
+                    snapshot = state.snapshot()
+                    state.pending_delivery_ack_source = source
+                    state.pending_delivery_ack_delivery_id = delivery.delivery_id
+                    state.pending_delivery_ack_managed_credential_ref = ref
+                    state.pending_delivery_ack_expires_at = delivery.expires_at
+                    try:
+                        await run_owned_thread_call(state.persist)
+                    except Exception:
+                        state.restore(snapshot)
+                        return self._delivery_ack_retry_result("pending_metadata_persist_failed")
+                    pending = await self._retry_pending_delivery_ack_if_needed()
+                    if pending is not None:
+                        return pending
+                    return ManagedOpenRouterReleaseResult(
+                        behavior=ManagedOpenRouterReleaseBehavior.READY,
+                        api_key=credential,
+                        local_key_available=True,
+                    )
+        if (
+            status.client_action in {"retry_authorized", "acknowledge_delivery"}
+            and status.succeeded
+        ):
+            converted = _operation_status_to_issue_success(status, source=source)
+            if converted is not None:
+                return await self._persist_managed_issue_success(converted)
+            resumed = await self._resume_managed_operation(operation_id, token, installation_id)
+            if resumed is not None:
+                status = resumed
+        if status.operation_status == "FAILED" or status.client_action == "action_required":
+            if status.operation_status == "FAILED":
+                await run_owned_thread_call(self._clear_pending_managed_operation)
+            result = self._managed_operation_action_required_result(
+                code=status.failed_reason or "managed_operation_action_required",
+                message_key=f"{message_prefix}.error."
+                + (
+                    "authorization_expired"
+                    if status.failed_reason == "authorization_expired"
+                    else "action_required"
+                ),
+                operation_status=status.operation_status,
+            )
+            return replace(
+                result,
+                diagnostics=replace(result.diagnostics, failure_diagnostics=status.diagnostics),
             )
         if not status.succeeded:
             if status.operation_status == "UNKNOWN_OPERATION":
-                self._clear_pending_managed_operation()
+                await run_owned_thread_call(self._clear_pending_managed_operation)
                 return None
-            return self._managed_operation_recovering_result(
-                operation="managed_operation_status",
-                code="managed_operation_status_failed",
+            result = self._managed_operation_recovering_result(
+                operation="managed_operation_status", code="managed_operation_status_failed"
+            )
+            return replace(
+                result,
+                diagnostics=replace(result.diagnostics, failure_diagnostics=status.diagnostics),
             )
         self._record_operation_state(status.operation_status)
-        if status.operation_status == "FAILED":
-            self._clear_pending_managed_operation()
-            if status.failed_reason == "authorization_expired":
+        if status.operation_status == "ACTIVE":
+            try:
+                binding, credential = await run_owned_thread_call(
+                    lambda: (
+                        ManagedCredentialBinding.decode(
+                            self.secrets.get(credential_binding_secret(source))
+                        ),
+                        self.secrets.get(managed_key_secret(source)),
+                    )
+                )
+            except Exception:
+                return self._delivery_ack_retry_result("managed_secret_read_failed")
+            ref = status.managed_credential_ref or (
+                status.attempt.managed_credential_ref if status.attempt is not None else None
+            )
+            if (
+                not ref
+                or binding is None
+                or not binding.matches(
+                    credential=credential,
+                    source=source,
+                    installation_id=installation_id,
+                    operation_id=operation_id,
+                    managed_credential_ref=ref,
+                )
+            ):
                 return self._managed_operation_action_required_result(
-                    code="managed_operation_authorization_expired",
-                    message_key="discord_auth.error.authorization_expired",
+                    code="managed_operation_active_key_unbound",
+                    message_key=f"{message_prefix}.error.action_required",
                     operation_status=status.operation_status,
                 )
-            return self._managed_operation_action_required_result(
-                code="managed_operation_action_required",
-                message_key="discord_auth.error.action_required",
-                operation_status=status.operation_status,
+            state.active_managed_credential_ref = binding.managed_credential_ref
+            await run_owned_thread_call(state.persist)
+            await run_owned_thread_call(
+                partial(self._clear_pending_managed_operation, preserve_active_credential=True)
             )
-        if status.operation_status == "ACTIVE":
-            self._clear_pending_managed_operation()
-            return self._managed_operation_action_required_result(
-                code="managed_operation_active_key_missing",
-                message_key="discord_auth.error.action_required",
-                operation_status=status.operation_status,
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.READY,
+                api_key=credential,
+                local_key_available=True,
             )
-        if status.client_action == "retry_authorized":
-            resumed = await self._resume_managed_operation(
-                operation_id, resume_token, installation_id
-            )
-            if resumed is not None and resumed.succeeded:
-                self._record_operation_state(resumed.operation_status)
-                if resumed.operation_status == "FAILED":
-                    self._clear_pending_managed_operation()
-                    return self._managed_operation_action_required_result(
-                        code="managed_operation_action_required",
-                        message_key="discord_auth.error.action_required",
-                        operation_status=resumed.operation_status,
-                    )
-                issue_success = _operation_status_to_issue_success(resumed)
-                if issue_success is not None:
-                    return await self._persist_managed_issue_success(issue_success)
-            return self._managed_operation_recovering_result(
-                operation="managed_operation_resume",
-                code="managed_operation_resume_pending",
-            )
-        if status.client_action == "acknowledge_delivery":
-            resumed = await self._resume_managed_operation(
-                operation_id, resume_token, installation_id
-            )
-            if resumed is not None and resumed.succeeded:
-                self._record_operation_state(resumed.operation_status)
-                issue_success = _operation_status_to_issue_success(resumed)
-                if issue_success is not None:
-                    return await self._persist_managed_issue_success(issue_success)
-            return self._managed_operation_recovering_result(
-                operation="managed_operation_resume",
-                code="managed_operation_delivery_reconciling",
-            )
-        issue_success = _operation_status_to_issue_success(status)
-        if issue_success is not None:
-            return await self._persist_managed_issue_success(issue_success)
+        converted = _operation_status_to_issue_success(status, source=source)
+        if converted is not None:
+            return await self._persist_managed_issue_success(converted)
         return self._managed_operation_recovering_result(
-            operation="managed_operation_status",
-            code="managed_operation_recovery_pending",
+            operation="managed_operation_status", code="managed_operation_recovery_pending"
         )
 
     def _managed_operation_recovering_result(
@@ -1349,9 +1252,8 @@ class ManagedOpenRouterReleaseService:
     async def _run_issue_flow(self) -> ManagedOpenRouterReleaseResult:
         if self._uses_qq_managed_credentials():
             return self._qq_managed_auth_required_result()
-        bundle = ensure_managed_identity_bundle(
-            self.managed_state,
-            self.secrets,
+        bundle = await run_owned_thread_call(
+            partial(ensure_managed_identity_bundle, self.managed_state, self.secrets)
         )
         release_token = _normalize_optional_text(self.managed_state.release_token)
         if release_token is None:
@@ -1379,237 +1281,177 @@ class ManagedOpenRouterReleaseService:
         try:
             issue_response = await self.client.issue(issue_request)
         except ManagedOpenRouterReleaseError as exc:
+            if exc.code == "managed_delivery_protocol_mismatch":
+                clear_temporary_managed_release_state(self.managed_state)
+                await run_owned_thread_call(self.managed_state.persist)
+                self._clear_retry_after()
+                return ManagedOpenRouterReleaseResult(
+                    behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                    message_key="discord_auth.error.action_required",
+                    diagnostics=exc.to_diagnostics(),
+                )
             return self._handle_release_error(exc, operation="issue")
 
         return await self._persist_managed_issue_success(issue_response)
 
-    async def _persist_managed_issue_success(
-        self,
-        issue_response: ManagedOpenRouterIssueSuccess,
+    async def _persist_legacy_issue_success(
+        self, issue_response: ManagedOpenRouterIssueSuccess
     ) -> ManagedOpenRouterReleaseResult:
-        delivery_id = _normalize_optional_text(issue_response.delivery_id)
-        managed_credential_ref = _normalize_optional_text(issue_response.managed_credential_ref)
-        delivery_ack_token = _normalize_optional_text(issue_response.delivery_ack_token)
-        delivery_ack_expires_at = _normalize_optional_text(issue_response.delivery_ack_expires_at)
-        if issue_response.delivery_ack_required:
-            if delivery_id is None or managed_credential_ref is None or delivery_ack_token is None:
-                self._clear_retry_after()
-                return self._delivery_ack_retry_result("delivery_ack_metadata_malformed")
+        state = self.managed_state
+        source = self._managed_source()
+        snapshot = state.snapshot()
+        keys = (
+            managed_key_secret(source),
+            credential_binding_secret(source),
+            "openrouter_managed_user_id",
+            "openrouter_managed_user_installation_id",
+        )
+
+        def store_legacy_delivery() -> None:
+            previous = {key: self.secrets.get(key) for key in keys}
             try:
-                self.secrets.set(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET, delivery_ack_token)
-            except Exception:
-                self._clear_retry_after()
-                return self._delivery_ack_retry_result(
-                    "delivery_ack_token_store_failed_before_local_key_write"
+                self.secrets.set(managed_key_secret(source), issue_response.openrouter_api_key)
+                best_effort_store_managed_openrouter_user_identifier(
+                    self._credential_runtime_config(),
+                    secrets=self.secrets,
+                    openrouter_user_id=issue_response.openrouter_user_id,
                 )
-            best_effort_store_managed_openrouter_user_identifier(
-                self._credential_runtime_config(),
-                secrets=self.secrets,
-                openrouter_user_id=issue_response.openrouter_user_id,
-            )
-            store_managed_entitlement_snapshot(
-                self.managed_state,
-                managed_credential_ref=issue_response.managed_credential_ref,
-                expires_at=issue_response.expires_at,
-            )
-            final_referral_id = _apply_discord_owned_referral_result(
-                self.managed_state,
-                issue_response.referral_id,
-            )
-            pass_status = issue_response.pass_status
-            if pass_status is not None and pass_status.pass_id != final_referral_id:
-                pass_status = None
-            clear_temporary_managed_release_state(self.managed_state)
-            self.managed_state.pending_delivery_ack_source = "discord"
-            self.managed_state.pending_delivery_ack_delivery_id = delivery_id
-            self.managed_state.pending_delivery_ack_managed_credential_ref = managed_credential_ref
-            self.managed_state.pending_delivery_ack_expires_at = delivery_ack_expires_at
-            try:
-                self.managed_state.persist()
-            except Exception:
-                with contextlib.suppress(Exception):
-                    self.secrets.delete(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET)
-                self._clear_retry_after()
-                return self._delivery_ack_retry_result("delivery_ack_pending_persist_failed")
-            try:
-                self.secrets.set(
-                    OPENROUTER_MANAGED_API_KEY_SECRET, issue_response.openrouter_api_key
+                store_managed_entitlement_snapshot(
+                    state,
+                    managed_credential_ref=issue_response.managed_credential_ref,
+                    expires_at=issue_response.expires_at,
                 )
+                clear_temporary_managed_release_state(state)
+                self.secrets.delete(credential_binding_secret(source))
+                state.persist()
             except Exception:
-                self._clear_retry_after()
-                return self._delivery_ack_retry_result("delivery_ack_local_key_store_failed")
-            try:
-                ack_result = await self.client.acknowledge_managed_key_delivery(
-                    ManagedKeyDeliveryAckRequest(
-                        delivery_id=delivery_id,
-                        managed_credential_ref=managed_credential_ref,
-                        delivery_ack_token=delivery_ack_token,
-                    )
-                )
-            except ManagedOpenRouterReleaseError as exc:
-                return self._handle_release_error(exc, operation="managed_key_delivery_ack")
-            except Exception:
-                return self._delivery_ack_retry_result("delivery_ack_request_failed")
-            if not (
-                getattr(ack_result, "succeeded", False) is True
-                and getattr(ack_result, "status", None) in {"acknowledged", "already_acknowledged"}
-            ):
-                return self._delivery_ack_retry_result(
-                    _safe_diagnostic_scalar(getattr(ack_result, "status", None))
-                    or "delivery_ack_failed"
-                )
-            try:
-                self.secrets.delete(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET)
-            except Exception:
-                return self._delivery_ack_retry_result("delivery_ack_token_clear_failed")
-            self.managed_state.pending_delivery_ack_source = None
-            self.managed_state.pending_delivery_ack_delivery_id = None
-            self.managed_state.pending_delivery_ack_managed_credential_ref = None
-            self.managed_state.pending_delivery_ack_expires_at = None
-            try:
-                self.managed_state.persist()
-            except Exception:
-                with contextlib.suppress(Exception):
-                    self.secrets.set(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET, delivery_ack_token)
-                self.managed_state.pending_delivery_ack_source = "discord"
-                self.managed_state.pending_delivery_ack_delivery_id = delivery_id
-                self.managed_state.pending_delivery_ack_managed_credential_ref = (
-                    managed_credential_ref
-                )
-                self.managed_state.pending_delivery_ack_expires_at = delivery_ack_expires_at
-                return self._delivery_ack_retry_result("delivery_ack_clear_persist_failed")
-            self._clear_pending_managed_operation()
-            self._clear_retry_after()
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.READY,
-                api_key=issue_response.openrouter_api_key,
-                local_key_available=True,
-                referral_bonus_applied=issue_response.referral_bonus_applied is True,
-                referral_id=final_referral_id,
-                pass_status=pass_status,
-            )
+                try:
+                    for key, value in previous.items():
+                        if value is None:
+                            self.secrets.delete(key)
+                        else:
+                            self.secrets.set(key, value)
+                finally:
+                    state.restore(snapshot)
+                    clear_temporary_managed_release_state(state)
+                    try:
+                        state.persist()
+                    except Exception:
+                        state.restore(snapshot)
+                raise
+
         try:
-            self.secrets.set(OPENROUTER_MANAGED_API_KEY_SECRET, issue_response.openrouter_api_key)
-        except Exception:
-            if issue_response.delivery_ack_required:
-                with contextlib.suppress(Exception):
-                    self.secrets.delete(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET)
-            previous_release_token = self.managed_state.release_token
-            previous_release_token_expires_at = self.managed_state.release_token_expires_at
-            previous_verified_hardware_hash = self.managed_state.verified_hardware_hash
-            previous_verified_hardware_hash_salt_version = (
-                self.managed_state.verified_hardware_hash_salt_version
-            )
-            try:
-                self.secrets.delete(OPENROUTER_MANAGED_API_KEY_SECRET)
-            except Exception:
-                pass
-            clear_temporary_managed_release_state(self.managed_state)
-            try:
-                self.managed_state.persist()
-            except Exception:
-                self.managed_state.release_token = previous_release_token
-                self.managed_state.release_token_expires_at = previous_release_token_expires_at
-                self.managed_state.verified_hardware_hash = previous_verified_hardware_hash
-                self.managed_state.verified_hardware_hash_salt_version = (
-                    previous_verified_hardware_hash_salt_version
-                )
-            self._clear_retry_after()
+            await run_owned_thread_call(store_legacy_delivery)
+        except Exception as exc:
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.STOP,
                 message_key="managed_release.stop",
+                diagnostics=ManagedOpenRouterReleaseDiagnostics(
+                    operation="issue",
+                    code="managed_legacy_delivery_store_failed",
+                    error_class="terminal",
+                    failure_diagnostics=provider_failure_report(
+                        exc, provider="openrouter", operation="provider_build"
+                    ).diagnostics,
+                ),
             )
-        best_effort_store_managed_openrouter_user_identifier(
-            self._credential_runtime_config(),
-            secrets=self.secrets,
-            openrouter_user_id=issue_response.openrouter_user_id,
-        )
-        store_managed_entitlement_snapshot(
-            self.managed_state,
-            managed_credential_ref=issue_response.managed_credential_ref,
-            expires_at=issue_response.expires_at,
-        )
-        final_referral_id = _apply_discord_owned_referral_result(
-            self.managed_state,
-            issue_response.referral_id,
-        )
-        pass_status = issue_response.pass_status
-        if pass_status is not None and pass_status.pass_id != final_referral_id:
-            pass_status = None
-        clear_temporary_managed_release_state(self.managed_state)
-        if issue_response.delivery_ack_required:
-            self.managed_state.pending_delivery_ack_source = "discord"
-            self.managed_state.pending_delivery_ack_delivery_id = delivery_id
-            self.managed_state.pending_delivery_ack_managed_credential_ref = managed_credential_ref
-            self.managed_state.pending_delivery_ack_expires_at = delivery_ack_expires_at
-            try:
-                self.managed_state.persist()
-            except Exception:
-                with contextlib.suppress(Exception):
-                    self.secrets.delete(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET)
-                    self.secrets.delete(OPENROUTER_MANAGED_API_KEY_SECRET)
-                self._clear_retry_after()
-                return self._delivery_ack_retry_result("delivery_ack_pending_persist_failed")
-            try:
-                ack_result = await self.client.acknowledge_managed_key_delivery(
-                    ManagedKeyDeliveryAckRequest(
-                        delivery_id=delivery_id,
-                        managed_credential_ref=managed_credential_ref,
-                        delivery_ack_token=delivery_ack_token,
-                    )
-                )
-            except ManagedOpenRouterReleaseError as exc:
-                return self._handle_release_error(exc, operation="managed_key_delivery_ack")
-            except Exception:
-                return self._delivery_ack_retry_result("delivery_ack_request_failed")
-            if not (
-                getattr(ack_result, "succeeded", False) is True
-                and getattr(ack_result, "status", None) in {"acknowledged", "already_acknowledged"}
-            ):
-                return self._delivery_ack_retry_result(
-                    _safe_diagnostic_scalar(getattr(ack_result, "status", None))
-                    or "delivery_ack_failed"
-                )
-            try:
-                self.secrets.delete(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET)
-            except Exception:
-                return self._delivery_ack_retry_result("delivery_ack_token_clear_failed")
-            self.managed_state.pending_delivery_ack_source = None
-            self.managed_state.pending_delivery_ack_delivery_id = None
-            self.managed_state.pending_delivery_ack_managed_credential_ref = None
-            self.managed_state.pending_delivery_ack_expires_at = None
-            try:
-                self.managed_state.persist()
-            except Exception:
-                with contextlib.suppress(Exception):
-                    self.secrets.set(DISCORD_MANAGED_DELIVERY_ACK_TOKEN_SECRET, delivery_ack_token)
-                self.managed_state.pending_delivery_ack_source = "discord"
-                self.managed_state.pending_delivery_ack_delivery_id = delivery_id
-                self.managed_state.pending_delivery_ack_managed_credential_ref = (
-                    managed_credential_ref
-                )
-                self.managed_state.pending_delivery_ack_expires_at = delivery_ack_expires_at
-                return self._delivery_ack_retry_result("delivery_ack_clear_persist_failed")
-            self._clear_pending_managed_operation()
-            self._clear_retry_after()
-            return ManagedOpenRouterReleaseResult(
-                behavior=ManagedOpenRouterReleaseBehavior.READY,
-                api_key=issue_response.openrouter_api_key,
-                local_key_available=True,
-                referral_bonus_applied=issue_response.referral_bonus_applied is True,
-                referral_id=final_referral_id,
-                pass_status=pass_status,
-            )
-        self.managed_state.persist()
-        self._clear_pending_managed_operation()
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
             api_key=issue_response.openrouter_api_key,
             local_key_available=True,
-            referral_bonus_applied=issue_response.referral_bonus_applied is True,
-            referral_id=final_referral_id,
-            pass_status=pass_status,
+        )
+
+    async def _persist_managed_issue_success(
+        self,
+        issue_response: ManagedOpenRouterIssueSuccess,
+    ) -> ManagedOpenRouterReleaseResult:
+        if not issue_response.delivery_ack_required:
+            if self.managed_state.pending_managed_operation_id is not None:
+                return self._managed_operation_action_required_result(
+                    code="managed_delivery_contract_missing",
+                    message_key="discord_auth.error.action_required",
+                    operation_status=None,
+                )
+            return await self._persist_legacy_issue_success(issue_response)
+        source = self._managed_source()
+        state = self.managed_state
+        binding = None
+        if issue_response.delivery_ack_required:
+            try:
+                if (
+                    state.pending_managed_operation_source != source
+                    or not is_valid_operation_id(state.pending_managed_operation_id)
+                    or not issue_response.delivery_ack_token
+                ):
+                    raise ValueError("managed delivery has no operation authority")
+                binding = ManagedCredentialBinding.create(
+                    source=source,
+                    installation_id=state.installation_id,
+                    operation_id=state.pending_managed_operation_id,
+                    delivery_id=issue_response.delivery_id or "",
+                    managed_credential_ref=issue_response.managed_credential_ref or "",
+                    credential=issue_response.openrouter_api_key,
+                )
+            except ValueError:
+                clear_temporary_managed_release_state(state)
+                await run_owned_thread_call(state.persist)
+                return self._managed_operation_action_required_result(
+                    code="managed_delivery_protocol_mismatch",
+                    message_key="discord_auth.error.action_required",
+                    operation_status=None,
+                )
+
+        snapshot = state.snapshot()
+
+        def store_delivery() -> None:
+            self.secrets.set(managed_key_secret(source), issue_response.openrouter_api_key)
+            if binding is not None:
+                observed = self.secrets.get(managed_key_secret(source))
+                if observed != issue_response.openrouter_api_key:
+                    raise ValueError("managed credential persistence is unconfirmed")
+                self.secrets.set(credential_binding_secret(source), binding.encode())
+                self.secrets.set(
+                    _delivery_ack_token_secret_key(source), issue_response.delivery_ack_token or ""
+                )
+                state.pending_delivery_ack_source = source
+                state.pending_delivery_ack_delivery_id = issue_response.delivery_id
+                state.pending_delivery_ack_managed_credential_ref = (
+                    issue_response.managed_credential_ref
+                )
+                state.pending_delivery_ack_expires_at = issue_response.delivery_ack_expires_at
+            if source == "discord":
+                best_effort_store_managed_openrouter_user_identifier(
+                    self._credential_runtime_config(),
+                    secrets=self.secrets,
+                    openrouter_user_id=issue_response.openrouter_user_id,
+                )
+            store_managed_entitlement_snapshot(
+                state,
+                managed_credential_ref=issue_response.managed_credential_ref,
+                expires_at=issue_response.expires_at,
+            )
+            clear_temporary_managed_release_state(state)
+            state.persist()
+
+        try:
+            await run_owned_thread_call(store_delivery)
+        except Exception:
+            state.restore(snapshot)
+            return self._delivery_ack_retry_result("managed_delivery_store_failed")
+        if issue_response.delivery_ack_required:
+            pending = await self._retry_pending_delivery_ack_if_needed()
+            if pending is not None:
+                return pending
+        else:
+            await run_owned_thread_call(
+                partial(self._clear_pending_managed_operation, preserve_active_credential=True)
+            )
+        self._clear_retry_after()
+        return ManagedOpenRouterReleaseResult(
+            behavior=ManagedOpenRouterReleaseBehavior.READY,
+            api_key=issue_response.openrouter_api_key,
+            local_key_available=True,
         )
 
     def _handle_release_error(
@@ -1621,23 +1463,36 @@ class ManagedOpenRouterReleaseService:
         diagnostics = error.to_diagnostics()
         if diagnostics.operation is None and operation is not None:
             diagnostics = replace(diagnostics, operation=operation)
-        if error.error_class == "security_fail" and error.subcode in BINDING_MISMATCH_SUBCODES:
-            try:
-                regenerate_managed_identity_bundle(
-                    self.managed_state,
-                    self.secrets,
-                )
-            except Exception:
-                self._clear_retry_after()
-                return ManagedOpenRouterReleaseResult(
-                    behavior=ManagedOpenRouterReleaseBehavior.STOP,
-                    message_key="managed_release.stop",
-                    diagnostics=diagnostics,
-                )
+        if error.subcode in {"oauth_session_expired", "discord_oauth_session_expired"}:
             self._clear_retry_after()
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.RESTART,
-                message_key="managed_release.restart",
+                message_key="discord_auth.error.expired",
+                diagnostics=diagnostics,
+            )
+        if error.code == "discord_browser_launch_failed" or (
+            error.failure_diagnostics is not None
+            and error.failure_diagnostics.fields.get("configuration_error")
+            in {
+                "unsupported_proxy_configuration",
+                "invalid_proxy_configuration",
+                "invalid_tls_configuration",
+            }
+        ):
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key=(
+                    "discord_auth.error.browser_launch_failed"
+                    if error.code == "discord_browser_launch_failed"
+                    else "discord_auth.error.network_configuration"
+                ),
+                diagnostics=diagnostics,
+            )
+        if error.error_class == "security_fail" and error.subcode in BINDING_MISMATCH_SUBCODES:
+            self._clear_retry_after()
+            return ManagedOpenRouterReleaseResult(
+                behavior=ManagedOpenRouterReleaseBehavior.STOP,
+                message_key="discord_auth.error.action_required",
                 diagnostics=diagnostics,
             )
 
@@ -1770,29 +1625,14 @@ class ManagedOpenRouterReleaseService:
 
     async def close(self) -> None:
         self._closed = True
-        status_refresh_tasks = tuple(self._status_refresh_tasks)
         self._prepare_task = None
         self._issue_task = None
-        self._status_refresh_tasks.clear()
 
         failures: list[BaseException] = []
         try:
             await self.oauth_runtime.close()
         except Exception as exc:
             failures.append(exc)
-
-        current_task = asyncio.current_task()
-        active_tasks = [
-            task
-            for task in status_refresh_tasks
-            if task is not None and not task.done() and task is not current_task
-        ]
-        for task in active_tasks:
-            task.cancel()
-        if active_tasks:
-            results = await asyncio.gather(*active_tasks, return_exceptions=True)
-            for result in results:
-                _record_close_task_result(failures, result)
 
         close_client = getattr(self.client, "close", None)
         if callable(close_client):
@@ -1964,53 +1804,16 @@ def _normalize_optional_text(value: object) -> str | None:
     return normalized or None
 
 
-def _managed_referral_source(value: object, referral_id: str | None) -> str | None:
-    normalized = _normalize_optional_text(value)
-    if normalized is not None:
-        normalized = normalized.lower()
-    if normalized in {"discord", "qq"}:
-        return normalized
-    return "discord" if referral_id is not None else None
-
-
-def _apply_discord_owned_referral_result(
-    managed_state: ManagedIdentityStatePort,
-    referral_id: object,
-) -> str | None:
-    returned_referral_id = normalize_owned_referral_id(referral_id)
-    current_referral_id = normalize_owned_referral_id(managed_state.referral_id)
-    current_source = _managed_referral_source(
-        getattr(managed_state, "referral_source", None),
-        current_referral_id,
-    )
-    if current_source != "discord":
-        managed_state.referral_id = None
-    managed_state.referral_source = "discord"
-    if returned_referral_id is not None:
-        managed_state.referral_id = returned_referral_id
-    return normalize_owned_referral_id(managed_state.referral_id)
-
-
-def _parse_qq_status_auth_secret(value: object) -> tuple[str, str, str | None] | None:
-    if not isinstance(value, str) or not value:
-        return None
-    try:
-        payload = json.loads(value)
-    except TypeError, ValueError:
-        return None
-    if not isinstance(payload, dict):
-        return None
-    qq_identity = _normalize_optional_text(payload.get("qq_identity"))
-    credential = _normalize_optional_text(payload.get("credential"))
-    managed_credential_ref = _normalize_optional_text(payload.get("managed_credential_ref"))
-    if qq_identity is None or credential is None:
-        return None
-    return qq_identity, credential, managed_credential_ref
-
-
 def _operation_status_to_issue_success(
     status: ManagedOperationStatusResult,
+    *,
+    source: str,
 ) -> ManagedOpenRouterIssueSuccess | None:
+    if status.delivery_ack is not None and (
+        status.delivery_ack.source != source
+        or status.delivery_ack.managed_credential_ref != status.managed_credential_ref
+    ):
+        return None
     if not status.succeeded or not status.managed_secret_key:
         return None
     delivery_ack = status.delivery_ack
@@ -2019,11 +1822,6 @@ def _operation_status_to_issue_success(
         managed_credential_ref=status.managed_credential_ref,
         expires_at=status.expires_at,
         openrouter_user_id=status.openrouter_user_id,
-        referral_bonus_applied=status.referral_bonus_applied,
-        referral_id=status.referral_id,
-        pass_status=(
-            status.pass_status if isinstance(status.pass_status, TalkTogetherPassStatus) else None
-        ),
         delivery_ack_required=delivery_ack is not None,
         delivery_id=delivery_ack.delivery_id if delivery_ack is not None else None,
         delivery_ack_token=delivery_ack.delivery_ack_token if delivery_ack is not None else None,

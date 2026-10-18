@@ -30,11 +30,23 @@ class PeerCaptureSourceAdapter:
         config: PeerCaptureSessionConfig,
         resolved_target: PeerCaptureResolvedTarget,
     ) -> object:
+        raw_source = self.open_raw_source(resolved_target, output_device=config.output_device)
+        return self.pipeline_factory(
+            source=self.wrap_source(raw_source),
+            target_sample_rate_hz=config.target_sample_rate_hz,
+        )
+
+    def open_raw_source(
+        self,
+        resolved_target: PeerCaptureResolvedTarget,
+        *,
+        output_device: str,
+    ) -> object:
         target = resolved_target.intent
         if target.kind == "process":
-            return self._create_process_pipeline(config, resolved_target)
+            return self._open_process_source(resolved_target)
 
-        device_name = target.device_name or config.output_device
+        device_name = target.device_name or output_device
         raw_source = self.loopback_source_factory(device_name=device_name)
         self.log_diagnostic(
             "[AudioDiag][Loopback][peer] "
@@ -45,13 +57,9 @@ class PeerCaptureSourceAdapter:
             f"actual_sample_rate_hz={getattr(raw_source, 'actual_sample_rate_hz', None)} "
             f"used_default_fallback={getattr(raw_source, 'used_default_fallback', None)}"
         )
-        return self._create_pipeline(config, raw_source)
+        return raw_source
 
-    def _create_process_pipeline(
-        self,
-        config: PeerCaptureSessionConfig,
-        resolved_target: PeerCaptureResolvedTarget,
-    ) -> object:
+    def _open_process_source(self, resolved_target: PeerCaptureResolvedTarget) -> object:
         resolution = resolved_target.capture_descriptor
         identity = getattr(resolution, "identity", resolution)
         if identity is None:
@@ -62,19 +70,9 @@ class PeerCaptureSourceAdapter:
         )
         self.log_diagnostic(
             "[AudioDiag][ProcessCapture][peer] "
-            f"target_kind={config.capture_target.process_kind} capture=process"
+            f"target_kind={resolved_target.intent.process_kind} capture=process"
         )
-        return self._create_pipeline(config, raw_source)
-
-    def _create_pipeline(
-        self,
-        config: PeerCaptureSessionConfig,
-        raw_source: object,
-    ) -> object:
-        return self.pipeline_factory(
-            source=self.wrap_source(raw_source),
-            target_sample_rate_hz=config.target_sample_rate_hz,
-        )
+        return raw_source
 
 
 __all__ = [

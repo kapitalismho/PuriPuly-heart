@@ -26,6 +26,7 @@ from puripuly_heart.core.audio.source import (
 from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import stt_failure_report
 from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 logger = logging.getLogger(__name__)
 
@@ -208,11 +209,13 @@ class ProcessAudioCaptureSource:
             self._closed = True
             if self._terminal_reason is None:
                 self._terminal_reason = "closed"
-            self._release_native_resources()
+        try:
+            await run_owned_thread_call(self._release_native_resources)
+        finally:
             self._signal_terminal()
-        self._queue.close()
-        with contextlib.suppress(Exception):
-            await self._queue.wait_closed()
+            self._queue.close()
+            with contextlib.suppress(Exception):
+                await self._queue.wait_closed()
 
     def _on_data(self, data: bytes, frames: int) -> None:
         if self._closed or self._terminal_reason is not None:

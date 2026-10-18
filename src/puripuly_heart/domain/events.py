@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Protocol, TypeAlias
+from typing import Literal, Protocol, TypeAlias
 from uuid import UUID
 
 from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
 
-from .models import ChannelId, Transcript
+from .models import ChannelId, Transcript, Translation
 
 
 def _validate_channel(channel: str) -> None:
@@ -92,8 +92,32 @@ class UIEventType(str, Enum):
     TRANSCRIPT_PARTIAL = "TRANSCRIPT_PARTIAL"
     TRANSCRIPT_FINAL = "TRANSCRIPT_FINAL"
     TRANSLATION_DONE = "TRANSLATION_DONE"
+    SELF_TURN_UPDATED = "SELF_TURN_UPDATED"
     OSC_SENT = "OSC_SENT"
     ERROR = "ERROR"
+
+
+@dataclass(frozen=True, slots=True)
+class SelfTurnTargetPresentation:
+    target_language: str
+    source_revision: int
+    status: Literal["pending", "ready", "failed", "cancelled", "expired", "source_only"]
+    translation: Translation | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SelfTurnPresentation:
+    utterance_id: UUID
+    turn_generation: int
+    turn_order: int
+    revision: int
+    source_revision: int
+    source_text: str
+    source_language: str
+    source_closed: bool
+    status: Literal["active", "complete", "failed", "cancelled", "expired"]
+    targets: tuple[SelfTurnTargetPresentation, ...]
+    created_at: float
 
 
 class UIEventDeliveryAuthority(Protocol):

@@ -47,13 +47,10 @@ class ManagedStatusRefreshOwner:
         return {
             "owner": self.owner_name,
             "resource_fields": ("_task_scope", "_task_sequence"),
-            "stop_ingress": "reject new managed status and usage refresh work",
+            "stop_ingress": "reject new managed usage refresh work",
             "shutdown_policy": "cancel and await every managed refresh task",
             "late_callback_rule": "controller refresh callbacks recheck current identity and shutdown",
         }
-
-    def schedule_status_refresh(self, work: ManagedStatusRefreshWork) -> bool:
-        return self._schedule(work, kind="status")
 
     def schedule_trial_usage_refresh(self, work: ManagedStatusRefreshWork) -> bool:
         return self._schedule(work, kind="trial_usage")

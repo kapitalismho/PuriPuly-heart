@@ -80,8 +80,9 @@ class RecordingUiMessages:
         parent_utterance_id=None,
         publication_generation=None,
         source_order=None,
+        presentation_is_current=None,
     ) -> None:
-        _ = parent_utterance_id, publication_generation, source_order
+        _ = parent_utterance_id, publication_generation, source_order, presentation_is_current
         self.events.append(event)
 
 

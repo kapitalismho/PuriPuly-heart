@@ -16,10 +16,6 @@ export interface ManagedIssuanceSourcePolicy {
   issue_source: ManagedIssueSource;
   budget_usd: number;
   uses_managed_trial_guardrail: true;
-  discord_referral_reservation: boolean;
-  owned_referral_id: boolean;
-  talk_together_pass: boolean;
-  referral_bonus_budget: boolean;
 }
 
 export interface ManagedCleanupRequiredAuditPayload {
@@ -48,15 +44,10 @@ export type ManagedCleanupOutcomeForAudit =
 export function getManagedIssuanceSourcePolicy(
   issueSource: ManagedIssueSource,
 ): ManagedIssuanceSourcePolicy {
-  const discordReferralFeatures = issueSource === 'discord';
   return {
     issue_source: issueSource,
     budget_usd: MANAGED_TRIAL_BUDGET_POLICY.hardLimit,
     uses_managed_trial_guardrail: true,
-    discord_referral_reservation: discordReferralFeatures,
-    owned_referral_id: discordReferralFeatures,
-    talk_together_pass: discordReferralFeatures,
-    referral_bonus_budget: discordReferralFeatures,
   };
 }
 

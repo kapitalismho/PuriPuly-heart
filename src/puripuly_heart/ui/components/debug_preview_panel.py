@@ -48,7 +48,6 @@ class DebugPreviewPanel(ft.Container):
         on_founder_letter: Callable[[], None],
         on_local_qwen_hallucination_modal: Callable[[], None],
         on_github_star_snackbar: Callable[[], None],
-        on_talk_together_pass_invite_progress: Callable[[], None],
         on_foundation_primitives: Callable[[], None],
         on_http_extension_form: Callable[[], None] | None = None,
         on_brake_notice: Callable[[], None] | None = None,
@@ -99,11 +98,6 @@ class DebugPreviewPanel(ft.Container):
                 "github_star_snackbar",
                 "debug_preview.github_star_snackbar",
                 on_github_star_snackbar,
-            ),
-            _PreviewAction(
-                "talk_together_pass_invite_progress",
-                "debug_preview.talk_together_pass_invite_progress",
-                on_talk_together_pass_invite_progress,
             ),
             _PreviewAction(
                 "foundation_primitives",

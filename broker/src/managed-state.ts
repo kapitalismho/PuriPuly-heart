@@ -24,16 +24,8 @@ export interface ManagedStateResponse {
     | null;
 }
 
-export interface TalkTogetherPassStatusResponse {
-  pass_id: string;
-  invite_count: number;
-  invite_limit: number;
-  bonus_translations_per_friend: number;
-}
 
 export interface TrialStatusResponse extends ManagedStateResponse {
-  referral_id?: string;
-  talk_together_pass?: TalkTogetherPassStatusResponse;
   onboarding_eligibility: {
     eligible: boolean;
     reason: 'discord_required' | OpenRouterEntitlementStatus;
@@ -87,15 +79,11 @@ export function normalizeManagedState(
 
 export function normalizeTrialStatusResponse(
   entitlement: OpenRouterEntitlementRecord | null,
-  referralId: string | null = null,
-  talkTogetherPass: TalkTogetherPassStatusResponse | null = null,
 ): TrialStatusResponse {
   const managedState = normalizeManagedState(entitlement);
 
   return {
     ...managedState,
-    ...(referralId ? { referral_id: referralId } : {}),
-    ...(talkTogetherPass ? { talk_together_pass: talkTogetherPass } : {}),
     onboarding_eligibility: {
       eligible: entitlement === null,
       reason: entitlement === null ? 'discord_required' : entitlement.status,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from uuid import uuid4
 
@@ -18,9 +19,15 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     SttEventLoopFailureDiagnostic,
     TranslationLatencyDiagnosticsOwner,
 )
+from puripuly_heart.core.orchestrator.translation_output_projection import (
+    TranslationOutputProjectionOwner,
+    TranslationUiMessageQueue,
+)
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
+from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.stt.backend import STTRecognitionUnit
-from puripuly_heart.domain.models import ChannelId, OSCMessage
+from puripuly_heart.domain.events import SelfTurnPresentation, SelfTurnTargetPresentation
+from puripuly_heart.domain.models import ChannelId, OSCMessage, Translation
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity, RecognitionUnitIdentity
 from tests.helpers.fakes import FakeSender
 
@@ -680,3 +687,217 @@ def test_owner_replaces_overlay_diagnostics_by_expected_identity() -> None:
 
     assert owner.overlay_diagnostics is second
     assert [event for event, _fields in second.records] == ["overlay_emit"]
+
+
+def _stream_latency_projection(clock, logging, sender):
+    owner = make_owner(clock=clock, runtime_logging=logging)
+    paginator = ChatboxPaginator(
+        sender=sender, clock=clock, max_chars=4, stage_recorder=owner.record_chatbox_stage
+    )
+    runtime = OutputRuntime(chatbox=paginator, clock=clock)
+    projection = TranslationOutputProjectionOwner(
+        output_runtime=runtime,
+        ui_messages=TranslationUiMessageQueue(asyncio.Queue(), runtime),
+        diagnostics=owner,
+        clock=clock,
+    )
+    return owner, paginator, runtime, projection
+
+
+def _stream_latency_snapshot(utterance_id, *, final):
+    translation = Translation(utterance_id=utterance_id, text="abcdefghijkl", target_language="en")
+    return SelfTurnPresentation(
+        utterance_id=utterance_id,
+        turn_generation=0,
+        turn_order=0,
+        revision=1,
+        source_revision=1,
+        source_text="source",
+        source_language="en",
+        source_closed=final,
+        status="complete" if final else "active",
+        targets=(SelfTurnTargetPresentation("en", 1, "ready", translation),),
+        created_at=10.0,
+    )
+
+
+@pytest.mark.asyncio
+async def test_managed_failed_first_page_releases_guard_but_retains_first_success_latency():
+    class SelectiveSender(FakeSender):
+        def send_chatbox(self, text):
+            if text != "ijkl":
+                raise OSError("send failed")
+            super().send_chatbox(text)
+
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    sender = SelectiveSender()
+    owner, paginator, runtime, projection = _stream_latency_projection(clock, logging, sender)
+    utterance_id = uuid4()
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self", utterance_id=utterance_id, stage="last_speech", timestamp=9.0
+        )
+    )
+    configuration = replace(
+        owner.config_snapshot(),
+        value=replace(owner.config_snapshot().value, chatbox_include_source=False),
+    )
+    try:
+        await projection.project_self_turn(
+            _stream_latency_snapshot(utterance_id, final=True), configuration, source="Mic"
+        )
+        owner.clear_latency_timeline("self", utterance_id)
+        clock.advance(3.0)
+        paginator.process_due()
+        assert logging.basic == []
+        clock.advance(3.0)
+        paginator.process_due()
+        assert sender.sent == ["ijkl"]
+        assert logging.basic == [
+            "[Basic][Latency] channel=self endpoint=chatbox_send last_speech_to_chatbox_send_ms=7000"
+        ]
+        dispositions = [
+            decision.reason
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        ]
+        assert dispositions == ["output_send_failed"]
+        assert owner.snapshot().timeline_keys == frozenset()
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_promoted_preview_remaining_pages_do_not_fabricate_first_final_success():
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    sender = FakeSender()
+    owner, paginator, runtime, projection = _stream_latency_projection(clock, logging, sender)
+    pages = []
+
+    def record(event, **fields):
+        if event == "page_send":
+            pages.append(
+                (fields["page_index"], fields["first_successful_page"], fields["self_turn_final"])
+            )
+        owner.record_chatbox_stage(event, **fields)
+
+    paginator.stage_recorder = record
+    utterance_id = uuid4()
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self", utterance_id=utterance_id, stage="last_speech", timestamp=9.0
+        )
+    )
+    configuration = replace(
+        owner.config_snapshot(),
+        value=replace(owner.config_snapshot().value, chatbox_include_source=False),
+    )
+    preview = _stream_latency_snapshot(utterance_id, final=False)
+    try:
+        await projection.project_self_turn(preview, configuration, source="Mic")
+        await projection.project_self_turn(
+            replace(preview, revision=2, source_closed=True, status="complete"),
+            configuration,
+            source="Mic",
+        )
+        assert sender.sent == ["abcd"]
+        clock.advance(3.0)
+        paginator.process_due()
+        assert sender.sent == ["abcd", "efgh"]
+        assert pages == [(0, True, False), (1, False, True)]
+        assert logging.basic == []
+        assert owner.snapshot().timeline_keys == frozenset()
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
+async def test_failed_preview_later_success_stays_preview_until_genuine_final_send():
+    class FailsOnceSender(FakeSender):
+        def __init__(self):
+            super().__init__()
+            self.attempted = []
+
+        def send_chatbox(self, text):
+            self.attempted.append(text)
+            if len(self.attempted) == 1:
+                raise OSError("send failed")
+            super().send_chatbox(text)
+
+    clock = FakeClock(_now=10.0)
+    logging = RuntimeLogging()
+    sender = FailsOnceSender()
+    owner, paginator, runtime, projection = _stream_latency_projection(clock, logging, sender)
+    pages = []
+
+    def record(event, **fields):
+        if event == "page_send":
+            pages.append(
+                (fields["page_index"], fields["first_successful_page"], fields["self_turn_final"])
+            )
+        owner.record_chatbox_stage(event, **fields)
+
+    paginator.stage_recorder = record
+    utterance_id = uuid4()
+    owner.record_latency_stage(
+        LatencyStageDiagnostic(
+            channel="self", utterance_id=utterance_id, stage="last_speech", timestamp=9.0
+        )
+    )
+    configuration = replace(
+        owner.config_snapshot(),
+        value=replace(owner.config_snapshot().value, chatbox_include_source=False),
+    )
+    preview = _stream_latency_snapshot(utterance_id, final=False)
+    try:
+        await projection.project_self_turn(preview, configuration, source="Mic")
+        assert sender.attempted == ["abcd"]
+        assert sender.sent == []
+        clock.advance(3.0)
+        paginator.process_due()
+        assert sender.sent == ["efgh"]
+        assert pages == [(1, True, False)]
+        assert logging.basic == []
+        clock.advance(3.0)
+        paginator.process_due()
+        assert sender.attempted == ["abcd", "efgh", "ijkl"]
+        assert sender.sent == ["efgh", "ijkl"]
+        assert pages == [(1, True, False), (2, False, False)]
+        assert not preview.source_closed and preview.status == "active"
+        assert logging.basic == []
+        assert owner.snapshot().timeline_keys == frozenset({("self", utterance_id)})
+        dispositions = [
+            decision.reason
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        ]
+        assert dispositions == ["output_send_failed"]
+        clock.advance(1.0)
+        await projection.project_self_turn(
+            replace(preview, revision=2, source_closed=True, status="complete"),
+            configuration,
+            source="Mic",
+        )
+        assert sender.sent == ["efgh", "ijkl", "abcd"]
+        assert pages[-1] == (0, True, True)
+        assert logging.basic == [
+            "[Basic][Latency] channel=self endpoint=chatbox_send last_speech_to_chatbox_send_ms=8000"
+        ]
+        clock.advance(3.0)
+        paginator.process_due()
+        clock.advance(3.0)
+        paginator.process_due()
+        assert sender.sent == ["efgh", "ijkl", "abcd", "efgh", "ijkl"]
+        assert pages[-2:] == [(1, False, True), (2, False, True)]
+        assert len(logging.basic) == 1
+        assert owner.snapshot().timeline_keys == frozenset()
+        dispositions = [
+            decision.reason
+            for decision in runtime.routing_decisions
+            if decision.metadata.get("stage") == "self_stream_delivery"
+        ]
+        assert dispositions == ["output_send_failed", "first_page_sent"]
+    finally:
+        await runtime.close()

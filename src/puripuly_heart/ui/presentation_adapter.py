@@ -112,7 +112,8 @@ class FletUiPresentationAdapter:
                 getattr(self._app, "view_dashboard", None)
             ),
             history_destination=AppHistoryEventDestination(
-                getattr(self._app, "add_history_entry", None)
+                getattr(self._app, "add_history_entry", None),
+                getattr(self._app, "view_logs", None),
             ),
             get_language_codes=getattr(self._app, "get_event_language_codes", None),
             is_translation_enabled=getattr(self._app, "is_event_translation_enabled", None),
@@ -418,32 +419,11 @@ class FletUiPresentationAdapter:
         *,
         visible: bool,
         remaining_percent: int | None,
-        referral_id: str | None,
-        pass_status: object | None,
     ) -> None:
         settings_view = getattr(self._app, "view_settings", None)
         setter = getattr(settings_view, "set_managed_key_state", None)
         if callable(setter):
-            try:
-                inspect.signature(setter).bind(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=referral_id,
-                    pass_status=pass_status,
-                )
-            except TypeError, ValueError:
-                setter(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=referral_id,
-                )
-            else:
-                setter(
-                    visible=visible,
-                    remaining_percent=remaining_percent,
-                    referral_id=referral_id,
-                    pass_status=pass_status,
-                )
+            setter(visible=visible, remaining_percent=remaining_percent)
             return
         usage_setter = getattr(settings_view, "set_managed_trial_usage_state", None)
         if callable(usage_setter):

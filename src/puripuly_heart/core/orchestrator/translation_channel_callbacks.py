@@ -88,7 +88,8 @@ class TranslationChannelOwnerCallbacks:
                 raise ValueError("Self input terminal belongs to another channel")
             if self._self_capture is not None:
                 self._self_capture.note_input_terminal(event)
-            self._require_self().release_input_segment(event.identity.segment.segment_id)
+            if self._self_scoped_event_is_current(event):
+                self._require_self().release_input_segment(event)
             await self._after_self_input_terminal(event)
             return
         if isinstance(event, STTProviderEpochEnded):
@@ -129,7 +130,7 @@ class TranslationChannelOwnerCallbacks:
             await self._publish_self_session_state(STTSessionState.DISCONNECTED)
 
     def _self_scoped_event_is_current(
-        self, event: STTProviderTurnUpdate | STTProviderTurnTerminal
+        self, event: STTProviderTurnUpdate | STTProviderTurnTerminal | STTProviderInputTerminal
     ) -> bool:
         return (
             self._self_capture is None
@@ -277,7 +278,8 @@ class TranslationChannelOwnerCallbacks:
             if event.channel == "self":
                 if self._self_capture is not None:
                     self._self_capture.note_input_terminal(event)
-                self._require_self().release_input_segment(event.identity.segment.segment_id)
+                if self._self_scoped_event_is_current(event):
+                    self._require_self().release_input_segment(event)
                 await self._after_self_input_terminal(event)
             else:
                 admissions = self._require_peer_capture().note_input_terminal(event)

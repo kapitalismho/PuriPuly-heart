@@ -67,11 +67,10 @@ class RecordingApplication:
             translation_enabled=True,
             stt_state=None,
             peer_translation_eula_accepted=False,
-            microphone_test_active=False,
+            audio_test_active=False,
             provider_name="gemini",
             overlay_target="none",
             desktop_overlay_captions_locked=False,
-            managed_auth_referral_bonus_applied=False,
         )
 
 

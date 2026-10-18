@@ -142,7 +142,7 @@ puripuly.exe capture set self on
 puripuly.exe capture set peer off
 puripuly.exe translation set on
 puripuly.exe asr set --channel both --provider soniox
-puripuly.exe microphone test on
+puripuly.exe audio test on
 puripuly.exe audio target set <value-from-audio-target-status>
 puripuly.exe audio retry
 puripuly.exe overlay set on
@@ -170,6 +170,22 @@ puripuly.exe models status
 - An older installed revision is invalid until model repair replaces it. Restarting alone does not update the files.
 - Installation reports progress through the normal application owner.
 - It publishes `ready` only after validation and staged replacement complete.
+
+### Model management
+
+Use the `assets` entries in `models status` for model IDs, state and import requirements.
+
+```powershell
+puripuly.exe models download --model-id <model-id>
+puripuly.exe models import --model-id <gemma-model-id> --dir <folder>
+puripuly.exe models cancel --model-id <model-id>
+puripuly.exe models delete --model-id <model-id>
+```
+
+- Operations preserve settings and provider selection without blocking unrelated commands.
+- Gemma imports verify the required files before replacement. Explicit Gemma download/repair also checks installed file integrity.
+- Only one model task runs at a time. Conflicts, including `gemma.prepare`, return `failed` with `task_busy`; deleting an in-use model returns `model_in_use`.
+- `models cancel` requests cancellation; wait for the original operation to settle before retrying conflicts. Runtime demand changes do not cancel transfers; shutdown drains owned work.
 
 ### Peer capture and consent
 
@@ -267,17 +283,13 @@ For example:
 
 Numeric CLI values are sent as JSON numbers. The application owner validates field-specific bounds.
 
-### Microphone test
+### Audio test
 
-- `microphone test on` stays in progress until the owner receives an actual input frame. Scheduling a capture task is not enough.
-- `app status` returns a `microphone_test` object with:
-  - `state`, `desired_active`, and `effective_active`.
-  - Normalized `meter_level` (0–1).
-  - `failure_reason` and `failure_type`.
-- No audio content is returned.
-- An unavailable input produces `action_required`.
-- `microphone test off` can interrupt pending startup. It waits for owned input resources to close.
-- Testing takes exclusive self-input ownership and can disable normal self capture. Re-enable that capture explicitly afterward if needed.
+`audio test on|off` checks VAD for the Self microphone and Peer loopback target without recognition or translation.
+
+- Inspect `audio_test` in `app status` for state, channel failures and VAD readings. `applied` means both inputs are ready; `degraded` means one; `action_required` means neither.
+- The test pauses normal capture and restores only still-valid prior capture intent. Explicit capture-on or source changes stop it.
+- `off` revokes pending starts and waits for input release. Failed cleanup stays visible and blocks restart; shutdown does not restore capture.
 
 ### Manual text
 
@@ -312,6 +324,7 @@ A direct JSON file rewrite is not a settings operation.
 - Revisions and settings events follow successfully committed changes, including GUI-only edits.
 - Queries return the committed snapshot without advancing its revision.
 - Staged preparation and failed persistence are not reported as persisted settings.
+- Mixed provider/general changes commit together. Explicit provider fields retry pending application; general-only edits do not. Runtime failure returns `degraded` without reverting saved intent.
 
 ### Activation notice
 
@@ -404,7 +417,9 @@ Discover current values with `settings choices` before applying them:
 
 Apply model and connection together through `settings apply`. The normal settings owner persists the selection; observe it again after a fresh process restart. `gemma.prepare` prepares the selected model, and `gemma.cancel` cancels ongoing preparation. Use `models status` for the managed Gemma owner, not ASR-specific `gpu status`. A completed preparation is not evidence of a completed translation; correlate `text submit` admission with the translation events.
 
-Models download on demand with progress, cancellation, checksum validation and atomic installation. No weights are bundled with the installer. The 26B target is `unsloth/gemma-4-26B-A4B-it-qat-GGUF` revision `7b92b5b28818151e8669af2e45e88d6086f490dd`, file `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf`, 14249047104 bytes, SHA-256 `a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891`. Chinese UI locales download that file from ModelScope revision `f5f82bed79bc0bc49b01e0e577bb3dc949ebc564` first. Other locales try that mirror after Hugging Face fails. The installed manifest keeps the Hugging Face revision. It has no draft model or multimodal projector. E4B retains its existing pinned target and CPU MTP drafter.
+Models download on demand with progress, cancellation, checksum validation and atomic installation. No weights are bundled with the installer. The 26B target is `unsloth/gemma-4-26B-A4B-it-qat-GGUF` revision `7b92b5b28818151e8669af2e45e88d6086f490dd`, file `gemma-4-26B-A4B-it-qat-UD-Q4_K_XL.gguf`, 14249047104 bytes, SHA-256 `a7c5bc715f5ff8e99a3e8901ce7d2b42b402c669bf24f7c5250747633d0f5891`. ModelScope serves that file at revision `f5f82bed79bc0bc49b01e0e577bb3dc949ebc564`. The installed manifest keeps the Hugging Face revision. It has no draft model or multimodal projector. E4B retains its existing pinned target and CPU MTP drafter.
+
+Local ASR and Gemma downloads try sources in UI-locale order: Chinese locales use ModelScope → `hf-mirror.net` → Hugging Face; others use Hugging Face → ModelScope → `hf-mirror.net`. Unsupported sources are skipped. `--source` selects one source without fallback. Downloads verify pinned assets; mirror transfers are anonymous, resumable and confined to their HTTPS host.
 
 The managed runtime is pinned to llama.cpp **b11537 / `8e2d31e0eb658d0382d3106a61369dff81f0c080`**. Source runtime files live under `build/llama.cpp/llama.cpp-b11537/{cpu,vulkan}`; installed files live under `_runtime/llama.cpp-b11537/{cpu,vulkan}`. `PURIPULY_HEART_LLAMA_CPP_ROOT` may select a compatible root with those backend subdirectories, but an incompatible executable build/commit is rejected. A missing or incompatible executable fails before launch; `models status` reports `failure_phase: runtime_files` with `failure_code` `runtime_missing` or `runtime_incompatible`, distinct from a native load failure (`runtime`). Distribution archive identities are in [the runtime notice](../third_party/llama.cpp/README.md).
 
@@ -432,7 +447,7 @@ E4B may fall back internally from GPU to its serialized CPU/MTP profile. **26B n
 
 The finite command catalog also includes:
 
-- Providers and accounts: Soniox diarization, managed referral settings, custom and local provider settings, both-channel provider updates, free-tier provider choices, and Qwen region.
+- Providers and accounts: Soniox diarization, custom and local provider settings, both-channel provider updates, free-tier provider choices, and Qwen region.
 - Models and devices: GPU device selection, model/connection history, and audio devices/host APIs.
 - Translation inputs: prompts, languages, and vocabulary.
 - Capture and output: VAD, overlay values, and OSC settings.
@@ -591,17 +606,17 @@ puripuly.exe auth logout chatgpt
   - `--open-browser` is the sole CLI permission to launch a browser.
 - **Protected input**
   - QQ uses hidden prompts for its identity and credential.
-  - It also accepts a protected JSON object on stdin with `qq_identity`, `credential`, and optional `referral_id`.
-  - Discord accepts optional `referral_id` where allowed. OpenRouter does not accept one.
+  - It also accepts a protected JSON object on stdin with `qq_identity` and `credential`.
+  - Referral inputs, referral settings and Talk Together Pass are removed. Existing managed credentials and previously applied allowances remain unchanged.
   - For automation, use the dedicated `auth login ... --stdin` input rather than generic arguments.
 - **Authorization**
   - A login request is the explicit authorization action.
   - Translation toggles, settings/provider changes, generic commands, and OSC translation commands must not initiate OAuth implicitly.
   - Existing authorization may still be used for normal operation.
 
-### QQ authorization recovery
+### Managed authentication recovery
 
-QQ authorization awaiting managed-operation recovery reports:
+Discord or QQ authorization awaiting managed-operation recovery can report:
 
 - `action_required`
 - `reason: resolve_pending_authorization`
@@ -613,6 +628,24 @@ This also applies when the message identifies a timeout, proxy, TLS, DNS, or oth
 - Pending delivery acknowledgment does not prove that a usable key was saved locally.
 - A missing or unreadable local key receives separate storage feedback and is not acknowledged to the Broker.
 - Neither pending condition is a reason to claim another key.
+
+- A saved pending operation is not proof that automatic recovery is running. When the bounded attempt ends, use the dialog's retry action or explicitly repeat the same source's `auth login`; valid saved authority resumes the existing operation before new issuance.
+- `auth status.action` reports whether the route can continue, needs a prompt, or has owned work in progress. `failure_kind` describes the current process's authentication-attempt outcome: it is `none` before an attempt or while a newly admitted attempt is active. Reusing a saved key after restart is not a failed attempt. An actual failed reauthentication can still coexist with a usable saved key.
+- Closing or cancelling the dialog stops local work; it does not prove that Broker/provider side effects were cancelled. Keep the saved settings and secrets so the next attempt can reconcile them.
+- A delivery ACK is sent only when the exact delivered credential is durably bound to it. An old key in the same slot is not sufficient. Missing or inconsistent ACK prerequisites require operation recovery, not repeated impossible ACKs.
+- If the key, receipt and ACK token were saved but the final settings write failed, correct the storage-access problem and retry the same source's `auth login` or translation enablement. A matching, still-pending delivery can recover its missing ACK metadata and finish without fresh authorization or a new key claim, including after restarting the app.
+- A terminal Broker rejection of an invalid, expired or mismatched ACK enters that same operation's reconciliation path. A retryable ACK failure or rate limit retains the delivery authority; it is not permission to issue a replacement.
+- If an operation terminates before ACK, its retained modern key is not usable just because it is still stored. Repeated Enable or an app restart does not activate it; follow the reported authentication action. An attached managed wrapper can still make `app.status.translation_runtime_ready` true while translation remains disabled: check the terminal operation and `auth status`, not that attachment flag alone.
+- A storage-read failure is unknown state, not proof of logout or missing credentials. Do not delete settings, the encrypted secret file or its `.lock` coordination file as a recovery shortcut.
+- Authentication can finish while runtime activation fails. Keep the saved credential, inspect the retained failure and retry translation enablement after correcting its cause; do not claim another key. If client construction fails while the selected managed credential remains available, enabling **TRANS** retries the existing preparation/rebuild path with that key. A missing runtime client alone is not a missing credential; existing credential checks and actual provider readiness still determine whether translation starts.
+
+**Network and configuration**
+
+- A full-tunnel VPN, browser-only proxy and Windows static proxy can route different legs. Browser authorization succeeding does not prove that app-to-Broker or app-to-inference requests use the same route.
+- The app uses supported explicit/environment or static system proxy settings and bypass rules; it does not evaluate browser PAC/WPAD configuration. Unsupported proxy schemes and invalid configured CA paths require a configuration correction, not a larger retry budget.
+- Certificate verification stays enabled. An explicitly selected proxy is not silently bypassed.
+- A Discord callback timeout means authorization did not return before its deadline; it is distinct from failure to bind the local callback listener or launch the browser. An expired OAuth session requires fresh authorization, not repeated use of the expired code. These local/OAuth failures are not evidence that Broker or inference traffic bypassed the configured route.
+- Use `query diagnostics.history` for available stage, HTTP status, network classification and selected-route/TLS metadata. Share only sanitized diagnostic identifiers/fields, application version, incident time and routing mode; never keys, OAuth codes, ACK/resume tokens, proxy URLs or complete settings/secret files.
 
 ### ChatGPT login
 

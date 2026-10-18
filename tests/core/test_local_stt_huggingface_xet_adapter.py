@@ -36,6 +36,7 @@ from puripuly_heart.core.local_stt_runtime_installer import (
     ensure_local_stt_installed,
 )
 
+from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.runtime import LocalSTTDownloadRuntime
 
 
@@ -179,7 +180,7 @@ async def test_gpu_huggingface_failure_preserves_http_source_fallback(
     installed = await ensure_local_stt_installed(
         manifest=manifest,
         model_root=tmp_path,
-        preferred_source="huggingface",
+        locale="en",
         huggingface_downloader=downloader,
     )
 
@@ -518,4 +519,8 @@ async def test_invalid_ca_prevents_worker_launch(tmp_path, monkeypatch):
     with pytest.raises(LocalSTTDownloadPortError) as caught:
         await adapter.download(request, cancel_event=None, on_progress=None)
     assert caught.value.failure_code == "network_configuration_failed"
-    assert caught.value.cause_type == "FileNotFoundError"
+    fields = safe_transport_fields(caught.value)
+    assert fields["configuration_error"] == "invalid_tls_configuration"
+    assert fields["dispatch_certainty"] == "not_dispatched"
+    assert fields["stage"] == "client_configuration"
+    assert fields["tls_source"] == "explicit_file"

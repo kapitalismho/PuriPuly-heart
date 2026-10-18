@@ -5,12 +5,13 @@ import inspect
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
 import flet as ft
 
+from puripuly_heart.domain.events import SelfTurnPresentation
 from puripuly_heart.ui.flet_runtime import control_page, update_control_if_mounted
 from puripuly_heart.ui.fonts import (
     LOG_TYPEFACE,
@@ -88,6 +89,13 @@ class ConversationRecord:
     target_index: int | None = None
     disposition: str = "translated"
     turn_kind: str | None = None
+    turn_generation: int | None = None
+    presentation_revision: int = 0
+    source_revision: int = 0
+    translation_source_revision: int | None = None
+    turn_status: str | None = None
+    accepted: bool = True
+    parent_utterance_id: str | None = None
 
 
 class ConversationViewModel:
@@ -113,7 +121,113 @@ class ConversationViewModel:
         return self._cleanup_count
 
     def append(self, record: ConversationRecord) -> None:
+        if record.utterance_id != "legacy":
+            parent_id = record.parent_utterance_id or record.utterance_id
+            matches = [
+                index
+                for index, previous in enumerate(self._records)
+                if previous.channel == record.channel
+                and (previous.parent_utterance_id or previous.utterance_id) == parent_id
+                and previous.turn_generation is not None
+                and (
+                    (record.target_index is None and record.target_language is None)
+                    or (
+                        record.target_index is not None
+                        and previous.target_index == record.target_index
+                    )
+                    or (
+                        record.target_index is None
+                        and previous.target_language == record.target_language
+                    )
+                )
+            ]
+            if matches:
+                for index in matches:
+                    previous = self._records[index]
+                    self._records[index] = replace(
+                        previous,
+                        accepted=True,
+                        source_text=record.source_text or previous.source_text,
+                        translated_text=record.translated_text or previous.translated_text,
+                    )
+                return
         self._records.append(record)
+        if len(self._records) > self._max_entries + self._cleanup_batch:
+            del self._records[: self._cleanup_batch]
+            self._cleanup_count += 1
+
+    def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+        utterance_id = str(snapshot.utterance_id)
+        existing = [
+            record
+            for record in self._records
+            if record.channel == "self"
+            and (record.parent_utterance_id or record.utterance_id) == utterance_id
+        ]
+        managed = next((record for record in existing if record.turn_generation is not None), None)
+        if managed is not None and (
+            snapshot.turn_generation != managed.turn_generation
+            or snapshot.revision <= managed.presentation_revision
+            or snapshot.source_revision < managed.source_revision
+            or (managed.turn_status != "active" and snapshot.status != managed.turn_status)
+        ):
+            return
+        timestamp = (
+            existing[0].timestamp_label if existing else _format_conversation_timestamp(None)
+        )
+        replacements = []
+        for index, target in enumerate(snapshot.targets or (None,)):
+            language = target.target_language if target is not None else None
+            previous = next(
+                (
+                    record
+                    for record in existing
+                    if (target is not None and record.target_index == index)
+                    or record.target_language == language
+                    or (
+                        target is not None
+                        and target.status == "source_only"
+                        and record.target_language is None
+                        and record.target_index is None
+                    )
+                ),
+                None,
+            )
+            translation = target.translation if target is not None else None
+            replacements.append(
+                ConversationRecord(
+                    timestamp_label=timestamp,
+                    source=source,
+                    channel="self",
+                    utterance_id=utterance_id,
+                    source_text=snapshot.source_text,
+                    translated_text=translation.text if translation is not None else None,
+                    source_language=snapshot.source_language,
+                    target_language=language,
+                    target_index=index if target is not None else None,
+                    disposition=target.status if target is not None else "source_only",
+                    turn_kind="speech",
+                    turn_generation=snapshot.turn_generation,
+                    presentation_revision=snapshot.revision,
+                    source_revision=snapshot.source_revision,
+                    translation_source_revision=(
+                        target.source_revision if translation is not None else None
+                    ),
+                    turn_status=snapshot.status,
+                    accepted=previous.accepted if previous is not None else False,
+                    parent_utterance_id=utterance_id,
+                )
+            )
+        indices = [
+            index
+            for index, record in enumerate(self._records)
+            if record.channel == "self"
+            and (record.parent_utterance_id or record.utterance_id) == utterance_id
+        ]
+        insertion = indices[0] if indices else len(self._records)
+        for index in reversed(indices):
+            del self._records[index]
+        self._records[insertion:insertion] = replacements
         if len(self._records) > self._max_entries + self._cleanup_batch:
             del self._records[: self._cleanup_batch]
             self._cleanup_count += 1
@@ -125,11 +239,45 @@ class ConversationViewModel:
         rendered: list[str] = []
         for record in self._records:
             header = f"[{record.timestamp_label}] {source_label(record.source)}"
-            if record.translated_text and record.target_language:
+            if record.target_language and (
+                record.translated_text
+                or (
+                    record.turn_status is not None
+                    and record.target_index is not None
+                    and record.disposition != "source_only"
+                )
+            ):
                 header = f"{header} → {language_name(record.target_language)}"
             elif record.source_text and record.source_language:
                 header = f"{header} · {language_name(record.source_language)}"
-            body = [value for value in (record.source_text, record.translated_text) if value]
+            body = [record.source_text] if record.source_text else []
+            if record.turn_status is not None:
+                status = record.turn_status
+                if status == "active":
+                    status = "preview"
+                elif (
+                    status == "failed"
+                    and record.disposition == "ready"
+                    and record.translated_text
+                    and record.translation_source_revision == record.source_revision
+                ):
+                    status = "complete"
+                header = f"{header} · {t(f'display.turn.{status}')}"
+                if record.disposition != "ready":
+                    body.append(t(f"logs.conversation.target.{record.disposition}"))
+            if record.translated_text:
+                if (
+                    record.translation_source_revision is not None
+                    and record.translation_source_revision != record.source_revision
+                ):
+                    body.append(
+                        t(
+                            "logs.conversation.earlier_source",
+                            revision=record.translation_source_revision,
+                            current_revision=record.source_revision,
+                        )
+                    )
+                body.append(record.translated_text)
             rendered.append("\n".join((header, *body)))
         return "\n\n".join(rendered)
 
@@ -291,6 +439,7 @@ class LogsView(ft.Column):
         disposition: str = "translated",
         origin_wall_clock_ms: int | None = None,
         turn_kind: str | None = None,
+        parent_utterance_id: str | None = None,
     ) -> None:
         cleaned_source = source_text.strip() if isinstance(source_text, str) else None
         cleaned_translation = translated_text.strip() if isinstance(translated_text, str) else None
@@ -312,8 +461,16 @@ class LogsView(ft.Column):
                 target_index=target_index,
                 disposition=disposition,
                 turn_kind=turn_kind,
+                parent_utterance_id=parent_utterance_id,
             )
         )
+        if self._showing_conversation:
+            self._render_conversation_text()
+            if self._log_text is not None:
+                update_control_if_mounted(self._log_text)
+
+    def update_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+        self._conversation_model.update_self_turn(snapshot, source=source)
         if self._showing_conversation:
             self._render_conversation_text()
             if self._log_text is not None:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 import json
 import socket
 import ssl
@@ -15,13 +14,13 @@ from puripuly_heart.core.managed_openrouter_release import (
     ManagedOpenRouterIssueSuccess,
     ManagedOpenRouterReleaseError,
     ManagedOpenRouterVerifySuccess,
-    TalkTogetherPassStatus,
 )
 
 from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckRequest,
     QqManagedAssertionRequest,
 )
+from puripuly_heart.core.diagnostics import sanitize_diagnostics
 
 
 class TrackingTransport(httpx.AsyncBaseTransport):
@@ -187,100 +186,6 @@ async def test_start_discord_oauth_posts_redirect_and_parses_success_payload() -
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("raw_referral_id", "expected_referral_id"),
-    [
-        ("  7kq9m2  ", "7KQ9M2"),
-        ("  invalid friend id  ", "INVALID FRIEND ID"),
-    ],
-)
-async def test_start_discord_oauth_forwards_trimmed_uppercase_non_empty_referral_id(
-    raw_referral_id: str,
-    expected_referral_id: str,
-) -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        assert body == {
-            "installation_id": "install-discord-123",
-            "device_public_key": "device-public-key-123",
-            "redirect_uri": "http://127.0.0.1:62187/discord/callback",
-            "app_version": "2.0.0",
-            "referral_id": expected_referral_id,
-        }
-        return httpx.Response(
-            200,
-            json={
-                "authorization_url": "https://discord.com/oauth2/authorize?state=state-123",
-                "redirect_uri": "http://127.0.0.1:62187/discord/callback",
-                "oauth_session_expires_at": "2026-04-30T06:05:00.000Z",
-                "issue_nonce": "issue-nonce-123",
-                "fingerprint_salt": {
-                    "version": 7,
-                    "salt": "fingerprint-salt-123",
-                },
-                "fingerprint_salt_version": 7,
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    signature = inspect.signature(client.start_discord_oauth)
-    assert "referral_id" in signature.parameters
-    await client.start_discord_oauth(
-        installation_id="install-discord-123",
-        device_public_key="device-public-key-123",
-        redirect_uri="http://127.0.0.1:62187/discord/callback",
-        app_version="2.0.0",
-        referral_id=raw_referral_id,
-    )
-
-    await client.close()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("empty_referral_id", [None, "", "   "])
-async def test_start_discord_oauth_omits_empty_referral_id(
-    empty_referral_id: str | None,
-) -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content)
-        assert body == {
-            "installation_id": "install-discord-123",
-            "device_public_key": "device-public-key-123",
-            "redirect_uri": "http://127.0.0.1:62187/discord/callback",
-            "app_version": "2.0.0",
-        }
-        return httpx.Response(
-            200,
-            json={
-                "authorization_url": "https://discord.com/oauth2/authorize?state=state-123",
-                "redirect_uri": "http://127.0.0.1:62187/discord/callback",
-                "oauth_session_expires_at": "2026-04-30T06:05:00.000Z",
-                "issue_nonce": "issue-nonce-123",
-                "fingerprint_salt": {
-                    "version": 7,
-                    "salt": "fingerprint-salt-123",
-                },
-                "fingerprint_salt_version": 7,
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    signature = inspect.signature(client.start_discord_oauth)
-    assert "referral_id" in signature.parameters
-    await client.start_discord_oauth(
-        installation_id="install-discord-123",
-        device_public_key="device-public-key-123",
-        redirect_uri="http://127.0.0.1:62187/discord/callback",
-        app_version="2.0.0",
-        referral_id=empty_referral_id,
-    )
-
-    await client.close()
-
-
-@pytest.mark.asyncio
 async def test_verify_parses_success_payload() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
@@ -385,6 +290,51 @@ async def test_issue_parses_success_payload() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {},
+        {
+            "delivery_id": "delivery-legacy",
+            "delivery_ack_token": "synthetic-sensitive-ack-token",
+            "delivery_ack_expires_at": "2099-01-01T00:00:00Z",
+        },
+        {"delivery_id": 7, "delivery_ack_token": None},
+    ],
+)
+async def test_legacy_issue_rejects_ack_required_wire_contract(metadata) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v1/providers/openrouter/issue"
+        return httpx.Response(
+            200,
+            json={
+                "openrouter_api_key": "synthetic-sensitive-legacy-key",
+                "managed_credential_ref": "legacy-ref",
+                "delivery_ack_required": True,
+                **metadata,
+            },
+        )
+
+    client, transport = _build_client(handler)
+    try:
+        with pytest.raises(ManagedOpenRouterReleaseError) as exc_info:
+            await client.issue({})
+        error = exc_info.value
+        assert error.code == "managed_delivery_protocol_mismatch"
+        assert error.error_class == "terminal"
+        assert error.operation == "issue"
+        assert error.http_status == 200
+        assert error.failure_diagnostics.status_code == 200
+        assert error.failure_diagnostics.category == "invalid_response"
+        assert error.failure_diagnostics.fields["stage"] == "protocol_parse"
+        assert error.failure_diagnostics.fields["dispatch_certainty"] == "response_received"
+        assert "synthetic-sensitive" not in repr(error.failure_diagnostics)
+    finally:
+        await client.close()
+    assert transport.closed
+
+
+@pytest.mark.asyncio
 async def test_issue_discord_managed_key_posts_signed_payload_and_parses_success() -> None:
     request_body = {
         "code": "discord-oauth-code-123",
@@ -468,67 +418,6 @@ async def test_issue_discord_managed_key_parses_delivery_ack_metadata() -> None:
     assert result.delivery_ack_token == "delivery-ack-token-123"
     assert result.delivery_ack_expires_at == "2026-07-30T06:05:00.000Z"
     assert "delivery-ack-token-123" not in repr(result)
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_issue_discord_managed_key_parses_referral_success_hints() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "openrouter_api_key": "managed-openrouter-api-key",
-                "managed_credential_ref": "managed-credential-ref-123",
-                "expires_at": "2026-07-30T06:00:00.000Z",
-                "openrouter_user_id": " user-123 ",
-                "referral_bonus_applied": True,
-                "referral_id": " 7kq9m2 ",
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
-
-    assert result == ManagedOpenRouterIssueSuccess(
-        openrouter_api_key="managed-openrouter-api-key",
-        managed_credential_ref="managed-credential-ref-123",
-        expires_at="2026-07-30T06:00:00.000Z",
-        openrouter_user_id="user-123",
-        referral_bonus_applied=True,
-        referral_id="7KQ9M2",
-    )
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_issue_discord_managed_key_parses_talk_together_pass_status() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "openrouter_api_key": "managed-openrouter-api-key",
-                "referral_id": " 7kq9m2 ",
-                "talk_together_pass": {
-                    "pass_id": "7KQ9M2",
-                    "invite_count": 1,
-                    "invite_limit": 3,
-                    "bonus_translations_per_friend": 200,
-                },
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
-
-    assert result.referral_id == "7KQ9M2"
-    assert result.pass_status == TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=1,
-        invite_limit=3,
-        bonus_translations_per_friend=200,
-    )
     await client.close()
 
 
@@ -637,14 +526,6 @@ async def test_acknowledge_managed_key_delivery_posts_token_and_maps_success() -
             json={
                 "ok": True,
                 "status": "acknowledged",
-                "referral_bonus_applied": True,
-                "referral_id": " 7kq9m2 ",
-                "talk_together_pass": {
-                    "pass_id": "7KQ9M2",
-                    "invite_count": 2,
-                    "invite_limit": 3,
-                    "bonus_translations_per_friend": 200,
-                },
             },
         )
 
@@ -661,30 +542,35 @@ async def test_acknowledge_managed_key_delivery_posts_token_and_maps_success() -
     assert result.succeeded is True
     assert result.status == "acknowledged"
     assert result.diagnostics is None
-    assert result.referral_bonus_applied is True
-    assert result.referral_id == "7KQ9M2"
-    assert result.pass_status == TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=2,
-        invite_limit=3,
-        bonus_translations_per_friend=200,
-    )
     await client.close()
 
 
 @pytest.mark.asyncio
-async def test_acknowledge_managed_key_delivery_maps_broker_error() -> None:
+@pytest.mark.parametrize(
+    ("rejection", "error_class", "http_status", "expected_status"),
+    [
+        ("invalid", "terminal", 404, "invalid"),
+        ("expired", "terminal", 410, "expired"),
+        ("mismatched", "terminal", 409, "mismatched"),
+        ("failed", "retryable", 409, "retryable"),
+        ("rate_limited", "retryable", 429, "retryable"),
+    ],
+)
+async def test_acknowledge_managed_key_delivery_maps_broker_error(
+    rejection, error_class, http_status, expected_status
+) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert request.url.path == "/v1/providers/openrouter/managed-key-delivery/ack"
         return httpx.Response(
-            409,
+            http_status,
             json={
                 "error": {
-                    "code": "invalid_request",
-                    "class": "terminal",
-                    "subcode": "delivery_ack_invalid",
-                    "message": "delivery ACK failed",
+                    "code": "rate_limited" if rejection == "rate_limited" else "invalid_request",
+                    "class": error_class,
+                    "subcode": f"delivery_ack_{rejection}",
+                    "message": "synthetic-sensitive delivery ACK rejection",
+                    "retry_after_ms": 19,
                 }
             },
         )
@@ -700,10 +586,21 @@ async def test_acknowledge_managed_key_delivery_maps_broker_error() -> None:
     )
 
     assert result.succeeded is False
-    assert result.status == "delivery_ack_invalid"
+    assert result.status == expected_status
     assert result.diagnostics is not None
     assert result.diagnostics.code == "managed_key_delivery_ack_error"
-    assert result.diagnostics.fields["broker_subcode"] == "delivery_ack_invalid"
+    assert result.diagnostics.fields["broker_subcode"] == f"delivery_ack_{rejection}"
+    assert result.diagnostics.status_code == http_status
+    assert result.diagnostics.retry_after_ms == 19
+    assert result.diagnostics.fields["ack_status"] == expected_status
+    assert "synthetic-sensitive" not in repr(result.diagnostics)
+    normalized = sanitize_diagnostics(result.diagnostics)
+    assert normalized.fields["broker_subcode"] == f"delivery_ack_{rejection}"
+    assert normalized.fields["broker_code"] == (
+        "rate_limited" if rejection == "rate_limited" else "invalid_request"
+    )
+    assert normalized.fields["ack_status"] == expected_status
+    assert normalized.status_code == http_status
     await client.close()
 
 
@@ -820,235 +717,6 @@ async def test_assert_qq_managed_identity_maps_legacy_verified_without_key_to_ke
     assert result.failure_subcode == "key_unavailable"
     assert result.diagnostics is not None
     assert result.diagnostics.fields["status"] == status
-    await client.close()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("extra_payload", "expected_referral_bonus_applied", "expected_referral_id"),
-    [
-        ({}, False, None),
-        ({"referral_bonus_applied": None, "referral_id": None}, False, None),
-        ({"referral_bonus_applied": False, "referral_id": " 7kq9m2 "}, False, "7KQ9M2"),
-        ({"referral_bonus_applied": "true", "referral_id": "ABC120"}, False, None),
-        ({"referral_bonus_applied": 1, "referral_id": 12345}, False, None),
-    ],
-)
-async def test_issue_discord_managed_key_tolerates_referral_hint_compatibility_fields(
-    extra_payload: dict[str, object],
-    expected_referral_bonus_applied: bool,
-    expected_referral_id: str | None,
-) -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "openrouter_api_key": "managed-openrouter-api-key",
-                "managed_credential_ref": "managed-credential-ref-123",
-                **extra_payload,
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
-
-    assert result == ManagedOpenRouterIssueSuccess(
-        openrouter_api_key="managed-openrouter-api-key",
-        managed_credential_ref="managed-credential-ref-123",
-        referral_bonus_applied=expected_referral_bonus_applied,
-        referral_id=expected_referral_id,
-    )
-    await client.close()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("extra_payload", "expected_referral_id"),
-    [
-        ({"referral_id": " 7kq9m2 "}, "7KQ9M2"),
-        ({}, None),
-        ({"referral_id": None}, None),
-        ({"referral_id": "ABC120"}, None),
-        ({"referral_id": 12345}, None),
-    ],
-)
-async def test_get_trial_status_tolerates_optional_referral_id_compatibility_fields(
-    extra_payload: dict[str, object],
-    expected_referral_id: str | None,
-) -> None:
-    def handler(request: httpx.Request) -> httpx.Response:
-        assert request.method == "GET"
-        assert request.url.path == "/v1/trial/status"
-        assert request.url.params.get("installation_id") == "install-discord-123"
-        assert request.headers["X-Puripuly-Timestamp"] == "2026-04-30T06:00:30.000Z"
-        assert request.headers["X-Puripuly-Signature"] == "signature-123"
-        return httpx.Response(
-            200,
-            json={
-                "managed_state": {
-                    "lifecycle": "active",
-                    "managed_availability": True,
-                },
-                "current_entitlement": None,
-                "onboarding_eligibility": {
-                    "eligible": False,
-                    "reason": "active",
-                    "requires_discord_oauth": False,
-                },
-                **extra_payload,
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    get_trial_status = getattr(client, "get_trial_status", None)
-    assert callable(get_trial_status)
-    result = await get_trial_status(
-        installation_id="install-discord-123",
-        timestamp="2026-04-30T06:00:30.000Z",
-        signature="signature-123",
-    )
-
-    assert getattr(result, "referral_id", None) == expected_referral_id
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_get_trial_status_parses_talk_together_pass_status() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "managed_state": {"lifecycle": "active", "managed_availability": True},
-                "current_entitlement": None,
-                "onboarding_eligibility": {
-                    "eligible": False,
-                    "reason": "active",
-                    "requires_discord_oauth": False,
-                },
-                "referral_id": "7KQ9M2",
-                "talk_together_pass": {
-                    "pass_id": "7KQ9M2",
-                    "invite_count": 2,
-                    "invite_limit": 3,
-                    "bonus_translations_per_friend": 200,
-                },
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.get_trial_status(
-        installation_id="install-discord-123",
-        timestamp="2026-04-30T06:00:30.000Z",
-        signature="signature-123",
-    )
-
-    assert result.referral_id == "7KQ9M2"
-    assert result.pass_status == TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=2,
-        invite_limit=3,
-        bonus_translations_per_friend=200,
-    )
-    await client.close()
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "talk_together_pass",
-    [
-        None,
-        {},
-        {"pass_id": "ABC120", "invite_count": 1, "invite_limit": 3},
-        {"pass_id": "8H3J4N", "invite_count": 1, "invite_limit": 3},
-        {"pass_id": "7KQ9M2", "invite_count": True, "invite_limit": 3},
-        {"pass_id": "7KQ9M2", "invite_count": 1.5, "invite_limit": 3},
-        {"pass_id": "7KQ9M2", "invite_count": "1", "invite_limit": 3},
-        {"pass_id": "7KQ9M2", "invite_count": None, "invite_limit": 3},
-        {"pass_id": "7KQ9M2", "invite_count": -1, "invite_limit": 3},
-        {"pass_id": "7KQ9M2", "invite_count": 1, "invite_limit": 0},
-        {"pass_id": "7KQ9M2", "invite_count": 2**63, "invite_limit": 3},
-    ],
-)
-async def test_talk_together_pass_malformed_required_fields_are_absent(
-    talk_together_pass: object,
-) -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        payload: dict[str, object] = {
-            "openrouter_api_key": "managed-openrouter-api-key",
-            "referral_id": "7KQ9M2",
-        }
-        if talk_together_pass is not None:
-            payload["talk_together_pass"] = talk_together_pass
-        return httpx.Response(200, json=payload)
-
-    client, _transport = _build_client(handler)
-
-    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
-
-    assert result.referral_id == "7KQ9M2"
-    assert result.pass_status is None
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_talk_together_pass_defaults_malformed_bonus_only() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "openrouter_api_key": "managed-openrouter-api-key",
-                "referral_id": "7KQ9M2",
-                "talk_together_pass": {
-                    "pass_id": "7KQ9M2",
-                    "invite_count": 1,
-                    "invite_limit": 3,
-                    "bonus_translations_per_friend": "200",
-                },
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
-
-    assert result.pass_status == TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=1,
-        invite_limit=3,
-        bonus_translations_per_friend=200,
-    )
-    await client.close()
-
-
-@pytest.mark.asyncio
-async def test_talk_together_pass_defaults_missing_bonus_only() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "openrouter_api_key": "managed-openrouter-api-key",
-                "referral_id": "7KQ9M2",
-                "talk_together_pass": {
-                    "pass_id": "7KQ9M2",
-                    "invite_count": 1,
-                    "invite_limit": 3,
-                },
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.issue_discord_managed_key({"code": "discord-oauth-code-123"})
-
-    assert result.pass_status == TalkTogetherPassStatus(
-        pass_id="7KQ9M2",
-        invite_count=1,
-        invite_limit=3,
-        bonus_translations_per_friend=200,
-    )
     await client.close()
 
 
@@ -1652,7 +1320,6 @@ async def test_get_managed_operation_status_posts_identity_and_parses_contract()
                 "attempt_count": 1,
                 "current_attempt_index": 1,
                 "auth_expires_at": "2026-12-01T01:00:00.000Z",
-                "referral": {"status": "reserved", "settlement": "none"},
                 "attempts": [
                     {
                         "attempt_index": 1,
@@ -1688,9 +1355,6 @@ async def test_get_managed_operation_status_posts_identity_and_parses_contract()
     assert result.attempt.managed_credential_ref == "managed-ref-1"
     assert result.delivery is not None
     assert result.delivery.status == "cleanup_required"
-    assert result.referral is not None
-    assert result.referral.status == "reserved"
-    assert result.referral.settlement == "none"
     assert result.failed_reason is None
     assert result.managed_secret_key is None
     await client.close()
@@ -1720,7 +1384,6 @@ async def test_resume_managed_operation_parses_failed_body_with_failure_reason()
                 "attempt_count": 2,
                 "current_attempt_index": 2,
                 "auth_expires_at": "2026-12-01T01:00:00.000Z",
-                "referral": {"status": "failed", "settlement": "none"},
                 "attempts": [],
                 "delivery": None,
             },
@@ -1802,7 +1465,6 @@ async def test_managed_operation_gone_with_failed_body_reports_terminal() -> Non
                 "attempt_count": 0,
                 "current_attempt_index": 0,
                 "auth_expires_at": "2026-12-01T01:00:00.000Z",
-                "referral": {"status": "failed", "settlement": "none"},
                 "attempts": [],
                 "delivery": None,
             },
@@ -1840,7 +1502,7 @@ async def test_managed_operation_gone_with_error_envelope_reports_expired() -> N
         ManagedOperationStatusRequest(operation_id="ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
     )
 
-    assert result.succeeded is False
+    assert result.succeeded is True
     assert result.operation_status == "FAILED"
     assert result.failed_reason == "authorization_expired"
     await client.close()
@@ -1865,34 +1527,6 @@ async def test_managed_operation_status_transport_error_is_retryable_wait() -> N
     await client.close()
 
 
-@pytest.mark.asyncio
-async def test_acknowledge_parses_referral_settlement_object() -> None:
-    def handler(_request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            json={
-                "ok": True,
-                "status": "acknowledged",
-                "referral": {"status": "reserved", "settlement": "invitee_pending"},
-            },
-        )
-
-    client, _transport = _build_client(handler)
-
-    result = await client.acknowledge_managed_key_delivery(
-        ManagedKeyDeliveryAckRequest(
-            delivery_id="delivery-123",
-            managed_credential_ref="managed-credential-ref-123",
-            delivery_ack_token="delivery-ack-token-123",
-        )
-    )
-
-    assert result.succeeded is True
-    assert result.referral_status == "reserved"
-    assert result.referral_settlement == "invitee_pending"
-    await client.close()
-
-
 def _delivery_pending_status_body(
     *,
     issue_source: object = "qq",
@@ -1907,7 +1541,6 @@ def _delivery_pending_status_body(
         "attempt_count": 1,
         "current_attempt_index": 1,
         "auth_expires_at": "2026-12-01T01:00:00.000Z",
-        "referral": {"status": "reserved", "settlement": "none"},
         "attempts": [],
         "delivery": {
             "delivery_id": "delivery-1",
@@ -2047,3 +1680,448 @@ async def test_resume_managed_operation_falls_back_to_request_source() -> None:
     assert result.delivery_ack is not None
     assert result.delivery_ack.source == "qq"
     await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status", "payload", "expected_code", "expected_class", "shape"),
+    [
+        (403, b"<html>private-denial</html>", "invalid_request", "terminal", "non_json"),
+        (429, b"<html>private-limit</html>", "rate_limited", "retryable", "non_json"),
+        (
+            429,
+            {"ok": False, "code": "rate_limited", "message": "limited"},
+            "rate_limited",
+            "retryable",
+            "flat_error",
+        ),
+        (
+            429,
+            {"error": {"code": "rate_limited", "class": "retryable", "message": "limited"}},
+            "rate_limited",
+            "retryable",
+            "public_error_envelope",
+        ),
+        (200, b"{private-malformed", "trial_unavailable", "retryable", "non_json"),
+        (200, [], "trial_unavailable", "retryable", "non_object"),
+        (200, {}, "trial_unavailable", "retryable", "malformed_success"),
+    ],
+)
+async def test_discord_and_qq_response_failures_keep_safe_outcome_metadata(
+    status, payload, expected_code, expected_class, shape
+):
+    def response(request):
+        kwargs = {"content": payload} if isinstance(payload, bytes) else {"json": payload}
+        return httpx.Response(
+            status,
+            headers={"Retry-After": "7"},
+            **kwargs,
+            extensions={
+                "connection_diagnostics": {
+                    "transport": "https",
+                    "tls_source": "explicit_file",
+                    "tls_backend": "openssl",
+                    "proxy_source": "system",
+                    "proxy_url": "private-proxy-url",
+                }
+            },
+        )
+
+    client, _ = _build_client(response)
+    try:
+        with pytest.raises(ManagedOpenRouterReleaseError) as caught:
+            await client.issue_discord_managed_key({"code": "private-oauth-code"})
+        error = caught.value
+        assert (error.code, error.error_class) == (expected_code, expected_class)
+        diagnostics = error.failure_diagnostics
+        assert diagnostics.status_code == status
+        assert diagnostics.retry_after_ms == 7000
+        assert diagnostics.fields["dispatch_certainty"] == "response_received"
+        assert diagnostics.fields["response_shape"] == shape
+        assert diagnostics.fields["stage"] == "protocol_parse"
+        assert diagnostics.fields["proxy_source"] == "system"
+        assert diagnostics.fields["tls_source"] == "explicit_file"
+        qq = await client.assert_qq_managed_identity(
+            QqManagedAssertionRequest("private-identity", "a" * 64, "2026-01-01", {})
+        )
+        assert not qq.succeeded
+        assert qq.diagnostics.status_code == status
+        assert qq.diagnostics.fields["response_shape"] == shape
+        assert qq.diagnostics.fields["dispatch_certainty"] == "response_received"
+        assert qq.diagnostics.fields["proxy_source"] == "system"
+        assert qq.diagnostics.fields["tls_source"] == "explicit_file"
+        for secret in ("private-denial", "private-limit", "private-malformed", "private-proxy-url"):
+            assert secret not in repr(diagnostics)
+            assert secret not in repr(qq)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retry", [-1, True, 10**20, 0, 7000])
+async def test_flat_rate_limit_retry_is_bounded_and_status_recovery_can_succeed(retry):
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    calls = []
+
+    def response(request):
+        calls.append(json.loads(request.content))
+        if len(calls) == 1:
+            return httpx.Response(
+                429,
+                headers={"Retry-After": "3"},
+                json={
+                    "ok": False,
+                    "code": "rate_limited",
+                    "message": "limited",
+                    "retry_after_ms": retry,
+                },
+            )
+        return httpx.Response(200, json={"state": "ACTIVE", "client_action": "wait"})
+
+    client, _ = _build_client(response)
+    request = ManagedOperationStatusRequest(
+        "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "installation", "private-resume", "qq"
+    )
+    try:
+        failure = await client.get_managed_operation_status(request)
+        assert not failure.succeeded
+        assert failure.operation_status == "CREATE_UNKNOWN"
+        assert failure.client_action == "wait"
+        assert failure.diagnostics.status_code == 429
+        expected = min(retry, 86400000) if type(retry) is int and retry >= 0 else 3000
+        assert failure.diagnostics.retry_after_ms == expected
+        assert failure.diagnostics.fields["broker_code"] == "rate_limited"
+        success = await client.get_managed_operation_status(request)
+        assert success.succeeded
+        assert success.operation_status == "ACTIVE"
+        assert calls[0] == calls[1]
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status,state", [(409, "RETRY_READY"), (200, "FAILED")])
+async def test_legacy_resume_guidance_stops_impossible_resume_without_losing_state(status, state):
+    from puripuly_heart.app.ports.broker_client import ManagedOperationResumeRequest
+
+    client, _ = _build_client(
+        lambda _: httpx.Response(
+            status,
+            json={
+                "ok": False,
+                "state": state,
+                "client_action": "retry_authorized",
+                "failure_reason": "terminal_provider_failure" if state == "FAILED" else None,
+                "code": "resume_issuance_unavailable",
+                "message": "restart authorization",
+            },
+        )
+    )
+    try:
+        result = await client.resume_managed_operation(
+            ManagedOperationResumeRequest("ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        )
+        assert result.succeeded
+        assert result.operation_status == state
+        assert result.client_action == "action_required"
+        assert result.diagnostics.status_code == status
+        assert result.diagnostics.fields["broker_code"] == "resume_issuance_unavailable"
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_retry_after_http_date_is_retained_and_bounded():
+    from datetime import UTC, datetime, timedelta
+    from email.utils import format_datetime
+
+    client, _ = _build_client(
+        lambda _: httpx.Response(
+            429,
+            text="limited",
+            headers={"Retry-After": format_datetime(datetime.now(UTC) + timedelta(seconds=30))},
+        )
+    )
+    try:
+        with pytest.raises(ManagedOpenRouterReleaseError) as caught:
+            await client.issue_discord_managed_key({})
+        assert 25000 <= caught.value.retry_after_ms <= 30000
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_local_ca_configuration_is_actionable_before_broker_dispatch(monkeypatch, tmp_path):
+    from puripuly_heart.core.managed_openrouter_broker_client import (
+        HttpManagedOpenRouterBrokerClient,
+    )
+
+    monkeypatch.setenv("SSL_CERT_FILE", str(tmp_path / "private-ca-path"))
+    client = HttpManagedOpenRouterBrokerClient("http://127.0.0.1:9")
+    try:
+        with pytest.raises(ManagedOpenRouterReleaseError) as caught:
+            await client.issue_discord_managed_key({})
+        error = caught.value
+        assert error.error_class == "terminal"
+        assert error.subcode == "invalid_tls_configuration"
+        assert error.http_status is None
+        assert error.failure_diagnostics.fields["dispatch_certainty"] == "not_dispatched"
+        assert (
+            error.failure_diagnostics.fields["configuration_error"] == "invalid_tls_configuration"
+        )
+        assert "private-ca-path" not in repr(error.failure_diagnostics)
+        qq = await client.assert_qq_managed_identity(
+            QqManagedAssertionRequest("private-identity", "a" * 64, "2026-01-01", {})
+        )
+        assert qq.diagnostics.fields["dispatch_certainty"] == "not_dispatched"
+        assert qq.diagnostics.fields["configuration_error"] == "invalid_tls_configuration"
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_removed_referral_input_is_rejected_without_dispatch():
+    calls = []
+    client, _ = _build_client(lambda request: calls.append(request))
+    try:
+        with pytest.raises(TypeError):
+            await client.start_discord_oauth(
+                installation_id="installation",
+                device_public_key="device",
+                redirect_uri="http://127.0.0.1:62187/discord/callback",
+                app_version="test",
+                referral_id="removed",
+            )
+        with pytest.raises(TypeError):
+            QqManagedAssertionRequest("identity", "a" * 64, "2026-01-01", {}, referral_id="removed")
+        assert calls == []
+        assert not hasattr(client, "get_qq_managed_status")
+        assert not hasattr(client, "get_trial_status")
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_denied_status_observation_does_not_invent_terminal_remote_state():
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    client, _ = _build_client(lambda _: httpx.Response(403, text="<html>denied</html>"))
+    try:
+        result = await client.get_managed_operation_status(
+            ManagedOperationStatusRequest("ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+        )
+        assert not result.succeeded
+        assert result.operation_status == "CREATE_UNKNOWN"
+        assert result.client_action == "action_required"
+        assert result.diagnostics.status_code == 403
+        assert result.diagnostics.fields["dispatch_certainty"] == "response_received"
+    finally:
+        await client.close()
+
+
+def test_safe_transport_metadata_and_identity_survive_diagnostic_projection():
+    from uuid import uuid4
+
+    from puripuly_heart.core.diagnostics import normalize_diagnostic
+    from puripuly_heart.core.openrouter.managed_openrouter_broker_client import (
+        _parse_error_response,
+        _qq_assertion_failure_from_error,
+    )
+
+    error = _parse_error_response(
+        httpx.Response(
+            429,
+            headers={"Retry-After": "7"},
+            text="<html>private-response</html>",
+            extensions={
+                "connection_diagnostics": {
+                    "transport": "https",
+                    "tls_source": "windows",
+                    "tls_backend": "native",
+                    "proxy_source": "system",
+                    "private_proxy_url": "private-route",
+                }
+            },
+        ),
+        operation="qq_assert",
+    )
+    result = _qq_assertion_failure_from_error(error)
+    assert result.diagnostics.diagnostic_id == error.failure_diagnostics.diagnostic_id
+    record = normalize_diagnostic(
+        result.diagnostics, instance_id=str(uuid4()), severity="error", disposition="failed"
+    )
+    assert record["diagnostic_id"] == result.diagnostics.diagnostic_id
+    assert record["status_code"] == 429
+    assert record["retry_after_ms"] == 7000
+    assert record["stage"] == "protocol_parse"
+    assert record["fields"]["proxy_source"] == "system"
+    assert record["fields"]["tls_source"] == "windows"
+    assert record["fields"]["dispatch_certainty"] == "response_received"
+    assert record["fields"]["response_shape"] == "non_json"
+    assert "private-" not in repr(record)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        "operation",
+        "installation",
+        "source",
+        "delivery",
+        "credential",
+        "malformed_source",
+        "malformed_attempt",
+        "malformed_delivery",
+    ],
+)
+async def test_operation_response_binding_rejects_wrong_or_malformed_delivery(mismatch):
+    from puripuly_heart.app.ports.broker_client import ManagedOperationStatusRequest
+
+    payload = _delivery_pending_status_body()
+    if mismatch == "operation":
+        payload["operation_id"] = "ph-mop-v1_BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+    elif mismatch == "installation":
+        payload["installation_id"] = "another-installation"
+    elif mismatch == "source":
+        payload["issue_source"] = "discord"
+    elif mismatch == "delivery":
+        payload["delivery"]["delivery_id"] = "another-delivery"
+    elif mismatch == "credential":
+        payload["attempts"] = [{"managed_credential_ref": "another-reference"}]
+    elif mismatch == "malformed_source":
+        payload["issue_source"] = ["private-shape"]
+    elif mismatch == "malformed_attempt":
+        payload["attempts"] = [{"outcome": ["private-shape"]}]
+    else:
+        payload["delivery"]["status"] = ["private-shape"]
+    responses = iter([payload, _delivery_pending_status_body()])
+    client, _ = _build_client(lambda _: httpx.Response(200, json=next(responses)))
+    request = ManagedOperationStatusRequest(
+        _delivery_pending_status_body()["operation_id"], "installation", "private-resume", "qq"
+    )
+    try:
+        failed = await client.get_managed_operation_status(request)
+        assert not failed.succeeded
+        assert failed.operation_status == "CREATE_UNKNOWN"
+        assert failed.managed_secret_key is None
+        assert failed.delivery_ack is None
+        assert failed.diagnostics.status_code == 200
+        assert failed.diagnostics.fields["response_shape"] == "malformed_success"
+        assert failed.diagnostics.fields["dispatch_certainty"] == "response_received"
+        assert "private-shape" not in repr(failed.diagnostics)
+        corrected = await client.get_managed_operation_status(request)
+        assert corrected.succeeded
+        assert corrected.delivery_ack.source == "qq"
+        assert corrected.delivery_ack.managed_credential_ref == corrected.managed_credential_ref
+        assert corrected.delivery_ack.delivery_id == corrected.delivery.delivery_id
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_malformed_qq_and_ack_enum_shapes_are_observable_failures():
+    client, _ = _build_client(
+        lambda _: httpx.Response(200, json={"ok": True, "status": ["private-shape"]})
+    )
+    try:
+        qq = await client.assert_qq_managed_identity(
+            QqManagedAssertionRequest("private-identity", "a" * 64, "2026-01-01", {})
+        )
+        ack = await client.acknowledge_managed_key_delivery(
+            ManagedKeyDeliveryAckRequest("delivery", "ref", "private-ack")
+        )
+        assert not qq.succeeded
+        assert not ack.succeeded
+        assert qq.diagnostics.status_code == ack.diagnostics.status_code == 200
+        assert qq.diagnostics.fields["response_shape"] == "malformed_success"
+        assert ack.diagnostics.fields["response_shape"] == "malformed_success"
+        assert "private-shape" not in repr(qq.diagnostics)
+        assert "private-shape" not in repr(ack.diagnostics)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resume", [False, True])
+@pytest.mark.parametrize("source", ["discord", "qq"])
+async def test_minimal_authorization_expired_fallback_is_authoritative_without_message(
+    resume, source
+):
+    from puripuly_heart.app.ports.broker_client import (
+        ManagedOperationResumeRequest,
+        ManagedOperationStatusRequest,
+    )
+
+    client, _ = _build_client(lambda _: httpx.Response(410, json={"code": "authorization_expired"}))
+    request_type = ManagedOperationResumeRequest if resume else ManagedOperationStatusRequest
+    method = client.resume_managed_operation if resume else client.get_managed_operation_status
+    try:
+        result = await method(
+            request_type(
+                "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                "installation",
+                "private-resume",
+                source,
+            )
+        )
+        assert result.succeeded
+        assert result.operation_status == "FAILED"
+        assert result.client_action == "action_required"
+        assert result.failed_reason == "authorization_expired"
+        assert result.diagnostics.status_code == 410
+        assert result.diagnostics.fields["broker_code"] == "authorization_expired"
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("field", ["operation_id", "installation_id", "issue_source"])
+async def test_initial_issue_rejects_wrong_echo_but_accepts_correct_binding(source, field):
+    operation_id = "ph-mop-v1_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    payload = {
+        "status": "issued",
+        "operation_id": operation_id,
+        "installation_id": "installation",
+        "issue_source": source,
+        "qq_subject_ref": "subject",
+        "openrouter_api_key": "synthetic-key",
+        "managed_credential_ref": "managed-ref",
+        "delivery_ack_required": True,
+        "delivery_id": "delivery",
+        "delivery_ack_token": "synthetic-ack",
+    }
+    wrong = {**payload, field: "wrong-binding"}
+    responses = iter([wrong, payload])
+    client, _ = _build_client(lambda _: httpx.Response(200, json=next(responses)))
+    try:
+        if source == "discord":
+            request = {"installation_id": "installation", "operation_id": operation_id}
+            with pytest.raises(ManagedOpenRouterReleaseError) as caught:
+                await client.issue_discord_managed_key(request)
+            assert caught.value.failure_diagnostics.fields["response_shape"] == "malformed_success"
+            correct = await client.issue_discord_managed_key(request)
+            assert correct.openrouter_api_key == "synthetic-key"
+            assert correct.managed_credential_ref == "managed-ref"
+        else:
+            request = QqManagedAssertionRequest(
+                "identity",
+                "a" * 64,
+                "2026-01-01",
+                {},
+                installation_id="installation",
+                operation_id=operation_id,
+            )
+            rejected = await client.assert_qq_managed_identity(request)
+            assert not rejected.succeeded
+            assert rejected.managed_secret_key is None
+            assert rejected.diagnostics.fields["response_shape"] == "malformed_success"
+            correct = await client.assert_qq_managed_identity(request)
+            assert correct.succeeded
+            assert correct.managed_secret_key == "synthetic-key"
+            assert correct.delivery_ack.source == "qq"
+            assert correct.entitlement.managed_credential_ref == "managed-ref"
+    finally:
+        await client.close()

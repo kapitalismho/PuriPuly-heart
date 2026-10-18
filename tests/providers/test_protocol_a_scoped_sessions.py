@@ -277,6 +277,7 @@ async def test_gemini_native_results_are_stream_scoped_receipt_units() -> None:
         )
         submitted = await _next(session)
         assert isinstance(submitted, STTProviderInputTerminal)
+        assert submitted.independent_recognition
         assert (submitted.outcome, submitted.identity) == ("submitted", first.identity)
         await session.begin_turn(second)
         next_span = (
@@ -348,6 +349,7 @@ async def test_gemini_empty_result_transport_error_and_abort_have_distinct_recei
         failed = await _next(errored)
         ended = await _next(errored)
         assert isinstance(failed, STTProviderInputTerminal)
+        assert failed.independent_recognition
         assert failed.failure_reason == "gemini_receive_failed"
         assert isinstance(ended, STTProviderEpochEnded)
     finally:
@@ -360,6 +362,7 @@ async def test_gemini_empty_result_transport_error_and_abort_have_distinct_recei
         await aborted.abort_turn(abort_request.identity, reason="cancelled")
         aborted_terminal = await _next(aborted)
         assert isinstance(aborted_terminal, STTProviderInputTerminal)
+        assert aborted_terminal.independent_recognition
         assert (aborted_terminal.outcome, aborted_terminal.failure_reason) == (
             "cancelled",
             "cancelled",
@@ -1011,6 +1014,7 @@ async def test_each_concrete_streaming_protocol_serves_self_and_peer_concurrentl
         if provider_id == "gemini_transcribe":
             submitted = await _next(session)
             assert isinstance(submitted, STTProviderInputTerminal)
+            assert submitted.independent_recognition
             assert submitted.outcome == "submitted"
             unit = await _next(session)
             assert isinstance(unit, STTRecognitionUnit)

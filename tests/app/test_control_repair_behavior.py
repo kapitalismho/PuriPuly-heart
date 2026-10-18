@@ -364,9 +364,6 @@ async def test_noninterruptible_persistence_drains_before_host_closes(offline, m
 async def test_shutdown_after_commit_before_runtime_reports_interrupted_transaction(
     offline, monkeypatch
 ):
-    from puripuly_heart.app.services.provider_runtime_apply import (
-        UiPromptClipboardStateRuntimeApplyAdapter,
-    )
 
     app = compose_headless_application(offline)
 
@@ -381,6 +378,8 @@ async def test_shutdown_after_commit_before_runtime_reports_interrupted_transact
     persist_entered = threading.Event()
     persist_release = threading.Event()
     runtime_entered = asyncio.Event()
+    runtime_release = asyncio.Event()
+    runtime_cancelled = asyncio.Event()
     original_persist = type(host.control.settings.persistence).persist
 
     def slow_save(self, path, settings):
@@ -389,21 +388,29 @@ async def test_shutdown_after_commit_before_runtime_reports_interrupted_transact
             raise TimeoutError("save gate not released")
         return original_persist(self, path, settings)
 
-    async def blocked_runtime(self, request):
-        runtime_entered.set()
-        await asyncio.Event().wait()
+    async def gated_clipboard_sync(self, *, enabled, strict_runtime_errors=None):
+        if self is clipboard and enabled:
+            runtime_entered.set()
+            try:
+                await runtime_release.wait()
+            except asyncio.CancelledError:
+                runtime_cancelled.set()
+                raise
+        await original_sync(self, enabled=enabled, strict_runtime_errors=strict_runtime_errors)
 
     try:
         await host.start()
+        clipboard = app._settings.application.runtime_effects._clipboard
+        original_sync = type(clipboard).sync
+        initial_strict_runtime_errors = clipboard.strict_runtime_errors
+        assert clipboard.runtime is None
         monkeypatch.setattr(type(host.control.settings.persistence), "persist", slow_save)
-        monkeypatch.setattr(
-            UiPromptClipboardStateRuntimeApplyAdapter, "apply_runtime", blocked_runtime
-        )
+        monkeypatch.setattr(type(clipboard), "sync", gated_clipboard_sync)
         control = host.control
         initial = await control.query("settings.current", {})
         active = await control.submit(
             "settings.apply",
-            {"changes": {"locale": "ja"}},
+            {"changes": {"locale": "ja", "clipboard.enabled": True}},
             request_id="commit-before-runtime",
         )
         assert await asyncio.to_thread(persist_entered.wait, 5)
@@ -412,12 +419,16 @@ async def test_shutdown_after_commit_before_runtime_reports_interrupted_transact
             {"changes": {"locale": "en"}},
             request_id="uncommitted-queued",
         )
-        closing = asyncio.create_task(host.close())
-        await asyncio.sleep(0.05)
-        assert not closing.done()
         persist_release.set()
         await asyncio.wait_for(runtime_entered.wait(), 5)
-        control._operations[active["operation_id"]].task.cancel()
+        committed = await control.query("settings.current", {})
+        assert committed["revision"] == initial["revision"] + 1
+        assert committed["settings"]["intent"]["ui"]["locale"] == "ja"
+        assert committed["settings"]["intent"]["clipboard"]["auto_translate_enabled"] is True
+        assert json.loads(offline.read_text(encoding="utf-8"))["intent"]["ui"]["locale"] == "ja"
+        assert clipboard.runtime is None
+        assert not control._operations[active["operation_id"]].task.done()
+        closing = asyncio.create_task(host.close())
         await asyncio.wait_for(closing, 6)
         active_receipt = await control.operation(active["operation_id"])
         queued_receipt = await control.operation(queued["operation_id"])
@@ -434,12 +445,23 @@ async def test_shutdown_after_commit_before_runtime_reports_interrupted_transact
         assert "transaction" not in queued_receipt
         assert current["settings"]["intent"]["ui"]["locale"] == "ja"
         assert json.loads(offline.read_text(encoding="utf-8"))["intent"]["ui"]["locale"] == "ja"
+        assert current["settings"]["intent"]["clipboard"]["auto_translate_enabled"] is True
+        assert (
+            json.loads(offline.read_text(encoding="utf-8"))["intent"]["clipboard"][
+                "auto_translate_enabled"
+            ]
+            is True
+        )
+        assert runtime_cancelled.is_set()
+        assert clipboard.runtime is None
+        assert clipboard.strict_runtime_errors == initial_strict_runtime_errors
         assert not [
             operation.task
             for operation in control._operations.values()
             if operation.task is not None and not operation.task.done()
         ]
     finally:
+        runtime_release.set()
         persist_release.set()
         if "active" in locals():
             operation = host.control._operations[active["operation_id"]]
@@ -1203,7 +1225,7 @@ async def test_qq_network_recovery_login_remains_action_required_without_reasser
     app = compose_headless_application(offline)
     control = app.control()
 
-    async def execute_qq(_identity, _credential, _referral_id):
+    async def execute_qq(_identity, _credential):
         transaction = await service.authenticate(_request())
         return ManagedAuthExecutionResult(
             succeeded=False,
@@ -1231,7 +1253,6 @@ async def test_qq_network_recovery_login_remains_action_required_without_reasser
         qq_executor=execute_qq,
         discord_executor=unexpected,
         runtime_ensurer=unexpected,
-        usage_view_sink=lambda *_args: None,
         usage_refresh_sink=lambda: None,
         message_sink=lambda *_args: None,
         result_sink=control.results.set,
@@ -1273,7 +1294,9 @@ async def test_qq_network_recovery_login_remains_action_required_without_reasser
             "authorization_failed",
         ),
         ("discord", True, None, False, "applied", None),
-        ("discord", False, "recovering", True, "action_required", "authorization_failed"),
+        ("discord", True, "runtime_degraded", False, "degraded", None),
+        ("qq", True, "runtime_degraded", False, "degraded", None),
+        ("discord", False, "idle_resumable", True, "action_required", "authorization_failed"),
         ("discord", False, "failed", True, "failed", "authorization_failed"),
         (
             "discord",

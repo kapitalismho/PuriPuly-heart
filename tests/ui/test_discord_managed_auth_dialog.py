@@ -352,3 +352,30 @@ def test_discord_managed_auth_dialog_close_is_idempotent() -> None:
 
     assert page.closed == [dialog._dialog]
     assert page.dialog is None
+
+
+def test_exhaustion_exposes_resume_and_ignores_stale_progress_callbacks() -> None:
+    page = DummyPage()
+    calls: list[str] = []
+    dialog = _dialog(page, calls)
+    dialog.open()
+    dialog.set_waiting()
+    dialog.set_recovering()
+    dialog.set_error("discord_auth.error.recovery_pending", resume=True)
+
+    assert dialog.is_open is True
+    assert dialog.is_waiting is False
+    assert dialog._dialog.modal is False
+    assert [button.content for button in dialog._actions.controls] == [
+        t("discord_auth.close"),
+        t("discord_auth.resume"),
+    ]
+    stopped_body = dialog._body_text.value
+    dialog.set_callback_received()
+    dialog.set_recovering()
+    assert dialog._body_text.value == stopped_body
+    dialog._continue_button.on_click(None)
+    assert calls == ["continue"]
+    dialog.set_waiting()
+    dialog._submit()
+    assert calls == ["continue"]
