@@ -1660,6 +1660,7 @@ class TestSpecCommitPaths:
                 lambda: any(message.text == "translated ja" for message in osc.messages)
             )
             assert not llm.releases["zh-CN"].is_set()
+            assert sink.active_self_overlay_metadata().secondary_text == ""
             await _eventually(lambda: harness.self_owner.merge_buffer is None)
             assert [call["target_language"] for call in llm.calls] == ["zh-CN", "ja"]
             llm.releases["zh-CN"].set()
@@ -1673,6 +1674,9 @@ class TestSpecCommitPaths:
                 ("hello", "zh-CN"),
                 ("hello", "ja"),
             ]
+            assert not any(
+                getattr(event, "secondary_text", "") == "translated ja" for event in sink.events
+            )
         finally:
             for release in llm.releases.values():
                 release.set()
@@ -1700,10 +1704,11 @@ class TestSpecCommitPaths:
             await harness.self_owner.handle_vad_event(SpeechEnd(first_id))
             await _source_revision(harness, first_id, "hello")
             await asyncio.wait_for(llm.all_started.wait(), timeout=1.0)
-            llm.releases["ja"].set()
+            llm.releases["zh-CN"].set()
             await _eventually(
                 lambda: any(
-                    getattr(event, "secondary_text", "") == "translated ja" for event in sink.events
+                    getattr(event, "secondary_text", "") == "translated zh-CN"
+                    for event in sink.events
                 )
             )
             await harness.self_owner.handle_vad_event(
@@ -1713,7 +1718,7 @@ class TestSpecCommitPaths:
                 await harness.self_owner.handle_vad_event(
                     SpeechChunk(resumed_id, chunk=samples(0.5))
                 )
-            assert sink.active_self_overlay_metadata().secondary_text == "translated ja"
+            assert sink.active_self_overlay_metadata().secondary_text == "translated zh-CN"
             harness.replace_configuration(low_latency_finalize_wait_ms=0)
             await harness.self_owner.handle_vad_event(SpeechEnd(resumed_id))
             await _source_revision(harness, resumed_id, "continued")
@@ -1789,11 +1794,9 @@ class TestSpecCommitPaths:
             if secondary_ready:
                 old.releases["ja"].set()
                 await _eventually(
-                    lambda: any(
-                        getattr(event, "secondary_text", "") == "translated ja"
-                        for event in sink.events
-                    )
+                    lambda: any(message.text == "translated ja" for message in osc.messages)
                 )
+                assert sink.active_self_overlay_metadata().secondary_text == ""
             await harness.replace_llm_provider(new)
             for release in old.releases.values():
                 release.set()

@@ -781,35 +781,23 @@ class DashboardView(ft.Column):
         self._self_turn_snapshot = snapshot
         self._primary_display_revision += 1
         self._current_display_text = snapshot.source_text
-        ready = [
-            target
-            for target in snapshot.targets
-            if target.status == "ready"
-            and target.source_revision == snapshot.source_revision
-            and target.translation is not None
+        primary = snapshot.targets[0] if snapshot.targets else None
+        translation = (
+            primary.translation
+            if primary is not None
+            and primary.status == "ready"
+            and primary.source_revision == snapshot.source_revision
             and snapshot.status not in ("cancelled", "expired")
-        ]
-        translation_text = "\n".join(
-            (
-                f"{language_name(target.target_language)}: {target.translation.text}"
-                if len(snapshot.targets) > 1
-                else target.translation.text
-            )
-            for target in ready
+            else None
         )
-        status_key = snapshot.status
-        if status_key == "active":
-            status_key = "translating" if snapshot.source_closed else "preview"
         self.display_card.set_turn(
             snapshot.source_text,
-            translation_text or None,
+            translation.text if translation is not None else None,
             source_face=self._typeface(snapshot.source_language),
             translation_face=self._typeface(
-                ready[0].target_language if ready else snapshot.source_language
+                primary.target_language if translation is not None else snapshot.source_language
             ),
-            status=status_key,
             new_turn=previous is None or previous.utterance_id != snapshot.utterance_id,
-            target_count=len(snapshot.targets),
         )
 
     def set_managed_auth_pending(self, pending: bool) -> None:

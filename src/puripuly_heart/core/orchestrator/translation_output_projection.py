@@ -1375,16 +1375,16 @@ class TranslationOutputProjectionOwner:
         self.diagnostics.retain_latency_until_output("self", snapshot.utterance_id)
         current = self._self_presentation_authority
         if current is None or current.order_watermark is None or key >= current.order_watermark:
-            translations = tuple(
-                target.translation
-                for target in snapshot.targets
-                if target.status == "ready"
-                and target.source_revision == snapshot.source_revision
-                and target.translation is not None
-            )
             ready = next(
-                (translation for translation in translations if translation.text.strip()),
-                translations[0] if translations else None,
+                (
+                    target.translation
+                    for target in snapshot.targets
+                    if target.target_language == config_snapshot.value.target_language
+                    and target.status == "ready"
+                    and target.source_revision == snapshot.source_revision
+                    and target.translation is not None
+                ),
+                None,
             )
             await self.sync_active_self(
                 ActiveSelfProjection(
@@ -3218,7 +3218,11 @@ class TranslationOutputProjectionOwner:
         translation = projection.spec_translation
         if translation is not None and reuse_mode is not None:
             return translation.text.strip(), "spec"
-        if metadata is not None and metadata.secondary_text.strip():
+        if (
+            metadata is not None
+            and metadata.secondary_text.strip()
+            and metadata.secondary_language == projection.target_language
+        ):
             return metadata.secondary_text.strip(), "sticky_cache"
         return "", "blank"
 

@@ -33,7 +33,6 @@ DISPLAY_TEXT_HEIGHT = 210
 DISPLAY_LINE_HEIGHT_RATIO = 1.4
 DISPLAY_WEIGHTED_UNIT_WIDTH_RATIO = 0.55
 DISPLAY_SIZE_CANDIDATES: tuple[int, ...] = (48, 44, 40, 36, 32, 28, 24, 20, 16)
-DISPLAY_MULTI_TARGET_SIZE_CAP = 28
 
 
 def _weighted_len(text: str) -> int:
@@ -114,7 +113,6 @@ class DisplayCard(ft.Container):
         self._source_as_message = False
         self._translation_is_visible = False
         self.input_is_focused = False
-        self._turn_status: str | None = None
 
         initial_size, initial_max_lines = _display_layout_for_length(
             _weighted_len(self._source_value)
@@ -128,13 +126,6 @@ class DisplayCard(ft.Container):
             no_wrap=False,
             max_lines=initial_max_lines,
             overflow=ft.TextOverflow.ELLIPSIS,
-        )
-
-        self._turn_state_text = ft.Text(
-            "",
-            size=14,
-            color=COLOR_SECONDARY,
-            visible=False,
         )
 
         self._notice_action_button = ft.TextButton(
@@ -202,7 +193,7 @@ class DisplayCard(ft.Container):
         )
 
         main_content = ft.Column(
-            [self._turn_state_text, display_region, input_footer],
+            [display_region, input_footer],
             expand=True,
             alignment=ft.MainAxisAlignment.START,
             spacing=8,
@@ -263,10 +254,6 @@ class DisplayCard(ft.Container):
     ):
         """Show source text and start a new turn, dropping any prior translation."""
         _ = is_error
-        self._turn_status = None
-        self._turn_state_text.value = ""
-        self._turn_state_text.visible = False
-        update_control_if_mounted(self._turn_state_text)
         self._showing_status = False
         self._source_value = text
         self._source_face = _content_face(font_family, letter_spacing)
@@ -288,10 +275,6 @@ class DisplayCard(ft.Container):
         debug_prefix: str | None = None,
     ) -> None:
         """Replace the visible slot with the translation."""
-        self._turn_status = None
-        self._turn_state_text.value = ""
-        self._turn_state_text.visible = False
-        update_control_if_mounted(self._turn_state_text)
         self._showing_status = False
         self._source_as_message = False
         self._translation_value = text or None
@@ -308,9 +291,7 @@ class DisplayCard(ft.Container):
         *,
         source_face: TypeFace,
         translation_face: TypeFace,
-        status: str,
         new_turn: bool,
-        target_count: int = 1,
     ) -> None:
         self._showing_status = False
         self._source_as_message = False
@@ -321,13 +302,7 @@ class DisplayCard(ft.Container):
         self._debug_prefix = None
         if new_turn or self._turn_size_cap is None:
             self._turn_size_cap = _display_layout_for_length(_weighted_len(source_text))[0]
-        if target_count > 1:
-            self._turn_size_cap = min(self._turn_size_cap, DISPLAY_MULTI_TARGET_SIZE_CAP)
-        self._turn_status = status
-        self._turn_state_text.value = t(f"display.turn.{status}")
-        self._turn_state_text.visible = True
         self._sync_display()
-        update_control_if_mounted(self._turn_state_text)
 
     def set_status(
         self,
@@ -338,8 +313,6 @@ class DisplayCard(ft.Container):
     ):
         """Update connection status display."""
         self._status = status
-        self._turn_state_text.visible = False
-        update_control_if_mounted(self._turn_state_text)
         self._showing_status = True
         self._source_as_message = False
         self._source_value = _status_label(status)
@@ -401,10 +374,6 @@ class DisplayCard(ft.Container):
         input_letter_spacing: float | None = None,
     ) -> None:
         self._input_field.hint_text = t("display.input_hint")
-        if self._turn_state_text.visible and self._turn_status is not None:
-            self._turn_state_text.value = t(f"display.turn.{self._turn_status}")
-            update_control_if_mounted(self._turn_state_text)
-
         # Explicitly set hint font to UI font (Display font)
         self._input_field.hint_style = text_style(
             _content_face(display_font_family, display_letter_spacing),

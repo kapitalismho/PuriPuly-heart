@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
@@ -29,17 +30,28 @@ from puripuly_heart.core.orchestrator.translation_turn import (
     TranslationTurnChild,
     TranslationTurnOutcome,
 )
-from puripuly_heart.core.overlay.sink import OverlayApplicationReceipt, OverlayEventUnion
+from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.overlay.sink import (
+    OverlayApplicationReceipt,
+    OverlayEventUnion,
+    OverlaySink,
+)
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime_logging import SessionRuntimeLoggingService
-from puripuly_heart.domain.events import UIEvent, UIEventType
+from puripuly_heart.domain.events import (
+    SelfTurnPresentation,
+    SelfTurnTargetPresentation,
+    UIEvent,
+    UIEventType,
+)
 from puripuly_heart.domain.models import OSCMessage, Transcript, Translation
 from tests.core.test_translation_owner_branch_coverage import (
     _make_runtime_logging_capture,
     _runtime_log_messages,
     _RuntimeLogSinks,
 )
+from tests.helpers.self_stream import until
 
 
 @dataclass(slots=True)
@@ -125,7 +137,7 @@ class BlockingPeerOverlay(RecordingOverlay):
 def make_owner(
     *,
     configuration: TranslationRuntimeConfig | None = None,
-    overlay: RecordingOverlay | None = None,
+    overlay: OverlaySink | None = None,
     chatbox: RecordingChatbox | None = None,
 ) -> tuple[
     TranslationOutputProjectionOwner,
@@ -1307,6 +1319,110 @@ async def test_active_self_projection_owns_soft_reuse_and_sticky_secondary_decis
     assert receipt.source == "sticky_cache"
     assert receipt.secondary_text == "sticky"
     assert receipt.emitted
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("primary_status", "primary_source_revision", "cached_language", "expected_secondary"),
+    [
+        ("pending", 1, None, ""),
+        ("failed", 1, None, ""),
+        ("ready", 0, None, ""),
+        ("pending", 1, "en", "cached primary"),
+        ("pending", 1, "ja", ""),
+    ],
+)
+async def test_self_turn_overlay_uses_only_current_primary_and_primary_language_cache(
+    primary_status, primary_source_revision, cached_language, expected_secondary
+) -> None:
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    owner, chatbox, _ui_messages, configuration = make_owner(
+        configuration=TranslationRuntimeConfig(
+            target_language="en",
+            self_target_languages=("en", "ja"),
+            chatbox_include_source=False,
+        ),
+        overlay=presenter,
+    )
+    turn_id = uuid4()
+    primary = Translation(turn_id, "current primary", source_language="ko", target_language="en")
+    secondary = Translation(
+        uuid4(), "secondary translation", source_language="ko", target_language="ja"
+    )
+    snapshot = SelfTurnPresentation(
+        utterance_id=turn_id,
+        turn_generation=0,
+        turn_order=0,
+        revision=1,
+        source_revision=1,
+        source_text="current source",
+        source_language="ko",
+        source_closed=False,
+        status="active",
+        targets=(
+            SelfTurnTargetPresentation(
+                "en",
+                primary_source_revision,
+                primary_status,
+                primary if primary_status == "ready" else None,
+            ),
+            SelfTurnTargetPresentation("ja", 1, "ready", secondary),
+        ),
+        created_at=10.0,
+    )
+    try:
+        if cached_language is not None:
+            await owner.sync_active_self(
+                ActiveSelfProjection(
+                    merge_id=turn_id,
+                    active_text="previous source",
+                    spec_text="previous source",
+                    spec_translation=Translation(
+                        turn_id,
+                        "cached primary" if cached_language == "en" else "cached secondary",
+                        source_language="ko",
+                        target_language=cached_language,
+                    ),
+                    source_language="ko",
+                    target_language=cached_language,
+                    resume_pending=False,
+                    resume_confirmed=False,
+                )
+            )
+        await owner.project_self_turn(snapshot, configuration.snapshot(), source="Mic")
+        await until(
+            lambda: any(
+                block.primary_text == snapshot.source_text for block in presenter.snapshot().blocks
+            )
+        )
+        block = presenter.snapshot().blocks[0]
+        assert block.secondary_text == expected_secondary
+        assert block.secondary_language == ("en" if expected_secondary else None)
+        assert chatbox.messages[-1].text == "secondary translation"
+        await owner.project_self_turn(
+            replace(
+                snapshot,
+                revision=2,
+                source_closed=True,
+                status="complete",
+                targets=(
+                    SelfTurnTargetPresentation("en", 1, "ready", primary),
+                    snapshot.targets[1],
+                ),
+            ),
+            configuration.snapshot(),
+            source="Mic",
+        )
+        await until(
+            lambda: any(block.block_variant == "finalized" for block in presenter.snapshot().blocks)
+        )
+        block = presenter.snapshot().blocks[0]
+        assert block.secondary_text == "current primary"
+        assert block.secondary_language == "en"
+        assert chatbox.messages[-1].text == "current primary\nsecondary translation"
+    finally:
+        await owner.output_runtime.close()
+        await presenter.close()
 
 
 @pytest.mark.asyncio
