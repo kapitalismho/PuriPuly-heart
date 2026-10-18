@@ -46,6 +46,7 @@ from puripuly_heart.core.overlay.sink import (
     OverlayEventAdapter,
     OverlayEventUnion,
     OverlaySink,
+    SelfActiveUpdate,
     UtteranceClosed,
 )
 from puripuly_heart.core.runtime.output_batch import (
@@ -611,8 +612,15 @@ class OutputRuntime:
         elif snapshot.revision <= state.snapshot.revision:
             return
         else:
+            unchanged = configuration == state.configuration and snapshot == replace(
+                state.snapshot,
+                revision=snapshot.revision,
+                boundary_source_revision=snapshot.boundary_source_revision,
+            )
             state.snapshot = snapshot
             state.configuration = configuration
+            if unchanged:
+                return
         if snapshot.status == "cancelled":
             state.settled = True
         if state.batch is not None and state.batch.disposition is None:
@@ -1285,6 +1293,13 @@ class OutputRuntime:
                     publication_kind=publication_kind,
                     reason=batch.disposition,
                 )
+        delivery_event = event
+        if (
+            batch.caption_admission_seq is not None
+            and isinstance(event, SelfActiveUpdate)
+            and (event.retained_only or event.seq != batch.caption_admission_seq)
+        ):
+            delivery_event = replace(event, seq=batch.caption_admission_seq, retained_only=False)
 
         current_task = asyncio.current_task()
         if current_task is None:
@@ -1302,7 +1317,7 @@ class OutputRuntime:
 
         receipt: OverlayApplicationReceipt | None = None
         try:
-            receipt = await overlay_sink.emit(event)
+            receipt = await overlay_sink.emit(delivery_event)
         except asyncio.CancelledError:
             receipt_lookup = getattr(overlay_sink, "application_receipt", None)
             if callable(receipt_lookup):

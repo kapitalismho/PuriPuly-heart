@@ -11,11 +11,12 @@ Windows Rust runtime for the VR subtitle overlay.
   - `src/puripuly_heart/core/runtime/overlay.py`
   - `src/puripuly_heart/ui/desktop_overlay.py`
 
-The shared bridge is version 15 with execution contract r2 and exclusive native
-presentation retries. Authentication and readiness require
-`speaker_identity_presentation: {"version":2,"policy":"immutable_first_readable_style"}`;
-version 14 and earlier are incompatible because native no longer independently
-retires captions from semantic frontiers. Python fixes a caption's `speaker_style` at first
+The shared bridge is version 16 with execution contract r2 and exclusive native
+presentation retries (`native_presentation_retry: {"version":2,"ownership":"exclusive"}`).
+Authentication and readiness also require
+`speaker_identity_presentation: {"version":2,"policy":"immutable_first_readable_style"}`.
+Version 15 and earlier are incompatible with the scene-coverage retry contract.
+Python fixes a caption's `speaker_style` at first
 readable publication and sends only that style, not speaker identity. SELF
 remains white. Peers without diarization (unsupported providers or Soniox with
 diarization OFF) use gold `#FFD700` without consuming or resetting speaker slots.
@@ -43,18 +44,55 @@ fails. Health reports presentation progress, not caption freshness. Runtime
 generation retirement, bounded recovery, OFF/shutdown, and the 500 ms empty-frame
 hide grace remain unchanged.
 
-Changed, visible SELF active-source captions use the existing stream-phase
-fresh-render episode without becoming semantic finals. Normal scene-update
-rendering remains immediate. Same-target updates may advance trigger generation
-but retain the episode deadline and completed count, including after exhaustion.
-Semantic finalization changes phase; a changed final translation retains its
-distinct final episode. Unchanged content does not establish a new trigger.
+Changed, visible SELF scenes renew both trigger and episode generations under the
+existing native retry owner. Ordinary scene-update rendering remains immediate.
+The reserved `scene:self` target covers the currently accepted nonempty scene,
+including a retained-caption patch and the surviving scene after SELF removal.
+It is not a caption, does not change PEER admission, and cannot revive removed
+content. The phase stays stream while an active SELF caption survives; otherwise
+the scene uses final protection. Source closure alone does not end an active
+caption's pending-translation protection.
 
-The production P05 bounds remain 100 ms retry cadence, a 500 ms scheduling
-deadline, at most four stream and five final opportunities, and a separate
-2 s readiness no-progress timeout. These are scheduling bounds, not display
-latency guarantees. Retry metadata does not refresh caption age or reanchor a
-current identity. Desktop presentation does not schedule native retries.
+Eligibility compares effective visible identity, text and style. Undisplayed
+stable source, unchanged boundary metadata and hidden translations do not rearm
+or erase intent. Coalescing protects the latest scene rather than replaying
+intermediate scenes. SELF publication uses odd generation identities; a nonempty
+send-time expiry change uses the following even identity, so it cannot collide
+with the next presenter milestone. Fully empty output cancels scene protection
+and retains the successful-empty-frame and Hide-grace contract.
+Same-epoch clear retains internal generation high-water marks so a later scene
+remains distinct even if the empty snapshot coalesces away. Fresh runtime epochs
+reset and seed only currently valid content, including applicable SELF scene
+coverage over a drawable PEER survivor after SELF removal. They use fresh
+generation 1 and the current phase without renewing Python caption deadlines
+or replaying old retry ticks. A secondary-only PEER without prior SELF scene
+coverage does not acquire a new SELF or independent PEER episode.
+
+Each P05 window starts when native reconciles the accepted eligible scene, not
+at Python publication time. The bounds remain 100 ms cadence, a 500 ms scheduling
+wall, at most four stream and five final credited opportunities, and a separate
+2 s due-work no-progress timeout. New episodes do not reset that timeout or
+release unfinished GPU work. Fresh rendering and readiness checking precede
+submission; delayed, superseded, cancelled and exhausted work is not a completed
+opportunity. More milestones can increase total work per caption despite bounded
+per-episode and simultaneous ownership. These limits do not guarantee physical
+HMD display. Retry metadata does not refresh caption age or reanchor an identity.
+Desktop presentation does not schedule native retries.
+
+The bounded `native_retry` diagnostic stream correlates runtime, scene, trigger,
+episode, phase and hashed target identity with active/due state, deadline and
+disposition. Completed rows retain matching fresh-render, producer-ready and
+submit-success witnesses. No caption text is logged. A scheduled row alone is
+not execution evidence; an obsolete completion cannot satisfy a newer episode.
+
+Scene-level nonempty eligibility includes enabled secondary-only text. A PEER
+awaiting translation can therefore retain SELF-driven scene protection without
+gaining a separate PEER retry episode or changing its caption policy.
+
+OpenVR process-quit events retain their process identity. A quit notification
+for another process cannot terminate this overlay or interrupt its empty-frame
+Hide grace. Owned-process quit, global Quit and DriverRequestedQuit remain fatal;
+ignored events still consume the existing bounded event-poll budget.
 
 Python's semantic retirement compares `(publication_order, publication_index)`
 within a scope and generation to reject late publications. It does not invalidate

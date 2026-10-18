@@ -386,8 +386,9 @@ async def test_blocked_overlay_and_ui_do_not_block_source_close_or_chatbox_progr
     )
     try:
         identity = await begin(harness, "independent")
-        await asyncio.wait_for(overlay.started.wait(), 1)
+        assert not overlay.started.is_set()
         provider.release("independent")
+        await asyncio.wait_for(overlay.started.wait(), 1)
         await until(lambda: sender.packets == ["en:independent"])
         assert harness.self_owner.merge_buffer is not None
         assert overlay.events == []

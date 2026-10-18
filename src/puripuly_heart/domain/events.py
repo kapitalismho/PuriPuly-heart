@@ -118,6 +118,7 @@ class SelfTurnPresentation:
     status: Literal["active", "complete", "failed", "cancelled", "expired"]
     targets: tuple[SelfTurnTargetPresentation, ...]
     created_at: float
+    boundary_source_revision: int = 0
 
 
 class UIEventDeliveryAuthority(Protocol):

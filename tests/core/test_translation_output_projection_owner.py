@@ -19,7 +19,6 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationLatencyDiagnosticsOwner,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
-    ActiveSelfProjection,
     TranslationOutputProjectionOwner,
     TranslationResultProjectionReceipt,
     TranslationUiMessage,
@@ -33,6 +32,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
 from puripuly_heart.core.overlay.sink import (
     OverlayApplicationReceipt,
+    OverlayEventAdapter,
     OverlayEventUnion,
     OverlaySink,
 )
@@ -1277,48 +1277,11 @@ async def test_overlay_failure_does_not_suppress_self_ui_or_chatbox() -> None:
     )
 
 
-@pytest.mark.asyncio
-async def test_active_self_projection_owns_soft_reuse_and_sticky_secondary_decision() -> None:
-    merge_id = uuid4()
-    overlay = RecordingOverlay(
-        metadata=ActiveSelfOverlayMetadata(
-            text="hello",
-            secondary_text="sticky",
-            utterance_id=merge_id,
-            occupant_key=f"self:{merge_id}",
-            update_id=None,
-            origin_wall_clock_ms=None,
-            session_scope=None,
-            source_text_hash=None,
-            source_text_len=None,
-            logical_turn_key=None,
-            primary_language="en",
-            secondary_language="ko",
-        )
-    )
-    owner, _chatbox, _ui_messages, _config_owner = make_owner(overlay=overlay)
-
-    receipt = await owner.sync_active_self(
-        ActiveSelfProjection(
-            merge_id=merge_id,
-            active_text="hello?",
-            spec_text="hello",
-            spec_translation=Translation(
-                utterance_id=merge_id,
-                text="spec",
-            ),
-            source_language="en",
-            target_language="ko",
-            resume_pending=False,
-            resume_confirmed=False,
-        )
-    )
-
+def test_source_owner_reuse_keeps_exact_and_soft_boundary_meanings_distinct() -> None:
+    owner, _chatbox, _ui_messages, _configuration = make_owner()
+    assert owner.soft_reuse_mode("hello", "hello") == "exact"
     assert owner.soft_reuse_mode(" hello ", "hello...") == "soft_boundary"
     assert owner.soft_reuse_mode("hello", "hello?") is None
-    assert receipt.source == "sticky_cache"
-    assert receipt.secondary_text == "sticky"
-    assert receipt.emitted
 
 
 @pytest.mark.asyncio
@@ -1328,11 +1291,11 @@ async def test_active_self_projection_owns_soft_reuse_and_sticky_secondary_decis
         ("pending", 1, None, ""),
         ("failed", 1, None, ""),
         ("ready", 0, None, ""),
-        ("pending", 1, "en", "cached primary"),
+        ("pending", 1, "en", ""),
         ("pending", 1, "ja", ""),
     ],
 )
-async def test_self_turn_overlay_uses_only_current_primary_and_primary_language_cache(
+async def test_self_turn_boundary_uses_only_current_target_without_unowned_live_cache(
     primary_status, primary_source_revision, cached_language, expected_secondary
 ) -> None:
     presenter = OverlayPresenter(calibration=OverlayCalibration())
@@ -1369,24 +1332,20 @@ async def test_self_turn_overlay_uses_only_current_primary_and_primary_language_
             SelfTurnTargetPresentation("ja", 1, "ready", secondary),
         ),
         created_at=10.0,
+        boundary_source_revision=1,
     )
     try:
         if cached_language is not None:
-            await owner.sync_active_self(
-                ActiveSelfProjection(
-                    merge_id=turn_id,
-                    active_text="previous source",
-                    spec_text="previous source",
-                    spec_translation=Translation(
-                        turn_id,
-                        "cached primary" if cached_language == "en" else "cached secondary",
-                        source_language="ko",
-                        target_language=cached_language,
+            await presenter.emit(
+                OverlayEventAdapter().self_active_update(
+                    utterance_id=turn_id,
+                    occupant_key=f"self:{turn_id}",
+                    text="previous source",
+                    secondary_text=(
+                        "cached primary" if cached_language == "en" else "cached secondary"
                     ),
                     source_language="ko",
                     target_language=cached_language,
-                    resume_pending=False,
-                    resume_confirmed=False,
                 )
             )
         await owner.project_self_turn(snapshot, configuration.snapshot(), source="Mic")

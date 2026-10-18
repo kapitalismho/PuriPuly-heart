@@ -39,6 +39,11 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 )
 from puripuly_heart.app.services.http_extension_registry import HttpExtensionRegistryService
 from puripuly_heart.app.services.telemetry_reporting import APP_ACTIVE_DAY_RETRY_DELAY_S
+from puripuly_heart.app.services.translation_enable import (
+    ManagedTranslationPreparation,
+    TranslationEnableOwner,
+    TranslationEnableState,
+)
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.provider_values import (
@@ -2512,11 +2517,13 @@ async def test_qq_success_translation_failure_reports_activation_only(raises, ca
     app._qq_managed_auth_cancelled = False
     app._show_snackbar = lambda message, *args: notices.append(message)
     app.view_dashboard = SimpleNamespace(set_translation_enabled=lambda value: None)
+    enable_calls = []
 
     async def authenticate(**kwargs):
         return True
 
     async def enable(*args, **kwargs):
+        enable_calls.append((args, kwargs))
         if raises:
             raise RuntimeError("secret-must-not-leak")
         return False
@@ -2531,6 +2538,7 @@ async def test_qq_success_translation_failure_reports_activation_only(raises, ca
         app._start_qq_managed_auth()
         await app.page.tasks[0]()
     assert closed == [True]
+    assert enable_calls == [((True,), {"allow_authorization": True})]
     assert errors == []
     assert notices == [app_module.t("qq_auth.error.translation_start_failed")]
     assert "success stage=authentication code=authentication_succeeded" in caplog.text
@@ -4189,6 +4197,121 @@ def _managed_dialog_app(source, login, *, activation=True, failure_key=None, pro
         app.show_discord_managed_auth_dialog()
         dialog = app._discord_managed_auth_dialog
     return app, dialog, notifications, visuals
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+@pytest.mark.parametrize("warmup_fails", [False, True])
+async def test_managed_auth_waits_for_owned_activation_before_reporting_result(
+    source, warmup_fails
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._mark_launch_high_priority_feedback_shown = lambda *_args: None
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+    notifications, visuals, runtime_values, starting_values = [], [], [], []
+    entered, release = asyncio.Event(), asyncio.Event()
+    state = TranslationEnableState(
+        runtime_available=True,
+        translation_enabled=False,
+        llm_available=True,
+        settings_available=True,
+        provider_name="openrouter",
+        qwen_region=None,
+        managed_selected=True,
+        managed_china=source == "qq",
+        managed_local_key_available=True,
+        managed_release_service_available=True,
+        ingress_frozen=False,
+    )
+
+    def set_runtime(enabled):
+        runtime_values.append(enabled)
+        hub.translation_enabled = enabled
+
+    async def warmup():
+        assert app.application.control().lock_owned_by_current_task()
+        entered.set()
+        await release.wait()
+        if warmup_fails:
+            raise RuntimeError("isolated provider warmup failure")
+
+    prepare = AsyncMock(return_value=ManagedTranslationPreparation(ready=True))
+    owner = TranslationEnableOwner(
+        state_provider=lambda: replace(state, translation_enabled=hub.translation_enabled),
+        managed_prepare=prepare,
+        founder_route=AsyncMock(return_value=False),
+        pending_sink=lambda _pending: None,
+        runtime_ensurer=AsyncMock(return_value=True),
+        usage_refresh_sink=lambda: None,
+        usage_refresh_now=AsyncMock(),
+        runtime_sink=set_runtime,
+        dashboard_sink=lambda _enabled: None,
+        clear_context=lambda: None,
+        warmup=warmup,
+        message_sink=lambda *_args: None,
+        qq_dialog_sink=lambda: None,
+        result_sink=lambda _result: None,
+        log_basic=lambda _message: None,
+        log_diagnostic=lambda _message: None,
+        log_error=lambda _message: None,
+        founder_letter_sink=lambda: None,
+        starting_sink=starting_values.append,
+    )
+    login = AsyncMock(return_value=True)
+    app._ui_application = compose_test_ui_application_boundary(
+        SimpleNamespace(
+            hub=hub,
+            start_qq_managed_auth_from_dialog=login,
+            start_discord_managed_auth_from_dialog=login,
+            set_translation_enabled=owner.set_enabled,
+            dashboard_managed_auth_prompt_kind=lambda: source,
+        )
+    )
+    app._show_snackbar = lambda message, color: notifications.append((message, color))
+    app._set_dashboard_translation_visual_state = visuals.append
+    getattr(app, f"show_{source}_managed_auth_dialog")()
+    dialog = getattr(app, f"_{source}_managed_auth_dialog")
+    if source == "qq":
+        dialog._qq_identity_field.value = "qq-user"
+        dialog._credential_field.value = "a" * 64
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    generation = getattr(app, f"_{source}_managed_auth_generation")
+    task = asyncio.create_task(app.page.tasks[0]())
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        assert hub.translation_enabled is True
+        assert starting_values == [True]
+        assert dialog.is_waiting is True
+        assert app.application.dashboard_managed_auth_action() == "in_progress"
+        assert visuals == []
+        assert notifications == []
+        start()
+        assert getattr(app, f"_{source}_managed_auth_generation") == generation
+        assert len(app.page.tasks) == 1
+    finally:
+        release.set()
+        await task
+    ready = not warmup_fails
+    prepare.assert_awaited_once_with(True)
+    login.assert_awaited_once()
+    assert runtime_values == ([True, False] if warmup_fails else [True])
+    assert hub.translation_enabled is ready
+    assert starting_values == [True, False]
+    assert dialog.is_open is False
+    assert dialog.is_waiting is False
+    assert visuals == [ready]
+    message_key = (
+        f"{source}_auth.success" if ready else f"{source}_auth.error.translation_start_failed"
+    )
+    assert notifications == [
+        (
+            app_module.t(message_key),
+            app_module.COLOR_SUCCESS if ready else app_module.COLOR_WARNING,
+        )
+    ]
+    assert app.application.managed_auth_task_names() == ()
 
 
 @pytest.mark.asyncio

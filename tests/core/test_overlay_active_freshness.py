@@ -15,21 +15,25 @@ from tests.helpers.overlay_active_freshness import projected_self_lifecycle
 
 
 @pytest.mark.asyncio
-async def test_active_self_projection_keeps_stream_episode_until_semantic_final() -> None:
+async def test_active_self_projection_rearms_stream_episode_for_each_visible_milestone() -> None:
     snapshots = await projected_self_lifecycle()
     blocks = [snapshot["blocks"][0] for snapshot in snapshots[:-1]]
     assert {block["id"] for block in blocks} == {blocks[0]["id"]}
     assert {block["occupant_key"] for block in blocks} == {blocks[0]["occupant_key"]}
     assert {block["appearance_seq"] for block in blocks} == {blocks[0]["appearance_seq"]}
     assert [block["block_variant"] for block in blocks] == ["active_self"] * 4 + ["finalized"] * 2
-    assert [
-        snapshot["native_fresh_render_generations"]["self"] for snapshot in snapshots[:-1]
-    ] == list(range(1, 7))
+    assert [snapshot["native_fresh_render_generations"]["self"] for snapshot in snapshots[:-1]] == [
+        1,
+        3,
+        5,
+        7,
+        9,
+        11,
+    ]
     episodes = [snapshot["native_quiet_tail_episodes"]["self"] for snapshot in snapshots[:-1]]
-    assert episodes[:4] == [{"phase": "stream", "generation": 1}] * 4
-    assert episodes[4:] == [
-        {"phase": "final", "generation": 2},
-        {"phase": "final", "generation": 3},
+    assert episodes == [
+        {"phase": "stream" if index < 4 else "final", "generation": 1 + 2 * index}
+        for index in range(6)
     ]
     assert snapshots[-1]["blocks"] == []
     assert "native_quiet_tail_episodes" not in snapshots[-1]

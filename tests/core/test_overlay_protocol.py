@@ -62,6 +62,10 @@ def test_native_fresh_render_targets_are_optional_and_backward_compatible() -> N
     assert OverlayPresentationSnapshot.from_dict(snapshot.to_dict()) == snapshot
     with pytest.raises(ValueError):
         NativeFreshRenderTargets.from_dict({"self": " "})
+    scene = NativeFreshRenderTargets(self="scene:self")
+    assert NativeFreshRenderTargets.from_dict(scene.to_dict()) == scene
+    with pytest.raises(ValueError, match="PEER"):
+        NativeFreshRenderTargets(peer="scene:self")
 
 
 @pytest.mark.parametrize(

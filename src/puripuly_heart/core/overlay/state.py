@@ -81,6 +81,8 @@ class OverlayLogicalTurnEntry:
     retained_hidden: bool = False
     window_evicted_at: float | None = None
     expiration_revision: int = 0
+    caption_revision: int = 0
+    source_closed: bool = False
 
     @property
     def block_id(self) -> str:
@@ -292,6 +294,109 @@ class OverlayPresentationState:
         )
         self._pending_removals.append(record)
         return record
+
+    def apply_self_caption_update(
+        self,
+        event: SelfActiveUpdate,
+        *,
+        now: float,
+        show_translation: bool,
+        next_appearance_seq: NextAppearanceSeq,
+        terminal_update_reason: OverlayTerminalUpdateReason,
+    ) -> OverlayReductionResult:
+        key = self.entry_key(event.channel, event.utterance_id)
+        if terminal_update_reason(event.channel, event.utterance_id) is not None:
+            return OverlayReductionResult(False)
+        entry = self.entries.get(key)
+        if event.retained_only and (entry is None or entry.retained_hidden):
+            return OverlayReductionResult(False)
+        if entry is not None and (
+            event.caption_revision <= entry.caption_revision or event.seq < entry.last_updated_seq
+        ):
+            return OverlayReductionResult(False)
+        if event.caption_cancelled:
+            self.remove_entry(key, reason="caption_cancelled", now=now, tombstone_seq=event.seq)
+            return OverlayReductionResult(entry is not None)
+        if entry is None:
+            entry = self.entry_for(event.channel, event.utterance_id)
+        previous_translation = self._rendered_self_translation_text(entry)
+        previous_payload = (
+            entry.original_text,
+            entry.translation_text,
+            entry.original_language,
+            entry.translation_language,
+            entry.source_closed,
+            self.live_self_turn_key == key,
+        )
+        if not event.retained_only and self.live_self_turn_key != key:
+            self._clear_live_self_pointer(
+                reason="live_self_replaced", now=now, show_translation=show_translation
+            )
+        self._remember_entry_input_seq(entry, event_seq=event.seq)
+        if not entry.occupant_key:
+            entry.occupant_key = event.occupant_key
+        if not entry.source_closed:
+            entry.original_text = event.text
+            entry.original_language = _line_language(event.source_language, event.text)
+            entry.original_seq = event.seq
+        entry.source_closed = bool(event.caption_source_closed)
+        entry.translation_text = event.secondary_text
+        entry.translation_language = _line_language(event.target_language, event.secondary_text)
+        entry.translation_update_id = event.update_id
+        entry.translation_origin_wall_clock_ms = event.origin_wall_clock_ms
+        entry.translation_session_scope = event.session_scope
+        entry.translation_source_text_hash = event.source_text_hash
+        entry.translation_source_text_len = event.source_text_len
+        entry.translation_logical_turn_key = event.logical_turn_key
+        entry.translation_seq = event.seq if event.secondary_text.strip() else None
+        if not event.retained_only:
+            self.live_self_turn_key = key
+        if self.live_self_turn_key == key:
+            if event.caption_complete:
+                self._clear_self_live_payload(entry)
+                self.live_self_turn_key = None
+            else:
+                entry.live_text = entry.original_text
+                entry.live_primary_language = entry.original_language
+                entry.live_secondary_text = entry.translation_text
+                entry.live_secondary_language = entry.translation_language
+                entry.live_update_id = event.update_id
+                entry.live_origin_wall_clock_ms = event.origin_wall_clock_ms
+                entry.live_session_scope = event.session_scope
+                entry.live_source_text_hash = event.source_text_hash
+                entry.live_source_text_len = event.source_text_len
+                entry.live_logical_turn_key = event.logical_turn_key
+                entry.live_seq = event.seq
+        if event.caption_complete and entry.closed_at is None:
+            entry.closed_at = now
+            entry.closed_seq = event.seq
+        entry.caption_revision = event.caption_revision
+        entry.last_updated_seq = event.seq
+        self._update_self_translation_visibility(
+            entry,
+            previous_rendered_text=previous_translation,
+            next_rendered_text=self._rendered_self_translation_text(entry),
+            now=now,
+            show_translation=show_translation,
+        )
+        self._refresh_entry_visibility_and_expiration(
+            key,
+            entry,
+            now=now,
+            publishable_seq=event.seq,
+            next_appearance_seq=next_appearance_seq,
+        )
+        return OverlayReductionResult(
+            previous_payload
+            != (
+                entry.original_text,
+                entry.translation_text,
+                entry.original_language,
+                entry.translation_language,
+                entry.source_closed,
+                self.live_self_turn_key == key,
+            )
+        )
 
     def apply_self_active_update(
         self,

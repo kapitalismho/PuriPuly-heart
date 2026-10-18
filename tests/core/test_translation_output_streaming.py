@@ -59,6 +59,16 @@ class RecordingOverlaySink:
         self.events.append(event)
         event_type = getattr(event, "type", None)
         if event_type == "self_active_update":
+            if getattr(event, "caption_complete", False):
+                if (
+                    self.active_self_metadata is not None
+                    and self.active_self_metadata.utterance_id
+                    == getattr(event, "utterance_id", None)
+                ):
+                    self.active_self_metadata = None
+                return
+            if getattr(event, "retained_only", False):
+                return
             utterance_id = getattr(event, "utterance_id", None)
             if not isinstance(utterance_id, UUID):
                 return
@@ -462,7 +472,10 @@ async def test_translation_active_self_overlay_snapshot_uses_spec_translation_la
         await _source_revision(harness, uuid4(), "こんにちは")
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         llm.release.set_result(None)
-        await _eventually(lambda: presenter.snapshot().blocks[0].secondary_text == "hello")
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "hello"
+        )
         block = presenter.snapshot().blocks[0]
         assert block.block_variant == "active_self"
         assert block.primary_text == "こんにちは"
@@ -494,15 +507,15 @@ async def test_translation_blank_spec_translation_keeps_source_first_until_final
     try:
         await _source_revision(harness, source_id, "こんにちは")
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
-        assert sink.events[0].type == "self_active_update"
-        assert sink.events[0].text == "こんにちは"
-        assert sink.events[0].secondary_text == ""
+        assert sink.events == []
         llm.release.set_result(None)
         await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
         await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
         assert all(not getattr(event, "secondary_text", "").strip() for event in sink.events)
         assert harness.osc.messages[-1].text == "こんにちは"
-        final_source = next(event for event in sink.events if event.type == "self_transcript_final")
+        final_source = next(
+            event for event in sink.events if getattr(event, "caption_complete", False)
+        )
         assert final_source.source_language == "ja"
     finally:
         await harness.stop()
@@ -694,7 +707,7 @@ async def test_translation_peer_translation_overlay_uses_translation_languages_n
 
 
 @pytest.mark.asyncio
-async def test_translation_active_self_sticky_secondary_preserves_cached_secondary_language() -> (
+async def test_active_resync_preserves_cached_translation_without_publishing_unowned_source() -> (
     None
 ):
     presenter = OverlayPresenter(
@@ -730,13 +743,13 @@ async def test_translation_active_self_sticky_secondary_preserves_cached_seconda
     await harness.self_owner._sync_overlay_active_self(buffer)
 
     block = presenter.snapshot().blocks[0]
-    assert block.primary_text == "こんにちは続き"
+    assert block.primary_text == "こんにちは"
     assert block.secondary_text == "你好"
     assert block.secondary_language == "zh-TW"
 
 
 @pytest.mark.asyncio
-async def test_translation_active_self_blank_secondary_preserves_cached_primary_language() -> None:
+async def test_active_resync_preserves_cached_primary_language_without_unowned_source() -> None:
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(),
     )
@@ -770,7 +783,7 @@ async def test_translation_active_self_blank_secondary_preserves_cached_primary_
     await harness.self_owner._sync_overlay_active_self(buffer)
 
     block = presenter.snapshot().blocks[0]
-    assert block.primary_text == "こんにちは続き"
+    assert block.primary_text == "こんにちは"
     assert block.secondary_text == ""
     assert block.primary_language == "ja"
 
@@ -798,7 +811,10 @@ async def test_translation_self_final_preserves_active_display_language_metadata
         await _source_revision(harness, source_id, "こんにちは")
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         llm.release.set_result(None)
-        await _eventually(lambda: presenter.snapshot().blocks[0].secondary_text == "你好")
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "你好"
+        )
         await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
         await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
         block = presenter.snapshot().blocks[0]
@@ -834,7 +850,10 @@ async def test_source_closure_preserves_sticky_active_caption_until_current_resu
         await _source_revision(harness, source_id, "こんにちは")
         await asyncio.wait_for(llm.started.wait(), timeout=1.0)
         llm.release.set_result(None)
-        await _eventually(lambda: presenter.snapshot().blocks[0].secondary_text == "你好")
+        await _eventually(
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "你好"
+        )
         original_id = presenter.snapshot().blocks[0].id
         llm.release = None
         llm.started.clear()
@@ -900,11 +919,11 @@ async def test_failed_current_source_final_clears_incompatible_sticky_translatio
         final_index = next(
             index
             for index, event in enumerate(sink.events)
-            if event.type == "self_transcript_final"
+            if getattr(event, "caption_complete", False)
         )
         final_source = sink.events[final_index]
         assert final_source.text == "goodbye"
-        cleared = sink.events[final_index - 1]
+        cleared = final_source
         assert cleared.type == "self_active_update"
         assert cleared.utterance_id == final_source.utterance_id
         assert cleared.text == "goodbye"
@@ -2685,6 +2704,8 @@ async def test_low_latency_self_final_emits_active_update_with_merge_occupant_ke
             ),
         )
     )
+    assert sink.events == []
+    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
 
     assert [event.type for event in sink.events] == ["self_active_update"]
     assert sink.events[0].text == "hello live"
@@ -2745,16 +2766,11 @@ async def test_low_latency_self_active_updates_only_when_merged_text_changes() -
         )
     )
 
-    assert [event.type for event in sink.events] == [
-        "self_active_update",
-        "self_active_update",
-    ]
-    assert [event.text for event in sink.events] == ["hello", "hello world"]
+    assert sink.events == []
+    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+    assert [event.text for event in sink.events] == ["hello world"]
     assert harness.self_owner.merge_buffer is not None
-    assert [event.utterance_id for event in sink.events] == [
-        harness.self_owner.merge_buffer.merge_id,
-        harness.self_owner.merge_buffer.merge_id,
-    ]
+    assert sink.events[0].utterance_id == harness.self_owner.merge_buffer.merge_id
 
 
 @pytest.mark.asyncio
@@ -2793,15 +2809,10 @@ async def test_low_latency_self_spec_translation_re_emits_active_update_with_sec
         )
     )
 
-    assert [event.type for event in sink.events] == [
-        "self_active_update",
-        "self_active_update",
-    ]
+    assert [event.type for event in sink.events] == ["self_active_update"]
     assert sink.events[0].text == "hello live"
-    assert sink.events[0].secondary_text == ""
-    assert sink.events[1].occupant_key == sink.events[0].occupant_key
-    assert sink.events[1].text == "hello live"
-    assert sink.events[1].secondary_text == "translated live"
+    assert sink.events[0].secondary_text == "translated live"
+    assert sink.events[0].occupant_key == f"self:{buffer.merge_id}"
     assert [event.type for event in sink.events if event.type != "self_active_update"] == []
     assert harness.self_owner.merge_buffer is buffer
     await _eventually(lambda: bool(osc.messages))
@@ -2855,25 +2866,25 @@ async def test_low_latency_self_active_secondary_stays_sticky_on_soft_reuse_mism
             ),
         )
     )
-    await _eventually(lambda: sum(event.type == "self_active_update" for event in sink.events) == 4)
+    await _eventually(
+        lambda: any(
+            event.text == "bye now" and event.secondary_text == second_translation
+            for event in sink.events
+        )
+    )
 
     active_events = [event for event in sink.events if event.type == "self_active_update"]
-    assert [event.secondary_text for event in active_events] == [
-        "",
-        "translated one",
-        "translated one",
-        second_translation,
-    ]
+    assert active_events[0].secondary_text == "translated one"
+    assert active_events[-1].secondary_text == second_translation
     assert [event.text for event in active_events] == [
         "hello live",
         "hello live",
         "bye now",
-        "bye now",
     ]
     assert len({event.utterance_id for event in active_events}) == 1
-    assert active_events[1].update_id
-    assert active_events[1].update_id == active_events[2].update_id
-    assert active_events[1].update_id != active_events[3].update_id
+    assert active_events[0].update_id
+    assert active_events[0].update_id == active_events[1].update_id
+    assert active_events[0].update_id != active_events[2].update_id
     assert [event.type for event in sink.events if event.type != "self_active_update"] == []
 
 
@@ -2952,7 +2963,8 @@ async def test_translation_active_self_metadata_flows_through_presenter_accessor
     try:
         await _source_revision(harness, uuid4(), "hello live")
         await _eventually(
-            lambda: presenter.snapshot().blocks[0].secondary_text == "translated live"
+            lambda: bool(presenter.snapshot().blocks)
+            and presenter.snapshot().blocks[0].secondary_text == "translated live"
         )
         metadata = presenter.active_self_overlay_metadata()
         block = presenter.snapshot().blocks[0]
@@ -3040,18 +3052,10 @@ async def test_low_latency_self_active_secondary_stays_sticky_through_resume_con
     )
 
     active_events = [event for event in sink.events if event.type == "self_active_update"]
-    assert [event.secondary_text for event in active_events] == [
-        "",
-        "translated live",
-        "translated live",
-        "translated continued",
-    ]
-    assert [event.text for event in active_events] == [
-        "hello live",
-        "hello live",
-        "hello live again",
-        "hello live again",
-    ]
+    assert active_events[0].secondary_text == "translated live"
+    assert active_events[-1].secondary_text == "translated continued"
+    assert active_events[-1].text == "hello live again"
+    assert all(event.secondary_text for event in active_events)
     assert [event.type for event in sink.events if event.type != "self_active_update"] == []
     assert harness.self_owner.merge_buffer is buffer
 
@@ -3081,8 +3085,9 @@ async def test_low_latency_merge_commit_reuses_merge_identity_without_emitting_c
             ),
         )
     )
-    active_event = sink.events[-1]
+    assert sink.events == []
     await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
+    active_event = sink.events[0]
     await harness.dispatch_stt_event(
         STTFinalEvent(
             utterance_id=utterance_id,
@@ -3095,12 +3100,9 @@ async def test_low_latency_merge_commit_reuses_merge_identity_without_emitting_c
         )
     )
 
-    assert [event.type for event in sink.events] == [
-        "self_active_update",
-        "self_transcript_final",
-        "utterance_closed",
-    ]
-    final_event = next(event for event in sink.events if event.type == "self_transcript_final")
+    await harness.translation_turns.wait_for_idle()
+    assert all(event.type == "self_active_update" for event in sink.events)
+    final_event = next(event for event in sink.events if event.caption_complete)
     assert active_event.utterance_id == final_event.utterance_id
     assert active_event.occupant_key == f"self:{final_event.utterance_id}"
 
@@ -3129,6 +3131,7 @@ async def test_low_latency_self_active_update_failures_do_not_break_harness() ->
             ),
         )
     )
+    await harness.self_owner.handle_vad_event(SpeechEnd(utterance_id))
 
     await _eventually(
         lambda: harness.translation_diagnostics.snapshot().last_error_source == "overlay_sink"
