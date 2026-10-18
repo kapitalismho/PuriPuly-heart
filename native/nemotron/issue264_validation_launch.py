@@ -116,7 +116,15 @@ def main():
             address = args[1]
             if isinstance(address, tuple):
                 host = address[0]
-                if host not in ("127.0.0.1", "::1", "localhost"):
+                caller = sys._getframe(1)
+                flet_port_reservation = (
+                    event == "socket.bind"
+                    and address == ("", 0)
+                    and caller.f_code.co_name == "get_free_tcp_port"
+                    and Path(caller.f_code.co_filename).resolve()
+                    == ROOT / ".venv/Lib/site-packages/flet/utils/network.py"
+                )
+                if host not in ("127.0.0.1", "::1", "localhost") and not flet_port_reservation:
                     observations["policy_rejections"].append({"event": event, "host": host})
                     raise PermissionError("Validation allows loopback sockets only")
                 observations["connections"].append(

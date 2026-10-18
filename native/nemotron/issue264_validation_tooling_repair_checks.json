@@ -1,0 +1,22 @@
+{
+  "schema": "issue264-tooling-repair-behavior-1",
+  "status": "all_checks_passed",
+  "checks": [
+    "Exact inspected Flet helper filename/name plus non-listening ephemeral ('',0) accepted",
+    "Wildcard listeners, external connections and wrong helper callsites rejected; loopback service bind accepted",
+    "Both current runtime/caption OutputRuntime constructor expressions succeed against frozen actual product; both guards reject actual enqueue/send_immediate",
+    "Native-final observer delegates real frozen snapshot and completes without removed slice fields",
+    "Injected observation-only exception is retained and invalidates nonempty-source pipeline without suppressing delegated native snapshot",
+    "Original first04 remains native-failed despite old exit0/nonempty-source status; one requested case is not complete authorized ten-case inventory",
+    "Public first_readable_at/nested assignment.settled parsed; controlled 400ms/750ms/1100ms records enter distinct reporting bands; original first04 has zero late assignments"
+  ],
+  "scope": "Offline throwaway behavior checks; frozen archived product classes only, current task AST/summary. No GPU/Flet/ASR/translation/cloud/VR or product mutations.",
+  "script_sha256": "f67559001ba94fd7d654851d5511a6d450b746f9c385fa53b66965f222eca184",
+  "task_hashes": {
+    "issue264_validation_launch.py": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+    "issue264_validation_runtime.py": "19ddc17744423738591c5092b584e5a64eed14f6e383c6f4ef210479098c8f62",
+    "issue264_validation_caption.py": "acc27035f6a627c0c7693cc47176831f03b29ba6a2c309d9d0c4d69068fa6550",
+    "issue264_validation_summary.py": "e71679a0b2b9fc9420dd9b802a09fc9ff1b5bbde24688c5f2dc7531a38961dcc"
+  },
+  "frozen_product_archive": "build/issue264-validation-first-04/execution_sources.zip"
+}

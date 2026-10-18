@@ -1,0 +1,56 @@
+{
+  "schema": "issue264-controlled-caption-preparation-1",
+  "status": "Prepared and task scripts frozen; F3/F5 not executed",
+  "product_checkpoint_reported_by_Director": "3f791b3c8d1f6632ed393a920aa7bd060757e0f2",
+  "execution_authority": "Await Director exact product-plus-task runtime pin, bounded tool review and explicit actual readiness. Product checkpoint alone is not permission to launch.",
+  "task_hashes": {
+    "issue264_validation_prerequisites.py": "354e1816b0f78c7be73e06c3b968e90a8ad3c8d8e4ce4108d4e5513d88cae7b3",
+    "issue264_validation_inputs.py": "b5a307d65fab46e14ba4e8d5fa7f03c2987a3412f3b8185b43e9e196044fcec5",
+    "issue264_validation_launch.py": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+    "issue264_validation_runtime.py": "19ddc17744423738591c5092b584e5a64eed14f6e383c6f4ef210479098c8f62",
+    "issue264_validation_caption.py": "acc27035f6a627c0c7693cc47176831f03b29ba6a2c309d9d0c4d69068fa6550",
+    "issue264_validation_summary.py": "e71679a0b2b9fc9420dd9b802a09fc9ff1b5bbde24688c5f2dc7531a38961dcc",
+    "issue264_validation_diagnose.py": "76c3a46675745ff6e3a56d7ce0f025525d528ea425346d66d0451b089922048c"
+  },
+  "changed_surface": "native/nemotron/issue264_validation_caption.py only for this preparation; historical files and product untouched",
+  "F3": {
+    "case": "late_overflow_divider_return",
+    "control": "Existing admitted/frames/translated_event helpers, actual authority/presenter, FakeClock based on current monotonic time. Four known palette sources, fifth/sixth initially unresolved then proof at controlled +0.1 each.",
+    "assertions": [
+      "Distinct overflow keys4/5, palette_index=None, palette_overflow=True reach actual rendered entries",
+      "Same gray card IDs, text, positions, appearance and expiry; required card revision increments",
+      "Canonical snapshot divider true; retained actual owned-window divider screenshot requested",
+      "Known returning fifth source appends to fifth card, moves it newest normally; sixth TTL unchanged"
+    ],
+    "presentation_limit": "Controlled metadata/clock observation, no acoustic identity or latency claim"
+  },
+  "F5": {
+    "cases": [
+      "application_after_cap",
+      "application_within_cap"
+    ],
+    "control": "After first readable gray, hold existing private presenter ownership-transition lock, advance controlled logical clock +0.9, accept proof and observe candidate through assignment_for; do not call mark_readable. Release logical application at +1.1 or +0.95. Bridge blocking is not used.",
+    "assertions": [
+      "Candidate before cap has key but no palette reservation, settled=False, no resolution delay",
+      "After-cap application stays gray and canonical key remains absent, with no resolution delay",
+      "Within-cap control becomes gold and reports logical delay0.95",
+      "Original card/text/position/appearance/expiry conserved through metadata application",
+      "Same-source new attempt, serialized other target and native retry preserve canonical gray/gold respectively"
+    ],
+    "pixels": [
+      "First readable gray",
+      "After scheduling release, stale gray rejection versus within-cap gold control",
+      "Serialized later target/retry style"
+    ],
+    "presentation_limit": "Another target is serialized on the same owned Flet window, not simultaneous destination or photon/transport timing proof"
+  },
+  "scope_inventory": "Existing seven controlled caption cases retained; added F3 plus two F5 schedules, total10 controlled cases. They remain separate from10 actual GPU cases and4 canonical native tape replays.",
+  "seam_coordination": "Replacement repair owner confirmed source_snapshot/assignment_for candidate semantics and presenter-owned mark_readable commit; existing _ownership_transition_lock is explicitly controlled only for this schedule. No product/manual settled-state mutation.",
+  "checks": {
+    "command": "Ruff --fix caption; Black caption; targeted Ruff all7 validation scripts; Black --check all7; .venv/Scripts/python.exe -B build/issue264-validation-tooling-repair-01/check.py",
+    "outcome": "Ruff passed; Black reformatted caption only; all7 Ruff/Black checks passed; seven offline tooling behavior groups passed.",
+    "offline_evidence": "native/nemotron/issue264_validation_tooling_repair_checks.json",
+    "limit": "Offline checks use frozen first04 archived product classes and current task AST/summary only. New F3/F5 scenarios have not executed against moving or repaired product; no model/Flet/cloud startup."
+  },
+  "retained_history": "first01/02 invalid startup/setup; first03 invalid observer with actual native failures retained; first04 genuine failed acoustic scenario. No originals rewritten; repaired ABA must be newly observed before remaining nine GPU cases."
+}

@@ -1,0 +1,401 @@
+{
+  "schema": "issue264-first-observation-findings-1",
+  "candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "disposition": "STOP_FOR_PRODUCT_REPAIR; not feature/profile acceptance",
+  "actual_command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate 8c01ad689aa8d48c0b5c73dd739f2944c12f5589 --route gpu --case-count 1 --output build/issue264-validation-first-04",
+  "attempts": [
+    {
+      "directory": "build/issue264-validation-first-01",
+      "runtime_sha256": "45fa53d9c993761ffdd919cf27ff6ec2d5d5ea17882b91d00b0766f1f1917d25",
+      "launcher_sha256": "ce61260099e2baa853fd7e875b75fc1af2b171a19e7c85e1675ba5a319d8cee9",
+      "status": "failed_execution",
+      "case_count": 0,
+      "recorded_error": "",
+      "classification": "invalid_harness_Flet_port_reservation_audit_rejection",
+      "policy_rejections": [
+        {
+          "event": "socket.bind",
+          "host": ""
+        }
+      ],
+      "owned_children_unreaped": [],
+      "product_sources_unchanged": true,
+      "owned_temp_removed": true
+    },
+    {
+      "directory": "build/issue264-validation-first-02",
+      "runtime_sha256": "45fa53d9c993761ffdd919cf27ff6ec2d5d5ea17882b91d00b0766f1f1917d25",
+      "launcher_sha256": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+      "status": "failed_execution",
+      "case_count": 0,
+      "recorded_error": "Task must not send chatbox/OSC: bind_delivery_observer",
+      "classification": "invalid_harness_optional_chatbox_binding_guard",
+      "policy_rejections": [],
+      "owned_children_unreaped": [],
+      "product_sources_unchanged": true,
+      "owned_temp_removed": true
+    },
+    {
+      "directory": "build/issue264-validation-first-03",
+      "runtime_sha256": "d11904e18a27a54d231e4b7ca6e125decdec712afa609cb905f6b3902a8856be",
+      "launcher_sha256": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+      "status": "matrix_executed",
+      "case_count": 1,
+      "recorded_error": null,
+      "classification": "invalid_harness_native_final_observer_exception_with_inference_and_real_decode_failures_retained",
+      "policy_rejections": [],
+      "owned_children_unreaped": [],
+      "product_sources_unchanged": true,
+      "owned_temp_removed": true
+    },
+    {
+      "directory": "build/issue264-validation-first-04",
+      "runtime_sha256": "5276fef359f02fe9ab4317827d78986fcd2f42284470eb8c368f91b48af62a09",
+      "launcher_sha256": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+      "status": "matrix_executed",
+      "case_count": 1,
+      "recorded_error": null,
+      "classification": "valid_actual_execution_product_failure_stop",
+      "policy_rejections": [],
+      "owned_children_unreaped": [],
+      "product_sources_unchanged": true,
+      "owned_temp_removed": true
+    }
+  ],
+  "decisive_failure": {
+    "native_requests": [
+      {
+        "at": 138463.6091985,
+        "request_id": "94a6391519ed4602859796583e2027ec",
+        "seal_reason": "speaker",
+        "submitted_samples": 48000,
+        "source_bounds": [
+          9728,
+          49728
+        ],
+        "all_declared_capture_pcm_matches": true
+      },
+      {
+        "at": 138463.6098947,
+        "request_id": "676287f3c8ef4e58be7c797fdfb358c8",
+        "seal_reason": "speaker",
+        "submitted_samples": 160,
+        "source_bounds": [
+          49728,
+          49888
+        ],
+        "all_declared_capture_pcm_matches": true
+      },
+      {
+        "at": 138465.041693,
+        "request_id": "256f793dcdaa40e5918f3eae6c931ef3",
+        "seal_reason": "speaker",
+        "submitted_samples": 26080,
+        "source_bounds": [
+          49888,
+          75968
+        ],
+        "all_declared_capture_pcm_matches": true
+      },
+      {
+        "at": 138465.042223,
+        "request_id": "ec2148d5365b4a3ba0fb0a19f0f0cab4",
+        "seal_reason": "speaker",
+        "submitted_samples": 160,
+        "source_bounds": [
+          75968,
+          76128
+        ],
+        "all_declared_capture_pcm_matches": true
+      },
+      {
+        "at": 138466.0831918,
+        "request_id": "e7ccafd8c4434e95bea76d1781560ae2",
+        "seal_reason": "delivery_deadline",
+        "submitted_samples": 29344,
+        "source_bounds": [
+          76128,
+          105472
+        ],
+        "all_declared_capture_pcm_matches": true
+      },
+      {
+        "at": 138467.0273485,
+        "request_id": "213d9e99c3574d5eacc918c6cabfc085",
+        "seal_reason": "delivery_pause",
+        "submitted_samples": 20160,
+        "source_bounds": [
+          105472,
+          120832
+        ],
+        "all_declared_capture_pcm_matches": true
+      }
+    ],
+    "actual_failed_audio_seconds": [
+      0.01,
+      0.01
+    ],
+    "worker_recovery": "Actual decode_failure, restart_only, utterance_retry=false twice. Cause of repeated physical cuts is for implementation owner; no minimum-duration/filter/model-threshold change made in harness."
+  },
+  "positive_and_limits": {
+    "actual_route": "Public/synthetic repeated A-B-A, actual GPU Qwen + eight-slot F16 Nemotron Vulkan + existing managed Gemma Vulkan + actual guarded Flet; no cloud/Parakeet/live audio/VR",
+    "full_profile_diagnostics": [
+      [
+        "backend",
+        "Vulkan"
+      ],
+      [
+        "device_ordinal",
+        "0"
+      ],
+      [
+        "profile",
+        "1.04"
+      ],
+      [
+        "geometry",
+        "9/4/0/264/264/222"
+      ],
+      [
+        "artifact_sha256",
+        "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38"
+      ],
+      [
+        "tensor_formats",
+        "{\"F16\": 125, \"F32\": 231}"
+      ],
+      [
+        "source_revision",
+        "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+      ],
+      [
+        "neural_cpu_fallback",
+        "forbidden"
+      ],
+      [
+        "probability_frontier",
+        "immutable emitted probabilities, not identity certainty"
+      ],
+      [
+        "processed_cursor",
+        "consumed mel hop prefix; excludes submitted lookahead"
+      ],
+      [
+        "accumulation",
+        "Vulkan shader selected; F32 auxiliary tensors/activations; not all-F16"
+      ]
+    ],
+    "qwen_activation": {
+      "device": {
+        "device_id": "vulkan-index-0",
+        "registry_index": 0,
+        "name": "Vulkan0",
+        "description": "AMD Radeon RX 7900 XTX",
+        "device_type": "gpu",
+        "memory_total_bytes": 25753026560,
+        "memory_free_bytes": 24890653872
+      },
+      "model_load_seconds": 1.3703523,
+      "warmup_seconds": 0.1221621
+    },
+    "gemma_readiness": {
+      "requested_backend": "gpu",
+      "effective_backend": "vulkan",
+      "source_language": "en",
+      "target_language": "ko",
+      "prefix_identity": "802fa527464adf660804dd395ebb9f842cf70ade5cf2c9a93024e9a4936f7c10"
+    },
+    "contract": {
+      "version": 3,
+      "policy": "bounded_late_speaker_assignment"
+    },
+    "wire": 16,
+    "requested_evidence_drain_seconds": 0.05,
+    "observed_evidence_poll_interval_seconds": {
+      "minimum": 0.05001189999165945,
+      "median": 0.061934800003655255,
+      "maximum": 0.1666057999827899
+    },
+    "source_count": 4,
+    "translation_calls": 4,
+    "admitted_text_conserved_once": true,
+    "history_registered_once_per_source": true,
+    "captured_once": true,
+    "seals": [
+      {
+        "at": 138466.0770718,
+        "reason": "delivery_deadline"
+      },
+      {
+        "at": 138467.010604,
+        "reason": "delivery_pause"
+      }
+    ],
+    "sources": [
+      {
+        "source_id": "0d5da0b2-6941-5a3a-9b44-0ff98c61dab8",
+        "text": "He washed the detritus from his hair.",
+        "immutable_speaker": {
+          "text": "He washed the detritus from his hair.",
+          "speaker_id": null,
+          "session_scope": "1",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "uncertain"
+        },
+        "translations": [
+          "그는 머리에서 이물질을 씻어냈어."
+        ],
+        "admission": 138463.8771294,
+        "translation_start": 138463.8779429,
+        "translation_end": 138465.0864976,
+        "ordered_publication_end": 138465.0928618,
+        "stable_readback_upper_bound": 138465.3721938
+      },
+      {
+        "source_id": "21eb0479-0fcc-5da6-821a-bf1315ea768a",
+        "text": "Gentlemen of the press.",
+        "immutable_speaker": {
+          "text": "Gentlemen of the press.",
+          "speaker_id": null,
+          "session_scope": "1",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "uncertain"
+        },
+        "translations": [
+          "언론 여러분."
+        ],
+        "admission": 138466.2098033,
+        "translation_start": 138466.2102358,
+        "translation_end": 138466.4144586,
+        "ordered_publication_end": 138466.4186616,
+        "stable_readback_upper_bound": 138466.6706675
+      },
+      {
+        "source_id": "59ce43af-fb3e-51e7-ab7f-558ed1152da0",
+        "text": "He washed the detritus from his.",
+        "immutable_speaker": {
+          "text": "He washed the detritus from his.",
+          "speaker_id": "0",
+          "session_scope": "1",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "identified"
+        },
+        "translations": [
+          "그는 자기 머리에서 찌꺼기를 씻어냈어."
+        ],
+        "admission": 138468.4427039,
+        "translation_start": 138468.4431476,
+        "translation_end": 138469.8277095,
+        "ordered_publication_end": 138469.832001,
+        "stable_readback_upper_bound": 138470.2474052
+      },
+      {
+        "source_id": "8c4946c4-db08-5b44-a4b1-28ae34bdfba6",
+        "text": "From his hair.",
+        "immutable_speaker": {
+          "text": "From his hair.",
+          "speaker_id": null,
+          "session_scope": "1",
+          "source_start_ms": null,
+          "source_end_ms": null,
+          "overlaps_previous": false,
+          "source": "nemotron",
+          "attribution_state": "uncertain"
+        },
+        "translations": [
+          "머리에서요."
+        ],
+        "admission": 138468.6089683,
+        "translation_start": 138468.609381,
+        "translation_end": 138469.7861327,
+        "ordered_publication_end": 138469.8612237,
+        "stable_readback_upper_bound": 138470.2474052
+      }
+    ],
+    "first_A_readback_lead_to_safety_seconds": 0.7048780000186525,
+    "first_A_readback_lead_to_natural_pause_seconds": 1.6384102000156417,
+    "color_result": "Initial A gray; B gray; returning-A prefix gold; tail gray. Three unresolved readable sources; zero late assignment settlements within either reporting band. This does not establish correct A/B/return continuity.",
+    "resolution_counts": {
+      "readable_unresolved": 3,
+      "within_500ms": 0,
+      "within_1s": 0,
+      "resolution_delays": []
+    },
+    "pixels_inspected": [
+      {
+        "path": "build/issue264-validation-first-04/commit_2.png",
+        "observation": "Actual coherent complete A/B source and Korean translation, both gray, owned uncloaked readback valid."
+      },
+      {
+        "path": "build/issue264-validation-first-04/commit_4.png",
+        "observation": "Actual returning prefix gold and tail gray; same colors on original/translation lines, owned uncloaked readback valid."
+      }
+    ],
+    "readback_validity": [
+      {
+        "revision": 1,
+        "valid": true,
+        "pixel_counts": {
+          "gold": 0,
+          "cyan": 0,
+          "gray": 6889
+        },
+        "capture_sha256": "abcba8432b9bed07df70662b2be5f207ab0466d32d8423ba9b6344747a0f0808"
+      },
+      {
+        "revision": 2,
+        "valid": true,
+        "pixel_counts": {
+          "gold": 0,
+          "cyan": 0,
+          "gray": 9933
+        },
+        "capture_sha256": "5a03de28be972583b493a6cec154e8169a3971fea16438693bbc8b4c10727fd9"
+      },
+      {
+        "revision": 3,
+        "valid": false,
+        "pixel_counts": {
+          "gold": 6964,
+          "cyan": 0,
+          "gray": 2371
+        },
+        "capture_sha256": "40e887ab34304024cefaeec6db7c52694999a5e512bd696b4238ee74e4772a06"
+      },
+      {
+        "revision": 4,
+        "valid": true,
+        "pixel_counts": {
+          "gold": 6964,
+          "cyan": 0,
+          "gray": 2371
+        },
+        "capture_sha256": "40e887ab34304024cefaeec6db7c52694999a5e512bd696b4238ee74e4772a06"
+      }
+    ],
+    "readback_limit": "Revision3 superseded during capture, so invalid even though pixels nonblank. Revision4 valid; no photons/exact onset claim."
+  },
+  "unrun_due_to_stop": [
+    "remaining nine GPU smoke cases",
+    "two canonical Deepgram tapes times two profiles",
+    "separate controlled actual-caption transitions"
+  ],
+  "controlled_boundaries": [
+    "Acquisition only replaced with read-only pinned install checksum validator; actual managed owners/runtime/server/provider and Vulkan translation retained. No installation/persistence/full-app-startup claim.",
+    "Child-local existing FLET_VIEW_PATH; exact inspected non-listening Flet port-reservation audit exception. All recorded actual service bind hosts are loopback; no external Python connection or DNS allowed. Native listener effective addresses not independently sampled in this run; server --host127.0.0.1 plus actual localhost transport and Flet loopback bind records retained.",
+    "Scoped owners and synthetic capture replace full application startup, secrets/discovery/telemetry/OSC/VR owners. Native filesystem is not an OS sandbox."
+  ],
+  "cleanup": "All four attempts retain exact executed sources in execution_sources.zip. Product hashes unchanged. All owned children reaped; owned temporary roots removed. Unowned OVRServer untouched.",
+  "formatting": "After public snapshot/v3/case-slicing adaptation: Ruff --fix corrected one import ordering, Black reformatted two scripts, final Ruff and Black --check passed all6. Exact-callsite audit repair: Black+Ruff+Black--check passed launcher. Optional guard repair: Black+Ruff+Black--check passed runtime/caption. Native observer context-field repair: Ruff+Black--check passed runtime.",
+  "pending": "Director/implementation owner disposition and repaired stable pin; no further actual execution until readiness."
+}

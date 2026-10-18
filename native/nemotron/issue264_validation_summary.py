@@ -33,16 +33,16 @@ def late_assignments(case):
         ]
         readable = next(
             (
-                record["first_readable"]
+                record["first_readable_at"]
                 for record in records
-                if record.get("first_readable") is not None
+                if record["first_readable_at"] is not None
             ),
             None,
         )
         allocated = [
             record
             for record in records
-            if record.get("settled")
+            if record["assignment"]["settled"]
             and assignment_key(record["assignment"]) is not None
             and (
                 record["assignment"].get("palette_index") is not None
@@ -50,7 +50,7 @@ def late_assignments(case):
             )
         ]
         predisplay = next(
-            (record for record in allocated if record.get("first_readable") is None), None
+            (record for record in allocated if record["first_readable_at"] is None), None
         )
         first_allocation = predisplay or next(iter(allocated), None)
         submission = next(
@@ -189,6 +189,17 @@ def summarize(path):
     report = json.loads(raw)
     result = analyze(path)
     for case, row in zip(report["cases"], result["cases"]):
+        row["pipeline_status_is_not_quality_pass"] = True
+        row["native_decode_failures"] = [
+            event
+            for event in case["trace"]
+            if event["event"] == "gpu_asr_diagnostic"
+            and event["value"]["kind"] == "decode_attempt"
+            and event["value"]["fields"].get("result") == "decode_failure"
+        ]
+        row["observation_errors"] = [
+            event for event in case["trace"] if event["event"] == "observation_exception"
+        ]
         assignments = late_assignments(case)
         row["presentation_assignments"] = assignments
         row["presentation_resolution_bands"] = dict(Counter(item["band"] for item in assignments))
@@ -218,6 +229,16 @@ def summarize(path):
             ),
         }
     result["schema"] = "issue264-validation-summary-1"
+    result["recorded_pipeline_status"] = result.pop("status")
+    result["scenario_disposition"] = (
+        "invalid_observation"
+        if any(row["observation_errors"] for row in result["cases"])
+        else (
+            "failed_native_execution"
+            if any(row["native_decode_failures"] for row in result["cases"])
+            else "not_automatically_assessed"
+        )
+    )
     result["frozen_source_analysis_limit"] = (
         "Inherited attribution-state/count/clear-AB/return fields describe immutable source-time metadata only, not final presentation resolution; inspect presentation_assignments and actual source-keyed caption observations for #264."
     )
@@ -253,7 +274,8 @@ def main():
                         "candidate": result["candidate"],
                         "route": result["route"],
                         "cases": len(result["cases"]),
-                        "status": result["status"],
+                        "recorded_pipeline_status": result["recorded_pipeline_status"],
+                        "scenario_disposition": result["scenario_disposition"],
                     }
                     for result in results
                 ]

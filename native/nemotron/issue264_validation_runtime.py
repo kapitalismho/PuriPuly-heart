@@ -29,6 +29,10 @@ from puripuly_heart.core.local_translation.provisioning import GemmaProvisioning
 from puripuly_heart.core.orchestrator.translation_channel_callbacks import (
     TranslationChannelOwnerCallbacks,
 )
+from puripuly_heart.core.overlay.manifest import (
+    OVERLAY_CONTRACT_VERSION,
+    OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+)
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
 from puripuly_heart.core.stt import speaker_attribution
@@ -182,6 +186,20 @@ class ObservedBatch(CausalBatchSession):
 
     def _snapshot_native_terminal(self, event):
         super()._snapshot_native_terminal(event)
+        try:
+            self._observe_native_terminal(event)
+        except Exception as error:
+            self.observation_trace.append(
+                {
+                    "event": "observation_exception",
+                    "at": time.monotonic(),
+                    "stage": "native_final_observer",
+                    "exception_class": type(error).__name__,
+                    "message": str(error),
+                }
+            )
+
+    def _observe_native_terminal(self, event):
         child = self._slices.get(event.identity)
         if child is not None:
             self.observation_trace.append(
@@ -190,8 +208,7 @@ class ObservedBatch(CausalBatchSession):
                     "at": time.monotonic(),
                     "identity": prior.serial(event.identity),
                     "source_ranges": prior.serial(child.audio.source_ranges),
-                    "unique_context": prior.serial(child.unique_context),
-                    "replayed_context": prior.serial(child.replayed_context),
+                    "context_ranges": prior.serial(child.audio.context_ranges),
                     "proof_id": child.audio.speaker_proof_id,
                     "delivered_frame_count": len(self.evidence.frames),
                     "immutable": self.evidence.immutable,
@@ -201,6 +218,40 @@ class ObservedBatch(CausalBatchSession):
                     "result": prior.serial(child.speaker),
                 }
             )
+
+
+def pipeline_status(record):
+    if any(event["event"] == "observation_exception" for event in record["trace"]):
+        return "invalid_observation"
+    if any(event["event"] == "unhandled_task_exception" for event in record["trace"]):
+        return "pipeline_task_failure"
+    if any(
+        event["event"] == "gpu_asr_diagnostic"
+        and event["value"]["kind"] == "decode_attempt"
+        and event["value"]["fields"].get("result") == "decode_failure"
+        for event in record["trace"]
+    ):
+        return "pipeline_completed_with_native_failures"
+    if record["errors"]:
+        return "pipeline_or_cleanup_failure"
+    if not record["sources"]:
+        return "failed_content_empty"
+    return "pipeline_completed"
+
+
+def execution_inventory(args):
+    names = sorted(args.cases.split(","), key=lambda value: value != "distinct_repeated_A_B_A")
+    authorized = [
+        {"route": args.route, "case": name, "profile": profile, "repetition": 1}
+        for profile in ("1.04", "0.64")
+        for name in names
+    ]
+    end = None if args.case_count is None else args.case_offset + args.case_count
+    return authorized, authorized[args.case_offset : end]
+
+
+class ChatboxGuard(local.ChatboxGuard):
+    bind_delivery_observer = None
 
 
 class ObservedDesktop(GuardedDesktop):
@@ -642,7 +693,7 @@ async def case_run(
         calibration=local.OverlayCalibration(), bridge=desktop, translation_enabled=True
     )
     output = local.OutputRuntime(
-        chatbox=local.ChatboxGuard(),
+        chatbox=ChatboxGuard(),
         clock=clock,
         overlay_sink=presenter,
         routing_observer=lambda d: trace.append(
@@ -709,8 +760,12 @@ async def case_run(
                 "event": "presentation_assignments",
                 "at": time.monotonic(),
                 "reason": reason,
-                "records": prior.serial(identities._sources),
-                "assignment_revision": identities._revision,
+                "records": {
+                    item["source"]["source_id"]: prior.serial(snapshot)
+                    for item in record["sources"]
+                    if (snapshot := identities.source_snapshot(UUID(item["source"]["source_id"])))
+                    is not None
+                },
                 "evidence_revision": evidence_view.revision,
                 "evidence_generation": evidence_view.generation,
                 "retained_frames": len(evidence_view.frames),
@@ -961,7 +1016,7 @@ async def case_run(
             )
             await asyncio.sleep(max(0.0, assignment_deadline + 0.05 - time.monotonic()))
         observe_assignments("completed_output_observation")
-        record["status"] = "executed" if record["sources"] else "failed_content_empty"
+        record["status"] = "pipeline_completed"
         record["wall_seconds"] = time.monotonic() - started
         record["snapshot_capture"] = await desktop.picture(
             f"{args.route}_{mode}_{profile}_{repetition}_{name}"
@@ -1016,6 +1071,16 @@ async def case_run(
         record["renderer_readbacks"] = desktop.readbacks[starts[2] :]
         await desktop.replace_snapshot(local.OverlayPresentationSnapshot(revision=0, blocks=[]))
         desktop.assignment_observer = None
+    record["observation_errors"] = [
+        event for event in trace if event["event"] == "observation_exception"
+    ]
+    if record["status"] == "pipeline_completed":
+        record["status"] = pipeline_status(record)
+    record["scenario_quality_disposition"] = (
+        "failed_native_execution"
+        if record["status"] == "pipeline_completed_with_native_failures"
+        else "not_automatically_assessed"
+    )
     return record
 
 
@@ -1034,6 +1099,7 @@ def source_manifest():
     paths += [ROOT / "native/nemotron/issue264_validation_launch.py"]
     paths += [
         ROOT / "native/nemotron/issue264_validation_caption.py",
+        ROOT / "native/nemotron/issue264_validation_summary.py",
         ROOT / "tests/core/test_issue264_shared_speaker.py",
         ROOT / "tests/core/test_causal_batch_speaker.py",
         ROOT / "tests/helpers/overlay_source_cards.py",
@@ -1124,11 +1190,21 @@ async def gemma_start(args, report):
 
 
 def preflight(args):
+    if OVERLAY_CONTRACT_VERSION != 16 or OVERLAY_SPEAKER_IDENTITY_CONTRACT != {
+        "version": 3,
+        "policy": "bounded_late_speaker_assignment",
+    }:
+        raise RuntimeError("Pinned v3 bounded-late-assignment/wire16 renderer contract required")
     if args.evidence_poll_ms != 50 or args.repetitions != 1:
         raise ValueError("Only approved 50ms and bounded repetitions are supported")
     expected = CASES if args.route == "gpu" else ("distinct_repeated_A_B_A", "short_A_B_A")
     if tuple(args.cases.split(",")) != expected:
         raise ValueError("Only approved reused case matrix is supported")
+    if args.case_offset < 0 or (args.case_count is not None and args.case_count < 1):
+        raise ValueError("Case slicing must retain at least one approved case")
+    authorized, requested = execution_inventory(args)
+    if not requested:
+        raise ValueError("Requested inventory is empty")
     provenance, cases = prior.input_cases(args)
     selected_tapes, replay_info = tapes(args, cases) if args.route != "gpu" else ({}, None)
     for path in (
@@ -1145,12 +1221,16 @@ def preflight(args):
             raise FileNotFoundError(path)
     report = {
         "schema": "issue264-changed-path-validation-1",
+        "requested_observations": requested,
+        "authorized_full_smoke_inventory": authorized,
         "candidate": args.candidate,
         "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
         "route": args.route,
         "command": sys.argv,
         "driver_sha256": prior.digest(Path(__file__)),
         "sources_sha256": source_manifest(),
+        "speaker_identity_contract": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
+        "overlay_wire_version": OVERLAY_CONTRACT_VERSION,
         "inputs": provenance,
         "input_hashes": {
             name: hashlib.sha256(cases[name][0].tobytes()).hexdigest() for name in expected
@@ -1270,6 +1350,14 @@ async def run(args):
                 for name in sorted(
                     args.cases.split(","), key=lambda value: value != "distinct_repeated_A_B_A"
                 ):
+                    case_index = arms.index((mode, profile)) * len(args.cases.split(",")) + sorted(
+                        args.cases.split(","), key=lambda value: value != "distinct_repeated_A_B_A"
+                    ).index(name)
+                    if case_index < args.case_offset or (
+                        args.case_count is not None
+                        and case_index >= args.case_offset + args.case_count
+                    ):
+                        continue
                     values, mapping = cases[name]
                     record = await case_run(
                         args,
@@ -1303,15 +1391,11 @@ async def run(args):
                         ),
                         flush=True,
                     )
-                    if record["status"] in ("invalid_replay", "failed_execution"):
+                    if record["status"] != "pipeline_completed":
                         raise RuntimeError(
-                            "Invalid execution stopped; failed attempts preserved separately"
+                            "Stopped on explicit pipeline/native/observation failure; original records retained"
                         )
-        report["status"] = (
-            "matrix_executed"
-            if all(c["status"] == "executed" for c in report["cases"])
-            else "matrix_content_failures"
-        )
+        report["status"] = "requested_pipeline_completed"
     except Exception as error:
         report["status"] = "failed_execution"
         report["error"] = str(error)
@@ -1338,7 +1422,21 @@ async def run(args):
             "scope": "Windows sampled adapter/process counters, not inference timestamp queries or isolated whole-host VRAM",
         }
         save(args.output / "trace.json", report)
-    return 0 if report["status"] in ("matrix_executed", "matrix_content_failures") else 1
+        authorized, requested = execution_inventory(args)
+        executed = [
+            {key: case[key] for key in ("route", "case", "profile", "repetition")}
+            for case in report["cases"]
+        ]
+        report["execution_inventory"] = {
+            "authorized": authorized,
+            "requested": requested,
+            "executed": executed,
+            "requested_inventory_complete": executed == requested,
+            "complete_authorized_smoke_executed": executed == authorized,
+        }
+        report["scenario_quality_disposition"] = "not_inferred_from_pipeline_completion"
+        save(args.output / "trace.json", report)
+    return 0 if report["status"] == "requested_pipeline_completed" else 1
 
 
 def arguments():
@@ -1392,6 +1490,8 @@ def arguments():
     parser.add_argument("--native-member", default="valid/trace.json")
     parser.add_argument("--cases")
     parser.add_argument("--repetitions", type=int)
+    parser.add_argument("--case-offset", type=int, default=0)
+    parser.add_argument("--case-count", type=int)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.cases = args.cases or ",".join(
