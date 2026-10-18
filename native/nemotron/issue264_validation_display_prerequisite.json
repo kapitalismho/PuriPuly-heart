@@ -1,0 +1,121 @@
+{
+  "schema": "issue264-display-prerequisite-1",
+  "scope": "Bounded Windows presentation prerequisite observations; no product change or acoustic rerun",
+  "current_input_desktop_before_owner_return": {
+    "observed_at_monotonic": 161386.2388667,
+    "scope": "Read-only present environment, after both failed controls; not the earlier capture-time state",
+    "thread_desktop": {
+      "available": true,
+      "name": "Default",
+      "error": null
+    },
+    "input_desktop": {
+      "available": true,
+      "name": "Default",
+      "error": null
+    },
+    "current_process_session": 1,
+    "active_console_session": 1,
+    "mutations": "None; only the newly opened input-desktop query handle is closed",
+    "input_query_handle_closed": true
+  },
+  "unsupported_output_only_query": {
+    "observed_at_monotonic": 161675.2597801,
+    "scope": "Current output-only SystemVideoState query, after failed captures; no input buffer and no power-policy mutation",
+    "information_level": 29,
+    "ntstatus_hex": "0xc000000d",
+    "raw_output": null,
+    "interpretation_limit": "Installed SDK declares SystemVideoState=29; public CallNtPowerInformation page does not document this level/output contract, so raw output is not promoted to a qualified monitor-on/off or capture-time state claim."
+  },
+  "supported_display_off_observation": {
+    "scope": "Read-only GUID_SESSION_DISPLAY_STATUS current-state notification, after failed captures; no window/model or power-policy mutation",
+    "registration_error": 0,
+    "events": [
+      {
+        "observed_at_monotonic": 161753.690497,
+        "value": 0,
+        "meaning": "off"
+      }
+    ],
+    "unregistration_error": 0,
+    "capture_time_state": "Not recorded; current state is not retroactive proof",
+    "contract": "https://learn.microsoft.com/en-us/windows/win32/power/power-setting-guids"
+  },
+  "unsuccessful_temporary_request": {
+    "scope": "Temporary dedicated-thread ES_CONTINUOUS|ES_DISPLAY_REQUIRED for owned-window verification only",
+    "maximum_duration_s": 600,
+    "power_plan_changes": false,
+    "user_input_or_unlock": false,
+    "notification_registration_error": 0,
+    "events": [
+      {
+        "observed_at_monotonic": 161846.702,
+        "value": 0,
+        "meaning": "off"
+      }
+    ],
+    "started_at_monotonic": 161846.7021585,
+    "thread_id": 22920,
+    "previous_execution_state": 2147483648,
+    "request_succeeded": true,
+    "active": false,
+    "input_desktop_before_release": {
+      "available": true,
+      "name": "Default",
+      "error": null
+    },
+    "observed_display_on": false,
+    "release_reason": "explicit_end_of_verification",
+    "restoration_return": 2147483650,
+    "restored": true,
+    "ended_at_monotonic": 161849.7346474,
+    "notification_unregistration_error": 0
+  },
+  "owner_resumed_display_and_final_request": {
+    "scope": "Temporary dedicated-thread display requirement after maintainer reported turning the display back on",
+    "owner_observation": "The maintainer reported turning the display back on and requested continuation.",
+    "maximum_duration_s": 600,
+    "power_plan_changes": false,
+    "user_input_or_unlock_by_agent": false,
+    "notification_registration_error": 0,
+    "events": [
+      {
+        "observed_at_monotonic": 172445.9321583,
+        "value": 1,
+        "meaning": "on"
+      }
+    ],
+    "started_at_monotonic": 172445.9322488,
+    "thread_id": 44096,
+    "previous_execution_state": 2147483648,
+    "request_succeeded": true,
+    "active": false,
+    "input_desktop_before_release": {
+      "available": true,
+      "name": "Default",
+      "error": null
+    },
+    "observed_display_on": true,
+    "release_reason": "explicit_end_of_verification",
+    "restoration_return": 2147483650,
+    "restored": true,
+    "ended_at_monotonic": 172628.293097,
+    "notification_unregistration_error": 0,
+    "released_after": "Both authorized display-qualified controls stopped; no further UI/model execution released"
+  },
+  "authorized_observations": [
+    "build/issue264-validation-streaming-after-presentation-display-on-01",
+    "build/issue264-validation-streaming-after-native-presentation-display-on-01"
+  ],
+  "interpretation": [
+    "Display-off was observed after the original GPU/no-model failures and before the four tape observations; capture-time display state for those earlier images was not continuously recorded. Their cause is not retrospectively proved.",
+    "During the two newly authorized controls, the subscribed current session display reported On and no subsequent change notification arrived. The input desktop was Default. This is an OS prerequisite observation, not photon or frame-application evidence.",
+    "The first resumed control produced four qualified caption images and one superseded invalid image. The second failed window startup before any source snapshot was replayed. No retry or model execution followed.",
+    "All temporary execution-state requests were restored on their owning threads and notification handles were unregistered. No power-plan change, input injection, unlocking, desktop switch or unrelated process operation was performed."
+  ],
+  "documentation": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/powersetting/nf-powersetting-powersettingregisternotification",
+    "https://learn.microsoft.com/en-us/windows/win32/power/power-setting-guids",
+    "https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setthreadexecutionstate"
+  ]
+}

@@ -1,0 +1,1057 @@
+{
+  "schema": "issue264-streaming-after-validation-v1",
+  "status": "authorized_five_scenario_inventory_complete_presentation_unqualified",
+  "goal_acceptance_claimed": false,
+  "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "product_source_candidate": "6c826f420205fd748a65431108cceb845da56eab",
+  "product_src_hashes_identical_across_all_three_runs": true,
+  "preserved_before": {
+    "report": "native/nemotron/issue264_validation_matrix_report.json",
+    "original_publication_commit": "6670a009d15bfc3431e0c7b8eba201da4bc650ca",
+    "original_publication_sha256": "a960013ac022ce4ce8987e2a61df0ae8750fbd95bc6b39e5462dc51dddb9d4e8",
+    "scope": "Original14-case matrix and original executed sources/observations untouched. Director-owned E5 assessment metadata is separate from original facts. No old run relabeled by this after report.",
+    "first_attempts": "first01/02 invalid startup; first03 invalid observer with actual decode failures retained; first04 genuine FAILED acoustic observation. None rerun or reclassified.",
+    "E5": "Separate corrected hidden_reveal actual at e4e85c093a03013f60346680eadbd168c7dbdef6 remains accepted/closed; native/nemotron/issue264_validation_hidden_actual.json unchanged; not rerun or promoted to current-candidate pixels."
+  },
+  "authorized_and_executed": {
+    "GPU": [
+      {
+        "case": "distinct_repeated_A_B_A",
+        "profile": "1.04",
+        "repetitions": 1
+      }
+    ],
+    "native_tapes": [
+      {
+        "case": "distinct_repeated_A_B_A",
+        "profile": "1.04",
+        "repetitions": 1
+      },
+      {
+        "case": "short_A_B_A",
+        "profile": "1.04",
+        "repetitions": 1
+      },
+      {
+        "case": "distinct_repeated_A_B_A",
+        "profile": "0.64",
+        "repetitions": 1
+      },
+      {
+        "case": "short_A_B_A",
+        "profile": "0.64",
+        "repetitions": 1
+      }
+    ],
+    "presentation_only_controls": 1,
+    "extra_GPU_or_UI_retries": 0,
+    "fresh_cloud_Gemini_Parakeet_VR_or_private_audio": false,
+    "inventory_completion_is_not_quality_acceptance": true
+  },
+  "runs": [
+    {
+      "kind": "gpu",
+      "candidate": "6c826f420205fd748a65431108cceb845da56eab",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate 6c826f420205fd748a65431108cceb845da56eab --route gpu --case-offset 0 --case-count 1 --repetitions 1 --evidence-poll-ms 50 --output build/issue264-validation-streaming-after-gpu-01",
+      "output": "build/issue264-validation-streaming-after-gpu-01",
+      "runtime_exit_code": 0,
+      "host_pid": 16448,
+      "product_sources_unchanged": true,
+      "owned_children_after_cleanup": [],
+      "unreaped_children": [],
+      "owned_temp_removed": true,
+      "policy_rejections": [],
+      "parent_product_imports": {
+        "modules": 347,
+        "checkout_file_paths": 346,
+        "namespace_without_file": [
+          "puripuly_heart.ui"
+        ]
+      },
+      "hashes": {
+        "trace.json": "10f1c8f4fcdb6457231682dafbd91addc0aebf00c4691ca30408420450c15b49",
+        "isolation.json": "b9a0aa1728272f23868a2bae70e6930cc03165f2e12b92f40af3df8672bbf3ce",
+        "preflight.json": "986ef05900c0283d4c9fa7a8d31499ac184e8deea363b4bbf322ef94ce1045bc",
+        "execution_sources.zip": "cd1e1622534a9e4a668e5c2d8bee987720044a9aae883371efe5d4e2ee37a195",
+        "raw_observation.zip": "e5d6f5c127e6f2a90274d1b15aa43afd7f9235aa5b2d79f7fadfd56a894cf0fa"
+      }
+    },
+    {
+      "kind": "presentation",
+      "candidate": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b5e59dfdef6dc2ce4b36063368d1b296864e7d44 --probe caption_replay --source-trace build/issue264-validation-streaming-after-gpu-01/trace.json --source-trace-sha256 10f1c8f4fcdb6457231682dafbd91addc0aebf00c4691ca30408420450c15b49 --source-candidate 6c826f420205fd748a65431108cceb845da56eab --source-case distinct_repeated_A_B_A --source-profile 1.04 --output build/issue264-validation-streaming-after-presentation-01",
+      "output": "build/issue264-validation-streaming-after-presentation-01",
+      "runtime_exit_code": 1,
+      "host_pid": 68324,
+      "product_sources_unchanged": true,
+      "owned_children_after_cleanup": [],
+      "unreaped_children": [],
+      "owned_temp_removed": true,
+      "policy_rejections": [],
+      "parent_product_imports": {
+        "modules": 347,
+        "checkout_file_paths": 346,
+        "namespace_without_file": [
+          "puripuly_heart.ui"
+        ]
+      },
+      "hashes": {
+        "presentation_replay.json": "8d70e09489efb64d4c4216b2e7d7813adbabd2752c074f82fb7fef1029f2d98f",
+        "isolation.json": "41b2ea9fdb82b5f1e8bd542a6d9cfb7bde1b3dce54a5e585f49832ee260cd95b",
+        "execution_sources.zip": "9d5e4442212207410af6c8ff25d43d64a81c72f44e69a39ed6ca636e902a77bb",
+        "raw_observation.zip": "8c868866389ecfb2498310b391471c845a2c9b129f172f00241df1cf53a3bc6c"
+      }
+    },
+    {
+      "kind": "tapes",
+      "candidate": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44",
+      "command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b5e59dfdef6dc2ce4b36063368d1b296864e7d44 --route deepgram-native-replay --repetitions 1 --evidence-poll-ms 50 --output build/issue264-validation-streaming-after-tapes-01",
+      "output": "build/issue264-validation-streaming-after-tapes-01",
+      "runtime_exit_code": 0,
+      "host_pid": 77632,
+      "product_sources_unchanged": true,
+      "owned_children_after_cleanup": [],
+      "unreaped_children": [],
+      "owned_temp_removed": true,
+      "policy_rejections": [],
+      "parent_product_imports": {
+        "modules": 347,
+        "checkout_file_paths": 346,
+        "namespace_without_file": [
+          "puripuly_heart.ui"
+        ]
+      },
+      "hashes": {
+        "trace.json": "f53d4f29c1dd90ca3c2fe2ad78fba59081cfcb76e3b5340080a6fdcaf620436f",
+        "isolation.json": "32aa8321857a65c76e5dcaafd45fc62f6bc53552d2983bde1063cb65451e5d9b",
+        "preflight.json": "b0120793d7bfbb3f2f41e7047cbf6332fcf0dd06986c19400d842a818cd6893c",
+        "execution_sources.zip": "cd1e1622534a9e4a668e5c2d8bee987720044a9aae883371efe5d4e2ee37a195",
+        "raw_observation.zip": "b5a2f29ed1e61fa7da903f64eba945a0cbd1854841e35d349667d06ea757d04c"
+      }
+    }
+  ],
+  "actual_runtime": {
+    "driver_sha256": "ae4af00c0d1361ca8d63797971d49865e51fa00daddf3ad4f9b19077475774ed",
+    "launcher_sha256": "7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5",
+    "control_driver_sha256": "6b1fe0d320ddc8e7f44ecee6dc248952e7de2495d5135e83948eb3a4bb74f888",
+    "control_driver_archive": {
+      "path": "build/issue264-validation-gpu-replay-prepare-01/prepared_sources.zip",
+      "sha256": "63e415f00f86c9925cce1c923b47a6b2f7c94959594263027edf21df970e20a9",
+      "note": "Supplement to inherited599-file runtime manifest archive; retains the exact separately executed control helper."
+    },
+    "python": "3.14.7 x64 Windows",
+    "dependencies": {
+      "numpy": "2.5.1",
+      "onnxruntime": "1.28.0",
+      "sherpa-onnx": "1.13.8",
+      "sherpa-onnx-core": "1.13.8",
+      "httpx": "0.28.1",
+      "flet": "1.0.0",
+      "psutil": "7.2.2",
+      "deepgram-sdk": "5.3.4"
+    },
+    "wire_version": 16,
+    "evidence_drain_ms": 50,
+    "extra_harness_speaker_wait": false,
+    "input_or_threshold_tuning": false,
+    "speaker_policy_constants": {
+      "ACTIVE_PROBABILITY": 0.5,
+      "CLEAR_PROBABILITY": 0.8,
+      "QUIET_PROBABILITY": 0.2,
+      "COMPETING_PROBABILITY": 0.35,
+      "MAX_AMBIGUOUS_INTERVAL_S": 0.12,
+      "MAX_AMBIGUOUS_TOTAL_S": 0.2,
+      "MAX_AMBIGUOUS_SUPPORT_RATIO": 0.2
+    },
+    "profiles": {
+      "1.04": "9/4/0/264/264/222",
+      "0.64": "6/2/0/264/264/222"
+    },
+    "batch_bounds": {
+      "MAX_PENDING_SLICES": 8,
+      "MAX_SUBMITTED_RANGES": 2048
+    },
+    "nemotron_artifact": {
+      "sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+      "version": "v3",
+      "num_speakers": 8,
+      "sample_rate": 16000,
+      "file_type": 1,
+      "tensor_formats": {
+        "F32": 231,
+        "F16": 125
+      },
+      "size_bytes": 201832928,
+      "tensor_count": 356
+    },
+    "nemotron_policy": {
+      "backend": "Vulkan",
+      "neural_cpu_fallback": false,
+      "precision": "F16",
+      "schedule_guard": true,
+      "physical_gpu_only": true
+    },
+    "precision_limit": "F16 weights plus F32 auxiliary tensors/activations; no all-F16 computation claim",
+    "GPU_ASR": {
+      "model_sha256": "c75a961b7134a6c952d89797865cb0d0376876185aee04ef6d12c31c2952e4e1",
+      "worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+      "actual_device": {
+        "device_id": "vulkan-index-0",
+        "registry_index": 0,
+        "name": "Vulkan0",
+        "description": "AMD Radeon RX 7900 XTX",
+        "device_type": "gpu",
+        "memory_total_bytes": 25753026560,
+        "memory_free_bytes": 24890653872
+      },
+      "worker_pid": 63660,
+      "actual_use": "Only the single GPU observation. These hashes also appear as inventory in tape preflight, which is not GPU-ASR execution."
+    },
+    "Gemma": {
+      "server_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+      "models_sha256": {
+        "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf": "df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3",
+        "mtp-gemma-4-E4B-it.gguf": "423074e537504b4f9ec5eafed5c639fac82c96631626efccacdd3c4039b20605"
+      },
+      "readiness": {
+        "requested_backend": "gpu",
+        "effective_backend": "vulkan",
+        "source_language": "en",
+        "target_language": "ko",
+        "prefix_identity": "802fa527464adf660804dd395ebb9f842cf70ade5cf2c9a93024e9a4936f7c10"
+      },
+      "scenario_translation_calls": 20,
+      "server_pids": {
+        "gpu": 45008,
+        "tapes": 78372
+      },
+      "warmup": "actual managed owner prepare/prefix prefill; no additional request warmup",
+      "prompt_cache": "production managed runtime kept resident throughout both full-profile smoke arms",
+      "prefix_disk_cache": "disabled"
+    },
+    "Flet": {
+      "version": "1.0.0",
+      "client_build": "758f21506fbb",
+      "client_sha256": "b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28",
+      "owned_pids": {
+        "gpu": 42304,
+        "control": 80176,
+        "tapes": 32416
+      }
+    },
+    "process_import_limit": "Host product imports and owned process resource identities recorded. Raw traces retain owned Python subprocess PID sets; no independent per-child Python import graph or guessed Nemotron-worker PID role is claimed.",
+    "nemotron_native_runtime": {
+      "abi": "puripuly-nemotron-1",
+      "source": {
+        "repository": "NVIDIA/NeMo-Speech.cpp",
+        "revision": "b809bbb467fb2da2be0042fff5ef1f503828c9cf"
+      },
+      "c_abi_dll_sha256": "158f330a9b8ce664f4388238d0a1cf7cf871520eb3d209aeeb392ddc0b80bf8e",
+      "vulkan_dll_sha256": "044345dfec12ac0c4a863bfaf0ace67c818af07f1eb75082ecdcdb608f7b8d24",
+      "actual_ready_backend": "Vulkan",
+      "device_ordinal": "0",
+      "physical_gpu_only": true
+    }
+  },
+  "isolation": {
+    "effective": "Secrets scrubbed before product import; child-local temp/appdata/FLET_VIEW_PATH; offline/telemetry controls; Python external socket/DNS and credential access rejected; only direct scoped composition. Actual model services and Flet endpoints loopback; exact Flet get_free_tcp_port non-listening bind(empty-host,0) exception only.",
+    "Gemma_acquisition": "Authorized read-only existing-install checksum validator replaces acquisition/provisioning only; no shared lease, download, install or persistence qualification",
+    "not_qualified": [
+      "ordinary provisioning/download/install persistence",
+      "full application startup",
+      "OS-level sandbox/native known-folder redirection/absence of injected third-party layers",
+      "whole-host side-effect absence",
+      "photon or VR latency"
+    ],
+    "cleanup": "All three launchers removed owned temp, reaped owned descendants and reported no policy rejection/product-source change. No unrelated process interruption."
+  },
+  "case_outcomes": [
+    {
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "route": "gpu",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "quality_pass_inferred": false,
+      "sources": [
+        {
+          "source_id": "a20332f9-904d-57c4-8f29-53d3708cf21f",
+          "text": "He washed the detritus from his hair.",
+          "translation": "그는 머리에서 찌꺼기를 씻어냈어.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/1/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 0
+        },
+        {
+          "source_id": "7fb5bc66-4ae8-578c-9392-2ba3608ddf4a",
+          "text": "Gentlemen of the press.",
+          "translation": "언론 여러분.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "1",
+          "effective_key": "nemotron/1/1",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 1
+        },
+        {
+          "source_id": "58f2a473-d38f-56db-8fc3-d599006a3b9a",
+          "text": "He washed the detritus from his.",
+          "translation": "그는 그의 머리에서 때를 씻어냈어.",
+          "immutable_state": "unavailable",
+          "immutable_speaker_id": null,
+          "effective_key": "nemotron/1/0",
+          "palette_index": 0,
+          "first_host_style": "gray",
+          "band": "late_assignment_observed_within_1s",
+          "resolution_kind": "late_evidence_assignment",
+          "raw_source_index": 2
+        },
+        {
+          "source_id": "15fc7105-ebb8-5caa-b885-3696b86463d8",
+          "text": "From his hair.",
+          "translation": "머리에서.",
+          "immutable_state": "unavailable",
+          "immutable_speaker_id": null,
+          "effective_key": null,
+          "palette_index": null,
+          "first_host_style": "gray",
+          "band": "unresolved",
+          "resolution_kind": "conservative_unresolved",
+          "raw_source_index": 3
+        }
+      ],
+      "conservation": {
+        "source_history_ids_exact_once_in_order": true,
+        "source_history_text_exact": true,
+        "prior_context_is_exact_source_prefix": true,
+        "scenario_translation_call_ids_exact_once_in_order": true,
+        "capture_received_once": true,
+        "translation_calls": 4,
+        "all_translation_outcomes_translated": true
+      },
+      "authority_counters": {
+        "readable_unresolved": 2,
+        "within_500ms": 0,
+        "within_1s": 1,
+        "resolution_delays": [
+          0.6396529999910854
+        ]
+      },
+      "style_metadata_transitions": [
+        {
+          "card_id": "peer:f8cb28b4-9bd3-517f-b5f9-0e0ec3696f22",
+          "from_style": "gray",
+          "to_style": "gold",
+          "submitted_at": 158765.1742938,
+          "renderer_ack_at": 158765.1774794,
+          "changed_conservation_fields": {},
+          "card_order_unchanged": true,
+          "expiration_before": 158772.5075696,
+          "expiration_after": 158772.5075696,
+          "revision": 4,
+          "limit": "A simultaneous source/translation completion may lawfully change text; controlled metadata-only caption cases separately protect pure-style conservation."
+        }
+      ],
+      "boundaries": [
+        {
+          "reason": "delivery_deadline",
+          "sealed_at": 158764.037653,
+          "observed_at": 158764.0376938,
+          "first_logical_readable_lead_from_observed_s": 1.1077404000097886,
+          "first_logical_readable_lead_from_sealed_s": 1.1076996000192594
+        },
+        {
+          "reason": "delivery_pause",
+          "sealed_at": 158764.9841172,
+          "observed_at": 158764.9841827,
+          "first_logical_readable_lead_from_observed_s": 2.054229300003499,
+          "first_logical_readable_lead_from_sealed_s": 2.0541637999995146
+        }
+      ],
+      "native_request_count": 4,
+      "historical_raw_receipt_count": 0,
+      "native_failures": [],
+      "observation_errors": [],
+      "actual_speaker_geometry": "9/4/0/264/264/222",
+      "input_f32_sha256": "47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67",
+      "automatic_pixels": {
+        "qualified": 0,
+        "invalid": 5
+      },
+      "named_final_capture": "checkerboard_only_unqualified",
+      "raw_case_ref": "build/issue264-validation-streaming-after-gpu-01/trace.json#cases/0",
+      "first_logical_readable_at": 158762.9299534,
+      "first_source_translation_end_at": 158762.9275565,
+      "first_source_admitted_at": 158761.8130766
+    },
+    {
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "route": "deepgram-native-replay",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "quality_pass_inferred": false,
+      "sources": [
+        {
+          "source_id": "f5f70fc5-4087-5a00-9a0a-611515a068c9",
+          "text": "Washed the detritus from his hair. ",
+          "translation": "머리에서 때를 씻어냈어요.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/1/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 0
+        },
+        {
+          "source_id": "54889d5e-6d35-538c-9e29-c749cd2ee868",
+          "text": "Gentlemen of the press.",
+          "translation": "기자 여러분.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "1",
+          "effective_key": "nemotron/1/1",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 1
+        },
+        {
+          "source_id": "456c3755-f510-5b9f-955c-62ab23bac9ea",
+          "text": "He washed the detritus from his",
+          "translation": "그는 머리에서 때를 씻어냈어",
+          "immutable_state": "unavailable",
+          "immutable_speaker_id": null,
+          "effective_key": "nemotron/1/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 2
+        },
+        {
+          "source_id": "a9cfd07a-2d16-58a4-a46a-56b476054485",
+          "text": "from his hair.",
+          "translation": "머리에서.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/1/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 3
+        }
+      ],
+      "conservation": {
+        "source_history_ids_exact_once_in_order": true,
+        "source_history_text_exact": true,
+        "prior_context_is_exact_source_prefix": true,
+        "scenario_translation_call_ids_exact_once_in_order": true,
+        "capture_received_once": true,
+        "translation_calls": 4,
+        "all_translation_outcomes_translated": true
+      },
+      "authority_counters": {
+        "readable_unresolved": 0,
+        "within_500ms": 0,
+        "within_1s": 0,
+        "resolution_delays": []
+      },
+      "style_metadata_transitions": [],
+      "boundaries": [
+        {
+          "reason": "delivery_deadline",
+          "sealed_at": 161964.4506369,
+          "observed_at": 161964.4606391,
+          "first_logical_readable_lead_from_observed_s": -0.9909247999894433,
+          "first_logical_readable_lead_from_sealed_s": -1.0009269999864046
+        },
+        {
+          "reason": "delivery_pause",
+          "sealed_at": 161965.40828370003,
+          "observed_at": 161965.4115556,
+          "first_logical_readable_lead_from_observed_s": -0.040008299984037876,
+          "first_logical_readable_lead_from_sealed_s": -0.04328019995591603
+        }
+      ],
+      "native_request_count": 2,
+      "historical_raw_receipt_count": 3,
+      "native_failures": [],
+      "observation_errors": [],
+      "actual_speaker_geometry": "9/4/0/264/264/222",
+      "input_f32_sha256": "47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67",
+      "automatic_pixels": {
+        "qualified": 0,
+        "invalid": 4
+      },
+      "named_final_capture": "checkerboard_only_unqualified",
+      "raw_case_ref": "build/issue264-validation-streaming-after-tapes-01/trace.json#cases/0",
+      "first_logical_readable_at": 161965.4515639,
+      "first_source_translation_end_at": 161965.4485079,
+      "first_source_admitted_at": 161963.2705296
+    },
+    {
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "route": "deepgram-native-replay",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "quality_pass_inferred": false,
+      "sources": [
+        {
+          "source_id": "21de1ef4-b23a-5255-8459-ec3aa12fc0db",
+          "text": "Washed the detritus from his hair. ",
+          "translation": "머리에서 떨어진 것들을 씻어냈어.",
+          "immutable_state": "uncertain",
+          "immutable_speaker_id": null,
+          "effective_key": null,
+          "palette_index": null,
+          "first_host_style": "gray",
+          "band": "unresolved",
+          "resolution_kind": "conservative_unresolved",
+          "raw_source_index": 0
+        },
+        {
+          "source_id": "df9dc4f8-f577-51f9-8bb7-4849f8f9ba1f",
+          "text": "No. ",
+          "translation": "아니요.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "1",
+          "effective_key": "nemotron/3/1",
+          "palette_index": 0,
+          "first_host_style": "gray",
+          "band": "late_assignment_observed_within_500ms",
+          "resolution_kind": "palette_settlement_already_identified",
+          "raw_source_index": 1
+        },
+        {
+          "source_id": "9338815b-f439-5526-ada5-64f4674f9ee2",
+          "text": "He washed",
+          "translation": "그가 씻었어요",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/3/0",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 2
+        },
+        {
+          "source_id": "1b4c4475-4328-5b00-b569-02fc61c5101a",
+          "text": "the detritus from his hair.",
+          "translation": "머리에서 떨어진 것들.",
+          "immutable_state": "unavailable",
+          "immutable_speaker_id": null,
+          "effective_key": "nemotron/3/0",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 3
+        }
+      ],
+      "conservation": {
+        "source_history_ids_exact_once_in_order": true,
+        "source_history_text_exact": true,
+        "prior_context_is_exact_source_prefix": true,
+        "scenario_translation_call_ids_exact_once_in_order": true,
+        "capture_received_once": true,
+        "translation_calls": 4,
+        "all_translation_outcomes_translated": true
+      },
+      "authority_counters": {
+        "readable_unresolved": 2,
+        "within_500ms": 1,
+        "within_1s": 1,
+        "resolution_delays": [
+          0.2243546000099741
+        ]
+      },
+      "style_metadata_transitions": [
+        {
+          "card_id": "peer:cadca919-31d2-5919-859b-f76de14011de",
+          "from_style": "gray",
+          "to_style": "gold",
+          "submitted_at": 161973.6946606,
+          "renderer_ack_at": 161973.7097183,
+          "changed_conservation_fields": {},
+          "card_order_unchanged": false,
+          "expiration_before": 161981.4427008,
+          "expiration_after": 161981.4427008,
+          "revision": 9,
+          "limit": "A simultaneous source/translation completion may lawfully change text; controlled metadata-only caption cases separately protect pure-style conservation."
+        }
+      ],
+      "boundaries": [
+        {
+          "reason": "delivery_pause",
+          "sealed_at": 161973.2255803,
+          "observed_at": 161973.2313556,
+          "first_logical_readable_lead_from_observed_s": -0.1689777999999933,
+          "first_logical_readable_lead_from_sealed_s": -0.17475310000008903
+        }
+      ],
+      "native_request_count": 1,
+      "historical_raw_receipt_count": 2,
+      "native_failures": [],
+      "observation_errors": [],
+      "actual_speaker_geometry": "9/4/0/264/264/222",
+      "input_f32_sha256": "f90a99feada86931d92e8eb8db4ba3c084a3418af57523a2ce2f710db46d8e3f",
+      "automatic_pixels": {
+        "qualified": 0,
+        "invalid": 4
+      },
+      "named_final_capture": "checkerboard_only_unqualified",
+      "raw_case_ref": "build/issue264-validation-streaming-after-tapes-01/trace.json#cases/1",
+      "first_logical_readable_at": 161973.4003334,
+      "first_source_translation_end_at": 161973.377662,
+      "first_source_admitted_at": 161972.824357
+    },
+    {
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "route": "deepgram-native-replay",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "quality_pass_inferred": false,
+      "sources": [
+        {
+          "source_id": "71196f00-b168-566a-bbb9-94972264da72",
+          "text": "Washed the detritus from his hair. ",
+          "translation": "머리에서 찌꺼기를 씻어냈어.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/5/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 0
+        },
+        {
+          "source_id": "4f233bd8-3ef4-53fa-8fc4-e5a58b786e8c",
+          "text": "Gentlemen of the press.",
+          "translation": "기자 여러분.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "1",
+          "effective_key": "nemotron/5/1",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 1
+        },
+        {
+          "source_id": "63c1b020-e2ec-5c6b-acc2-fd58cbd0f283",
+          "text": "He washed the detritus from his",
+          "translation": "그는 머리에서 찌꺼기를 씻어냈어",
+          "immutable_state": "unavailable",
+          "immutable_speaker_id": null,
+          "effective_key": "nemotron/5/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 2
+        },
+        {
+          "source_id": "a608a68c-9fbd-5a7b-b1a0-e402168cc4c5",
+          "text": "from his hair.",
+          "translation": "머리에서.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/5/0",
+          "palette_index": 0,
+          "first_host_style": "gold",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 3
+        }
+      ],
+      "conservation": {
+        "source_history_ids_exact_once_in_order": true,
+        "source_history_text_exact": true,
+        "prior_context_is_exact_source_prefix": true,
+        "scenario_translation_call_ids_exact_once_in_order": true,
+        "capture_received_once": true,
+        "translation_calls": 4,
+        "all_translation_outcomes_translated": true
+      },
+      "authority_counters": {
+        "readable_unresolved": 0,
+        "within_500ms": 0,
+        "within_1s": 0,
+        "resolution_delays": []
+      },
+      "style_metadata_transitions": [],
+      "boundaries": [
+        {
+          "reason": "delivery_deadline",
+          "sealed_at": 161982.38968509997,
+          "observed_at": 161982.3988092,
+          "first_logical_readable_lead_from_observed_s": 0.7944029000063892,
+          "first_logical_readable_lead_from_sealed_s": 0.7852787999727298
+        },
+        {
+          "reason": "delivery_pause",
+          "sealed_at": 161983.3473319,
+          "observed_at": 161983.3605956,
+          "first_logical_readable_lead_from_observed_s": 1.7561893000092823,
+          "first_logical_readable_lead_from_sealed_s": 1.7429256000032183
+        }
+      ],
+      "native_request_count": 2,
+      "historical_raw_receipt_count": 3,
+      "native_failures": [],
+      "observation_errors": [],
+      "actual_speaker_geometry": "6/2/0/264/264/222",
+      "input_f32_sha256": "47484dedc6a7e69a33495b6fffb115ffdfcce59fedf55c59d41af5c79a97ac67",
+      "automatic_pixels": {
+        "qualified": 0,
+        "invalid": 4
+      },
+      "named_final_capture": "checkerboard_only_unqualified",
+      "raw_case_ref": "build/issue264-validation-streaming-after-tapes-01/trace.json#cases/2",
+      "first_logical_readable_at": 161981.6044063,
+      "first_source_translation_end_at": 161981.6016145,
+      "first_source_admitted_at": 161981.2116395
+    },
+    {
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "route": "deepgram-native-replay",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "quality_pass_inferred": false,
+      "sources": [
+        {
+          "source_id": "60770e09-0e3b-5ed7-afe5-7013d1f95c56",
+          "text": "Washed the detritus from his hair. ",
+          "translation": "머리에서 털을 씻어냈어.",
+          "immutable_state": "uncertain",
+          "immutable_speaker_id": null,
+          "effective_key": null,
+          "palette_index": null,
+          "first_host_style": "gray",
+          "band": "unresolved",
+          "resolution_kind": "conservative_unresolved",
+          "raw_source_index": 0
+        },
+        {
+          "source_id": "b10008a0-90ff-52ef-9c7f-c0cc28474fb2",
+          "text": "No. ",
+          "translation": "아니요.",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "1",
+          "effective_key": "nemotron/7/1",
+          "palette_index": 0,
+          "first_host_style": "gray",
+          "band": "late_assignment_observed_within_500ms",
+          "resolution_kind": "palette_settlement_already_identified",
+          "raw_source_index": 1
+        },
+        {
+          "source_id": "8c4dcd45-21cc-5346-af45-d563948b139a",
+          "text": "He washed",
+          "translation": "그가 씻었어",
+          "immutable_state": "identified",
+          "immutable_speaker_id": "0",
+          "effective_key": "nemotron/7/0",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 2
+        },
+        {
+          "source_id": "ab0fb5a3-4c48-533a-bd86-d6da26495920",
+          "text": "the detritus from his hair.",
+          "translation": "그의 머리에서 찌꺼기를 씻어냈어.",
+          "immutable_state": "unavailable",
+          "immutable_speaker_id": null,
+          "effective_key": "nemotron/7/0",
+          "palette_index": 1,
+          "first_host_style": "cyan",
+          "band": "identified_before_first_readable",
+          "resolution_kind": "settled_before_first_readable",
+          "raw_source_index": 3
+        }
+      ],
+      "conservation": {
+        "source_history_ids_exact_once_in_order": true,
+        "source_history_text_exact": true,
+        "prior_context_is_exact_source_prefix": true,
+        "scenario_translation_call_ids_exact_once_in_order": true,
+        "capture_received_once": true,
+        "translation_calls": 4,
+        "all_translation_outcomes_translated": true
+      },
+      "authority_counters": {
+        "readable_unresolved": 2,
+        "within_500ms": 1,
+        "within_1s": 1,
+        "resolution_delays": [
+          0.25853340001776814
+        ]
+      },
+      "style_metadata_transitions": [
+        {
+          "card_id": "peer:f85576bc-74b0-5d83-807e-202120aa9a03",
+          "from_style": "gray",
+          "to_style": "gold",
+          "submitted_at": 161991.7771863,
+          "renderer_ack_at": 161991.7930765,
+          "changed_conservation_fields": {},
+          "card_order_unchanged": false,
+          "expiration_before": 161999.4880583,
+          "expiration_after": 161999.4880583,
+          "revision": 21,
+          "limit": "A simultaneous source/translation completion may lawfully change text; controlled metadata-only caption cases separately protect pure-style conservation."
+        }
+      ],
+      "boundaries": [
+        {
+          "reason": "delivery_pause",
+          "sealed_at": 161991.2882413,
+          "observed_at": 161991.2944912,
+          "first_logical_readable_lead_from_observed_s": -0.14465410000411794,
+          "first_logical_readable_lead_from_sealed_s": -0.15090400000917725
+        }
+      ],
+      "native_request_count": 1,
+      "historical_raw_receipt_count": 2,
+      "native_failures": [],
+      "observation_errors": [],
+      "actual_speaker_geometry": "6/2/0/264/264/222",
+      "input_f32_sha256": "f90a99feada86931d92e8eb8db4ba3c084a3418af57523a2ce2f710db46d8e3f",
+      "automatic_pixels": {
+        "qualified": 0,
+        "invalid": 4
+      },
+      "named_final_capture": "checkerboard_only_unqualified",
+      "raw_case_ref": "build/issue264-validation-streaming-after-tapes-01/trace.json#cases/3",
+      "first_logical_readable_at": 161991.4391453,
+      "first_source_translation_end_at": 161991.4195541,
+      "first_source_admitted_at": 161990.8897616
+    }
+  ],
+  "aggregate_logical": {
+    "sources": 20,
+    "scenario_translation_calls": 20,
+    "native_failures": 0,
+    "observer_failures": 0,
+    "disjoint_bands": {
+      "identified_before_first_readable": 14,
+      "late_assignment_observed_within_1s": 1,
+      "unresolved": 3,
+      "late_assignment_observed_within_500ms": 2
+    },
+    "band_limit": "Logical public assignment/first-host-snapshot bands, not pixels or accuracy. First colored host snapshot takes precedence over a later polling observation. within_1s counters include within_500ms; do not add them as disjoint counts.",
+    "identity_assessment": "GPU A/B/returnA keys0/1/0; native repeated scopes1/5 keys0/1/0/0. Native short scopes3/7 No is key1 and He/tail key0; firstA remains uncertain. Source key is separate from palette: short No receives palette0/gold and returningA palette1/cyan. No forced wrong key observed in these named comparisons; identity count is not accuracy.",
+    "No_color_kind": "Both No sources already carry key1 before first readable; gray-to-gold is bounded palette settlement, not newly discovered late acoustic identity. Case logical delays224.355ms/258.533ms; per-source polling upper bounds234.926ms/271.264ms.",
+    "GPU_late_kind": "Returning prefix immutable unavailable resolves to key0 after first readable; case logical639.653ms, polling upper649.818ms, style submission659.937ms. No qualified visual delay.",
+    "scope_limit": "Keys are compared within their recorded session/case only; local IDs/scopes are not globally persistent person identities. Scoring/reference labels are post-hoc only, never model decisions."
+  },
+  "lexical_and_mapping_witnesses": {
+    "native_No_He": {
+      "source_case_indices": [
+        1,
+        3
+      ],
+      "No_contribution_chars": [
+        35,
+        39
+      ],
+      "He_contribution_chars": [
+        39,
+        48
+      ],
+      "No_normalized_envelope": [
+        47807,
+        54208
+      ],
+      "He_normalized_envelope": [
+        54208,
+        61888
+      ],
+      "boundary_sample": 54208,
+      "note": "Both profiles produce distinct No. and He washed source/history/translation units through current real streaming producer→Peer; raw source origins retain independent proof IDs. No annotation fed to decisions. Adjacent A/No envelopes retain their recorded one-sample floor/ceil overlap; no harness clamp/epsilon/rounding waiver."
+    },
+    "native_returning_prefix": {
+      "source_case_indices": [
+        0,
+        2
+      ],
+      "contribution_chars": [
+        58,
+        89
+      ],
+      "normalized_envelope": [
+        73968,
+        103408
+      ],
+      "outcome": "Effective returning key0 settled before first readable in both profiles, while immutable source snapshot remains unavailable."
+    },
+    "raw_probability_and_proof_refs": "Per-case trace.evidence, trace.presentation_assignments and sources.origins in local raw archives. No full frame-probability timelines duplicated here."
+  },
+  "retained_quality_limits": [
+    "Historical native firstA text begins Washed, omitting He; not a fresh ASR error measurement.",
+    "GPU and native repeated return prefix/tail repeat lexical from his; source/history conservation is not coherent-phrase or correction quality.",
+    "Short native returningA remains split He washed / the detritus from his hair.; both keys0, but these are phrase fragments and actual translations are reported without semantic-accuracy approval.",
+    "Three final gray/unresolved sources remain: GPU final tail unavailable, short native firstA uncertain in both profiles. No unsupported policy-floor/model-cause attribution.",
+    "Actual No recolor shares a publication with firstA retirement and He insertion: No card/text/appearance/TTL conserved, but global card order changes; no pure position-conservation claim from that real event. GPU return metadata-only recolor preserves order and TTL; all actual positions remain visually unqualified.",
+    "Current correction/standalone6s continuation/other GPU cases were not rerun; their original before evidence is not promoted to this after candidate.",
+    "Native replay consumes the live actual StreamingSpeakerSession iterator and awaits real Peer handling. It is not the actual streaming ScopedRecognitionEngine/deferred queue route; GPU alone uses actual ScopedRecognitionEngine+CausalBatch.",
+    "Historical ASR timestamps/maps/controls are rebased only at playback host origin. No fresh Deepgram call, cloud latency, live recording or statistical/profile-selection inference."
+  ],
+  "presentation_qualification": {
+    "pipeline_automatic": {
+      "qualified": 0,
+      "invalid": 21
+    },
+    "pipeline_named_final_captures": {
+      "qualified": 0,
+      "unqualified": 5
+    },
+    "one_no_model_control": {
+      "qualified": 0,
+      "invalid": 5,
+      "status": "failed_pixel_qualification",
+      "diagnostics_valid": true
+    },
+    "observed_pixels": "Owned checkerboard only. Decisive GPU commit3/4; control commit2/3/4; native commit2/9/14/21 directly inspected; all relevant saved image byte hashes equal1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0. No receipt/host ACK/window flag rescues them.",
+    "original_GPU_visual_latency": "Unqualified and unrecovered by the no-model control",
+    "control": {
+      "all_six_payloads_exact": true,
+      "requested_offsets_s": [
+        0.0,
+        0.4842814000148792,
+        1.6080509000166785,
+        2.244244000001345,
+        2.3735756000096444,
+        3.9098609999928158
+      ],
+      "observed_offsets_s": [
+        0.00015770000754855573,
+        0.4921203999838326,
+        1.6241921999899205,
+        2.2602099000068847,
+        2.384221299987985,
+        3.9171977000078186
+      ],
+      "outbound_writes": 8,
+      "outbound_drains": 8,
+      "outbound_bytes": 4055,
+      "public_text_hash_matches": 8,
+      "observer_methods_restored": true,
+      "owned_overlay_pid": 80176,
+      "owned_overlay_hwnd": 1578268,
+      "owned_backdrop_pid": 29220,
+      "during_snapshots": "Visible/noniconic/uncloaked, overlay above owned backdrop, matching client rectangles32,32,1376,368",
+      "extended_style": 524584,
+      "layered_attributes": {
+        "alpha": 0,
+        "flags": 0,
+        "color_key": 0,
+        "available": true
+      },
+      "limits": "Outbound caption bytes and drains established, NOT native control application/paint. flags0 is not LWA_ALPHA/global-opacity-zero proof; no root cause assigned."
+    }
+  },
+  "display_prerequisite": {
+    "Director_owned_record": "local://issue264-display-lease.json",
+    "off_notification_monotonic": 161846.702,
+    "lease_succeeded": true,
+    "display_on_observed": false,
+    "input_desktop": "Default",
+    "restored": true,
+    "ended_monotonic": 161849.7346474,
+    "tape_run_started_monotonic": 161944.4799902,
+    "interpretation": "Off observation precedes the tape run but follows original GPU/control failures. No continuous capture-time display-state record or retrospective causal proof. Owner availability/presentation remains a prerequisite, not a negative acoustic-quality score."
+  },
+  "counter_limits": {
+    "gpu": {
+      "file": "gpu_counters.jsonl",
+      "sha256": "5a24e4de321f8fa001ca7073fa7177793c2233f66fb0a73e15f0119b8b3653f4",
+      "stderr": "",
+      "returncode": 1,
+      "scope": "Windows sampled adapter/process counters, not inference timestamp queries or isolated whole-host VRAM"
+    },
+    "tapes": {
+      "file": "gpu_counters.jsonl",
+      "sha256": "2e48fabcfcf6447c781540e75326890d14c4891fcd6e2fb3dc6c1dde543d0f1f",
+      "stderr": "",
+      "returncode": 1,
+      "scope": "Windows sampled adapter/process counters, not inference timestamp queries or isolated whole-host VRAM"
+    }
+  },
+  "final_limit": "All explicitly authorized five scenario observations plus the one no-model control completed without rerun. Source/native/translation/logical results retained; current actual visible caption qualification remains unresolved. No further model/UI run authorized by this report.",
+  "historical_tape_source": {
+    "archive": "native/nemotron/issue218_cloud_deepgram_raw.zip",
+    "archive_sha256": "7554260beb589938b392141d3ccbb31fa3ae6c90993ecb52211c1fb454a1daea",
+    "member": "valid/trace.json",
+    "member_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+    "historical_candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+    "clock": "Only playback host origin rebased; lexical clocks, successful PCM maps, receipt delays and controls retained. Native ASR timings are historical, not fresh cloud latency.",
+    "repetitions": "Original baseline repetition1 only",
+    "fresh_Deepgram_calls": 0,
+    "current_inference": "Actual Nemotron and managed local Gemma on reused permitted public PCM; historical ASR replay is not a fresh acoustics/ASR capture measurement."
+  },
+  "raw_archive_scope": "Local-only runtime manifests contain599 files. GPU/tape source ZIPs are identical because executed runtime/product/helper bytes are identical; the separately executed presentation helper is additionally retained in its pinned preparation archive. Original full traces, counters and images are retained in per-run raw_observation.zip; no frame timeline is duplicated in this report.",
+  "late_witnesses": [
+    {
+      "case": "distinct_repeated_A_B_A",
+      "route": "gpu",
+      "profile": "1.04",
+      "source_id": "58f2a473-d38f-56db-8fc3-d599006a3b9a",
+      "kind": "late_evidence_assignment",
+      "first_readable_at": 158764.5143567,
+      "deadline": 158765.5143567,
+      "case_authority_delay_s": [
+        0.6396529999910854
+      ],
+      "observed_assignment_upper_delay_s": 0.6498175000015181,
+      "transition_reference": "Matching case_outcomes.style_metadata_transitions (card/text/TTL/order details); not duplicated here"
+    },
+    {
+      "case": "short_A_B_A",
+      "route": "deepgram-native-replay",
+      "profile": "1.04",
+      "source_id": "df9dc4f8-f577-51f9-8bb7-4849f8f9ba1f",
+      "kind": "palette_settlement_already_identified",
+      "first_readable_at": 161973.4491911,
+      "deadline": 161974.4491911,
+      "case_authority_delay_s": [
+        0.2243546000099741
+      ],
+      "observed_assignment_upper_delay_s": 0.23492580000311136,
+      "transition_reference": "Matching case_outcomes.style_metadata_transitions (card/text/TTL/order details); not duplicated here"
+    },
+    {
+      "case": "short_A_B_A",
+      "route": "deepgram-native-replay",
+      "profile": "0.64",
+      "source_id": "b10008a0-90ff-52ef-9c7f-c0cc28474fb2",
+      "kind": "palette_settlement_already_identified",
+      "first_readable_at": 161991.4948995,
+      "deadline": 161992.4948995,
+      "case_authority_delay_s": [
+        0.25853340001776814
+      ],
+      "observed_assignment_upper_delay_s": 0.27126410001073964,
+      "transition_reference": "Matching case_outcomes.style_metadata_transitions (card/text/TTL/order details); not duplicated here"
+    }
+  ],
+  "source_reference_format": "Each source raw_source_index resolves under its case raw_case_ref/sources/index. effective_key is source/scope/local_id, never a palette index or global person ID. Precise late first-readable/deadline/assignment and style witnesses are separated below; full raw records remain local."
+}

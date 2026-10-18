@@ -1,0 +1,49 @@
+{
+  "RESULT": "repair_verified",
+  "DOMAIN": "Bounded task-readiness review of the new presentation-only replay at b5e59dfdef6dc2ce4b36063368d1b296864e7d44. Product6c826f420205fd748a65431108cceb845da56eab correctness and actual execution acceptance are excluded.",
+  "assessment": "No blocking task-control finding. The prepared replay is suitable for one separately released no-model observation. It conserves the selected recorded sequence, adds owned-instance passive diagnostics, and distinguishes host/socket completion from native paint. This verdict does not authorize launch or qualify the original failed pixels.",
+  "affected_surfaces": {
+    "native/nemotron/issue264_validation_caption_replay.py": "Reviewed exact hash6b1fe0d320ddc8e7f44ecee6dc248952e7de2495d5135e83948eb3a4bb74f888, replacing the prior hardcoded correction replay with explicit source/hash/candidate/case/profile selection and passive transport/HWND diagnostics.",
+    "native/nemotron/issue264_validation_gpu_replay_preparation.json": "Reviewed selection, requested timing, check provenance, failure retention and one-control stop rule.",
+    "native/nemotron/issue264_validation_gpu_pixel_diagnosis.json": "Reviewed preserved original failure and appropriately unknown cause; no renderer/capture-only causal conclusion is asserted."
+  },
+  "COVERAGE": [
+    {
+      "item": "Selection and original evidence identity",
+      "status": "verified by inspection and pure controls",
+      "basis": "The selected trace hash matches10f1c8f4… and candidate6c826f42…. Selection yields exactly revisions1–6, block counts1/2/2/2/2/0, including final clear. Wrong candidate, missing/duplicate case/profile, intermediate clears and reordered submissions reject. All five original automatic readbacks remain explicitly invalid."
+    },
+    {
+      "item": "Payload, expiration metadata and timing conservation",
+      "status": "inspected; pure controls passed",
+      "basis": "Official decoder round-trip and whole-snapshot comparison permit only top-level transport revision rebasing. GPU revisions remain1–6. Blocks/text/styles/card/calibration metadata are protected. Original expiration metadata is retained, not interpreted as a new TTL test. Scheduling uses absolute targets from the original offsets, without per-snapshot pixel waits or timing retries; observed offsets are recorded separately. Observer/dispatch overhead is not represented as exact original timing reproduction."
+    },
+    {
+      "item": "Owned writer interception, delegation, failures and restoration",
+      "status": "verified by inspection and pure fixture checks",
+      "basis": "Only the writer reached through the owned renderer's Session/FletSocketServer connection is wrapped; installed Flet source confirms this seam and its write→drain send loop. Original write/drain are each delegated once with unchanged results and original exceptions. Observation-only errors are separately retained. Instance attributes are restored in finally, including cleanup-failure paths; unrelated writers are untouched. No global StreamWriter patch or additional await is introduced by observation."
+    },
+    {
+      "item": "Passive owned HWND diagnostics",
+      "status": "inspected",
+      "basis": "New calls read owned PID/HWND identity, rectangles, z-order, visibility/cloak and extended/layered attributes. They do not call window activation, repositioning or opacity setters. Existing guarded owned capture/recovery behavior is reused without weakening its safeguards. Actual native API/writer attachment compatibility remains unexercised until the authorized control."
+    },
+    {
+      "item": "ACK and diagnostic interpretation",
+      "status": "inspected; correctly qualified",
+      "basis": "Installed Flet queues encoded packets, then asynchronously calls writer.write/drain. These records prove only those returns/failures. Host revision correlation and public-text hashes do not prove native application, rasterization or paint. Code/report explicitly preserve this distinction. diagnostics_valid=false or attachment/HWND errors must remain incomplete diagnostic evidence, even if separately qualified pixels are obtained."
+    },
+    {
+      "item": "Readiness, source gates and no-model isolation",
+      "status": "inspected; unchanged boundaries retained",
+      "basis": "Execution still requires the isolated launcher's exact candidate/source gate, fresh owned output path, credential scrubbing, supported FLET_VIEW_PATH, loopback policy and owned-child cleanup. Source path/hash/candidate reject before UI construction. No ASR/Nemotron/Gemma/source admission/translation/history owner is invoked by this replay. Original source bytes are rehashed afterward."
+    },
+    {
+      "item": "Independent checks and exact pin",
+      "status": "verified",
+      "basis": "Independently ran the retained pure checker: exit0, all seven groups passed, no product imports. Checked replay/preparation/diagnosis/launcher/runtime files against exact b5e59 Git objects; replay hash and checker/source-ZIP hashes match the preparation record. Launcher7ca24… and runtimeae4af… are unchanged. Reported Ruff/Black success and initial throwaway-script formatting failure were read, not rerun."
+    }
+  ],
+  "execution_and_acceptance_limits": "No UI/model/cloud/VR launch, credential access, product import, file edit or Git mutation occurred in this review. The actual one-replay result remains unverified. Qualified replay pixels would show that these recorded snapshots can render through the controlled presentation path; they would not validate original blank images, recover original coupled latency or establish the original cause. If blank/partial/invalid, retain the discriminating records and stop without another timing attempt.",
+  "retained_scope": "E1–E5 closures and all unaffected prior actual/evidence coverage remain applicable to their original candidates. The latest GPU run's five failed automatic images and failed final image remain failures with unknown cause. Earlier successes are not relabelled as current pixels. Four tapes remain required; their hold/release and terminal Goal acceptance remain Director-owned."
+}

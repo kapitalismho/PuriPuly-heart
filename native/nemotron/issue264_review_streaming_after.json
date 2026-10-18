@@ -1,0 +1,69 @@
+{
+  "RESULT": "repair_verified",
+  "DOMAIN": "Bounded combined actual-after evidence and presentation-control review; product 6c826f420205fd748a65431108cceb845da56eab, accepted task/helper b5e59dfdef6dc2ce4b36063368d1b296864e7d44. This verifies tooling/evidence claims, not whole-Goal acceptance or universal GUI qualification.",
+  "material_findings": [],
+  "COVERAGE": [
+    {
+      "item": "Actual-after candidate, imports, composition, isolation and source provenance",
+      "status": "inspected",
+      "basis": "Original GPU and four canonical-native cases support 20 actual source/Gemma outcomes, no reported native/observer failures, exact source/context accounting and intended product-source manifests. GPU exercises actual Nemotron/GPU Qwen/Gemma; canonical tapes use recorded provider input through the actual adapter/session path, not fresh service calls or actual streaming deferred-queue execution. Existing-install acquisition/lease substitution and child-local FLET_VIEW_PATH remain explicit controls, not provisioning/persistence or OS-sandbox proof."
+    },
+    {
+      "item": "Source boundaries, translation, identity, clocks, context and TTL",
+      "status": "inspected",
+      "basis": "Current native cases preserve separate No. and He washed sources with distinct provenance. Source/context conservation and effective speaker outcomes are supported. GPU returning-A authority/style occur about 639.653/659.937 ms after first logical readability. Native short-case 224.355/258.533 ms changes are palette settlement, not newly measured acoustic identification. Three unresolved-gray outcomes and aggregate bands are not accuracy measurements. Literal No. ID/text/appearance/TTL were preserved; concurrent retirement/insertion changed global card order, so this is not pure position-conservation evidence."
+    },
+    {
+      "item": "Current GPU presentation-only control",
+      "status": "inspected",
+      "basis": "Independently inspected qualified commit_2/3/5: coherent bilingual A gold/B cyan, returning source gray, then the same returning source gold with separate gray tail. All six payloads and expiry metadata are exact except permitted transport revision rebasing. Four qualified revisions [1,2,3,5]; revision4 changed 4→5 during capture and remains invalid. Strict failed_pixel_qualification/exit1 is correctly retained. All eight outbound packet length/hash pairs match the earlier blank control. Socket write/drain remains non-paint acknowledgement."
+    },
+    {
+      "item": "Native-short display-On control",
+      "status": "inspected",
+      "basis": "Correct source hash/case/profile selected, but owned native startup failed window_reveal_lost/visible_bounds_not_retained before replay; outer harness TimeoutError. Zero snapshots and zero readbacks. Stored diagnostics_valid=true is explicitly and correctly qualified as vacuous because observation installation was not reached. This is an invalid startup observation, not caption-content/acoustic failure or demonstrated product regression."
+    },
+    {
+      "item": "Display prerequisite, restoration and cleanup",
+      "status": "inspected",
+      "basis": "Both controls fall within the recorded On notification/temporary dedicated-thread request window, lasting 182.361 s within the 600 s cap. Request restored, notification unregistered, no input injection/unlock/power-plan change. Both controls report reaped children, removed owned temporaries, unchanged product sources and no policy rejection. Earlier Off observation is not retrospective capture-time cause proof."
+    },
+    {
+      "item": "Retained E1–E5 and earlier caption/matrix coverage",
+      "status": "supported_by_prior_evidence",
+      "basis": "E1–E4 repairs remain applicable. E5's actual blank-hidden→gray→gold evidence remains closed; independently compared eight archived E5 OutputRuntime/presenter/Flet/renderer modules with current control manifest: byte hashes identical. Earlier matrix/nine-caption coverage remains bounded to its original code paths and observations; current subset is not a replacement full matrix. Genuine first04 decode failure, setup attempts, failed E5 history and all invalid original pixels remain retained."
+    },
+    {
+      "item": "Gemini R4, drivers, reports and .gitignore",
+      "status": "supported_by_prior_evidence",
+      "basis": "Original focused cc75792..8c01 coverage retained: two exact-input controls, complete attempt/audio accounting, evidenced negative disposition, no qualified offsets/FIFO or arrival mapping, no provider-universal bug or app-qualification claim. Executed versus formatted derivative hashes remain distinct. No new API calls, raw-frame publication or key-file inspection."
+    },
+    {
+      "item": "Durable records and reproducibility",
+      "status": "inspected",
+      "basis": "Verified display_on_summary SHA79863e0bd1ee103db4e113790f729727cb212327240202d22661643068966883 and all 11 referenced artifact hashes. After-report disk SHA794e36fd3468bcfa4b5669bb05888b8f554dfdd1ac4154d125bed7127ce0c526 verified; normalizing exactly 1057 CRLFs reproduces the earlier 4711ecdf... content hash. These are different byte representations, not a body/outcome rewrite."
+    }
+  ],
+  "remaining_evidence_boundaries": [
+    {
+      "boundary": "Current native-short-specific No./He GUI pixels",
+      "status": "unverified",
+      "reason": "The only released display-On native-short attempt never reached snapshot application. Prior actual GPU No. presentation, current qualified generic rendering and unchanged renderer are supporting cross-boundary evidence; none turns this failed attempt into current native-short-specific GUI qualification."
+    },
+    {
+      "boundary": "Original current-run coupled visual timing and revision4 paint",
+      "status": "unverified",
+      "reason": "Original GPU/tape images remain invalid. Presentation-only replay does not recover original acoustic-to-pixel timing, physical first-readable latency, or revision4 paint. Qualified revisions3→5 include ordinary layout changes and cannot prove pure unchanged-position recoloring."
+    },
+    {
+      "boundary": "Goal applicability",
+      "status": "bounded_support_not_terminal_acceptance",
+      "reason": "Actual source/translation/identity outcomes support shared short-turn and returning-speaker contracts; current replay demonstrates those recorded GPU caption fields really render; unchanged OutputRuntime/renderer plus E5 retain hidden-clock, TTL and pure-metadata presentation evidence. No new product defect is established. Do not claim every current scenario visually qualified or every control passed. The separate terminal audit must assess the combined proportionate coverage without promoting the explicitly missing observations above."
+    }
+  ],
+  "inspected_record_sha256": {
+    "native/nemotron/issue264_validation_display_on_actual.json": "1f0f5d0f1802f96504699267b495ebbbaaa6cce9c96ebe73e44080142b7ad37d",
+    "native/nemotron/issue264_validation_display_prerequisite.json": "8dddf96240942174f9812ffda0dcfb24e9d3b0da2b05b33c3ef6e064ace1418f"
+  },
+  "review_actions": "Read-only original-evidence/image inspection and offline hash/accounting comparisons only; no model, cloud, GUI, test-suite or formatter execution; no edits. Final report/docs pin needs byte-identity reconciliation; any later mechanism delta needs bounded review."
+}

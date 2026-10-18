@@ -1,0 +1,899 @@
+{
+  "schema": "issue264-completion-evidence-1",
+  "issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/264",
+  "record_kind": "Evidence index; independent terminal verdict is recorded separately on the issue, not inferred from this index.",
+  "authority": {
+    "goal_baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+    "inspected_dev": "2b2f7dceda67351c2cd1f34cc8c4c93a10a46d00",
+    "product_and_runtime_pin": "6c826f420205fd748a65431108cceb845da56eab",
+    "policy": "Immediate translation/readable text; at most one unresolved-to-identified application within first-readable original-or-translation +1.000s; 500ms is a reporting band, not a hold or guarantee.",
+    "accepted_limits": [
+      "Existing Parakeet lexical/rollover omissions; no additional Parakeet-specific repair or acoustic qualification.",
+      "Gemini R4 may complete with an evidenced unsupported/provider-dependent result."
+    ],
+    "not_authorized": [
+      "push",
+      "PR",
+      "merge",
+      "release/deployment",
+      "issue closure",
+      "worktree cleanup",
+      "VRChat/SteamVR",
+      "fresh Deepgram service calls",
+      "additional Gemini calls beyond the two completed variants"
+    ],
+    "current_task_pin": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44"
+  },
+  "pinned_inventory": {
+    "baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+    "candidate_binding": "The containing Git commit is the final evidence candidate; its exact SHA is supplied in the publication and independent terminal assignment. Product code is6c826f42; task controls areb5e59dfd-equivalent.",
+    "total_files": 110,
+    "category_counts": {
+      "task_control_or_evidence": 58,
+      "local_artifact_exclusion": 1,
+      "documentation": 3,
+      "native_contract": 3,
+      "product_python": 23,
+      "tests": 22
+    },
+    "files": [
+      {
+        "status": "M",
+        "path": ".gitignore",
+        "category": "local_artifact_exclusion"
+      },
+      {
+        "status": "M",
+        "path": "docs/architecture.md",
+        "category": "documentation"
+      },
+      {
+        "status": "M",
+        "path": "docs/issue218-speaker-attribution-plan.md",
+        "category": "documentation"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_boundary_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_buffer_disposal_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_completion_evidence.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_gemini_auto-no-mid-eos_report.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_gemini_execution_decision.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_gemini_findings.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_gemini_manual_report.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_gemini_probe.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_inflight_handoff_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_repair_review_evidence.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_repair_review_product.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_evidence.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_gpu_replay_preparation.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_hidden_actual.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_hidden_readiness.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_hook_migration.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_inflight_handoff.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_matrix.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_product.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_shared_handoff.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_streaming.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_streaming_after.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_review_streaming_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_shared_evidence.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_shared_handoff_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_streaming_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_streaming_review_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_caption.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_caption_preparation.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_caption_replay.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_caption_setup_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_diagnose.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_diagnosis_04.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_display_on_actual.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_display_prerequisite.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_e4_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_first_findings.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_formatting.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_gpu_pixel_diagnosis.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_gpu_replay_actual.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_gpu_replay_preparation.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_hidden_actual.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_hidden_repair.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_hook_migration.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_inputs.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_launch.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_matrix_report.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_preparation.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_prerequisites.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_remaining_gray.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_repair_handoff.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_replay_mapping.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_runtime.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_streaming_after_report.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_summary.py",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_summary_first04.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_tooling_e4_checks.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "A",
+        "path": "native/nemotron/issue264_validation_tooling_repair_checks.json",
+        "category": "task_control_or_evidence"
+      },
+      {
+        "status": "M",
+        "path": "native/overlay/README.md",
+        "category": "documentation"
+      },
+      {
+        "status": "M",
+        "path": "native/overlay/src/bridge.rs",
+        "category": "native_contract"
+      },
+      {
+        "status": "M",
+        "path": "native/overlay/src/runtime.rs",
+        "category": "native_contract"
+      },
+      {
+        "status": "M",
+        "path": "native/overlay/tests/runtime.rs",
+        "category": "native_contract"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/app/wiring/wiring_local_asr_provider_runtime.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/local_asr/local_asr_provider_runtime.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/orchestrator/peer_translation_channel.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/orchestrator/translation_output_projection.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/orchestrator/translation_turn.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/overlay/manifest.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/overlay/presenter.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/overlay/presenter_sources.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/runtime/local_asr_provider_runtime.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/runtime/output.py",
+        "category": "product_python"
+      },
+      {
+        "status": "A",
+        "path": "src/puripuly_heart/core/speaker/evidence.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/speaker_identity.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/backend.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/batch_speaker.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/recognition_units.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/scoped_engine.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/scoped_normalizer.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/session_projection.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/speaker_attribution.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/core/stt/streaming_speaker.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/domain/models.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "src/puripuly_heart/domain/recognition.py",
+        "category": "product_python"
+      },
+      {
+        "status": "M",
+        "path": "tests/app/test_desktop_overlay_repro.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/app/test_overlay_process_manager.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/config/public_compatibility_surfaces_snapshot.json",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/config/test_public_compatibility_surfaces.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/core/runtime/test_overlay_runtime.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/core/test_causal_batch_speaker.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_boundary_repair.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_inflight_handoff_repair.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_producer_handoff_repair.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_shared_handoff_repair.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_shared_speaker.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_streaming_repair.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_issue264_streaming_review_repair.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/core/test_overlay_bridge.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/core/test_streaming_speaker.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/core/test_stt_event_buffer_disposal.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/core/test_stt_scoped_engine.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/core/test_stt_session_projection.py",
+        "category": "tests"
+      },
+      {
+        "status": "A",
+        "path": "tests/helpers/speaker_evidence.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/providers/test_local_cpu_backends.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/providers/test_local_gpu_backend.py",
+        "category": "tests"
+      },
+      {
+        "status": "M",
+        "path": "tests/providers/test_protocol_a_scoped_sessions.py",
+        "category": "tests"
+      }
+    ]
+  },
+  "checkpoint_chain": [
+    {
+      "scope": "All product/native/tests/maintained docs",
+      "range": "cc75792e..8c01ad68",
+      "record": "issue264_review_product.json",
+      "result": "F1-F5 findings; preserved failed baseline"
+    },
+    {
+      "scope": "F1-F5 and coupled onset/owner/allocator repairs; unaffected full product coverage retained",
+      "range": "8c01ad68..3f791b3c",
+      "record": "issue264_repair_review_product.json",
+      "result": "repair_verified"
+    },
+    {
+      "scope": "Task drivers, isolation, .gitignore, Gemini original evidence and report claims",
+      "range": "cc75792e..8c01ad68",
+      "record": "issue264_review_evidence.json",
+      "result": "E1-E3 findings; actual work not accepted"
+    },
+    {
+      "scope": "Task repair and E4 native-failure accounting",
+      "range": "8c01ad68..73ccc935..b98bfb7c",
+      "record": "issue264_repair_review_evidence.json",
+      "result": "E1-E4 repair_verified; earlier repair_failed records preserved"
+    },
+    {
+      "scope": "Original fourteen actual pipelines, original captions and source archives",
+      "range": "b98bfb7c product/task execution; 6670a009 evidence",
+      "record": "issue264_review_matrix.json",
+      "result": "Valid observations retained; E5 hidden control found invalid; streaming residuals not waived"
+    },
+    {
+      "scope": "Corrected hidden-control readiness and its sole actual run",
+      "range": "6670a009..09b93880 task control; e4e85c09 actual",
+      "records": [
+        "issue264_review_hidden_readiness.json",
+        "issue264_review_hidden_actual.json"
+      ],
+      "result": "E5 repair_verified by separate actual closure; prior false-positive retained"
+    },
+    {
+      "scope": "Complete e4 streaming mapping/lexical proof/replay delta and coupled callers",
+      "range": "09b93880..e4e85c09",
+      "record": "issue264_review_streaming.json",
+      "result": "SR1-SR4 findings; original complete assigned coverage retained"
+    },
+    {
+      "scope": "Task callback migration only",
+      "range": "e4e85c09..3d541b18",
+      "record": "issue264_review_hook_migration.json",
+      "result": "repair_verified; source and actual gates separate"
+    },
+    {
+      "scope": "SR1-SR4 bounded source repair verification",
+      "range": "e4e85c09..3d541b18",
+      "record": "issue264_review_streaming_repair.json",
+      "result": "SR1-SR3 verified; SR4 original wrapper leak closed, but SR4-R1 found a live engine handoff prematurely released by later buffer rejection. Preserved repair_failed; subsequent closure must be recorded separately."
+    },
+    {
+      "scope": "Exact SR4-R1 engine handoff and coupled real-Peer cleanup",
+      "range": "3d541b18..20a3872d",
+      "record": "issue264_review_inflight_handoff.json",
+      "result": "Original SR4-R1 verified closed; accepted queued future part still lost in direct Peer finally-cleanup (SR4-R2). Preserved repair_failed with real-Peer source/translation/late-assignment observations."
+    },
+    {
+      "scope": "SR4-R2 shared cleanup and confirmed producer queue/yield custody",
+      "range": "20a3872d..6c826f42",
+      "record": "issue264_review_shared_handoff.json",
+      "result": "repair_verified; SR1-SR3, original SR4 and exactSR4-R1 closures retained; no remaining material defect in bounded scope. Actual gate separate."
+    },
+    {
+      "scope": "Bounded exact replay task readiness",
+      "range": "6c826f42..b5e59dfd task helper only",
+      "record": "issue264_review_gpu_replay_preparation.json",
+      "result": "repair_verified; seven pure groups independently rerun; no native paint claim or actual execution acceptance."
+    },
+    {
+      "scope": "Combined actual-after source/tape and display-control evidence",
+      "range": "product6c826f42/taskb5e59dfd",
+      "record": "issue264_review_streaming_after.json",
+      "result": "repair_verified; no material tooling/evidence findings; missing current native-short-specific pixels and original coupled visual timing remain explicit; terminal Goal acceptance separate."
+    }
+  ],
+  "requirement_evidence": [
+    {
+      "requirement": "R1 shared capture evidence, immutable historical snapshot and fixed request/contribution/source footprint",
+      "records": [
+        "issue264_shared_evidence.json",
+        "issue264_streaming_repair.json",
+        "issue264_streaming_review_repair.json",
+        "issue264_inflight_handoff_repair.json",
+        "issue264_shared_handoff_repair.json",
+        "issue264_validation_streaming_after_report.json"
+      ],
+      "basis": "One bounded accepted view; frame/epoch/revision and fixed proof stages; text-scoped parts; synchronous native-publication fences; own-final task coverage; retained-reference-safe disposal. Engine handoff references span accepted queue residence and every awaited sink/admission call; only the last ended dependency permits unadopted cleanup. Shared pin holds are authoritative across direct Peer cleanup and streaming/batch private queue/yield custody; one reused speaker-specific helper replaces engine-only protection. Reset/epoch/frame pressure and explicit source retirement remain final.",
+      "bounds": {
+        "frames": 2048,
+        "proofs": 128,
+        "range_pieces": 4096,
+        "pending_sources": 128,
+        "aliases_or_dispositions": 4096
+      }
+    },
+    {
+      "requirement": "R2 slot-relative uncertainty, confirmed one-time boundaries and useful short turns",
+      "records": [
+        "issue264_boundary_repair.json",
+        "issue264_streaming_repair.json",
+        "issue264_streaming_review_repair.json",
+        "issue264_validation_matrix_report.json",
+        "issue264_validation_streaming_after_report.json"
+      ],
+      "basis": "Distinct temporal native frames, predecessor/successor corroboration, one-time commit; strict missing-coverage rejection; legal unique lexical junction; confidence change alone does not fragment a phrase. Current occurrence maps prove replay; one bounded producer-continuity fact prevents replacement from inventing fresh onset.",
+      "heuristic_limits": "Two distinct contiguous native clear frames, existing .5 active/.8 clear/.2 runner-up/.35 competing thresholds and 120ms continuous/200ms total/20% unique-support ambiguity limits are reversible implementation defaults, not selected acoustic optima."
+    },
+    {
+      "requirement": "R3 immediate source-ordered text, one canonical late application, first-readable deadline and in-place style",
+      "records": [
+        "issue264_shared_evidence.json",
+        "issue264_boundary_repair.json",
+        "issue264_validation_matrix_report.json",
+        "issue264_validation_hidden_actual.json",
+        "issue264_validation_streaming_after_report.json",
+        "issue264_validation_display_on_actual.json",
+        "issue264_review_hidden_actual.json",
+        "issue264_review_streaming_after.json"
+      ],
+      "basis": "Presenter logical application is the deadline boundary; evidence availability is not settlement. Source-only/failure, reversed completion, multiple attempts/targets, protected output, ordinary producer close, reset/expiry, overflow/divider and known-return behavior are separately exercised. No source rewrite/retranslation/text resend/TTL reset."
+    },
+    {
+      "requirement": "R4 Gemini discriminating variants and precise negative decision",
+      "records": [
+        "issue264_gemini_execution_decision.json",
+        "issue264_gemini_auto-no-mid-eos_report.json",
+        "issue264_gemini_manual_report.json",
+        "issue264_gemini_findings.json"
+      ],
+      "basis": "Exactly two valid KEY2 sessions with identical permitted PCM/schedule; both A+B interim, only B final, no raw offsets; raw/SDK final conservation; no supported adapter repair. Sanitized reproduction/questions retained; no external report published."
+    },
+    {
+      "requirement": "Cross-layer capability and user documentation",
+      "records": [
+        "issue264_shared_evidence.json",
+        "issue264_repair_review_product.json"
+      ],
+      "basis": "Strict speaker_identity_presentation v3 across Python/Desktop/native authentication/readiness/startup report; wire16/card1 unchanged. Matching native rebuild required. docs/architecture.md, docs/issue218-speaker-attribution-plan.md and native/overlay/README.md document the intentional ownership/policy changes."
+    }
+  ],
+  "execution_checkpoints": [
+    {
+      "pin": "8c01ad68",
+      "record": "issue264_shared_evidence.json",
+      "result": "1181 passed, 2 skipped, 252 warnings; controlled Python/localhost/fake-Desktop integration, not actual GUI or inference",
+      "retained_skips": [
+        "test_overlay_runtime_receives_real_subprocess_shutdown_ack_before_reader_cleanup",
+        "test_runtime_real_bridge_writer_delivers_one_shutdown_before_delayed_child_exit"
+      ],
+      "skip_reason": "Unchanged INTEGRATION !=1 subprocess guards"
+    },
+    {
+      "pin": "3f791b3c",
+      "record": "issue264_boundary_repair.json",
+      "result": "369 affected tests passed; independent reviewer also executed 14 focused cases"
+    },
+    {
+      "pin": "e4e85c09",
+      "record": "issue264_streaming_repair.json",
+      "result": "570 passed, 213 warnings; no skips; controlled four-tape replay, not new inference"
+    },
+    {
+      "pin": "3d541b18",
+      "record": "issue264_streaming_review_repair.json",
+      "result": "694 passed, 213 dependency warnings, no failures/skips; scoped Ruff/Black16 files; fresh controlled four-tape production replay:762 writes/3944 evidence/16 source-context-translation units, retired claims0"
+    },
+    {
+      "pin": "3d541b18",
+      "record": "issue264_validation_hook_migration.json",
+      "result": "Six AST-only task-control groups; independently repeated by task reviewer; no product imports or actual inference"
+    },
+    {
+      "pin": "8c01ad68 native code, unchanged thereafter",
+      "record": "issue264_shared_evidence.json#/director_requested_final_checkpoint",
+      "result": "Short-target offline cargo check --tests passed; pure auth/ready and startup-contract tests each1 passed; actual PuriPulyHeartOverlay.exe --check-startup-contract exit0 advertised v3/wire16",
+      "boundary": "Early exit before manifest/logging/bridge/graphics/OpenVR/device initialization; not ordinary app/VR execution"
+    },
+    {
+      "pin": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+      "record": "issue264_inflight_handoff_repair.json",
+      "result": "22 new regressions passed first execution;451 affected cases passed/211 dependency warnings/no failures or skips; scoped Ruff/Black2 files. Real Peer + pure presenter delayed-admission case preserves One once and logical gray-to-gold+250ms. Controlled boundary, not new inference/GUI."
+    },
+    {
+      "pin": "6c826f420205fd748a65431108cceb845da56eab",
+      "record": "issue264_shared_handoff_repair.json",
+      "result": "634 affected cases passed/211 warnings/0 failures or skips; scoped Ruff/Black9 files. Original SR4-R2 real-Peer driver now resolves both0/1 identities; real streaming/batch custody smokes preserve one source-context-translation each and logical+250ms in-place assignment. No model/GUI execution."
+    }
+  ],
+  "retained_failures_and_limits": [
+    "Original Python fixture migrations/pressure/admission/layout failures and source repair collection/fixture/lifetime/style failures remain in their original reports, not relabelled.",
+    "Initial MSVC/OpenVR build failed FTK1011 in long target path; short target succeeded. Pure native auth test first failed its nonexistent-directory cleanup; corrected fixture passed.",
+    "Whole-file rustfmt failed six pre-existing unrelated hunks. Baseline provenance was checked; those blocks were intentionally not reformatted. Only the new contract-test hunk has a separate formatting pass.",
+    "Actual first01/02 were invalid harness setup; first03 invalid observer also had real native failures; first04 was a genuine failed GPU scenario with two160-sample requests. They remain failed/invalid before evidence.",
+    "The original hidden-reveal assertions passed but actual qualification was false-positive. The separate corrected E5 actual closes only that gap, not by rewriting the original run.",
+    "Cloaked/superseded readbacks remain invalid. The original0.64 correction pixels were qualified only in a separate no-model replay, not recovered original timing.",
+    "Three Windows counter samplers failed. No GPU utilization, VRAM saturation, throughput, statistical performance, general acoustic accuracy or profile superiority claim.",
+    "Actual checks use isolated current-runtime/current-renderer composition with existing-install provisioner and local output replacements. No installation/persistence, full-app startup, HMD/VR coexistence or physical-photon claim.",
+    "Gemini adapter remains unchanged: complete final behavior plus qualified per-final audio correspondence are external prerequisites; no interim promotion, receipt-time/FIFO inference or product-drain extension.",
+    "Public issue211 amendment initially suffered a failed stdin mutation that blanked its body. Director restored the original plus authorized amendment through an actual body file. Preserved GitHub readback has35234 characters including207 CRLF pairs; its35027-character LF-normalized body matches the approved local artifact. Raw readback UTF8 SHA256 a6eddd2a242f9c54dcbdc4a4e36834bc53bef4d3345e0dba4a6f109abfdd5354; LF-normalized SHA256 c76b44a2ee1f018117773666084c6d69cde89b8135cba836a7500acdc3aab6f5. No failed publication is represented as success.",
+    "SR4-R1 was independently reproduced at3d541b: a dequeued accepted delivery waiting before source adoption lost its contribution pins when a later shared event was rejected. Already-adopted-source control survived. This is a product ownership failure, not an unavailable hardware observation.",
+    "SR4-R2 at20a3872d: both accepted cumulative releases preserved One / two. and both translations, but direct Peer cleanup deleted the already-queued future part. Later evidence yielded identified/unavailable rather than both lawful assignments. The exact SR4-R1 engine failure was independently closed; this distinct direct-cleanup failure remains recorded.",
+    "Producer custody gap was confirmed on20a3872d PLUS an uncommitted central repair, not plain20a: real streaming queued terminal lost its He washed future proof after No. admission. Exact source hashes, script and failing result are preserved in issue264_shared_handoff_repair.json. The subsequent current-pin fixes and checks are separate.",
+    "Retained-worker wake tasks cancelled unexpectedly; an explicit resume failed before provider dispatch after4 attempts with0 tool/model requests. The old owner was terminated and a fresh worker recovered its preserved changes, original probes and failures, then completed current-pin checks. No check pass was inferred from the interrupted turn.",
+    "Current6c826f GPU after-run has valid native/logical observations but no qualified original caption pixels: all5 automatic captures and final named capture show only owned checkerboard. Acknowledgement is host-side, not native paint. Cause remains unestablished; original images/latency are not rescued by any later control. See issue264_validation_gpu_pixel_diagnosis.json."
+  ],
+  "publication": {
+    "implementation_issue": "https://github.com/kapitalismho/PuriPuly-heart/issues/264",
+    "parent_amendment": "https://github.com/kapitalismho/PuriPuly-heart/issues/211",
+    "parent_plan_comment": "https://github.com/kapitalismho/PuriPuly-heart/issues/218#issuecomment-6246195969",
+    "historical_actual_checkpoint": "https://github.com/kapitalismho/PuriPuly-heart/issues/264#issuecomment-6247861576",
+    "historical_checkpoint_body_sha256": "02c3d35fc011e9ff52a92c132e2808efcadbe021d9489d6be6112a919f87212f",
+    "parent_amendment_readback": {
+      "raw_characters": 35234,
+      "crlf_pairs": 207,
+      "lf_normalized_characters": 35027,
+      "raw_utf8_sha256": "a6eddd2a242f9c54dcbdc4a4e36834bc53bef4d3345e0dba4a6f109abfdd5354",
+      "lf_normalized_utf8_sha256": "c76b44a2ee1f018117773666084c6d69cde89b8135cba836a7500acdc3aab6f5",
+      "exact_raw_equality_with_approved_artifact": true,
+      "original_readback": "artifact://800:raw:2-2",
+      "approved_body": "local://speaker-211-approved-amendment.md"
+    },
+    "final_publication_binding": "The containing candidate is followed by an English implementation/evidence comment on issue264 and a linked update on issue218. Their exact readback URLs and the separate fresh terminal audit are recorded outside this immutable index; no acceptance is inferred here."
+  },
+  "privacy": "Shared records contain permitted/synthetic text and sanitized relative paths. Credentials, private/live capture and raw cloud/audio/execution archives remain outside publication. Source commits are local only.",
+  "actual_route_boundaries": {
+    "gpu": "Actual ScopedRecognitionEngine consumes the live batch iterator and real Peer admission.",
+    "native_tapes": "RecordedInputCoordinator directly consumes the live StreamingSpeakerSession iterator and awaits real Peer handling; it does not exercise an actual streaming-engine deferred queue. That deterministic interaction is separately covered by real-class controlled regressions.",
+    "task_readiness": "All eight task files retain accepted hashes; validator inspected owned iterator/yield custody at6c826f without importing product code or launching anything."
+  },
+  "actual_after_gpu": {
+    "candidate": "6c826f420205fd748a65431108cceb845da56eab",
+    "directory": "build/issue264-validation-streaming-after-gpu-01",
+    "trace_sha256": "10f1c8f4fcdb6457231682dafbd91addc0aebf00c4691ca30408420450c15b49",
+    "isolation_sha256": "b9a0aa1728272f23868a2bae70e6930cc03165f2e12b92f40af3df8672bbf3ce",
+    "execution_sources_zip_sha256": "cd1e1622534a9e4a668e5c2d8bee987720044a9aae883371efe5d4e2ee37a195",
+    "native_outcome": "One authorized repeated ABA/full1.04 run;4native requests47840/26240/29664/20160samples,0native/observer failures,4ordered source/context/translation units and4actual local-Gemma calls.",
+    "returning_A_logical_assignment_ms": 639.6529999910854,
+    "authority_observation_upper_ms": 649.817500001518,
+    "application_invariants": "Returning A uses original key0/palette0; text/card/order/appearance unchanged; expiration158772.5075696 unchanged. Final short tail unavailable; from-his lexical overlap remains.",
+    "early_logical_output": "First translated logical readability precedes safety seal by1.1077404s and natural-pause seal by2.0542293s; no current visible-early-output claim.",
+    "pixel_qualification": "FAILED:0qualified/5invalid automatic PNGs, plus unqualified final named capture. All checkerboard-only. Director inspected commit4 directly. No original pixel latency or visual success is claimed.",
+    "diagnosis_record": "issue264_validation_gpu_pixel_diagnosis.json",
+    "ack_boundary": "Correct nonempty blocks reached/committed Python DesktopOverlayRenderer and page.update returned. Diagnostic ACK is HOST-side; native socket patch write/drain/application/paint were not captured. Window eligibility is not proof of caption pixels.",
+    "cause": "Not established; neither product defect nor capture-only failure inferred.",
+    "cleanup": "Owned children reaped/temp removed; no policy rejection; product sources unchanged.",
+    "rerun": false
+  },
+  "presentation_control": {
+    "status": "bounded_observations_complete_partial_GPU_pixels_native_short_startup_failed",
+    "candidate": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44",
+    "record": "issue264_validation_gpu_replay_preparation.json",
+    "scope": "One no-model native Flet replay of original GPU snapshots1-6 and relative intervals; no model/source/translation/history re-execution. Cannot qualify original failed GPU pixels or original visual latency.",
+    "helper_sha256": "6b1fe0d320ddc8e7f44ecee6dc248952e7de2495d5135e83948eb3a4bb74f888",
+    "checks": "Seven pure preparation groups plus scoped Ruff/Black passed; native writer attachment/Win32 facts not yet exercised.",
+    "four_native_tapes": "All four required observations completed once; actual source/translation/identity evidence is recorded separately from unqualified original pixels.",
+    "readiness_review": "issue264_review_gpu_replay_preparation.json",
+    "actual_record": "issue264_validation_gpu_replay_actual.json",
+    "pixels": "0qualified/5invalid; Director independently inspected requested-gold commit4, checkerboard-only",
+    "native_transport": "8owned writer writes/drains4055bytes, all8public caption strings present; no native apply/paint ACK",
+    "diagnostics_valid": true,
+    "cause": "Unresolved; blank also without models, so coupled model execution is not necessary to reproduce this observed failure. Native rendering versus composition/capture not separated.",
+    "next": "Independent bounded evidence review; no further UI/model execution authorized.",
+    "display_prerequisite_record": "issue264_validation_display_prerequisite.json",
+    "resumed_controls": "GPUreplay4qualified/1superseded invalid; NativeShortcontrol startup failed before replay. Separate final records forthcoming; original failures retained.",
+    "resumed_actual_record": "issue264_validation_display_on_actual.json",
+    "visual_evidence": "Current exact GPU snapshots: coherent bilingual Gentlemen cyan/firstA gold, returningA gray thenoriginalgold andgraytail;4qualified/1superseded invalid; Director inspected2/3/5. NativeShortcontrol0snapshots,0readbacks duewindow_reveal_lost before replay.",
+    "bounded_review": "issue264_review_streaming_after.json"
+  },
+  "actual_after_inventory": {
+    "record": "issue264_validation_streaming_after_report.json",
+    "candidate_product": "6c826f420205fd748a65431108cceb845da56eab",
+    "task_candidate": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44",
+    "runs": "One actual GPU +four native-tape downstream cases;20sources/20actualGemma calls;0native/observerfailures",
+    "disjoint_logical_bands": {
+      "identified_before_first_readable": 14,
+      "late_at_most_500ms": 2,
+      "late_over_500ms_at_most_1s": 1,
+      "unresolved": 3
+    },
+    "late_interpretation": "Two No. sources already had the acoustic key; their224.355/258.533ms changes settle the source-ordered palette. GPU returningA newly settles its identity639.653ms after first logical readability. Counts are not accuracy.",
+    "pixels": "All21automatic+5named final images of these five original pipelines remain unqualified; no original coupled visual latency claim.",
+    "pending_window_bands": {
+      "enrolled_readable_unresolved_or_palette_pending_sources": 6,
+      "resolved_at_most_500ms": 2,
+      "resolved_at_most_1s_inclusive": 3,
+      "still_unresolved": 3,
+      "denominator_limit": "Excludes14sources identified before first readability; includes2already-known acoustic identities awaiting source-order palette settlement. Not recognition/diarization accuracy."
+    },
+    "record_disk_sha256": "794e36fd3468bcfa4b5669bb05888b8f554dfdd1ac4154d125bed7127ce0c526",
+    "record_LF_normalized_sha256": "4711ecdfcfa3422f9a2792234c97c0a92fc9f29981813a0301ef28abd9735260",
+    "hash_correction": "The first worker handoff reported the LF input-text hash as a file hash; the unchanged1057CRLF file has the distinct on-disk hash above. Content/outcomes were not rewritten."
+  },
+  "explicit_remaining_observation_limits": [
+    "Current native-short-specific No./He pixels were not obtained: one authorized display-On attempt failed startup before replay. Current actual source/identity/conservation evidence and earlier actual short-turn GUI evidence are separate.",
+    "Original current five-pipeline pixels and coupled visual timing remain unqualified. The current same-data GPU replay supplies real renderer output, not original acoustic-to-pixel latency.",
+    "Current GPU replay revision4 remains superseded/invalid; qualified3-to5 contains ordinary layout changes. E5 and prior pure-metadata observations retain their applicable position/TTL evidence.",
+    "Parakeet accepted residual lexical omissions, historical tape omissions, rollover repetition, remaining gray sources and supported Gemini final/mapping limitations are retained. No production profile, VR, install/persistence or broad accuracy/performance qualification."
+  ],
+  "final_adjudication": "Independent checkpoint/evidence scopes are closed; fresh terminal completion-evidence assessment and Director acceptance remain external to this index."
+}

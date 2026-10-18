@@ -1,0 +1,58 @@
+{
+  "status": "two_display_on_controls_stopped_partial_GPU_qualification_native_startup_blocked",
+  "lease": "Main was promptly notified both owned UI runs stopped and may release its transient display lease.",
+  "candidate": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44",
+  "helper_sha256": "6b1fe0d320ddc8e7f44ecee6dc248952e7de2495d5135e83948eb3a4bb74f888",
+  "GPU_control": {
+    "directory": "build/issue264-validation-streaming-after-presentation-display-on-01",
+    "status": "failed_pixel_qualification retained:4qualified/1invalid; exit1",
+    "all_six_payloads_exact": true,
+    "qualified_inspected_images": [
+      {
+        "meaning": "A gold; coherent Gentlemen cyan",
+        "file": "commit_2.png",
+        "sha256": "a6cdfa9cfe34e395e93df6d2e989a02325220ccc118c9073d318f8488b198548"
+      },
+      {
+        "meaning": "Returning-A caption gray",
+        "file": "commit_3.png",
+        "sha256": "de030e8a653ec1f2a7c4f9273cca2681191ba96ddec2025a7aae6f734fcdb232"
+      },
+      {
+        "meaning": "Same returning-A caption gold; tail gray",
+        "file": "commit_5.png",
+        "sha256": "906ecf3d669d37b5408dfccbf2c25bb7020f687db10d8c80dcde175b38e27836"
+      }
+    ],
+    "invalid": "commit4 remains INVALID because revision4→5 during capture, despite visible gold. No rescue/retry.",
+    "position_limit": "Qualified3→5 preserves returning caption identity/text metadata, but normal retirement/tail insertion changes its position. No pure unchanged-position claim.",
+    "diagnostics_valid": true,
+    "outbound": "Eight write/drain packet hashes exactly match prior blank control; qualified pixels now observed. Socket ACK is still not native paint ACK.",
+    "timing_limit": "Presentation-only replay; no original coupled visual latency or acoustic/source-resolution timing recovered."
+  },
+  "native_control": {
+    "directory": "build/issue264-validation-streaming-after-native-presentation-display-on-01",
+    "status": "Invalid pre-replay startup attempt; exit1, no retry",
+    "error": "Renderer startup_error window_reveal_lost; port_reason visible_bounds_not_retained; outer harness TimeoutError.",
+    "identity": "Owned nativePID80900/HWND1119522; endpoint/PID matched, bounds confirmed/no drift, visibility not confirmed.",
+    "snapshots_sent": 0,
+    "readbacks_attempted": 0,
+    "native_No_He_pixels": "Not obtained; do not classify as caption-content/acoustic failure.",
+    "decoder_limit": "Source hash/case/profile selection passed. Actual decoder/render loop never reached after startup failure.",
+    "diagnostics_limit": "Stored diagnostics_valid=true is vacuous here: writer/window-observer stage was never reached."
+  },
+  "cleanup": "Both controls have no remaining/unreaped owned children, temp removed, no policy rejection, product sources unchanged. No models/cloud/source/context work or E5 repeat.",
+  "evidence": {
+    "local_addendum": "build/issue264-validation-streaming-after-presentation-display-on-01/display_on_summary.json",
+    "addendum_sha256": "79863e0bd1ee103db4e113790f729727cb212327240202d22661643068966883",
+    "GPU_raw_archive_sha256": "ed761c8e32ad9ad26a120ddc0df867587ac6916ce8c7cc6f02205e72e6bd0214",
+    "native_raw_archive_sha256": "ff0ad77403464977f157c340e02a56b0e3b56608370868d7257dd9b15f353e26",
+    "native_report_sha256": "e52fffe1db5fd1d3820700a47a707fe971826598e90625254a58b738b051015b"
+  },
+  "explicit_corrections": {
+    "literal_No": "The literal No. source card ID/text/appearance/TTL WERE preserved; global card order changed with concurrent firstA retirement/He insertion. Earlier wording did not mean absence of preservation.",
+    "prior_after_report_hash": "Actual unchanged file SHA794e36fd3468bcfa4b5669bb05888b8f554dfdd1ac4154d125bed7127ce0c526. Earlier4711ecdf... was LF input-text/content hash; normalizing1057CRLFs reproduces it exactly. No report body/outcome rewrite."
+  },
+  "preservation": "All prior failed images remain failed; existing after report untouched; E5 closed. Display-On is a new prerequisite observation, not retrospective cause proof.",
+  "next": "No further UI/model execution. Native No./returning-A visual qualification remains blocked by this startup failure."
+}

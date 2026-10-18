@@ -1,0 +1,101 @@
+{
+  "status": "single_no_model_control_failed_pixel_qualification_stopped",
+  "candidate": "b5e59dfdef6dc2ce4b36063368d1b296864e7d44",
+  "source_candidate": "6c826f420205fd748a65431108cceb845da56eab",
+  "executed_helper_sha256": "6b1fe0d320ddc8e7f44ecee6dc248952e7de2495d5135e83948eb3a4bb74f888",
+  "scope": "Exactly one released presentation-only run; exit1. No model/cloud/source-admission/translation/history work or E5 repeat.",
+  "payload_and_timing": {
+    "revisions": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "all_six_snapshot_payloads_exact": true,
+    "original_expiration_metadata_preserved": true,
+    "requested_offsets_s": [
+      0,
+      0.4842814000148792,
+      1.6080509000166785,
+      2.244244000001345,
+      2.3735756000096444,
+      3.9098609999928158
+    ],
+    "observed_offsets_s": [
+      0.00015770000754855573,
+      0.4921203999838326,
+      1.6241921999899205,
+      2.2602099000068847,
+      2.384221299987985,
+      3.9171977000078186
+    ],
+    "max_submission_lateness_ms": 16.141299973241985,
+    "limit": "Replay offsets are not original coupled latency or evidence-backed source-resolution measurements."
+  },
+  "pixels": {
+    "qualified": 0,
+    "invalid": 5,
+    "disposition": "All five captures checkerboard only; no caption text/color/layout qualification. Requested-Gentlemen commit2, requested-gray commit3 and requested-gold commit4 directly inspected.",
+    "decisive_paths": [
+      "build/issue264-validation-streaming-after-presentation-01/commit_2.png",
+      "build/issue264-validation-streaming-after-presentation-01/commit_3.png",
+      "build/issue264-validation-streaming-after-presentation-01/commit_4.png"
+    ],
+    "each_image_sha256": "1c3f0544f2b81a24bc14dc0c952a279932846de8b9110e8292c5db48140ae3f0"
+  },
+  "passive_diagnostics": {
+    "diagnostics_valid": true,
+    "diagnostic_errors": [],
+    "writer": "Actual flet.messaging.flet_socket_server.FletSocketServer writer, 127.0.0.1:59041→127.0.0.1:59042.",
+    "writes_returned": 8,
+    "drains_returned": 8,
+    "bytes_written": 4055,
+    "exact_public_caption_strings_present_in_outbound_bytes": 8,
+    "style_revision4": "250-byte write/drain correlated with host revision4; no complete text strings in that incremental packet. Do not infer native style application from it.",
+    "observer_methods_restored": true,
+    "native_boundary": "Actual outbound write/drain established, including English/Korean source/translation strings. Native control application/rasterization/paint remains unobserved; host/socket ACK never means paint."
+  },
+  "owned_window_facts": {
+    "overlay_pid": 80176,
+    "overlay_hwnd": 1578268,
+    "backdrop_pid": 29220,
+    "backdrop_hwnd": 20907914,
+    "during_revisions1_through6": "Visible, noniconic, uncloaked; overlay above owned backdrop; both client rectangles[32,32,1376,368].",
+    "overlay_extended_style": 524584,
+    "layered": true,
+    "transparent": true,
+    "layered_attributes": {
+      "available": true,
+      "alpha": 0,
+      "flags": 0,
+      "color_key": 0
+    },
+    "interpretation_limit": "flags0 does not establish LWA_ALPHA/global-opacity-zero. These facts do not identify native-paint versus composition/capture cause."
+  },
+  "cleanup": {
+    "owned_children_unreaped": [],
+    "owned_children_after_runtime_cleanup": [],
+    "temporary_files_removed": true,
+    "policy_rejections": [],
+    "product_sources_unchanged": true,
+    "cleanup_errors": []
+  },
+  "evidence": {
+    "directory": "build/issue264-validation-streaming-after-presentation-01",
+    "presentation_replay_json_sha256": "8d70e09489efb64d4c4216b2e7d7813adbabd2752c074f82fb7fef1029f2d98f",
+    "isolation_json_sha256": "41b2ea9fdb82b5f1e8bd542a6d9cfb7bde1b3dce54a5e585f49832ee260cd95b",
+    "execution_sources_zip_sha256": "9d5e4442212207410af6c8ff25d43d64a81c72f44e69a39ed6ca636e902a77bb",
+    "execution_source_files": 599,
+    "raw_observation_zip_sha256": "8c868866389ecfb2498310b391471c845a2c9b129f172f00241df1cf53a3bc6c",
+    "archives": "Local-only source archive and raw report/isolation/five-image archive retained."
+  },
+  "preservation": {
+    "original_GPU_trace_sha256": "10f1c8f4fcdb6457231682dafbd91addc0aebf00c4691ca30408420450c15b49",
+    "original_GPU_images": "Remain FAILED qualification; no visual timing recovered.",
+    "before_matrix": "Untouched.",
+    "E5": "Closed/unchanged."
+  },
+  "next": "Stopped as directed. No second UI control, GPU rerun or four native tapes until Director examines this result and explicitly releases further work."
+}
