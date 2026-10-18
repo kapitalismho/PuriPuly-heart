@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import os
+import sys
 import time
 import traceback
 from dataclasses import replace
@@ -18,6 +19,8 @@ from issue264_validation_runtime import (
     save,
     source_manifest,
 )
+
+sys.path.insert(0, str(ROOT))
 
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.sink import OverlayEventAdapter

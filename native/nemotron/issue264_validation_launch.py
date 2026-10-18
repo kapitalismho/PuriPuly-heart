@@ -40,7 +40,9 @@ def main():
     gate = argparse.ArgumentParser(add_help=False)
     gate.add_argument("--candidate", required=True)
     gate.add_argument("--output", type=Path, required=True)
-    gate.add_argument("--probe", choices=("runtime", "caption"), default="runtime")
+    gate.add_argument(
+        "--probe", choices=("runtime", "caption", "caption_replay"), default="runtime"
+    )
     selected, remaining_arguments = gate.parse_known_args()
     if not re.fullmatch("[0-9a-f]{40}", selected.candidate):
         raise ValueError("Director stable full candidate SHA is required")

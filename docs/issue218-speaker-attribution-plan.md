@@ -22,6 +22,21 @@ Repair checkpoint `3f791b3c8d1f6632ed393a920aa7bd060757e0f2` separates committed
 
 The [repair record](../native/nemotron/issue264_boundary_repair.json) preserves exact before/after PCM replay, causal observations, failed checks and focused regression results. Its repaired A/B attribution uses recorded evidence at historical final times and is explicitly counterfactual, not renewed model or GUI execution. The [original product review](../native/nemotron/issue264_review_product.json) and [tooling review](../native/nemotron/issue264_review_evidence.json) preserve the pre-repair findings rather than relabelling them as acceptance. The short returning rollover tail's ambiguity and its lexical split are not claimed fixed by this deterministic checkpoint.
 
+### Actual downstream verification and streaming follow-up
+
+The frozen [actual matrix](../native/nemotron/issue264_validation_matrix_report.json) records candidate `b98bfb7c6fb821838787aca7dbd77285903f26cd`: five existing cases through actual Nemotron/GPU Qwen/Gemma/Flet under each full profile, four recorded Deepgram replays through actual downstream inference/translation/presentation, and ten controlled caption cases. The ten GPU observations produced 24 native requests without decode failures or duplicate 160-sample boundary jobs. These are changed-path observations, not profile selection or general accuracy estimates.
+
+Both GPU profiles preserved isolated `No.` between A sources with applied identities A/B/A. Clear A/B received distinct identities. In the full-1.04 repeated-A case, the returning source was displayed unresolved, then received the original A identity after 593.974 ms without changing its card, text, placement or TTL. Qualified gold software readback was observed by 850.826 ms; this is not photon latency. The preceding complete A translation was readable 857.486 ms before the safety seal and 1805.028 ms before the recorded natural-pause seal.
+
+Two other actual logical assignments occurred within the preferred 500 ms band. Gray rollover tails, repeated wording across safety continuation, and the correction's native `No, no, three.` insertion remain explicit quality limitations. Controlled caption checks separately exercised expiry, reset, retirement, established-identity stability, source-only/error output, hidden reveal, overflow and the application-time deadline. Original invalid/superseded/cloaked readbacks remain invalid. A separate no-model Flet replay verified the full-0.64 correction's presentation; it did not recover that original run's missing pixel or latency evidence.
+
+The recorded Deepgram cases preserved `Gentlemen of the press.` as one useful source/translation, but exposed two reachable shared-code gaps. The Director authorized the following bounded repairs under #264 R1/R2; the frozen matrix remains their before evidence:
+
+- When a coarse result interval cannot map, use independently qualified, complete native word correspondence for that exact contribution. Map the entire first-word-to-last-word envelope, including inter-word audio. Preserve a valid coarse mapping and reject incomplete, conflicting, unqualified or unmappable word coverage. Do not change timestamp rounding, clamp to the sent frontier or invent missing audio.
+- Permit a unique complete native lexical junction inside an observed, confirmed transition's uncertainty band when adjacent mapped words contain the required predecessor/successor witnesses. Preserve ambiguous/overlapping/unmapped cases conservatively. This partitions authoritative text at an existing legal word boundary; it does not force a speaker identity, split a word or add a translation wait.
+
+Any necessary text-scoped proof parts belong to the existing source-audio handoff before immutable source admission. Keep parent provenance intact, bound and dispose of every claim, and do not widen a child's eligible footprint back to the entire contribution. These repairs require their own fixed-candidate review and targeted replay; the earlier actual matrix is not evidence that they have already succeeded.
+
 ### Current Gemini disposition
 
 The two approved #264 control differentials are complete: automatic activity detection without the intermediate audio-stream-end marker, and explicit manual activity boundaries. Each sent the same 93,404 samples in 168 archived audio writes to `gemini-3.5-transcribe-live`, using only the designated `GOOGLE_API_KEY2`. In both, interim text contained A+B, but the sole authoritative final was `Gentlemen of the press.` (B). Neither raw final supplied an audio start/end offset; raw-to-SDK final preservation was exact.
@@ -30,9 +45,11 @@ This is a supported negative result, not a client repair or app/GUI qualificatio
 
 The [sanitized findings](../native/nemotron/issue264_gemini_findings.json) link both executed reports, actual hashes, controlled boundaries, stopping decision and provider questions. Raw wire/audio archives remain local-only. The archived executed driver and its later formatting-only public derivative have distinct recorded hashes; only offline preflight and formatting checks exercised the derivative. No external provider report was published.
 
-## Agreement and starting point
+## Historical checkpoint agreement and starting point
 
-The maintainer supplied the practical-policy proposal and requested this Markdown plan **and implementation against it**. This is the task's approved local implementation agreement, not a claim that the feature or either Nemotron profile is already qualified.
+The remainder records the preceding implementation checkpoint. Its own-native-final deadline, Parakeet repair work and blanket post-readable freeze are historical, not competing requirements for #264.
+
+The maintainer supplied the earlier practical-policy proposal and requested this Markdown plan **and implementation against it**. That agreement did not establish feature or Nemotron profile qualification.
 
 Starting candidate: `b2cfc0c42bfa07d1570c243fb17ab2e547b8da1e`, branch `listen-integrate-the-initial-fp16-vulkan-nemotro`, clean working tree, no configured upstream. Issue [#218](https://github.com/kapitalismho/PuriPuly-heart/issues/218) is OPEN and already In progress. Earlier measured failures and their limits are recorded in the [issue comment](https://github.com/kapitalismho/PuriPuly-heart/issues/218#issuecomment-6139799554) and `native/nemotron/issue218_*` evidence. They are the failing-before evidence; do not rerun them merely to reconfirm the failures.
 

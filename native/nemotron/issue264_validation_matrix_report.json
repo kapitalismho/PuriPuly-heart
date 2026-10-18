@@ -1,0 +1,1676 @@
+{
+  "schema": "issue264-compact-executed-matrix-1",
+  "status": "Authorized observations completed; evidence and limitations reported, not product acceptance or all-green quality.",
+  "product_candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
+  "baseline_not_rerun": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+  "task_candidate_limit": "GPU and native runs used pinned runtime421542/summary8298/launcher17ca. Caption attempt01 used acc270 and failed before GUI; authorized import-only caption repair4b42 used for attempt02. Product hashes stayed unchanged; final task pin/import-delta review belongs to Director. Additional authorized presentation-only replay used new narrow launcher probe7ca24 and replay driver7825; existing audit/helper controls unchanged. Exact execution sources retained separately.",
+  "authorized_vs_executed": {
+    "gpu_requested": 10,
+    "gpu_executed": 10,
+    "gpu_description": "Five existing cases x full1.04/0.64, repetition1 each. First repeatedABA/full1.04 is included, not an extra attempt. No profile selection/statistics/baseline run.",
+    "native_tape_requested": 4,
+    "native_tape_executed": 4,
+    "native_description": "Two canonical historical Deepgram native tapes x both full profiles, repetition1 each; actual current speaker/Gemma/Flet downstream.",
+    "controlled_caption_requested": 10,
+    "controlled_caption_assertions_executed": 10,
+    "controlled_caption_assertions_passed": 10,
+    "caption_invalid_startups": 1,
+    "pipeline_completion_is_not_quality_pass": true,
+    "additional_no_model_presentation_replays_requested": 1,
+    "additional_no_model_presentation_replays_executed": 1
+  },
+  "runtime_and_isolation": {
+    "python": ".venv/Scripts/python.exe 3.14.7",
+    "imports": "All recorded product modules with file paths resolve under this checkout src; puripuly_heart.ui is a namespace without __file__. Actual module inventories retained per isolation.json.",
+    "device": "Actual Nemotron F16/Vulkan and Qwen Vulkan0 AMD Radeon RX7900XTX; neural CPU fallback forbidden. CPU frontend permitted, no all-F16 accumulation claim.",
+    "geometry": {
+      "1.04": "9/4/0/264/264/222",
+      "0.64": "6/2/0/264/264/222",
+      "verified_ready_cases": 14,
+      "slots": 8
+    },
+    "artifact_sha256": "9b277e1dcec60b2c771a1dcb45dc8e36f7285ff7c1619d880d3926a373036b38",
+    "qwen_model_sha256": "c75a961b7134a6c952d89797865cb0d0376876185aee04ef6d12c31c2952e4e1",
+    "qwen_worker_sha256": "5ee4541f289e7aebb76808d3375dd45059518307aa67dee6d91d51cb28cc990d",
+    "gemma_server_sha256": "7b36a3bc3a24e552d0fcc18441893bc198abaeb0fa77d653241d762077c995c6",
+    "gemma_model_hashes": {
+      "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf": "df0fd4ee07072c607c29a0a1cb4f98918426cca12f45a2776bdd6ee6d09a4de3",
+      "mtp-gemma-4-E4B-it.gguf": "423074e537504b4f9ec5eafed5c639fac82c96631626efccacdd3c4039b20605"
+    },
+    "gemma": "Actual ManagedGemma owner/runtime/server/provider, b11537 Vulkan0/43of43 GPU layers; all three acquisition validations verified required install manifest and hashes. Approved read-only acquisition validator, no shared provisioning lease/download or installation/persistence qualification. Prefix disk cache disabled, production resident prompt cache retained.",
+    "flet": "Flet/flet-desktop1.0.0 existing matching build758f21506fbb; actual owned Flet process/window and protected HWND crops. Child-local supported FLET_VIEW_PATH; client sha256 b6112f6f0ebf38e531e6390aa4db45ad1d312af691bc94c7e8b21f3720296d28. Wire16/v3 speaker contract unchanged.",
+    "env_controls": "Secrets scrubbed before product imports; task-local TEMP/TMP/APPDATA/LOCALAPPDATA, HF offline/telemetry disabled. Python rejects external DNS/sockets and credential files; real services use loopback. Only exact inspected Flet get_free_tcp_port helper may temporarily bind empty-host port0 without listening. Not an OS sandbox.",
+    "outputs": "Actual caption output only; actual OSC enqueue/send_immediate rejected, optional bind_delivery_observer explicitly absent. No settings/model changes, discovery/full-app startup, cloud, Parakeet, VRChat/SteamVR or ambient/private audio. Unowned OVRServer left untouched.",
+    "target_drain_ms": 50,
+    "observed_drain_ms": {
+      "minimum": 50.012299994705245,
+      "per_case_median_range": [
+        61.931250005727634,
+        62.07235000329092
+      ],
+      "maximum": 191.30810000933707
+    },
+    "delivery": "Production trimming OFF and no added speaker wait; existing fixed fixture crops/settings retained.",
+    "new_interval_observed_starts": {
+      "gpu_model_activations": 10,
+      "gpu_native_audio_requests": 24,
+      "speaker_ready_cases": 14,
+      "managed_gemma_owners": 3,
+      "actual_flet_windows": 5,
+      "controlled_caption_models": 0,
+      "additional_presentation_only_replay_models": 0
+    },
+    "translation_call_boundary": "38 source-result translate calls, exactly one per admitted source. Managed owner readiness/prefix preparation is separately recorded and is not counted as a source result.",
+    "counter_limit": "All three Windows counter sampler returncodes1 retained. No successful profiling, GPU-utilization/VRAM or statistical performance claim is inferred from them."
+  },
+  "decisive_first_ABA": {
+    "trace": "build/issue264-validation-repaired-first-01/trace.json",
+    "native_input_samples": [
+      47840,
+      26240,
+      29664,
+      20160
+    ],
+    "native_source_ranges": [
+      [
+        9728,
+        49568
+      ],
+      [
+        49568,
+        75808
+      ],
+      [
+        75808,
+        105472
+      ],
+      [
+        105472,
+        120832
+      ]
+    ],
+    "cut_reasons": [
+      "speaker",
+      "speaker",
+      "delivery_deadline",
+      "delivery_pause"
+    ],
+    "source_and_context": "All native PCM matches declared input. First request includes8000 genuine-onset context samples; final continuation includes4800 proven replay samples. No160sample repeated boundary jobs.",
+    "A_identity": [
+      "1",
+      "0"
+    ],
+    "B_identity": [
+      "1",
+      "1"
+    ],
+    "return_A_applied_identity": [
+      "1",
+      "0"
+    ],
+    "return_card": "peer:03d38365-5136-5286-b734-14785ce9cea2",
+    "return_first_readable": 141139.6206109,
+    "authority_resolution_delay_s": 0.5939736000145786,
+    "authority_observation_upper_bound_s": 0.5940684000088368,
+    "gray_qualified_readback": 141139.8972443,
+    "gold_qualified_readback": 141140.4714366,
+    "gold_software_readback_upper_bound_s": 0.8508257000066806,
+    "card_revision_change": [
+      1,
+      2
+    ],
+    "unchanged": "Exact card id, text, order, placement, appearance and expiration141147.6139391; metadata caused no extra translation/history registration.",
+    "early_real_translation": {
+      "complete_A_text": "He washed the detritus from his hair.",
+      "Korean": "그는 머리에서 찌꺼기를 씻어냈어.",
+      "qualified_readback": 141138.2777269,
+      "safety_event": 141139.1352132,
+      "natural_pause_event": 141140.082755,
+      "lead_before_safety_s": 0.8574863000032491,
+      "lead_before_natural_pause_s": 1.8050281000032555,
+      "limit": "Natural end means recorded owned delivery_pause seal, not inferred acoustic/photon onset."
+    },
+    "residual": "Return prefix He washed the detritus from his. plus From his hair.; tail gray. Required-word coverage is not grammatical/semantic quality."
+  },
+  "identity_band_inventory_not_accuracy": {
+    "identified_before_first_readable": 27,
+    "late_observed_within_500ms": 2,
+    "late_observed_over500ms_within1s": 1,
+    "unresolved": 8,
+    "interpretation": "Public applied source_snapshot/first_readable_at and nested assignment.settled are authority. Immutable ownfinal runs remain immutable; their returning-A false/count fields are not applied-presentation accuracy. No mapping correctness is inferred from counts."
+  },
+  "remaining_gray_causality": {
+    "compact_report": "native/nemotron/issue264_validation_remaining_gray.json",
+    "exact_mapping_control": "native/nemotron/issue264_validation_replay_mapping.json",
+    "gpu_tails": "Repeated ABA tails have110ms/full1.04 and120ms/full0.64 ambiguous evidence versus236ms clear support; closed evidence exceeds unchanged ambiguity allowance. Full1.04 initially also lacks late coverage, but not at deadline. No foreign identity/overlap is forced.",
+    "native_short": "First A and No. He washed have original mixed0/1 contribution proof ranges at admission/readable/deadline; text conserved, not an isolated correctly identified B claim.",
+    "native_return_prefix": "No transferable proof: historical estimated result_span ends6.4840003s, scaled103744.0048 ceil103745 versus recorded sent103744. Archived pure mapping returns empty while individual word intervals map. Observed whole-turn mixed fallback, no late enrollment. This is a timing/proof-qualification residual, not model/policy-floor inference. Director decides repair/acceptance; no product fix or acoustic rerun was made.",
+    "diagnostic_limit": "Frozen deterministic reconstruction is not actual acoustics. Raw probability timelines stay in local build records, not duplicated here.",
+    "classification_status": "UNDER INVESTIGATION by Director-assigned read-only repair owner. Not an approved limitation or quality waiver; no epsilon/clamp/rounding workaround authorized or applied.",
+    "native_short_split_eligibility": "Repair owner separately classifying strict uncertainty-interval/legal-word-cut eligibility. No per-word classifier observer was installed, so no eligible/missed split is inferred from aggregate mixed proof alone."
+  },
+  "case_inventory": [
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "a7484b4b-5f04-53c5-82bf-4594a4c512cd",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "0634d5e2-86b4-52e8-a788-2b56e6375e0c",
+          "text": "Gentlemen of the press.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "2c05e286-bd5e-5e38-82a3-4ad242312d05",
+          "text": "He washed the detritus from his.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "0"
+          },
+          "band": "late_assignment_observed_within_1s",
+          "assignment_observation_upper_bound_s": 0.5940684000088368
+        },
+        {
+          "source_id": "a80f4dab-afca-5497-b2b9-0a967ebd1e71",
+          "text": "From his hair.",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        }
+      ],
+      "translation_result_calls": 4,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.050384200003463775,
+        "median": 0.06207235000329092,
+        "maximum": 0.17238269999506883
+      },
+      "qualified_readbacks": 5,
+      "invalid_readback_revisions": [],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-first-01/commit_2.png",
+        "build/issue264-validation-repaired-first-01/commit_3.png",
+        "build/issue264-validation-repaired-first-01/commit_4.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-first-01/trace.json",
+      "quality_limit": "Returning sentence remains prefix plus overlapping From his hair. tail across real safety continuation; tail remains gray. Repeated same-speaker source may append to the existing card normally; pure metadata-only updates are separately conserved."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "c5b102a4-7122-571b-9738-3d0e9b0f6763",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "24cbba9b-7686-5fb6-b334-091f40639a9e",
+          "text": "Gentlemen of the press.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 2,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.050012299994705245,
+        "median": 0.06201819999841973,
+        "maximum": 0.19130810000933707
+      },
+      "qualified_readbacks": 1,
+      "invalid_readback_revisions": [
+        1
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_2.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json"
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "175f1b5f-be5c-5b79-9553-736f8943c755",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "3",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "4b278284-8a76-5b91-87cf-8150167328ec",
+          "text": "No.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "3",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "05d7ab9e-2101-5496-935a-8bbf916cef71",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "3",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 3,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05108529998688027,
+        "median": 0.06204769999021664,
+        "maximum": 0.10892210001475178
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [
+        5
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_7.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json"
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "8b7dd057-f850-505a-9ab3-fa8bba1acb65",
+          "text": "No, no, three.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "5",
+            "local_speaker_id": "0"
+          },
+          "band": "late_assignment_observed_within_500ms",
+          "assignment_observation_upper_bound_s": 0.04644969999208115
+        }
+      ],
+      "translation_result_calls": 1,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.050181400001747534,
+        "median": 0.061931250005727634,
+        "maximum": 0.08037900002091192
+      },
+      "qualified_readbacks": 1,
+      "invalid_readback_revisions": [
+        10
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_11.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json",
+      "quality_limit": "One native decode/source/call, not duplicate cuts. Native text adds a second no relative to fixed synthetic reference No, three.; required-word coverage does not protect against that insertion."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "d7b5f9bd-4bab-5a8a-a0d8-4032d72ee7f8",
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "7",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "53c401e8-d22a-5b65-a9d1-7aa7718638d4",
+          "text": "With the impacts.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "7",
+            "local_speaker_id": "0"
+          },
+          "band": "late_assignment_observed_within_500ms",
+          "assignment_observation_upper_bound_s": 0.17994259999250062
+        }
+      ],
+      "translation_result_calls": 2,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.050263500015717,
+        "median": 0.06200839999655727,
+        "maximum": 0.12442559999180958
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [
+        15
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_16.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json",
+      "quality_limit": "Prefix ends with the.; continuation is With the impacts. Repeated with-the lexical overlap is retained. Two successful native requests are not a faithful whole-sentence quality pass."
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "85e9ca26-b935-5ddd-80b0-9e4b47c505dd",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "9",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "f32b0b68-cf6a-5c0f-9473-9a9bc5127269",
+          "text": "Gentlemen of the press.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "9",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "3fd9983e-64c6-5d59-a555-86d71a49e034",
+          "text": "He washed the detritus from his.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "9",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "d80a9935-2dac-5427-883e-58d74c10c2ec",
+          "text": "From his hair.",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        }
+      ],
+      "translation_result_calls": 4,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05079820001265034,
+        "median": 0.061999800003832206,
+        "maximum": 0.1241281000257004
+      },
+      "qualified_readbacks": 4,
+      "invalid_readback_revisions": [],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_21.png",
+        "build/issue264-validation-repaired-gpu-rest-01/commit_22.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json",
+      "quality_limit": "Returning sentence remains prefix plus overlapping From his hair. tail across real safety continuation; tail remains gray. Repeated same-speaker source may append to the existing card normally; pure metadata-only updates are separately conserved."
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "0a5a0bd5-e537-57af-b0f3-39b7e911347e",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "11",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "2a1bf489-f91a-5854-8bfd-ef02dc1df9d7",
+          "text": "Gentlemen of the press.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "11",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 2,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05039809999288991,
+        "median": 0.061987400011275895,
+        "maximum": 0.12429520001751371
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_26.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json"
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "6fd1c546-d7e6-5005-927b-54aa6abfed37",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "13",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "ccd12d3e-079f-528c-8288-aa9906da2e97",
+          "text": "No.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "13",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "4c0dc321-dc98-534e-8715-0a43cd1a83bf",
+          "text": "He washed the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "13",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 3,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05022149998694658,
+        "median": 0.061978300000191666,
+        "maximum": 0.12448030000086874
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [
+        29
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_31.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json"
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "22a9824e-cb13-5988-a19d-88fb5f87b8bf",
+          "text": "No, no, three.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "15",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 5.639999289996922e-05
+        }
+      ],
+      "translation_result_calls": 1,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05008260000613518,
+        "median": 0.06195875001139939,
+        "maximum": 0.07408579997718334
+      },
+      "qualified_readbacks": 0,
+      "invalid_readback_revisions": [
+        34
+      ],
+      "inspected_qualified_images": [],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json",
+      "quality_limit": "One native decode/source/call, not duplicate cuts. Native text adds a second no relative to fixed synthetic reference No, three.; required-word coverage does not protect against that insertion.",
+      "pixel_gap": "Only revision34 readback rejected: owned overlay DWM cloak=2. ACK is not visibility; no pixels captured and no later image rescues it."
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "complete_required_words",
+      "reference_word_order_missing_reported": [],
+      "sources": [
+        {
+          "source_id": "e3e381c2-d827-5900-9596-48a99a7267da",
+          "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "17",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "2a28d284-a8a6-556c-8e6c-11140f8427f7",
+          "text": "With the impacts.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "17",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 7.489998824894428e-05
+        }
+      ],
+      "translation_result_calls": 2,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05031479999888688,
+        "median": 0.06200519998674281,
+        "maximum": 0.1554570000153035
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-gpu-rest-01/commit_38.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-gpu-rest-01/trace.json",
+      "quality_limit": "Prefix ends with the.; continuation is With the impacts. Repeated with-the lexical overlap is retained. Two successful native requests are not a faithful whole-sentence quality pass."
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "failed_content",
+      "reference_word_order_missing_reported": [
+        "he"
+      ],
+      "sources": [
+        {
+          "source_id": "0de09778-828f-5da0-af2e-bcc7a2a01e5f",
+          "text": "Washed the detritus from his hair. ",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "ebc95653-f888-5919-a8a3-160ec44e0c5a",
+          "text": "Gentlemen of the press.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "65de7da7-640b-5192-baf5-5ac986815885",
+          "text": "He washed the detritus from his",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        },
+        {
+          "source_id": "254d92e5-c653-5dfb-969d-251395cc5aa3",
+          "text": "from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "1",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 4,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.050025800010189414,
+        "median": 0.06201150000561029,
+        "maximum": 0.13314720001653768
+      },
+      "qualified_readbacks": 1,
+      "invalid_readback_revisions": [
+        1,
+        2,
+        3
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-tapes-01/commit_4.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-tapes-01/trace.json",
+      "quality_limit": "Returning sentence remains prefix plus overlapping from-his tail across real safety continuation. Same identity is assessed with applied public assignment, not immutable own-final counts. Native replay prefix has no transferable proof; see mapping control.",
+      "historical_asr_limit": "Canonical native producer text already starts Washed, not He washed. Unchanged reference scorer reports failed_content; retained without weakening assertions. No fresh cloud ASR quality/latency claim."
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "failed_content",
+      "reference_word_order_missing_reported": [
+        "he",
+        "washed",
+        "the"
+      ],
+      "sources": [
+        {
+          "source_id": "4ad5e16d-e3a5-5b0b-b10c-d3eda7763c9b",
+          "text": "Washed the detritus from his hair. ",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        },
+        {
+          "source_id": "23a07de2-b865-572e-b48d-f96e25f34bce",
+          "text": "No. He washed",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        },
+        {
+          "source_id": "54211c60-0624-5e44-b039-79148bb89edc",
+          "text": "the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "3",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 3,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.050633300008485094,
+        "median": 0.062007500004256144,
+        "maximum": 0.1148883999849204
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [
+        7
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-tapes-01/commit_8.png",
+        "build/issue264-validation-repaired-tapes-01/commit_9.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-tapes-01/trace.json",
+      "quality_limit": "No. is preserved inside mixed-source No. He washed, not an isolated correctly identified B source. First A and mixed B/return group remain gray; returning tail is A.",
+      "historical_asr_limit": "Canonical native producer text already starts Washed, not He washed. Unchanged reference scorer reports failed_content; retained without weakening assertions. No fresh cloud ASR quality/latency claim."
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "failed_content",
+      "reference_word_order_missing_reported": [
+        "he"
+      ],
+      "sources": [
+        {
+          "source_id": "97124edb-41c1-510a-b16d-6e0eb7e7c8f3",
+          "text": "Washed the detritus from his hair. ",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "5",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "e262ce7d-524a-5be0-aa72-447ba709d2f1",
+          "text": "Gentlemen of the press.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "5",
+            "local_speaker_id": "1"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        },
+        {
+          "source_id": "4c3bd42d-568b-5438-ab3a-d6abf6089c61",
+          "text": "He washed the detritus from his",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        },
+        {
+          "source_id": "b520845a-d073-5634-b18d-e835deea0116",
+          "text": "from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "5",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 8.300002082251012e-05
+        }
+      ],
+      "translation_result_calls": 4,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.0502068999921903,
+        "median": 0.06200769997667521,
+        "maximum": 0.1270688000076916
+      },
+      "qualified_readbacks": 3,
+      "invalid_readback_revisions": [
+        12
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-tapes-01/commit_13.png",
+        "build/issue264-validation-repaired-tapes-01/commit_15.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-tapes-01/trace.json",
+      "quality_limit": "Returning sentence remains prefix plus overlapping from-his tail across real safety continuation. Same identity is assessed with applied public assignment, not immutable own-final counts. Native replay prefix has no transferable proof; see mapping control.",
+      "historical_asr_limit": "Canonical native producer text already starts Washed, not He washed. Unchanged reference scorer reports failed_content; retained without weakening assertions. No fresh cloud ASR quality/latency claim."
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "repetition": 1,
+      "pipeline_status": "pipeline_completed",
+      "reference_word_order_status": "failed_content",
+      "reference_word_order_missing_reported": [
+        "he",
+        "washed",
+        "the"
+      ],
+      "sources": [
+        {
+          "source_id": "a539496b-2100-5198-b4a4-6faccdbfbb5a",
+          "text": "Washed the detritus from his hair. ",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        },
+        {
+          "source_id": "4525d878-9396-59ca-8d2d-b948a1fbf5cd",
+          "text": "No. He washed",
+          "applied_identity": null,
+          "band": "unresolved",
+          "assignment_observation_upper_bound_s": null
+        },
+        {
+          "source_id": "2994d650-bf13-5943-8d46-293a70ab843a",
+          "text": "the detritus from his hair.",
+          "applied_identity": {
+            "source": "nemotron",
+            "speaker_scope_id": "7",
+            "local_speaker_id": "0"
+          },
+          "band": "identified_before_first_readable",
+          "assignment_observation_upper_bound_s": 0
+        }
+      ],
+      "translation_result_calls": 3,
+      "native_failures": 0,
+      "native_pcm_mismatches": 0,
+      "exact_authoritative_text_conserved_once": true,
+      "history_once_per_source": true,
+      "capture_source_order_preserved": true,
+      "publication_time_order_preserved": true,
+      "drain_interval_s": {
+        "minimum": 0.05024010001216084,
+        "median": 0.06200140000146348,
+        "maximum": 0.13611950000631623
+      },
+      "qualified_readbacks": 2,
+      "invalid_readback_revisions": [
+        18
+      ],
+      "inspected_qualified_images": [
+        "build/issue264-validation-repaired-tapes-01/commit_19.png",
+        "build/issue264-validation-repaired-tapes-01/commit_20.png"
+      ],
+      "raw_trace": "build/issue264-validation-repaired-tapes-01/trace.json",
+      "quality_limit": "No. is preserved inside mixed-source No. He washed, not an isolated correctly identified B source. First A and mixed B/return group remain gray; returning tail is A.",
+      "historical_asr_limit": "Canonical native producer text already starts Washed, not He washed. Unchanged reference scorer reports failed_content; retained without weakening assertions. No fresh cloud ASR quality/latency claim."
+    }
+  ],
+  "controlled_actual_captions": {
+    "raw_report": "build/issue264-validation-repaired-caption-02/caption.json",
+    "executed_driver_sha256": "4b42e1a74f9d54cb3511e102305a7c5bd62c2db9c1bb907eedea2daf02c9886b",
+    "renderer_pid": 67988,
+    "backdrop_pid": 72744,
+    "model_calls": 0,
+    "translation_service_calls": 0,
+    "cloud_calls": 0,
+    "qualified_automatic_readbacks": 14,
+    "invalid_automatic_readbacks": 12,
+    "cases": [
+      {
+        "case": "source_only_ttl",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141548.3767547,
+        "proof_delivered_monotonic": 141548.6847425,
+        "style_application_monotonic": 141548.685198,
+        "original_expiration": 141556.3766904,
+        "expiration_after_metadata": 141556.3766904,
+        "expiry_observed_monotonic": 141556.5340169,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 2,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_source_only_ttl_101.png",
+            "sha256": "25393e313fc652e158d2c126f4264d6961e499a5cda95583c3493b2a6aca61b9",
+            "owned_visibility_valid": true
+          }
+        ],
+        "pixel_limit": "Gray commit1 and gold commit2 were both qualified and inspected; TTL expiry/nonresurrection checked in actual SystemClock presenter/empty projection, but no separately photographed blank surface at expiry."
+      },
+      {
+        "case": "translation_error_disposition",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141556.6016131,
+        "proof_delivered_monotonic": 141556.9063484,
+        "style_application_monotonic": 141556.9068207,
+        "original_expiration": 141564.6015665,
+        "expiration_after_metadata": 141564.6015665,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 2,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_translation_error_disposition_102.png",
+            "sha256": "5ef0fbfc96233839aa4cd568b0b32ee2e662d949e6ae54b1ffd9aed2f0c8c17a",
+            "owned_visibility_valid": true
+          }
+        ]
+      },
+      {
+        "case": "deadline",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141557.2824764,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": 141565.2824307,
+        "expiration_after_metadata": 141565.2824307,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 1,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_deadline_103.png",
+            "sha256": "a1a3fb0a5a63e23780c3ff0cf6ffd7c3da05202079ea8d0b01f9bc0321431607",
+            "owned_visibility_valid": true
+          }
+        ]
+      },
+      {
+        "case": "established_nonrecolor",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141558.8500825,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": 141566.8500511,
+        "expiration_after_metadata": 141566.8500511,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 1,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_established_nonrecolor_104.png",
+            "sha256": "65d79a8773a1b14f0aecefd6d2f57e9b9a6ce538ae870017cbd14703a0b1b12c",
+            "owned_visibility_valid": true
+          }
+        ]
+      },
+      {
+        "case": "reset",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141559.3500623,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": 141567.3500168,
+        "expiration_after_metadata": 141567.3500168,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 1,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_reset_105.png",
+            "sha256": "3b2a5b33b67615cf93f133aee9083d5f4c5c9abf30e7fd1a811ee5927cd18ba3",
+            "owned_visibility_valid": true
+          }
+        ]
+      },
+      {
+        "case": "retirement",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141559.8309173,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": 141567.8308718,
+        "expiration_after_metadata": 141567.8308718,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 1,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_retirement_106.png",
+            "sha256": "ec47655155e97d70fa54c649d605a4b23d59b5ecc949eed65ae9676a5b7c35bd",
+            "owned_visibility_valid": true
+          }
+        ]
+      },
+      {
+        "case": "hidden_reveal",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": true,
+        "first_readable_monotonic": 141560.333181,
+        "proof_delivered_monotonic": 141560.6363008,
+        "style_application_monotonic": 141560.6367135,
+        "original_expiration": 141568.3331363,
+        "expiration_after_metadata": 141568.3331363,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": null,
+        "qualified_readbacks": 2,
+        "invalid_readback_revisions": [],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_hidden_reveal_107.png",
+            "sha256": "dc5d6fd47f6462a51b950211a2b25fe9434cf3884555f7ffad7ff8b95bd7559e",
+            "owned_visibility_valid": true
+          }
+        ]
+      },
+      {
+        "case": "late_overflow_divider_return",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": null,
+        "first_readable_monotonic": null,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": null,
+        "expiration_after_metadata": null,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": 0.20000000001164153,
+        "qualified_readbacks": 1,
+        "invalid_readback_revisions": [
+          26,
+          27,
+          28,
+          29,
+          30,
+          31,
+          32,
+          33
+        ],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_late_overflow_divider.png",
+            "sha256": "ea8f2a8b4a48c781bde21c5afc43b712177b01fd8addfabea7a159d9595102fa",
+            "owned_visibility_valid": true
+          },
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_overflow_known_return.png",
+            "sha256": "8f85c70c8ced15a4f5fa265eee88164650746902fe29df10c668b741a5c2764f",
+            "owned_visibility_valid": true
+          }
+        ],
+        "scope": "Logical synthetic evidence assigns distinct overflow keys4/5 to gray cards, retains card/text/position/TTL with revision changes, visible divider inspected; known key4 return appends normally. Named protected screenshots independently matched source5/source6 content; automated invalid revisions26-33 remain invalid, not rescued by return revision34."
+      },
+      {
+        "case": "application_after_cap",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": null,
+        "first_readable_monotonic": null,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": null,
+        "expiration_after_metadata": null,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": 1.2000000000116415,
+        "qualified_readbacks": 2,
+        "invalid_readback_revisions": [
+          38
+        ],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_application_after_cap_application.png",
+            "sha256": "1a5a62cea3b894c1ff5c1908221fb8d4bf7240aeac9797056760f98c29218b98",
+            "owned_visibility_valid": true
+          },
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_application_after_cap_retry_target.png",
+            "sha256": "e7be3ca3646d7f1ed26b331639e25895c83daf5a11ecacc702094d7353846d87",
+            "owned_visibility_valid": true
+          }
+        ],
+        "scope": "Controlled logical clock/ownership-lock schedule, not acoustic or wall-clock latency. Candidate available at +0.90 without palette/settlement; application +1.10 stays gray or +0.95 becomes gold. Source retry/native retry/serialized other target retain canonical assignment; not concurrent destinations."
+      },
+      {
+        "case": "application_within_cap",
+        "status": "executed_assertions_passed",
+        "ttl_conserved": null,
+        "first_readable_monotonic": null,
+        "proof_delivered_monotonic": null,
+        "style_application_monotonic": null,
+        "original_expiration": null,
+        "expiration_after_metadata": null,
+        "expiry_observed_monotonic": null,
+        "logical_clock_advance": 1.2000000000116415,
+        "qualified_readbacks": 1,
+        "invalid_readback_revisions": [
+          43,
+          44,
+          45
+        ],
+        "inspected_protected_captures": [
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_application_within_cap_application.png",
+            "sha256": "558400211627d8f2da33972817d1b458b3d1eeb481f98f8895006f2faf760f21",
+            "owned_visibility_valid": true
+          },
+          {
+            "path": "build/issue264-validation-repaired-caption-02/controlled_application_within_cap_retry_target.png",
+            "sha256": "bd0966e794bdf4e62a58dffb960ca571ee87e277b8ff8195dc52f19806445517",
+            "owned_visibility_valid": true
+          }
+        ],
+        "scope": "Controlled logical clock/ownership-lock schedule, not acoustic or wall-clock latency. Candidate available at +0.90 without palette/settlement; application +1.10 stays gray or +0.95 becomes gold. Source retry/native retry/serialized other target retain canonical assignment; not concurrent destinations."
+      }
+    ],
+    "limit": "Controlled synthetic metadata/dispositions are separate from real PCM speaker inference. Protected named screenshots were inspected for actual content/style, independently of superseded automatic readbacks; no invalid revision is rescued."
+  },
+  "all_pipeline_readbacks": {
+    "qualified": 29,
+    "invalid": 12,
+    "critical_gap": "GPU correction/full0.64 has no qualified pixels: DWM-cloaked owned window. No repeat or quality waiver. Native ABA/full1.04 coherent A/B has only superseded readbacks; coherent native Gentlemen pixels qualified and inspected at full0.64.",
+    "pixel_method": "Exact owned-window BitBlt crop over opaque owned checkerboard; before/after uncloaked/nonminimized visibility, layout/content/palette and foreign-window safeguards. ACK is not visibility; readback is an upper observation bound, never photon onset."
+  },
+  "early_output_inventory": [
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "first_qualified_readback": 141138.2777269,
+      "first_safety": 141139.1352132,
+      "first_natural_pause": 141140.082755,
+      "readback_lead_to_first_natural_pause_s": 1.8050281000032555,
+      "seals": [
+        {
+          "at": 141139.1352132,
+          "reason": "delivery_deadline",
+          "opened": 141133.13057520002,
+          "sealed": 141139.1351725,
+          "content_samples": 95744,
+          "context_samples": 8000
+        },
+        {
+          "at": 141140.082755,
+          "reason": "delivery_pause",
+          "opened": 141139.11457520002,
+          "sealed": 141140.0826993,
+          "content_samples": 15360,
+          "context_samples": 4800
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "1.04",
+      "first_qualified_readback": 141231.5555006,
+      "first_safety": null,
+      "first_natural_pause": 141229.2368809,
+      "readback_lead_to_first_natural_pause_s": -2.3186197000031825,
+      "seals": [
+        {
+          "at": 141229.2368809,
+          "reason": "delivery_pause",
+          "opened": 141224.99933700002,
+          "sealed": 141229.2368328,
+          "content_samples": 67584,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "first_qualified_readback": 141240.3251805,
+      "first_safety": null,
+      "first_natural_pause": 141240.3253414,
+      "readback_lead_to_first_natural_pause_s": 0.00016090000281110406,
+      "seals": [
+        {
+          "at": 141240.3253414,
+          "reason": "delivery_pause",
+          "opened": 141235.137388,
+          "sealed": 141240.3252876,
+          "content_samples": 82432,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "1.04",
+      "first_qualified_readback": 141248.7660562,
+      "first_safety": null,
+      "first_natural_pause": 141247.8924143,
+      "readback_lead_to_first_natural_pause_s": -0.8736418999906164,
+      "seals": [
+        {
+          "at": 141247.8924143,
+          "reason": "delivery_pause",
+          "opened": 141245.80676,
+          "sealed": 141247.8923874,
+          "content_samples": 33280,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "first_qualified_readback": 141260.9276648,
+      "first_safety": 141259.5103225,
+      "first_natural_pause": 141260.7388972,
+      "readback_lead_to_first_natural_pause_s": -0.18876759998966008,
+      "seals": [
+        {
+          "at": 141259.5103225,
+          "reason": "delivery_deadline",
+          "opened": 141253.4986635,
+          "sealed": 141259.5102991,
+          "content_samples": 95744,
+          "context_samples": 8000
+        },
+        {
+          "at": 141260.7388972,
+          "reason": "delivery_pause",
+          "opened": 141259.4826635,
+          "sealed": 141260.7388334,
+          "content_samples": 19968,
+          "context_samples": 4800
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "first_qualified_readback": 141270.1236693,
+      "first_safety": 141272.2874163,
+      "first_natural_pause": 141273.223574,
+      "readback_lead_to_first_natural_pause_s": 3.0999047000077553,
+      "seals": [
+        {
+          "at": 141272.2874163,
+          "reason": "delivery_deadline",
+          "opened": 141266.2774086,
+          "sealed": 141272.2873844,
+          "content_samples": 95744,
+          "context_samples": 8000
+        },
+        {
+          "at": 141273.223574,
+          "reason": "delivery_pause",
+          "opened": 141272.2614086,
+          "sealed": 141273.2235146,
+          "content_samples": 15360,
+          "context_samples": 4800
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "clean_A_B",
+      "profile": "0.64",
+      "first_qualified_readback": 141282.648432,
+      "first_safety": null,
+      "first_natural_pause": 141282.8716127,
+      "readback_lead_to_first_natural_pause_s": 0.22318070000619628,
+      "seals": [
+        {
+          "at": 141282.8716127,
+          "reason": "delivery_pause",
+          "opened": 141278.6420307,
+          "sealed": 141282.8715682,
+          "content_samples": 67584,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "first_qualified_readback": 141292.8032913,
+      "first_safety": null,
+      "first_natural_pause": 141293.747401,
+      "readback_lead_to_first_natural_pause_s": 0.944109700008994,
+      "seals": [
+        {
+          "at": 141293.747401,
+          "reason": "delivery_pause",
+          "opened": 141288.5914294,
+          "sealed": 141293.7473478,
+          "content_samples": 82432,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "0.64",
+      "first_qualified_readback": null,
+      "first_safety": null,
+      "first_natural_pause": 141301.3219056,
+      "readback_lead_to_first_natural_pause_s": null,
+      "seals": [
+        {
+          "at": 141301.3219056,
+          "reason": "delivery_pause",
+          "opened": 141299.2369198,
+          "sealed": 141301.3218678,
+          "content_samples": 33280,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "0.64",
+      "first_qualified_readback": 141314.4783087,
+      "first_safety": 141313.1248837,
+      "first_natural_pause": 141314.4785017,
+      "readback_lead_to_first_natural_pause_s": 0.00019300001440569758,
+      "seals": [
+        {
+          "at": 141313.1248837,
+          "reason": "delivery_deadline",
+          "opened": 141307.118743,
+          "sealed": 141313.1248649,
+          "content_samples": 95744,
+          "context_samples": 8000
+        },
+        {
+          "at": 141314.4785017,
+          "reason": "delivery_pause",
+          "opened": 141313.102743,
+          "sealed": 141314.4784343,
+          "content_samples": 19968,
+          "context_samples": 4800
+        }
+      ]
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "first_qualified_readback": 141387.3078677,
+      "first_safety": 141384.5499632,
+      "first_natural_pause": 141385.5004051,
+      "readback_lead_to_first_natural_pause_s": -1.8074626000015996,
+      "seals": [
+        {
+          "at": 141384.5499632,
+          "reason": "delivery_deadline",
+          "opened": 141378.5142811,
+          "sealed": 141384.5415589,
+          "content_samples": 95744,
+          "context_samples": 8000
+        },
+        {
+          "at": 141385.5004051,
+          "reason": "delivery_pause",
+          "opened": 141384.4982811,
+          "sealed": 141385.49920570003,
+          "content_samples": 15360,
+          "context_samples": 4800
+        }
+      ]
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "first_qualified_readback": 141394.2277592,
+      "first_safety": null,
+      "first_natural_pause": 141393.7523631,
+      "readback_lead_to_first_natural_pause_s": -0.4753960999951232,
+      "seals": [
+        {
+          "at": 141393.7523631,
+          "reason": "delivery_pause",
+          "opened": 141388.5945594,
+          "sealed": 141393.7503261,
+          "content_samples": 82432,
+          "context_samples": 8000
+        }
+      ]
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "first_qualified_readback": 141402.8935133,
+      "first_safety": 141402.8945664,
+      "first_natural_pause": 141403.87932,
+      "readback_lead_to_first_natural_pause_s": 0.9858067000168376,
+      "seals": [
+        {
+          "at": 141402.8945664,
+          "reason": "delivery_deadline",
+          "opened": 141396.8345014,
+          "sealed": 141402.8617792,
+          "content_samples": 95744,
+          "context_samples": 8000
+        },
+        {
+          "at": 141403.87932,
+          "reason": "delivery_pause",
+          "opened": 141402.8185014,
+          "sealed": 141403.81942600003,
+          "content_samples": 15360,
+          "context_samples": 4800
+        }
+      ]
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "first_qualified_readback": 141412.193107,
+      "first_safety": null,
+      "first_natural_pause": 141411.6359884,
+      "readback_lead_to_first_natural_pause_s": -0.5571186000015587,
+      "seals": [
+        {
+          "at": 141411.6359884,
+          "reason": "delivery_pause",
+          "opened": 141406.4787565,
+          "sealed": 141411.63452319996,
+          "content_samples": 82432,
+          "context_samples": 8000
+        }
+      ]
+    }
+  ],
+  "native_tape_provenance": {
+    "archive": "native/nemotron/issue218_cloud_deepgram_raw.zip",
+    "archive_sha256": "7554260beb589938b392141d3ccbb31fa3ae6c90993ecb52211c1fb454a1daea",
+    "member": "valid/trace.json",
+    "member_sha256": "cbcb49ae13ed87856579f2d1ea33779273c66991db716f426bc9f53f508c0ec7",
+    "historical_candidate": "c7e7ae0d5bfb8a5ab8637c0dbc1e40eb0f84e6f9",
+    "native_description": "Only host playback origin rebased; lexical clocks, successful PCM maps, receipt delays/control events kept. Original raw results already omit first He and include rollover fragments. No fresh network/ASR latency claim."
+  },
+  "preserved_attempts": {
+    "pre_repair": "first01/02 invalid startup/setup, first03 invalid observer with actual decode failures retained, first04 genuine FAILED acoustic scenario; all unchanged and never rerun merely to confirm.",
+    "caption01": "Invalid pre-scenario tests namespace import, no child/model/Flet operation; isolation record preserved.",
+    "caption_setup_repair": "native/nemotron/issue264_validation_caption_setup_repair.json",
+    "formatting_failure": "Initial post-import edit Ruff I001 missing blank line; Black/import dependent commands did not execute. Blank line added, then Ruff/Black/import control passed.",
+    "analysis_only_rejections": "Exploratory metadata extraction TypeError/KeyError/namespace None checks were corrected without model/GUI reruns or input/product changes. Full script diagnosis and mapping controls completed; raw analysis retained locally."
+  },
+  "cleanup": {
+    "all_six_launcher_attempts": "Owned children reaped, task temporary files removed, product hashes unchanged, policy_rejections empty. Zero unowned process interruptions. Captured windows/backdrops and owned service workers closed. Evidence JSON/PNG/source archives intentionally retained.",
+    "isolation_records": [
+      "build/issue264-validation-repaired-first-01/isolation.json",
+      "build/issue264-validation-repaired-gpu-rest-01/isolation.json",
+      "build/issue264-validation-repaired-tapes-01/isolation.json",
+      "build/issue264-validation-repaired-caption-01/isolation.json",
+      "build/issue264-validation-repaired-caption-02/isolation.json",
+      "build/issue264-validation-correction-presentation-01/isolation.json"
+    ]
+  },
+  "final_task_scripts_sha256": {
+    "native/nemotron/issue264_validation_prerequisites.py": "354e1816b0f78c7be73e06c3b968e90a8ad3c8d8e4ce4108d4e5513d88cae7b3",
+    "native/nemotron/issue264_validation_inputs.py": "b5a307d65fab46e14ba4e8d5fa7f03c2987a3412f3b8185b43e9e196044fcec5",
+    "native/nemotron/issue264_validation_launch.py": "7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5",
+    "native/nemotron/issue264_validation_runtime.py": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+    "native/nemotron/issue264_validation_caption.py": "4b42e1a74f9d54cb3511e102305a7c5bd62c2db9c1bb907eedea2daf02c9886b",
+    "native/nemotron/issue264_validation_caption_replay.py": "7825c1bfcdfb1f930bd6024324e2907f7121dd3ffeb218d1fb879653620fd116",
+    "native/nemotron/issue264_validation_summary.py": "8298c7c64a581f1229b7301bdef8185ebd5b432c19dd4ce79c05a52671149ae5",
+    "native/nemotron/issue264_validation_diagnose.py": "76c3a46675745ff6e3a56d7ce0f025525d528ea425346d66d0451b089922048c"
+  },
+  "checks": {
+    "task_lint": "Final Ruff check and Black --check passed all eight task scripts after authorized replay-probe addition. Earlier seven-script checks and initial I001 failure remain recorded.",
+    "offline_controls": "Prior seven tooling groups plus12 E4 controls passed at unchanged runtime/summary. Narrow caption import control additionally passed with no process/network allowed, same pinned test helpers. First ABA frozen diagnosis reproduced all4 ownfinal attribution states/frontiers; remaining-gray proof analysis and replay timing mapping completed.",
+    "product_checks": "Independent product REPAIR_VERIFY is Director-owned; not rerun here.",
+    "no_extra_runs": "No baseline, profile tuning, cloud, Parakeet, VR, live/private capture or additional model run after approved14cases. One separately authorized no-model presentation-only replay does not add to acoustic/coupled counts."
+  },
+  "publication_and_next_owner": {
+    "recommended_compact_reports": [
+      "native/nemotron/issue264_validation_matrix_report.json",
+      "native/nemotron/issue264_validation_remaining_gray.json",
+      "native/nemotron/issue264_validation_replay_mapping.json",
+      "native/nemotron/issue264_validation_caption_setup_repair.json"
+    ],
+    "local_detailed_reports": "Generated detailed summary_repaired*.json and diagnosis_repaired_first.json are analysis records, not public-quality summaries. Complete raw traces/executed source archives and probability proof details remain task-local; do not publish full timelines.",
+    "decisions": "Native estimated-end and short-word/legal-cut classifications remain Director/repair-owner investigations, not approved limitations. Director retains exact final task pin, bounded import/replay-delta and evidence review, terminal audit and acceptance. No further actual execution without a new assignment."
+  },
+  "separate_correction_presentation_only_replay": {
+    "authority": "Director explicitly authorized one isolated no-model actual Flet replay after original DWM gap; no additional acoustic/model run.",
+    "report": "build/issue264-validation-correction-presentation-01/presentation_replay.json",
+    "report_sha256": "f3ecc9b9c647b3ea885da73ec3cd2babeb741082ed491094bcb86f2f2468e620",
+    "original_coupled_case_unchanged": "GPU linguistic_correction/full0.64 original revision34 remains INVALID. Original source/native/translation records and timing are unchanged; this replay does not recover them.",
+    "actual_inspection": "Protected actual owned-window image inspected: gold 아니, 아니, 셋. and No, no, three.; correct one-card two-line layout with original card id/appearance/text metadata. Official snapshot decoder and existing protected readback reused; transport revisions only rebased.",
+    "inspected_capture": {
+      "path": "build/issue264-validation-correction-presentation-01/recorded_correction.png",
+      "sha256": "947fbbe65e489729cf43abd75aa3347d44d54cbae5b2f4e10df5a2dbc595a177",
+      "visibility_valid": true,
+      "width": 1344,
+      "height": 336,
+      "overlay_pid": 75208,
+      "backdrop_pid": 79400
+    },
+    "qualified_automatic_readbacks": 1,
+    "invalid_automatic_readbacks": 0,
+    "requested_inter_snapshot_s": 0.7512720000231639,
+    "observed_inter_snapshot_s": 0.760731600021245,
+    "model_calls": 0,
+    "translation_service_calls": 0,
+    "cloud_calls": 0,
+    "actual_owned_child_names": [
+      "python.exe",
+      "flet.exe",
+      "python.exe"
+    ],
+    "executed_driver_sha256": "7825c1bfcdfb1f930bd6024324e2907f7121dd3ffeb218d1fb879653620fd116",
+    "executed_launcher_sha256": "7ca24ca6936ac65c745c1da0612245c7469f0e3654d0c091eab3fe03ab2476a5",
+    "cleanup": "Owned children all reaped, task temporary files removed, product hashes unchanged, policy rejections empty.",
+    "non_claims": "No original latency recovery, ASR/speaker/translation rerun, corrected reference text, original invalid-readback rescue, TTL or acoustic-quality qualification."
+  },
+  "execution_commands": [
+    ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --route gpu --case-count 1 --output build/issue264-validation-repaired-first-01",
+    ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --route gpu --case-offset 1 --case-count 9 --output build/issue264-validation-repaired-gpu-rest-01",
+    ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --route deepgram-native-replay --output build/issue264-validation-repaired-tapes-01",
+    ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --probe caption --output build/issue264-validation-repaired-caption-01",
+    ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --probe caption --output build/issue264-validation-repaired-caption-02",
+    ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --probe caption_replay --output build/issue264-validation-correction-presentation-01"
+  ],
+  "postpin_code_changes_for_bounded_review": {
+    "native/nemotron/issue264_validation_caption.py": "import sys; add checkout ROOT to child sys.path before the same existing pinned synthetic helpers; formatting blank line. No scenario/assertion change.",
+    "native/nemotron/issue264_validation_launch.py": "Add caption_replay probe choice, Black wrapping only. No audit, isolation or cleanup change.",
+    "native/nemotron/issue264_validation_caption_replay.py": "New narrow two-snapshot recorded correction replay using existing ObservedDesktop and official decoder; zero model/service calls, explicit old/new evidence separation."
+  }
+}

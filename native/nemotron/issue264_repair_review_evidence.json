@@ -1,6 +1,7 @@
 {
   "issue": 264,
-  "reviewed_candidate": "73ccc93518e75560f44b40b223c937c1d093bc89",
+  "initial_reviewed_candidate": "73ccc93518e75560f44b40b223c937c1d093bc89",
+  "repair_verified_candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
   "records": [
     {
       "RESULT": "repair_failed",
@@ -88,6 +89,56 @@
       ],
       "nonblocking_metadata_note": "repair_handoff.current_task_hashes_for_review.caption still contains the earlier dac85f99… hash, whereas final caption_preparation and tooling_repair_checks correctly record current acc27035…. Use the pinned bytes/final preparation hashes for execution provenance; the earlier handoff is historical, not the current caption snapshot.",
       "verification_limits": "No GPU/Flet/cloud/VR execution, credential-file reads, product/test/docs edits, builds, formatters or linter runs. The remaining issue is a bounded task-accounting repair; it does not reopen the independently reviewed product repair or justify another full review. New actual repaired-candidate observations remain required after the Director's next pin/decision."
+    },
+    {
+      "RESULT": "repair_failed",
+      "DOMAIN": "E4 follow-up coordination only; latest reviewed pin remains 73ccc93518e75560f44b40b223c937c1d093bc89.",
+      "status": "Received the validation worker's report of an E4 task-only repair and retained offline controls. The reported later hashes/evidence are not yet independently reviewed or repair_verified.",
+      "next_boundary": "Await Director pin and bounded E4 REPAIR_VERIFY assignment. Retain E1–E3 closure and unaffected coverage; verify the shared terminal/diagnostic classifier, explicit-identity deduplication, anonymous nonassociation, runtime stopping, summary disposition and historical evidence preservation. No actual model/GUI execution is inferred or authorized."
+    },
+    {
+      "RESULT": "repair_verified",
+      "DOMAIN": "E4-only bounded REPAIR_VERIFY: 73ccc93518e75560f44b40b223c937c1d093bc89 → b98bfb7c6fb821838787aca7dbd77285903f26cd. Original baseline cc75792e9704e8609f38a3aa0794c03a1c7e3416; failed implementation 8c01ad689aa8d48c0b5c73dd739f2944c12f5589. E1–E3 and unaffected prior coverage retained.",
+      "closure_evidence": {
+        "shared_failure_authority": "issue264_validation_summary.py:13-69 now supplies one pure native_failures extractor to both runtime stopping and summary disposition. Failed/expired/degraded native_result and provider_result terminals qualify without a GPU decode diagnostic; unsuccessful diagnostic-only work also remains recorded.",
+        "runtime_stop": "issue264_validation_runtime.py:224-235 calls the shared extractor before permitting pipeline_completed. Per-case failure groups are retained at :1073. The existing stop predicate at :1391-1394 rejects every non-pipeline_completed case, so a terminal failure with surviving source text no longer continues as requested_pipeline_completed.",
+        "summary_disposition": "issue264_validation_summary.py:250-255,286-293 uses the same extracted failures and preserves observation_exception precedence. Native failures produce failed_native_execution; a successful surviving-output control remains not_automatically_assessed, not a quality pass.",
+        "association_fences": "Only exact explicit serialized provider-turn identity or explicit request/attempt identity, with matching outcome and reason, merges occurrences. Every merged occurrence remains retained. Anonymous observations remain separate; differing identity forms, identity values, outcomes or reasons are not silently equated. Failure groups are explicitly not claimed to count unique physical attempts."
+      },
+      "independent_checks": {
+        "method": "Read-only AST execution of the exact repaired runtime/summary functions and inherited analyzer. Actual summarize() was exercised against in-memory copies of the retained first04 trace; no fixture/report files were written and no product/model/GUI imports or execution were needed.",
+        "results": [
+          "All 12 retained E4 controls passed independently, including the original timeout counterexample, native/provider-only failed and expired terminals, surviving success, explicit shared-identity deduplication, diagnostic-only failures, anonymous nonassociation and observation-error precedence.",
+          "Two additional degraded-terminal controls passed, one at each native/provider boundary.",
+          "Three additional controls confirmed that differing explicit identity, outcome or reason remains separate.",
+          "Original first04 still summarizes as failed_native_execution while preserving recorded_pipeline_status=matrix_executed.",
+          "All four final recorded runtime/summary/unchanged-launcher/unchanged-caption hashes match reviewed files; the retained E4 checker hash matches its report.",
+          "Original first04 trace hash remains c87b9e870b7a1f187ca5389b1d8b66dc821bdaabdda5b836ad9a45a02b481a3d."
+        ]
+      },
+      "COVERAGE": [
+        {
+          "item": "E4 failure extraction, runtime stop and summary integration",
+          "status": "repair_verified",
+          "basis": "Shared function inspection plus independent positive/negative controls above; no remaining material E4 gap found."
+        },
+        {
+          "item": "E1–E3 and direct regressions",
+          "status": "supported_by_prior_evidence",
+          "basis": "Exact Flet exception, optional no-OSC capability, nonthrowing observation hook and observation-error precedence are unchanged. The new runtime import is acyclic and uses the same reviewed summary extractor. Worker-reported seven prior groups and Ruff/Black were read, not rerun."
+        },
+        {
+          "item": "Historical handoff and preserved review records",
+          "status": "inspected",
+          "basis": "The stale caption hash is now explicitly labelled pre-F3/F5 historical and points to final preparation/E4 hashes. New repair-review JSONs preserve the earlier repair_failed E4 verdict and independently scoped product repair_verified verdict with their original candidates; neither is relabelled as current acceptance."
+        },
+        {
+          "item": "First01–04 history and pending actual work",
+          "status": "supported_by_prior_evidence",
+          "basis": "First01/02 remain invalid startup/setup, first03 invalid observer with real native failures retained, first04 genuine failed acoustic scenario with useful early translated A and invalid revision3 retained. Unchanged caption preparation remains explicitly unrun."
+        }
+      ],
+      "limits": "This closes E4 tooling accounting, not actual acoustic/translation/Flet Goal qualification. No new model, Flet, cloud, VR, credentials, real timeout or expiry was exercised; no source, report, Git/index/history or documentation writes occurred. The repaired actual ABA, remaining GPU cases, tape replays and controlled-caption observations remain pending. Actual execution remains subject to the Director's explicit readiness decision; this verdict is not remote approval or terminal acceptance."
     }
   ]
 }

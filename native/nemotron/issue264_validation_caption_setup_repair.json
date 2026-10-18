@@ -1,0 +1,25 @@
+{
+  "schema": "issue264-caption-setup-repair-1",
+  "candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
+  "authority": "Director explicit actual readiness permits task-only observed setup repair with exact changes/hashes; product unchanged.",
+  "invalid_attempt": {
+    "path": "build/issue264-validation-repaired-caption-01/isolation.json",
+    "command": ".venv/Scripts/python.exe -B native/nemotron/issue264_validation_launch.py --candidate b98bfb7c6fb821838787aca7dbd77285903f26cd --probe caption --output build/issue264-validation-repaired-caption-01",
+    "executed_caption_sha256": "acc27035f6a627c0c7693cc47176831f03b29ba6a2c309d9d0c4d69068fa6550",
+    "outcome": "Exit1 before actual GUI/scenarios: ModuleNotFoundError tests at existing synthetic-helper import. No subprocess or model/GUI launch. Policy rejections none; owned children none; temporary files removed; product hashes unchanged.",
+    "disposition": "invalid_startup, not an acoustic or controlled-GUI observation"
+  },
+  "repair": "Only caption.py: import sys and insert checkout ROOT into this child interpreter's sys.path before existing tests.core.test_issue264_shared_speaker / tests.helpers.overlay_source_cards imports. Same pinned existing admitted/frames/translated_event helpers and product/scenario behavior. No global environment/settings, product code, helper fixtures, assertions, timeouts, selectors or acquisition boundary changed.",
+  "caption_sha256_after_repair": "4b42e1a74f9d54cb3511e102305a7c5bd62c2db9c1bb907eedea2daf02c9886b",
+  "unchanged_executed_runtime_sha256": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+  "unchanged_launcher_sha256": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+  "checks": [
+    {"command": ".venv/Scripts/python.exe -m ruff check native/nemotron/issue264_validation_caption.py && .venv/Scripts/python.exe -m black --check native/nemotron/issue264_validation_caption.py && .venv/Scripts/python.exe -B build/issue264-validation-caption-import-01/check.py", "first_outcome": "Ruff I001 missing blank line after runtime import; dependent commands not executed. Added only that blank line.", "final_outcome": "Ruff passed, Black --check passed, isolated no-process/no-network offline import control passed. Existing helpers resolved to this checkout tests directory."}
+  ],
+  "helper_sha256": {
+    "tests/core/test_issue264_shared_speaker.py": "98bfe9f2d6cb21cd415d7c1aa6a34189330e1b62cb4ef31e47b2ce87792abd44",
+    "tests/core/test_causal_batch_speaker.py": "412f7bd7576203d600690464296b8724d353215e6f0295ccb8676591e00ea585",
+    "tests/helpers/overlay_source_cards.py": "7bafb000f24bb98b0cb6b413e547091a333cb637a319b6b7f3db595138c60d1c"
+  },
+  "next_attempt": "Fresh repaired-caption-02 will use this exact caption hash with the same pinned product and isolated launcher. Attempt01 is retained, not overwritten or counted among ten controlled cases."
+}

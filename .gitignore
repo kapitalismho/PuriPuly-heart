@@ -268,3 +268,6 @@ opencode.json
 /native/nemotron/issue264_gemini_manual_raw_local.zip
 /native/nemotron/issue264_gemini_auto-no-mid-eos_local/
 /native/nemotron/issue264_gemini_manual_local/
+/native/nemotron/issue264_validation_diagnosis_repaired_first.json
+/native/nemotron/issue264_validation_summary_repaired.json
+/native/nemotron/issue264_validation_summary_repaired_first.json

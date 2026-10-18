@@ -1,0 +1,88 @@
+{
+  "schema": "issue264-replay-prefix-mapping-control-1",
+  "candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
+  "scope": "Read-only deterministic mapping control with actual declared successful PCM maps and native qualified clock. Controlled owner object (mapping_available=True, no native-input override); exact archived _mapped_pieces, no STT session/model/service/GUI execution or product fix. Individually mappable word intervals are diagnostic contrast only, not substituted into product decisions.",
+  "script_sha256": "90a3aa125c7635aa51291e709372dd9396c7a90c9bf8fea01c5d51f87ae1ac8a",
+  "frozen_streaming_source_sha256": "335d6c2e11f1386d8dbf869d421197fc67257530a426589a293b4c6c54b631d1",
+  "loaded_streaming_module": "<CHECKOUT>\\build\\issue264-validation-repaired-tapes-01\\execution_sources.zip\\src\\puripuly_heart\\core\\stt\\streaming_speaker.py",
+  "rows": [
+    {
+      "profile": "1.04",
+      "source_id": "65de7da7-640b-5192-baf5-5ac986815885",
+      "text": "He washed the detritus from his",
+      "raw_record_at": 141384.8429676,
+      "raw_result_span": {
+        "contribution_id": "00871082f7b24b489a4a297f1c687f15:segment:2",
+        "text_start": 58,
+        "text_end": 89,
+        "semantics": "result_span",
+        "raw_start": 4.515,
+        "raw_end": 6.4840003,
+        "unit": "s",
+        "clock_id": "deepgram:recorded-9a8019697caaa96dace18c4bb5f5d735",
+        "complete_boundary": true,
+        "estimated": true
+      },
+      "registered_sent_sample_count": 103744,
+      "scaled_result_span_end": 103744.0048,
+      "rounded_result_span_end": 103745,
+      "coverage_past_recorded_sent_frontier_samples": 1,
+      "exact_archived_mapping_returned_empty": true,
+      "all_six_word_intervals_individually_map": true,
+      "observed_source_proof_id": null,
+      "observed_origin_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "1"
+      },
+      "fallback_source_bounds": [
+        9728,
+        105472
+      ],
+      "fallback_context_bounds": [
+        1728,
+        9728
+      ]
+    },
+    {
+      "profile": "0.64",
+      "source_id": "4c3bd42d-568b-5438-ab3a-d6abf6089c61",
+      "text": "He washed the detritus from his",
+      "raw_record_at": 141403.1602007,
+      "raw_result_span": {
+        "contribution_id": "00871082f7b24b489a4a297f1c687f15:segment:2",
+        "text_start": 58,
+        "text_end": 89,
+        "semantics": "result_span",
+        "raw_start": 4.515,
+        "raw_end": 6.4840003,
+        "unit": "s",
+        "clock_id": "deepgram:recorded-cdef20e582d4c8ef66331ccc285cedf9",
+        "complete_boundary": true,
+        "estimated": true
+      },
+      "registered_sent_sample_count": 103744,
+      "scaled_result_span_end": 103744.0048,
+      "rounded_result_span_end": 103745,
+      "coverage_past_recorded_sent_frontier_samples": 1,
+      "exact_archived_mapping_returned_empty": true,
+      "all_six_word_intervals_individually_map": true,
+      "observed_source_proof_id": null,
+      "observed_origin_attribution": {
+        "state": "mixed",
+        "key": null,
+        "source": "nemotron",
+        "speaker_scope_id": "5"
+      },
+      "fallback_source_bounds": [
+        9728,
+        105472
+      ],
+      "fallback_context_bounds": [
+        1728,
+        9728
+      ]
+    }
+  ]
+}

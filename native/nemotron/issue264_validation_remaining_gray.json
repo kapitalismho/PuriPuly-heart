@@ -1,0 +1,1335 @@
+{
+  "schema": "issue264-remaining-gray-frozen-proof-analysis-1",
+  "candidate": "b98bfb7c6fb821838787aca7dbd77285903f26cd",
+  "status": "analysis_completed_not_acoustic_rerun",
+  "scope": "Original accepted evidence delivery schedule, original proof coordinates and exact archived classifier. Existing diagnose helper functions reused by AST, no model/service/GUI/ASR or threshold changes. Evidence availability is not application; recorded source_snapshot is separately retained.",
+  "script_sha256": "d0d6578c79740f3fe44e8992e49a3225764311308ca1c0522a735df1b52aa2fe",
+  "diagnose_helper_sha256": "76c3a46675745ff6e3a56d7ce0f025525d528ea425346d66d0451b089922048c",
+  "verified_frozen_hashes": {
+    "src/puripuly_heart/core/speaker/evidence.py": "284eb4b88c90bbe157707f2df3266133d2ab99cbefe735b2180bd6ffc1530f17",
+    "src/puripuly_heart/core/stt/speaker_attribution.py": "7730a70db432e3a95e83b16a341f5987d97960a1dd87ecb1ea5931cf4d56b7b3",
+    "src/puripuly_heart/core/stt/batch_speaker.py": "8139f3b89d0f257149667b6d95511bdc05f8d42331e71b47a0ae5071dd970727",
+    "src/puripuly_heart/core/stt/streaming_speaker.py": "335d6c2e11f1386d8dbf869d421197fc67257530a426589a293b4c6c54b631d1"
+  },
+  "raw_details_local_only": {
+    "path": "build/issue264-validation-proof-analysis-01/remaining_gray_raw.json",
+    "sha256": "84e79db9ca29e68306d8c10469c621f8b91b495405f560df616415b697730ea7",
+    "publication": "Do not duplicate raw proof-coordinate/frame-probability records in public matrix."
+  },
+  "mapping_control": "native/nemotron/issue264_validation_replay_mapping.json",
+  "sources": [
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "source_id": "2c05e286-bd5e-5e38-82a3-4ad242312d05",
+      "source_text": "He washed the detritus from his.",
+      "observed_band": "late_assignment_observed_within_1s",
+      "first_readable_at": 141139.6206109,
+      "deadline": 141140.6206109,
+      "proof_count": 1,
+      "observed_final_key": {
+        "source": "nemotron",
+        "speaker_scope_id": "1",
+        "local_speaker_id": "0"
+      },
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141139.2934625,
+          "proof_diagnostics": [
+            {
+              "proof_token": "7700b32a8ff645efb71452a3a5f0fa4e",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 1.1100000000000008,
+                "total": 0.02,
+                "longest": 0.02,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  1
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 92160,
+                "immutable": 92160,
+                "revision": 10,
+                "generation": 0,
+                "frames": 727
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141139.6206109,
+          "proof_diagnostics": [
+            {
+              "proof_token": "7700b32a8ff645efb71452a3a5f0fa4e",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 1.8300000000000014,
+                "total": 0.02,
+                "longest": 0.02,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  1
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 103680,
+                "immutable": 103680,
+                "revision": 11,
+                "generation": 0,
+                "frames": 816
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141140.6886716,
+          "proof_diagnostics": [
+            {
+              "proof_token": "7700b32a8ff645efb71452a3a5f0fa4e",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 1.8340000000000014,
+                "total": 0.02,
+                "longest": 0.02,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  1
+                ],
+                "state": "identified"
+              },
+              "accepted_frontiers": {
+                "processed": 138240,
+                "immutable": 138240,
+                "revision": 14,
+                "generation": 0,
+                "frames": 995
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": true
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "source_id": "a80f4dab-afca-5497-b2b9-0a967ebd1e71",
+      "source_text": "From his hair.",
+      "observed_band": "unresolved",
+      "first_readable_at": 141140.4832607,
+      "deadline": 141141.4832607,
+      "proof_count": 1,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141140.221283,
+          "proof_diagnostics": [
+            {
+              "proof_token": "c20d6edf6e924be3be4d52a1aeb0ac96",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.23600000000000007,
+                "total": 0.11,
+                "longest": 0.11,
+                "exceeds": true,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  1
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 115200,
+                "immutable": 115200,
+                "revision": 12,
+                "generation": 0,
+                "frames": 907
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141140.4832607,
+          "proof_diagnostics": [
+            {
+              "proof_token": "c20d6edf6e924be3be4d52a1aeb0ac96",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.23600000000000007,
+                "total": 0.11,
+                "longest": 0.11,
+                "exceeds": true,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  1
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 115200,
+                "immutable": 115200,
+                "revision": 12,
+                "generation": 0,
+                "frames": 907
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141141.5421789,
+          "proof_diagnostics": [
+            {
+              "proof_token": "c20d6edf6e924be3be4d52a1aeb0ac96",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.23600000000000007,
+                "total": 0.11,
+                "longest": 0.11,
+                "exceeds": true,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  1
+                ],
+                "state": "uncertain"
+              },
+              "accepted_frontiers": {
+                "processed": 138240,
+                "immutable": 138240,
+                "revision": 14,
+                "generation": 0,
+                "frames": 995
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": true
+    },
+    {
+      "route": "gpu",
+      "case": "linguistic_correction",
+      "profile": "1.04",
+      "source_id": "8b7dd057-f850-505a-9ab3-fa8bba1acb65",
+      "source_text": "No, no, three.",
+      "observed_band": "late_assignment_observed_within_500ms",
+      "first_readable_at": 141248.37852,
+      "deadline": 141249.37852,
+      "proof_count": 1,
+      "observed_final_key": {
+        "source": "nemotron",
+        "speaker_scope_id": "5",
+        "local_speaker_id": "0"
+      },
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141248.1491533,
+          "proof_diagnostics": [
+            {
+              "proof_token": "1956c8d7a5d942aaa536873b307e0624",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 1.0800000000000007,
+                "total": 0.07,
+                "longest": 0.02,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  5
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 34560,
+                "immutable": 34560,
+                "revision": 4,
+                "generation": 0,
+                "frames": 272
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141248.37852,
+          "proof_diagnostics": [
+            {
+              "proof_token": "1956c8d7a5d942aaa536873b307e0624",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 1.0800000000000007,
+                "total": 0.07,
+                "longest": 0.02,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  5
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 34560,
+                "immutable": 34560,
+                "revision": 4,
+                "generation": 0,
+                "frames": 272
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "last_recorded_public_snapshot_before_retirement",
+          "at": 141248.9402472,
+          "proof_diagnostics": [
+            {
+              "proof_token": "1956c8d7a5d942aaa536873b307e0624",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 1.0800000000000007,
+                "total": 0.07,
+                "longest": 0.02,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  5
+                ],
+                "state": "identified"
+              },
+              "accepted_frontiers": {
+                "processed": 57600,
+                "immutable": 57600,
+                "revision": 5,
+                "generation": 0,
+                "frames": 384
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": false
+    },
+    {
+      "route": "gpu",
+      "case": "six_second_rollover",
+      "profile": "1.04",
+      "source_id": "53c401e8-d22a-5b65-a9d1-7aa7718638d4",
+      "source_text": "With the impacts.",
+      "observed_band": "late_assignment_observed_within_500ms",
+      "first_readable_at": 141261.1943185,
+      "deadline": 141262.1943185,
+      "proof_count": 1,
+      "observed_final_key": {
+        "source": "nemotron",
+        "speaker_scope_id": "7",
+        "local_speaker_id": "0"
+      },
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141260.9353011,
+          "proof_diagnostics": [
+            {
+              "proof_token": "f7427f72aa554dc2bc0a1562ac8703ef",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.5460000000000003,
+                "total": 0.03,
+                "longest": 0.03,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 115200,
+                "immutable": 115200,
+                "revision": 24,
+                "generation": 0,
+                "frames": 951
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141261.1943185,
+          "proof_diagnostics": [
+            {
+              "proof_token": "f7427f72aa554dc2bc0a1562ac8703ef",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": true,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.5460000000000003,
+                "total": 0.03,
+                "longest": 0.03,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "unavailable"
+              },
+              "accepted_frontiers": {
+                "processed": 115200,
+                "immutable": 115200,
+                "revision": 24,
+                "generation": 0,
+                "frames": 951
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141262.2984461,
+          "proof_diagnostics": [
+            {
+              "proof_token": "f7427f72aa554dc2bc0a1562ac8703ef",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.5460000000000003,
+                "total": 0.03,
+                "longest": 0.03,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "identified"
+              },
+              "accepted_frontiers": {
+                "processed": 138240,
+                "immutable": 138240,
+                "revision": 29,
+                "generation": 0,
+                "frames": 1086
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": true
+    },
+    {
+      "route": "gpu",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "source_id": "d80a9935-2dac-5427-883e-58d74c10c2ec",
+      "source_text": "From his hair.",
+      "observed_band": "unresolved",
+      "first_readable_at": 141273.540414,
+      "deadline": 141274.540414,
+      "proof_count": 1,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141273.3520372,
+          "proof_diagnostics": [
+            {
+              "proof_token": "40c1e71fed8d45d688d986879cc46863",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.23600000000000007,
+                "total": 0.12,
+                "longest": 0.12000000000000001,
+                "exceeds": true,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  9
+                ],
+                "state": "uncertain"
+              },
+              "accepted_frontiers": {
+                "processed": 122880,
+                "immutable": 122880,
+                "revision": 18,
+                "generation": 0,
+                "frames": 945
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141273.540414,
+          "proof_diagnostics": [
+            {
+              "proof_token": "40c1e71fed8d45d688d986879cc46863",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.23600000000000007,
+                "total": 0.12,
+                "longest": 0.12000000000000001,
+                "exceeds": true,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  9
+                ],
+                "state": "uncertain"
+              },
+              "accepted_frontiers": {
+                "processed": 122880,
+                "immutable": 122880,
+                "revision": 18,
+                "generation": 0,
+                "frames": 945
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141274.5987134,
+          "proof_diagnostics": [
+            {
+              "proof_token": "40c1e71fed8d45d688d986879cc46863",
+              "proof_convention": "exact_batch_native_proof_partition",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": 0,
+                "clear_slots": [
+                  0
+                ],
+                "active_slots": [
+                  0
+                ],
+                "support": 0.23600000000000007,
+                "total": 0.12,
+                "longest": 0.12000000000000001,
+                "exceeds": true,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  9
+                ],
+                "state": "uncertain"
+              },
+              "accepted_frontiers": {
+                "processed": 122880,
+                "immutable": 122880,
+                "revision": 24,
+                "generation": 0,
+                "frames": 967
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "1.04",
+      "source_id": "65de7da7-640b-5192-baf5-5ac986815885",
+      "source_text": "He washed the detritus from his",
+      "observed_band": "unresolved",
+      "first_readable_at": 141386.7426103,
+      "deadline": 141387.7426103,
+      "proof_count": 0,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141384.9594872,
+          "proof_diagnostics": []
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141386.7426103,
+          "proof_diagnostics": []
+        },
+        {
+          "boundary": "last_recorded_public_snapshot_before_retirement",
+          "at": 141387.3080637,
+          "proof_diagnostics": []
+        }
+      ],
+      "deadline_snapshot_observed": false,
+      "cause": "No transferable native contribution proof. Exact recorded estimated result-span end rounds one sample past recorded sent frontier; mapping control reports empty mapping and observed whole-turn mixed fallback. Not missing late speaker evidence; not a forced wrong identity."
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "source_id": "4ad5e16d-e3a5-5b0b-b10c-d3eda7763c9b",
+      "source_text": "Washed the detritus from his hair. ",
+      "observed_band": "unresolved",
+      "first_readable_at": 141393.7487287,
+      "deadline": 141394.7487287,
+      "proof_count": 1,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141393.3511723,
+          "proof_diagnostics": [
+            {
+              "proof_token": "64e73dc584554d1587a6970b19d4c828",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  3
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 69120,
+                "immutable": 69120,
+                "revision": 9,
+                "generation": 0,
+                "frames": 547
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141393.7487287,
+          "proof_diagnostics": [
+            {
+              "proof_token": "64e73dc584554d1587a6970b19d4c828",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  3
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 80640,
+                "immutable": 80640,
+                "revision": 10,
+                "generation": 0,
+                "frames": 636
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "last_recorded_public_snapshot_before_retirement",
+          "at": 141394.42172,
+          "proof_diagnostics": [
+            {
+              "proof_token": "64e73dc584554d1587a6970b19d4c828",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  3
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 92160,
+                "immutable": 92160,
+                "revision": 11,
+                "generation": 0,
+                "frames": 727
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": false
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "1.04",
+      "source_id": "23a07de2-b865-572e-b48d-f96e25f34bce",
+      "source_text": "No. He washed",
+      "observed_band": "unresolved",
+      "first_readable_at": 141393.752822,
+      "deadline": 141394.752822,
+      "proof_count": 1,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141393.3517624,
+          "proof_diagnostics": [
+            {
+              "proof_token": "64e73dc584554d1587a6970b19d4c828",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  3
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 69120,
+                "immutable": 69120,
+                "revision": 9,
+                "generation": 0,
+                "frames": 547
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141393.752822,
+          "proof_diagnostics": [
+            {
+              "proof_token": "64e73dc584554d1587a6970b19d4c828",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  3
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 80640,
+                "immutable": 80640,
+                "revision": 10,
+                "generation": 0,
+                "frames": 636
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141394.753559,
+          "proof_diagnostics": [
+            {
+              "proof_token": "64e73dc584554d1587a6970b19d4c828",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  3
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 92160,
+                "immutable": 92160,
+                "revision": 11,
+                "generation": 0,
+                "frames": 727
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": true
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "distinct_repeated_A_B_A",
+      "profile": "0.64",
+      "source_id": "4c3bd42d-568b-5438-ab3a-d6abf6089c61",
+      "source_text": "He washed the detritus from his",
+      "observed_band": "unresolved",
+      "first_readable_at": 141403.6526404,
+      "deadline": 141404.6526404,
+      "proof_count": 0,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141403.2791198,
+          "proof_diagnostics": []
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141403.6526404,
+          "proof_diagnostics": []
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141404.6828314,
+          "proof_diagnostics": []
+        }
+      ],
+      "deadline_snapshot_observed": true,
+      "cause": "No transferable native contribution proof. Exact recorded estimated result-span end rounds one sample past recorded sent frontier; mapping control reports empty mapping and observed whole-turn mixed fallback. Not missing late speaker evidence; not a forced wrong identity."
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "source_id": "a539496b-2100-5198-b4a4-6faccdbfbb5a",
+      "source_text": "Washed the detritus from his hair. ",
+      "observed_band": "unresolved",
+      "first_readable_at": 141411.7091747,
+      "deadline": 141412.7091747,
+      "proof_count": 1,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141411.2261565,
+          "proof_diagnostics": [
+            {
+              "proof_token": "10788377ec594246a78a3920f016cd4a",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 76800,
+                "immutable": 76800,
+                "revision": 13,
+                "generation": 0,
+                "frames": 607
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141411.7091747,
+          "proof_diagnostics": [
+            {
+              "proof_token": "10788377ec594246a78a3920f016cd4a",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 84480,
+                "immutable": 84480,
+                "revision": 14,
+                "generation": 0,
+                "frames": 667
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "last_recorded_public_snapshot_before_retirement",
+          "at": 141412.247826,
+          "proof_diagnostics": [
+            {
+              "proof_token": "10788377ec594246a78a3920f016cd4a",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 99840,
+                "immutable": 99840,
+                "revision": 16,
+                "generation": 0,
+                "frames": 781
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": false
+    },
+    {
+      "route": "deepgram-native-replay",
+      "case": "short_A_B_A",
+      "profile": "0.64",
+      "source_id": "4525d878-9396-59ca-8d2d-b948a1fbf5cd",
+      "source_text": "No. He washed",
+      "observed_band": "unresolved",
+      "first_readable_at": 141411.7118236,
+      "deadline": 141412.7118236,
+      "proof_count": 1,
+      "observed_final_key": null,
+      "states": [
+        {
+          "boundary": "source_admission",
+          "at": 141411.2268806,
+          "proof_diagnostics": [
+            {
+              "proof_token": "10788377ec594246a78a3920f016cd4a",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 76800,
+                "immutable": 76800,
+                "revision": 13,
+                "generation": 0,
+                "frames": 607
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_readable",
+          "at": 141411.7118236,
+          "proof_diagnostics": [
+            {
+              "proof_token": "10788377ec594246a78a3920f016cd4a",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 84480,
+                "immutable": 84480,
+                "revision": 14,
+                "generation": 0,
+                "frames": 667
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        },
+        {
+          "boundary": "first_recorded_public_snapshot_at_or_after_deadline",
+          "at": 141412.7722117,
+          "proof_diagnostics": [
+            {
+              "proof_token": "10788377ec594246a78a3920f016cd4a",
+              "proof_convention": "exact_streaming_contribution_source_plus_context",
+              "classifier": {
+                "missing": false,
+                "broken": false,
+                "overlap": false,
+                "candidate": null,
+                "clear_slots": [
+                  0,
+                  1
+                ],
+                "active_slots": [
+                  0,
+                  1
+                ],
+                "support": 0.0,
+                "total": 0,
+                "longest": 0.0,
+                "exceeds": false,
+                "foreign_replay": false,
+                "foreign_uncertainty": false,
+                "epochs": [
+                  7
+                ],
+                "state": "mixed"
+              },
+              "accepted_frontiers": {
+                "processed": 99840,
+                "immutable": 99840,
+                "revision": 18,
+                "generation": 0,
+                "frames": 786
+              },
+              "foreign_leaning_unique_ranges": []
+            }
+          ]
+        }
+      ],
+      "deadline_snapshot_observed": true
+    }
+  ]
+}
