@@ -32,6 +32,9 @@ class BenchApp:
         from bench import observe, source
 
         observe.install(self.control_dir / "observations.jsonl")
+        from bench import record
+
+        record.install()
         from puripuly_heart.core.audio import desktop_source
 
         desktop_source.DesktopLoopbackAudioSource = source.BenchLoopbackSource

@@ -200,6 +200,7 @@ def install(path: Path) -> None:
     original_view_observe = view.observe
 
     def view_observe(self, items):
+        items = tuple(items)
         frames = []
         for item in items:
             frame = getattr(item, "frame", None)
