@@ -636,7 +636,7 @@ private manifest was removed. No user process or runtime setting was changed.
 The original failed run's missing payload remains unknown; this successful
 continuation does not retroactively identify its cause.
 
-### Remaining physical acceptance
+### Physical evidence limits and closure scope
 
 Physical HMD consumption, comfort, sparse-update freshness on an affected
 headset and long-session behavior are **not run**. An installed runtime,
@@ -645,4 +645,12 @@ observations. The finite shared caption window still permits displacement
 before a late translation, and fast completed translations can still cause
 closely spaced visible changes. No cross-turn grouping or new dwell timer was
 introduced.
+
+The maintainer subsequently approved closing #265 on software verification,
+excluding physical HMD and long-session observation from this issue's closure
+criteria. The [recorded scope decision](https://github.com/kapitalismho/PuriPuly-heart/issues/265#issuecomment-6255868549)
+supersedes only that earlier acceptance blocker. Physical results remain
+**not run**, not passed; no historical HMD-freshness fix or P05 equivalence is
+certified. All R1–R6 software requirements and their preserved contracts remain
+in scope. PR CI, review and normal merge are separate publication obligations.
 
