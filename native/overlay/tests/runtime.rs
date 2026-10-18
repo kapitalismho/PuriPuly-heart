@@ -1,5 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
+use std::collections::VecDeque;
 use std::process::Command;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -11,6 +12,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use puripuly_heart_overlay::logging::OverlayLogger;
 use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperiment};
+use puripuly_heart_overlay::openvr::OpenVrEventSource;
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
     load_manifest, resolve_quiet_tail_profile, run_with_manifest, submit_texture,
@@ -593,6 +595,10 @@ struct OwnedSubmitterState {
     drops: AtomicUsize,
     first_texture_ptr: AtomicUsize,
     texture_pointer_mismatches: AtomicUsize,
+    runtime_events: Mutex<VecDeque<OpenVrRuntimeEvent>>,
+    runtime_event_batches: Mutex<Vec<(Instant, usize, Vec<OpenVrRuntimeEvent>)>>,
+    empty_submitted_at: Mutex<Option<Instant>>,
+    hide_requested_at: Mutex<Option<Instant>>,
 }
 
 struct OwnedSubmitterProbe {
@@ -803,6 +809,9 @@ impl OverlayFrameSubmitter for ObservedVisibilitySubmitter {
             } else {
                 "submit:text"
             });
+        if frame.layout().visible_blocks.is_empty() {
+            *self.state.empty_submitted_at.lock().unwrap() = Some(Instant::now());
+        }
         Ok(())
     }
 
@@ -812,12 +821,33 @@ impl OverlayFrameSubmitter for ObservedVisibilitySubmitter {
             .lock()
             .unwrap()
             .push(if visible { "show" } else { "hide" });
+        if !visible {
+            self.state
+                .hide_requested_at
+                .lock()
+                .unwrap()
+                .get_or_insert_with(Instant::now);
+        }
         self.observed = Some(visible);
         Ok(())
     }
 
     fn observed_overlay_visible(&self) -> Option<bool> {
         self.observed
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        let mut pending = self.state.runtime_events.lock().unwrap();
+        let count = max_events.min(pending.len());
+        let events = pending.drain(..count).collect::<Vec<_>>();
+        if !events.is_empty() {
+            self.state.runtime_event_batches.lock().unwrap().push((
+                Instant::now(),
+                max_events,
+                events.clone(),
+            ));
+        }
+        events
     }
 }
 
@@ -4983,6 +5013,265 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
 }
 
 #[tokio::test]
+async fn production_owner_process_quit_preserves_empty_handoff_hide_grace_and_shutdown() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({
+                "type":"snapshot",
+                "payload":{
+                    "revision":1,
+                    "blocks":[block("self:process-quit", "self", "visible", "", true)]
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws).await;
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{"revision":2,"blocks":[]}})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_test_progress("successful empty submission", || {
+            server_state.empty_submitted_at.lock().unwrap().is_some()
+        })
+        .await;
+
+        for challenge_id in [2, 3, 4] {
+            if challenge_id == 3 {
+                assert!(!server_state.operations.lock().unwrap().contains(&"hide"));
+                let owned_pid = std::process::id();
+                let foreign_pid = owned_pid.wrapping_add(1).max(1);
+                server_state
+                    .runtime_events
+                    .lock()
+                    .unwrap()
+                    .extend((0..17).map(|index| OpenVrRuntimeEvent::ProcessQuit {
+                        source: if index % 2 == 0 {
+                            OpenVrEventSource::Overlay
+                        } else {
+                            OpenVrEventSource::System
+                        },
+                        pid: foreign_pid,
+                        old_pid: owned_pid,
+                        forced: index % 2 == 0,
+                        connection_lost: index % 3 == 0,
+                    }));
+                wait_for_test_progress("foreign ProcessQuit delivery", || {
+                    server_state.runtime_events.lock().unwrap().is_empty()
+                })
+                .await;
+            } else if challenge_id == 4 {
+                wait_for_test_progress("empty Hide grace completion", || {
+                    server_state.hide_requested_at.lock().unwrap().is_some()
+                })
+                .await;
+            }
+            ws.send(Message::Text(
+                json!({
+                    "type":"health_challenge",
+                    "challenge_id":challenge_id,
+                    "overlay_instance_id":"overlay-test",
+                    "runtime_generation":1
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            let status = tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    let message = next_owner_message(&mut ws).await;
+                    if message["type"] == "owner_status"
+                        && message["health_challenge_id"] == challenge_id
+                    {
+                        break message;
+                    }
+                }
+            })
+            .await
+            .expect("owner stopped answering health challenges");
+            assert_eq!(status["latest_applied_revision"], 2);
+            assert_eq!(status["latest_handoff_revision"], 2);
+            assert_eq!(status["current_covered_handoff"], true);
+            assert_eq!(status["observed_runtime_visible"], challenge_id != 4);
+            assert_eq!(status["desired_visible"], challenge_id != 4);
+            if challenge_id != 4 {
+                assert!(!server_state.operations.lock().unwrap().contains(&"hide"));
+            } else {
+                assert_eq!(status["classification"], "intentional_hidden");
+            }
+        }
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+    );
+    let logger = test_logger("process-quit-empty-hide-grace").await;
+    tokio::time::timeout(Duration::from_secs(10), owner.run(&mut bridge, &logger))
+        .await
+        .expect("owner failed to finish graceful shutdown")
+        .unwrap();
+    server.await.unwrap();
+    assert!(owner.resources_released());
+    assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    assert!(owner.fresh_retry_schedules_for_test().is_empty());
+    let attempts = owner.successful_attempt_audit_for_test();
+    assert_eq!(attempts.len(), 2);
+    let empty = attempts[1];
+    assert_eq!(
+        (
+            empty.logical_revision,
+            empty.render_generation,
+            empty.submission_attempt,
+            empty.scene_generation
+        ),
+        (2, 2, 2, 2)
+    );
+    assert_eq!(attempts[0].scene_generation, 1);
+    let operations = state.operations.lock().unwrap().clone();
+    assert!(operations.starts_with(&["submit:text", "show", "submit:empty", "hide"]));
+    assert!(operations[4..].iter().all(|operation| *operation == "hide"));
+    let submitted_at = state.empty_submitted_at.lock().unwrap().unwrap();
+    let hidden_at = state.hide_requested_at.lock().unwrap().unwrap();
+    assert!(hidden_at.duration_since(submitted_at) >= Duration::from_millis(500));
+    let batches = state.runtime_event_batches.lock().unwrap();
+    assert_eq!(
+        batches
+            .iter()
+            .map(|(_, _, events)| events.len())
+            .collect::<Vec<_>>(),
+        vec![8, 8, 1]
+    );
+    for (polled_at, maximum, events) in batches.iter() {
+        assert_eq!(*maximum, 8);
+        assert!(*polled_at >= submitted_at);
+        assert!(polled_at.duration_since(submitted_at) < Duration::from_millis(500));
+        assert!(*polled_at < hidden_at);
+        assert!(events.iter().all(|event| matches!(
+            event,
+            OpenVrRuntimeEvent::ProcessQuit { pid, .. } if *pid != std::process::id()
+        )));
+    }
+    logger.shutdown().unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_process_quit_and_genuine_quit_events_remain_fatal() {
+    for event in [
+        OpenVrRuntimeEvent::Quit,
+        OpenVrRuntimeEvent::DriverRequestedQuit,
+        OpenVrRuntimeEvent::ProcessQuit {
+            source: OpenVrEventSource::Overlay,
+            pid: std::process::id(),
+            old_pid: 0,
+            forced: false,
+            connection_lost: false,
+        },
+        OpenVrRuntimeEvent::ProcessQuit {
+            source: OpenVrEventSource::System,
+            pid: std::process::id(),
+            old_pid: 0,
+            forced: false,
+            connection_lost: false,
+        },
+    ] {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let state = Arc::new(OwnedSubmitterState::default());
+        let server_state = state.clone();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            let _auth = ws.next().await.unwrap().unwrap();
+            ws.send(Message::Text(
+                json!({
+                    "type":"snapshot",
+                    "payload":{
+                        "revision":1,
+                        "blocks":[block("self:fatal-quit", "self", "visible", "", true)]
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            wait_for_owner_ready(&mut ws).await;
+            server_state.runtime_events.lock().unwrap().push_back(event);
+            tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    let message = next_owner_message(&mut ws).await;
+                    if message["type"] == "owner_status"
+                        && message["classification"] == "terminal_failed"
+                    {
+                        assert_eq!(message["primary_failure_reason"], "openvr_failed");
+                        assert_eq!(message["cleanup_failure_reason"], Value::Null);
+                        assert_eq!(message["desired_visible"], false);
+                        break;
+                    }
+                }
+            })
+            .await
+            .expect("genuine quit event did not produce terminal failure");
+        });
+        let mut manifest = test_manifest();
+        manifest.bridge_url = format!("ws://{address}");
+        let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+        let mut owner = NativePresentationOwner::new(
+            snapshot,
+            CaptionRenderer::new_for_test().unwrap(),
+            ObservedVisibilitySubmitter {
+                state: state.clone(),
+                observed: None,
+            },
+        );
+        let logger = test_logger("process-quit-owned-fatal").await;
+        let failure = tokio::time::timeout(Duration::from_secs(5), owner.run(&mut bridge, &logger))
+            .await
+            .expect("genuine quit event did not stop the owner")
+            .unwrap_err();
+        assert!(
+            matches!(&failure, RuntimeFailure::OpenVr(message)
+                if message == &format!("event={}", event.as_str())),
+            "wrong terminal result for {event:?}: {failure:?}"
+        );
+        assert!(owner.resources_released());
+        assert_eq!(
+            state.operations.lock().unwrap().as_slice(),
+            ["submit:text", "show", "hide"]
+        );
+        let batches = state.runtime_event_batches.lock().unwrap();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].1, 8);
+        assert_eq!(batches[0].2, vec![event]);
+        server.await.unwrap();
+        logger.shutdown().unwrap();
+    }
+}
+
+#[tokio::test]
 async fn production_owner_empty_scene_stays_settled_during_silent_input() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
@@ -6769,6 +7058,10 @@ async fn production_owner_renders_python_active_self_and_rearms_exhausted_stream
 }
 
 fn python_scene_protection_input() -> Value {
+    python_scene_protection_input_for_peer_mode("secondary_only")
+}
+
+fn python_scene_protection_input_for_peer_mode(peer_mode: &str) -> Value {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -6782,6 +7075,7 @@ fn python_scene_protection_input() -> Value {
             "-m",
             "tests.helpers.overlay_scene_protection",
         ])
+        .args(["--peer-mode", peer_mode])
         .current_dir(root)
         .output()
         .unwrap();
@@ -6922,7 +7216,16 @@ fn assert_scene_retry_execution(
 
 #[tokio::test]
 async fn python_mailbox_scene_coverage_executes_after_retirement_and_partial_removal() {
-    let input = python_scene_protection_input();
+    assert_python_mailbox_scene_coverage("secondary_only").await;
+}
+
+#[tokio::test]
+async fn python_mailbox_translated_primary_peer_survivor_executes_after_removal_and_expiry() {
+    assert_python_mailbox_scene_coverage("translated_primary").await;
+}
+
+async fn assert_python_mailbox_scene_coverage(peer_mode: &str) {
+    let input = python_scene_protection_input_for_peer_mode(peer_mode);
     let scenes: Vec<OverlayPresentationSnapshot> =
         serde_json::from_value(input["scenes"].clone()).unwrap();
     assert_eq!(input["pruned"], input["repeated_pruned"]);
@@ -6932,6 +7235,35 @@ async fn python_mailbox_scene_coverage_executes_after_retirement_and_partial_rem
     assert_eq!(scenes[7].blocks.len(), 1);
     assert_eq!(scenes[7].blocks[0].channel, "peer");
     assert_eq!(scenes[6].blocks[1], scenes[7].blocks[0]);
+    assert_eq!(
+        scenes[7].blocks[0].primary_text.is_empty(),
+        peer_mode == "secondary_only"
+    );
+    assert!(scenes[7].blocks[0].secondary_enabled);
+    assert!(!scenes[7].blocks[0].secondary_text.is_empty());
+    let mut peer_runtime = OverlayRuntime::new(scenes[6].clone());
+    let peer_before = peer_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .find(|slot| slot.id == scenes[7].blocks[0].id)
+        .unwrap()
+        .clone();
+    peer_runtime.apply_snapshot(scenes[7].clone());
+    let peer_after = peer_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    assert_eq!(peer_before.id, peer_after.id);
+    assert_eq!(peer_before.appearance_seq, peer_after.appearance_seq);
+    assert_eq!(peer_before.slot_index, peer_after.slot_index);
+    assert_eq!(peer_before.anchor_top_px, peer_after.anchor_top_px);
     let mut reduced = OverlayRuntime::new(scenes[2].clone());
     let before = reduced.state().scene().slots().clone();
     reduced.apply_snapshot(scenes[3].clone());
@@ -7013,6 +7345,34 @@ async fn python_mailbox_scene_coverage_executes_after_retirement_and_partial_rem
     )
     .await;
     assert_scene_retry_execution(&held.owner, pruned_generation, 5);
+    for secondary_enabled in [false, true]
+        .into_iter()
+        .filter(|_| peer_mode == "secondary_only")
+    {
+        let mut hidden = scenes[7].clone();
+        hidden.blocks[0].secondary_enabled = secondary_enabled;
+        if secondary_enabled {
+            hidden.blocks[0].secondary_text.clear();
+        }
+        let rejected = exercise_scene_schedule(
+            vec![
+                (hidden, Duration::ZERO),
+                (scenes[8].clone(), Duration::from_millis(600)),
+            ],
+            "scene-nondrawable-survivor",
+        )
+        .await;
+        assert!(!rejected
+            .owner
+            .fresh_retry_evidence_for_test()
+            .iter()
+            .any(|record| record["channel"] == "self" && record["active"] == true));
+        assert!(!rejected
+            .owner
+            .fresh_retry_audit_for_test()
+            .iter()
+            .any(|fact| fact.0 == "self" && fact.2 == "completed"));
+    }
 }
 
 #[tokio::test]

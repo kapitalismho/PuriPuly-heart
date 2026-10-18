@@ -29,6 +29,7 @@ from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigSnapshotPort,
+    translation_configs_match,
 )
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyInheritanceDiagnostic,
@@ -1832,7 +1833,7 @@ class SelfTranslationChannelOwner:
             provider_generation=self.translation_requests.provider_generation,
             compatible=lambda left, right: self.output_projection.soft_reuse_mode(left, right)
             is not None,
-            configuration_compatible=self._translation_config_matches,
+            configuration_compatible=translation_configs_match,
         )
 
     def _prepare_draft_child(self, child: TranslationTurnChild) -> TranslationTurnChild:
@@ -1857,43 +1858,6 @@ class SelfTranslationChannelOwner:
             child,
             prepared_request=replace(prepared, provider_generation=child.provider_generation),
             preparation_failure=None,
-        )
-
-    @staticmethod
-    def _translation_config_matches(
-        left: TranslationRuntimeConfig,
-        right: TranslationRuntimeConfig,
-    ) -> bool:
-        return (
-            left.source_language,
-            left.target_language,
-            left.self_target_languages,
-            left.peer_source_language,
-            left.peer_target_language,
-            left.peer_source_mode,
-            left.system_prompt,
-            left.translation_enabled,
-            left.peer_translation_enabled,
-            left.integrated_context_enabled,
-            left.context_time_window_s,
-            left.context_max_entries,
-            left.integrated_context_time_window_s,
-            left.integrated_context_max_entries,
-        ) == (
-            right.source_language,
-            right.target_language,
-            right.self_target_languages,
-            right.peer_source_language,
-            right.peer_target_language,
-            right.peer_source_mode,
-            right.system_prompt,
-            right.translation_enabled,
-            right.peer_translation_enabled,
-            right.integrated_context_enabled,
-            right.context_time_window_s,
-            right.context_max_entries,
-            right.integrated_context_time_window_s,
-            right.integrated_context_max_entries,
         )
 
     async def _evaluate_speculative_next_action(self, buffer: _MergeBuffer, *, reason: str) -> None:

@@ -43,6 +43,7 @@ class DestinationBatch:
     active: bool = False
     disposition: str | None = None
     caption_id: str | None = None
+    caption_admission_seq: int | None = None
 
 
 @dataclass(slots=True)
@@ -283,12 +284,23 @@ class DestinationBatchAdmission:
         if payload_size > OUTPUT_BATCH_MAX_BYTES:
             return None, "output_payload_exhausted"
         waiting = self.waiting.setdefault(scope, deque())
+        waiting_index = None
+        caption_admission_seq = event.seq if assembled_caption and not event.retained_only else None
         if scope == "preview:self" and scope in self.active:
             for superseded_key in tuple(waiting):
                 superseded = self.batches.get(superseded_key)
                 if superseded is not None and (
-                    not assembled_caption or superseded.caption_id == str(event.utterance_id)
+                    not assembled_caption
+                    or (
+                        superseded.caption_id == str(event.utterance_id)
+                        and superseded.turn_generation == event.turn_generation
+                        and superseded.turn_order == event.turn_order
+                    )
                 ):
+                    if assembled_caption:
+                        waiting_index = waiting.index(superseded_key)
+                        if superseded.caption_admission_seq is not None:
+                            caption_admission_seq = superseded.caption_admission_seq
                     self.release(superseded, "preview_superseded")
             waiting = self.waiting.setdefault(scope, deque())
         if scope in self.active and len(waiting) >= OUTPUT_BATCH_MAX_UNSENT:
@@ -314,8 +326,9 @@ class DestinationBatchAdmission:
             seen_targets={0},
             expected_targets=frozenset({0}),
             caption_id=str(event.utterance_id) if assembled_caption else None,
+            caption_admission_seq=caption_admission_seq,
         )
-        self._insert(batch)
+        self._insert(batch, waiting_index=waiting_index)
         return batch, None
 
     def cancel_waiting(self, batch: DestinationBatch) -> None:
@@ -462,7 +475,7 @@ class DestinationBatchAdmission:
             or self.reserved_bytes.get(scope, 0) + retained_payload_bytes > OUTPUT_SCOPE_MAX_BYTES
         )
 
-    def _insert(self, batch: DestinationBatch) -> None:
+    def _insert(self, batch: DestinationBatch, *, waiting_index: int | None = None) -> None:
         key = (batch.scope, batch.parent_id)
         self.batches[key] = batch
         self.reserved_bytes[batch.scope] = (
@@ -473,7 +486,11 @@ class DestinationBatchAdmission:
             batch.active = True
             batch.ready.set()
         else:
-            self.waiting.setdefault(batch.scope, deque()).append(key)
+            waiting = self.waiting.setdefault(batch.scope, deque())
+            if waiting_index is None:
+                waiting.append(key)
+            else:
+                waiting.insert(waiting_index, key)
 
     def _prune_scope(self, scope: str) -> None:
         waiting = self.waiting.get(scope)

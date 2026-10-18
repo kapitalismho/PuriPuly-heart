@@ -185,10 +185,13 @@ def test_send_time_self_removal_preserves_peer_policy_and_wrap_namespaces() -> N
 
 
 @pytest.mark.asyncio
-async def test_actual_presenter_and_mailbox_retained_patch_and_partial_removal() -> None:
+@pytest.mark.parametrize("peer_mode", ["secondary_only", "translated_primary"])
+async def test_actual_presenter_and_mailbox_retained_patch_and_partial_removal(
+    peer_mode: str,
+) -> None:
     from tests.helpers.overlay_scene_protection import projected_scenes
 
-    result = await projected_scenes()
+    result = await projected_scenes(peer_mode=peer_mode)
     scenes = result["scenes"]
     a, b = scenes[3]["blocks"]
     assert a["secondary_text"] == "synthetic retained patch"
@@ -201,13 +204,23 @@ async def test_actual_presenter_and_mailbox_retained_patch_and_partial_removal()
     assert survivor["native_fresh_render_targets"]["self"] == NATIVE_SELF_SCENE_TARGET
     mixed = scenes[6]
     assert len(mixed["blocks"]) == 2
+    assert mixed["blocks"][1]["primary_text"] == (
+        "" if peer_mode == "secondary_only" else "synthetic peer translation"
+    )
+    assert mixed["blocks"][1]["secondary_enabled"]
+    assert mixed["blocks"][1]["secondary_text"] == "synthetic peer source"
     peer_only = scenes[7]
     assert peer_only["blocks"] == [mixed["blocks"][1]]
     assert peer_only["native_quiet_tail_episodes"]["self"]["phase"] == "final"
-    assert (
-        peer_only["native_fresh_render_targets"]["peer"]
-        == mixed["native_fresh_render_targets"]["peer"]
-    )
+    if peer_mode == "secondary_only":
+        assert "peer" not in peer_only["native_fresh_render_targets"]
+        assert "peer" not in mixed["native_fresh_render_targets"]
+        assert "peer" not in peer_only["native_quiet_tail_episodes"]
+    else:
+        assert (
+            peer_only["native_fresh_render_targets"]["peer"]
+            == mixed["native_fresh_render_targets"]["peer"]
+        )
     pruned = result["pruned"]
     assert pruned == result["repeated_pruned"]
     assert pruned["blocks"] == peer_only["blocks"]
@@ -276,3 +289,40 @@ async def test_presenter_clear_coalescing_and_fresh_epoch_seed_distinct_valid_sc
         "generation": 1,
     }
     assert result["empty_after_rearm"]["blocks"] == []
+
+
+@pytest.mark.parametrize(
+    ("secondary_enabled", "secondary_text", "drawable"),
+    [(True, "source", True), (False, "source", False), (True, "", False)],
+)
+def test_scene_survivor_drawability_preserves_independent_peer_policy(
+    secondary_enabled: bool, secondary_text: str, drawable: bool
+) -> None:
+    projection = NativeRetryIntentProjection(enabled=True)
+    self_block = block("self:A", active=True)
+    peer = replace(
+        block("peer:P"),
+        primary_text="",
+        secondary_enabled=secondary_enabled,
+        secondary_text=secondary_text,
+    )
+    projection.reconcile_self_scene([], [self_block, peer])
+    assert projection.reconcile_self_scene([self_block, peer], [peer]) == drawable
+    projection.prune([peer])
+    assert (projection.targets.self == NATIVE_SELF_SCENE_TARGET) == drawable
+    assert (projection.episodes.self is not None) == drawable
+    assert projection.targets.peer is None
+    assert projection.episodes.peer is None
+    projection.begin(enabled=True, snapshot=OverlayPresentationSnapshot(blocks=[peer]))
+    clock = FakeClock(_now=10.0)
+    outbox = mailbox(clock)
+    seeded = NativeRetryIntentProjection(enabled=True)
+    seeded.reconcile_self_scene([], [self_block, peer])
+    envelope = outbox.make_scene(snapshot(seeded, [self_block, peer], 1), {self_block.id: 10.1})
+    clock.advance(1)
+    sent = json.loads(outbox.revalidated_scene_message(envelope))["payload"]
+    assert (
+        sent.get("native_fresh_render_targets", {}).get("self") == NATIVE_SELF_SCENE_TARGET
+    ) == drawable
+    assert projection.targets.peer is None
+    assert projection.episodes.peer is None

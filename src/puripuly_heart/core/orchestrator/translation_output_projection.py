@@ -13,6 +13,7 @@ from puripuly_heart.core.clock import Clock
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
+    translation_configs_match,
 )
 from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
@@ -1434,7 +1435,7 @@ class TranslationOutputProjectionOwner:
             self._self_captions[identity] = caption
             while len(self._self_captions) > _SELF_CAPTION_LIMIT:
                 self._self_captions.popitem(last=False)
-        if caption.configuration.value != configuration.value:
+        if not translation_configs_match(caption.configuration.value, configuration.value):
             caption.translation = None
         caption.configuration = configuration
         caption.presentation_revision = snapshot.revision

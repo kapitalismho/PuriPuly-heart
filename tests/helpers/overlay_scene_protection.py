@@ -13,7 +13,7 @@ from puripuly_heart.domain.models import Transcript
 from puripuly_heart.ui.overlay_calibration import OverlayCalibration
 
 
-async def projected_scenes() -> dict[str, object]:
+async def projected_scenes(*, peer_mode: str = "secondary_only") -> dict[str, object]:
     clock = FakeClock(_now=10.0)
     presenter = OverlayPresenter(
         calibration=OverlayCalibration(anchor="spatial_locked"),
@@ -91,16 +91,17 @@ async def projected_scenes() -> dict[str, object]:
                 target_language="ko",
             )
         )
-        await presenter.emit(
-            adapter.translation_final(
-                utterance_id=peer,
-                channel="peer",
-                text="synthetic peer translation",
-                source_language="en",
-                target_language="ko",
-                applied_context_mode=None,
+        if peer_mode == "translated_primary":
+            await presenter.emit(
+                adapter.translation_final(
+                    utterance_id=peer,
+                    channel="peer",
+                    text="synthetic peer translation",
+                    source_language="en",
+                    target_language="ko",
+                    applied_context_mode=None,
+                )
             )
-        )
         capture()
         mixed = presenter.snapshot()
         held = outbox.make_scene(mixed, {f"self:{b}": clock.now() + 0.1})
@@ -150,4 +151,11 @@ async def projected_scenes() -> dict[str, object]:
 
 
 if __name__ == "__main__":
-    print(json.dumps(asyncio.run(projected_scenes())))
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--peer-mode", choices=("secondary_only", "translated_primary"), default="secondary_only"
+    )
+    args = parser.parse_args()
+    print(json.dumps(asyncio.run(projected_scenes(peer_mode=args.peer_mode))))

@@ -367,22 +367,44 @@ pub enum OpenVrEventClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OpenVrEventSource {
+    Overlay,
+    System,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OpenVrRuntimeEvent {
     OverlayShown,
     OverlayHidden,
     Quit,
-    ProcessQuit,
+    ProcessQuit {
+        source: OpenVrEventSource,
+        pid: u32,
+        old_pid: u32,
+        forced: bool,
+        connection_lost: bool,
+    },
     DriverRequestedQuit,
     Ignored(u32),
 }
 
 impl OpenVrRuntimeEvent {
-    pub fn from_event_type(event_type: u32) -> Self {
-        match event_type {
+    #[cfg(windows)]
+    fn from_raw_event(event: &openvr_sys::VREvent_t, source: OpenVrEventSource) -> Self {
+        match event.eventType {
             OPENVR_EVENT_OVERLAY_SHOWN => Self::OverlayShown,
             OPENVR_EVENT_OVERLAY_HIDDEN => Self::OverlayHidden,
             OPENVR_EVENT_QUIT => Self::Quit,
-            OPENVR_EVENT_PROCESS_QUIT => Self::ProcessQuit,
+            OPENVR_EVENT_PROCESS_QUIT => {
+                let process = unsafe { event.data.process };
+                Self::ProcessQuit {
+                    source,
+                    pid: process.pid,
+                    old_pid: process.oldPid,
+                    forced: process.bForced,
+                    connection_lost: process.bConnectionLost,
+                }
+            }
             OPENVR_EVENT_DRIVER_REQUESTED_QUIT => Self::DriverRequestedQuit,
             other => Self::Ignored(other),
         }
@@ -390,7 +412,11 @@ impl OpenVrRuntimeEvent {
 
     pub fn classify(self) -> OpenVrEventClass {
         match self {
-            Self::Quit | Self::ProcessQuit | Self::DriverRequestedQuit => OpenVrEventClass::Fatal,
+            Self::Quit | Self::DriverRequestedQuit => OpenVrEventClass::Fatal,
+            Self::ProcessQuit { pid, .. } if pid != 0 && pid == std::process::id() => {
+                OpenVrEventClass::Fatal
+            }
+            Self::ProcessQuit { .. } => OpenVrEventClass::Ignore,
             Self::OverlayShown | Self::OverlayHidden => OpenVrEventClass::Reconfigure,
             Self::Ignored(_) => OpenVrEventClass::Ignore,
         }
@@ -401,7 +427,7 @@ impl OpenVrRuntimeEvent {
             Self::OverlayShown => "overlay_shown",
             Self::OverlayHidden => "overlay_hidden",
             Self::Quit => "quit",
-            Self::ProcessQuit => "process_quit",
+            Self::ProcessQuit { .. } => "process_quit",
             Self::DriverRequestedQuit => "driver_requested_quit",
             Self::Ignored(_) => "ignored",
         }
@@ -859,7 +885,10 @@ impl WindowsOpenVrOverlay {
                 if !got {
                     break;
                 }
-                events.push(OpenVrRuntimeEvent::from_event_type(event.eventType));
+                events.push(OpenVrRuntimeEvent::from_raw_event(
+                    &event,
+                    OpenVrEventSource::Overlay,
+                ));
             }
         }
         if let Some(poll) = self.system_api().PollNextEvent {
@@ -874,7 +903,10 @@ impl WindowsOpenVrOverlay {
                 if !got {
                     break;
                 }
-                events.push(OpenVrRuntimeEvent::from_event_type(event.eventType));
+                events.push(OpenVrRuntimeEvent::from_raw_event(
+                    &event,
+                    OpenVrEventSource::System,
+                ));
             }
         }
         events
@@ -1377,10 +1409,10 @@ mod tests {
         fn_table_interface_version, reanchor_spatial_locked_with_api, requested_adapter_identity,
         run_startup_preflight, spatial_locked_transform, split_output_device_luid,
         validate_resolved_adapter, FakeOpenVr, OpenVrBackgroundInitError, OpenVrError,
-        OpenVrEventClass, OpenVrPreflightApi, OpenVrRuntimeEvent, OpenVrStartupPreflightError,
-        OverlayAnchorMode, OverlayFrameSubmitter, OverlayPlacementApi, OverlayPlacementPolicy,
-        SpatialHmdPose, SpatialReanchorApi, SpatialReanchorOutcome, SpatialTrackingOrigin,
-        DEFAULT_OVERLAY_WIDTH_METERS, OPENVR_EVENT_DRIVER_REQUESTED_QUIT,
+        OpenVrEventClass, OpenVrEventSource, OpenVrPreflightApi, OpenVrRuntimeEvent,
+        OpenVrStartupPreflightError, OverlayAnchorMode, OverlayFrameSubmitter, OverlayPlacementApi,
+        OverlayPlacementPolicy, SpatialHmdPose, SpatialReanchorApi, SpatialReanchorOutcome,
+        SpatialTrackingOrigin, DEFAULT_OVERLAY_WIDTH_METERS, OPENVR_EVENT_DRIVER_REQUESTED_QUIT,
         OPENVR_EVENT_OVERLAY_HIDDEN, OPENVR_EVENT_OVERLAY_SHOWN, OPENVR_EVENT_PROCESS_QUIT,
         OPENVR_EVENT_QUIT,
     };
@@ -1828,19 +1860,162 @@ mod tests {
 
     #[test]
     fn openvr_runtime_events_classify_fatal_reconfigure_and_ignore() {
-        for (event_type, class) in [
-            (OPENVR_EVENT_QUIT, OpenVrEventClass::Fatal),
-            (OPENVR_EVENT_PROCESS_QUIT, OpenVrEventClass::Fatal),
-            (OPENVR_EVENT_DRIVER_REQUESTED_QUIT, OpenVrEventClass::Fatal),
-            (OPENVR_EVENT_OVERLAY_SHOWN, OpenVrEventClass::Reconfigure),
-            (OPENVR_EVENT_OVERLAY_HIDDEN, OpenVrEventClass::Reconfigure),
-            (1, OpenVrEventClass::Ignore),
+        for (event, class) in [
+            (OpenVrRuntimeEvent::Quit, OpenVrEventClass::Fatal),
+            (
+                OpenVrRuntimeEvent::DriverRequestedQuit,
+                OpenVrEventClass::Fatal,
+            ),
+            (
+                OpenVrRuntimeEvent::OverlayShown,
+                OpenVrEventClass::Reconfigure,
+            ),
+            (
+                OpenVrRuntimeEvent::OverlayHidden,
+                OpenVrEventClass::Reconfigure,
+            ),
+            (OpenVrRuntimeEvent::Ignored(1), OpenVrEventClass::Ignore),
         ] {
-            assert_eq!(
-                OpenVrRuntimeEvent::from_event_type(event_type).classify(),
-                class
-            );
+            assert_eq!(event.classify(), class);
         }
+    }
+
+    #[test]
+    fn process_quit_is_fatal_only_for_the_owned_pid() {
+        let owned_pid = std::process::id();
+        let other_pid = owned_pid.wrapping_add(1).max(1);
+        for source in [OpenVrEventSource::Overlay, OpenVrEventSource::System] {
+            for (pid, expected) in [
+                (owned_pid, OpenVrEventClass::Fatal),
+                (other_pid, OpenVrEventClass::Ignore),
+                (0, OpenVrEventClass::Ignore),
+            ] {
+                for forced in [false, true] {
+                    for connection_lost in [false, true] {
+                        let event = OpenVrRuntimeEvent::ProcessQuit {
+                            source,
+                            pid,
+                            old_pid: owned_pid,
+                            forced,
+                            connection_lost,
+                        };
+                        assert_eq!(event.classify(), expected);
+                        assert_eq!(event.as_str(), "process_quit");
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn raw_process_quit_preserves_both_ingress_sources_and_process_payload() {
+        let owned_pid = std::process::id();
+        let other_pid = owned_pid.wrapping_add(1).max(1);
+        for source in [OpenVrEventSource::Overlay, OpenVrEventSource::System] {
+            for pid in [owned_pid, other_pid, 0] {
+                for forced in [false, true] {
+                    for connection_lost in [false, true] {
+                        let mut raw = unsafe { std::mem::zeroed::<openvr_sys::VREvent_t>() };
+                        raw.eventType = OPENVR_EVENT_PROCESS_QUIT;
+                        raw.data.process = openvr_sys::VREvent_Process_t {
+                            pid,
+                            oldPid: owned_pid,
+                            bForced: forced,
+                            bConnectionLost: connection_lost,
+                        };
+                        let event = OpenVrRuntimeEvent::from_raw_event(&raw, source);
+                        assert_eq!(
+                            event,
+                            OpenVrRuntimeEvent::ProcessQuit {
+                                source,
+                                pid,
+                                old_pid: owned_pid,
+                                forced,
+                                connection_lost,
+                            }
+                        );
+                        assert_eq!(
+                            event.classify(),
+                            if pid == owned_pid {
+                                OpenVrEventClass::Fatal
+                            } else {
+                                OpenVrEventClass::Ignore
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn raw_nonprocess_events_preserve_terminal_visibility_and_unknown_semantics() {
+        for source in [OpenVrEventSource::Overlay, OpenVrEventSource::System] {
+            for (event_type, expected, class) in [
+                (
+                    OPENVR_EVENT_QUIT,
+                    OpenVrRuntimeEvent::Quit,
+                    OpenVrEventClass::Fatal,
+                ),
+                (
+                    OPENVR_EVENT_DRIVER_REQUESTED_QUIT,
+                    OpenVrRuntimeEvent::DriverRequestedQuit,
+                    OpenVrEventClass::Fatal,
+                ),
+                (
+                    OPENVR_EVENT_OVERLAY_SHOWN,
+                    OpenVrRuntimeEvent::OverlayShown,
+                    OpenVrEventClass::Reconfigure,
+                ),
+                (
+                    OPENVR_EVENT_OVERLAY_HIDDEN,
+                    OpenVrRuntimeEvent::OverlayHidden,
+                    OpenVrEventClass::Reconfigure,
+                ),
+                (1, OpenVrRuntimeEvent::Ignored(1), OpenVrEventClass::Ignore),
+            ] {
+                let mut raw = unsafe { std::mem::zeroed::<openvr_sys::VREvent_t>() };
+                raw.eventType = event_type;
+                let event = OpenVrRuntimeEvent::from_raw_event(&raw, source);
+                assert_eq!(event, expected);
+                assert_eq!(event.classify(), class);
+            }
+        }
+    }
+
+    #[test]
+    fn unrelated_process_quits_consume_the_poll_budget_without_hiding_a_later_quit() {
+        let mut openvr = FakeOpenVr::default();
+        let other_pid = std::process::id().wrapping_add(1).max(1);
+        for source in [OpenVrEventSource::Overlay, OpenVrEventSource::System] {
+            for _ in 0..4 {
+                openvr.push_runtime_event(OpenVrRuntimeEvent::ProcessQuit {
+                    source,
+                    pid: other_pid,
+                    old_pid: std::process::id(),
+                    forced: false,
+                    connection_lost: false,
+                });
+            }
+        }
+        openvr.push_runtime_event(OpenVrRuntimeEvent::Quit);
+
+        assert!(openvr.poll_runtime_events(0).is_empty());
+        for expected_count in [3, 3, 2] {
+            let events = openvr.poll_runtime_events(expected_count);
+            assert_eq!(events.len(), expected_count);
+            assert!(events
+                .iter()
+                .all(|event| event.classify() == OpenVrEventClass::Ignore
+                    && event.as_str() == "process_quit"));
+        }
+        assert_eq!(
+            openvr.poll_runtime_events(1),
+            vec![OpenVrRuntimeEvent::Quit]
+        );
+        assert!(openvr.poll_runtime_events(1).is_empty());
     }
 
     #[test]

@@ -84,7 +84,7 @@ class NativeRetryIntentProjection:
             rendered_blocks
         ):
             return False
-        if not any(block.primary_text.strip() for block in rendered_blocks):
+        if not any(self._scene_drawable(block) for block in rendered_blocks):
             return False
         generation = self.next_self_generation(self.generations.self)
         episode_generation = self.next_self_generation(self._episode_generations.get("self"))
@@ -101,6 +101,12 @@ class NativeRetryIntentProjection:
         self._episode_targets["self"] = NATIVE_SELF_SCENE_TARGET
         self._episode_generations["self"] = episode_generation
         return True
+
+    @staticmethod
+    def _scene_drawable(block: OverlayPresentationBlock) -> bool:
+        return bool(
+            block.primary_text.strip() or (block.secondary_enabled and block.secondary_text.strip())
+        )
 
     @staticmethod
     def self_scene_phase(blocks: list[OverlayPresentationBlock]) -> str:
@@ -160,7 +166,10 @@ class NativeRetryIntentProjection:
             self.targets.self
             if (
                 self.targets.self in visible
-                or (self.targets.self == NATIVE_SELF_SCENE_TARGET and visible)
+                or (
+                    self.targets.self == NATIVE_SELF_SCENE_TARGET
+                    and any(self._scene_drawable(block) for block in rendered_blocks)
+                )
             )
             else None
         )

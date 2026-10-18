@@ -268,11 +268,17 @@ class OverlayBridgeMailbox:
         if len(valid_blocks) == len(envelope.snapshot.blocks):
             return envelope.message
         visible = {block.id for block in valid_blocks}
+        scene_drawable = any(
+            NativeRetryIntentProjection._scene_drawable(block) for block in valid_blocks
+        )
         targets = envelope.snapshot.native_fresh_render_targets
         self_target = (
             targets.self
             if targets is not None
-            and (targets.self in visible or (targets.self == NATIVE_SELF_SCENE_TARGET and visible))
+            and (
+                targets.self in visible
+                or (targets.self == NATIVE_SELF_SCENE_TARGET and scene_drawable)
+            )
             else None
         )
         peer_target = targets.peer if targets is not None and targets.peer in visible else None
@@ -284,7 +290,7 @@ class OverlayBridgeMailbox:
             block.channel == "self" and block.id not in visible
             for block in envelope.snapshot.blocks
         )
-        rearm_self = bool(valid_blocks and removed_self and self_generation is not None)
+        rearm_self = bool(scene_drawable and removed_self and self_generation is not None)
         if rearm_self:
             self_target = NATIVE_SELF_SCENE_TARGET
             self_generation = NativeRetryIntentProjection.next_generation(self_generation)

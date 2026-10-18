@@ -1633,7 +1633,10 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 .state()
                 .blocks()
                 .iter()
-                .filter(|block| !block.primary_text.trim().is_empty())
+                .filter(|block| {
+                    !block.primary_text.trim().is_empty()
+                        || (block.secondary_enabled && !block.secondary_text.trim().is_empty())
+                })
                 .fold((false, false), |(_, active), block| {
                     (
                         true,

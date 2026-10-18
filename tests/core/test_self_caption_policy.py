@@ -571,3 +571,222 @@ async def test_equal_utterances_keep_separate_caption_identity_without_sticky_ca
     finally:
         await harness.stop()
         await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("result_before_release", [True, False])
+async def test_queued_first_admission_keeps_order_when_predecessor_result_is_coalesced(
+    result_before_release,
+):
+    provider = HeldTranslations()
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    entered, release = asyncio.Event(), asyncio.Event()
+    delivered = []
+
+    class BlockedOverlay:
+        async def emit(self, event):
+            entered.set()
+            await release.wait()
+            receipt = await presenter.emit(event)
+            delivered.append(event)
+            return receipt
+
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=BlockedOverlay(),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+    )
+    try:
+        for text in ("charlie", "alpha", "bravo"):
+            uid = uuid4()
+            await source(harness, uid, text)
+            await harness.self_owner.handle_vad_event(SpeechEnd(uid))
+            if text == "charlie":
+                await entered.wait()
+        await eventually(lambda: ("bravo", "en") in provider.responses)
+        assert provider.calls == [("charlie", "en"), ("alpha", "en"), ("bravo", "en")]
+        if result_before_release:
+            provider.finish("alpha", "A")
+            await eventually(
+                lambda: any(
+                    "A" in batch.retained_payloads.values()
+                    for batch in harness.output_runtime._batch_admission.batches.values()
+                    if batch.caption_id is not None
+                )
+            )
+        assert visible(presenter) == []
+        assert (
+            harness.output_runtime.overlay_admission_snapshot()["scopes"]["preview:self"]["unsent"]
+            <= 8
+        )
+        release.set()
+        if not result_before_release:
+            await eventually(lambda: visible(presenter) == [("alpha", ""), ("bravo", "")])
+            provider.finish("alpha", "A")
+        await eventually(lambda: visible(presenter) == [("alpha", "A"), ("bravo", "")])
+        first_alpha = next(event for event in delivered if getattr(event, "text", "") == "alpha")
+        first_bravo = next(event for event in delivered if getattr(event, "text", "") == "bravo")
+        assert delivered.index(first_alpha) < delivered.index(first_bravo)
+        assert not first_alpha.retained_only
+        assert first_alpha.secondary_text == ("A" if result_before_release else "")
+        assert presenter.snapshot().blocks[0].appearance_seq < (
+            presenter.snapshot().blocks[1].appearance_seq
+        )
+        assert presenter.active_self_overlay_metadata().text == "bravo"
+    finally:
+        release.set()
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_evicted_queued_admission_is_not_revived_by_a_late_patch():
+    provider = HeldTranslations()
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    entered, release = asyncio.Event(), asyncio.Event()
+    delivered = []
+
+    class BlockedOverlay:
+        async def emit(self, event):
+            entered.set()
+            await release.wait()
+            receipt = await presenter.emit(event)
+            delivered.append(event)
+            return receipt
+
+    osc = RecordingOscQueue()
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=BlockedOverlay(),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+    )
+    try:
+        for text in ("charlie", "alpha", *(f"successor {i}" for i in range(9))):
+            uid = uuid4()
+            await source(harness, uid, text)
+            await harness.self_owner.handle_vad_event(SpeechEnd(uid))
+            if text == "charlie":
+                await entered.wait()
+            assert (
+                harness.output_runtime.overlay_admission_snapshot()["scopes"]["preview:self"][
+                    "unsent"
+                ]
+                <= 8
+            )
+        await eventually(lambda: ("alpha", "en") in provider.responses)
+        provider.finish("alpha", "A")
+        await eventually(
+            lambda: any(
+                "A" in batch.retained_payloads.values()
+                for batch in harness.output_runtime._batch_admission.batches.values()
+                if batch.caption_id is not None
+            )
+        )
+        assert visible(presenter) == []
+        release.set()
+        await eventually(lambda: any(getattr(event, "text", "") == "alpha" for event in delivered))
+        alpha = next(event for event in delivered if getattr(event, "text", "") == "alpha")
+        assert alpha.retained_only
+        assert visible(presenter) == [("successor 7", ""), ("successor 8", "")]
+        assert presenter.active_self_overlay_metadata().text == "successor 8"
+    finally:
+        release.set()
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_chatbox_configuration_preserves_sticky_translation_and_pending_request():
+    provider = HeldTranslations()
+    presenter = OverlayPresenter(calibration=OverlayCalibration(), native_retry_enabled=True)
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOscQueue(),
+        overlay_sink=presenter,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=400,
+    )
+    try:
+        uid = uuid4()
+        await source(harness, uid, "alpha")
+        await eventually(lambda: ("alpha", "en") in provider.responses)
+        provider.finish("alpha", "A")
+        await eventually(lambda: visible(presenter) == [("alpha", "A")])
+        first = presenter.snapshot().blocks[0]
+        episode = presenter.snapshot().native_quiet_tail_episodes.self
+        await source(harness, uid, "alpha beta")
+        await eventually(lambda: ("alpha beta", "en") in provider.responses)
+        pending = provider.responses[("alpha beta", "en")]
+        calls = list(provider.calls)
+        harness.replace_configuration(chatbox_include_source=False)
+        await source(harness, uid, "alpha beta")
+        assert visible(presenter) == [("alpha", "A")]
+        assert provider.calls == calls
+        assert provider.responses[("alpha beta", "en")] is pending
+        assert not pending.done()
+        assert presenter.snapshot().native_quiet_tail_episodes.self == episode
+        await harness.self_owner.handle_vad_event(SpeechEnd(uid))
+        assert visible(presenter) == [("alpha beta", "A")]
+        provider.finish("alpha beta", "AB")
+        await eventually(lambda: visible(presenter) == [("alpha beta", "AB")])
+        current = presenter.snapshot().blocks[0]
+        assert (current.id, current.occupant_key, current.appearance_seq) == (
+            first.id,
+            first.occupant_key,
+            first.appearance_seq,
+        )
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"target_language": "fr", "self_target_languages": ("fr",)},
+        {"system_prompt": "Different translation instructions"},
+        {"integrated_context_enabled": True},
+    ],
+)
+async def test_incompatible_configuration_clears_sticky_translation_with_new_revision_pending(
+    changes,
+):
+    provider = HeldTranslations()
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=RecordingOscQueue(),
+        overlay_sink=presenter,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=400,
+    )
+    try:
+        uid = uuid4()
+        await source(harness, uid, "alpha")
+        await eventually(lambda: ("alpha", "en") in provider.responses)
+        provider.finish("alpha", "A")
+        await eventually(lambda: visible(presenter) == [("alpha", "A")])
+        await source(harness, uid, "alpha beta")
+        await eventually(lambda: ("alpha beta", "en") in provider.responses)
+        pending = provider.responses[("alpha beta", "en")]
+        harness.replace_configuration(**changes)
+        await source(harness, uid, "alpha beta")
+        await eventually(lambda: len(provider.calls) == 3)
+        assert pending.cancelled()
+        assert visible(presenter) == [("alpha", "")]
+        target = changes.get("target_language", "en")
+        provider.finish("alpha beta", "replacement", target)
+        await eventually(lambda: visible(presenter) == [("alpha beta", "replacement")])
+    finally:
+        await harness.stop()
+        await presenter.close()

@@ -81,6 +81,15 @@ disposition. Completed rows retain matching fresh-render, producer-ready and
 submit-success witnesses. No caption text is logged. A scheduled row alone is
 not execution evidence; an obsolete completion cannot satisfy a newer episode.
 
+Scene-level nonempty eligibility includes enabled secondary-only text. A PEER
+awaiting translation can therefore retain SELF-driven scene protection without
+gaining a separate PEER retry episode or changing its caption policy.
+
+OpenVR process-quit events retain their process identity. A quit notification
+for another process cannot terminate this overlay or interrupt its empty-frame
+Hide grace. Owned-process quit, global Quit and DriverRequestedQuit remain fatal;
+ignored events still consume the existing bounded event-poll budget.
+
 Python's semantic retirement compares `(publication_order, publication_index)`
 within a scope and generation to reject late publications. It does not invalidate
 a different entry that is still current. Native uses those coordinates and
