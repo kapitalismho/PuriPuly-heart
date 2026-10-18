@@ -52,6 +52,174 @@
     "execution_limit": "Read-only source, record and image inspection; no new provider/model/GUI/VR/test execution, no CRC or summary rerun. Acoustic measurements remain dd3cad observations, not a new repaired-product matrix.",
     "director_disposition": "ACCEPT this bounded evidence checkpoint. Declared acoustic continuity and original replay visual-timing limits remain; no whole-Goal, profile, production or remote-operation acceptance."
   },
+  "latest_dev_integration": {
+    "scope": "Safe synchronization and normal merge of the existing experimental checkpoint, while a separate session reviews speaker policy. This does not complete #218, implement late-display resolution, select a profile, enable production, release, or authorize branch/worktree cleanup.",
+    "baseline": "2b2f7dceda67351c2cd1f34cc8c4c93a10a46d00",
+    "initial_integrated_candidate": "701a9441401b62b1a40985df07ba7f03ab92c269",
+    "initial_repair_candidate": "d407d2d7e86d87c7f6d0ab2595a1e95fd5451392",
+    "repaired_product_candidate": "f2a4a43c6e2d619fe189ef30e0350bcd25377d60",
+    "historical_applicability": "Original acoustic matrices retain their original pins. Rebase and current public-driver formatting do not create new measurements. Native/runtime evidence is reused only where the relevant implementation and assumptions remain applicable.",
+    "whole_lane_checks_at_initial_candidate": [
+      {
+        "command": "uv run --locked pytest -ra --junitxml=build/merge-app-architecture-tooling.xml tests/app tests/architecture tests/scripts tests/cli tests/release_evidence",
+        "result": "3019 passed, 3 opt-in real-process skips, 21 warnings."
+      },
+      {
+        "command": "uv run --locked pytest -ra --junitxml=build/merge-providers-ui.xml tests/providers tests/ui",
+        "result": "2459 passed, 2 opt-in real-process skips, 555 warnings."
+      },
+      {
+        "command": "uv run --locked pytest -ra --junitxml=build/merge-contracts.xml tests/domain tests/config tests/core",
+        "result": "4120 passed, 4 failed, 4 opt-in real-process skips, 210 warnings.",
+        "failures": [
+          "Two real canonical-Self final-caption losses; both original assertions are retained and pass in the repaired 190-case caption/progressive run.",
+          "Two exact new internal packages were absent from the compatibility inventory; explicit classifications were added under the existing convention. The complete inventory module passed 20 cases.",
+          "An output logging case still asserted obsolete logical_pacing wording. Removed wording/incidental counts, retaining publication-correlated file-only, terminal-application and no-physical-ack guarantees. The affected logging selection passed 26 cases."
+        ]
+      }
+    ],
+    "repair_checks": [
+      {
+        "command": "uv run --locked pytest -o addopts= -q tests/core/test_translation_output_streaming.py tests/core/test_source_progressive_integration.py tests/core/test_self_stream_233.py tests/core/test_self_stream_pressure_233.py tests/core/test_self_translation_low_latency.py tests/core/test_translation_output_projection_owner.py",
+        "result": "190 passed. An intermediate repair run had 189 passes and one unchanged blank-result failure; the product branch was corrected rather than weakening that assertion."
+      },
+      {
+        "command": "uv run --locked pytest -o addopts= -q tests/providers/test_qwen_audio_source_integration.py tests/providers/test_qwen_audio.py tests/providers/test_qwen_audio_peer.py tests/providers/test_qwen_audio_recovery_boundaries.py tests/providers/test_qwen_audio_delivery_recovery.py tests/providers/test_qwen_audio_runtime_quarantine.py tests/providers/test_qwen_audio_handover_loopback.py tests/providers/test_qwen_audio_diagnostics.py tests/providers/test_qwen_audio_connection_replacement.py tests/providers/test_qwen_audio_configuration.py tests/core/test_streaming_speaker.py tests/providers/test_provider_speaker_cleanup.py",
+        "result": "313 passed. New task-clock regressions yielded four failures and one valid-progress pass before the repair."
+      },
+      {
+        "command": "uv run --locked pytest -o addopts= -q tests/core/test_speaker_session_cleanup.py tests/core/test_causal_batch_speaker.py tests/providers/test_local_cpu_backends.py tests/providers/test_local_decode.py tests/providers/test_provider_speaker_cleanup.py tests/core/test_stt_scoped_engine.py",
+        "result": "319 passed. Both new healthy batch stop/close terminal-drain cases failed before the repair; negative error/cancellation/retry protection remains."
+      },
+      {
+        "command": "uv run --locked pytest -ra --junitxml=build/merge-control-cancellation-repair.xml tests/app/test_speaker_application.py tests/app/test_speaker_assets.py tests/app/test_control_repair_behavior.py tests/app/test_application_control_contract.py",
+        "result": "133 passed after generic speaker operation cancellation was repaired. Its new cooperative-cleanup regression failed before the dispatcher repair."
+      },
+      {
+        "command": ".venv/Scripts/python.exe -m pytest tests/app/test_speaker_assets.py tests/app/test_speaker_application.py",
+        "result": "23 passed after request-specific asset cancellation isolation was repaired, including successor progress and explicit asset-wide cancel/close cleanup."
+      },
+      {
+        "command": "uv run --locked ruff check . && uv run --locked black --check . && uv run --locked python scripts/ci/check_test_selection.py && uv run --locked pytest -ra --junitxml=build/merge-final-architecture.xml tests/architecture",
+        "result": "Passed at d407d2d7: 1190 Python files unchanged by Black, 530 offline test files covered by selection, and 378 architecture cases passed. The existing 9 intentional file exclusions and opt-in integration prerequisites were not weakened."
+      },
+      {
+        "command": ".venv/Scripts/python.exe -m pytest tests/app/test_speaker_assets.py tests/app/test_speaker_application.py",
+        "result": "25 passed at the final product after repeated-cancellation settlement repair. The new direct-request and two-caller composed-control regressions both failed against d407 behavior before the fix. Single cancellation, successor progress/isolation and global cancel/close remain protected."
+      },
+      {
+        "command": "uv run --locked ruff check . && uv run --locked black --check . && uv run --locked python scripts/ci/check_test_selection.py && uv run --locked pytest -ra tests/architecture/test_lifecycle_task_guard.py",
+        "result": "Passed at f2a4a43c: whole Ruff/Black, unchanged 1190 Python files and 530-file selection, plus 11 task-ownership guard cases. No new task creation or checker exception."
+      }
+    ],
+    "native_overlay_checks": {
+      "result": "Cargo check passed; deterministic Rust lane passed 266 cases with one opt-in performance case ignored and 29 graphics cases filtered into their separate lane; Windows graphics lane passed all 29 cases.",
+      "process_integration": "The exact five INTEGRATION=1 cases required by pr-ci.yml executed and passed with zero skips, covering import isolation, actual shutdown acknowledgement, Windows Job Object reaping and ten process/PID-file cleanup cycles.",
+      "limit": "Current native/renderer code is unchanged by the subsequent source and cancellation repairs. This is not a new installer build, release or HMD qualification."
+    },
+    "broker_checks": {
+      "environment": "Windows Node 22.21.1, pnpm 10.33.0; frozen workspace install. No deployment or live Cloudflare operation.",
+      "commands": [
+        "pnpm typecheck",
+        "pnpm exec vitest run broker/tests --exclude \"broker/tests/deploy-smoke/**\""
+      ],
+      "initial_result": "Typecheck passed. Broker tests yielded 582 passes and one deploy-automation failure: Windows Node supplied a Windows GITHUB_OUTPUT path to a Linux/WSL Bash selected from PATH, so the expected Windows output file was absent.",
+      "diagnosis": "The relevant test, Bash runner and workflow are identical to the baseline. Benign executable/path probes established the mixed-platform pathname semantics; the baseline suite itself was not rerun.",
+      "bounded_recheck": "All 12 deploy-automation cases passed unchanged with Git Bash selected only in the child process PATH. No test, workflow, assertion or global environment change was made. Owned temporary fixture directories were removed.",
+      "limit": "This local Windows check does not replace the intended Ubuntu Broker CI job on the published candidate."
+    },
+    "actual_runtime_observations": [
+      {
+        "surface": "CLI configuration and fresh-process persistence",
+        "result": "Isolated actual CLI rejected invalid enablement and missing download consent, persisted a disabled synthetic profile/device selection across restart to a different instance, and completed reset/cancel/stop.",
+        "limit": "No speaker/model activation. app stop reported cleanup_outcome unobserved; that receipt alone is not all-resource cleanup proof.",
+        "retained_attempts": "Initial missing-LOCALAPPDATA fixture failure and later single-JSON parser failure on the successful restart's two JSONL records were corrected in the driver, not the product."
+      },
+      {
+        "surface": "Actual native Parakeet 1.13.8 request at the initial integrated candidate",
+        "result": "One real CPU decode conserved the original 29504 samples, frozen options, ranges and display group; native and outgoing text were both 'He washed the detritus from his hand.'. The own-native-final hook ran before enqueue with no eligible evidence. Later replayed recorded Nemotron proof identified slot 0 diagnostically but did not change the frozen unavailable result. All owned work settled.",
+        "pcm16_sha256": "563945ae319de1dbb7286714e9bf651d30ce1462ce1a6b75750021162b85a586",
+        "limit": "One native conservation/freeze observation, not perfect lexical accuracy, live Nemotron inference, new acoustic profile qualification or a post-repair all-source-hashes-unchanged claim. Subsequent batch cleanup changes have separate drain proof."
+      },
+      {
+        "surface": "Production source/translation composition",
+        "result": "Actual factory, scoped engine, Qwen localhost transport, Self/Peer owners and output preserved manual interleave, once-only multi-target history, prior-only running contexts, reverse-completion Peer source order, fresh epoch after abort and Peer chatbox isolation. The repair observation conserved regressed-clock text while downgrading timing, then recovered useful speaker 0/1 attribution on a fresh task.",
+        "limit": "Synthetic PCM/native records over real localhost WebSockets, controlled capture handoff and deterministic gated translation; not live provider, model or capture-device qualification.",
+        "retained_attempts": "A repair smoke initially used the deliberately unqualified legacy-shared Qwen endpoint. The fixture was corrected to the supported explicit Beijing workspace; product rules and assertions were not relaxed."
+      },
+      {
+        "surface": "Actual desktop captions and interaction",
+        "result": "Owned Flet windows displayed gold A, cyan B and returning gold A with stable append/replay/TTL behavior, and the Lock control changed ignore-mouse-events state. Separate exact production-payload replay showed こんにちは/你好, then こんにちは?/你好 while pending, then こんにちは?/current after canonical finalization on the same card. Actual ja/zh-TW response metadata survived ko/en request configuration.",
+        "pending_png_sha256": "11ce97f8ab5cffda29a359c4f6dafa5a986a02c5ff41b6288ee9a9c1e31facaa",
+        "producer_payload_sha256": "95d9ef98e73252bca941bc9cc24b49e0a7a825d1978acb95b26d25fde5b72604",
+        "observation_correction": "An initial reading incorrectly described the pending secondary line as blank. The unchanged original PNG visibly contains 你好; its recorded hash and producer bytes matched. No extra GUI run or product repair was needed.",
+        "limit": "Owned-client privacy/geometry/DWM guards and process cleanup were observed. Source execution and its renderer replay were serialized, not an engine-to-photon latency measurement or acoustic-color qualification."
+      },
+      {
+        "surface": "Healthy native-provider batch drain",
+        "result": "Actual CausalBatchSession, LocalQwenSession and LocalDecodeCoordinator rejected new ingress during stop, waited for one owned decode, then forwarded 'Owned completion.' with frozen speaker 0 and unchanged 1600 samples/options. Consumer and all owned jobs settled.",
+        "limit": "Controlled deterministic recognizer/backend lock replaces model inference; this specifically exercises a final arriving during healthy stop, unlike the earlier Parakeet final-before-cleanup observation."
+      },
+      {
+        "surface": "Native process cleanup debt",
+        "result": "A real controlled Windows child survived an injected first kill failure; replacement was rejected, and explicit retry reaped that same child and observed stderr EOF. Cancelled creation was also adopted and reaped.",
+        "limit": "Real process ownership with a synthetic worker protocol, not another Nemotron inference run."
+      },
+      {
+        "surface": "Authenticated operation cancellation and successor isolation",
+        "result": "Thirteen actual CLI invocations used real headless owners and ControlServer. Cancellation remained pending until cooperative acquisition cleanup settled, then returned the same terminal cancelled operation with documented exit 6. Subsequent disabled configuration was effective and persisted; the owned host exited 0 with assets closed. A separate post-repair actual asset-lifecycle observation proved cancelling an earlier inspection did not cancel or reset the successor, which completed ready.",
+        "limit": "Only external acquisition/inspection I/O was controlled. The earlier CLI asset hash predates the isolation repair; its route proof is retained, while the later focused lifecycle observation supplies isolation proof. No real download, cloud call, GPU/model activation or private input."
+      },
+      {
+        "surface": "Repeated cancellation settlement",
+        "result": "A post-fix actual NativeSpeakerAssets observation sent two cancellations while cooperative cleanup was gated: the request and acquisition remained pending, cleanup was unsettled and phase stayed installing. After gate release, cancellation completed only with acquisition/cleanup settled, idle phase, closed assets and zero remaining tasks.",
+        "limit": "Only acquisition I/O was controlled. The duplicate operation route was additionally exercised through the composed control owner, not two CLI clients. The earlier actual single-request CLI observation remains separately pinned; it was not rerun or relabelled."
+      }
+    ],
+    "independent_review": {
+      "initial_checkpoint": {
+        "baseline": "2b2f7dceda67351c2cd1f34cc8c4c93a10a46d00",
+        "candidate": "701a9441401b62b1a40985df07ba7f03ab92c269",
+        "mode": "Two independent focused FULL_REVIEW assignments with explicitly allocated shared consumers.",
+        "source_coverage": "Complete source/provider review: canonical admission/manual ordering; once-only multi-target context; compatible drafts; source-final output; Soniox source lifecycle; ledger range/atomicity/tombstones; separator/native provenance; Qwen two-slot clocks/currentness; native-final freeze/retention; representative attribution/phrase composition; cleanup/drain consumers; changed test guarantees.",
+        "platform_coverage": "Complete platform review: services/ports/composition; settings/persistence/CLI; physical capture; speaker runtime and 15 task-creation lifetimes; native artifact/worker/build/package/license boundaries; Python/Rust caption identity and caches; logging/privacy; tests/checker migrations; maintained authority and public evidence.",
+        "adjudication": "ACCEPT the discovered SOURCE-F1 clock regression, SOURCE-F2 canonical caption loss, P2-DRAIN healthy batch output loss and P2-CANCEL capability/dispatch mismatch. Earlier native/streaming/Scribe cleanup repairs L1/L2/L4 were independently verified; L3 required the additional healthy-drain repair."
+      },
+      "platform_repair_history": [
+        {
+          "candidate": "d407d2d7e86d87c7f6d0ab2595a1e95fd5451392",
+          "result": "repair_failed",
+          "closed": "L3/P2-DRAIN, original P2-CANCEL dispatcher mismatch, P2-CANCEL-ISOLATION, inventory/logging migrations; L1/L2/L4 and unaffected platform coverage retained.",
+          "remaining": "P2-CANCEL-SETTLEMENT: an independently executed second cancellation interrupted the request's cleanup join and allowed premature completion. Director ACCEPT; fixed by retaining and shielding the same request-local join through further cancellation, without changing the documented terminal guarantee."
+        }
+      ],
+      "platform_repair": {
+        "reviewer": "merge-lifecycle-review, originating independent platform/lifecycle reviewer",
+        "mode": "REPAIR_VERIFY",
+        "previous_candidate": "d407d2d7e86d87c7f6d0ab2595a1e95fd5451392",
+        "candidate": "f2a4a43c6e2d619fe189ef30e0350bcd25377d60",
+        "result": "repair_verified",
+        "closure": "Repeated cancellation cannot terminate the request before its captured acquisition cleanup settles. The exact three-file delta retains request/token identity, successor-phase isolation, global cancel/close authority and subsequent valid progress.",
+        "evidence": "Two new regressions failed before repair; 25 focused cases passed afterward. The actual controlled asset-lifecycle observation remained pending through two cancellations, then settled with zero remaining tasks. Reviewer independently bound product/test and unchanged control-owner hashes to the evidence.",
+        "retained_coverage": "Completed platform FULL_REVIEW, L1/L2/L4, L3/P2-DRAIN, P2-CANCEL dispatcher, P2-CANCEL-ISOLATION and inventory/logging closure remain applicable. Separately verified source changes are untouched.",
+        "limit": "Read-only pinned-delta and original-evidence assessment. No duplicate whole-suite, GUI, model or CLI execution; not a GitHub approval."
+      },
+      "director_disposition": "ACCEPT the locally verified integration checkpoint at f2a4a43c, with original complete focused coverage and bounded repair closures retained. Pre-publication evidence does not substitute for current PR CI, Codex disposition, guarded merge confirmation or issue/Project readback. #218 remains incomplete; no profile/default, production, release or cleanup acceptance.",
+      "source_repair": {
+        "reviewer": "merge-source-repair-review, independent replacement supplied the originating full review and original evidence",
+        "mode": "REPAIR_VERIFY",
+        "previous_candidate": "701a9441401b62b1a40985df07ba7f03ab92c269",
+        "candidate": "d407d2d7e86d87c7f6d0ab2595a1e95fd5451392",
+        "result": "repair_verified",
+        "closure": "SOURCE-F1/F2 closed with valid-progress, invalid/regressed-clock rejection, fresh-task recovery, preserved raw text/origins, canonical readable translation and actual language/identity protection. Existing blank/failure/source-only assertions remain intact.",
+        "shared_boundary": "Healthy batch/native-result consumers inspected; no wider source-review invalidation. Normal-path Parakeet evidence remains applicable at unchanged native/provider/projection boundaries, while changed closed-state behavior uses the new actual-provider drain proof.",
+        "retained_coverage": "All unaffected originating source obligations retained. No new topology, dependency, workflow, source-ledger, context/history or policy change requires another full source review.",
+        "final_product_applicability": "The subsequent f2a4a43c delta only changes speaker asset cancellation settlement and its tests. Reviewed source/provider/batch/caption code and their retained proof are unchanged.",
+        "limit": "Read-only pinned-delta/source/evidence and existing-PNG inspection; supplied execution reused, not a reviewer-run suite. Not GitHub approval or whole-Goal acceptance."
+      }
+    },
+    "accounting": "Selections overlap and must not be summed. Initial failures, ordinary opt-in skips, controlled boundaries and observation-driver corrections retain their meaning. Public records contain conclusions and reproducible test commands; local smoke reports/screenshots are not new published acoustic archives."
+  },
   "remaining_owner_decision": "Corrected by issue218 comment6243553002: #211 R5 already permits no-wait presentation metadata resolution during existing work before first readable output. That path is not implemented by this checkpoint. Extra speaker/display waiting or substantial blind-suffix estimation remains a separate unselected quality/latency decision.",
   "acceptance": "Historical implementation checkpoint accepted at the repaired product pin; focused integration/evidence checkpoint accepted at6443c3749802442c965262e126ed9a30a2efca55. Complete Goal and rich-continuity/profile/production acceptance remain pending. The later maintainer request authorizes latest-dev synchronization and safe normal merge of the verified integration checkpoint, not issue closure, release, production enablement or worktree cleanup."
 }
