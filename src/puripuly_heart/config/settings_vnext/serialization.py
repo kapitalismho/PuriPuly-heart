@@ -184,6 +184,21 @@ def _drop_removed_settings_extensions(
     extensions: dict[str, object],
 ) -> dict[str, object]:
     cleaned = copy.deepcopy(extensions)
+    for section_name in ("managed_identity", "managed_connection"):
+        section = cleaned.get(section_name)
+        if isinstance(section, dict):
+            for key in (
+                "referral_id",
+                "referral_source",
+                "talk_together_pass",
+                "pass_status",
+                "invite_count",
+                "invite_limit",
+                "referral_bonus_applied",
+            ):
+                section.pop(key, None)
+            if not section:
+                cleaned.pop(section_name, None)
     cleaned.pop("system_prompt", None)
     intent = cleaned.get("intent")
     if isinstance(intent, dict):
@@ -220,6 +235,20 @@ def _drop_removed_settings_extensions(
             cleaned.pop("intent", None)
     state = cleaned.get("state")
     if isinstance(state, dict):
+        managed = state.get("managed_connection")
+        if isinstance(managed, dict):
+            for key in (
+                "referral_id",
+                "referral_source",
+                "talk_together_pass",
+                "pass_status",
+                "invite_count",
+                "invite_limit",
+                "referral_bonus_applied",
+            ):
+                managed.pop(key, None)
+            if not managed:
+                state.pop("managed_connection", None)
         verification = state.get("provider_verification")
         if isinstance(verification, dict):
             verification.pop("cerebras", None)

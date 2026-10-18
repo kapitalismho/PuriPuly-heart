@@ -207,7 +207,7 @@ async def test_replace_provider_propagates_updated_config_by_capture_activity(
     )
 
     factory = CaptureOwnerFactory(
-        canonical_provider=lambda: settings,
+        canonical_provider=AppSettingsVNext,
         self_admission=cast(Any, None),
         ensure_peer_local_ready=cast(Any, None),
         clock=cast(Any, None),

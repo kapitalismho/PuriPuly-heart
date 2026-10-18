@@ -7,12 +7,14 @@ from types import SimpleNamespace
 import pytest
 from puripuly_heart.app.services.provider_runtime_apply import ProviderRuntimeApplyPlan
 from puripuly_heart.app.services.provider_settings import ProviderApplicationOwner
+from puripuly_heart.app.services.settings_mutation_legacy import apply_settings_path_patch
 from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext import serialization
+from puripuly_heart.config.settings_vnext.migration import apply_canonical_delta
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.messages import (
     RUNTIME_APPLY_STATUS_FAILED,
@@ -26,6 +28,7 @@ from puripuly_heart.core.messages import (
 class FakeSettingsOwner:
     def __init__(self, current: AppSettingsVNext, events: list[object]) -> None:
         self.canonical = current
+        self.committed_settings = current
         self.projection_snapshot = copy.deepcopy(current)
         self.events = events
         self.mutation_depth = 0
@@ -34,6 +37,9 @@ class FakeSettingsOwner:
     @staticmethod
     def snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
         return serialization.to_dict(settings)
+
+    def require_committed(self) -> AppSettingsVNext:
+        return self.committed_settings
 
     def project_canonical_delta(
         self,
@@ -45,33 +51,14 @@ class FakeSettingsOwner:
     def create_canonical_patch_repository(self, **_kwargs) -> object:
         return object()
 
-    def begin(self, **_kwargs) -> None:
-        self.mutation_depth += 1
-        self.rollback_pending = True
-        self.events.append("begin")
-
-    def apply_canonical_delta(self, _base: AppSettingsVNext, _next: AppSettingsVNext) -> None:
-        self.events.append("delta")
-
-    def persist(self) -> None:
-        self.events.append("persist")
-
-    def save_current(self, **_kwargs: object) -> bool:
-        self.events.append("persist_current")
-        return True
-
-    def rollback(self) -> None:
-        self.mutation_depth = 0
-        self.rollback_pending = False
-        self.events.append("rollback")
-
-    def remember_projection(self, _settings: AppSettingsVNext) -> None:
-        self.events.append("projection")
-
-    def complete(self) -> None:
-        self.mutation_depth = max(0, self.mutation_depth - 1)
-        self.rollback_pending = self.mutation_depth > 0
-        self.events.append("complete")
+    def commit_delta(
+        self, base: AppSettingsVNext, next_settings: AppSettingsVNext
+    ) -> AppSettingsVNext:
+        self.events.append("commit")
+        self.canonical = apply_canonical_delta(self.canonical, base, next_settings)
+        self.committed_settings = self.canonical
+        self.projection_snapshot = copy.deepcopy(self.canonical)
+        return self.canonical
 
 
 class FakeRuntimeOwner:
@@ -87,10 +74,11 @@ class FakeRuntimeOwner:
         self,
         _settings: object,
         _plan: ProviderRuntimeApplyPlan,
-    ) -> None:
+    ) -> object:
         self.events.append("runtime")
         if self.mode == "exception":
             raise RuntimeError("runtime failed")
+        return _settings
 
     def unavailable_result(
         self,
@@ -110,9 +98,13 @@ class FakeRuntimeOwner:
 class RecordingMutationService:
     def __init__(self, requests: list[object]) -> None:
         self.requests = requests
+        self.settings: FakeSettingsOwner | None = None
 
     async def mutate(self, request) -> TransactionResult:
         self.requests.append(request)
+        assert self.settings is not None
+        current = self.settings.canonical
+        self.settings.commit_delta(current, apply_settings_path_patch(current, request.values))
         return _applied_result()
 
 
@@ -134,6 +126,8 @@ def _owner(
     apply_order24=None,
     events: list[object],
 ) -> ProviderApplicationOwner:
+    service.settings = settings
+
     async def preserve(_settings: AppSettingsVNext) -> None:
         events.append("preserve")
 
@@ -293,17 +287,9 @@ async def test_provider_application_owner_force_rebuild_owns_direct_apply_sequen
         assert result is (
             expected_status == TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
         )
-        assert events[:7] == [
-            "preserve",
-            "begin",
-            "capture",
-            "delta",
-            "plan",
-            "persist_current",
-            "runtime",
-        ]
+        assert events[:5] == ["preserve", "capture", "plan", "commit", "runtime"]
         assert "remember" in events
-        assert events[-2:] == ["complete", "sync_ui"]
+        assert events[-1] == "sync_ui"
         assert settings.mutation_depth == 0
         assert settings.rollback_pending is False
         assert results.current is not None

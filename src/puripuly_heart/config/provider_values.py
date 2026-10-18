@@ -41,8 +41,6 @@ LOCAL_LLM_RESERVED_EXTRA_BODY_KEYS = frozenset(
 LOCAL_LLM_SENSITIVE_EXTRA_BODY_KEYS = frozenset(
     {"api_key", "authorization", "headers", "token", "secret", "password"}
 )
-REFERRAL_ID_LENGTH = 6
-REFERRAL_ID_ALPHABET = frozenset("23456789ABCDEFGHJKMNPQRSTUVWXYZ")
 
 
 class STTProviderName(str, Enum):
@@ -219,17 +217,6 @@ class OpenRouterSelectionAlias(str, Enum):
     GPT_6_LUNA_BYOK = OPENROUTER_SELECTION_ALIAS_GPT_6_LUNA_BYOK
 
 
-def normalize_owned_referral_id(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().upper()
-    if len(normalized) != REFERRAL_ID_LENGTH:
-        return None
-    if any(char not in REFERRAL_ID_ALPHABET for char in normalized):
-        return None
-    return normalized
-
-
 def normalize_local_llm_base_url(value: str) -> str:
     if not isinstance(value, str):
         raise ValueError("invalid local llm base url")
@@ -277,6 +264,5 @@ __all__ = [
     "display_stt_provider",
     "is_custom_stt_provider",
     "is_qwen_cloud_stt_provider",
-    "normalize_owned_referral_id",
     "normalize_local_llm_base_url",
 ]

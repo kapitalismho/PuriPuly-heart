@@ -42,10 +42,10 @@ def _runtime_owner(
     return ProviderRuntimeOwner(
         state_provider=lambda _settings: state,
         common_effect=lambda _settings: events.append("common"),
-        rebuild_llm=lambda: record("llm"),
+        rebuild_llm=lambda _settings: record("llm"),
         recover_gpu=recover,
-        refresh_peer=lambda: record("peer"),
-        refresh_self_stt=lambda: record("self"),
+        refresh_peer=lambda _settings: record("peer"),
+        refresh_self_stt=lambda _settings: record("self"),
         signature_sink=lambda _settings: events.append("signatures"),
         current_settings_provider=lambda: current,
         signature_cache_provider=lambda: cache,
@@ -306,14 +306,14 @@ async def test_llm_factory_failure_preserves_requested_stt_replacement(
         events=[],
         state=ProviderRuntimeState(True, False, True, False, True, False),
     )
-    owner.rebuild_llm = lambda: rebuild.rebuild(propagate_failure=True)
+    owner.rebuild_llm = lambda _settings: rebuild.rebuild(propagate_failure=True)
     owner.signature_cache_provider = lambda: (None, None, binding.signature)
-    owner.refresh_self_stt = replace_stt
+    owner.refresh_self_stt = lambda _settings: replace_stt()
     owner.recover_gpu = lambda _settings, _plan: replace_stt()
     try:
         result = await ProviderRuntimeApplyAdapter(
             owner=owner,
-            settings="settings",
+            settings_provider=lambda: "settings",
             plan=ProviderRuntimeApplyPlan(
                 should_rebuild_llm=True,
                 should_refresh_peer=False,

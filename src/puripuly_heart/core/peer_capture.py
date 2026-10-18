@@ -139,6 +139,7 @@ class PeerCaptureSessionConfig:
     release_backend_after: float | None = None
     warmup: bool = True
     endpoint_language: PeerCaptureLanguageFacts | None = None
+    gpu_device_id: str = "auto"
 
     @property
     def backend(self) -> object | None:

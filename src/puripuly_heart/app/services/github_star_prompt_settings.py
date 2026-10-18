@@ -87,7 +87,6 @@ def compose_github_star_prompt_owner(
                 correlation_id=None,
             )
         )
-        settings.complete()
         transaction_result_sink(transaction_result)
         return transaction_result.status in {
             TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,

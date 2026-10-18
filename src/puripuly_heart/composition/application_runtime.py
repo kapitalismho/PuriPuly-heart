@@ -885,7 +885,7 @@ def compose_application_runtime(
             return
         await require_gpu_recovery().recover(
             lambda: gpu_recovery_request(
-                current_canonical(),
+                settings.require_committed(),
                 reason="manual_retry",
                 plan=None,
                 peer_enabled=settings.peer_translation_enabled(),
@@ -1040,7 +1040,9 @@ def compose_application_runtime(
                 error_sink=lambda key: show_short_message(key, is_error=True),
                 notice_sink=presentation.set_dashboard_local_stt_notice,
                 rebuild_self_provider=lambda: (
-                    require_runtime_components().provider_runtime.effects.rebuild_self_stt()
+                    require_runtime_components().provider_runtime.effects.rebuild_self_stt(
+                        settings.require_committed()
+                    )
                 ),
                 resume_self=resume_self_after_cpu_repair,
                 resume_peer=resume_peer_after_cpu_repair,
@@ -1731,6 +1733,13 @@ def compose_application_runtime(
                 gpu_device_id=gpu_device_id,
                 warmup=True,
             ),
+            ensure_self_switch=lambda: replace_self_stt_for_settings(canonical, True),
+            refresh_self=lambda: (
+                require_runtime_components().provider_runtime.effects.refresh_self_stt(canonical)
+            ),
+            refresh_peer=lambda: (
+                require_runtime_components().provider_runtime.effects.refresh_peer(canonical)
+            ),
             should_refresh_self=bool(plan is not None and plan.should_refresh_self_stt),
             should_refresh_peer=bool(plan is not None and plan.should_refresh_peer),
         )
@@ -1781,11 +1790,6 @@ def compose_application_runtime(
                 self_owner_factory=(require_runtime_components().self_capture_owner),
                 peer_owner_provider=lambda: require_peer().owner.runtime,
                 self_state_sink=on_self_capture_state,
-                ensure_self_switch=require_self_application().run_switch,
-                refresh_self=(
-                    require_runtime_components().provider_runtime.effects.refresh_self_stt
-                ),
-                refresh_peer=(require_runtime_components().provider_runtime.effects.refresh_peer),
                 diagnostic_sink=on_gpu_recovery_diagnostic,
             )
         return gpu_recovery
@@ -1836,6 +1840,19 @@ def compose_application_runtime(
     async def refresh_managed_usage() -> None:
         await require_managed_account().usage.refresh_best_effort()
 
+    async def refresh_peer_for_settings(value: AppSettingsVNext) -> None:
+        peer_runtime = require_peer()
+        await peer_runtime.owner.refresh_runtime_with_config(
+            build_peer_capture_session_config_from_vnext(canonical_settings(value)),
+            state=peer_runtime.state_for(peer_application_settings(value)),
+        )
+
+    async def replace_self_stt_for_settings(value: AppSettingsVNext, smooth: bool) -> None:
+        await require_self_application().replace_provider_with_config(
+            build_self_capture_session_config_from_vnext(canonical_settings(value)),
+            smooth_local=smooth,
+        )
+
     async def recover_gpu(value, plan: ProviderRuntimeApplyPlan) -> None:
         await require_gpu_recovery().recover(
             lambda: gpu_recovery_request(
@@ -1885,6 +1902,10 @@ def compose_application_runtime(
             if verification_provider is not None:
                 entry = getattr(current.state.provider_verification, verification_provider)
                 needs_key = needs_key or entry.status != "verified"
+            elif needs_key:
+                auth_state = require_managed_account().auth_runtime.state()
+                if auth_state.managed_selected:
+                    needs_key = not auth_state.local_key_available
         presentation.set_dashboard_translation_needs_key(needs_key)
         llm_connection_readiness.sync()
 
@@ -1900,7 +1921,7 @@ def compose_application_runtime(
         self_capture_provider=lambda: pipeline.self_capture,
         self_capture_owner=self_capture_owner,
         peer=lambda: require_peer().owner,
-        peer_desired=peer_runtime_desired,
+        peer_state=lambda value: require_peer().state_for(peer_application_settings(value)),
         canonical_settings=canonical_settings,
         clear_local_pending=lambda: (
             require_local_asr().cpu_repair.clear_if_provider_switched_away()
@@ -1911,10 +1932,8 @@ def compose_application_runtime(
         dashboard_managed_pending_sink=(presentation.set_dashboard_managed_auth_pending),
         sync_effective_flags=sync_effective_flags,
         refresh_overlay=refresh_overlay_presentation,
-        refresh_peer_runtime=lambda: require_peer().owner.refresh_runtime(),
-        replace_self_stt=lambda smooth: require_self_application().replace_provider(
-            smooth_local=smooth
-        ),
+        refresh_peer_runtime=refresh_peer_for_settings,
+        replace_self_stt=replace_self_stt_for_settings,
         self_state_sink=on_self_capture_state,
         self_availability=require_self_application().project_availability,
         gpu_recovery=recover_gpu,
@@ -1935,8 +1954,6 @@ def compose_application_runtime(
         presentation.set_settings_managed_key_state(
             visible=state.visible,
             remaining_percent=state.remaining_percent,
-            referral_id=state.referral_id,
-            pass_status=state.pass_status,
         )
 
     def maybe_show_founder_letter(launch_source: str) -> None:

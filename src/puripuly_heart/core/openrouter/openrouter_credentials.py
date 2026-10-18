@@ -6,12 +6,15 @@ from enum import Enum
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+)
 from puripuly_heart.core.storage.secrets import SecretStore
 
 OPENROUTER_BYOK_API_KEY_SECRET = "openrouter_api_key"
 OPENROUTER_MANAGED_API_KEY_SECRET = "openrouter_managed_api_key"
 OPENROUTER_MANAGED_QQ_API_KEY_SECRET = "openrouter_managed_qq_api_key"
-OPENROUTER_MANAGED_QQ_STATUS_AUTH_SECRET = "openrouter_managed_qq_status_auth"
 OPENROUTER_MANAGED_USER_ID_SECRET = "openrouter_managed_user_id"
 OPENROUTER_MANAGED_USER_INSTALLATION_ID_SECRET = "openrouter_managed_user_installation_id"
 OPENROUTER_MANAGED_USER_ID_MAX_LENGTH = 256
@@ -32,6 +35,9 @@ class OpenRouterCredentialRuntimeConfig:
     managed_credential_kind: str = "standard"
     active_managed_credential_ref: str | None = None
     active_managed_expires_at: str | None = None
+    pending_managed_operation_id: str | None = None
+    pending_managed_operation_source: str | None = None
+    pending_delivery_ack_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +84,27 @@ def resolve_openrouter_credentials(
     if opposite_managed_api_key is not None:
         raise ValueError("OpenRouter managed local claim conflict")
     if managed_api_key is not None:
+        source = "qq" if managed_credential_kind == "qq" else "discord"
+        receipt = secrets.get(credential_binding_secret(source))
+        if receipt is not None:
+            binding = ManagedCredentialBinding.decode(receipt)
+            if (
+                (
+                    config.pending_managed_operation_id
+                    and config.pending_managed_operation_source in {None, source}
+                )
+                or config.pending_delivery_ack_source == source
+                or not config.active_managed_credential_ref
+                or binding is None
+                or not binding.matches(
+                    credential=managed_api_key,
+                    source=source,
+                    installation_id=config.installation_id or "",
+                    managed_credential_ref=config.active_managed_credential_ref,
+                )
+            ):
+                managed_api_key = None
+    if managed_api_key is not None:
         return OpenRouterCredentialResolution(
             selected_source=selected_source,
             api_key=managed_api_key,
@@ -91,6 +118,33 @@ def resolve_openrouter_credentials(
             and managed_secret_key == OPENROUTER_MANAGED_API_KEY_SECRET
         ),
     )
+
+
+def clear_failed_managed_credential_projection(
+    state: ManagedIdentityStatePort,
+    *,
+    source: str,
+    binding: ManagedCredentialBinding | None,
+    credential: str | None,
+) -> None:
+    if (
+        state.pending_managed_operation_source != source
+        or not state.pending_managed_operation_id
+        or state.pending_managed_operation_installation_id != state.installation_id
+        or binding is None
+        or state.active_managed_credential_ref != binding.managed_credential_ref
+        or not binding.matches(
+            credential=credential,
+            source=source,
+            installation_id=state.installation_id,
+            operation_id=state.pending_managed_operation_id,
+        )
+    ):
+        return
+    state.active_managed_credential_ref = None
+    state.active_managed_expires_at = None
+    if state.founder_letter_seen_credential_ref == binding.managed_credential_ref:
+        state.founder_letter_seen_credential_ref = None
 
 
 def require_openrouter_execution_api_key(

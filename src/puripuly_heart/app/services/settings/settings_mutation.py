@@ -211,6 +211,24 @@ class SettingsMutationService:
                     reason=request.reason,
                 )
             )
+        except asyncio.CancelledError:
+            if not getattr(self.settings_repository, "commit_succeeded", False):
+                raise
+            raise SettingsMutationInterrupted(
+                TransactionResult(
+                    status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_INTERRUPTED,
+                    message=None,
+                    diagnostics=_phase_diagnostics(
+                        "runtime_apply_interrupted", "runtime_apply", None
+                    ),
+                    secondary_diagnostics=getattr(
+                        self.settings_repository, "secondary_diagnostics", ()
+                    ),
+                    secondary_omitted_count=getattr(
+                        self.settings_repository, "secondary_omitted_count", 0
+                    ),
+                )
+            )
         except Exception as exc:
             return TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED,

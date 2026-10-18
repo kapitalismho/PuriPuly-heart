@@ -444,7 +444,7 @@ E4B may fall back internally from GPU to its serialized CPU/MTP profile. **26B n
 
 The finite command catalog also includes:
 
-- Providers and accounts: Soniox diarization, managed referral settings, custom and local provider settings, both-channel provider updates, free-tier provider choices, and Qwen region.
+- Providers and accounts: Soniox diarization, custom and local provider settings, both-channel provider updates, free-tier provider choices, and Qwen region.
 - Models and devices: GPU device selection, model/connection history, and audio devices/host APIs.
 - Translation inputs: prompts, languages, and vocabulary.
 - Capture and output: VAD, overlay values, and OSC settings.
@@ -603,17 +603,17 @@ puripuly.exe auth logout chatgpt
   - `--open-browser` is the sole CLI permission to launch a browser.
 - **Protected input**
   - QQ uses hidden prompts for its identity and credential.
-  - It also accepts a protected JSON object on stdin with `qq_identity`, `credential`, and optional `referral_id`.
-  - Discord accepts optional `referral_id` where allowed. OpenRouter does not accept one.
+  - It also accepts a protected JSON object on stdin with `qq_identity` and `credential`.
+  - Referral inputs, referral settings and Talk Together Pass are removed. Existing managed credentials and previously applied allowances remain unchanged.
   - For automation, use the dedicated `auth login ... --stdin` input rather than generic arguments.
 - **Authorization**
   - A login request is the explicit authorization action.
   - Translation toggles, settings/provider changes, generic commands, and OSC translation commands must not initiate OAuth implicitly.
   - Existing authorization may still be used for normal operation.
 
-### QQ authorization recovery
+### Managed authentication recovery
 
-QQ authorization awaiting managed-operation recovery reports:
+Discord or QQ authorization awaiting managed-operation recovery can report:
 
 - `action_required`
 - `reason: resolve_pending_authorization`
@@ -625,6 +625,24 @@ This also applies when the message identifies a timeout, proxy, TLS, DNS, or oth
 - Pending delivery acknowledgment does not prove that a usable key was saved locally.
 - A missing or unreadable local key receives separate storage feedback and is not acknowledged to the Broker.
 - Neither pending condition is a reason to claim another key.
+
+- A saved pending operation is not proof that automatic recovery is running. When the bounded attempt ends, use the dialog's retry action or explicitly repeat the same source's `auth login`; valid saved authority resumes the existing operation before new issuance.
+- `auth status.action` reports whether the route can continue, needs a prompt, or has owned work in progress. `failure_kind` describes the current process's authentication-attempt outcome: it is `none` before an attempt or while a newly admitted attempt is active. Reusing a saved key after restart is not a failed attempt. An actual failed reauthentication can still coexist with a usable saved key.
+- Closing or cancelling the dialog stops local work; it does not prove that Broker/provider side effects were cancelled. Keep the saved settings and secrets so the next attempt can reconcile them.
+- A delivery ACK is sent only when the exact delivered credential is durably bound to it. An old key in the same slot is not sufficient. Missing or inconsistent ACK prerequisites require operation recovery, not repeated impossible ACKs.
+- If the key, receipt and ACK token were saved but the final settings write failed, correct the storage-access problem and retry the same source's `auth login` or translation enablement. A matching, still-pending delivery can recover its missing ACK metadata and finish without fresh authorization or a new key claim, including after restarting the app.
+- A terminal Broker rejection of an invalid, expired or mismatched ACK enters that same operation's reconciliation path. A retryable ACK failure or rate limit retains the delivery authority; it is not permission to issue a replacement.
+- If an operation terminates before ACK, its retained modern key is not usable just because it is still stored. Repeated Enable or an app restart does not activate it; follow the reported authentication action. An attached managed wrapper can still make `app.status.translation_runtime_ready` true while translation remains disabled: check the terminal operation and `auth status`, not that attachment flag alone.
+- A storage-read failure is unknown state, not proof of logout or missing credentials. Do not delete settings, the encrypted secret file or its `.lock` coordination file as a recovery shortcut.
+- Authentication can finish while runtime activation fails. Keep the saved credential, inspect the retained failure and retry translation enablement after correcting its cause; do not claim another key. If client construction fails while the selected managed credential remains available, enabling **TRANS** retries the existing preparation/rebuild path with that key. A missing runtime client alone is not a missing credential; existing credential checks and actual provider readiness still determine whether translation starts.
+
+**Network and configuration**
+
+- A full-tunnel VPN, browser-only proxy and Windows static proxy can route different legs. Browser authorization succeeding does not prove that app-to-Broker or app-to-inference requests use the same route.
+- The app uses supported explicit/environment or static system proxy settings and bypass rules; it does not evaluate browser PAC/WPAD configuration. Unsupported proxy schemes and invalid configured CA paths require a configuration correction, not a larger retry budget.
+- Certificate verification stays enabled. An explicitly selected proxy is not silently bypassed.
+- A Discord callback timeout means authorization did not return before its deadline; it is distinct from failure to bind the local callback listener or launch the browser. An expired OAuth session requires fresh authorization, not repeated use of the expired code. These local/OAuth failures are not evidence that Broker or inference traffic bypassed the configured route.
+- Use `query diagnostics.history` for available stage, HTTP status, network classification and selected-route/TLS metadata. Share only sanitized diagnostic identifiers/fields, application version, incident time and routing mode; never keys, OAuth codes, ACK/resume tokens, proxy URLs or complete settings/secret files.
 
 ### ChatGPT login
 

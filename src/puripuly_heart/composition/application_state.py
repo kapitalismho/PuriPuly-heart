@@ -80,9 +80,5 @@ class ApplicationUiStateAdapter:
         return self.desktop_overlay.captions_locked
 
     @property
-    def managed_auth_referral_bonus_applied(self) -> bool:
-        return self.managed.auth.last_referral_bonus_applied is True
-
-    @property
     def overlay_calibration(self) -> object:
         return self.calibration.current

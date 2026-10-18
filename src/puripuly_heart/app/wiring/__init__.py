@@ -33,7 +33,6 @@ _EXPORT_SOURCES = {
     "_qwen_api_key_for_resolved_credential": "root",
     "_WIRING_SECRET_KEYS_FOR_COMPATIBILITY_GUARD": "root",
     "annotations": "root",
-    "apply_discord_issue_result_to_managed_state": "root",
     "build_custom_vocabulary_runtime_config": "root",
     "build_llm_provider_signature": "wiring_provider_runtime_policy",
     "build_local_asr_session_options": "root",
@@ -198,7 +197,6 @@ _EXPORT_SOURCES = {
 
 __all__ = [
     "annotations",
-    "apply_discord_issue_result_to_managed_state",
     "build_custom_vocabulary_runtime_config",
     "build_llm_provider_signature",
     "build_local_asr_session_options",

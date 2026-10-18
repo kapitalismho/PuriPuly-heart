@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field, replace
 
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_DEGRADED,
@@ -60,6 +60,7 @@ QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY = {
             "network_tls",
             "network_dns",
             "network_network",
+            "network_configuration",
         )
     },
     "qq_managed_auth.already_claimed_discord": "qq_auth.error.already_claimed_discord",
@@ -95,9 +96,6 @@ class ManagedAuthExecutionResult:
     succeeded: bool
     transaction_result: TransactionResult | None = None
     delivery_ack_pending: bool = False
-    referral_bonus_applied: bool = False
-    referral_id: str | None = None
-    pass_status: TalkTogetherPassStatus | None = None
     message_key: str = "discord_auth.error.retry"
     message_kwargs: Mapping[str, object] = field(default_factory=dict)
     error_class: str | None = None
@@ -108,30 +106,24 @@ class ManagedAuthExecutionResult:
 
 ManagedAuthStateProvider = Callable[[], ManagedAuthState]
 ManagedAuthPendingSink = Callable[[bool], None]
-ManagedAuthQqExecutor = Callable[[str, str, str | None], Awaitable[ManagedAuthExecutionResult]]
-ManagedAuthDiscordExecutor = Callable[
-    [str | None, Callable[[], None] | None, Callable[[], None] | None],
-    Awaitable[ManagedAuthExecutionResult],
-]
+ManagedAuthQqExecutor = Callable[[str, str], Awaitable[ManagedAuthExecutionResult]]
+ManagedAuthDiscordExecutor = Callable[..., Awaitable[ManagedAuthExecutionResult]]
 ManagedAuthRuntimeEnsurer = Callable[[str], Awaitable[bool]]
-ManagedAuthUsageViewSink = Callable[
-    [str | None, TalkTogetherPassStatus | None],
-    None,
-]
 ManagedAuthUsageRefreshSink = Callable[[], None]
 ManagedAuthMessageSink = Callable[[str, Mapping[str, object]], None]
 ManagedAuthResultSink = Callable[[TransactionResult], None]
 ManagedAuthLogSink = Callable[[str], None]
 
 
-def _failure_kind_for_message_key(message_key: str) -> str:
-    if message_key in {
-        "discord_auth.error.action_required",
-        "discord_auth.error.authorization_expired",
-    }:
+def _failure_kind_for_result(result: ManagedAuthExecutionResult) -> str:
+    if result.delivery_ack_pending or result.message_key.endswith(
+        (".recovery_pending", ".delivery_ack_pending")
+    ):
+        return "idle_resumable"
+    if result.message_key.endswith(
+        (".action_required", ".authorization_expired", ".other_source_pending")
+    ):
         return "action_required"
-    if message_key == "discord_auth.error.recovery_pending":
-        return "recovering"
     return "failed"
 
 
@@ -142,15 +134,13 @@ class ManagedAuthOwner:
     qq_executor: ManagedAuthQqExecutor
     discord_executor: ManagedAuthDiscordExecutor
     runtime_ensurer: ManagedAuthRuntimeEnsurer
-    usage_view_sink: ManagedAuthUsageViewSink
     usage_refresh_sink: ManagedAuthUsageRefreshSink
     message_sink: ManagedAuthMessageSink
     result_sink: ManagedAuthResultSink
     log_sink: ManagedAuthLogSink
     pending: bool = False
     discord_in_progress: bool = False
-    last_referral_bonus_applied: bool = False
-    last_failure_kind: str = "failed"
+    last_failure_kind: str = "none"
     last_message_key: str | None = None
     callback_received_hook: Callable[[], None] | None = field(
         init=False,
@@ -158,6 +148,7 @@ class ManagedAuthOwner:
         repr=False,
     )
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
+    _active_source: str | None = field(init=False, default=None, repr=False)
 
     def set_pending(self, pending: bool) -> None:
         self.pending = bool(pending)
@@ -169,14 +160,14 @@ class ManagedAuthOwner:
             )
 
     def clear_pending(self) -> None:
-        self.set_pending(False)
+        self.set_pending(self._active_source is not None)
 
     def dashboard_action(self) -> str:
         state = self.state_provider()
+        if self._active_source is not None or self.discord_in_progress or self.pending:
+            return "in_progress"
         if not state.managed_selected:
             return "continue"
-        if self.discord_in_progress or self.pending:
-            return "in_progress"
         if state.local_key_available:
             return "continue"
         return "prompt"
@@ -189,9 +180,9 @@ class ManagedAuthOwner:
         *,
         qq_identity: str,
         credential: str,
-        referral_id: str | None = None,
     ) -> bool | tuple[str, dict[str, object]]:
-        self.last_referral_bonus_applied = False
+        if self._active_source is not None:
+            return "qq_auth.error.other_source_pending", {}
         state = self.state_provider()
         if (
             self._ingress_stopped
@@ -206,33 +197,51 @@ class ManagedAuthOwner:
                 else "flow_not_ready"
             )
             log_qq_auth("preflight", code)
+            self.last_failure_kind = "action_required"
+            self.last_message_key = "qq_auth.error.configuration_unavailable"
             return "qq_auth.error.configuration_unavailable", {}
+        self._active_source = "qq"
+        self.last_failure_kind = "none"
+        self.last_message_key = None
+        self.set_pending(True)
         try:
-            result = await self.qq_executor(qq_identity, credential, referral_id)
-        except Exception as exc:
-            diagnostic = _managed_auth_failure(
-                "managed_authentication", exc, "managed_authentication_failed"
+            try:
+                result = await self.qq_executor(qq_identity, credential)
+            except Exception as exc:
+                diagnostic = _managed_auth_failure(
+                    "managed_authentication", exc, "managed_authentication_failed"
+                )
+                self._report_result(
+                    TransactionResult(
+                        TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED, None, diagnostic
+                    )
+                )
+                self.last_failure_kind = "failed"
+                self.last_message_key = "qq_auth.error.retry"
+                return "qq_auth.error.retry", {}
+            if result.transaction_result is not None:
+                self._report_result(result.transaction_result)
+            if result.succeeded:
+                self.last_failure_kind = "none"
+                if result.runtime_rebuild != "never" and not await self._ensure_auth_runtime(
+                    result
+                ):
+                    self.last_failure_kind = "runtime_degraded"
+                self._notify_usage()
+                return True
+            message_key = QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY.get(
+                result.message_key,
+                result.message_key,
             )
-            self._report_result(
-                TransactionResult(TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED, None, diagnostic)
-            )
-            return "qq_auth.error.retry", {}
-        if result.transaction_result is not None:
-            self._report_result(result.transaction_result)
-        if result.succeeded:
+            self.last_message_key = message_key
+            self.last_failure_kind = _failure_kind_for_result(result)
+            return message_key, dict(result.message_kwargs)
+        except asyncio.CancelledError:
+            self.last_failure_kind = "cancelled"
+            raise
+        finally:
+            self._active_source = None
             self.clear_pending()
-            self.last_referral_bonus_applied = result.referral_bonus_applied
-            if result.runtime_rebuild != "never":
-                await self._ensure_auth_runtime(result, propagate=False)
-            self._notify_usage(result.referral_id, result.pass_status)
-            return True
-        if result.delivery_ack_pending and result.referral_id is not None:
-            self._notify_usage(result.referral_id, result.pass_status)
-        message_key = QQ_AUTH_DIALOG_MESSAGE_KEY_BY_SERVICE_KEY.get(
-            result.message_key,
-            result.message_key,
-        )
-        return message_key, dict(result.message_kwargs)
 
     def _report_result(self, result: TransactionResult) -> None:
         try:
@@ -248,9 +257,7 @@ class ManagedAuthOwner:
                 disposition="degraded",
             )
 
-    async def _ensure_auth_runtime(
-        self, result: ManagedAuthExecutionResult, *, propagate: bool
-    ) -> bool:
+    async def _ensure_auth_runtime(self, result: ManagedAuthExecutionResult) -> bool:
         try:
             applied = await self.runtime_ensurer(result.runtime_rebuild)
         except Exception as exc:
@@ -266,8 +273,6 @@ class ManagedAuthOwner:
                         diagnostics=diagnostic,
                     )
                 )
-            if propagate:
-                raise
             return False
         if not applied and result.transaction_result is not None:
             diagnostic = ErrorDiagnostics(
@@ -290,15 +295,7 @@ class ManagedAuthOwner:
             )
         return applied
 
-    def _notify_usage(
-        self, referral_id: str | None, pass_status: TalkTogetherPassStatus | None
-    ) -> None:
-        try:
-            self.usage_view_sink(referral_id, pass_status)
-        except Exception as exc:
-            _managed_auth_failure(
-                "auth_notification", exc, "managed_auth_notification_failed", disposition="degraded"
-            )
+    def _notify_usage(self) -> None:
         try:
             self.usage_refresh_sink()
         except Exception as exc:
@@ -311,13 +308,11 @@ class ManagedAuthOwner:
         *,
         on_callback_received: Callable[[], None] | None = None,
         on_recovery_started: Callable[[], None] | None = None,
-        referral_id: str | None = None,
         authorization_url_sink: Callable[[str], None] | None = None,
         open_browser: bool = True,
     ) -> bool:
-        self.last_referral_bonus_applied = False
-        self.last_failure_kind = "failed"
-        self.last_message_key = None
+        if self._active_source is not None:
+            return False
         state = self.state_provider()
         if (
             self._ingress_stopped
@@ -325,22 +320,22 @@ class ManagedAuthOwner:
             or not state.settings_available
             or not state.release_service_available
         ):
-            self.discord_in_progress = False
-            self.clear_pending()
+            self.last_failure_kind = "action_required"
+            self.last_message_key = "discord_auth.error.retry"
             self.message_sink("discord_auth.error.retry", {})
             return False
         previous_callback = self.callback_received_hook
+        self._active_source = "discord"
+        self.last_failure_kind = "none"
+        self.last_message_key = None
         self.callback_received_hook = on_callback_received
         self.discord_in_progress = True
         self.set_pending(True)
         try:
             if authorization_url_sink is None and open_browser:
-                result = await self.discord_executor(
-                    referral_id, on_callback_received, on_recovery_started
-                )
+                result = await self.discord_executor(on_callback_received, on_recovery_started)
             else:
                 result = await self.discord_executor(
-                    referral_id,
                     on_callback_received,
                     on_recovery_started,
                     authorization_url_sink=authorization_url_sink,
@@ -349,11 +344,10 @@ class ManagedAuthOwner:
             if result.transaction_result is not None:
                 self._report_result(result.transaction_result)
             if result.succeeded:
-                self.last_referral_bonus_applied = result.referral_bonus_applied
-                if not await self._ensure_auth_runtime(result, propagate=True):
-                    self.message_sink("discord_auth.error.retry", {})
-                    return False
-                self._notify_usage(result.referral_id, result.pass_status)
+                self.last_failure_kind = "none"
+                if not await self._ensure_auth_runtime(result):
+                    self.last_failure_kind = "runtime_degraded"
+                self._notify_usage()
                 return True
             if result.log_message is not None:
                 self.log_sink(result.log_message)
@@ -363,16 +357,29 @@ class ManagedAuthOwner:
                     f"message_key={result.message_key} "
                     f"class={result.error_class or 'unknown'}"
                 )
-            if result.delivery_ack_pending and result.referral_id is not None:
-                self._notify_usage(result.referral_id, result.pass_status)
             self.last_message_key = result.message_key
-            self.last_failure_kind = _failure_kind_for_message_key(result.message_key)
+            self.last_failure_kind = _failure_kind_for_result(result)
             self.message_sink(result.message_key, result.message_kwargs)
+            return False
+        except asyncio.CancelledError:
+            self.last_failure_kind = "cancelled"
+            raise
+        except Exception as exc:
+            diagnostic = _managed_auth_failure(
+                "managed_authentication", exc, "managed_authentication_failed"
+            )
+            self._report_result(
+                TransactionResult(TRANSACTION_STATUS_PROVIDER_VERIFICATION_FAILED, None, diagnostic)
+            )
+            self.last_message_key = "discord_auth.error.retry"
+            self.last_failure_kind = "failed"
+            self.message_sink("discord_auth.error.retry", {})
             return False
         finally:
             if self.callback_received_hook is on_callback_received:
                 self.callback_received_hook = previous_callback
             self.discord_in_progress = False
+            self._active_source = None
             self.clear_pending()
 
     def on_callback_received(self) -> None:
@@ -390,7 +397,8 @@ class ManagedAuthOwner:
 
     def stop_ingress(self) -> None:
         self._ingress_stopped = True
-        self.discord_in_progress = False
+        if self._active_source is None:
+            self.discord_in_progress = False
         self.callback_received_hook = None
         with contextlib.suppress(Exception):
             self.clear_pending()

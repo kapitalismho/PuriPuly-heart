@@ -6,6 +6,7 @@ from collections.abc import Mapping
 
 from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.network_diagnostics import (
+    TRANSPORT_ENUM_FIELDS,
     classify_transport_error,
     safe_transport_fields,
     transport_exception_chain,
@@ -29,6 +30,42 @@ STAGES = frozenset(
 CODES = frozenset(
     {
         "invalid_input",
+        "unsupported_proxy_configuration",
+        "invalid_proxy_configuration",
+        "invalid_tls_configuration",
+        "access_rejected",
+        "authorization_expired",
+        "resume_issuance_unavailable",
+        "discord_oauth_session_expired",
+        "discord_oauth_failed",
+        "challenge_expired",
+        "challenge_invalid",
+        "issuance_suspended",
+        "trial_not_eligible",
+        "delivery_ack_malformed",
+        "delivery_ack_invalid",
+        "delivery_ack_expired",
+        "delivery_ack_mismatched",
+        "delivery_ack_failed",
+        "delivery_ack_rate_limited",
+        "discord_oauth_state_unknown",
+        "discord_oauth_session_processing",
+        "discord_session_binding_mismatch",
+        "installation_binding_mismatch",
+        "device_public_key_registered",
+        "discord_email_unverified",
+        "discord_invalid_snowflake",
+        "discord_account_too_new",
+        "discord_lifetime_used",
+        "hardware_duplicate",
+        "global_cap_reached",
+        "entitlement_reservation_failed",
+        "discord_installation_already_issuing",
+        "hardware_salt_mismatch",
+        "timestamp_skew",
+        "signature_mismatch",
+        "invalid_operation_id",
+        "invalid_operation_binding",
         "configuration_unavailable",
         "flow_not_ready",
         "unknown_error",
@@ -66,6 +103,8 @@ CODES = frozenset(
         "qq_delivery_ack_recovered",
         "qq_delivery_ack_token_store_failed_before_local_key_write",
         "qq_pending_delivery_ack_persist_failed_before_local_key_write",
+        "qq_delivery_ack_token_store_failed",
+        "qq_pending_delivery_ack_persist_failed",
         "qq_delivery_ack_token_store_failed_local_key_rolled_back",
         "qq_delivery_ack_token_store_failed_local_key_rollback_failed",
         "qq_managed_operation_recovery_pending",
@@ -77,7 +116,6 @@ CODES = frozenset(
         "qq_other_source_pending_operation",
         "operation_status_failed",
         "operation_resume_failed",
-        "status_auth_storage_failed",
         "operation_cleanup_failed",
         "network_timeout",
         "network_proxy",
@@ -103,12 +141,18 @@ CODES = frozenset(
     }
 )
 ENUM_FIELDS = {
+    **TRANSPORT_ENUM_FIELDS,
+    "broker_code": CODES,
+    "broker_subcode": CODES,
+    "status": {"issued", "delivery_pending", "verified", "already_verified"},
     "ack_status": {
         "acknowledged",
         "already_acknowledged",
         "retryable",
         "pending",
         "expired",
+        "invalid",
+        "mismatched",
         "malformed",
         "missing",
         "cleanup_required",
@@ -128,17 +172,6 @@ ENUM_FIELDS = {
         "ACTIVE",
         "FAILED",
     },
-    "proxy_source": {"env", "system", "direct", "bypass", "explicit", "unknown"},
-    "tls_source": {
-        "windows",
-        "explicit_file",
-        "explicit_directory",
-        "requests_bundle",
-        "curl_bundle",
-        "none",
-        "unknown",
-    },
-    "tls_backend": {"native", "openssl", "none", "unknown"},
     "network_error_kind": {"timeout", "proxy", "tls", "dns", "network", "unknown"},
     "qq_failure_subcode": {
         "invalid_credential",
@@ -168,6 +201,19 @@ NUMBER_FIELDS = {"http_status", "retry_after_ms", "os_errno", "winerror", "tls_v
 def exception_fields(exc: BaseException) -> dict[str, object]:
     fields = dict(safe_transport_fields(exc))
     chain = tuple(transport_exception_chain(exc))
+    for item in chain:
+        normalized = getattr(item, "diagnostic_transport_fields", None)
+        if isinstance(normalized, Mapping):
+            for key in NUMBER_FIELDS:
+                if type(normalized.get(key)) is int:
+                    fields.setdefault(key, normalized[key])
+        diagnostics = getattr(item, "failure_diagnostics", None)
+        if isinstance(diagnostics, ErrorDiagnostics):
+            for key, value in safe_fields(diagnostics.fields).items():
+                if fields.get(key) in (None, "unknown"):
+                    fields[key] = value
+            if diagnostics.status_code is not None:
+                fields["http_status"] = diagnostics.status_code
     kind = (
         "dns"
         if any(isinstance(item, socket.gaierror) for item in chain)
@@ -195,10 +241,6 @@ def safe_fields(fields: Mapping[str, object]) -> dict[str, object]:
     for key, allowed in ENUM_FIELDS.items():
         value = fields.get(key)
         if type(value) is str and value in allowed:
-            result[key] = value
-    for key in ("broker_code", "broker_subcode"):
-        value = fields.get(key)
-        if type(value) is str and value in CODES:
             result[key] = value
     for key in NUMBER_FIELDS:
         value = fields.get(key)

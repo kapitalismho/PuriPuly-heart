@@ -24,7 +24,6 @@ class UiApplicationStateOwner:
             provider_name=runtime.provider_name,
             overlay_target=runtime.overlay_target,
             desktop_overlay_captions_locked=runtime.desktop_overlay_captions_locked,
-            managed_auth_referral_bonus_applied=(runtime.managed_auth_referral_bonus_applied),
             translation_runtime_ready=runtime.translation_runtime_ready,
         )
 

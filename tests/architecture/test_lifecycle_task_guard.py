@@ -702,29 +702,6 @@ def test_order40_named_owner_allowlist_adds_vrchat_osc_presence_owner() -> None:
     ) in NAMED_LIFECYCLE_OWNER_TASK_ALLOWLIST
 
 
-def test_order41_managed_refresh_scheduling_uses_its_named_owner() -> None:
-    controller_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"
-    )
-    owner_path = (
-        REPO_ROOT / "src" / "puripuly_heart" / "app" / "services" / "managed" / "managed_usage.py"
-    )
-    controller_methods = {
-        node.name: ast.unparse(node)
-        for node in ast.walk(ast.parse(controller_path.read_text(encoding="utf-8")))
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-    owner_methods = {
-        node.name: ast.unparse(node)
-        for node in ast.walk(ast.parse(owner_path.read_text(encoding="utf-8")))
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
-    }
-
-    assert "_schedule_owned_referral_id_status_refresh" not in controller_methods
-    assert "schedule_status_refresh" in owner_methods["schedule_status_refresh"]
-    assert "schedule_trial_usage_refresh" in owner_methods["schedule_usage_refresh"]
-
-
 def test_order43_output_runtime_owns_ui_bridge_startup_waiter() -> None:
     controller_path = (
         REPO_ROOT / "src" / "puripuly_heart" / "composition" / "application_runtime.py"

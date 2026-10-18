@@ -211,3 +211,17 @@ def test_requests_and_urllib3_typed_wrappers_classify_without_message_heuristics
     }
     for wrapper in wrappers[failure]:
         assert classify_transport_error(wrapper) == kind
+
+
+@pytest.mark.parametrize("control", [ssl.SSLWantReadError, ssl.SSLWantWriteError])
+def test_tls_io_control_flow_does_not_replace_actual_read_timeout(control):
+    failure = httpx.ReadTimeout("neutral")
+    failure.__context__ = control(ssl.SSL_ERROR_WANT_READ, "neutral")
+    assert classify_transport_error(failure) == "timeout"
+    assert (
+        provider_failure_report(
+            failure, provider="openrouter", operation="translate"
+        ).diagnostics.category
+        == "timeout"
+    )
+    assert classify_transport_error(control(ssl.SSL_ERROR_WANT_READ, "neutral")) is None

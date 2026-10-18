@@ -26,6 +26,7 @@ from puripuly_heart.core.local_asr_provider_runtime import (
 )
 from puripuly_heart.core.peer_capture import (
     PeerCaptureDiagnostic,
+    PeerCaptureSessionConfig,
     PeerCaptureSessionSnapshot,
 )
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
@@ -57,7 +58,7 @@ from .wiring_composition import (
 )
 from .wiring_stt_factory import (
     build_peer_stt_provider_request,
-    build_self_stt_provider_request_from_vnext,
+    build_self_stt_provider_request_from_config,
 )
 
 _CAPTURE_ID_RE = re.compile(r"[0-9a-f]{32}\Z")
@@ -179,11 +180,7 @@ class CaptureOwnerFactory:
             ),
             target_resolver=create_peer_capture_target_resolver_adapter(),
             clock=self.clock,
-            provider_request_factory=lambda config, warmup: build_peer_stt_provider_request(
-                config,
-                gpu_device_id=self._canonical().intent.stt.gpu_device_id,
-                warmup=warmup,
-            ),
+            provider_request_factory=self.peer_provider_request,
             source_factory=create_peer_capture_source_adapter(
                 log_diagnostic=self.log_diagnostic,
                 wrap_source=self.source_wrapper,
@@ -203,14 +200,14 @@ class CaptureOwnerFactory:
         config: SelfCaptureSessionConfig,
         warmup: bool,
     ) -> ProviderRuntimeBuildRequest:
-        _ = config
-        return build_self_stt_provider_request_from_vnext(self._canonical(), warmup=warmup)
+        return build_self_stt_provider_request_from_config(config, warmup=warmup)
 
-    def _canonical(self) -> AppSettingsVNext:
-        settings = self.canonical_provider()
-        if settings is None:
-            raise RuntimeError("Capture provider request requires canonical settings")
-        return settings
+    def peer_provider_request(
+        self, config: PeerCaptureSessionConfig, warmup: bool
+    ) -> ProviderRuntimeBuildRequest:
+        return build_peer_stt_provider_request(
+            config, gpu_device_id=config.gpu_device_id, warmup=warmup
+        )
 
 
 __all__ = [

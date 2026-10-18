@@ -56,6 +56,7 @@ def _settings_owner(
 ) -> SimpleNamespace:
     return SimpleNamespace(
         canonical=settings,
+        committed_settings=settings,
         peer_translation_enabled=lambda: peer_translation_enabled,
     )
 
@@ -83,11 +84,12 @@ def _components(
     async def no_op() -> None:
         return None
 
-    async def no_op_bool(_value: bool) -> None:
+    async def no_op_bool(_settings: AppSettingsVNext, _value: bool) -> None:
         return None
 
     peer = SimpleNamespace(
         effective_enabled=lambda: False,
+        desired_active=lambda _state: False,
         activation_requested=lambda **_kwargs: False,
         last_runtime_signature=None,
         last_provider_signature=None,
@@ -109,7 +111,7 @@ def _components(
         self_capture_provider=lambda: None,
         self_capture_owner=lambda: SimpleNamespace(),
         peer=lambda: peer,
-        peer_desired=lambda _settings: False,
+        peer_state=lambda _settings: None,
         canonical_settings=lambda current: current,
         clear_local_pending=lambda: None,
         sync_local_notice=lambda: None,
@@ -118,7 +120,7 @@ def _components(
         dashboard_managed_pending_sink=lambda _value: None,
         sync_effective_flags=lambda: None,
         refresh_overlay=lambda: None,
-        refresh_peer_runtime=no_op,
+        refresh_peer_runtime=lambda _settings: no_op(),
         replace_self_stt=no_op_bool,
         self_state_sink=lambda _state: None,
         self_availability=lambda _state: True,
@@ -373,7 +375,7 @@ async def _bound_components(tmp_path, monkeypatch):
     components.runtime.self_runtime_convergence = lambda _settings: True
     components.runtime.peer_runtime_convergence = lambda _settings: None
 
-    async def controlled_stt():
+    async def controlled_stt(_settings):
         return None
 
     components.runtime.refresh_self_stt = controlled_stt
@@ -408,15 +410,17 @@ async def test_partial_stt_failure_retains_actual_llm_binding_and_rebuilds_retur
         cpu = _connection(initial, "cpu")
         plan = components.runtime.build_plan(cpu, force_rebuild_llm=False)
         assert plan.should_rebuild_llm
-        result = await ProviderRuntimeApplyAdapter(components.runtime, cpu, plan).apply_runtime(
-            RuntimeApplyRequest({}, "controlled-backend-change", None)
-        )
+        result = await ProviderRuntimeApplyAdapter(
+            components.runtime, lambda: cpu, plan
+        ).apply_runtime(RuntimeApplyRequest({}, "controlled-backend-change", None))
         assert result.status == "failed"
         assert result.diagnostics.code == "stt_runtime_apply_not_converged"
         assert components.signatures.last_llm_provider == build_llm_provider_signature(cpu)
         assert components.signatures.last_self_provider == initial_stt
         assert handle.provider.provider.backend == "cpu"
         assert managed.runtime.readiness.effective_backend == "cpu"
+        assert components.effects.settings.canonical is initial
+        assert components.effects.settings.committed_settings is initial
         assert processes[0].terminated
         identity, request, message, _slot = await _bound_request(
             handle, transports[-1], "cpu result"
@@ -427,9 +431,9 @@ async def test_partial_stt_failure_retains_actual_llm_binding_and_rebuilds_retur
 
         plan = components.runtime.build_plan(initial, force_rebuild_llm=False)
         assert plan.should_rebuild_llm
-        result = await ProviderRuntimeApplyAdapter(components.runtime, initial, plan).apply_runtime(
-            RuntimeApplyRequest({}, "controlled-return-to-gpu", None)
-        )
+        result = await ProviderRuntimeApplyAdapter(
+            components.runtime, lambda: initial, plan
+        ).apply_runtime(RuntimeApplyRequest({}, "controlled-return-to-gpu", None))
         assert result.status == "failed"
         assert result.diagnostics.code == "stt_runtime_apply_not_converged"
         assert components.signatures.last_llm_provider == build_llm_provider_signature(initial)
@@ -481,9 +485,9 @@ async def test_failed_llm_replacement_is_retryable_without_committing_failed_pro
     monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", fail_factory)
     try:
         plan = components.runtime.build_plan(cpu, force_rebuild_llm=False)
-        result = await ProviderRuntimeApplyAdapter(components.runtime, cpu, plan).apply_runtime(
-            RuntimeApplyRequest({}, "controlled-failed-replacement", None)
-        )
+        result = await ProviderRuntimeApplyAdapter(
+            components.runtime, lambda: cpu, plan
+        ).apply_runtime(RuntimeApplyRequest({}, "controlled-failed-replacement", None))
         assert result.status == "failed"
         assert result.diagnostics.code == "provider_runtime_apply_exception"
         assert handle.provider is None
@@ -496,11 +500,13 @@ async def test_failed_llm_replacement_is_retryable_without_committing_failed_pro
         retry = components.runtime.build_plan(cpu, force_rebuild_llm=False)
         assert retry.should_rebuild_llm
         monkeypatch.setattr(wiring_provider_runtime, "create_translation_backend", factory)
-        result = await ProviderRuntimeApplyAdapter(components.runtime, cpu, retry).apply_runtime(
-            RuntimeApplyRequest({}, "controlled-successful-retry", None)
-        )
+        result = await ProviderRuntimeApplyAdapter(
+            components.runtime, lambda: cpu, retry
+        ).apply_runtime(RuntimeApplyRequest({}, "controlled-successful-retry", None))
         assert result.status == "applied"
         assert handle.provider.provider.backend == "cpu"
+        assert components.effects.settings.canonical is initial
+        assert components.effects.settings.committed_settings is initial
         assert components.signatures.last_llm_provider != ()
         assert not components.runtime.build_plan(cpu, force_rebuild_llm=False).should_rebuild_llm
         identity, request, message, _slot = await _bound_request(

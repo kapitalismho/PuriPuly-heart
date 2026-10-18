@@ -10,8 +10,72 @@ from .external_network import (
     ProxyPolicy,
     TLSSelection,
     annotate_connection_error,
+    connection_diagnostic_fields,
     select_tls,
+    validate_http_proxy,
 )
+
+
+class _HTTPResponseStream(httpx.SyncByteStream):
+    def __init__(self, stream, *, url, tls, route, status) -> None:
+        self.stream = stream
+        self.url, self.tls, self.route, self.status = url, tls, route, status
+
+    def __iter__(self):
+        try:
+            yield from self.stream
+        except Exception as exc:
+            annotate_connection_error(
+                exc,
+                url=self.url,
+                tls=self.tls,
+                route=self.route,
+                stage="response_body",
+                dispatch_certainty="response_received",
+                http_status=self.status,
+            )
+            raise
+
+    def close(self) -> None:
+        self.stream.close()
+
+
+class _AsyncHTTPResponseStream(httpx.AsyncByteStream):
+    def __init__(self, stream, *, url, tls, route, status) -> None:
+        self.stream = stream
+        self.url, self.tls, self.route, self.status = url, tls, route, status
+
+    async def __aiter__(self):
+        try:
+            async for chunk in self.stream:
+                yield chunk
+        except Exception as exc:
+            annotate_connection_error(
+                exc,
+                url=self.url,
+                tls=self.tls,
+                route=self.route,
+                stage="response_body",
+                dispatch_certainty="response_received",
+                http_status=self.status,
+            )
+            raise
+
+    async def aclose(self) -> None:
+        await self.stream.aclose()
+
+
+def _annotate_response(response, *, request, tls, route, stream_type):
+    response.stream = stream_type(
+        response.stream, url=str(request.url), tls=tls, route=route, status=response.status_code
+    )
+    response.extensions["connection_diagnostics"] = {
+        **connection_diagnostic_fields(url=str(request.url), tls=tls, route=route),
+        "stage": "response_headers",
+        "dispatch_certainty": "response_received",
+        "http_status": response.status_code,
+    }
+    return response
 
 
 class _HTTPTransport(httpx.BaseTransport):
@@ -25,6 +89,7 @@ class _HTTPTransport(httpx.BaseTransport):
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         route = self.policy.route(str(request.url))
         try:
+            validate_http_proxy(route)
             with self.lock:
                 transport = self.transports.get(route.url)
                 if transport is None:
@@ -42,7 +107,13 @@ class _HTTPTransport(httpx.BaseTransport):
                         verify=self.tls.context, proxy=proxy, trust_env=False, **self.kwargs
                     )
                     self.transports[route.url] = transport
-            return transport.handle_request(request)
+            return _annotate_response(
+                transport.handle_request(request),
+                request=request,
+                tls=self.tls,
+                route=route,
+                stream_type=_HTTPResponseStream,
+            )
         except Exception as exc:
             annotate_connection_error(exc, url=str(request.url), tls=self.tls, route=route)
             raise
@@ -62,6 +133,7 @@ class _AsyncHTTPTransport(httpx.AsyncBaseTransport):
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         route = self.policy.route(str(request.url))
         try:
+            validate_http_proxy(route)
             transport = self.transports.get(route.url)
             if transport is None:
                 proxy = (
@@ -76,7 +148,13 @@ class _AsyncHTTPTransport(httpx.AsyncBaseTransport):
                     verify=self.tls.context, proxy=proxy, trust_env=False, **self.kwargs
                 )
                 self.transports[route.url] = transport
-            return await transport.handle_async_request(request)
+            return _annotate_response(
+                await transport.handle_async_request(request),
+                request=request,
+                tls=self.tls,
+                route=route,
+                stream_type=_AsyncHTTPResponseStream,
+            )
         except Exception as exc:
             annotate_connection_error(exc, url=str(request.url), tls=self.tls, route=route)
             raise

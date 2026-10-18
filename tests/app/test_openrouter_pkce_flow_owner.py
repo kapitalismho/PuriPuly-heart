@@ -90,10 +90,11 @@ class AppliedProviderRuntime:
         self,
         settings: AppSettingsVNext,
         _plan: ProviderRuntimeApplyPlan,
-    ) -> None:
+    ) -> AppSettingsVNext:
         if self.cancel:
             raise asyncio.CancelledError
         self.applied.append(copy.deepcopy(settings))
+        return settings
 
     def unavailable_result(
         self,

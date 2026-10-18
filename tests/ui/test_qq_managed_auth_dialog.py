@@ -143,3 +143,24 @@ def test_qq_managed_auth_dialog_chatgpt_closes_then_invokes_callback() -> None:
 
     assert events == ["chatgpt_closed=True"]
     assert dialog.is_open is False
+
+
+def test_qq_recovery_is_idle_and_resume_preserves_inputs_until_admission() -> None:
+    page = DummyPage()
+    calls: list[str] = []
+    dialog = _dialog(page, calls)
+    dialog.open()
+    dialog._qq_identity_field.value = "qq-user"
+    dialog._credential_field.value = "a" * 64
+    dialog.set_waiting()
+    dialog._submit()
+    assert calls == []
+    dialog.set_error("qq_auth.error.delivery_ack_pending")
+    assert dialog.is_waiting is False
+    assert dialog._continue_button.content == t("qq_auth.resume")
+    assert dialog.qq_identity == "qq-user"
+    assert dialog.credential == "a" * 64
+    assert dialog._qq_identity_field.disabled is False
+    assert dialog._credential_field.disabled is False
+    dialog._continue_button.on_click(None)
+    assert calls == ["continue"]

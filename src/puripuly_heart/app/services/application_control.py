@@ -34,7 +34,6 @@ from puripuly_heart.app.ports.settings_view import (
     LocalLlmBaseUrlEdit,
     LocalLlmExtraBodyEdit,
     LocalLlmModelEdit,
-    ManagedReferralEdit,
     OscConnectionSettingsIntent,
     OverlayPeerOriginalSettingsIntent,
     OverlayTargetSettingsIntent,
@@ -202,7 +201,6 @@ COMMAND_ARGUMENTS = {
         "provider": ["qq", "discord", "openrouter", "chatgpt"],
         "qq_identity": "required non-empty string for QQ",
         "credential": "required non-empty secret for QQ (stdin/hidden input only)",
-        "referral_id": "optional referral string for QQ or Discord",
         "open_browser": "optional boolean, default false (OAuth only)",
     },
     "auth.logout": {"provider": ["qq", "discord", "openrouter", "chatgpt"]},
@@ -278,7 +276,6 @@ SETTINGS_FIELDS = (
             "translation.connection",
             "translation.connection_history",
             "translation.previous_llm_model",
-            "managed.referral_id",
             "prompts.value",
             "osc.connection",
             "custom_vocabulary",
@@ -317,7 +314,7 @@ OBJECT_FIELDS = frozenset(
     }
 )
 LIST_FIELDS = frozenset({"peer_expected_languages", "stt.cloud_free_tier_providers"})
-OPTIONAL_STRING_FIELDS = frozenset({"managed.referral_id", "translation.previous_llm_model"})
+OPTIONAL_STRING_FIELDS = frozenset({"translation.previous_llm_model"})
 
 FREE_FORM_SETTINGS_FIELDS = frozenset(
     {
@@ -2263,7 +2260,7 @@ class ApplicationControlOwner:
             if not identity or not credential:
                 raise InvalidArgumentsError("QQ account and credential are required")
             result = await app.start_qq_managed_auth_from_dialog(
-                qq_identity=identity, credential=credential, referral_id=args.get("referral_id")
+                qq_identity=identity, credential=credential
             )
         else:
             open_browser = args.get("open_browser", False)
@@ -2329,7 +2326,6 @@ class ApplicationControlOwner:
                 }
             if provider == "discord":
                 result = await app.start_discord_managed_auth_from_dialog(
-                    referral_id=args.get("referral_id"),
                     open_browser=open_browser,
                     authorization_url_sink=authorization_url,
                     on_callback_received=lambda: self.events.publish(
@@ -2350,10 +2346,6 @@ class ApplicationControlOwner:
                     ),
                 )
             else:
-                if "referral_id" in args:
-                    raise InvalidArgumentsError(
-                        "referral_id is not valid for OpenRouter authorization"
-                    )
                 target = app.build_managed_openrouter_byok_target()
                 if target is None:
                     from puripuly_heart.app.ports.settings_view import OpenRouterPkceTarget
@@ -2386,6 +2378,11 @@ class ApplicationControlOwner:
         )
         if result is True:
             status = _transaction_status(transaction) if transaction_data else "applied"
+            if (
+                provider in {"qq", "discord"}
+                and app.managed_auth_last_failure_kind() == "runtime_degraded"
+            ):
+                status = "degraded"
             return {
                 "status": status,
                 "provider": provider,
@@ -2414,7 +2411,9 @@ class ApplicationControlOwner:
             }
         kind = app.managed_auth_last_failure_kind() if provider == "discord" else None
         return {
-            "status": "action_required" if kind in {"action_required", "recovering"} else "failed",
+            "status": (
+                "action_required" if kind in {"action_required", "idle_resumable"} else "failed"
+            ),
             "provider": provider,
             "reason": "authorization_failed",
             **transaction_data,
@@ -2728,12 +2727,6 @@ class ApplicationControlOwner:
                     ProviderApplyIntent((edit,)),
                     materialize_translation=self.settings.materialize_translation,
                 )
-            elif key == "managed.referral_id":
-                updated = materialize_provider_apply_intent(
-                    updated,
-                    ProviderApplyIntent((ManagedReferralEdit(value),)),
-                    materialize_translation=self.settings.materialize_translation,
-                )
             elif key == "prompts.value":
                 updated = materialize_prompt_apply_intent(updated, PromptApplyIntent(value))
             elif key == "custom_vocabulary":
@@ -2804,7 +2797,6 @@ class ApplicationControlOwner:
             "translation.connection",
             "translation.connection_history",
             "translation.previous_llm_model",
-            "managed.referral_id",
         }
         if changes.keys() <= provider_fields:
             return await self.application.apply_providers(updated)
@@ -3023,24 +3015,14 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
 
 
 def _validate_auth_login_args(args: dict, provider: str) -> None:
-    from puripuly_heart.config.provider_values import normalize_owned_referral_id
-
     open_browser = args.get("open_browser", False)
     if type(open_browser) is not bool:
         raise InvalidArgumentsError("open_browser must be a boolean")
-    referral_id = args.get("referral_id")
-    if referral_id is not None and (
-        type(referral_id) is not str
-        or not referral_id
-        or normalize_owned_referral_id(referral_id) is None
-    ):
-        raise InvalidArgumentsError("invalid referral ID")
     if provider == "qq":
         if args.keys() - {
             "provider",
             "qq_identity",
             "credential",
-            "referral_id",
             "open_browser",
         }:
             raise InvalidArgumentsError("QQ login has unsupported arguments")
@@ -3054,12 +3036,8 @@ def _validate_auth_login_args(args: dict, provider: str) -> None:
         if open_browser:
             raise InvalidArgumentsError("QQ login does not support browser opening")
         return
-    if args.keys() - {"provider", "referral_id", "open_browser"}:
-        raise InvalidArgumentsError("OAuth login does not accept QQ credentials")
-    if provider == "openrouter" and referral_id is not None:
-        raise InvalidArgumentsError("referral_id is not valid for OpenRouter authorization")
-    if provider == "chatgpt" and referral_id is not None:
-        raise InvalidArgumentsError("referral_id is not valid for ChatGPT authorization")
+    if args.keys() - {"provider", "open_browser"}:
+        raise InvalidArgumentsError("OAuth login has unsupported arguments")
 
 
 def _chatgpt_status(application: object, retain: Callable[..., dict]) -> dict:
@@ -3176,7 +3154,6 @@ def _validate_settings_field(
         CLOUD_FREE_TIER_STT_PROVIDERS,
         QwenRegion,
         normalize_local_llm_base_url,
-        normalize_owned_referral_id,
     )
     from puripuly_heart.config.resolved import (
         OVERLAY_TARGETS,
@@ -3280,8 +3257,6 @@ def _validate_settings_field(
                 or (type(value["send_port"]) is int and 1 <= value["send_port"] <= 65535)
             )
         )
-    elif name == "managed.referral_id":
-        valid = value is None or not value or normalize_owned_referral_id(value) is not None
     elif name == "local_llm.base_url":
         valid = bool(value)
         if valid:

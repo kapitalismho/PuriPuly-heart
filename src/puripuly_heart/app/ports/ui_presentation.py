@@ -145,8 +145,6 @@ class UiPresentationPort(Protocol):
         *,
         visible: bool,
         remaining_percent: int | None,
-        referral_id: str | None,
-        pass_status: object | None,
     ) -> None: ...
 
     def add_history_entry(self, *args: Any, **kwargs: Any) -> None: ...

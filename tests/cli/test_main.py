@@ -170,3 +170,41 @@ def test_submission_rejects_missing_or_non_boolean_terminal(
     assert output.out == ""
     assert json.loads(output.err)["error"]["code"] == "malformed_response"
     assert calls == (["submit"] if phase == "submit" else ["submit", "wait"])
+
+
+@pytest.mark.parametrize("provider", ["qq", "discord", "openrouter", "chatgpt"])
+def test_auth_rejects_removed_referral_input_without_dispatch(monkeypatch, capsys, provider):
+    import io
+
+    fields = {"referral_id": "private-retired-code"}
+    if provider == "qq":
+        fields.update(qq_identity="synthetic-qq", credential="a" * 64)
+    monkeypatch.setattr(cli.sys, "stdin", io.StringIO(json.dumps(fields)))
+    monkeypatch.setattr(cli, "_instance", lambda _path: SimpleNamespace(instance_id="session"))
+
+    async def unexpected(*_args, **_kwargs):
+        pytest.fail("Removed auth input must never reach application dispatch")
+
+    monkeypatch.setattr(cli, "request", unexpected)
+    assert cli.main(["auth", "login", provider, "--stdin"]) == 3
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert json.loads(output.err)["error"]["code"] == "invalid_input"
+    assert "private-retired-code" not in output.err
+
+
+@pytest.mark.parametrize("provider", ["qq", "discord"])
+def test_auth_rejects_removed_referral_cli_flag(capsys, provider):
+    with pytest.raises(SystemExit) as result:
+        cli.build_parser().parse_args(["auth", "login", provider, "--referral-id", "retired"])
+    assert result.value.code == 2
+    assert "unrecognized arguments" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("provider", ["qq", "discord"])
+def test_auth_protected_input_keeps_supported_login_fields(monkeypatch, provider):
+    import io
+
+    fields = {"qq_identity": "synthetic-qq", "credential": "a" * 64} if provider == "qq" else {}
+    monkeypatch.setattr(cli.sys, "stdin", io.StringIO(json.dumps(fields)))
+    assert cli._auth_input(SimpleNamespace(stdin=True, provider=provider)) == fields

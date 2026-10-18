@@ -54,7 +54,6 @@ class RecordingBackend:
         )
         self.audio_test_active = True
         self.desktop_overlay_captions_locked = True
-        self.last_discord_managed_auth_referral_bonus_applied = True
         self.peer_retry_result = True
         self.events: list[tuple[object, ...]] = []
 
@@ -246,7 +245,6 @@ def test_state_is_a_semantic_snapshot_without_exposing_backend_objects() -> None
     assert state.provider_name == "local_llm"
     assert state.overlay_target == "desktop"
     assert state.desktop_overlay_captions_locked is True
-    assert state.managed_auth_referral_bonus_applied is True
     assert not hasattr(state, "hub")
     assert not hasattr(state, "settings")
 

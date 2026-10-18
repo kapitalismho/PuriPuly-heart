@@ -281,19 +281,23 @@ async def composed(tmp_path, monkeypatch):
     monkeypatch.setattr(socket.socket, "connect_ex", forbidden_network)
 
     @asynccontextmanager
-    async def open_application(route, *, initial=None, connection=None):
+    async def open_application(route, *, initial=None, connection=None, translation=None):
         path = tmp_path / "settings.json"
         settings = AppSettingsVNext()
         settings = replace(
             settings,
             intent=replace(
                 settings.intent,
-                translation=replace(
-                    settings.intent.translation,
-                    model=route.model,
-                    connection=connection or route.connection,
-                    openrouter_selected_source="managed" if connection else "byok",
-                    openrouter_selection_alias=None,
+                translation=(
+                    translation
+                    if translation is not None
+                    else replace(
+                        settings.intent.translation,
+                        model=route.model,
+                        connection=connection or route.connection,
+                        openrouter_selected_source="managed" if connection else "byok",
+                        openrouter_selection_alias=None,
+                    )
                 ),
                 secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
                 stt=replace(settings.intent.stt, provider="soniox"),
@@ -606,9 +610,7 @@ async def test_failed_managed_to_byok_apply_clears_managed_usage_view(composed, 
         _path,
     ):
         presentation = _presentation(app)
-        presentation.set_settings_managed_key_state(
-            visible=True, remaining_percent=50, referral_id=None, pass_status=None
-        )
+        presentation.set_settings_managed_key_state(visible=True, remaining_percent=50)
         diagnostic = ErrorDiagnostics(
             component="provider.llm",
             operation="provider_construction",
@@ -790,7 +792,7 @@ async def test_committed_runtime_resync_retains_both_failures_and_restore_cause(
             error.failure_diagnostics = llm_diagnostic
             raise RuntimeError("controlled provider construction wrapper") from error
 
-        async def fail_stt():
+        async def fail_stt(_settings):
             error = RuntimeError("controlled independent runtime failure")
             error.failure_diagnostics = stt_diagnostic
             raise error

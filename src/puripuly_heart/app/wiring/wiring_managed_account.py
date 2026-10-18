@@ -28,9 +28,6 @@ from puripuly_heart.app.services.settings_transaction_result import (
     SettingsTransactionResultOwner,
 )
 from puripuly_heart.app.services.translation_enable import TranslationEnableOwner
-from puripuly_heart.config.provider_values import (
-    normalize_owned_referral_id,
-)
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS
 from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
@@ -172,6 +169,12 @@ class ManagedOpenRouterReleaseRuntime:
 
     async def rebuild(self, *, secrets: object) -> ManagedOpenRouterReleaseService | None:
         await self.retry_retired()
+
+        def retire_removed_secrets() -> None:
+            secrets.delete("openrouter_managed_qq_status_auth")
+            secrets.delete("openrouter_managed_qq_operation_auth")
+
+        await run_owned_thread_call(retire_removed_secrets)
         replacement = self._create(secrets=secrets)
         previous = self.service
         self.service = replacement
@@ -280,8 +283,6 @@ class ManagedUsageRuntimeAdapter:
                 release_settings_available=False,
                 installation_id=None,
                 entitlement_ref=None,
-                referral_id=None,
-                referral_source=None,
                 ingress_frozen=self.ingress_provider(),
             )
         identity = canonical.state.managed_connection
@@ -293,8 +294,6 @@ class ManagedUsageRuntimeAdapter:
             release_settings_available=self.release.release_settings() is not None,
             installation_id=identity.installation_id.strip() or None,
             entitlement_ref=entitlement_ref or None,
-            referral_id=normalize_owned_referral_id(identity.referral_id),
-            referral_source=identity.referral_source,
             ingress_frozen=self.ingress_provider(),
         )
 
@@ -422,12 +421,6 @@ def compose_managed_account(
         qq_executor=auth_adapter.execute_qq,
         discord_executor=auth_adapter.execute_discord,
         runtime_ensurer=runtime.ensure,
-        usage_view_sink=lambda referral_id, pass_status: current_usage().set_view_state(
-            visible=True,
-            remaining_percent=None,
-            referral_id=referral_id or current_usage().current_referral_id,
-            pass_status=pass_status,
-        ),
         usage_refresh_sink=lambda: current_usage().schedule_usage_refresh(),
         message_sink=message_sink,
         result_sink=results.set,
@@ -494,7 +487,6 @@ def compose_managed_account(
         view_sink=usage_view_sink,
         disable_translation_sink=disable_translation,
         auto_show_founder_letter_provider=usage_adapter.should_auto_show_founder_letter,
-        normalize_referral_id=normalize_owned_referral_id,
         warning_sink=warning_sink,
     )
     translation_owner = TranslationEnableOwner(

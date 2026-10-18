@@ -42,6 +42,7 @@ from puripuly_heart.app.wiring.wiring_stt_factory import (
     build_peer_capture_session_config_from_vnext,
     build_peer_stt_provider_request,
     build_self_capture_session_config_from_vnext,
+    build_self_stt_provider_request_from_config,
     build_self_stt_provider_request_from_vnext,
 )
 from puripuly_heart.config.provider_values import STTProviderName
@@ -248,10 +249,13 @@ class _Peer:
     def effective_enabled(self) -> bool:
         return False
 
+    def desired_active(self, _state) -> bool:
+        return False
+
     def activation_requested(self, *, intent_enabled: bool, eula_accepted: bool) -> bool:
         return bool(intent_enabled and eula_accepted)
 
-    def capture_runtime_convergence(self, _config) -> None:
+    def capture_runtime_convergence(self, _config, _state=None) -> None:
         return None
 
 
@@ -422,8 +426,10 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     settings_owner = compose_settings_owner(tmp_path / "settings.json")
+    settings_owner.persistence.persist(
+        settings_owner.path, _settings(STTProviderName.ROLLING_FREE.value)
+    )
     settings_owner.start()
-    settings_owner.canonical = _settings(STTProviderName.ROLLING_FREE.value)
     harness_factory = _RuntimeFactory()
     harness = compose_translation_test_harness(
         stt=None,
@@ -445,10 +451,8 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
     async def run_audio_loop(**_kwargs):
         await asyncio.Event().wait()
 
-    def request_factory(config, _warmup):
-        current = settings_owner.canonical
-        assert current is not None
-        return build_self_stt_provider_request_from_vnext(current)
+    def request_factory(config, warmup):
+        return build_self_stt_provider_request_from_config(config, warmup=warmup)
 
     config_a = build_self_capture_session_config_from_vnext(settings_owner.canonical)
     capture_owner = SelfCaptureSessionOwner(
@@ -461,8 +465,10 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         vad_sink=harness.self_owner,
     )
 
-    async def replace_self_stt(smooth: bool) -> None:
-        await self_application.replace_provider(smooth_local=smooth)
+    async def replace_self_stt(settings: AppSettingsVNext, smooth: bool) -> None:
+        await self_application.replace_provider_with_config(
+            build_self_capture_session_config_from_vnext(settings), smooth_local=smooth
+        )
 
     self_application = SelfCaptureApplicationOwner(
         settings_provider=lambda: SelfCaptureApplicationSettings(
@@ -507,7 +513,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         self_capture_provider=lambda: capture_owner,
         self_capture_owner=lambda: capture_owner,
         peer=lambda: peer,
-        peer_desired=lambda _settings: False,
+        peer_state=lambda _settings: None,
         canonical_settings=lambda value: value,
         clear_local_pending=lambda: None,
         sync_local_notice=lambda: None,
@@ -516,7 +522,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
         dashboard_managed_pending_sink=lambda _value: None,
         sync_effective_flags=lambda: None,
         refresh_overlay=lambda: None,
-        refresh_peer_runtime=_noop,
+        refresh_peer_runtime=lambda _settings: _noop(),
         replace_self_stt=replace_self_stt,
         self_state_sink=lambda _snapshot: None,
         self_availability=lambda snapshot: snapshot.provider_status.value == "ready",
@@ -619,7 +625,7 @@ async def test_provider_apply_intent_full_vertical_rolling_gemini_soniox_reverse
 
     original_refresh_self_stt = components.runtime.refresh_self_stt
     original_self_runtime_convergence = components.runtime.self_runtime_convergence
-    components.runtime.refresh_self_stt = _noop
+    components.runtime.refresh_self_stt = lambda _settings: _noop()
     components.runtime.self_runtime_convergence = lambda _settings: False
     await boundary.apply_provider_intent(soniox_intent)
     stale_result = results.current

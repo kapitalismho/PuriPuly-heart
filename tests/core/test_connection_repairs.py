@@ -24,6 +24,7 @@ from puripuly_heart.core.local_asr.local_stt_download_port import (
 from puripuly_heart.core.local_asr.local_stt_huggingface_xet_adapter import (
     HuggingFaceXetDownloadAdapter,
 )
+from puripuly_heart.core.network_diagnostics import safe_transport_fields
 from puripuly_heart.core.network_requests import ExternalRequestsSession
 from tests.core.test_external_network import certificates as certificates
 from tests.core.test_external_network import http_server, recording_proxy
@@ -83,9 +84,20 @@ async def test_bare_proxy_address_relays_httpx_requests_and_websocket(certificat
 async def test_unsupported_explicit_proxy_scheme_is_not_rewritten(monkeypatch):
     monkeypatch.setenv("HTTPS_PROXY", "ftp://localhost:9")
     assert ProxyPolicy().route("https://example.com").url == "ftp://localhost:9"
+
+    async def dispatch(_transport, _request):
+        pytest.fail("Unsupported explicit routing must fail before any transport dispatch")
+
+    monkeypatch.setattr(httpx.AsyncHTTPTransport, "handle_async_request", dispatch)
     async with network_clients.external_async_client() as client:
-        with pytest.raises(ValueError, match="Unknown scheme"):
-            await client.get("https://example.com")
+        with pytest.raises(Exception) as caught:
+            await client.get("https://broker.example.invalid")
+    fields = safe_transport_fields(caught.value)
+    assert fields["configuration_error"] == "unsupported_proxy_configuration"
+    assert fields["dispatch_certainty"] == "not_dispatched"
+    assert fields["stage"] == "client_configuration"
+    assert fields["proxy_source"] == "env"
+    assert ProxyPolicy().route("https://example.com").url == "ftp://localhost:9"
 
 
 @pytest.mark.parametrize(

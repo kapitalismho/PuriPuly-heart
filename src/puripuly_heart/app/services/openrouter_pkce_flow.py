@@ -224,7 +224,7 @@ class OpenRouterPkceApplicationOwner:
         )
         runtime_apply = ProviderRuntimeApplyAdapter(
             owner=self.provider_runtime,
-            settings=updated,
+            settings_provider=self.settings.require_committed,
             plan=plan,
             surface="openrouter_pkce",
             operation="openrouter_pkce_runtime_apply",
@@ -233,51 +233,44 @@ class OpenRouterPkceApplicationOwner:
         scope = LifecycleScope("openrouter-pkce-commit")
 
         async def commit_and_apply() -> bool:
-            try:
-                commit_result = await transaction.set_provider_secret(
-                    SecretSetRequest(
-                        secret_key=OPENROUTER_BYOK_API_KEY_SECRET,
-                        secret_value=result.api_key,
-                        settings_values=values,
-                        expected_settings_revision=None,
-                        reason="openrouter_pkce",
-                        correlation_id=None,
-                    )
+            commit_result = await transaction.set_provider_secret(
+                SecretSetRequest(
+                    secret_key=OPENROUTER_BYOK_API_KEY_SECRET,
+                    secret_value=result.api_key,
+                    settings_values=values,
+                    expected_settings_revision=None,
+                    reason="openrouter_pkce",
+                    correlation_id=None,
                 )
-                if (
-                    commit_result.status
-                    != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED
-                ):
-                    self.results.set(commit_result)
-                    self._fail(
-                        launch_source,
-                        OpenRouterAuthenticationError(stage="settings_commit", reason="setup"),
-                        stage="settings_commit",
-                    )
-                    return False
+            )
+            if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+                self.results.set(commit_result)
+                self._fail(
+                    launch_source,
+                    OpenRouterAuthenticationError(stage="settings_commit", reason="setup"),
+                    stage="settings_commit",
+                )
+                return False
 
-                runtime_result = await runtime_apply.apply_runtime(
-                    RuntimeApplyRequest(
-                        settings_values=values,
-                        reason="openrouter_pkce",
-                        correlation_id=None,
-                    )
+            runtime_result = await runtime_apply.apply_runtime(
+                RuntimeApplyRequest(
+                    settings_values=self.settings.snapshot_values(
+                        self.settings.require_committed()
+                    ),
+                    reason="openrouter_pkce",
+                    correlation_id=None,
                 )
-                if runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED:
-                    result_value = TransactionResult(
-                        status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
-                        message=runtime_result.message,
-                        diagnostics=runtime_result.diagnostics,
-                    )
-                else:
-                    result_value = _runtime_apply_result_as_degraded_transaction(runtime_result)
-                self.results.set(result_value)
-                return True
-            finally:
-                if settings_repository.commit_succeeded:
-                    self.settings.complete()
-                else:
-                    self.settings.rollback()
+            )
+            if runtime_result.status == RUNTIME_APPLY_STATUS_APPLIED:
+                result_value = TransactionResult(
+                    status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
+                    message=runtime_result.message,
+                    diagnostics=runtime_result.diagnostics,
+                )
+            else:
+                result_value = _runtime_apply_result_as_degraded_transaction(runtime_result)
+            self.results.set(result_value)
+            return True
 
         operation = start_lifecycle_task(
             scope,

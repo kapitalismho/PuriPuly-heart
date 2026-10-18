@@ -3,12 +3,20 @@ from __future__ import annotations
 import asyncio
 import inspect
 from collections.abc import Awaitable, Callable, Coroutine
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from puripuly_heart.core.openrouter_pkce import OpenRouterPKCEExchangeResult
 
 _TaskResultT = TypeVar("_TaskResultT")
 ExternalTaskRunner = Callable[[Callable[[], Awaitable[Any]]], object]
+
+
+@dataclass(slots=True)
+class _ExternalAuthTask:
+    handle: object | None = None
+    task: asyncio.Task[Any] | None = None
+    cancel_requested: bool = False
 
 
 class OAuthRuntime:
@@ -30,7 +38,7 @@ class OAuthRuntime:
         self._auth_task_timeout_s = max(0.0, float(auth_task_timeout_s))
         self._auth_tasks: dict[str, asyncio.Task[Any]] = {}
         self._task_names: dict[asyncio.Task[Any], str] = {}
-        self._external_task_handles: dict[str, object] = {}
+        self._external_task_handles: dict[str, _ExternalAuthTask] = {}
         self._loopback_listeners: dict[str, object] = {}
         self._openrouter_pkce_client: object | None = None
         self._closing = False
@@ -144,21 +152,34 @@ class OAuthRuntime:
         if self._closing or self._closed:
             raise RuntimeError("OAuthRuntime is closed to new external auth tasks")
         if task_name in self._external_task_handles:
-            existing = self._external_task_handles[task_name]
-            done = getattr(existing, "done", None)
-            if not (callable(done) and bool(done())):
-                raise RuntimeError(f"OAuthRuntime already owns external task {task_name!r}")
-            self._external_task_handles.pop(task_name, None)
-        handle = task_runner(task_factory)
-        self._external_task_handles[task_name] = handle
+            raise RuntimeError(f"OAuthRuntime already owns external task {task_name!r}")
+        owned = _ExternalAuthTask()
+        self._external_task_handles[task_name] = owned
+
+        async def run_owned() -> Any:
+            if self._external_task_handles.get(task_name) is not owned:
+                return None
+            owned.task = asyncio.current_task()
+            try:
+                if not owned.cancel_requested:
+                    return await task_factory()
+                return None
+            finally:
+                if self._external_task_handles.get(task_name) is owned:
+                    self._external_task_handles.pop(task_name, None)
+
+        try:
+            handle = task_runner(run_owned)
+            if handle is None:
+                raise RuntimeError("OAuthRuntime external task was not admitted")
+        except BaseException:
+            if self._external_task_handles.get(task_name) is owned:
+                self._external_task_handles.pop(task_name, None)
+            raise
+        owned.handle = handle
         add_done_callback = getattr(handle, "add_done_callback", None)
         if callable(add_done_callback):
-            add_done_callback(
-                lambda finished, *, _task_name=task_name: self._clear_external_task(
-                    _task_name,
-                    finished,
-                )
-            )
+            add_done_callback(lambda finished: self._clear_external_task(task_name, finished))
         return handle
 
     def cancel_external_task(
@@ -167,21 +188,26 @@ class OAuthRuntime:
         *,
         task_name: str | None = None,
     ) -> None:
-        if task_name is None:
-            for name, candidate in tuple(self._external_task_handles.items()):
-                if candidate is handle:
-                    task_name = name
-                    break
-        if task_name is not None:
-            handle = self._external_task_handles.pop(task_name, handle)
-        cancel = getattr(handle, "cancel", None)
-        if callable(cancel):
-            cancel()
+        owned = self._external_task_handles.get(task_name) if task_name is not None else None
+        if owned is None:
+            owned = next(
+                (item for item in self._external_task_handles.values() if item.handle is handle),
+                None,
+            )
+        if owned is None or owned.cancel_requested:
+            return
+        owned.cancel_requested = True
+        if owned.task is not None:
+            owned.task.get_loop().call_soon_threadsafe(owned.task.cancel)
+        else:
+            cancel = getattr(owned.handle, "cancel", None)
+            if callable(cancel):
+                cancel()
 
     def clear_external_task(self, task_name: str, handle: object | None = None) -> None:
-        current = self._external_task_handles.get(task_name)
-        if handle is None or current is handle:
-            self._external_task_handles.pop(task_name, None)
+        owned = self._external_task_handles.get(task_name)
+        if owned is not None:
+            self._clear_external_task(task_name, owned.handle if handle is None else handle)
 
     async def close(self) -> None:
         if self._closed and not self._has_resources():
@@ -195,7 +221,7 @@ class OAuthRuntime:
             failures: list[Exception] = []
             try:
                 failures.extend(await self._close_loopback_listeners())
-                failures.extend(self._cancel_external_tasks())
+                failures.extend(await self._cancel_external_tasks())
                 failures.extend(await self._cancel_and_gather_auth_tasks())
                 self._openrouter_pkce_client = None
             finally:
@@ -222,17 +248,34 @@ class OAuthRuntime:
                     self._loopback_listeners.pop(listener_name, None)
         return failures
 
-    def _cancel_external_tasks(self) -> list[Exception]:
+    async def _cancel_external_tasks(self) -> list[Exception]:
         failures: list[Exception] = []
-        handles = tuple(self._external_task_handles.values())
-        self._external_task_handles.clear()
-        for handle in handles:
-            cancel = getattr(handle, "cancel", None)
-            if callable(cancel):
-                try:
-                    cancel()
-                except Exception as exc:
-                    failures.append(exc)
+        for task_name, owned in tuple(self._external_task_handles.items()):
+            try:
+                self.cancel_external_task(owned.handle, task_name=task_name)
+            except Exception as exc:
+                failures.append(exc)
+        await asyncio.sleep(0)
+        current_task = asyncio.current_task()
+        tasks = {
+            owned.task
+            for owned in self._external_task_handles.values()
+            if owned.task is not None and owned.task is not current_task
+        }
+        if tasks:
+            done, pending = await asyncio.wait(tasks, timeout=self._auth_task_timeout_s)
+            for task in done:
+                _observe_task_exception(task)
+            if pending:
+                failures.append(RuntimeError("OAuthRuntime external auth tasks did not settle"))
+        for task_name, owned in tuple(self._external_task_handles.items()):
+            self._clear_external_task(task_name, owned.handle)
+            if (
+                self._external_task_handles.get(task_name) is owned
+                and owned.task is not current_task
+                and owned.task not in tasks
+            ):
+                failures.append(RuntimeError("OAuthRuntime external task settlement is unobserved"))
         return failures
 
     async def _cancel_and_gather_auth_tasks(self) -> list[Exception]:
@@ -255,10 +298,8 @@ class OAuthRuntime:
                 )
                 for task in done_after_cancel:
                     _observe_task_exception(task)
-        for task in tasks:
-            task_name = self._task_names.pop(task, None)
-            if task_name is not None:
-                self._auth_tasks.pop(task_name, None)
+        if any(not task.done() for task in tasks):
+            failures.append(RuntimeError("OAuthRuntime auth tasks did not settle"))
         return failures
 
     def _on_auth_task_done(self, task: asyncio.Task[Any]) -> None:
@@ -268,7 +309,15 @@ class OAuthRuntime:
         _observe_task_exception(task)
 
     def _clear_external_task(self, task_name: str, handle: object) -> None:
-        if self._external_task_handles.get(task_name) is handle:
+        owned = self._external_task_handles.get(task_name)
+        if owned is None or owned.handle is not handle:
+            return
+        if owned.task is not None:
+            settled = owned.task.done()
+        else:
+            done = getattr(handle, "done", None)
+            settled = callable(done) and bool(done())
+        if settled:
             self._external_task_handles.pop(task_name, None)
 
 

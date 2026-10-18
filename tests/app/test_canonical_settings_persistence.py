@@ -77,14 +77,14 @@ def _with_locale(settings: AppSettingsVNext, locale: str) -> AppSettingsVNext:
     )
 
 
-def _with_referral(settings: AppSettingsVNext, referral_id: str) -> AppSettingsVNext:
+def _with_managed_ref(settings: AppSettingsVNext, credential_ref: str) -> AppSettingsVNext:
     return replace(
         settings,
         state=replace(
             settings.state,
             managed_connection=replace(
                 settings.state.managed_connection,
-                referral_id=referral_id,
+                active_managed_credential_ref=credential_ref,
             ),
         ),
     )
@@ -225,15 +225,18 @@ def test_canonical_settings_persistence_port_covers_load_save_and_rollback(
     owner.remember_projection(active_settings)
     owner.persist_current()
 
-    persist_managed_identity(_with_referral(stale_settings, "234567"))
+    persist_managed_identity(_with_managed_ref(stale_settings, "managed-ref-234567"))
 
     assert owner.require_canonical().intent.ui.locale == "ru"
-    assert owner.require_canonical().state.managed_connection.referral_id == "234567"
+    assert (
+        owner.require_canonical().state.managed_connection.active_managed_credential_ref
+        == "managed-ref-234567"
+    )
 
     active_before_failure = copy.deepcopy(owner.require_canonical())
     monkeypatch.setattr(adapter_module, "save_vnext_settings", fail_save)
     with pytest.raises(OSError, match="injected save failure"):
-        persist_managed_identity(_with_referral(stale_settings, "345678"))
+        persist_managed_identity(_with_managed_ref(stale_settings, "managed-ref-345678"))
     assert owner.canonical == active_before_failure
 
 

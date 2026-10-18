@@ -7,11 +7,11 @@ import {
   resolveRequestNetworkIdentitySecrets,
   type AbuseDecision,
 } from './abuse-controls';
-import { ensureReferralSettlementJobsForDelivery, hasUnsettledReservedRewardWithoutJob } from './managed-referral-settlement';
+
 import {
-  attachReferralToOperation,
   bindOperationForIssue,
   buildManagedOperationStatusBodyWithDelivery,
+  createManagedOperationChildKey,
   failManagedOperationTerminal,
   markOperationActiveOnAck,
   type ManagedOperationRecord as StrictManagedOperationRecord,
@@ -23,7 +23,6 @@ import {
   providerKeyNameForOperationAttempt,
   recordAttemptCredential,
   startManagedOperationAttempt,
-  transitionManagedOperation,
   transitionOperationToPostCreateState,
   hasOtherLiveOperation,
   findConflictingOperationDelivery,
@@ -45,12 +44,11 @@ import {
   buildManagedCleanupRequiredAuditPayload,
   getManagedIssuanceSourcePolicy,
 } from './managed-issuance';
-import type { TalkTogetherPassStatusResponse } from './managed-state';
+
 import { createManagedKeyDelivery } from './managed-key-delivery';
 import {
   assignManagedGuardrail,
   cleanupManagedChildKey,
-  createManagedChildKey,
   isDefinitiveManagedChildKeyCreateRejection,
   OpenRouterManagementError,
   type ManagedChildKeyCleanupResult,
@@ -58,27 +56,11 @@ import {
 import { deriveManagedOpenRouterUserId } from './openrouter-user-id';
 import {
   QQ_MANAGED_ENTITLEMENT_STALE_ISSUING_POLICY,
-  type BrokerQqTalkTogetherPassConfigValue,
   type QqManagedEntitlementRecord,
 } from './persistence';
-import {
-  countCountedQqReferralRewardsSince,
-  ensureOwnedReferralIdForActiveQqManagedUser,
-  getOperationReferralReward,
-  getReservedReferralRewardIdForOperation,
-  markReservedIssueReferralFailed,
-  recordSkippedIssueReferralReward,
-  reserveIssueReferralReward,
-  resolveOwnedReferralStatusForManagedSubject,
-  resolveTalkTogetherPassStatusForOwnedReferralCode,
-  type IssueReferralReservationResult,
-  type ReferralAttemptIpDigest,
-} from './referral';
+
 import { resolveNetworkIdentityWriteMode } from './network-identity';
-import {
-  getQqTalkTogetherPassConfig,
-  qqReferralUtcDayStartIso,
-} from './qq-talk-together-pass';
+
 import { nonEmptyString } from './public-input';
 import { MANAGED_TRIAL_POLICY } from './trial-policy';
 
@@ -90,13 +72,9 @@ interface QqManagedIssueInput {
   qqSubjectRef: string;
   now: Date;
   deliveryAckSupported?: boolean;
-  referralId: string | null;
-  referredInstallationId: string | null;
-  attemptIpDigest: ReferralAttemptIpDigest | null;
-  attemptIpLegacyHash: string | null;
+  installationId: string | null;
   operationId: string | null;
   resumeToken: string | null;
-  passConfig: BrokerQqTalkTogetherPassConfigValue;
 }
 
 type QqReservationResult =
@@ -120,7 +98,6 @@ export async function issueQqManagedEntitlement(
   let childKey: { rawKey: string; hash: string } | null = null;
   let childKeyAttached = false;
   let childKeyCreationStarted = false;
-  let referralReservation: IssueReferralReservationResult | null = null;
   const issueBudgetUsd = sourcePolicy.budget_usd;
   let boundOperation: StrictManagedOperationRecord | null = null;
   let boundAttemptIndex: number | null = null;
@@ -148,7 +125,7 @@ export async function issueQqManagedEntitlement(
           resumeToken: input.resumeToken,
           issueSource: ISSUE_SOURCE,
           subjectRef: input.qqSubjectRef,
-          installationId: input.referredInstallationId,
+          installationId: input.installationId,
           devicePublicKey: null,
           now: input.now,
         })
@@ -172,7 +149,7 @@ export async function issueQqManagedEntitlement(
       const deliveryConflict = await findConflictingOperationDelivery(c.env.BROKER_DB, {
         issueSource: 'qq',
         subjectRef: input.qqSubjectRef,
-        installationId: input.referredInstallationId,
+        installationId: input.installationId,
         excludeOperationId: boundOperation.operation_id,
       });
       if (deliveryConflict) {
@@ -189,6 +166,7 @@ export async function issueQqManagedEntitlement(
         return c.json(operationBindingResponseBody(current ?? boundOperation, attempts));
       }
       boundAttemptIndex = started.attempt.attempt_index;
+      boundOperation = { ...boundOperation, current_attempt_index: boundAttemptIndex, attempt_count: boundAttemptIndex };
     }
     const reservation = await reserveQqManagedEntitlement(c.env, {
       qqSubjectRef: input.qqSubjectRef,
@@ -221,39 +199,6 @@ export async function issueQqManagedEntitlement(
       });
     }
 
-    if (input.referralId && input.deliveryAckSupported === true) {
-      referralReservation = await bestEffortReserveQqIssueReferralReward(
-        c.env.BROKER_DB,
-        {
-          referralId: input.referralId,
-          qqSubjectRef: input.qqSubjectRef,
-          referredInstallationId: input.referredInstallationId,
-          attemptIpDigest: input.attemptIpDigest ?? null,
-          operationId: boundOperation?.operation_id ?? null,
-          passConfig: input.passConfig,
-          now: input.now,
-          nowIso,
-        },
-      );
-      if (referralReservation?.outcome === 'reserved') {
-        await bestEffortWarnQqReferralDailyThreshold(c.env.BROKER_DB, {
-          passConfig: input.passConfig,
-          now: input.now,
-        });
-      }
-    }
-
-    if (boundOperation) {
-      const rewardId = await getReservedReferralRewardIdForOperation(c.env.BROKER_DB, boundOperation.operation_id);
-      await attachReferralToOperation(
-        c.env.BROKER_DB,
-        boundOperation.operation_id,
-        rewardId,
-        referralReservation?.outcome === 'reserved' ? 'reserved' : referralReservation?.outcome === 'skipped' ? 'skipped' : 'none',
-        'none',
-        input.now,
-      );
-    }
     const issuedAt = nowIso;
     const deliveredAt = nowIso;
     const expiresAt = addMonthsUtc(
@@ -274,7 +219,7 @@ export async function issueQqManagedEntitlement(
       throw new Error('QQ managed child key creation start persistence failed');
     }
 
-    childKey = await createManagedChildKey({
+    childKey = await createManagedOperationChildKey(c.env.BROKER_DB, boundOperation?.operation_id ?? null, boundAttemptIndex, {
       managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
       issueSource: ISSUE_SOURCE,
       subjectRef: input.qqSubjectRef,
@@ -303,7 +248,7 @@ export async function issueQqManagedEntitlement(
     }
     childKeyAttached = true;
     if (boundOperation && boundAttemptIndex !== null) {
-      await recordAttemptCredential(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, childKey.hash, input.now);
+      if (!(await recordAttemptCredential(c.env.BROKER_DB, boundOperation.operation_id, boundAttemptIndex, childKey.hash, input.now))) throw new Error('managed attempt is no longer owned');
     }
 
     await assignManagedGuardrail({
@@ -331,7 +276,7 @@ export async function issueQqManagedEntitlement(
       const delivery = await createManagedKeyDelivery(c.env.BROKER_DB, {
         issueSource: ISSUE_SOURCE,
         subjectRef: input.qqSubjectRef,
-        installationId: input.referredInstallationId,
+        installationId: input.installationId,
         managedCredentialRef: childKey.hash,
         createdAt: input.now,
         expiresAt: deliveryAckExpiresAt,
@@ -339,7 +284,7 @@ export async function issueQqManagedEntitlement(
         attemptIndex: boundAttemptIndex,
       });
       if (boundOperation) {
-        const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, 'DELIVERY_PENDING', input.now);
+        const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, boundOperation.current_attempt_index, 'DELIVERY_PENDING', input.now);
         if (!settled || settled.state !== 'DELIVERY_PENDING') {
           throw new Error('QQ managed operation delivery-pending transition failed');
         }
@@ -376,7 +321,7 @@ export async function issueQqManagedEntitlement(
       throw new Error('QQ managed entitlement activation failed');
     }
     if (boundOperation) {
-      const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, 'ACTIVE', input.now);
+      const settled = await transitionOperationToPostCreateState(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation.operation_id, boundOperation.current_attempt_index, 'ACTIVE', input.now);
       if (!settled || settled.state !== 'ACTIVE') {
         throw new Error('QQ managed operation activation transition failed');
       }
@@ -389,15 +334,6 @@ export async function issueQqManagedEntitlement(
       now: input.now,
     });
 
-    const ownedStatus = await bestEffortResolveQqOwnedReferralStatus(
-      c.env.BROKER_DB,
-      {
-        qqSubjectRef: input.qqSubjectRef,
-        ownerInstallationId: input.referredInstallationId,
-        passEnabled: input.passConfig.enabled,
-        nowIso,
-      },
-    );
     const openRouterUserId = await deriveOptionalOpenRouterUserId({
       subjectRef: input.qqSubjectRef,
       secret: c.env.OPENROUTER_MANAGED_USER_HMAC_SECRET,
@@ -411,12 +347,6 @@ export async function issueQqManagedEntitlement(
       managed_credential_ref: childKey.hash,
       expires_at: expiresAt,
       ...(openRouterUserId ? { openrouter_user_id: openRouterUserId } : {}),
-      ...(ownedStatus
-        ? {
-            referral_id: ownedStatus.referralCode.referral_id,
-            talk_together_pass: ownedStatus.talkTogetherPass,
-          }
-        : {}),
     });
   } catch (error) {
     if (
@@ -437,16 +367,8 @@ export async function issueQqManagedEntitlement(
     if (boundOperation && isDefinitiveManagedChildKeyCreateRejection(error)) {
       await failManagedOperationTerminal(c.env.BROKER_DB, boundOperation, input.now, 'terminal_provider_failure');
     } else if (boundOperation && boundAttemptIndex !== null) {
-      const reconciled = await reconcileUnknownAttempt(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, boundOperation, input.now);
+      const reconciled = await reconcileUnknownAttempt(c.env.BROKER_DB, c.env.OPENROUTER_MANAGEMENT_API_KEY, { ...boundOperation, current_attempt_index: boundAttemptIndex }, input.now);
       boundProviderCleanupVerified = reconciled?.state === 'RETRY_READY' || reconciled?.state === 'CLEAN';
-    }
-    if (!boundOperation) {
-      await bestEffortMarkQqIssueReferralFailed(c.env.BROKER_DB, {
-        referralReservation,
-        qqSubjectRef: input.qqSubjectRef,
-        referredInstallationId: input.referredInstallationId,
-        nowIso,
-      });
     }
 
     if (reservationCreated) {
@@ -456,7 +378,7 @@ export async function issueQqManagedEntitlement(
         if (
           !childKeyCreationStarted ||
           definitiveCreateRejection ||
-          boundOperation !== null
+          boundProviderCleanupVerified
         ) {
           const release = childKeyCreationStarted
             ? releaseStartedQqReservationWithoutChildKey
@@ -475,7 +397,7 @@ export async function issueQqManagedEntitlement(
           });
         }
       } else {
-        await handleQqManagedChildKeyFailure(c, {
+        if (!boundOperation) await handleQqManagedChildKeyFailure(c, {
           qqSubjectRef: input.qqSubjectRef,
           issueRef: issueMetadata.issueRef,
           childKey,
@@ -504,14 +426,11 @@ export async function executeQqResumeIssuance(
   const db = c.env.BROKER_DB;
   const operation = input.operation;
   const qqSubjectRef = operation.subject_ref;
-  const referredInstallationId = operation.installation_id;
-  const passConfig = await getQqTalkTogetherPassConfig(db);
+  const installationId = operation.installation_id;
   const sourcePolicy = getManagedIssuanceSourcePolicy(ISSUE_SOURCE);
   const issueBudgetUsd = sourcePolicy.budget_usd;
   const issueRef = createIssueRef();
-  let reservationCreated = false;
   let childKey: { rawKey: string; hash: string } | null = null;
-  let childKeyAttached = false;
   let childKeyCreationStarted = false;
   const staleEntitlement = await getQqManagedEntitlement(db, qqSubjectRef);
   if (
@@ -525,7 +444,7 @@ export async function executeQqResumeIssuance(
       const blocked = await hasOtherLiveOperation(db, {
         issueSource: 'qq',
         subjectRef: qqSubjectRef,
-        installationId: referredInstallationId,
+        installationId: installationId,
         excludeOperationId: operation.operation_id,
       });
       if (blocked) {
@@ -543,35 +462,23 @@ export async function executeQqResumeIssuance(
       staleEntitlement.managed_credential_ref,
       input.now,
     );
-    const staleCleanup = await cleanupManagedChildKey({
-      managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
-      keyHash: staleEntitlement.managed_credential_ref,
-    });
-    if (!staleCleanup.ok) {
-      await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
-      const attempts = await listManagedOperationAttempts(db, operation.operation_id);
-      const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
-      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
+    await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+    const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+    if (current) {
+      await reconcileUnknownAttempt(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, { ...current, current_attempt_index: input.attemptIndex }, input.now);
     }
-    const reset = await resetStaleQqReservationForRetry(db, {
-      qqSubjectRef,
-      managedCredentialRef: staleEntitlement.managed_credential_ref,
-      nowIso: input.nowIso,
-    });
-    if (!reset) {
-      await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
-      const attempts = await listManagedOperationAttempts(db, operation.operation_id);
-      const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
-      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
-    }
+    const attempts = await listManagedOperationAttempts(db, operation.operation_id);
+    const reconciled = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+    return c.json(await buildManagedOperationStatusBodyWithDelivery(db, reconciled ?? operation, attempts));
   }
   try {
     const currentEntitlement = await getQqManagedEntitlement(db, qqSubjectRef);
     if (currentEntitlement && isLifetimeBlockingQqEntitlement(currentEntitlement)) {
-      await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
+      await failManagedOperationTerminal(db, operation, input.now, 'terminal_provider_failure');
       const attempts = await listManagedOperationAttempts(db, operation.operation_id);
-      const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
-      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
+      const terminal = await getManagedOperationStatusSnapshot(db, operation.operation_id);
+      return c.json(await buildManagedOperationStatusBodyWithDelivery(db, terminal ?? operation, attempts));
     }
     const brakeDecision = await checkActiveIssuanceBrake(db, currentEntitlement);
     if (brakeDecision) {
@@ -603,13 +510,11 @@ export async function executeQqResumeIssuance(
       const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
       return c.json(await buildManagedOperationStatusBodyWithDelivery(db, current ?? operation, attempts));
     }
-    reservationCreated = true;
     const cap = await getManagedDailyIssuanceCapState(db, input.now, {
       excludeCurrent: { issueSource: ISSUE_SOURCE, subjectRef: qqSubjectRef, issueRef },
     });
     if (cap.reached) {
       await releaseQqReservationBeforeChildKey(db, { qqSubjectRef, issueRef });
-      reservationCreated = false;
       await markAttemptUnknown(db, operation.operation_id, input.attemptIndex, input.now);
       await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
       return publicErrorResponse(c, 503, {
@@ -620,11 +525,6 @@ export async function executeQqResumeIssuance(
         message: 'Daily managed issuance cap reached',
         entitlement: null,
       });
-    }
-    const referralReservation = await getOperationReferralReward(db, operation.operation_id);
-    if (operation.referral_status === 'reserved') {
-      const rewardId = await getReservedReferralRewardIdForOperation(db, operation.operation_id);
-      await attachReferralToOperation(db, operation.operation_id, rewardId, 'reserved', 'none', input.now);
     }
     const issuedAt = input.nowIso;
     const expiresAt = addMonthsUtc(
@@ -640,7 +540,7 @@ export async function executeQqResumeIssuance(
     if (!childKeyCreationStarted) {
       throw new Error('QQ managed child key creation start persistence failed');
     }
-    childKey = await createManagedChildKey({
+    childKey = await createManagedOperationChildKey(db, operation.operation_id, input.attemptIndex, {
       managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
       issueSource: ISSUE_SOURCE,
       subjectRef: qqSubjectRef,
@@ -658,8 +558,7 @@ export async function executeQqResumeIssuance(
     if (!attached) {
       throw new Error('QQ managed child key reservation attachment failed');
     }
-    childKeyAttached = true;
-    await recordAttemptCredential(db, operation.operation_id, input.attemptIndex, childKey.hash, input.now);
+    if (!(await recordAttemptCredential(db, operation.operation_id, input.attemptIndex, childKey.hash, input.now))) throw new Error('managed attempt is no longer owned');
     await assignManagedGuardrail({
       managementApiKey: c.env.OPENROUTER_MANAGEMENT_API_KEY,
       guardrailId: c.env.OPENROUTER_MANAGED_GUARDRAIL_ID,
@@ -681,14 +580,14 @@ export async function executeQqResumeIssuance(
     const delivery = await createManagedKeyDelivery(db, {
       issueSource: ISSUE_SOURCE,
       subjectRef: qqSubjectRef,
-      installationId: referredInstallationId,
+      installationId: installationId,
       managedCredentialRef: childKey.hash,
       createdAt: input.now,
       expiresAt: deliveryAckExpiresAt,
       operationId: operation.operation_id,
       attemptIndex: input.attemptIndex,
     });
-    const settled = await transitionOperationToPostCreateState(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, operation.operation_id, 'DELIVERY_PENDING', input.now);
+    const settled = await transitionOperationToPostCreateState(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, operation.operation_id, input.attemptIndex, 'DELIVERY_PENDING', input.now);
     if (!settled || settled.state !== 'DELIVERY_PENDING') {
       const attempts = await listManagedOperationAttempts(db, operation.operation_id);
       const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
@@ -729,25 +628,9 @@ export async function executeQqResumeIssuance(
       const terminal = await getManagedOperationStatusSnapshot(db, operation.operation_id);
       return c.json(await buildManagedOperationStatusBodyWithDelivery(db, terminal ?? operation, attempts));
     }
-    if (reservationCreated) {
-      if (!childKey) {
-        const definitiveCreateRejection = isDefinitiveManagedChildKeyCreateRejection(error);
-        if (!childKeyCreationStarted || definitiveCreateRejection) {
-          const release = childKeyCreationStarted
-            ? releaseStartedQqReservationWithoutChildKey
-            : bestEffortReleaseQqReservationBeforeChildKey;
-          await release(db, { qqSubjectRef, issueRef });
-        }
-      } else {
-        await handleQqManagedChildKeyFailure(c, {
-          qqSubjectRef,
-          issueRef,
-          childKey,
-          childKeyAttached,
-          nowIso: input.nowIso,
-          error,
-        });
-      }
+    if (!childKeyCreationStarted) {
+      await bestEffortReleaseQqReservationBeforeChildKey(db, { qqSubjectRef, issueRef });
+      await releaseUnstartedOperationAttempt(db, operation.operation_id, input.attemptIndex, input.now);
     }
     const attempts = await listManagedOperationAttempts(db, operation.operation_id);
     const current = await getManagedOperationStatusSnapshot(db, operation.operation_id);
@@ -755,178 +638,6 @@ export async function executeQqResumeIssuance(
   }
 }
 
-async function resetStaleQqReservationForRetry(
-  db: D1Database,
-  input: { qqSubjectRef: string; managedCredentialRef: string; nowIso: string },
-): Promise<boolean> {
-  const result = await db
-    .prepare(
-      `UPDATE qq_managed_entitlements
-          SET status = 'issuing',
-              managed_credential_ref = NULL,
-              issued_at = NULL,
-              expires_at = NULL,
-              delivered_at = NULL,
-              child_key_creation_started_at = NULL,
-              updated_at = ?
-        WHERE qq_subject_ref = ?
-          AND status = 'delivery_pending'
-          AND managed_credential_ref = ?`,
-    )
-    .bind(input.nowIso, input.qqSubjectRef, input.managedCredentialRef)
-    .run();
-  return Number(result.meta.changes ?? 0) === 1;
-}
-
-async function bestEffortReserveQqIssueReferralReward(
-  db: D1Database,
-  input: {
-    referralId: string;
-    qqSubjectRef: string;
-    referredInstallationId: string | null;
-    attemptIpDigest: ReferralAttemptIpDigest | null;
-    attemptIpLegacyHash?: string | null;
-    operationId?: string | null;
-    passConfig: BrokerQqTalkTogetherPassConfigValue;
-    now: Date;
-    nowIso: string;
-  },
-): Promise<IssueReferralReservationResult | null> {
-  try {
-    if (!input.passConfig.enabled) {
-      return null;
-    }
-    if (!input.passConfig.rewards_enabled) {
-      return await recordSkippedIssueReferralReward(db, {
-        referralId: input.referralId,
-        referredSource: 'qq',
-        referredSubjectRef: input.qqSubjectRef,
-        referredInstallationId: input.referredInstallationId,
-        referredHardwareHash: null,
-        referredHardwareHashSaltVersion: null,
-        skipReason: 'rewards_disabled',
-        attemptIpDigest: input.attemptIpDigest ?? null,
-        attemptIpLegacyHash: input.attemptIpLegacyHash ?? null,
-        nowIso: input.nowIso,
-      });
-    }
-    if (!input.referredInstallationId) {
-      return await recordSkippedIssueReferralReward(db, {
-        referralId: input.referralId,
-        referredSource: 'qq',
-        referredSubjectRef: input.qqSubjectRef,
-        referredInstallationId: null,
-        referredHardwareHash: null,
-        referredHardwareHashSaltVersion: null,
-        skipReason: 'invalid_installation',
-        attemptIpDigest: input.attemptIpDigest ?? null,
-        attemptIpLegacyHash: input.attemptIpLegacyHash ?? null,
-        operationId: input.operationId ?? null,
-        nowIso: input.nowIso,
-      });
-    }
-    return await reserveIssueReferralReward(db, {
-      referralId: input.referralId,
-      referredSource: 'qq',
-      referredSubjectRef: input.qqSubjectRef,
-      referredInstallationId: input.referredInstallationId,
-      referredHardwareHash: null,
-      referredHardwareHashSaltVersion: null,
-      attemptIpDigest: input.attemptIpDigest ?? null,
-      attemptIpLegacyHash: input.attemptIpLegacyHash ?? null,
-      operationId: input.operationId ?? null,
-      globalCountLimit: input.passConfig.daily_max_count,
-      globalCountWindowStartIso: qqReferralUtcDayStartIso(input.now),
-      nowIso: input.nowIso,
-    });
-  } catch {
-    return null;
-  }
-}
-
-async function bestEffortWarnQqReferralDailyThreshold(
-  db: D1Database,
-  input: { passConfig: BrokerQqTalkTogetherPassConfigValue; now: Date },
-): Promise<void> {
-  try {
-    const count = await countCountedQqReferralRewardsSince(
-      db,
-      qqReferralUtcDayStartIso(input.now),
-    );
-    if (count >= input.passConfig.daily_warning_count) {
-      console.warn('qq_referral_daily_warning_threshold_reached', {
-        counted_rewards: count,
-        warning_threshold: input.passConfig.daily_warning_count,
-        daily_max_count: input.passConfig.daily_max_count,
-        broker_timestamp: input.now.toISOString(),
-      });
-    }
-  } catch {
-    return;
-  }
-}
-
-async function bestEffortMarkQqIssueReferralFailed(
-  db: D1Database,
-  input: {
-    referralReservation: IssueReferralReservationResult | null;
-    qqSubjectRef: string;
-    referredInstallationId: string | null;
-    nowIso: string;
-  },
-): Promise<void> {
-  if (input.referralReservation?.outcome !== 'reserved') {
-    return;
-  }
-  try {
-    await markReservedIssueReferralFailed(db, {
-      referralId: input.referralReservation.referralId,
-      referredSource: 'qq',
-      referredSubjectRef: input.qqSubjectRef,
-      referredInstallationId: input.referredInstallationId,
-      failureReason: 'issue_delivery_failed',
-      nowIso: input.nowIso,
-    });
-  } catch {
-    return;
-  }
-}
-
-async function bestEffortResolveQqOwnedReferralStatus(
-  db: D1Database,
-  input: {
-    qqSubjectRef: string;
-    ownerInstallationId: string | null;
-    passEnabled: boolean;
-    nowIso: string;
-  },
-) {
-  try {
-    let status = await resolveOwnedReferralStatusForManagedSubject(db, {
-      source: 'qq',
-      subjectRef: input.qqSubjectRef,
-    });
-    if (!status && input.passEnabled) {
-      const ensured = await ensureOwnedReferralIdForActiveQqManagedUser(db, {
-        qqSubjectRef: input.qqSubjectRef,
-        ownerInstallationId: input.ownerInstallationId,
-        nowIso: input.nowIso,
-      });
-      if (ensured.ok) {
-        status = {
-          referralCode: ensured.referralCode,
-          talkTogetherPass: await resolveTalkTogetherPassStatusForOwnedReferralCode(
-            db,
-            ensured.referralCode,
-          ),
-        };
-      }
-    }
-    return status;
-  } catch {
-    return null;
-  }
-}
 
 async function reserveQqManagedEntitlement(
   env: Pick<
@@ -1262,8 +973,6 @@ export async function finalizeQqManagedKeyDeliveryAck(
   },
 ): Promise<{
   acknowledgementStatus: 'acknowledged' | 'already_acknowledged';
-  referralId?: string;
-  talkTogetherPass?: TalkTogetherPassStatusResponse;
 }> {
   const entitlement = await c.env.BROKER_DB.prepare(
     `SELECT qq_subject_ref, status, issue_ref, managed_credential_ref,
@@ -1362,65 +1071,6 @@ export async function finalizeQqManagedKeyDeliveryAck(
       input.managedCredentialRef,
       input.managedCredentialRef,
     ),
-    c.env.BROKER_DB.prepare(
-      `INSERT INTO managed_referral_settlement_jobs (
-          source,
-          referral_reward_id,
-          delivery_id,
-          operation_id,
-          phase,
-          attempt_count,
-          last_attempt_at,
-          next_attempt_at,
-          fencing_token,
-          lease_expires_at,
-          last_error_code,
-          created_at,
-          updated_at,
-          completed_at
-        )
-        SELECT 'qq',
-               reward.id,
-               delivery.delivery_id,
-               reward.operation_id,
-               'invitee_pending',
-               0,
-               NULL,
-               ?,
-               NULL,
-               NULL,
-               NULL,
-               ?,
-               ?,
-               NULL
-          FROM referral_rewards reward
-          JOIN managed_key_deliveries delivery
-            ON delivery.delivery_id = ?
-           AND delivery.issue_source = 'qq'
-           AND delivery.subject_ref = reward.referred_subject_ref
-           AND delivery.installation_id IS reward.referred_installation_id
-           AND delivery.managed_credential_ref = ?
-           AND delivery.status = 'acknowledged'
-         WHERE reward.id = (
-           SELECT candidate.id
-             FROM referral_rewards candidate
-            WHERE candidate.referred_source = 'qq'
-              AND candidate.referred_subject_ref = ?
-              AND candidate.referred_installation_id IS ?
-              AND candidate.referred_bonus_status = 'reserved'
-            ORDER BY candidate.created_at DESC, candidate.id DESC
-            LIMIT 1
-         )
-        ON CONFLICT(referral_reward_id) DO NOTHING`,
-    ).bind(
-      acknowledgedAtIso,
-      acknowledgedAtIso,
-      acknowledgedAtIso,
-      input.deliveryId,
-      input.managedCredentialRef,
-      entitlement.qq_subject_ref,
-      delivery.installation_id,
-    ),
   ]);
   const finalized = await c.env.BROKER_DB.prepare(
     `SELECT 1 AS finalized
@@ -1436,73 +1086,11 @@ export async function finalizeQqManagedKeyDeliveryAck(
            WHERE issue_source = 'qq'
              AND managed_credential_ref = delivery.managed_credential_ref
         )
-        AND NOT EXISTS (
-          SELECT 1
-            FROM referral_rewards reward
-           WHERE reward.referred_source = 'qq'
-             AND reward.referred_subject_ref = entitlement.qq_subject_ref
-             AND reward.referred_installation_id IS delivery.installation_id
-             AND reward.referred_bonus_status = 'reserved'
-             AND NOT EXISTS (
-               SELECT 1
-                 FROM managed_referral_settlement_jobs job
-                WHERE job.referral_reward_id = reward.id
-                  AND job.delivery_id = delivery.delivery_id
-             )
-        )`,
+        `,
   )
     .bind(input.deliveryId)
     .first<{ finalized: number }>();
-  let finalizedAck = Number(finalized?.finalized ?? 0) === 1;
-  if (!finalizedAck) {
-    await ensureReferralSettlementJobsForDelivery(c.env.BROKER_DB, {
-      source: 'qq',
-      deliveryId: input.deliveryId,
-      now: input.acknowledgedAt,
-    });
-    const rechecked = await c.env.BROKER_DB.prepare(
-      `SELECT 1 AS finalized
-         FROM managed_key_deliveries AS delivery
-         JOIN qq_managed_entitlements AS entitlement
-           ON entitlement.managed_credential_ref = delivery.managed_credential_ref
-        WHERE delivery.delivery_id = ?
-          AND delivery.status = 'acknowledged'
-          AND entitlement.status = 'active'
-          AND entitlement.delivered_at IS NOT NULL
-          AND EXISTS (
-            SELECT 1 FROM broker_issue_success_events
-             WHERE issue_source = 'qq'
-               AND managed_credential_ref = delivery.managed_credential_ref
-          )
-          AND NOT EXISTS (
-            SELECT 1
-              FROM referral_rewards reward
-             WHERE reward.referred_source = 'qq'
-               AND reward.referred_subject_ref = entitlement.qq_subject_ref
-               AND reward.referred_installation_id IS delivery.installation_id
-               AND reward.referred_bonus_status = 'reserved'
-               AND NOT EXISTS (
-                 SELECT 1
-                   FROM managed_referral_settlement_jobs job
-                  WHERE job.referral_reward_id = reward.id
-                    AND job.delivery_id = delivery.delivery_id
-               )
-          )`,
-    )
-      .bind(input.deliveryId)
-      .first<{ finalized: number }>()
-      .catch(() => null);
-    finalizedAck = Number(rechecked?.finalized ?? 0) === 1;
-  }
-  if (
-    !finalizedAck &&
-    (await hasUnsettledReservedRewardWithoutJob(c.env.BROKER_DB, {
-      source: 'qq',
-      subjectRef: entitlement.qq_subject_ref,
-      installationId: delivery.installation_id,
-      deliveryId: input.deliveryId,
-    }))
-  ) {
+  if (Number(finalized?.finalized ?? 0) !== 1) {
     throw new Error('QQ delivery ACK finalization failed');
   }
   const operationActivated = await markOperationActiveOnAck(c.env.BROKER_DB, input.deliveryId, input.acknowledgedAt);
@@ -1520,54 +1108,15 @@ export async function finalizeQqManagedKeyDeliveryAck(
   } catch {
   }
 
-  return buildQqDeliveryAckResult(c, {
+  return {
     acknowledgementStatus:
       Number(results[2]?.meta.changes ?? 0) === 1
         ? 'acknowledged'
         : 'already_acknowledged',
-    qqSubjectRef: entitlement.qq_subject_ref,
-    ownerInstallationId: delivery.installation_id,
-    nowIso: deliveredAt,
-  });
+  };
 }
 
-async function buildQqDeliveryAckResult(
-  c: Context<BrokerEnv>,
-  input: {
-    acknowledgementStatus: 'acknowledged' | 'already_acknowledged';
-    qqSubjectRef: string;
-    ownerInstallationId: string | null;
-    nowIso: string;
-  },
-): Promise<{
-  acknowledgementStatus: 'acknowledged' | 'already_acknowledged';
-  referralId?: string;
-  talkTogetherPass?: TalkTogetherPassStatusResponse;
-}> {
-  try {
-    const passConfig = await getQqTalkTogetherPassConfig(c.env.BROKER_DB);
-    const ownedStatus = await bestEffortResolveQqOwnedReferralStatus(
-      c.env.BROKER_DB,
-      {
-        qqSubjectRef: input.qqSubjectRef,
-        ownerInstallationId: input.ownerInstallationId,
-        passEnabled: passConfig.enabled,
-        nowIso: input.nowIso,
-      },
-    );
-    return {
-      acknowledgementStatus: input.acknowledgementStatus,
-      ...(ownedStatus
-        ? {
-            referralId: ownedStatus.referralCode.referral_id,
-            talkTogetherPass: ownedStatus.talkTogetherPass,
-          }
-        : {}),
-    };
-  } catch {
-    return { acknowledgementStatus: input.acknowledgementStatus };
-  }
-}
+
 
 async function releaseQqReservationBeforeChildKey(
   db: D1Database,
