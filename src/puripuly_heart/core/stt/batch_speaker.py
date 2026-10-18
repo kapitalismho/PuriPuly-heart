@@ -7,7 +7,7 @@ from collections import deque
 from dataclasses import dataclass, field, replace
 from uuid import uuid4
 
-from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView, SpeakerProofHandoffs
 from puripuly_heart.core.stt.backend import (
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
@@ -65,11 +65,12 @@ class CausalBatchSession:
     def __init__(self, inner, *, clock=time.monotonic, evidence_view=None):
         self.inner = inner
         self.clock = clock
-        self._events = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._parents = deque()
         self._active = None
         self._slices = {}
         self.evidence = evidence_view if evidence_view is not None else SpeakerEvidenceView()
+        self._speaker_handoffs = SpeakerProofHandoffs(self.evidence)
+        self._events = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._owns_evidence = evidence_view is None
         self._input_owner = object()
         self._submitted_ranges = deque(maxlen=self.MAX_SUBMITTED_RANGES)
@@ -308,7 +309,12 @@ class CausalBatchSession:
             self._active = None
             await self._release()
 
+    def _put_event(self, event):
+        self._speaker_handoffs.begin(event, queued=True)
+        return self._events.put(event)
+
     def _discard_buffered_event(self, event, retained):
+        self._speaker_handoffs.end(event, queued=True)
         discard_source_audio_proofs(event, self.evidence, retained=retained)
 
     def _snapshot_native_event(self, event):
@@ -383,7 +389,7 @@ class CausalBatchSession:
                 parent.speakers += (replace(child.speaker, text=text),)
                 if parent.sealed and not parent.children:
                     continue
-                self._events.put(
+                self._put_event(
                     STTProviderTurnUpdate(
                         parent.request.identity,
                         sequence,
@@ -410,7 +416,7 @@ class CausalBatchSession:
                     else "failed" if parent.failures else "final" if parent.text else "empty"
                 )
             )
-            self._events.put(
+            self._put_event(
                 STTProviderTurnTerminal(
                     parent.request.identity,
                     outcome,
@@ -443,8 +449,17 @@ class CausalBatchSession:
             await self._release()
 
     async def turn_events(self):
-        async for event in self._events.events():
-            yield event
+        try:
+            async for event in self._events.events():
+                self._speaker_handoffs.activate(event)
+                try:
+                    yield event
+                finally:
+                    self._speaker_handoffs.end(event)
+                    discard_source_audio_proofs(event, self.evidence)
+        finally:
+            if self._closed:
+                self._speaker_handoffs.discard_queued()
 
     async def _settle_consumer(self):
         if not self._consumer.done():

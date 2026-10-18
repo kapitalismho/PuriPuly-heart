@@ -6,7 +6,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field, replace
 
-from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView, SpeakerProofHandoffs
 from puripuly_heart.core.stt.backend import (
     MAX_SPEAKER_AUDIO_PARTS,
     STTProviderAudioBoundary,
@@ -77,6 +77,7 @@ class StreamingSpeakerSession:
         self._input_owner = object()
         self._stream_scope = None
         self._turns = {}
+        self._speaker_handoffs = SpeakerProofHandoffs(self._timeline)
         self._events = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._closed = False
         self._lock = asyncio.Lock()
@@ -236,12 +237,17 @@ class StreamingSpeakerSession:
                     continue
                 turn.boundaries.add(boundary.boundary_id)
                 self.audio_boundaries.append((identity, boundary))
-                self._events.put(STTProviderAudioBoundary(identity, boundary))
+                self._put_event(STTProviderAudioBoundary(identity, boundary))
 
     def _mapped(self, turn, timing):
         return tuple(span for span, _ in self._mapped_pieces(turn, timing))
 
+    def _put_event(self, event):
+        self._speaker_handoffs.begin(event, queued=True)
+        return self._events.put(event)
+
     def _discard_buffered_event(self, event, retained):
+        self._speaker_handoffs.end(event, queued=True)
         discard_source_audio_proofs(event, self._timeline, retained=retained)
 
     def _snapshot_native_event(self, event):
@@ -1138,7 +1144,7 @@ class StreamingSpeakerSession:
             source_release=release,
         )
         self._freeze_timings(turn, outgoing, publication=True)
-        self._events.put(self._annotate(turn, outgoing))
+        self._put_event(self._annotate(turn, outgoing))
 
     async def _consume(self):
         try:
@@ -1157,7 +1163,7 @@ class StreamingSpeakerSession:
                             )
                         except STTNormalizationError:
                             turn.sequence += 1
-                            self._events.put(
+                            self._put_event(
                                 replace(event, sequence=turn.sequence, final_speaker_runs=())
                             )
                             self._turns.pop(event.identity, None)
@@ -1172,7 +1178,7 @@ class StreamingSpeakerSession:
                         if normalized.source_release is not None:
                             if len(turn.source_endpoints) < 256:
                                 turn.source_endpoints.add(normalized.source_release.text_end)
-                        self._events.put(self._annotate(turn, normalized))
+                        self._put_event(self._annotate(turn, normalized))
                         if normalized.source_release is not None:
                             turn.released = max(turn.released, normalized.source_release.text_end)
                         self._release_available(turn)
@@ -1194,11 +1200,11 @@ class StreamingSpeakerSession:
                             self._release_proofs(turn)
                         else:
                             event = replace(event, final_speaker_runs=())
-                        self._events.put(event)
+                        self._put_event(event)
                     elif isinstance(event, STTRecognitionUnit):
-                        self._events.put(replace(event, final_speaker_runs=()))
+                        self._put_event(replace(event, final_speaker_runs=()))
                     else:
-                        self._events.put(event)
+                        self._put_event(event)
                         if (
                             isinstance(event, STTProviderInputTerminal)
                             and self.independent_recognition_units
@@ -1214,8 +1220,17 @@ class StreamingSpeakerSession:
             self._events.close()
 
     async def turn_events(self):
-        async for event in self._events.events():
-            yield event
+        try:
+            async for event in self._events.events():
+                self._speaker_handoffs.activate(event)
+                try:
+                    yield event
+                finally:
+                    self._speaker_handoffs.end(event)
+                    discard_source_audio_proofs(event, self._timeline)
+        finally:
+            if self._closed:
+                self._speaker_handoffs.discard_queued()
 
     async def _settle_consumer(self):
         if not self._consumer.done():

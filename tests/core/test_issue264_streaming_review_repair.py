@@ -354,8 +354,12 @@ async def seed_capture_input(kind, view):
                 observed_trailing_silence_ms=600,
             )
             await wait_until(lambda: not wrapper._slices)
-            while wrapper._events.depth:
-                discard_source_audio_proofs(await wrapper._events.get(), view)
+            events = wrapper.turn_events()
+            try:
+                while wrapper._events.depth:
+                    await anext(events)
+            finally:
+                await events.aclose()
     finally:
         await wrapper.close()
     assert not view._proofs
@@ -405,6 +409,7 @@ async def test_replaced_producer_history_is_unknown_but_adjacent_no_still_progre
         native = TextBatchSession()
         wrapper = CausalBatchSession(native, evidence_view=view)
     engine = ScopedRecognitionEngine(None, evidence_view=view)
+    event_stream = wrapper.turn_events()
     try:
         await wrapper.begin_turn(req)
         proof = frames(0, 5120, 0) + (probabilities(5120, 5440, 0.6, 0.01),) + frames(5440, 7040, 1)
@@ -423,7 +428,7 @@ async def test_replaced_producer_history_is_unknown_but_adjacent_no_still_progre
                     result_end=0.44,
                 )
             )
-            events = [await next_text(wrapper.turn_events())]
+            events = [await next_text(event_stream)]
         else:
             await wrapper.seal_turn(
                 req.identity,
@@ -432,21 +437,19 @@ async def test_replaced_producer_history_is_unknown_but_adjacent_no_still_progre
                 observed_trailing_silence_ms=600,
             )
             await wait_until(lambda: not wrapper._parents)
-            events = []
-            while wrapper._events.depth:
-                events.append(await wrapper._events.get())
+            events = None
         normalizer = STTScopedTurnNormalizer(req.identity)
-        for event in events:
+
+        async def deliver(event):
             if not hasattr(event, "source_audio"):
-                continue
+                return
             event = (
                 normalizer.apply_terminal(event)
                 if isinstance(event, STTProviderTurnTerminal)
                 else normalizer.apply_update(event)
             )
             if event is None:
-                continue
-            engine._publish_speaker_proofs(event)
+                return
             if isinstance(event, STTProviderTurnTerminal):
                 from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
 
@@ -455,6 +458,15 @@ async def test_replaced_producer_history_is_unknown_but_adjacent_no_still_progre
                 )
             elif event.source_release is not None:
                 await harness.peer_owner.handle_provider_turn_update(snapshot, event)
+
+        engine.event_sink = deliver
+        if events is not None:
+            for event in events:
+                await engine._emit(event)
+        else:
+            while wrapper._events.depth:
+                await engine._emit(await anext(event_stream))
+        await event_stream.aclose()
         await finish(harness)
         children = [item.source_child for item in trace.items]
         assert [child.raw_text for child in children] == ["A. ", "No."]
@@ -472,6 +484,7 @@ async def test_replaced_producer_history_is_unknown_but_adjacent_no_still_progre
             harness.peer_owner._speaker_identities.retire_source(child.source_id)
         assert not view._proofs
     finally:
+        await event_stream.aclose()
         await wrapper.close()
         await engine.close()
         await close(harness)
@@ -501,6 +514,14 @@ async def test_real_parent_and_parts_are_disposed_on_rejection_but_healthy_close
         result_start=2.8799999,
         result_end=3.825,
     )
+    events = wrapper.turn_events()
+
+    async def deliver(event):
+        await harness.peer_owner.handle_provider_turn_terminal(
+            AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 10), event
+        )
+
+    engine = ScopedRecognitionEngine(None, evidence_view=view, event_sink=deliver)
     try:
         await wrapper.begin_turn(req)
         await send(wrapper, req, 1728, 9728, 1, context=True)
@@ -509,14 +530,15 @@ async def test_real_parent_and_parts_are_disposed_on_rejection_but_healthy_close
         view.observe(proof)
         await wrapper.observe_speaker_evidence(proof)
         native.emit(replace(update_event, source_release=None))
-        candidate = await next_text(wrapper.turn_events())
+        candidate = await next_text(events)
         assert candidate.source_release is None
         while wrapper._events.depth:
-            await wrapper._events.get()
+            await anext(events)
+        await events.aclose()
         wrapper._events = STTProviderEventBuffer(
             max_events=1 if pressure else 2, on_discard=wrapper._discard_buffered_event
         )
-        wrapper._events.put(
+        wrapper._put_event(
             STTProviderAudioBoundary(
                 req.identity, STTAudioBoundary("prefill", 7, 5440, 3.0, "speaker")
             )
@@ -533,8 +555,9 @@ async def test_real_parent_and_parts_are_disposed_on_rejection_but_healthy_close
         )
         await native.close()
         await asyncio.wait_for(asyncio.shield(wrapper._consumer), 1)
+        events = wrapper.turn_events()
         if pressure:
-            event = await wrapper._events.get()
+            event = await anext(events)
             assert event.outcome == "failed"
             assert event.failure_reason == "provider_event_buffer_overflow"
             assert event.source_audio == ()
@@ -544,13 +567,10 @@ async def test_real_parent_and_parts_are_disposed_on_rejection_but_healthy_close
             assert len(view._proofs) == 3
             await wrapper.close()
             assert len(view._proofs) == 3
-            assert isinstance(await wrapper._events.get(), STTProviderAudioBoundary)
-            event = await wrapper._events.get()
-            engine = ScopedRecognitionEngine(None, evidence_view=view)
-            engine._publish_speaker_proofs(event)
-            await harness.peer_owner.handle_provider_turn_terminal(
-                AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 10), event
-            )
+            assert isinstance(await anext(events), STTProviderAudioBoundary)
+            event = await anext(events)
+            await engine._emit(event)
+            await events.aclose()
             await finish(harness)
             assert [item.source_child.raw_text for item in trace.items] == ["No. ", "He washed"]
             assert len(view._proofs) == 2
@@ -559,7 +579,9 @@ async def test_real_parent_and_parts_are_disposed_on_rejection_but_healthy_close
         await wrapper.close()
         assert not view._proofs
     finally:
+        await events.aclose()
         await wrapper.close()
+        await engine.close()
         await close(harness)
         await presenter.close()
 
@@ -594,15 +616,17 @@ async def test_wrapper_discard_keeps_claims_shared_with_accepted_incoming(coales
     wrapper._events = STTProviderEventBuffer(
         max_events=1, on_discard=wrapper._discard_buffered_event
     )
+    events = wrapper.turn_events()
     try:
-        assert wrapper._events.put(provisional)
+        assert wrapper._put_event(provisional)
         incoming = replace(provisional if coalesced else event, sequence=2)
-        assert wrapper._events.put(incoming)
+        assert wrapper._put_event(incoming)
         assert all(view.has_proof(token) for token in tokens)
-        assert await wrapper._events.get() is incoming
-        discard_source_audio_proofs(incoming, view)
+        assert await anext(events) is incoming
+        await events.aclose()
         assert not view._proofs
     finally:
+        await events.aclose()
         await wrapper.close()
 
 
@@ -623,7 +647,7 @@ async def test_wrapper_rejection_releases_requests_not_contribution_or_source_ha
         from puripuly_heart.core.stt.scoped_event_buffer import STTProviderEventBufferClosed
 
         with pytest.raises(STTProviderEventBufferClosed):
-            wrapper._events.put(event)
+            wrapper._put_event(event)
         assert not view.has_proof(tokens[0])
         assert view.has_proof(tokens[1]) and view.has_proof(tokens[2])
         discard_source_audio_proofs(event, view, published=True)
@@ -653,8 +677,10 @@ async def test_engine_buffer_rejection_disposes_parts_without_retiring_healthy_o
         await engine._emit(rejected)
         assert all(not view.has_proof(token) for token in rejected_tokens)
         assert all(view.has_proof(token) for token in healthy_tokens)
-        assert await engine._event_buffer.get() is healthy
-        discard_source_audio_proofs(healthy, view, published=True)
+        delivered = []
+        engine.bind_event_sink(delivered.append)
+        await engine.wait_for_event_ingress_drain()
+        assert delivered[0] is healthy
         assert not view._proofs
     finally:
         await engine.close()

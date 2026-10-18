@@ -110,14 +110,22 @@ def timed_final(req, text, words, *, result_start, result_end, qualified=True):
 
 
 async def admit(harness, session, provider, req, snapshot, event):
-    provider.emit(event)
-    outgoing = await next_text(session.turn_events())
-    outgoing = STTScopedTurnNormalizer(req.identity).apply_update(outgoing)
+    events = session.turn_events()
     engine = ScopedRecognitionEngine(
-        None, evidence_view=harness.peer_owner._speaker_identities.evidence
+        None,
+        evidence_view=harness.peer_owner._speaker_identities.evidence,
+        event_sink=lambda outgoing: harness.peer_owner.handle_provider_turn_update(
+            snapshot, outgoing
+        ),
     )
-    engine._publish_speaker_proofs(outgoing)
-    await harness.peer_owner.handle_provider_turn_update(snapshot, outgoing)
+    try:
+        provider.emit(event)
+        outgoing = await next_text(events)
+        outgoing = STTScopedTurnNormalizer(req.identity).apply_update(outgoing)
+        await engine._emit(outgoing)
+    finally:
+        await events.aclose()
+        await engine.close()
     await finish(harness)
     return outgoing
 
@@ -494,15 +502,19 @@ async def test_partial_release_repin_terminal_replay_and_adopted_part_dispositio
             )
         )
         await asyncio.sleep(0)
-        while session._events.depth:
-            terminal = await session._events.get()
-            if isinstance(terminal, STTProviderTurnTerminal):
-                from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
+        events = session.turn_events()
+        try:
+            while session._events.depth:
+                terminal = await anext(events)
+                if isinstance(terminal, STTProviderTurnTerminal):
+                    from puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt
 
-                await harness.peer_owner.handle_provider_turn_terminal(
-                    AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 10),
-                    terminal,
-                )
+                    await harness.peer_owner.handle_provider_turn_terminal(
+                        AudioSegmentTerminalReceipt(identity.segment, "final", snapshot, 10),
+                        terminal,
+                    )
+        finally:
+            await events.aclose()
         await finish(harness)
         assert len(trace.items) == len(translator.calls) == 2
         await session.close()

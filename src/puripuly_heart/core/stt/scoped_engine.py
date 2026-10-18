@@ -26,7 +26,7 @@ from puripuly_heart.core.network_diagnostics import (
     classify_transport_error,
     transport_exception_chain,
 )
-from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView
+from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView, SpeakerProofHandoffs
 from puripuly_heart.core.stt.backend import (
     PermanentSTTScopedSessionError,
     STTIndependentRecognitionSession,
@@ -207,13 +207,6 @@ class _RecognitionAuthority:
 
 
 @dataclass(slots=True)
-class _SpeakerHandoff:
-    event: STTProviderTurnEvent
-    queued: int = 0
-    active: int = 0
-
-
-@dataclass(slots=True)
 class ScopedRecognitionEngine:
     session_factory: STTScopedSessionFactory
     channel: Literal["self", "peer"] = "peer"
@@ -326,9 +319,7 @@ class ScopedRecognitionEngine:
         repr=False,
     )
     _event_buffer: STTProviderEventBuffer = field(init=False, repr=False)
-    _speaker_handoffs: dict[int, _SpeakerHandoff] = field(
-        init=False, default_factory=dict, repr=False
-    )
+    _speaker_handoffs: SpeakerProofHandoffs = field(init=False, repr=False)
     _event_dispatch_task: asyncio.Task[None] | None = field(
         init=False,
         default=None,
@@ -354,6 +345,7 @@ class ScopedRecognitionEngine:
         self._abort_lock = asyncio.Lock()
         self._turn_resolved = asyncio.Event()
         self._turn_resolved.set()
+        self._speaker_handoffs = SpeakerProofHandoffs(self.evidence_view)
         self._event_buffer = STTProviderEventBuffer(on_discard=self._discard_buffered_event)
         self._event_drained = asyncio.Event()
         self._event_drained.set()
@@ -968,7 +960,7 @@ class ScopedRecognitionEngine:
             )
             if event_task not in done:
                 event_task.cancel()
-        self._discard_queued_speaker_handoffs()
+        self._speaker_handoffs.discard_queued(published=True)
         pending = (
             tuple(self._cleanup_tasks)
             + tuple(self._factory_tasks)
@@ -1719,58 +1711,15 @@ class ScopedRecognitionEngine:
             self._notify_terminal_failure(last_error)
         return False
 
-    def _begin_speaker_handoff(self, event, *, queued=False) -> None:
-        if self.evidence_view is None or not any(
-            audio.speaker_proof_ids for audio in getattr(event, "source_audio", ())
-        ):
-            return
-        handoff = self._speaker_handoffs.get(id(event))
-        if handoff is None:
-            handoff = _SpeakerHandoff(event)
-            self._speaker_handoffs[id(event)] = handoff
-        if queued:
-            handoff.queued += 1
-        else:
-            handoff.active += 1
-
-    def _start_queued_speaker_handoff(self, event) -> None:
-        handoff = self._speaker_handoffs.get(id(event))
-        if handoff is not None and handoff.queued:
-            handoff.queued -= 1
-            handoff.active += 1
-        else:
-            self._begin_speaker_handoff(event)
-
-    def _end_speaker_handoff(self, event, *, queued=False) -> None:
-        handoff = self._speaker_handoffs.get(id(event))
-        if handoff is None:
-            return
-        if queued:
-            if handoff.queued:
-                handoff.queued -= 1
-        elif handoff.active:
-            handoff.active -= 1
-        if not handoff.queued and not handoff.active:
-            del self._speaker_handoffs[id(event)]
-
-    def _discard_queued_speaker_handoffs(self) -> None:
-        queued = tuple(handoff for handoff in self._speaker_handoffs.values() if handoff.queued)
-        for handoff in queued:
-            handoff.queued = 0
-            if not handoff.active:
-                del self._speaker_handoffs[id(handoff.event)]
-        for handoff in queued:
-            self._discard_speaker_proofs(handoff.event, published=True)
-
     def _discard_buffered_event(self, event, retained) -> None:
-        self._end_speaker_handoff(event, queued=True)
+        self._speaker_handoffs.end(event, queued=True)
         self._discard_speaker_proofs(event, retained=retained, published=True)
 
     def _discard_speaker_proofs(self, event, *, retained=(), published=False) -> None:
         discard_source_audio_proofs(
             event,
             self.evidence_view,
-            retained=(*retained, *(handoff.event for handoff in self._speaker_handoffs.values())),
+            retained=retained,
             published=published,
         )
 
@@ -2809,7 +2758,7 @@ class ScopedRecognitionEngine:
         if sink is None and isinstance(event, STTProviderInputTerminal):
             sink = self._deferred_event_sink
         if sink is not None:
-            self._begin_speaker_handoff(event)
+            self._speaker_handoffs.begin(event)
             self._publish_speaker_proofs(event)
             try:
                 result = sink(event)
@@ -2819,11 +2768,11 @@ class ScopedRecognitionEngine:
                 self._record_delivery_failure(exc, getattr(event, "identity", None))
                 raise
             finally:
-                self._end_speaker_handoff(event)
+                self._speaker_handoffs.end(event)
                 self._discard_speaker_proofs(event, published=True)
             return
         self._event_drained.clear()
-        self._begin_speaker_handoff(event, queued=True)
+        self._speaker_handoffs.begin(event, queued=True)
         accepted = self._event_buffer.put(event)
         if not accepted:
             self._discard_speaker_proofs(event)
@@ -2849,7 +2798,7 @@ class ScopedRecognitionEngine:
             sink = self._deferred_event_sink
             self._event_dispatching = True
             original_event = event
-            self._start_queued_speaker_handoff(original_event)
+            self._speaker_handoffs.activate(original_event)
             try:
                 if sink is None:
                     raise RuntimeError("scoped STT event sink is not bound")
@@ -2880,7 +2829,7 @@ class ScopedRecognitionEngine:
                 emit_failure(logger, diagnostics, stage="event_loop")
                 raise
             finally:
-                self._end_speaker_handoff(original_event)
+                self._speaker_handoffs.end(original_event)
                 self._discard_speaker_proofs(original_event, published=True)
                 self._event_dispatching = False
                 if self._event_buffer.depth == 0:

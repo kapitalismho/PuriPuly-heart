@@ -411,6 +411,7 @@ def test_rejection_releases_only_after_all_attempts_finish_and_applied_output_su
 async def test_native_final_claim_transfers_through_origin_and_survives_asr_close():
     from puripuly_heart.core.stt.backend import STTProviderTurnTerminal
     from puripuly_heart.core.stt.batch_speaker import CausalBatchSession
+    from puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine
     from tests.core.test_causal_batch_speaker import payload, request, seal
     from tests.core.test_stt_scoped_engine import ControlledScopedSession
 
@@ -418,24 +419,44 @@ async def test_native_final_claim_transfers_through_origin_and_survives_asr_clos
     inner = ControlledScopedSession()
     session = CausalBatchSession(inner, evidence_view=view)
     req = request()
-    await session.begin_turn(req)
-    await payload(session, req, 0, 1600, 1)
-    await seal(session, req)
-    inner.emit(
-        STTProviderTurnTerminal(
-            inner.requests[0].identity, "final", "No.", text_authority="authoritative"
+    events = session.turn_events()
+    delivered = []
+
+    def deliver(event):
+        for audio in event.source_audio:
+            for token in audio.speaker_proof_ids:
+                view.adopt(token)
+        delivered.append(event)
+
+    engine = ScopedRecognitionEngine(None, evidence_view=view, event_sink=deliver)
+    try:
+        await session.begin_turn(req)
+        await payload(session, req, 0, 1600, 1)
+        await seal(session, req)
+        inner.emit(
+            STTProviderTurnTerminal(
+                inner.requests[0].identity, "final", "No.", text_authority="authoritative"
+            )
         )
-    )
-    final = await asyncio.wait_for(anext(session.turn_events()), 1)
-    token = final.source_audio[0].speaker_proof_id
-    assert final.final_speaker_runs[0].speaker_id is None
-    assert view.has_proof(token)
-    await session.close()
-    assert view.has_proof(token)
-    view.observe(frames(0, 1600, 1))
-    assert view.resolve(token).speaker_id == "1"
-    assert final.final_speaker_runs[0].speaker_id is None
-    view.release(token)
+        final = await asyncio.wait_for(anext(events), 1)
+        token = final.source_audio[0].speaker_proof_id
+        assert final.final_speaker_runs[0].speaker_id is None
+        assert view.has_proof(token)
+        await engine._emit(final)
+        await events.aclose()
+        assert delivered == [final]
+        assert view._proofs[token].stage == "source"
+        assert view._proofs[token].handoffs == 0
+        await session.close()
+        assert view.has_proof(token)
+        view.observe(frames(0, 1600, 1))
+        assert view.resolve(token).speaker_id == "1"
+        assert final.final_speaker_runs[0].speaker_id is None
+        view.release(token)
+    finally:
+        await events.aclose()
+        await session.close()
+        await engine.close()
 
 
 @pytest.mark.asyncio

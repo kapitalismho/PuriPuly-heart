@@ -1,0 +1,466 @@
+{
+  "schema": "issue264-shared-handoff-repair-v1",
+  "created_at_utc": "2026-10-18T12:11:49.683994+00:00",
+  "status": "Frozen local bounded repair and execution evidence; ready for originating independent bounded verification and Director pin",
+  "goal_acceptance_claimed": false,
+  "range": {
+    "baseline": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+    "goal_baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+    "candidate": "Uncommitted exact working-tree bytes in final_inventory; not a new commit",
+    "accepted_finding": "native/nemotron/issue264_review_inflight_handoff.json:SR4-R2",
+    "baseline_product_git_blob_inventory": [
+      {
+        "path": "src/puripuly_heart/core/speaker/evidence.py",
+        "git_blob_content_sha256": "ff6bb51e24a3ba4ab730737987f8050ffc7090965df32ab362402a60d08c8fd3"
+      },
+      {
+        "path": "src/puripuly_heart/core/stt/batch_speaker.py",
+        "git_blob_content_sha256": "f221080a2818e5886eefd682719aa02ab338696ea768701ea7fb537ea3cdc796"
+      },
+      {
+        "path": "src/puripuly_heart/core/stt/scoped_engine.py",
+        "git_blob_content_sha256": "facded726c6191b8472ee35acc4133ff72a94a82b895b4ac9eafc75a50302a0c"
+      },
+      {
+        "path": "src/puripuly_heart/core/stt/streaming_speaker.py",
+        "git_blob_content_sha256": "3b9a564c82516ce5559ecc069c1943bf8188eff5c51701304b79df3c34b1e8b4"
+      }
+    ]
+  },
+  "authority": {
+    "scope": "Preserve and finish the interrupted central shared-pin hold repair plus explicitly authorized, confirmed producer queue/yield custody seam. No new policy decision.",
+    "retained_closed_findings": [
+      "SR1 synchronous on_native_event publication fence",
+      "SR2 immutable own-final task coverage and global occurrence fence",
+      "SR3 monotonic capture and opaque producer continuity",
+      "Original SR4 wrapper rejection leak",
+      "Precise SR4-R1 engine in-flight rejected-extension handoff, independently closed at baseline20a3872d"
+    ],
+    "exclusions": [
+      "No generic event buffer implementation/API/policy change",
+      "No model/cloud/GPU/Gemma/Flet/VR/full-matrix execution",
+      "No Git/index/history/remote/GitHub/publication mutation",
+      "No maintained docs or Director-owned review-record edit",
+      "No E5 rerun; its independent closure retained",
+      "Actual1GPU+4tapes remains held; no acceptance or acoustic-incidence claim"
+    ]
+  },
+  "recovery": {
+    "previous_owner": "speaker-264-boundary-repair",
+    "replacement_owner": "speaker-264-shared-handoff-finish",
+    "preservation": "All inherited uncommitted product changes were retained. Replacement completed affected test custody migration and evidence; no baseline restart/revert.",
+    "runtime_interruptions": [
+      "Director reported runtime wake cancellation: Wake turn was cancelled: Cancelled by caller; no completion handoff received. Previous worker could not continue.",
+      "Retained history ends after expanding the producer custody tests; no final shared-handoff record or final-current integration run existed. Replacement did not label historical451 or22 passes as current proof."
+    ],
+    "initial_recovered_check": {
+      "command": ".venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_inflight_handoff_repair.py",
+      "job": "bg_129",
+      "exit_code": 0,
+      "outcome": "46 passed in0.96s; wall1.49s; zero failures/skips. This preceded the final affected-fixture migration; the final634-case run includes these tests."
+    }
+  },
+  "before_evidence": {
+    "shared_peer_cleanup": {
+      "candidate": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+      "disposition": "Original reviewer observation reused without running the known-failing baseline again.",
+      "source": "history://speaker-264-streaming-review; Eval title Probing queued real Peer ownership cleanup",
+      "command": ".venv/Scripts/python.exe -B - <isolated inline driver>",
+      "driver_source": "\nimport asyncio,json,sys\nfrom dataclasses import replace\nfrom pathlib import Path\nsys.path.insert(0,str(Path.cwd()/'src'))\nfrom puripuly_heart.core.clock import FakeClock\nfrom puripuly_heart.core.overlay.presenter import OverlayPresenter\nfrom puripuly_heart.core.stt.backend import STTProviderTurnUpdate\nfrom puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine\nfrom puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer\nfrom puripuly_heart.ui.overlay_calibration import OverlayCalibration\nfrom tests.core.test_issue264_inflight_handoff_repair import handoff_event\nfrom tests.core.test_issue264_shared_speaker import frames\nfrom tests.core.test_source_context_contract import ControlledProvider,harness_for,finish,close\nfrom tests.core.test_stt_scoped_engine import wait_until\nasync def main():\n    clock=FakeClock(10)\n    presenter=OverlayPresenter(OverlayCalibration(),clock=clock)\n    translator=ControlledProvider()\n    harness,trace=harness_for(translator,overlay_sink=presenter)\n    view=harness.peer_owner._speaker_identities.evidence\n    snapshot,full,tokens=handoff_event(view)\n    normalizer=STTScopedTurnNormalizer(full.identity)\n    prefix=normalizer.apply_update(replace(full,source_release=replace(full.source_release,text_end=4)))\n    extension=normalizer.apply_update(replace(full,sequence=2,assembly='replace',source_release=replace(full.source_release,release_id='full'),provenance=replace(full.provenance,native_event_id='second')))\n    admission_lock=asyncio.Lock()\n    await admission_lock.acquire()\n    harness.translation_turns._channel_admission_locks['peer']=admission_lock\n    engine=ScopedRecognitionEngine(None,evidence_view=view)\n    async def deliver(event):\n        if isinstance(event,STTProviderTurnUpdate):\n            await harness.peer_owner.handle_provider_turn_update(snapshot,event)\n    engine.bind_event_sink(deliver)\n    try:\n        await engine._emit(prefix)\n        await wait_until(lambda:bool(harness.translation_turns._parents))\n        await engine._emit(extension)\n        before=[view.has_proof(t) for t in tokens]\n        admission_lock.release()\n        await engine.wait_for_event_ingress_drain()\n        await finish(harness)\n        sources=[item.source_child for item in trace.items]\n        after=[view.has_proof(t) for t in tokens]\n        view.observe(frames(0,1600,0)+frames(1600,3200,1))\n        for _ in range(20):await asyncio.sleep(0)\n        assignments=[harness.peer_owner._speaker_identities.source_snapshot(s.source_id).assignment.attribution for s in sources]\n        print(json.dumps({'text':[s.raw_text for s in sources],'translation_calls':[c[0] for c in translator.calls],'proofs_before_release':before,'proofs_after_both_admissions':after,'late_assignment_states':[a.state for a in assignments],'late_assignment_keys':[None if a.key is None else a.key.local_speaker_id for a in assignments],'engine_handoffs':len(engine._speaker_handoffs)}))\n    finally:\n        if admission_lock.locked():admission_lock.release()\n        await engine.close()\n        await close(harness)\n        await presenter.close()\nasyncio.run(main())\n",
+      "driver_sha256": "d7a5950f52abba19ec355a1bc75195a4eac212b528782340858725efc8392f30",
+      "outer_isolation": "Original script used TemporaryDirectory APPDATA/LOCALAPPDATA/XDG_CONFIG_HOME, PYTHONDONTWRITEBYTECODE=1, a30s isolated subprocess and controlled native-shaped evidence/translation.",
+      "observed_output": "returncode= 0\n{\"text\": [\"One \", \"two.\"], \"translation_calls\": [\"One \", \"two.\"], \"proofs_before_release\": [true, true, true], \"proofs_after_both_admissions\": [false, true, false], \"late_assignment_states\": [\"identified\", \"unavailable\"], \"late_assignment_keys\": [\"0\", null], \"engine_handoffs\": 0}",
+      "interpretation": "Diagnostic exited0 but observed product failure: texts/translations One and two were conserved, while prefix Peer finally cleanup deleted a second-part contribution token already referenced by the accepted queued cumulative extension. First late assignment identified; second permanently unavailable.",
+      "baseline_fixture_dependency": {
+        "path": "tests/core/test_issue264_inflight_handoff_repair.py",
+        "git_blob_content_sha256": "ab0958cfb97e28249a4150433e79e03570b882ee6a3e4762fa528fb1d87f88f6",
+        "sha256": "ab0958cfb97e28249a4150433e79e03570b882ee6a3e4762fa528fb1d87f88f6",
+        "identical_to_baseline_blob": true
+      }
+    },
+    "producer_custody": {
+      "candidate": "Baseline20a3872d PLUS uncommitted central shared-pin repair. This is NOT an observation of plain20a3872d.",
+      "source": "history://speaker-264-boundary-repair; titles Pinning producer qualification BEFORE source bytes / Qualifying current producer queue proof ownership gap",
+      "exact_product_inventory": [
+        {
+          "path": "src/puripuly_heart/core/speaker/evidence.py",
+          "sha256": "dc6422f29ff1d01b04ac3912520f1747ed3087a766006939e5bf4452e162eb56",
+          "bytes": 13166
+        },
+        {
+          "path": "src/puripuly_heart/core/stt/scoped_engine.py",
+          "sha256": "b80ac8511a3698c053aa4a2dd4d5daad3c96511c14a89494a3a6880eb294ebc2",
+          "bytes": 136745
+        },
+        {
+          "path": "src/puripuly_heart/core/stt/backend.py",
+          "sha256": "9a0231e035d7a5c4a21d053f101f38e107088664ea8a7a47653da0bd18d7e7e4",
+          "bytes": 33794
+        },
+        {
+          "path": "src/puripuly_heart/core/stt/streaming_speaker.py",
+          "sha256": "3b9a564c82516ce5559ecc069c1943bf8188eff5c51701304b79df3c34b1e8b4",
+          "bytes": 53560
+        },
+        {
+          "path": "src/puripuly_heart/core/stt/batch_speaker.py",
+          "sha256": "f221080a2818e5886eefd682719aa02ab338696ea768701ea7fb537ea3cdc796",
+          "bytes": 19405
+        }
+      ],
+      "test_script_path": "tests/core/test_issue264_producer_handoff_repair.py",
+      "test_script_source": "from __future__ import annotations\n\nimport asyncio\nfrom dataclasses import replace\n\nimport pytest\n\nfrom puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt\nfrom puripuly_heart.core.clock import FakeClock\nfrom puripuly_heart.core.overlay.presenter import OverlayPresenter\nfrom puripuly_heart.core.stt.backend import (\n    STTProviderTurnRequest,\n    STTProviderTurnTerminal,\n    STTProviderTurnUpdate,\n)\nfrom puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine\nfrom puripuly_heart.core.stt.streaming_speaker import StreamingSpeakerSession\nfrom puripuly_heart.ui.overlay_calibration import OverlayCalibration\nfrom tests.core.test_issue264_shared_speaker import changed\nfrom tests.core.test_issue264_streaming_repair import recorded_short_evidence, timed_final\nfrom tests.core.test_source_context_contract import (\n    ControlledProvider,\n    close,\n    finish,\n    harness_for,\n    source_fixture,\n)\nfrom tests.core.test_streaming_speaker import Provider, next_text, send\nfrom tests.core.test_stt_scoped_engine import wait_until\n\n\n@pytest.mark.asyncio\nasync def test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission():\n    clock = FakeClock(10)\n    presenter = OverlayPresenter(OverlayCalibration(), clock=clock)\n    translator = ControlledProvider()\n    harness, trace = harness_for(translator, overlay_sink=presenter)\n    allocator = harness.peer_owner._speaker_identities\n    view = allocator.evidence\n    native = Provider()\n    wrapper = StreamingSpeakerSession(native, evidence_view=view)\n    snapshot, identity = source_fixture()\n    request = STTProviderTurnRequest(identity, snapshot.settings)\n    native_update = timed_final(\n        request,\n        \"No. He washed\",\n        [(0, 3, 2.8799999, 3.28), (4, 6, 3.28, 3.52), (7, 13, 3.52, 3.76)],\n        result_start=2.8799999,\n        result_end=3.825,\n    )\n    native_evidence = recorded_short_evidence()\n    initial_evidence = tuple(\n        replace(item, immutable_through_sample=min(item.immutable_through_sample, 47648))\n        for item in native_evidence\n    )\n    admission_lock = asyncio.Lock()\n    await admission_lock.acquire()\n    harness.translation_turns._channel_admission_locks[\"peer\"] = admission_lock\n    engine = ScopedRecognitionEngine(None, evidence_view=view)\n    events = wrapper.turn_events()\n\n    async def deliver(event):\n        if isinstance(event, STTProviderTurnUpdate):\n            await harness.peer_owner.handle_provider_turn_update(snapshot, event)\n        elif isinstance(event, STTProviderTurnTerminal):\n            await harness.peer_owner.handle_provider_turn_terminal(\n                AudioSegmentTerminalReceipt(identity.segment, \"final\", snapshot, 10), event\n            )\n\n    engine.bind_event_sink(deliver)\n    try:\n        await wrapper.begin_turn(request)\n        await send(wrapper, request, 1728, 9728, 1, context=True)\n        await send(wrapper, request, 9728, 84992, 2)\n        view.observe(initial_evidence)\n        await wrapper.observe_speaker_evidence(initial_evidence)\n        native.emit(\n            replace(native_update, source_release=replace(native_update.source_release, text_end=4))\n        )\n        prefix = await next_text(events)\n        assert prefix.source_release.text_end == 4\n        assert len(prefix.source_audio[0].speaker_parts) == 2\n        future_token = prefix.source_audio[0].speaker_parts[1].speaker_proof_id\n        assert future_token is not None\n        await engine._emit(prefix)\n        await wait_until(lambda: bool(harness.translation_turns._parents))\n        native.emit(\n            STTProviderTurnTerminal(\n                identity,\n                \"final\",\n                native_update.text,\n                text_authority=\"authoritative\",\n                provenance=(native_update.provenance,),\n                included_contributions=(native_update.contribution,),\n            )\n        )\n        await native.close()\n        await asyncio.wait_for(asyncio.shield(wrapper._consumer), 1)\n        queued = next(\n            event for event in wrapper._events._events if isinstance(event, STTProviderTurnTerminal)\n        )\n        assert queued.source_audio[0].speaker_parts[1].speaker_proof_id == future_token\n        admission_lock.release()\n        await engine.wait_for_event_ingress_drain()\n        await finish(harness)\n        assert [item.source_child.raw_text for item in trace.items] == [\"No. \"]\n        assert view.has_proof(future_token), \"annotated future part lost before producer queue drain\"\n        terminal = await anext(events)\n        while not isinstance(terminal, STTProviderTurnTerminal):\n            terminal = await anext(events)\n        await engine._emit(terminal)\n        await engine.wait_for_event_ingress_drain()\n        await events.aclose()\n        await finish(harness)\n        assert [item.source_child.raw_text for item in trace.items] == [\"No. \", \"He washed\"]\n        assert [call[0] for call in translator.calls] == [\"No. \", \"He washed\"]\n        assert len(harness.peer_runtime.translation_history) == 2\n        clock.advance(0.25)\n        harness.peer_owner.clock.advance(0.25)\n        view.observe(native_evidence)\n        await changed(presenter, lambda: allocator.resolved_within_500ms == 2)\n        sources = [item.source_child for item in trace.items]\n        assert [\n            allocator.source_snapshot(source.source_id).assignment.attribution.key.local_speaker_id\n            for source in sources\n        ] == [\"1\", \"0\"]\n        assert not view._proofs\n    finally:\n        if admission_lock.locked():\n            admission_lock.release()\n        await events.aclose()\n        await wrapper.close()\n        await engine.close()\n        await close(harness)\n        await presenter.close()\n",
+      "test_script_sha256": "d32580ce54c72f46645e5ab5267c0860d30d2d5def88f982672ed05c6f35b265",
+      "command": ".venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_producer_handoff_repair.py",
+      "original_job": "bg_126",
+      "observed": "1 failed in1.12s; wall1.68s; exit1. annotated future part lost before producer queue drain; view.has_proof(future_token) was false.",
+      "diagnosis": "Real StreamingSpeakerSession had already annotated its native terminal and queued it privately while the prefix awaited real Peer admission. Tokens were shared, but only engine ownership held the pin. Prefix admission cleanup could therefore delete the queued terminal future-part proof before Engine acquired it. The before fixture supplied evidence earlier than a true late-presentation control; this does not invalidate its direct pre-drain missing-proof observation. That timing fixture defect was later corrected and preserved separately below.",
+      "no_baseline_rerun": true
+    }
+  },
+  "repair": {
+    "root_cause": "Ordinary cleanup had more than one caller (Peer, producer, engine), but only engine-local retained-event scans understood live engine dependencies. Producer output queue residence and suspended generator/yield delivery were also lawful live custody, before engine registration. A current live pin must therefore be the single authority that defers ordinary unadopted release.",
+    "shared_pin_owner": "Existing _Proof gains only handoffs count and release_pending flag. retain_handoff/release_handoff update that live pin. Ordinary request/contribution release marks pending while any hold remains. Last ended dependency reclaims a pending unadopted pin. adopt changes stage to source and cancels stale pending unadopted disposal. No second evidence/input history is retained.",
+    "source_settlement": "Explicit source-stage release remains final even while a stale event is live. Ordinary release_unadopted still cannot delete a source-stage claim. Source assignment, first-readable deadline and disposition algorithms are unchanged.",
+    "shared_helper": "SpeakerProofHandoffs in existing speaker/evidence.py owns current proof-bearing event records with queued/active counts. It is reused by engine, streaming wrapper and batch wrapper. Records keep event identity safe for repeated same-object and distinct-object aliases. All owners retain/release the same shared pins; no competing lifetime authorities or generic resource framework.",
+    "engine": "Removed engine-local _SpeakerHandoff implementation, local token retain scans and redundant lifecycle methods. Engine now uses the shared helper across direct awaited sinks, deferred queue residence, queued-to-active transfer, finally cleanup and abandoned queued close. Original SR4-R1 protection remains through central holds.",
+    "producer_publication": "Streaming/batch _put_event begins custody synchronously before the unchanged generic buffer.put; discard callbacks end that queued dependency and perform existing stage-aware cleanup. All real wrapper output publications use this path. No mapping/publication callback, clock, normalizer policy, queue admission rule or wait is changed.",
+    "producer_yield": "turn_events transfers queued to active before yield and releases in finally only after downstream returns or explicitly closes/cancels the generator. Engine synchronously acquires its own dependency before it awaits delivery/admission, so generator release cannot create a gap.",
+    "close_and_cancellation": "Healthy shared-view producer close settles inner resources but preserves already accepted drainable output. A drain or generator close ends yielded custody; an explicitly abandoned generator after wrapper close also releases remaining queued dependencies. Published contribution/source claims retain their established downstream stage semantics. A shared-view close is not a command to delete lawful admitted-source claims. Own-view reset remains intentional conservative invalidation. Smoke covers abandoned closed queued aliases in both wrappers with/without source adoption.",
+    "unused_cleanup": "Rejected/evicted/request-only output, successful delivery without adoption, failure/cancellation, final ended aliases and explicitly abandoned queues release only their corresponding dependency. Last unused request/contribution disappears; source-stage lifetime stays with source owner."
+  },
+  "hard_bounds_and_conservative_paths": {
+    "existing_limits": {
+      "frames": 2048,
+      "pins": 128,
+      "range_pieces": 4096,
+      "generic_buffer_events": 256,
+      "generic_buffer_recognition_bytes": 1048576
+    },
+    "bound_explanation": "Holds add two scalar facts to existing bounded pins, not extra ranges, probabilities, PCM or input occurrences. Helper records describe only currently queued or active proof-bearing events; queue population remains governed by the unchanged event/byte bounds (and its existing bounded retirement representation), active record lifetime by already-running deliveries/generator custody. Same-object deliveries are counted, not lost by set membership. No timeout, pending-source limit or queue policy is enlarged.",
+    "pressure": "MAX_PROOFS saturation still returns no new pin and preserves conservative text. Hard frame pressure directly invalidates affected pins even if held; it does not become a deferrable ordinary cleanup.",
+    "invalidation": "reset, release_claims, capture/speaker epoch reset and hard frame pressure remove held proofs immediately. Ended stale handoffs cannot recreate a proof or release a replacement UUID. Explicit source retirement remains final.",
+    "no_timing_change": "New operations are synchronous ownership bookkeeping. No new wait, retry, TTL renewal or deadline extension. One unresolved-to-identified opportunity remains capped at first-readable+1.000s; 500ms remains only the preferred reporting band."
+  },
+  "focused_consumer_regressions": [
+    {
+      "module": "tests/core/test_issue264_shared_handoff_repair.py",
+      "cases": 15,
+      "coverage": "Accepted-vs-rejected cumulative extension through real Peer admission lock, normalizer, immutable SourceChild, concurrent translation/context owners and pure presenter. Accepted path keeps both One / two source opportunities; rejected path keeps only One and disposes future unused pins. Eligible A/B evidence produces two source-scoped applied assignments at synthetic+250ms, once each, without text/card/appearance/TTL change. Also covers central deferred ordinary release, adoption vs explicit retirement, reset/epoch/frame pressure, MAX_PROOFS saturation and stale-handoff nonresurrection."
+    },
+    {
+      "module": "tests/core/test_issue264_producer_handoff_repair.py",
+      "cases": 9,
+      "coverage": "Real streaming queued native terminal shares a future part while prefix is awaiting real Peer admission, then both No. / He washed texts/translations/context units and both late keys1/0 progress exactly once. Both real wrappers preserve pins across healthy close, private output queue and suspended yield into real engine/Peer admission. Adopted/unadopted consumer cancellation and producer overflow/rejection controls preserve stage semantics and cleanup."
+    },
+    {
+      "module": "tests/core/test_issue264_inflight_handoff_repair.py",
+      "cases": 22,
+      "coverage": "Retained rejected extension, same/distinct-object aliases, concurrent direct calls, queued aliases, success/failure/cancel, dispatcher restart and abandoned queued/active close tests executed under the centralized implementation. Historical source module unchanged."
+    }
+  ],
+  "affected_test_migrations": [
+    {
+      "path": "tests/core/test_issue264_streaming_repair.py",
+      "change": "admit keeps the producer generator explicitly alive until real Engine delivery acquires/ends custody; partial-release terminal drain uses the wrapper iterator and explicitly closes it. No expected source, translation, identity, tolerance or disposition weakened."
+    },
+    {
+      "path": "tests/core/test_issue264_streaming_review_repair.py",
+      "change": "Raw buffer gets/puts that bypassed newly real owner bookkeeping moved to wrapper _put_event/turn_events and real engine delivery, including closed healthy output, coalesced aliases, capture-producer replacement and engine rejection cleanup. Existing source-order/provenance/positive-negative assertions retained."
+    },
+    {
+      "path": "tests/core/test_issue264_shared_speaker.py",
+      "change": "A previously orphaned temporary anext(session.turn_events()) fixture asserted post-close request retention without any downstream ownership. It now keeps the generator alive through real engine dispatch and an explicit controlled source adoption sink, then closes producer and proves historical snapshot immutability plus later eligible proof resolution. This is not a real Peer sink claim; the new producer regression/smoke separately use real Peer admission. Added exact once delivery, source stage and zero-hold assertions. Existing post-close proof/late-key/historical-final assertions retained."
+    }
+  ],
+  "verification": {
+    "rationale": "A pin-presence assertion or source_snapshot key could pass before any style is logically applied. The decisive accepted-vs-rejected control therefore executes real Peer finally cleanup and waits for applied-assignment metrics plus visible pure-presenter style, while asserting immutable source/text/translation/context/card/TTL progress. Producer tests and smoke separately move across actual private queue, yield, engine and admission boundaries; rejection, cancellation, abandonment and conservative invalidation are not inferred from the positive alone.",
+    "configuration": "Normal repository pytest config and plugin autoload; no addopts override, narrowed assertion, new skip or test deselection. tests/conftest.py supplies isolated APPDATA/LOCALAPPDATA/XDG_CONFIG_HOME for tests. Integration uses controlled fake native/translation boundaries, not real services/models or full application startup.",
+    "final_integration": {
+      "job": "bg_131",
+      "command": ".venv/Scripts/python.exe -m black tests/core/test_issue264_shared_speaker.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/streaming_speaker.py tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_issue264_streaming_review_repair.py tests/core/test_issue264_shared_speaker.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/streaming_speaker.py tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_issue264_streaming_review_repair.py tests/core/test_issue264_shared_speaker.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_inflight_handoff_repair.py tests/core/test_stt_scoped_engine.py tests/core/test_stt_event_buffer_disposal.py tests/core/test_speaker_session_cleanup.py tests/core/test_source_context_contract.py tests/core/test_translation_turn_owner.py tests/core/test_source_progressive_integration.py tests/core/test_issue264_shared_speaker.py tests/core/test_issue264_streaming_review_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_streaming_speaker.py tests/core/test_causal_batch_speaker.py",
+      "exit_code": 0,
+      "passed": 634,
+      "failed": 0,
+      "skipped": 0,
+      "warnings": 211,
+      "pytest_duration_s": 27.95,
+      "wall_s": 29.21,
+      "style": "Ruff all checks passed; Black --check9 affected Python files unchanged; the preceding Black call left the migrated shared-speaker fixture unchanged.",
+      "warning_details": {
+        "websockets_ConnectionClosed_reason_deprecation": 210,
+        "Deepgram_Pydantic_V1_Python314_compatibility": 1
+      }
+    },
+    "controlled_smoke": {
+      "command": "Each source below ran in a fresh .venv/Scripts/python.exe -B -c subprocess after secret-env scrubbing and isolated appdata/temp setup;30s timeout per subprocess.",
+      "isolation_prefix_source": "\nimport json, sys\n_audit_events = []\ndef _guard(event,args):\n    if event in ('subprocess.Popen','os.system','os.spawn','os.posix_spawn'):\n        _audit_events.append(event)\n        raise PermissionError('Controlled custody smoke prohibits child processes')\n    if event in ('socket.connect','socket.bind','socket.getaddrinfo'):\n        address = args[1] if event != 'socket.getaddrinfo' else args[0]\n        host = address[0] if isinstance(address,tuple) else address\n        if host not in ('127.0.0.1','::1','localhost'):\n            _audit_events.append(event)\n            raise PermissionError('Controlled custody smoke prohibits external networking')\nsys.addaudithook(_guard)\n",
+      "runs": [
+        {
+          "label": "original_SR4_R2_driver_current_bytes",
+          "command": ".venv/Scripts/python.exe -B -c <isolated source>",
+          "source": "\nimport asyncio,json,sys\nfrom dataclasses import replace\nfrom pathlib import Path\nsys.path.insert(0,str(Path.cwd()/'src'))\nfrom puripuly_heart.core.clock import FakeClock\nfrom puripuly_heart.core.overlay.presenter import OverlayPresenter\nfrom puripuly_heart.core.stt.backend import STTProviderTurnUpdate\nfrom puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine\nfrom puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer\nfrom puripuly_heart.ui.overlay_calibration import OverlayCalibration\nfrom tests.core.test_issue264_inflight_handoff_repair import handoff_event\nfrom tests.core.test_issue264_shared_speaker import frames\nfrom tests.core.test_source_context_contract import ControlledProvider,harness_for,finish,close\nfrom tests.core.test_stt_scoped_engine import wait_until\nasync def main():\n    clock=FakeClock(10)\n    presenter=OverlayPresenter(OverlayCalibration(),clock=clock)\n    translator=ControlledProvider()\n    harness,trace=harness_for(translator,overlay_sink=presenter)\n    view=harness.peer_owner._speaker_identities.evidence\n    snapshot,full,tokens=handoff_event(view)\n    normalizer=STTScopedTurnNormalizer(full.identity)\n    prefix=normalizer.apply_update(replace(full,source_release=replace(full.source_release,text_end=4)))\n    extension=normalizer.apply_update(replace(full,sequence=2,assembly='replace',source_release=replace(full.source_release,release_id='full'),provenance=replace(full.provenance,native_event_id='second')))\n    admission_lock=asyncio.Lock()\n    await admission_lock.acquire()\n    harness.translation_turns._channel_admission_locks['peer']=admission_lock\n    engine=ScopedRecognitionEngine(None,evidence_view=view)\n    async def deliver(event):\n        if isinstance(event,STTProviderTurnUpdate):\n            await harness.peer_owner.handle_provider_turn_update(snapshot,event)\n    engine.bind_event_sink(deliver)\n    try:\n        await engine._emit(prefix)\n        await wait_until(lambda:bool(harness.translation_turns._parents))\n        await engine._emit(extension)\n        before=[view.has_proof(t) for t in tokens]\n        admission_lock.release()\n        await engine.wait_for_event_ingress_drain()\n        await finish(harness)\n        sources=[item.source_child for item in trace.items]\n        after=[view.has_proof(t) for t in tokens]\n        view.observe(frames(0,1600,0)+frames(1600,3200,1))\n        for _ in range(20):await asyncio.sleep(0)\n        assignments=[harness.peer_owner._speaker_identities.source_snapshot(s.source_id).assignment.attribution for s in sources]\n        print(json.dumps({'text':[s.raw_text for s in sources],'translation_calls':[c[0] for c in translator.calls],'proofs_before_release':before,'proofs_after_both_admissions':after,'late_assignment_states':[a.state for a in assignments],'late_assignment_keys':[None if a.key is None else a.key.local_speaker_id for a in assignments],'engine_handoffs':len(engine._speaker_handoffs)}))\n    finally:\n        if admission_lock.locked():admission_lock.release()\n        await engine.close()\n        await close(harness)\n        await presenter.close()\nasyncio.run(main())\n",
+          "source_sha256": "d7a5950f52abba19ec355a1bc75195a4eac212b528782340858725efc8392f30",
+          "isolation_prefix_sha256": "8cb92d3a73431f03ae067e632e6a3c380afaa22f566fae4d05943ee8169f8b74",
+          "elapsed_s": 0.8933329999854323,
+          "exit_code": 0,
+          "stdout": "{\"text\": [\"One \", \"two.\"], \"translation_calls\": [\"One \", \"two.\"], \"proofs_before_release\": [true, true, true], \"proofs_after_both_admissions\": [false, true, true], \"late_assignment_states\": [\"identified\", \"identified\"], \"late_assignment_keys\": [\"0\", \"1\"], \"engine_handoffs\": 0}\n{\"guard_rejections\": []}\n",
+          "stderr": "",
+          "isolated_created_files": [],
+          "temporary_directory_removed": true
+        },
+        {
+          "label": "real_streaming_batch_custody",
+          "command": ".venv/Scripts/python.exe -B -c <isolated source>",
+          "source": "\nimport asyncio, hashlib, importlib, json, os, sys\nfrom dataclasses import replace\nfrom pathlib import Path\nsys.path.insert(0, str(Path.cwd() / 'src'))\nfrom puripuly_heart.core.audio.ownership import AudioSegmentTerminalReceipt\nfrom puripuly_heart.core.clock import FakeClock\nfrom puripuly_heart.core.overlay.presenter import OverlayPresenter\nfrom puripuly_heart.core.speaker.evidence import SpeakerEvidenceView\nfrom puripuly_heart.core.stt.scoped_engine import ScopedRecognitionEngine\nfrom puripuly_heart.core.stt.scoped_normalizer import STTScopedTurnNormalizer\nfrom puripuly_heart.ui.overlay_calibration import OverlayCalibration\nfrom tests.core.test_issue264_producer_handoff_repair import native_terminal_in_producer\nfrom tests.core.test_issue264_shared_speaker import changed, frames\nfrom tests.core.test_source_context_contract import ControlledProvider, harness_for, finish, close\n\nasync def transfer(kind):\n    clock = FakeClock(10)\n    presenter = OverlayPresenter(OverlayCalibration(), clock=clock)\n    translator = ControlledProvider()\n    harness, trace = harness_for(translator, overlay_sink=presenter)\n    harness.peer_owner.set_clock(clock)\n    allocator = harness.peer_owner._speaker_identities\n    view = allocator.evidence\n    wrapper, snapshot = await native_terminal_in_producer(kind, view)\n    queued = wrapper._events._events[0]\n    token = queued.source_audio[0].speaker_proof_id\n    queue_holds = view._proofs[token].handoffs\n    view.release_unadopted(token, published=True)\n    await wrapper.close()\n    assert view.has_proof(token)\n    events = wrapper.turn_events()\n    normalizer = STTScopedTurnNormalizer(queued.identity)\n    async def deliver(event):\n        event = normalizer.apply_terminal(event)\n        await harness.peer_owner.handle_provider_turn_terminal(\n            AudioSegmentTerminalReceipt(event.identity.segment, 'final', snapshot, 10), event)\n    engine = ScopedRecognitionEngine(None, evidence_view=view, event_sink=deliver)\n    try:\n        event = await anext(events)\n        assert view.has_proof(token)\n        yielded_holds = view._proofs[token].handoffs\n        await engine._emit(event)\n        await events.aclose()\n        await finish(harness)\n        before = presenter.snapshot().blocks\n        immutable = [(b.id, b.occupant_key, b.appearance_seq, b.primary_text, b.secondary_text) for b in before]\n        ttl = {k: presenter._entry_expiration_deadline(e) for k, e in presenter._entries.items()}\n        assert len(before) == 1 and before[0].speaker_style == 'gray'\n        assert view._proofs[token].stage == 'source' and view._proofs[token].handoffs == 0\n        clock.advance(0.25)\n        view.observe(frames(0, 3200, 0))\n        await changed(presenter, lambda: allocator.resolved_within_500ms == 1)\n        after = presenter.snapshot().blocks\n        assert len(after) == 1 and after[0].speaker_style == 'gold'\n        assert [(b.id, b.occupant_key, b.appearance_seq, b.primary_text, b.secondary_text) for b in after] == immutable\n        assert {k: presenter._entry_expiration_deadline(e) for k, e in presenter._entries.items()} == ttl\n        assert after[0].card_revision > before[0].card_revision\n        assert [i.source_child.raw_text for i in trace.items] == [c[0] for c in translator.calls] == ['Hello.']\n        assert len(harness.peer_runtime.translation_history) == 1\n        assert not view._proofs and not wrapper._speaker_handoffs and not engine._speaker_handoffs\n        return {'kind':kind, 'queue_holds':queue_holds, 'yielded_holds':yielded_holds,\n                'source_texts':[i.source_child.raw_text for i in trace.items],\n                'translation_texts':[c[0] for c in translator.calls],\n                'context_entries':len(harness.peer_runtime.translation_history),\n                'initial_style':before[0].speaker_style, 'applied_style':after[0].speaker_style,\n                'logical_delay_ms':250, 'same_card_text_appearance_ttl':True,\n                'assignment_count':allocator.resolved_within_500ms,\n                'unused_proofs':len(view._proofs), 'remaining_handoffs':len(wrapper._speaker_handoffs)+len(engine._speaker_handoffs)}\n    finally:\n        await events.aclose()\n        await wrapper.close()\n        await engine.close()\n        await close(harness)\n        await presenter.close()\n\nasync def abandon(kind, same_event, adopted):\n    view = SpeakerEvidenceView()\n    wrapper, _ = await native_terminal_in_producer(kind, view)\n    queued = wrapper._events._events[0]\n    token = queued.source_audio[0].speaker_proof_id\n    assert wrapper._put_event(queued if same_event else replace(queued))\n    events = wrapper.turn_events()\n    try:\n        event = await anext(events)\n        assert view._proofs[token].handoffs == 2\n        view.release_unadopted(token, published=True)\n        if adopted: view.adopt(token)\n        await wrapper.close()\n        await events.aclose()\n        assert not wrapper._speaker_handoffs and view.has_proof(token) == adopted\n        view.release(token)\n        assert not view._proofs\n        return {'kind':kind,'same_event':same_event,'adopted':adopted,'remaining_handoffs':0,'unused_proofs':0}\n    finally:\n        await events.aclose()\n        await wrapper.close()\n\nasync def main():\n    modules = {}\n    for name in ('speaker.evidence','stt.batch_speaker','stt.scoped_engine','stt.streaming_speaker'):\n        module = importlib.import_module('puripuly_heart.core.'+name)\n        path = Path(module.__file__).resolve()\n        modules[path.relative_to(Path.cwd()).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()\n    progress = [await transfer(kind) for kind in ('streaming','batch')]\n    cleanup = [await abandon(kind, same, adopted) for kind in ('streaming','batch') for same in (False,True) for adopted in (False,True)]\n    print(json.dumps({'modules':modules,'progress':progress,'abandoned_closed_aliases':cleanup}))\nasyncio.run(main())\n",
+          "source_sha256": "5aa54a28701c9f996085b4266c67f831a5896e4ff8eeb871dae0b0861c442d39",
+          "isolation_prefix_sha256": "8cb92d3a73431f03ae067e632e6a3c380afaa22f566fae4d05943ee8169f8b74",
+          "elapsed_s": 0.8798691999982111,
+          "exit_code": 0,
+          "stdout": "{\"modules\": {\"src/puripuly_heart/core/speaker/evidence.py\": \"9e0e2898eda62446a09b5e52ece4e41e3a18c9cc688a258e6e446331091b2076\", \"src/puripuly_heart/core/stt/batch_speaker.py\": \"5d3ca394bc3adea2f4f5e7e67f8ac5fdb403ee1b6f0f5bf6a034b9240b16036a\", \"src/puripuly_heart/core/stt/scoped_engine.py\": \"1451780ea154834bfbb6e165e278c476e3964781815f6c45a0220c494587deff\", \"src/puripuly_heart/core/stt/streaming_speaker.py\": \"25e04504810e2d9e67d652c650337c39da5c2411806ffa55689a295e30bbbd10\"}, \"progress\": [{\"kind\": \"streaming\", \"queue_holds\": 1, \"yielded_holds\": 1, \"source_texts\": [\"Hello.\"], \"translation_texts\": [\"Hello.\"], \"context_entries\": 1, \"initial_style\": \"gray\", \"applied_style\": \"gold\", \"logical_delay_ms\": 250, \"same_card_text_appearance_ttl\": true, \"assignment_count\": 1, \"unused_proofs\": 0, \"remaining_handoffs\": 0}, {\"kind\": \"batch\", \"queue_holds\": 1, \"yielded_holds\": 1, \"source_texts\": [\"Hello.\"], \"translation_texts\": [\"Hello.\"], \"context_entries\": 1, \"initial_style\": \"gray\", \"applied_style\": \"gold\", \"logical_delay_ms\": 250, \"same_card_text_appearance_ttl\": true, \"assignment_count\": 1, \"unused_proofs\": 0, \"remaining_handoffs\": 0}], \"abandoned_closed_aliases\": [{\"kind\": \"streaming\", \"same_event\": false, \"adopted\": false, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"streaming\", \"same_event\": false, \"adopted\": true, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"streaming\", \"same_event\": true, \"adopted\": false, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"streaming\", \"same_event\": true, \"adopted\": true, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"batch\", \"same_event\": false, \"adopted\": false, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"batch\", \"same_event\": false, \"adopted\": true, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"batch\", \"same_event\": true, \"adopted\": false, \"remaining_handoffs\": 0, \"unused_proofs\": 0}, {\"kind\": \"batch\", \"same_event\": true, \"adopted\": true, \"remaining_handoffs\": 0, \"unused_proofs\": 0}]}\n{\"guard_rejections\": []}\n",
+          "stderr": "",
+          "isolated_created_files": [],
+          "temporary_directory_removed": true
+        }
+      ],
+      "observed": "Original exact SR4-R2 driver now returns both late assignments identified0/1 and surviving applicable part tokens. Separate production streaming/batch smoke observes one source/translation/context unit, gray-to-gold logical application at synthetic+250ms, unchanged card/text/appearance/TTL and zero residual holds/pins; eight closed-abandoned same/distinct-object alias controls preserve source adoption and reclaim unused output.",
+      "side_effects": "Secrets removed before product import; external networking and child-process audit guards installed. Direct production composition with controlled provider/translator, no discovery/provider factory/full-app startup. Guards recorded no rejection attempts and isolated roots contained no created files. Every created wrapper/engine/harness/presenter was closed; parent TemporaryDirectory cleanup succeeded. Guard is Python-level, not an OS/native sandbox. No ports/devices/model child processes were owned by these smokes.",
+      "limits": "Synthetic PCM/capture maps, recorded/synthetic probabilities, controlled translators and FakeClock. Pure presenter logical snapshots are not Flet/GUI/native renderer observations or physical latency. No actual inference, GPU, cloud, persistence, live capture, full-app startup, VR or performance certification."
+    },
+    "type_check": "Not run; no type-check claim."
+  },
+  "preserved_failures_and_intermediate_results": {
+    "historical_jobs": [
+      {
+        "job": "bg_122",
+        "status": "failed",
+        "command": ".venv/Scripts/python.exe -m black src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_shared_handoff_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_shared_handoff_repair.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_inflight_handoff_repair.py",
+        "output": "<system-notice>\nBackground job bg_122 has completed. Resume your work using the result below.\nreformatted tests\\core\\test_issue264_shared_handoff_repair.py\n\nAll done! ✨ 🍰 ✨\n1 file reformatted, 2 files left unchanged.\nAll checks passed!\nFF...................................\n================================== FAILURES ===================================\n_ test_real_peer_cleanup_preserves_only_live_accepted_source_opportunities[False] _\ntests\\core\\test_issue264_shared_handoff_repair.py:118: in test_real_peer_cleanup_preserves_only_live_accepted_source_opportunities\n    assert allocator.resolved_within_500ms == len(sources)\nE   AssertionError: assert 0 == 1\nE    +  where 0 = <puripuly_heart.core.speaker_identity.PeerSpeakerIdentityAllocator object at 0x0000024FBDF742F0>.resolved_within_500ms\nE    +  and   1 = len([SourceChild(source_id=UUID('1b8da91e-d876-5eb3-a806-ffef35db6368'), revision='request-1:1', channel='peer', order=(1,...y_max=1, low_latency_finalize_wait_ms=400, low_latency_awaiting_vad_timeout_s=3.0)), display_group_id=None, version=1)])\n_ test_real_peer_cleanup_preserves_only_live_accepted_source_opportunities[True] _\ntests\\core\\test_issue264_shared_handoff_repair.py:118: in test_real_peer_cleanup_preserves_only_live_accepted_source_opportunities\n    assert allocator.resolved_within_500ms == len(sources)\nE   AssertionError: assert 0 == 2\nE    +  where 0 = <puripuly_heart.core.speaker_identity.PeerSpeakerIdentityAllocator object at 0x0000024FBEBB9090>.resolved_within_500ms\nE    +  and   2 = len([SourceChild(source_id=UUID('a96414cc-349f-5eb5-93f7-18694d2958a7'), revision='request-1:1', channel='peer', order=(1,...y_max=1, low_latency_finalize_wait_ms=400, low_latency_awaiting_vad_timeout_s=3.0)), display_group_id=None, version=1)])\n=========================== short test summary info ===========================\nFAILED tests/core/test_issue264_shared_handoff_repair.py::test_real_peer_cleanup_preserves_only_live_accepted_source_opportunities[False] - AssertionError: assert 0 == 1\n +  where 0 = <puripuly_heart.core.speaker_identity.PeerSpeakerIdentityAllocator object at 0x0000024FBDF742F0>.resolved_within_500ms\n +  and   1 = len([SourceChild(source_id=UUID('1b8da91e-d876-5eb3-a806-ffef35db6368'), revision='request-1:1', channel='peer', order=(1,...y_max=1, low_latency_finalize_wait_ms=400, low_latency_awaiting_vad_timeout_s=3.0)), display_group_id=None, version=1)])\nFAILED tests/core/test_issue264_shared_handoff_repair.py::test_real_peer_cleanup_preserves_only_live_accepted_source_opportunities[True] - AssertionError: assert 0 == 2\n +  where 0 = <puripuly_heart.core.speaker_identity.PeerSpeakerIdentityAllocator object at 0x0000024FBEBB9090>.resolved_within_500ms\n +  and   2 = len([SourceChild(source_id=UUID('a96414cc-349f-5eb5-93f7-18694d2958a7'), revision='request-1:1', channel='peer', order=(1,...y_max=1, low_latency_finalize_wait_ms=400, low_latency_awaiting_vad_timeout_s=3.0)), display_group_id=None, version=1)])\n2 failed, 35 passed in 1.52s\nWall time: 2.89 seconds\n\nCommand exited with code 1\n</system-notice>"
+      },
+      {
+        "job": "bg_123",
+        "status": "completed",
+        "command": ".venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py",
+        "output": "<system-notice>\nBackground job bg_123 has completed. Resume your work using the result below.\n...............\n15 passed in 0.72s\nWall time: 1.26 seconds\n</system-notice>"
+      },
+      {
+        "job": "bg_124",
+        "status": "failed",
+        "command": ".venv/Scripts/python.exe -m black tests/core/test_issue264_shared_handoff_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_shared_handoff_repair.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_shared_handoff_repair.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_inflight_handoff_repair.py tests/core/test_stt_scoped_engine.py tests/core/test_stt_event_buffer_disposal.py tests/core/test_speaker_session_cleanup.py tests/core/test_source_context_contract.py tests/core/test_translation_turn_owner.py tests/core/test_source_progressive_integration.py tests/core/test_issue264_shared_speaker.py tests/core/test_issue264_streaming_review_repair.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_issue264_streaming_repair.py",
+        "output": "<system-notice>\nBackground job bg_124 has completed. Resume your work using the result below.\nAll done! ✨ 🍰 ✨\n1 file left unchanged.\nAll checks passed!\nAll done! ✨ 🍰 ✨\n3 files would be left unchanged.\n......................................................................................................................................................................................................................................................................................................................................................................................................................................................................F..........................................................................................................................................................................\n================================== FAILURES ===================================\n_ test_engine_buffer_rejection_disposes_parts_without_retiring_healthy_output _\ntests\\core\\test_issue264_streaming_review_repair.py:658: in test_engine_buffer_rejection_disposes_parts_without_retiring_healthy_output\n    assert not view._proofs\nE   AssertionError: assert not {'fae644b6172f454899003cf0a99cf4de': _Proof(ranges=(AudioCaptureSpan(capture_epoch=7, callback_sequence=0, source_samp...=320, normalized_end_sample=480),), replayed=(), generation=0, stage='contribution', handoffs=1, release_pending=True)}\nE    +  where {'fae644b6172f454899003cf0a99cf4de': _Proof(ranges=(AudioCaptureSpan(capture_epoch=7, callback_sequence=0, source_samp...=320, normalized_end_sample=480),), replayed=(), generation=0, stage='contribution', handoffs=1, release_pending=True)} = <puripuly_heart.core.speaker.evidence.SpeakerEvidenceView object at 0x0000024145899DE0>._proofs\n------------------------------ Captured log call ------------------------------\nWARNING  puripuly_heart.core.stt.scoped_engine:diagnostics.py:784 [Failure] structured_failure\n============================== warnings summary ===============================\ntests/core/test_stt_scoped_engine.py: 210 warnings\n  <CHECKOUT>\\.venv\\Lib\\site-packages\\websockets\\exceptions.py:136: DeprecationWarning: ConnectionClosed.reason is deprecated; use Protocol.close_reason or ConnectionClosed.rcvd.reason\n    warnings.warn(  # deprecated in 13.1 - 2024-09-21\n\ntests/core/test_issue264_streaming_review_repair.py::test_installed_adapter_authoritative_frontier_precedes_result_scheduling[processed]\n  <CHECKOUT>\\.venv\\Lib\\site-packages\\deepgram\\core\\pydantic_utilities.py:13: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.\n    from pydantic.v1.datetime_parse import parse_date as parse_date\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nFAILED tests/core/test_issue264_streaming_review_repair.py::test_engine_buffer_rejection_disposes_parts_without_retiring_healthy_output - AssertionError: assert not {'fae644b6172f454899003cf0a99cf4de': _Proof(ranges=(AudioCaptureSpan(capture_epoch=7, callback_sequence=0, source_samp...=320, normalized_end_sample=480),), replayed=(), generation=0, stage='contribution', handoffs=1, release_pending=True)}\n +  where {'fae644b6172f454899003cf0a99cf4de': _Proof(ranges=(AudioCaptureSpan(capture_epoch=7, callback_sequence=0, source_samp...=320, normalized_end_sample=480),), replayed=(), generation=0, stage='contribution', handoffs=1, release_pending=True)} = <puripuly_heart.core.speaker.evidence.SpeakerEvidenceView object at 0x0000024145899DE0>._proofs\n1 failed, 624 passed, 211 warnings in 29.80s\nWall time: 31.01 seconds\n\nCommand exited with code 1\n</system-notice>"
+      },
+      {
+        "job": "bg_125",
+        "status": "completed",
+        "command": ".venv/Scripts/python.exe -m black tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_streaming_review_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_streaming_review_repair.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_streaming_review_repair.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_inflight_handoff_repair.py tests/core/test_stt_scoped_engine.py tests/core/test_stt_event_buffer_disposal.py tests/core/test_speaker_session_cleanup.py tests/core/test_source_context_contract.py tests/core/test_translation_turn_owner.py tests/core/test_source_progressive_integration.py tests/core/test_issue264_shared_speaker.py tests/core/test_issue264_streaming_review_repair.py tests/core/test_causal_batch_speaker.py tests/core/test_streaming_speaker.py tests/core/test_issue264_streaming_repair.py",
+        "output": "<system-notice>\nBackground job bg_125 has completed. Resume your work using the result below.\nAll done! ✨ 🍰 ✨\n2 files left unchanged.\nAll checks passed!\nAll done! ✨ 🍰 ✨\n4 files would be left unchanged.\n.................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................\n============================== warnings summary ===============================\ntests/core/test_stt_scoped_engine.py: 210 warnings\n  <CHECKOUT>\\.venv\\Lib\\site-packages\\websockets\\exceptions.py:136: DeprecationWarning: ConnectionClosed.reason is deprecated; use Protocol.close_reason or ConnectionClosed.rcvd.reason\n    warnings.warn(  # deprecated in 13.1 - 2024-09-21\n\ntests/core/test_issue264_streaming_review_repair.py::test_installed_adapter_authoritative_frontier_precedes_result_scheduling[processed]\n  <CHECKOUT>\\.venv\\Lib\\site-packages\\deepgram\\core\\pydantic_utilities.py:13: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.\n    from pydantic.v1.datetime_parse import parse_date as parse_date\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n625 passed, 211 warnings in 27.99s\nWall time: 29.47 seconds\n</system-notice>"
+      },
+      {
+        "job": "bg_126",
+        "status": "failed",
+        "command": ".venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_producer_handoff_repair.py",
+        "output": "<system-notice>\nBackground job bg_126 has completed. Resume your work using the result below.\nF\n================================== FAILURES ===================================\n_ test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission _\ntests\\core\\test_issue264_producer_handoff_repair.py:107: in test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission\n    assert view.has_proof(future_token), \"annotated future part lost before producer queue drain\"\nE   AssertionError: annotated future part lost before producer queue drain\nE   assert False\nE    +  where False = has_proof('e4b536dadc32445f91b912727ef4135c')\nE    +    where has_proof = <puripuly_heart.core.speaker.evidence.SpeakerEvidenceView object at 0x0000026554633230>.has_proof\n=========================== short test summary info ===========================\nFAILED tests/core/test_issue264_producer_handoff_repair.py::test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission - AssertionError: annotated future part lost before producer queue drain\nassert False\n +  where False = has_proof('e4b536dadc32445f91b912727ef4135c')\n +    where has_proof = <puripuly_heart.core.speaker.evidence.SpeakerEvidenceView object at 0x0000026554633230>.has_proof\n1 failed in 1.12s\nWall time: 1.68 seconds\n\nCommand exited with code 1\n</system-notice>"
+      },
+      {
+        "job": "bg_127",
+        "status": "failed",
+        "command": ".venv/Scripts/python.exe -m black src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/stt/batch_speaker.py tests/core/test_issue264_producer_handoff_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/streaming_speaker.py src/puripuly_heart/core/stt/batch_speaker.py tests/core/test_issue264_producer_handoff_repair.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_producer_handoff_repair.py",
+        "output": "<system-notice>\nBackground job bg_127 has completed. Resume your work using the result below.\nreformatted tests\\core\\test_issue264_producer_handoff_repair.py\nreformatted src\\puripuly_heart\\core\\stt\\batch_speaker.py\nreformatted src\\puripuly_heart\\core\\stt\\streaming_speaker.py\nreformatted src\\puripuly_heart\\core\\stt\\scoped_engine.py\n\nAll done! ✨ 🍰 ✨\n4 files reformatted, 1 file left unchanged.\nAll checks passed!\nF\n================================== FAILURES ===================================\n_ test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission _\ntests\\core\\test_issue264_producer_handoff_repair.py:123: in test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission\n    await changed(presenter, lambda: allocator.resolved_within_500ms == 2)\ntests\\core\\test_issue264_shared_speaker.py:68: in changed\n    raise AssertionError(presenter.snapshot())\nE   AssertionError: OverlayPresentationSnapshot(revision=2, calibration=OverlayPresentationCalibration(anchor='head_locked', offset_x=0.0, offset_y=-0.45, distance=1.1, text_scale=1.0, background_alpha=0.24), blocks=[OverlayPresentationBlock(id='peer:242ec5af-ad01-5f01-b568-92474dbd6e51', occupant_key='peer:242ec5af-ad01-5f01-b568-92474dbd6e51', appearance_seq=2, channel='peer', block_variant='finalized', primary_text='ja:No.', secondary_text='No.', secondary_enabled=True, primary_language='ja', secondary_language='en', update_id='8e678709467d41388e7d2d6f278e0e7d', origin_wall_clock_ms=1792324247623, session_scope=None, source_text_hash='2de5cf832dbecaac', source_text_len=4, logical_turn_key='peer:e89f9fa4-02ea-5bea-ae73-ca1badf3ed74', publication_scope='…\n=========================== short test summary info ===========================\nFAILED tests/core/test_issue264_producer_handoff_repair.py::test_streaming_native_terminal_in_producer_queue_keeps_its_future_part_during_prefix_admission - AssertionError: OverlayPresentationSnapshot(revision=2, calibration=OverlayPresentationCalibration(anchor='head_locked', offset_x=0.0, offset_y=-0.45, distance=1.1, text_scale=1.0, background_alpha=0.24), blocks=[OverlayPresentationBlock(id='peer:242ec5af-ad01-5f01-b568-92474dbd6e51', occupant_key='peer:242ec5af-ad01-5f01-b568-92474dbd6e51', appearance_seq=2, channel='peer', block_variant='finalized', primary_text='ja:No.', secondary_text='No.', secondary_enabled=True, primary_language='ja', secondary_language='en', update_id='8e678709467d41388e7d2d6f278e0e7d', origin_wall_clock_ms=1792324247623, sess…\n1 failed in 1.38s\nWall time: 3.53 seconds\n\nCommand exited with code 1\n\n[Some lines truncated to 768 bytes. Use artifact://1249:raw:16-16 to read line 16 whole; cut lines run to line 18, each read the same way]\n</system-notice>"
+      },
+      {
+        "job": "bg_128",
+        "status": "completed",
+        "command": ".venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_producer_handoff_repair.py",
+        "output": "<system-notice>\nBackground job bg_128 has completed. Resume your work using the result below.\n.\n1 passed in 0.87s\nWall time: 1.42 seconds\n</system-notice>"
+      }
+    ],
+    "classifications": [
+      {
+        "job": "bg_122",
+        "result": "2 failed,35 passed",
+        "classification": "Both new shared-Peer test cases inspected candidate key availability before actual logical application; resolved_within_500ms was0. Fixture waits were strengthened to actual applied metric before checking keys/styles/TTL. Product behavior was not repaired by relaxing the metric."
+      },
+      {
+        "job": "bg_123",
+        "result": "15 passed",
+        "classification": "Central shared-pin tests after the observation fix; pre-producer-helper evidence, not final-current proof."
+      },
+      {
+        "job": "bg_124",
+        "result": "1 failed,624 passed,211 warnings",
+        "classification": "Existing engine rejection fixture used raw event_buffer.get, leaving a live helper queue reference. Fixture migrated to normal bind/drain delivery and retained disposal assertions; no product suppression."
+      },
+      {
+        "job": "bg_125",
+        "result": "625 passed,211 warnings",
+        "classification": "Central-only successful barrier before the producer seam repair; retained historically, superseded by final634 run."
+      },
+      {
+        "job": "bg_126",
+        "result": "1 failed",
+        "classification": "Confirmed real product producer queue custody loss against central-uncommitted before bytes recorded above."
+      },
+      {
+        "job": "bg_127",
+        "result": "1 failed",
+        "classification": "After producer repair, both cards were already initially gold/cyan because the clipped initial evidence was still sufficient. The test incorrectly demanded two LATE applied assignments. Removed only premature initial evidence delivery; retained expected identities, texts, exact translation/context counts and late assignment metric2. No product threshold or assertion weakened."
+      },
+      {
+        "job": "bg_128",
+        "result": "1 passed",
+        "classification": "Producer positive after genuinely delayed evidence; before the later8 additional producer controls."
+      },
+      {
+        "job": "bg_130",
+        "result": "1 failed,633 passed,211 warnings;28.25s,wall30.01s;exit1",
+        "classification": "Expanded final-current integration exposed the old orphan native-final temporary-generator fixture, not a real downstream adoption. It lost a request proof after generator finalization. Migrated the test through explicit live generator/engine/source adoption as described, preserving its historical-final and post-close-resolution protections; final634 run passed."
+      }
+    ],
+    "bg_130_command": ".venv/Scripts/python.exe -m black tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_issue264_streaming_review_repair.py && .venv/Scripts/python.exe -m ruff check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/streaming_speaker.py tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_issue264_streaming_review_repair.py && .venv/Scripts/python.exe -m black --check src/puripuly_heart/core/speaker/evidence.py src/puripuly_heart/core/stt/batch_speaker.py src/puripuly_heart/core/stt/scoped_engine.py src/puripuly_heart/core/stt/streaming_speaker.py tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_issue264_streaming_review_repair.py && .venv/Scripts/python.exe -m pytest --tb=short tests/core/test_issue264_shared_handoff_repair.py tests/core/test_issue264_producer_handoff_repair.py tests/core/test_issue264_inflight_handoff_repair.py tests/core/test_stt_scoped_engine.py tests/core/test_stt_event_buffer_disposal.py tests/core/test_speaker_session_cleanup.py tests/core/test_source_context_contract.py tests/core/test_translation_turn_owner.py tests/core/test_source_progressive_integration.py tests/core/test_issue264_shared_speaker.py tests/core/test_issue264_streaming_review_repair.py tests/core/test_issue264_streaming_repair.py tests/core/test_streaming_speaker.py tests/core/test_causal_batch_speaker.py",
+    "bg_130_failure": "test_native_final_claim_transfers_through_origin_and_survives_asr_close at test_issue264_shared_speaker.py:434: assert view.has_proof(token) was false after close; no source-stage adoption had occurred in that fixture.",
+    "prior_tool_failures": [
+      {
+        "record_index": 1835,
+        "tool": "edit",
+        "output": "This edit anchors to lines 1786 of src/puripuly_heart/core/stt/scoped_engine.py that [src/puripuly_heart/core/stt/scoped_engine.py#E4F8] never displayed (it showed a partial range, a search hit, or a folded summary). Actual file content at those lines:\n  1786:            retained=(*retained, *(handoff.event for handoff in self._speaker_handoffs.values())),\nVerify the content matches what you intend to touch, then re-issue the edit with the same [path#tag] header — a straight retry now succeeds without a re-read. If the content does NOT match, fix your line numbers."
+      },
+      {
+        "record_index": 1947,
+        "tool": "edit",
+        "output": "This edit anchors to lines 29 of src/puripuly_heart/core/stt/scoped_engine.py that [src/puripuly_heart/core/stt/scoped_engine.py#1DC8] never displayed (it showed a partial range, a search hit, or a folded summary). Actual file content at those lines:\n  29:from puripuly_heart.core.speaker.evidence import SpeakerEvidenceView\nVerify the content matches what you intend to touch, then re-issue the edit with the same [path#tag] header — a straight retry now succeeds without a re-read. If the content does NOT match, fix your line numbers."
+      }
+    ],
+    "other_tool_and_runtime_limits": [
+      "Interrupted previous-worker wake/dispatch failures are retained under recovery, not converted to successful verification.",
+      "Previous-worker ranged read path with comma negative footer suffix was misparsed; it reported the issue and reread the exact footer.",
+      "Replacement attempted read of a nonexistent historical translation_harness.py path; no execution/edit resulted. Actual harness_for composition was read from test_source_context_contract.py.",
+      "One replacement edit anchor was rejected because the edit response had folded the requested native-final fixture lines; replacement reread the displayed range and applied the corrected source-adopting sink before executing final checks. No partially applied test run was claimed."
+    ],
+    "earlier_records_untouched": [
+      "native/nemotron/issue264_streaming_review_repair.json",
+      "native/nemotron/issue264_review_streaming_repair.json",
+      "native/nemotron/issue264_inflight_handoff_repair.json",
+      "native/nemotron/issue264_review_inflight_handoff.json"
+    ],
+    "prior_scope": "All previously reported real/model, Gemini negative, accepted Parakeet residual, earlier style/fixture/tool failures and invalid actual observations retain their original dispositions. This bounded report neither reruns nor relabels them."
+  },
+  "final_inventory": [
+    {
+      "path": "src/puripuly_heart/core/speaker/evidence.py",
+      "sha256": "9e0e2898eda62446a09b5e52ece4e41e3a18c9cc688a258e6e446331091b2076",
+      "bytes": 15654
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/batch_speaker.py",
+      "sha256": "5d3ca394bc3adea2f4f5e7e67f8ac5fdb403ee1b6f0f5bf6a034b9240b16036a",
+      "bytes": 20031
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/scoped_engine.py",
+      "sha256": "1451780ea154834bfbb6e165e278c476e3964781815f6c45a0220c494587deff",
+      "bytes": 134458
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/streaming_speaker.py",
+      "sha256": "25e04504810e2d9e67d652c650337c39da5c2411806ffa55689a295e30bbbd10",
+      "bytes": 54183
+    },
+    {
+      "path": "tests/core/test_issue264_streaming_repair.py",
+      "sha256": "3a0e3cedec494bb8cc470655d9a582abba204440090ae416d330d0df41f79890",
+      "bytes": 38919
+    },
+    {
+      "path": "tests/core/test_issue264_streaming_review_repair.py",
+      "sha256": "39c24baf742764d9a2eff19aaaf13afcee0bd9290e2bae8083e6e4e12e3f254b",
+      "bytes": 36634
+    },
+    {
+      "path": "tests/core/test_issue264_shared_handoff_repair.py",
+      "sha256": "b4454ba4623780267eb5b1566684f4789dbedaa193eb063256b5a87d1e33c2cb",
+      "bytes": 10073
+    },
+    {
+      "path": "tests/core/test_issue264_producer_handoff_repair.py",
+      "sha256": "013285703966bbf92121c8a030e2699a6dac39e797fdeaa9e00554279ea33562",
+      "bytes": 12219
+    },
+    {
+      "path": "tests/core/test_issue264_shared_speaker.py",
+      "sha256": "851b92e780a072d1cdda621c91a2a7e749464f347aaa6186a830cb20746b7759",
+      "bytes": 33633
+    }
+  ],
+  "unchanged_dependency_inventory": [
+    {
+      "path": "src/puripuly_heart/core/stt/scoped_event_buffer.py",
+      "git_blob_content_sha256": "78028a184866bda0a92f4d4d0de18ec70308d92ad12dd634ee6d51e0e4aba8c6",
+      "sha256": "78028a184866bda0a92f4d4d0de18ec70308d92ad12dd634ee6d51e0e4aba8c6",
+      "identical_to_baseline_blob": true
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/backend.py",
+      "git_blob_content_sha256": "9a0231e035d7a5c4a21d053f101f38e107088664ea8a7a47653da0bd18d7e7e4",
+      "sha256": "9a0231e035d7a5c4a21d053f101f38e107088664ea8a7a47653da0bd18d7e7e4",
+      "identical_to_baseline_blob": true
+    },
+    {
+      "path": "src/puripuly_heart/core/stt/session_projection.py",
+      "git_blob_content_sha256": "13693572c9acb1fe6c797957d5c1aee5b59d3777d2fd26e79a3a927acfb73e69",
+      "sha256": "13693572c9acb1fe6c797957d5c1aee5b59d3777d2fd26e79a3a927acfb73e69",
+      "identical_to_baseline_blob": true
+    },
+    {
+      "path": "src/puripuly_heart/core/orchestrator/peer_translation_channel.py",
+      "git_blob_content_sha256": "efc5b48023e4b7ca43eefe6f960ddd993362c938501a6d2acec49f8fa4dc97db",
+      "sha256": "efc5b48023e4b7ca43eefe6f960ddd993362c938501a6d2acec49f8fa4dc97db",
+      "identical_to_baseline_blob": true
+    },
+    {
+      "path": "src/puripuly_heart/core/speaker_identity.py",
+      "git_blob_content_sha256": "006dbb2ac74b8b8b5582e7b5bda6c7f16e9b8509f143527992c11fc094228991",
+      "sha256": "006dbb2ac74b8b8b5582e7b5bda6c7f16e9b8509f143527992c11fc094228991",
+      "identical_to_baseline_blob": true
+    },
+    {
+      "path": "src/puripuly_heart/core/overlay/presenter.py",
+      "git_blob_content_sha256": "4e83b2dc5e960951e7ed683836882919cc07fb917ee21bdac96805f6a4e2668c",
+      "sha256": "4e83b2dc5e960951e7ed683836882919cc07fb917ee21bdac96805f6a4e2668c",
+      "identical_to_baseline_blob": true
+    },
+    {
+      "path": "tests/core/test_issue264_inflight_handoff_repair.py",
+      "git_blob_content_sha256": "ab0958cfb97e28249a4150433e79e03570b882ee6a3e4762fa528fb1d87f88f6",
+      "sha256": "ab0958cfb97e28249a4150433e79e03570b882ee6a3e4762fa528fb1d87f88f6",
+      "identical_to_baseline_blob": true
+    }
+  ],
+  "director_handoff": {
+    "result": "Local implementation, affected integration and controlled production-class custody smoke complete. No remaining observed deterministic failure in the authorized bounded scope. Candidate is frozen at exact inventory bytes pending Director pin and originating reviewer verification.",
+    "review_request": "Bounded verification of baseline20a3872d to the Director-pinned candidate: central live-pin deferral across unchanged Peer cleanup; accepted-vs-rejected real-Peer differential; actual streaming/batch private queue and yield custody; alias/cancel/close/pressure/source-stage finality; removal of redundant engine-only protection. Retain SR1-SR3/originalSR4/SR4-R1 closures rather than reopening unrelated policy/profile audits.",
+    "proposed_maintained_guidance": "Director should update architecture.md streaming ownership paragraph286 and applicable maintained plan text to describe the central pin hold plus shared speaker-specific helper across wrapper private queue/yield and engine delivery. Healthy close preserves accepted drain, abandoned closed generators end remaining queued dependencies, ordinary cleanup defers, reset/epoch/frame pressure/source retirement remains final. No docs edited by this worker.",
+    "user_visible_effect": "Supported already-queued cumulative releases retain both source-scoped late speaker assignments instead of leaving the second source permanently gray. Text/translation readiness, exact source/context accounting, card placement/TTL and existing identity deadlines are unchanged.",
+    "owned_changes": [
+      "src/puripuly_heart/core/speaker/evidence.py",
+      "src/puripuly_heart/core/stt/batch_speaker.py",
+      "src/puripuly_heart/core/stt/scoped_engine.py",
+      "src/puripuly_heart/core/stt/streaming_speaker.py",
+      "tests/core/test_issue264_streaming_repair.py",
+      "tests/core/test_issue264_streaming_review_repair.py",
+      "tests/core/test_issue264_shared_handoff_repair.py",
+      "tests/core/test_issue264_producer_handoff_repair.py",
+      "tests/core/test_issue264_shared_speaker.py",
+      "native/nemotron/issue264_shared_handoff_repair.json"
+    ],
+    "director_owned_untouched": [
+      "docs/issue218-speaker-attribution-plan.md",
+      "native/nemotron/issue264_review_inflight_handoff.json"
+    ],
+    "remaining_gates": [
+      "Director owns Git/index/history pin and maintained docs integration",
+      "Originating independent bounded review still required",
+      "Actual1GPU+4tapes held for Director authorization; no rerun here",
+      "No final Goal/#264 acceptance, publication, push, PR, merge or cleanup authorization is inferred"
+    ]
+  }
+}

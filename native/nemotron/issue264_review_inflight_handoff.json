@@ -1,0 +1,183 @@
+{
+  "RESULT": "repair_failed",
+  "DOMAIN": "Bounded SR4-R1 REPAIR_VERIFY: live engine delivery ownership, its precise original failure, and tightly coupled queued/admission cleanup",
+  "range": {
+    "baseline": "3d541b18867d586892f2b1a5e58cf236e1432282",
+    "candidate": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+    "checkout_observed": "20a3872d5921135ce1bbc7ff8cb372c855a7ccd0",
+    "original_finding": "native/nemotron/issue264_review_streaming_repair.json:SR4-R1",
+    "repair_evidence": "native/nemotron/issue264_inflight_handoff_repair.json"
+  },
+  "assessment": "The exact original SR4-R1 engine-discard failure is repaired, including the accepted rejected-extension schedule. The engine reference accounting also correctly handles the inspected direct/deferred alias and shutdown paths. However, real Peer admission has a separate, tightly coupled cleanup path that bypasses those references: finishing an accepted prefix releases a future-part token already referenced by another accepted queued release. A controlled real-Peer observation preserves both texts/translations but permanently loses the second source's late-speaker opportunity. The complete shared-claim lifecycle therefore remains unverified as repaired due to this observed product defect, not a hardware/evidence prerequisite.",
+  "original_failure_disposition": {
+    "id": "SR4-R1",
+    "disposition": "precise_original_failure_verified_closed",
+    "decisive_locations": [
+      "src/puripuly_heart/core/stt/scoped_engine.py:1722-1775 — queued/active counters and retained live-event protection",
+      "src/puripuly_heart/core/stt/scoped_engine.py:2811-2831 — registration before direct invocation or buffer admission",
+      "src/puripuly_heart/core/stt/scoped_engine.py:2847-2887 — queued-to-active transfer before delivery; final disposition in finally",
+      "src/puripuly_heart/core/stt/scoped_engine.py:946-985 — abandoned queued-reference cleanup without altering drain timing"
+    ],
+    "independent_execution": {
+      "probe": "Exact original inline handoff failure driver, run against 20a3872d rather than the known-failing baseline",
+      "command": ".venv/Scripts/python.exe -B - <inline driver>",
+      "outcome": "Exit 0. Initial stages were [contribution,contribution,contribution]. After rejecting the later shared extension, has_proof was [true,true,true]. Resumed prefix admission found its proof present; the adopted part remained as one live source claim.",
+      "comparison": "The preserved original 3d541b observation had [false,false,false] after rejection and proof_exists_at_admission=false. That known-failing baseline was not rerun."
+    }
+  },
+  "findings": [
+    {
+      "id": "SR4-R2",
+      "severity": "P2",
+      "title": "Peer prefix cleanup releases a future part still owned by an accepted queued release",
+      "violated_contract": "#264 R1 and the SR4 handoff guarantee: release only otherwise-unreferenced claims; preserve request/contribution/source transfer without destroying a lawful late-resolution opportunity.",
+      "exact_locations": [
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py:491-494 — directly releases every unadopted parent/part claim with published=True, without checking live queued/active dependencies",
+        "src/puripuly_heart/core/orchestrator/peer_translation_channel.py:504-516,550-571 — that cleanup runs after each successful prefix or terminal admission",
+        "src/puripuly_heart/core/stt/scoped_engine.py:1769-1775 — engine disposal protects its live references, but Peer cleanup does not use this protection",
+        "src/puripuly_heart/core/stt/streaming_speaker.py:887-902 — cached live footprint tokens can be shared by releases produced before the first admission completes",
+        "src/puripuly_heart/core/speaker/evidence.py:106-113 — published=True deletes a contribution-stage token regardless of another queued delivery",
+        "src/puripuly_heart/core/speaker_identity.py:192-200 — an unresolved admitted source with a missing token settles unavailable"
+      ],
+      "reachable_path": "The first normalized release admits 'One ' and pauses on the real Peer admission lock. A full cumulative release for 'One two.' is accepted into the engine queue while the parent and both part tokens are still live, so it lawfully references the same cached tokens. When the first release resumes, its Peer finally-cleanup retains the adopted first-part token but deletes the parent and future second-part token. The second accepted release subsequently consumes 'two.' with that missing token. The engine's own counters cannot protect against this direct Peer release call.",
+      "decisive_executed_evidence": {
+        "probe_title": "Probing queued real Peer ownership cleanup",
+        "command": ".venv/Scripts/python.exe -B - <isolated inline driver retained in this review transcript>",
+        "boundaries": "Production ScopedRecognitionEngine, normalizer, real Peer admission lock, SourceChild/context/translation owners and pure OverlayPresenter; controlled translator and synthetic speaker evidence. Both releases were accepted without buffer pressure.",
+        "observations": {
+          "source_texts": [
+            "One ",
+            "two."
+          ],
+          "translation_call_texts": [
+            "One ",
+            "two."
+          ],
+          "proofs_before_releasing_admission_lock": [
+            true,
+            true,
+            true
+          ],
+          "proofs_after_both_admissions": [
+            false,
+            true,
+            false
+          ],
+          "late_assignment_states": [
+            "identified",
+            "unavailable"
+          ],
+          "late_assignment_keys": [
+            "0",
+            null
+          ],
+          "remaining_engine_handoffs": 0
+        },
+        "outcome": "Exit 0 is successful diagnostic execution observing a product failure. Supplying eligible A/B evidence resolved the first source but not the second, whose token had already been discarded."
+      },
+      "counterevidence_and_limits": [
+        "The new real-Peer regression correctly tests a rejected extension. Its future part is genuinely unused and should be discarded. It does not test an accepted queued extension that already owns the same future token.",
+        "The concurrent/queued alias tests protect engine-controlled disposal using synthetic sinks. They do not execute PeerTranslationChannelOwner's direct finally-cleanup for two accepted cumulative releases.",
+        "Existing later-release repinning works when the wrapper annotates the later event after the earlier cleanup. It cannot repair an event already queued with the earlier token.",
+        "This does not establish that the new engine counters regressed Peer behavior. It exposes an existing coupled cleanup caller that does not participate in the newly implemented live-dependency guarantee.",
+        "Text, source order and translation/context progress remained intact. No model, GUI, physical renderer timing or acoustic-incidence claim is made."
+      ]
+    }
+  ],
+  "COVERAGE": [
+    {
+      "item": "Immutable range and bounded product delta",
+      "status": "inspected",
+      "basis": "Confirmed candidate HEAD and reviewed the complete 3d541b..20a3872d product/test/docs delta. Product change is confined to scoped_engine.py; generic buffer and prior source/test surfaces remain outside this delta."
+    },
+    {
+      "item": "Precise original in-flight rejected-extension failure",
+      "status": "inspected; independently executed",
+      "basis": "Executed the preserved original driver against the repaired candidate. All three claims survived the rejection; the accepted prefix adopted its applicable part successfully."
+    },
+    {
+      "item": "Queued-to-active ownership and same-object identity safety",
+      "status": "inspected",
+      "basis": "Registration precedes buffer admission; dequeue transfers the reference synchronously before any sink await. Per-object queued/active counts retain the event itself, prevent identity reuse and preserve repeated same-object admissions."
+    },
+    {
+      "item": "Distinct-object aliases and concurrent direct calls",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "All live records participate in protected disposal. Direct active references begin before invocation and end in finally. Reviewed all 12 success/failure/cancel and adopted/unadopted direct-alias cases in the new test module; reused their recorded execution."
+    },
+    {
+      "item": "Deferred success/failure/cancellation and queued aliases",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Deferred finally removes only the ended active reference, preserving queued or other active dependencies. Reviewed the six same/distinct-object queued-alias cases, including dispatcher restart after failure/cancellation."
+    },
+    {
+      "item": "Real Peer admission and late logical presentation",
+      "status": "inspected; additional controlled execution",
+      "basis": "The new rejected-extension regression covers the original failure through the actual admission lock and pure presenter. The additional two-accepted-release observation exposes SR4-R2 in the neighboring Peer finally-cleanup path."
+    },
+    {
+      "item": "Unreferenced request/contribution disposal and adopted-source protection",
+      "status": "inspected",
+      "basis": "Engine final disposal still delegates to the unchanged stage-aware helper after ending its reference. Already-source-stage claims remain protected. The remaining finding concerns a referenced but not-yet-adopted future part."
+    },
+    {
+      "item": "Close, abandoned queues, cleanup and bounds",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Close clears abandoned queued counts together before disposal and preserves active records until their finally blocks unwind. Records are only created for proof-bearing events and removed when all queued/active dependencies end. No independent history/cache, new queue policy or timeout was introduced. Reviewed the adopted/unadopted close regressions."
+    },
+    {
+      "item": "Generic buffer behavior and SR1–SR3 closure",
+      "status": "supported_by_prior_evidence",
+      "basis": "No changes to generic buffer admission/discard semantics, synchronous native publication, native-task fences or capture-owner continuity. Prior verified SR1–SR3 and original wrapper-buffer leak closure are retained."
+    },
+    {
+      "item": "Unchanged full-review coverage",
+      "status": "supported_by_prior_evidence",
+      "basis": "Retain prior qualified enclosure/lexical negatives, immutable SourceChild and boundary-marker behavior, batch/SELF routing, thresholds/profiles/wire and F1–F5 coverage. No unrelated full audit or threshold/policy change was undertaken."
+    },
+    {
+      "item": "Regression quality and recorded integration barrier",
+      "status": "inspected; supported_by_prior_evidence",
+      "basis": "Read the entire new 281-line test module and repair record. The 22 first-pass regressions retain meaningful claims, source/translation counts, in-place gray-to-gold, TTL and cleanup assertions. Reused the recorded 451 affected passes, 211 dependency warnings and zero skips/failures; did not rerun that supplied barrier."
+    },
+    {
+      "item": "Maintained documentation",
+      "status": "inspected",
+      "basis": "Docs accurately describe engine reference ownership, but the broader 'only final ended dependency' disposal promise remains incomplete while Peer cleanup bypasses it."
+    },
+    {
+      "item": "E5, actual five-run gate and Goal acceptance",
+      "status": "not_applicable to this bounded implementation verdict; actual gate unverified",
+      "basis": "E5's separate accepted closure is retained. No E5/model/GPU/cloud/GUI/VR execution or actual-tape rerun occurred. The demonstrated cleanup defect—not the held actual gate—is the reason for repair_failed."
+    }
+  ],
+  "verification": {
+    "reviewer_executed": [
+      {
+        "check": "Exact original SR4-R1 driver on candidate20a3872d",
+        "outcome": "Exit0; original missing-proof failure closed: all shared claims survived rejection and accepted adoption succeeded."
+      },
+      {
+        "check": "Two accepted normalized cumulative releases through real Peer admission",
+        "outcome": "Exit0; exact texts and translations progressed once each, but Peer cleanup discarded the queued second part and its late assignment remained unavailable."
+      }
+    ],
+    "recorded_checks_reused": {
+      "reference": "native/nemotron/issue264_inflight_handoff_repair.json:verification",
+      "outcomes": [
+        "22 new regressions passed on first execution; no failures/skips.",
+        "451 affected tests passed with211 dependency warnings; no failures/skips.",
+        "Scoped Ruff and Black --check passed for the product and new test module."
+      ],
+      "qualification": "These are inspected recorded executions, not new reviewer runs."
+    },
+    "preserved_evidence": "The accepted original SR4-R1 failure and adopted-source control remain in the original report. No failing-baseline reconfirmation was run. Prior SR1–SR3 and all historical invalid/failed outcomes retain their original disposition.",
+    "isolation_and_cleanup": "Both reviewer probes used -B/PYTHONDONTWRITEBYTECODE and temporary APPDATA/LOCALAPPDATA/XDG_CONFIG_HOME. Created engines, translation/presenter tasks and isolated views were closed/reset; temporary directories removed. No repository/docs/Git/GitHub mutation."
+  },
+  "handoff": {
+    "director_decision_needed": "The precise engine-only SR4-R1 fix can be retained as closed. Allocate the observed tightly coupled Peer finally-cleanup dependency gap explicitly; it is outside this follow-up's single product-file delta. No generic buffer redesign or policy change is needed to describe the failure.",
+    "smallest_required_regression": "Accept both a prefix and cumulative extension before the prefix's admission finishes. Execute real Peer finally-cleanup, then admit the already-queued tail and provide eligible late evidence. Both source-scoped opportunities must survive while unused claims are reclaimed; preserve the rejected-extension control where the future part is genuinely unused.",
+    "scope_retained": "SR1–SR3 closure, original wrapper rejection-leak closure and unaffected full-review coverage remain applicable. No fresh unrelated FULL_REVIEW is requested.",
+    "acceptance_limit": "The Director owns adjudication, allocation and the actual1GPU+4 gate. This result does not authorize execution, publication or Goal acceptance."
+  }
+}

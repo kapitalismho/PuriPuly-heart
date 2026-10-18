@@ -4,7 +4,11 @@ from dataclasses import dataclass, replace
 from uuid import uuid4
 
 from puripuly_heart.core.speaker.contracts import SpeakerEvidence
-from puripuly_heart.core.stt.backend import STTAudioBoundary
+from puripuly_heart.core.stt.backend import (
+    STTAudioBoundary,
+    STTProviderTurnEvent,
+    discard_source_audio_proofs,
+)
 from puripuly_heart.core.stt.speaker_attribution import (
     SpeakerFrame,
     attribute_speaker,
@@ -21,6 +25,8 @@ class _Proof:
     replayed: tuple
     generation: int
     stage: str = "request"
+    handoffs: int = 0
+    release_pending: bool = False
 
 
 class SpeakerEvidenceView:
@@ -91,12 +97,31 @@ class SpeakerEvidenceView:
         return token
 
     def release(self, token):
-        self._proofs.pop(token, None)
+        proof = self._proofs.get(token)
+        if proof is not None and proof.stage != "source" and proof.handoffs:
+            self._proofs[token] = replace(proof, release_pending=True)
+        else:
+            self._proofs.pop(token, None)
+
+    def retain_handoff(self, token):
+        proof = self._proofs.get(token)
+        if proof is not None:
+            self._proofs[token] = replace(proof, handoffs=proof.handoffs + 1)
+
+    def release_handoff(self, token):
+        proof = self._proofs.get(token)
+        if proof is None or not proof.handoffs:
+            return
+        remaining = proof.handoffs - 1
+        if not remaining and proof.release_pending and proof.stage != "source":
+            self._proofs.pop(token, None)
+        else:
+            self._proofs[token] = replace(proof, handoffs=remaining)
 
     def adopt(self, token):
         proof = self._proofs.get(token)
         if proof is not None and proof.stage != "source":
-            self._proofs[token] = replace(proof, stage="source")
+            self._proofs[token] = replace(proof, stage="source", release_pending=False)
 
     def publish(self, token):
         proof = self._proofs.get(token)
@@ -232,7 +257,7 @@ class SpeakerEvidenceView:
                     for span in (*proof.ranges, *proof.replayed)
                     for frame in removed
                 ):
-                    self.release(token)
+                    self._proofs.pop(token, None)
         if changed:
             self._changed()
 
@@ -318,3 +343,75 @@ class SpeakerEvidenceView:
 
     def boundaries(self):
         return (boundary for boundary, _, _ in self.transitions())
+
+
+@dataclass(slots=True)
+class _SpeakerHandoff:
+    event: STTProviderTurnEvent
+    queued: int = 0
+    active: int = 0
+
+
+class SpeakerProofHandoffs:
+    def __init__(self, evidence: SpeakerEvidenceView | None):
+        self.evidence = evidence
+        self._events: dict[int, _SpeakerHandoff] = {}
+
+    def __len__(self):
+        return len(self._events)
+
+    def begin(self, event, *, queued=False):
+        if self.evidence is None or not any(
+            audio.speaker_proof_ids for audio in getattr(event, "source_audio", ())
+        ):
+            return
+        handoff = self._events.get(id(event))
+        if handoff is None:
+            handoff = _SpeakerHandoff(event)
+            self._events[id(event)] = handoff
+        if queued:
+            handoff.queued += 1
+        else:
+            handoff.active += 1
+        for audio in event.source_audio:
+            for token in audio.speaker_proof_ids:
+                self.evidence.retain_handoff(token)
+
+    def activate(self, event):
+        handoff = self._events.get(id(event))
+        if handoff is not None and handoff.queued:
+            handoff.queued -= 1
+            handoff.active += 1
+        else:
+            self.begin(event)
+
+    def end(self, event, *, queued=False):
+        handoff = self._events.get(id(event))
+        if handoff is None:
+            return
+        if queued:
+            if not handoff.queued:
+                return
+            handoff.queued -= 1
+        else:
+            if not handoff.active:
+                return
+            handoff.active -= 1
+        if not handoff.queued and not handoff.active:
+            del self._events[id(event)]
+        for audio in event.source_audio:
+            for token in audio.speaker_proof_ids:
+                self.evidence.release_handoff(token)
+
+    def discard_queued(self, *, published=False):
+        queued = tuple(handoff for handoff in self._events.values() if handoff.queued)
+        for handoff in queued:
+            for _ in range(handoff.queued):
+                for audio in handoff.event.source_audio:
+                    for token in audio.speaker_proof_ids:
+                        self.evidence.release_handoff(token)
+            handoff.queued = 0
+            if not handoff.active:
+                del self._events[id(handoff.event)]
+        for handoff in queued:
+            discard_source_audio_proofs(handoff.event, self.evidence, published=published)
