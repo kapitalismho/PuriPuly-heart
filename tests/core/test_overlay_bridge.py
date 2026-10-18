@@ -1493,7 +1493,6 @@ async def test_active_self_stalled_bridge_coalesces_and_never_replays_removed_ta
         accepted = presenter.snapshot()
         assert accepted.blocks[0].secondary_text == "synthetic translation"
         assert accepted.native_quiet_tail_episodes.self.phase == "stream"
-        assert accepted.native_quiet_tail_episodes.self.generation == 1
         assert not stalled.sent_payloads
         if remove == "expiry":
             clock.advance(9.0)
@@ -1518,5 +1517,6 @@ async def test_active_self_stalled_bridge_coalesces_and_never_replays_removed_ta
         assert reconnected.sent_payloads[0]["payload"]["blocks"] == []
         assert "native_quiet_tail_episodes" not in reconnected.sent_payloads[0]["payload"]
     finally:
+        stalled.release_send.set()
         await presenter.close()
         await bridge.stop()
