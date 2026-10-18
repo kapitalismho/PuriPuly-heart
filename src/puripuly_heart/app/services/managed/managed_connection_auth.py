@@ -271,6 +271,7 @@ class ManagedConnectionAuthService:
         if isinstance(secret_write_result, TransactionResult):
             return secret_write_result
         state = self._managed_state()
+        state_snapshot = state.snapshot() if state is not None else None
         service = self.delivery_ack_service
         if service is None and state is not None:
             service = ManagedKeyDeliveryAckService(
@@ -325,6 +326,11 @@ class ManagedConnectionAuthService:
             secret_diagnostics=secret_write_result.diagnostics,
         )
         if commit_result.status != TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED:
+            if state is not None and state_snapshot is not None:
+                try:
+                    state.restore(state_snapshot)
+                except Exception as exc:
+                    _observe_managed_failure("managed_authentication", exc)
             return commit_result
         if state is not None:
             state.active_managed_credential_ref = broker_result.managed_credential_ref
@@ -974,11 +980,12 @@ class ManagedConnectionAuthService:
         probe: ManagedOperationStatusResult,
     ) -> TransactionResult | None:
         service = self.delivery_ack_service
-        if (
-            service is not None
-            and service.managed_state.pending_delivery_ack_source == ACK_SOURCE_DISCORD
-        ):
-            recovered = await service.retry_pending()
+        recovered = (
+            await service.recover_operation_delivery(ACK_SOURCE_DISCORD, probe)
+            if service is not None
+            else None
+        )
+        if recovered is not None:
             if recovered.ack_result is not None:
                 self._emit_ack_result(request, recovered.ack_result)
             if recovered.succeeded:

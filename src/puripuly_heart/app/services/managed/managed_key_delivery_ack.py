@@ -9,6 +9,7 @@ from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckRequest,
     ManagedKeyDeliveryAckResult,
+    ManagedOperationStatusResult,
 )
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
@@ -33,6 +34,7 @@ from puripuly_heart.core.messages import (
     DiagnosticFieldValue,
     ErrorDiagnostics,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 ACK_SOURCE_DISCORD = "discord"
 ACK_SOURCE_QQ = "qq"
@@ -149,6 +151,84 @@ class ManagedKeyDeliveryAckService:
             metadata.managed_credential_ref
         )
         self.managed_state.pending_delivery_ack_expires_at = metadata.expires_at
+
+    async def recover_operation_delivery(
+        self, source: str, probe: ManagedOperationStatusResult
+    ) -> ManagedKeyDeliveryAckServiceResult | None:
+        state = self.managed_state
+        if state.pending_delivery_ack_source == source:
+            return await self.retry_pending()
+        delivery = probe.delivery
+        ref = probe.managed_credential_ref or (
+            probe.attempt.managed_credential_ref if probe.attempt is not None else None
+        )
+        if (
+            state.pending_delivery_ack_source is not None
+            or state.pending_managed_operation_source != source
+            or not state.pending_managed_operation_id
+            or state.pending_managed_operation_installation_id != state.installation_id
+            or not probe.succeeded
+            or probe.operation_status != "DELIVERY_PENDING"
+            or probe.client_action != "acknowledge_delivery"
+            or delivery is None
+            or delivery.status != "pending"
+            or not delivery.delivery_id
+            or not delivery.expires_at
+            or delivery_expired(delivery.expires_at)
+            or not ref
+        ):
+            return None
+        try:
+            binding, credential = await self.credential_binding(source)
+            token = await self.secret_store.get_secret(secret_key_for_ack_source(source))
+            if token.diagnostics is not None:
+                raise ManagedKeyDeliveryAckTokenStoreError(
+                    "delivery ACK token observation failed", token.diagnostics
+                )
+        except Exception as exc:
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="managed_secret_read_failed",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="managed_secret_read_failed",
+                    fields={"source": source},
+                    exception=exc,
+                ),
+            )
+        if (
+            not token.value
+            or binding is None
+            or not binding.matches(
+                credential=credential,
+                source=source,
+                installation_id=state.installation_id,
+                operation_id=state.pending_managed_operation_id,
+                delivery_id=delivery.delivery_id,
+                managed_credential_ref=ref,
+            )
+        ):
+            return None
+        snapshot = state.snapshot()
+        state.pending_delivery_ack_source = source
+        state.pending_delivery_ack_delivery_id = delivery.delivery_id
+        state.pending_delivery_ack_managed_credential_ref = ref
+        state.pending_delivery_ack_expires_at = delivery.expires_at
+        try:
+            await run_owned_thread_call(state.persist)
+        except Exception as exc:
+            state.restore(snapshot)
+            return ManagedKeyDeliveryAckServiceResult(
+                succeeded=False,
+                status="pending_metadata_persist_failed",
+                diagnostics=_diagnostics(
+                    operation="recover_managed_key_delivery",
+                    code="delivery_ack_metadata_persist_failed",
+                    fields={"source": source},
+                    exception=exc,
+                ),
+            )
+        return await self.retry_pending()
 
     async def recover_pending(
         self,

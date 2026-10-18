@@ -1033,6 +1033,66 @@ class ManagedOpenRouterReleaseService:
                 operation="managed_operation_status", code="managed_operation_status_unavailable"
             )
         if (
+            status.succeeded
+            and status.operation_status == "DELIVERY_PENDING"
+            and status.client_action == "acknowledge_delivery"
+            and state.pending_delivery_ack_source is None
+        ):
+            delivery = status.delivery
+            ref = status.managed_credential_ref or (
+                status.attempt.managed_credential_ref if status.attempt is not None else None
+            )
+            if (
+                delivery is not None
+                and delivery.status == "pending"
+                and delivery.delivery_id
+                and delivery.expires_at
+                and not delivery_expired(delivery.expires_at)
+                and ref
+            ):
+                try:
+                    binding, credential, ack_token = await run_owned_thread_call(
+                        lambda: (
+                            ManagedCredentialBinding.decode(
+                                self.secrets.get(credential_binding_secret(source))
+                            ),
+                            self.secrets.get(managed_key_secret(source)),
+                            self.secrets.get(_delivery_ack_token_secret_key(source)),
+                        )
+                    )
+                except Exception:
+                    return self._delivery_ack_retry_result("managed_secret_read_failed")
+                if (
+                    ack_token
+                    and binding is not None
+                    and binding.matches(
+                        credential=credential,
+                        source=source,
+                        installation_id=installation_id,
+                        operation_id=operation_id,
+                        delivery_id=delivery.delivery_id,
+                        managed_credential_ref=ref,
+                    )
+                ):
+                    snapshot = state.snapshot()
+                    state.pending_delivery_ack_source = source
+                    state.pending_delivery_ack_delivery_id = delivery.delivery_id
+                    state.pending_delivery_ack_managed_credential_ref = ref
+                    state.pending_delivery_ack_expires_at = delivery.expires_at
+                    try:
+                        await run_owned_thread_call(state.persist)
+                    except Exception:
+                        state.restore(snapshot)
+                        return self._delivery_ack_retry_result("pending_metadata_persist_failed")
+                    pending = await self._retry_pending_delivery_ack_if_needed()
+                    if pending is not None:
+                        return pending
+                    return ManagedOpenRouterReleaseResult(
+                        behavior=ManagedOpenRouterReleaseBehavior.READY,
+                        api_key=credential,
+                        local_key_available=True,
+                    )
+        if (
             status.client_action in {"retry_authorized", "acknowledge_delivery"}
             and status.succeeded
         ):
@@ -1327,6 +1387,8 @@ class ManagedOpenRouterReleaseService:
                     operation_status=None,
                 )
 
+        snapshot = state.snapshot()
+
         def store_delivery() -> None:
             self.secrets.set(managed_key_secret(source), issue_response.openrouter_api_key)
             if binding is not None:
@@ -1360,6 +1422,7 @@ class ManagedOpenRouterReleaseService:
         try:
             await run_owned_thread_call(store_delivery)
         except Exception:
+            state.restore(snapshot)
             return self._delivery_ack_retry_result("managed_delivery_store_failed")
         if issue_response.delivery_ack_required:
             pending = await self._retry_pending_delivery_ack_if_needed()

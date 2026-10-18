@@ -19,11 +19,15 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
 from puripuly_heart.app.ports.broker_client import (
     ManagedKeyDeliveryAckMetadata,
     ManagedKeyDeliveryAckResult,
+    ManagedOperationAttemptSnapshot,
+    ManagedOperationDeliverySnapshot,
     ManagedOperationStatusResult,
     QqManagedAssertionResult,
     QqManagedEntitlementSnapshot,
 )
+from puripuly_heart.app.services import qq_managed_auth
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
+from puripuly_heart.app.services.managed import managed_connection_auth
 from puripuly_heart.app.services.managed.managed_operation import (
     MANAGED_OPERATION_RESUME_TOKEN_SECRET,
     new_managed_operation_id,
@@ -96,6 +100,15 @@ class Broker:
             managed_credential_ref=self.ref,
             expires_at=FUTURE,
             delivery_ack=self.metadata(),
+        )
+
+    def pending_delivery(self):
+        return ManagedOperationStatusResult(
+            succeeded=True,
+            operation_status="DELIVERY_PENDING",
+            client_action="acknowledge_delivery",
+            attempt=ManagedOperationAttemptSnapshot(managed_credential_ref=self.ref),
+            delivery=ManagedOperationDeliverySnapshot(self.delivery, "pending", FUTURE),
         )
 
     async def start_discord_oauth(self, **kwargs):
@@ -1372,3 +1385,282 @@ async def test_actual_oauth_adapter_scopes_callback_timeout_and_listener_failure
     finally:
         await client.close()
         await runtime.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("issuance", ["initial", "resumed", "core"])
+@pytest.mark.parametrize("consumer", ["factory", "core"])
+async def test_physical_final_settings_failure_recovers_bound_delivery_after_reload(
+    isolated_home, monkeypatch, source, issuance, consumer
+):
+    monkeypatch.setattr(managed_connection_auth, "DEFAULT_MAX_STATUS_POLLS", 1)
+    monkeypatch.setattr(qq_managed_auth, "DEFAULT_MAX_STATUS_POLLS", 1)
+    owner, store, boundary, broker, release, adapter = component(isolated_home, source)
+    if issuance != "initial":
+        pending(owner, store, source, key="preserved-old-key")
+        broker.statuses = [ManagedOperationStatusResult(True, "RETRY_READY", "retry_authorized")]
+        broker.resumes = [broker.resumed_delivery()]
+    replace_file = Path.replace
+    failures = []
+
+    def fail_final_replace(path, target):
+        if Path(target) == owner.path:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if raw["state"]["managed_connection"].get("pending_delivery_ack_source"):
+                failures.append("settings_replace")
+                raise PermissionError(13, "synthetic final settings replacement denied")
+        return replace_file(path, target)
+
+    try:
+        with monkeypatch.context() as failure:
+            failure.setattr(Path, "replace", fail_final_replace)
+            if issuance == "core":
+                result = await release.prepare_for_translation(allow_authorization=False)
+                assert result.behavior == ManagedOpenRouterReleaseBehavior.RETRY
+                assert result.diagnostics.code == "managed_delivery_store_failed"
+            else:
+                result = await authorize(adapter, source)
+                assert not result.succeeded
+                assert result.transaction_result.diagnostics is not None
+        assert failures
+        assert not broker.ack_observations
+        saved = (
+            SettingsVNextCanonicalPersistenceAdapter().load_active(owner.path).canonical_settings
+        )
+        before = saved.state.managed_connection
+        operation, installation = (
+            before.pending_managed_operation_id,
+            before.pending_managed_operation_installation_id,
+        )
+        assert operation and installation == before.installation_id
+        assert before.pending_delivery_ack_source is None
+        assert before.active_managed_credential_ref is None
+        assert before == owner.require_canonical().state.managed_connection
+        assert release.managed_state.active_managed_credential_ref is None
+        fresh = EncryptedFileSecretStore(store.path, passphrase="synthetic-passphrase")
+        assert fresh.get(managed_key_secret(source)) == broker.key
+        binding = ManagedCredentialBinding.decode(fresh.get(credential_binding_secret(source)))
+        assert binding is not None and binding.matches(
+            credential=broker.key,
+            source=source,
+            installation_id=installation,
+            operation_id=operation,
+            delivery_id=broker.delivery,
+            managed_credential_ref=broker.ref,
+        )
+        ack_slot = f"openrouter_managed_{'qq_' if source == 'qq' else ''}delivery_ack_token"
+        assert fresh.get(ack_slot) == "synthetic-ack"
+    finally:
+        await release.close()
+    owner, store, boundary, broker, release, adapter = component(
+        isolated_home, source, existing=True
+    )
+    broker.statuses = [broker.pending_delivery()]
+    broker.resumes = [broker.pending_delivery()]
+    try:
+        if consumer == "factory":
+            assert (await authorize(adapter, source)).succeeded
+        else:
+            ready = await release.prepare_for_translation(allow_authorization=False)
+            assert ready.behavior == ManagedOpenRouterReleaseBehavior.READY
+            assert ready.api_key == broker.key
+        assert [name for name, _ in broker.calls] == ["status", "ack"]
+        assert broker.calls[0][1].operation_id == operation
+        assert broker.ack_observations == [(True, True)]
+        assert observe_fresh_process(owner, store, source, broker.key, installation) == {
+            "same_installation": True,
+            "key_matches": True,
+            "binding_matches": True,
+            "pending": False,
+            "unrelated_preserved": True,
+        }
+    finally:
+        await release.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("consumer", ["factory", "core"])
+@pytest.mark.parametrize(
+    "boundary",
+    [
+        "missing_key",
+        "wrong_key",
+        "missing_token",
+        "missing_receipt",
+        "wrong_source",
+        "wrong_installation",
+        "wrong_operation",
+        "wrong_delivery",
+        "wrong_ref",
+        "unknown_key",
+        "unknown_receipt",
+        "unknown_token",
+        "expired",
+        "terminal",
+        "recovery_write",
+    ],
+)
+async def test_missing_ack_metadata_requires_exact_proof_and_broker_truth(
+    isolated_home, monkeypatch, source, consumer, boundary
+):
+    monkeypatch.setattr(managed_connection_auth, "DEFAULT_MAX_STATUS_POLLS", 1)
+    monkeypatch.setattr(qq_managed_auth, "DEFAULT_MAX_STATUS_POLLS", 1)
+    monkeypatch.setattr(managed_connection_auth, "DEFAULT_STATUS_POLL_INTERVAL_MS", 0)
+    monkeypatch.setattr(qq_managed_auth, "DEFAULT_STATUS_POLL_INTERVAL_MS", 0)
+    owner, store, secrets, broker, release, adapter = component(isolated_home, source)
+    operation, installation = pending(
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+    )
+    state = release.managed_state
+    state.pending_delivery_ack_source = None
+    state.pending_delivery_ack_delivery_id = None
+    state.pending_delivery_ack_managed_credential_ref = None
+    state.pending_delivery_ack_expires_at = None
+    state.persist()
+    ack_slot = f"openrouter_managed_{'qq_' if source == 'qq' else ''}delivery_ack_token"
+    if boundary == "missing_key":
+        store.delete(managed_key_secret(source))
+    elif boundary == "wrong_key":
+        store.set(managed_key_secret(source), "unrelated-old-key")
+    elif boundary == "missing_token":
+        store.delete(ack_slot)
+    elif boundary == "missing_receipt":
+        store.delete(credential_binding_secret(source))
+    elif boundary.startswith("wrong_"):
+        binding = ManagedCredentialBinding.decode(store.get(credential_binding_secret(source)))
+        field = {
+            "wrong_source": "source",
+            "wrong_installation": "installation_id",
+            "wrong_operation": "operation_id",
+            "wrong_delivery": "delivery_id",
+            "wrong_ref": "managed_credential_ref",
+        }[boundary]
+        value = ("qq" if source == "discord" else "discord") if field == "source" else "other"
+        store.set(credential_binding_secret(source), replace(binding, **{field: value}).encode())
+    elif boundary.startswith("unknown_"):
+        secrets.fail_read = {
+            "unknown_key": managed_key_secret(source),
+            "unknown_receipt": credential_binding_secret(source),
+            "unknown_token": ack_slot,
+        }[boundary]
+        secrets.after_status = broker
+    probe = broker.pending_delivery()
+    if boundary == "expired":
+        probe = replace(probe, delivery=replace(probe.delivery, expires_at=PAST))
+    elif boundary == "terminal":
+        probe = ManagedOperationStatusResult(
+            True, "FAILED", "action_required", failed_reason="authorization_expired"
+        )
+    broker.statuses = [probe, probe]
+    broker.resumes = [probe, probe]
+    replace_file = Path.replace
+
+    def deny_recovery_write(path, target):
+        if Path(target) == owner.path:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if raw["state"]["managed_connection"].get("pending_delivery_ack_source"):
+                raise PermissionError(13, "synthetic recovery replacement denied")
+        return replace_file(path, target)
+
+    if boundary == "recovery_write":
+        monkeypatch.setattr(Path, "replace", deny_recovery_write)
+    try:
+        if consumer == "factory":
+            assert not (await authorize(adapter, source)).succeeded
+        else:
+            result = await release.prepare_for_translation(allow_authorization=False)
+            assert result.behavior != ManagedOpenRouterReleaseBehavior.READY
+        assert not broker.ack_observations
+        assert all(name in {"status", "resume"} for name, _ in broker.calls)
+        assert all(request.operation_id == operation for _, request in broker.calls)
+        saved = (
+            SettingsVNextCanonicalPersistenceAdapter().load_active(owner.path).canonical_settings
+        )
+        current = saved.state.managed_connection
+        assert current == owner.require_canonical().state.managed_connection
+        assert current.installation_id == installation
+        assert current.active_managed_credential_ref is None
+        assert current.pending_delivery_ack_source is None
+        if boundary != "terminal":
+            assert current.pending_managed_operation_id == operation
+            assert store.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+        else:
+            assert current.pending_managed_operation_id is None
+        assert store.get("unrelated") == "synthetic-unrelated"
+    finally:
+        await release.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("consumer", ["factory", "core"])
+async def test_reconstructed_ack_metadata_commit_settles_before_cancellation(
+    isolated_home, monkeypatch, source, consumer
+):
+    owner, store, boundary, broker, release, adapter = component(isolated_home, source)
+    operation, installation = pending(
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+    )
+    state = release.managed_state
+    state.pending_delivery_ack_source = None
+    state.pending_delivery_ack_delivery_id = None
+    state.pending_delivery_ack_managed_credential_ref = None
+    state.pending_delivery_ack_expires_at = None
+    state.persist()
+    broker.statuses = [broker.pending_delivery()]
+    entered, finish = threading.Event(), threading.Event()
+    replace_file = Path.replace
+
+    def hold_recovery_replace(path, target):
+        if Path(target) == owner.path:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            if raw["state"]["managed_connection"].get("pending_delivery_ack_source"):
+                entered.set()
+                assert finish.wait(5)
+        return replace_file(path, target)
+
+    monkeypatch.setattr(Path, "replace", hold_recovery_replace)
+    task = asyncio.create_task(
+        authorize(adapter, source)
+        if consumer == "factory"
+        else release.prepare_for_translation(allow_authorization=False)
+    )
+    closing = None
+    try:
+        assert await asyncio.to_thread(entered.wait, 5)
+        if consumer == "core":
+            closing = asyncio.create_task(release.close())
+        else:
+            task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        finish.set()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        if closing is not None:
+            await closing
+        assert not broker.ack_observations
+        fresh = (
+            SettingsVNextCanonicalPersistenceAdapter().load_active(owner.path).canonical_settings
+        )
+        assert fresh.state.managed_connection.pending_delivery_ack_delivery_id == broker.delivery
+        assert fresh.state.managed_connection.pending_managed_operation_id == operation
+        assert fresh.state.managed_connection.installation_id == installation
+        assert fresh.state.managed_connection.active_managed_credential_ref is None
+    finally:
+        finish.set()
+        await asyncio.gather(task, return_exceptions=True)
+        if closing is not None:
+            await asyncio.gather(closing, return_exceptions=True)
+        await release.close()
+    owner, store, boundary, broker, release, adapter = component(
+        isolated_home, source, existing=True
+    )
+    try:
+        assert (await authorize(adapter, source)).succeeded
+        assert [name for name, _ in broker.calls] == ["ack"]
+        assert broker.ack_observations == [(True, True)]
+    finally:
+        await release.close()

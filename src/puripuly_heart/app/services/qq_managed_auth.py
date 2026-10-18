@@ -79,8 +79,6 @@ from puripuly_heart.core.messages import (
     TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
     TRANSACTION_STATUS_REMOTE_DELIVERY_ACK_PENDING,
     TRANSACTION_STATUS_SECRET_WRITE_FAILED,
-    TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORE_FAILED,
-    TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORED,
     TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
     DiagnosticCategory,
     DiagnosticFieldValue,
@@ -355,15 +353,6 @@ class QqManagedAuthService:
                     for cause in getattr(exc, "secondary_diagnostics", ())
                     if isinstance(cause, ErrorDiagnostics)
                 )
-                try:
-                    await self._delivery_ack_service().clear_pending(ACK_SOURCE_QQ)
-                except Exception as clear_exc:
-                    secondary += (
-                        replace(
-                            _qq_exception_diagnostics("managed_operation_clear", clear_exc),
-                            cause_id=primary.diagnostic_id,
-                        ),
-                    )
                 _, restore_causes = self._restore_state_snapshot(state_snapshot)
                 secondary += tuple(
                     replace(cause, cause_id=cause.cause_id or primary.diagnostic_id)
@@ -1031,8 +1020,8 @@ class QqManagedAuthService:
                 secret_store=self.secret_store,
                 managed_state=self.managed_state,
             )
-        if service.managed_state.pending_delivery_ack_source == ACK_SOURCE_QQ:
-            recovered = await service.retry_pending()
+        recovered = await service.recover_operation_delivery(ACK_SOURCE_QQ, probe)
+        if recovered is not None:
             self._consume_ack_result(recovered.ack_result)
             if recovered.succeeded:
                 if self.claim_guard is not None:
@@ -1149,8 +1138,7 @@ class QqManagedAuthService:
         try:
             self.managed_state.persist()
         except Exception as exc:
-            return await self._rollback_after_persist_failure(
-                secret_snapshot=secret_snapshot,
+            return self._restore_after_delivery_persist_failure(
                 state_snapshot=state_snapshot,
                 primary=_qq_exception_diagnostics(
                     "local_settings_commit", exc, code="settings_commit_failed"
@@ -1271,27 +1259,17 @@ class QqManagedAuthService:
             entitlement.expires_at
         )
 
-    async def _rollback_after_persist_failure(
+    def _restore_after_delivery_persist_failure(
         self,
         *,
-        secret_snapshot: SecretSnapshot,
         state_snapshot: ManagedIdentitySnapshot,
         primary: ErrorDiagnostics,
         upstream_secondaries: tuple[ErrorDiagnostics, ...] = (),
         upstream_omitted_count: int = 0,
     ) -> TransactionResult:
         state_rollback_succeeded, state_causes = self._restore_state_snapshot(state_snapshot)
-        secret_rollback_succeeded, secret_cause = await self._restore_secret_snapshot(
-            secret_snapshot
-        )
-        compensation_succeeded = state_rollback_succeeded and secret_rollback_succeeded
-        status = (
-            TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORED
-            if compensation_succeeded
-            else TRANSACTION_STATUS_SETTINGS_COMMIT_FAILED_SECRET_RESTORE_FAILED
-        )
         return TransactionResult(
-            status=status,
+            status=TRANSACTION_STATUS_REMOTE_ACTIVE_LOCAL_MISSING,
             message=_message(
                 "qq_managed_auth.settings_commit_failed",
                 severity=SEVERITY_ERROR,
@@ -1304,8 +1282,6 @@ class QqManagedAuthService:
                     "secret_write_succeeded": True,
                     "settings_commit_succeeded": False,
                     "state_rollback_succeeded": state_rollback_succeeded,
-                    "secret_rollback_succeeded": secret_rollback_succeeded,
-                    "compensation_succeeded": compensation_succeeded,
                 },
             ),
             secondary_diagnostics=tuple(
@@ -1313,7 +1289,6 @@ class QqManagedAuthService:
                 for cause in (
                     *upstream_secondaries,
                     *state_causes,
-                    *((secret_cause,) if secret_cause is not None else ()),
                 )
             ),
             secondary_omitted_count=upstream_omitted_count,
@@ -1322,53 +1297,15 @@ class QqManagedAuthService:
     def _restore_state_snapshot(
         self, snapshot: ManagedIdentitySnapshot
     ) -> tuple[bool, tuple[ErrorDiagnostics, ...]]:
-        phase = "restore_memory"
         try:
             self.managed_state.restore(snapshot)
-            phase = "settings_restore"
-            self.managed_state.persist()
         except Exception as exc:
-            primary = _qq_exception_diagnostics(phase, exc, code="settings_restore_failed")
-            causes = (primary,)
-            try:
-                self.managed_state.restore(snapshot)
-            except Exception as restore_exc:
-                causes += (
-                    replace(
-                        _qq_exception_diagnostics(
-                            "restore_memory", restore_exc, code="settings_memory_restore_failed"
-                        ),
-                        cause_id=primary.diagnostic_id,
-                    ),
-                )
-            return False, causes
-        return True, ()
-
-    async def _restore_secret_snapshot(
-        self, snapshot: SecretSnapshot
-    ) -> tuple[bool, ErrorDiagnostics | None]:
-        try:
-            result = await self.secret_store.restore_secret(snapshot)
-        except Exception as exc:
-            return False, _qq_exception_diagnostics(
-                "restore_secret", exc, code="secret_restore_failed"
-            )
-        if not result.succeeded:
             return False, (
-                sanitize_diagnostics(result.diagnostics)
-                if result.diagnostics is not None
-                else _diagnostics(
-                    operation="restore_secret",
-                    code="secret_restore_failed",
-                    category=DIAGNOSTIC_CATEGORY_TRANSACTION,
-                    fields={
-                        "phase": "restore_secret",
-                        "secret_key": snapshot.key,
-                        "compensation_succeeded": False,
-                    },
-                )
+                _qq_exception_diagnostics(
+                    "restore_memory", exc, code="settings_memory_restore_failed"
+                ),
             )
-        return True, None
+        return True, ()
 
 
 @dataclass(frozen=True, slots=True)
