@@ -119,7 +119,7 @@
     }
   },
   "overlay": {
-    "contract_version": 15,
+    "contract_version": 16,
     "manifest_fields": [
       "app_version",
       "bridge_url",

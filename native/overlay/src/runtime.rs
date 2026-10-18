@@ -28,7 +28,7 @@ use crate::openvr::{
 use crate::presentation::{
     HandoffMode, PresentationBackend, PresentationCause, PresentationCauseChannel,
     PresentationCauseKind, PresentationCauses, PresentationCorrelation, PresentationDiagnostics,
-    ReadinessCancellation, ReadinessOutcome,
+    PresentationOutcome, PresentationStage, ReadinessCancellation, ReadinessOutcome,
 };
 use crate::renderer::{
     CaptionBlock, CaptionBlockVariant, CaptionChannel, CaptionLayoutResult, CaptionPresentation,
@@ -666,7 +666,7 @@ impl PresentationRuntime {
                     "revision": "r2"
                 },
                 "native_presentation_retry": {
-                    "version": 1,
+                    "version": 2,
                     "ownership": "exclusive"
                 },
                 "speaker_identity_presentation": {
@@ -1357,6 +1357,7 @@ pub struct NativePresentationOwner<S: OverlayFrameSubmitter> {
     readiness_retry_due: Option<Instant>,
     pose_wait_suspended: bool,
     next_status_due: Instant,
+    last_retry_diagnostic_sequence: u64,
 }
 
 impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
@@ -1386,6 +1387,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             readiness_retry_due: None,
             pose_wait_suspended: false,
             next_status_due: Instant::now(),
+            last_retry_diagnostic_sequence: 0,
         }
     }
 
@@ -1513,7 +1515,83 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     }
 
     fn push_fresh_retry_audit(&mut self, schedule: NativeFreshSchedule, outcome: &'static str) {
-        self.retry_episodes.record(&schedule, outcome);
+        let correlation = (outcome == "completed")
+            .then(|| self.runtime.frame_progress().correlation)
+            .flatten();
+        let execution = correlation.map(|correlation| {
+            let mut observed = (false, false, false);
+            for record in self
+                .runtime
+                .presentation_diagnostics
+                .records()
+                .iter()
+                .rev()
+                .filter(|record| {
+                    record.render_generation == Some(correlation.render_generation)
+                        && record.submission_attempt == Some(correlation.submission_attempt)
+                        && record.scene_generation == correlation.scene_generation
+                })
+            {
+                match (record.stage, record.outcome) {
+                    (PresentationStage::RenderReturned, PresentationOutcome::Success) => {
+                        observed.0 = true
+                    }
+                    (PresentationStage::ReadinessObserved, PresentationOutcome::Ready) => {
+                        observed.1 = true
+                    }
+                    (PresentationStage::SubmissionReturned, PresentationOutcome::Success) => {
+                        observed.2 = true
+                    }
+                    _ => {}
+                }
+                if observed == (true, true, true) {
+                    break;
+                }
+            }
+            observed
+        });
+        self.retry_episodes
+            .record(&schedule, outcome, correlation, execution);
+        if outcome == "completed" && schedule.completed >= schedule.max_completed {
+            self.retry_episodes
+                .record(&schedule, "exhausted", None, None);
+        }
+    }
+
+    async fn flush_retry_diagnostics(&mut self, bridge: &BridgeClient, logger: &OverlayLogger) {
+        for fact in self
+            .retry_episodes
+            .diagnostics_since(self.last_retry_diagnostic_sequence)
+        {
+            let correlation = fact.correlation;
+            let _ = logger.warn(format!("native_retry {}", json!({
+                "overlay_instance_id": bridge.overlay_instance_id(),
+                "runtime_generation": bridge.runtime_generation(),
+                "sequence": fact.sequence,
+                "channel": fact.channel.name(),
+                "trigger_generation": fact.trigger_generation,
+                "scene_generation": fact.scene_generation,
+                "episode_generation": fact.episode_generation,
+                "phase": fact.phase,
+                "target_identity_hash": fact.target_identity_hash,
+                "outcome": fact.outcome,
+                "completed": fact.completed,
+                "maximum": fact.max_completed,
+                "active": fact.active,
+                "due_in_ms": fact.due_in.as_millis() as u64,
+                "deadline_in_ms": fact.deadline_in.as_millis() as u64,
+                "observed_at_ms": fact.at.as_millis() as u64,
+                "render_generation": correlation.map(|value| value.render_generation),
+                "submission_attempt": correlation.map(|value| value.submission_attempt),
+                "submitted_scene_generation": correlation.map(|value| value.scene_generation),
+                "fresh_rendered": fact.execution.map(|value| value.0),
+                "producer_ready": fact.execution.map(|value| value.1),
+                "submission_succeeded": fact.execution.map(|value| value.2),
+                "audit_dropped": self.retry_episodes.audit_dropped(),
+                "physical_hmd_visibility": "not_observable",
+            }))).await;
+            self.last_retry_diagnostic_sequence = fact.sequence;
+        }
     }
 
     #[cfg(test)]
@@ -1546,6 +1624,28 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             FreshRetryChannel::SelfChannel => generations.self_target.as_ref(),
             FreshRetryChannel::Peer => generations.peer_target.as_ref(),
         };
+        if channel == FreshRetryChannel::SelfChannel
+            && selected.is_some_and(|target| target == "scene:self")
+        {
+            let phase = self.channel_episode(channel)?.phase;
+            let (nonempty, active_self) = self
+                .runtime
+                .state()
+                .blocks()
+                .iter()
+                .filter(|block| !block.primary_text.trim().is_empty())
+                .fold((false, false), |(_, active), block| {
+                    (
+                        true,
+                        active
+                            || (block.channel == "self"
+                                && block.block_variant
+                                    == OverlayPresentationBlockVariant::ActiveSelf),
+                    )
+                });
+            return (nonempty && (phase == NativeQuietTailPhase::Stream) == active_self)
+                .then(|| "scene:self".to_string());
+        }
         let fallback;
         let selected = if let Some(selected) = selected {
             selected
@@ -1731,8 +1831,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 now.saturating_duration_since(started).as_millis() as u64
             })
             .unwrap_or(0);
-        self
-            .runtime
+        self.runtime
             .emit_owner_status(
                 bridge,
                 None,
@@ -1754,6 +1853,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     ) -> Result<(), RuntimeFailure> {
         let primary_failure_reason = result.as_ref().err().map(RuntimeFailure::failure_reason);
         let cleanup_result = self.teardown();
+        self.flush_retry_diagnostics(bridge, logger).await;
         let cleanup_failure_reason = cleanup_result
             .as_ref()
             .err()
@@ -1862,7 +1962,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 now <= schedule.deadline
                     && (schedule.next_due <= now
                         || (schedule.completed == 0
-                            && schedule.required_scene_generation == scene_revision
+                            && schedule.required_scene_generation <= scene_revision
                             && (self.runtime.redraw_requested() || current_handoff_due)))
             })
             .cloned()
@@ -1935,6 +2035,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 };
                 self.record_fresh_retry(schedule, disposition);
             } else {
+                self.retry_episodes.record(&schedule, "due", None, None);
                 due.push(schedule);
             }
         }
@@ -2018,6 +2119,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
             let Some(active) = self.retry_episodes.schedule(channel) else {
                 continue;
             };
+            if active.expired_at(Instant::now()) {
+                let expired = self
+                    .retry_episodes
+                    .take_schedule(channel)
+                    .expect("active schedule");
+                self.record_fresh_retry(expired, "expired");
+                continue;
+            }
             if !Self::submission_covers_schedule(
                 correlation,
                 active,
@@ -2040,6 +2149,49 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         Ok(())
     }
 
+    #[doc(hidden)]
+    pub fn fresh_retry_evidence_for_test(&self) -> Vec<serde_json::Value> {
+        self.retry_episodes
+            .diagnostics_since(0)
+            .map(|fact| {
+                json!({
+                    "channel": fact.channel.name(),
+                    "trigger_generation": fact.trigger_generation,
+                    "episode_generation": fact.episode_generation,
+                    "scene_generation": fact.scene_generation,
+                    "outcome": fact.outcome,
+                    "active": fact.active,
+                    "render_generation": fact.correlation.map(|value| value.render_generation),
+                    "submission_attempt": fact.correlation.map(|value| value.submission_attempt),
+                    "fresh_rendered": fact.execution.map(|value| value.0),
+                    "producer_ready": fact.execution.map(|value| value.1),
+                    "submission_succeeded": fact.execution.map(|value| value.2),
+                })
+            })
+            .collect()
+    }
+
+    #[doc(hidden)]
+    pub fn fresh_retry_schedules_for_test(&self) -> Vec<serde_json::Value> {
+        let now = Instant::now();
+        self.retry_episodes
+            .schedules()
+            .map(|schedule| {
+                json!({
+                    "channel": schedule.channel.name(),
+                    "trigger_generation": schedule.trigger_generation,
+                    "scene_generation": schedule.required_scene_generation,
+                    "episode_generation": schedule.episode_generation,
+                    "phase": schedule.phase,
+                    "completed": schedule.completed,
+                    "maximum": schedule.max_completed,
+                    "due": schedule.next_due <= now,
+                    "expired": schedule.expired_at(now),
+                })
+            })
+            .collect()
+    }
+
     pub async fn run(
         &mut self,
         bridge: &mut BridgeClient,
@@ -2051,6 +2203,9 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
         self.next_status_due = Instant::now() + Duration::from_millis(250);
         if self.runtime.has_accepted_due_work() {
             self.arm_due_deadline();
+        }
+        if let Err(error) = self.reconcile_fresh_schedules(logger).await {
+            return self.finish_run(bridge, logger, Err(error)).await;
         }
         self.sync_runtime_readiness_status_context();
         let initial_result = {
@@ -2156,6 +2311,7 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
     ) -> Result<(), RuntimeFailure> {
         let mut pending_message = None;
         loop {
+            self.flush_retry_diagnostics(bridge, logger).await;
             self.pump_openvr_events().await?;
             if self
                 .readiness_no_progress_deadline
@@ -2296,6 +2452,14 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                     self.arm_due_deadline();
                 }
                 self.sync_runtime_readiness_status_context();
+                let message = match message {
+                    Ok(BridgeIncoming::Snapshot(snapshot)) => {
+                        self.runtime.apply_snapshot(snapshot);
+                        self.reconcile_fresh_schedules(logger).await?;
+                        None
+                    }
+                    other => Some(other),
+                };
                 let previous_submission = self.runtime.frame_progress().correlation;
                 let captured_schedules =
                     self.submission_eligible_fresh_schedules(Instant::now(), current_handoff_due);
@@ -2309,10 +2473,16 @@ impl<S: OverlayFrameSubmitter> NativePresentationOwner<S> {
                 }
                 let renderer = self.renderer.as_ref().expect("active renderer");
                 let openvr = self.openvr.as_mut().expect("active OpenVR session");
-                let handled = self
-                    .runtime
-                    .handle_bridge_message(message, renderer, openvr, bridge, logger)
-                    .await;
+                let handled = if let Some(message) = message {
+                    self.runtime
+                        .handle_bridge_message(message, renderer, openvr, bridge, logger)
+                        .await
+                } else {
+                    self.runtime
+                        .submit_frame_if_needed_with_timing(renderer, openvr, bridge, logger, true)
+                        .await
+                        .map(|outcome| (true, outcome.pending_message()))
+                };
                 let (continue_running, preempted_message) = match handled {
                     Ok(handled) => handled,
                     Err(RuntimeFailure::ReadinessTimedOut) => {
@@ -2540,7 +2710,7 @@ pub async fn run_cli(args: &[String]) -> i32 {
                 "contract_version": EXPECTED_CONTRACT_VERSION,
                 "app_version": env!("CARGO_PKG_VERSION"),
                 "execution_contract": {"version": 1, "revision": "r2"},
-                "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
+                "native_presentation_retry": {"version": 2, "ownership": "exclusive"},
                 "speaker_identity_presentation": {"version": 2, "policy": "immutable_first_readable_style"},
             })
         );
@@ -2964,6 +3134,44 @@ mod tests {
             .any(|value| value.channel == FreshRetryChannel::Peer));
     }
 
+    #[test]
+    fn newer_fresh_scene_captures_unserved_surviving_intent_without_future_or_extra_credit() {
+        let mut owner = NativePresentationOwner::new(
+            OverlayPresentationSnapshot {
+                revision: 2,
+                blocks: vec![block("peer:survivor", "peer", "synthetic", "", true)],
+                ..Default::default()
+            },
+            CaptionRenderer::new_for_test().unwrap(),
+            FakeOpenVr::default(),
+        );
+        let now = Instant::now();
+        let mut pending = schedule(FreshRetryChannel::Peer, 2, 1, now);
+        pending.target_identity = "peer:survivor".into();
+        owner
+            .retry_episodes
+            .replace_schedule(FreshRetryChannel::Peer, pending.clone());
+        assert_eq!(
+            owner.submission_eligible_fresh_schedules(now, true).len(),
+            1
+        );
+        pending.required_scene_generation = 3;
+        owner
+            .retry_episodes
+            .replace_schedule(FreshRetryChannel::Peer, pending.clone());
+        assert!(owner
+            .submission_eligible_fresh_schedules(now, true)
+            .is_empty());
+        pending.required_scene_generation = 1;
+        pending.completed = 1;
+        owner
+            .retry_episodes
+            .replace_schedule(FreshRetryChannel::Peer, pending);
+        assert!(owner
+            .submission_eligible_fresh_schedules(now, true)
+            .is_empty());
+    }
+
     #[tokio::test]
     async fn stream_generation_replacement_preserves_due_and_budget_while_final_resets() {
         fn snapshot(
@@ -3089,7 +3297,7 @@ mod tests {
         assert_eq!(final_schedule.max_completed, 5);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn python_active_self_projection_drives_native_stream_and_final_accounting() {
         use crate::{NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE};
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -3129,45 +3337,30 @@ mod tests {
             first.deadline - (first.next_due - NATIVE_FRESH_RETRY_CADENCE),
             NATIVE_FRESH_RETRY_DEADLINE
         );
-        let completed = owner
-            .retry_episodes
-            .complete_matching(&first, first.next_due, NATIVE_FRESH_RETRY_CADENCE)
-            .unwrap();
-        assert_eq!(completed.completed, 1);
+        owner.arm_due_deadline();
+        let no_progress_deadline = owner.readiness_no_progress_deadline;
+        tokio::time::advance(Duration::from_millis(800)).await;
         owner.runtime.apply_snapshot(snapshots[1].clone());
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
         let updated = owner.retry_episodes.schedule(channel).unwrap().clone();
-        assert_eq!(updated.completed, 1);
-        assert_eq!(updated.deadline, first.deadline);
-        assert_eq!(updated.next_due, completed.next_due);
-        assert_eq!(updated.episode_generation, first.episode_generation);
-        assert_ne!(updated.trigger_generation, first.trigger_generation);
-        owner.runtime.apply_snapshot(snapshots[2].clone());
-        owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        for count in 2..=4 {
-            let due = owner.retry_episodes.schedule(channel).unwrap().clone();
-            let result = owner
-                .retry_episodes
-                .complete_matching(&due, due.next_due, NATIVE_FRESH_RETRY_CADENCE)
-                .unwrap();
-            assert_eq!(result.completed, count);
-        }
-        assert!(owner.retry_episodes.schedule(channel).is_none());
-        owner.runtime.apply_snapshot(snapshots[3].clone());
-        owner.reconcile_fresh_schedules(&logger).await.unwrap();
-        assert!(owner.retry_episodes.schedule(channel).is_none());
-        assert_eq!(
-            owner.retry_episodes.accounting(channel).unwrap().completed,
-            4
-        );
-        for snapshot in &snapshots[4..6] {
+        assert_eq!(updated.completed, 0);
+        assert!(updated.deadline > first.deadline);
+        assert_eq!(updated.episode_generation, 3);
+        assert_eq!(updated.trigger_generation, 3);
+        assert_eq!(owner.readiness_no_progress_deadline, no_progress_deadline);
+        assert!(owner
+            .active_fresh_schedules(updated.next_due)
+            .iter()
+            .any(|value| value.same_intent(&updated)));
+        for (index, snapshot) in snapshots[2..6].iter().enumerate() {
             owner.runtime.apply_snapshot(snapshot.clone());
             owner.reconcile_fresh_schedules(&logger).await.unwrap();
-            let final_schedule = owner.retry_episodes.schedule(channel).unwrap().clone();
-            assert_eq!(final_schedule.completed, 0);
-            assert_eq!(final_schedule.max_completed, 5);
-            assert_ne!(final_schedule.episode_generation, first.episode_generation);
-            for count in 1..=5 {
+            let fresh = owner.retry_episodes.schedule(channel).unwrap().clone();
+            assert_eq!(fresh.completed, 0);
+            assert_eq!(fresh.max_completed, if index < 2 { 4 } else { 5 });
+            assert_eq!(fresh.trigger_generation, 5 + index as u64 * 2);
+            assert_eq!(fresh.episode_generation, fresh.trigger_generation);
+            for count in 1..=fresh.max_completed {
                 let due = owner.retry_episodes.schedule(channel).unwrap().clone();
                 let result = owner
                     .retry_episodes
@@ -3175,6 +3368,7 @@ mod tests {
                     .unwrap();
                 assert_eq!(result.completed, count);
             }
+            assert!(owner.retry_episodes.schedule(channel).is_none());
         }
         owner.runtime.apply_snapshot(snapshots[6].clone());
         owner.reconcile_fresh_schedules(&logger).await.unwrap();
@@ -3308,9 +3502,32 @@ mod tests {
         transferred.trigger_generation = 8;
         transferred.required_scene_generation = 12;
         assert!(
+            !NativePresentationOwner::<FakeOpenVr>::submission_covers_schedule(
+                correlation,
+                &transferred,
+                &captured,
+                PresentationCauseKind::ActiveRetryIntent,
+                Some(8),
+                Some("[\"target\"]"),
+            )
+        );
+        assert!(
             NativePresentationOwner::<FakeOpenVr>::submission_covers_schedule(
                 correlation_for(&captured, 12, PresentationCauseKind::ActiveRetryIntent),
                 &transferred,
+                &captured,
+                PresentationCauseKind::ActiveRetryIntent,
+                Some(8),
+                Some("[\"target\"]"),
+            )
+        );
+        let mut new_episode = transferred.clone();
+        new_episode.episode_generation += 1;
+        new_episode.completed = 0;
+        assert!(
+            !NativePresentationOwner::<FakeOpenVr>::submission_covers_schedule(
+                correlation_for(&captured, 12, PresentationCauseKind::ActiveRetryIntent),
+                &new_episode,
                 &captured,
                 PresentationCauseKind::ActiveRetryIntent,
                 Some(8),
@@ -3822,18 +4039,22 @@ mod tests {
             CaptionRenderer::new_for_test().unwrap(),
             HideFailureProbe,
         );
-        let result = owner.finish_run(
-            &mut bridge,
-            &logger,
-            Err(RuntimeFailure::Render("private-token-body-path".into())),
-        ).await;
+        let result = owner
+            .finish_run(
+                &mut bridge,
+                &logger,
+                Err(RuntimeFailure::Render("private-token-body-path".into())),
+            )
+            .await;
         assert!(matches!(result, Err(RuntimeFailure::Render(_))));
         assert!(owner.resources_released());
         let emitted = String::from_utf8(stdout.contents()).unwrap();
-        let terminal = emitted.lines()
+        let terminal = emitted
+            .lines()
             .filter_map(|line| line.strip_prefix("EVENT "))
             .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .find(|value| value["type"] == "startup_error").unwrap();
+            .find(|value| value["type"] == "startup_error")
+            .unwrap();
         assert_eq!(terminal["failure_reason"], "render_failed");
         assert_eq!(terminal["primary_failure_reason"], "render_failed");
         assert_eq!(terminal["cleanup_failure_reason"], "openvr_failed");

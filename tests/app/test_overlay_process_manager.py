@@ -44,7 +44,7 @@ def _ready_script_line() -> str:
         "print(__import__('json').dumps({'type':'overlay_ready',"
         "'overlay_instance_id':m['overlay_instance_id'],'runtime_generation':1,"
         "'capabilities':{'execution_contract':{'version':1,'revision':'r2'},"
-        "'native_presentation_retry':{'version':1,'ownership':'exclusive'},"
+        "'native_presentation_retry':{'version':2,'ownership':'exclusive'},"
         "'speaker_identity_presentation':{'version':2,"
         "'policy':'immutable_first_readable_style'}}}), flush=True)"
     )
@@ -569,7 +569,7 @@ async def test_real_subprocess_pressure_preserves_lifecycle_and_bounded_cleanup(
                 "manifest = json.load(open(sys.argv[2], encoding='utf-8'))",
                 "for index in range(2048):",
                 "    print(json.dumps({'type':'overlay_trace','component':'probe','event':'pressure','index':index}), flush=True)",
-                "print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':1,'ownership':'exclusive'},'speaker_identity_presentation':{'version':2,'policy':'immutable_first_readable_style'}}}), flush=True)",
+                "print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':2,'ownership':'exclusive'},'speaker_identity_presentation':{'version':2,'policy':'immutable_first_readable_style'}}}), flush=True)",
                 "time.sleep(0.1)",
                 "print(json.dumps({'type':'shutdown_complete','overlay_instance_id':manifest['overlay_instance_id']}), flush=True)",
                 "time.sleep(0.05)",
@@ -2870,9 +2870,12 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
 @pytest.mark.parametrize(
     "native_retry_capability",
     [
-        {"version": 2, "ownership": "exclusive"},
-        {"version": 1, "ownership": "shared"},
-        {"version": 1, "ownership": "exclusive", "extension": True},
+        {"version": 1, "ownership": "exclusive"},
+        {"version": 3, "ownership": "exclusive"},
+        {"version": True, "ownership": "exclusive"},
+        {"version": 2.0, "ownership": "exclusive"},
+        {"version": 2, "ownership": "shared"},
+        {"version": 2, "ownership": "exclusive", "extension": True},
     ],
 )
 async def test_overlay_ready_rejects_non_exact_native_retry_contract(
@@ -2892,6 +2895,7 @@ async def test_overlay_ready_rejects_non_exact_native_retry_contract(
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "native_presentation_retry": native_retry_capability,
+                "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
             },
         },
         allow_ready=True,

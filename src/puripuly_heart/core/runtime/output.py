@@ -611,8 +611,15 @@ class OutputRuntime:
         elif snapshot.revision <= state.snapshot.revision:
             return
         else:
+            unchanged = configuration == state.configuration and snapshot == replace(
+                state.snapshot,
+                revision=snapshot.revision,
+                boundary_source_revision=snapshot.boundary_source_revision,
+            )
             state.snapshot = snapshot
             state.configuration = configuration
+            if unchanged:
+                return
         if snapshot.status == "cancelled":
             state.settled = True
         if state.batch is not None and state.batch.disposition is None:

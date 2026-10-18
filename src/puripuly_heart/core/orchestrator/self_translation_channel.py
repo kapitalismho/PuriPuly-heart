@@ -41,7 +41,6 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationLatencyDiagnosticsOwner,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
-    ActiveSelfProjection,
     TranslationOutputProjectionOwner,
     TranslationUiMessage,
 )
@@ -142,6 +141,7 @@ class SelfTranslationChannelOwner:
     diagnostics: TranslationLatencyDiagnosticsOwner = field(repr=False)
     clock: Clock
     _last_promo_time: float | None = field(init=False, default=None)
+    _pending_boundary_id: UUID | None = field(init=False, default=None)
     _promo_eligible: bool = field(init=False, default=False)
     _accepting_events: bool = field(init=False, default=True)
     _admitted_requests: dict[UUID, PreparedTranslationRequest] = field(default_factory=dict)
@@ -176,6 +176,8 @@ class SelfTranslationChannelOwner:
 
     @merge_buffer.setter
     def merge_buffer(self, value: _MergeBuffer | None) -> None:
+        if value is None:
+            self._pending_boundary_id = None
         self.runtime.merge_buffer = value
 
     @property
@@ -1552,6 +1554,7 @@ class SelfTranslationChannelOwner:
             )
 
     def _restart_post_end_grace(self, buffer: _MergeBuffer) -> None:
+        self._pending_boundary_id = buffer.merge_id
         wait_ms = self.config_snapshot().value.low_latency_finalize_wait_ms
         if wait_ms <= 0:
             self._cancel_finalize_wait(buffer)
@@ -1896,6 +1899,9 @@ class SelfTranslationChannelOwner:
     async def _evaluate_speculative_next_action(self, buffer: _MergeBuffer, *, reason: str) -> None:
         if self.merge_buffer is not buffer:
             return
+        if self._pending_boundary_id == buffer.merge_id:
+            self._pending_boundary_id = None
+            await self.translation_turns.publish_draft_boundary(buffer.merge_id)
         blocker = self._continuation_blocker(buffer)
         if blocker == "post_end_grace" or blocker is None:
             self.translation_turns.prestart_draft_secondary(buffer.merge_id)
@@ -1904,30 +1910,16 @@ class SelfTranslationChannelOwner:
             return
         await self._commit_merge(buffer, reason=reason)
 
-    async def _sync_overlay_active_self(
-        self, buffer: _MergeBuffer, *, created_at: float | None = None
-    ) -> None:
-        configuration = self.config_snapshot().value
-        await self.output_projection.sync_active_self(
-            ActiveSelfProjection(
-                merge_id=buffer.merge_id,
-                active_text=self._merge_text(
-                    buffer.parts, preserve_text=bool(buffer.recognition_origins)
-                ),
-                spec_text=None,
-                spec_translation=None,
-                source_language=configuration.source_language,
-                target_language=configuration.target_language,
-                resume_pending=buffer.resume_pending,
-                resume_confirmed=buffer.resume_confirmed,
-                created_at=created_at,
-            ),
-            handoff=True,
-        )
+    async def _sync_overlay_active_self(self, buffer: _MergeBuffer) -> None:
+        await self.translation_turns.republish_draft(buffer.merge_id)
 
     async def _on_draft_updated(
         self, snapshot: SelfTurnPresentation, request: TranslationTurnRequest
     ) -> None:
+        if self._pending_boundary_id == snapshot.utterance_id and not snapshot.source_closed:
+            self._pending_boundary_id = None
+            await self.translation_turns.publish_draft_boundary(snapshot.utterance_id)
+            return
         await self.output_projection.project_self_turn(
             snapshot, request.config_snapshot, source=request.source
         )

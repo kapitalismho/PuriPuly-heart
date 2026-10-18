@@ -5448,6 +5448,22 @@ async def test_desktop_overlay_windows_handle_fallback_does_not_probe_with_os_ki
     await asyncio.wait_for(wait_task, timeout=1.0)
 
 
+@pytest.mark.parametrize(
+    "contract_version",
+    [OVERLAY_CONTRACT_VERSION - 1, OVERLAY_CONTRACT_VERSION + 1],
+)
+def test_desktop_overlay_manifest_rejects_unmatched_contract(
+    tmp_path: Path,
+    contract_version: int,
+) -> None:
+    manifest_path = _write_manifest(tmp_path, _manifest(contract_version=contract_version))
+
+    with pytest.raises(desktop_overlay.DesktopOverlayStartupError) as exc_info:
+        desktop_overlay.load_renderer_manifest(manifest_path)
+
+    assert exc_info.value.failure_reason == "contract_mismatch"
+
+
 def test_desktop_overlay_manifest_rejects_non_loopback_bridge_and_redacts_token(
     tmp_path: Path,
 ) -> None:
@@ -5513,6 +5529,8 @@ async def test_desktop_overlay_bridge_lifecycle_ready_after_auth_snapshot_and_wi
         initial_snapshot=OverlayPresentationSnapshot(revision=7),
         heartbeat_interval_ms=20,
         desktop_runtime_controls_enabled=True,
+        overlay_instance_id="desktop-overlay-test",
+        runtime_generation=1,
     )
     await bridge.start()
     sink = RecordingLifecycleSink()

@@ -347,6 +347,16 @@ class RecordingOverlaySink:
         self.events.append(event)
         event_type = getattr(event, "type", None)
         if event_type == "self_active_update":
+            if getattr(event, "caption_complete", False):
+                if (
+                    self.active_self_metadata is not None
+                    and self.active_self_metadata.utterance_id
+                    == getattr(event, "utterance_id", None)
+                ):
+                    self.active_self_metadata = None
+                return
+            if getattr(event, "retained_only", False):
+                return
             utterance_id = getattr(event, "utterance_id", None)
             if not isinstance(utterance_id, UUID):
                 return
@@ -1497,7 +1507,8 @@ class TestSpecFinalReconciliation:
         try:
             await _source_revision(harness, source_id, initial)
             await asyncio.wait_for(llm.started.wait(), timeout=1.0)
-            turn_id = sink.events[0].utterance_id
+            turn_id = harness.self_owner.merge_buffer.merge_id
+            assert sink.events == []
             if ready:
                 llm.release.set()
                 await _eventually(

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .protocol import (
+    NATIVE_SELF_SCENE_TARGET,
     U64_MAX,
     NativeFreshRenderGenerations,
     NativeFreshRenderTargets,
@@ -14,7 +15,6 @@ from .protocol import (
 from .sink import (
     OverlayEventUnion,
     PeerTranscriptFinal,
-    SelfTranscriptFinal,
     TranslationFinal,
 )
 
@@ -38,8 +38,10 @@ class NativeRetryIntentProjection:
 
     def clear_scene(self) -> None:
         enabled = self.enabled
+        generations = self.generations
         episode_generations = dict(self._episode_generations)
         self.reset(enabled=enabled)
+        self.generations = generations
         self._episode_generations.update(episode_generations)
 
     def begin(self, *, enabled: bool, snapshot: OverlayPresentationSnapshot) -> None:
@@ -54,9 +56,13 @@ class NativeRetryIntentProjection:
             if channel not in {"self", "peer"} or not block.primary_text.strip():
                 continue
             generations[channel] = 1
-            targets[channel] = block.id
+            targets[channel] = NATIVE_SELF_SCENE_TARGET if channel == "self" else block.id
             episodes[channel] = NativeQuietTailEpisode(
-                phase="final" if block.block_variant == "finalized" else "stream",
+                phase=(
+                    self.self_scene_phase(snapshot.blocks)
+                    if channel == "self"
+                    else ("final" if block.block_variant == "finalized" else "stream")
+                ),
                 generation=1,
             )
         self.generations = NativeFreshRenderGenerations(
@@ -69,30 +75,95 @@ class NativeRetryIntentProjection:
         self._episode_targets.update(targets)
         self._episode_generations.update(generations)
 
-    def advance(self, channel: str, event: OverlayEventUnion | None) -> None:
-        if event is None or event.utterance_id is None:
-            return
-        target = f"{channel}:{event.utterance_id}"
-        generations = self.generations
-        targets = self.targets
-        next_generation = self.next_generation(
-            generations.self if channel == "self" else generations.peer
+    def reconcile_self_scene(
+        self,
+        previous_blocks: list[OverlayPresentationBlock],
+        rendered_blocks: list[OverlayPresentationBlock],
+    ) -> bool:
+        if not self.enabled or self._self_signature(previous_blocks) == self._self_signature(
+            rendered_blocks
+        ):
+            return False
+        if not any(block.primary_text.strip() for block in rendered_blocks):
+            return False
+        generation = self.next_self_generation(self.generations.self)
+        episode_generation = self.next_self_generation(self._episode_generations.get("self"))
+        self.generations = NativeFreshRenderGenerations(self=generation, peer=self.generations.peer)
+        self.targets = NativeFreshRenderTargets(
+            self=NATIVE_SELF_SCENE_TARGET, peer=self.targets.peer
         )
-        if channel == "self":
-            self.generations = NativeFreshRenderGenerations(
-                self=next_generation, peer=generations.peer
+        self.episodes = NativeQuietTailEpisodes(
+            self=NativeQuietTailEpisode(
+                phase=self.self_scene_phase(rendered_blocks), generation=episode_generation
+            ),
+            peer=self.episodes.peer,
+        )
+        self._episode_targets["self"] = NATIVE_SELF_SCENE_TARGET
+        self._episode_generations["self"] = episode_generation
+        return True
+
+    @staticmethod
+    def self_scene_phase(blocks: list[OverlayPresentationBlock]) -> str:
+        return (
+            "stream"
+            if any(
+                block.channel == "self"
+                and block.block_variant == "active_self"
+                and block.primary_text.strip()
+                for block in blocks
             )
-            self.targets = NativeFreshRenderTargets(self=target, peer=targets.peer)
-        else:
-            self.generations = NativeFreshRenderGenerations(
-                self=generations.self, peer=next_generation
+            else "final"
+        )
+
+    @staticmethod
+    def _self_signature(blocks: list[OverlayPresentationBlock]) -> tuple[object, ...]:
+        return tuple(
+            (
+                block.id,
+                block.occupant_key,
+                block.appearance_seq,
+                block.block_variant,
+                block.primary_text,
+                block.secondary_text if block.secondary_enabled else "",
+                block.primary_language,
+                (
+                    block.secondary_language
+                    if block.secondary_enabled and block.secondary_text
+                    else None
+                ),
+                block.speaker_style,
             )
-            self.targets = NativeFreshRenderTargets(self=targets.self, peer=target)
-        self._advance_episode(channel, event)
+            for block in blocks
+            if block.channel == "self" and block.primary_text.strip()
+        )
+
+    def advance(self, channel: str, event: OverlayEventUnion | None) -> None:
+        if channel != "peer" or event is None or event.utterance_id is None:
+            return
+        target = f"peer:{event.utterance_id}"
+        self.generations = NativeFreshRenderGenerations(
+            self=self.generations.self, peer=self.next_generation(self.generations.peer)
+        )
+        self.targets = NativeFreshRenderTargets(self=self.targets.self, peer=target)
+        phase = "final" if isinstance(event, (PeerTranscriptFinal, TranslationFinal)) else "stream"
+        current = self.episodes.peer
+        if current is None or current.phase != phase or self._episode_targets.get("peer") != target:
+            generation = self.next_generation(self._episode_generations.get("peer"))
+            current = NativeQuietTailEpisode(phase=phase, generation=generation)
+            self._episode_generations["peer"] = generation
+        self._episode_targets["peer"] = target
+        self.episodes = NativeQuietTailEpisodes(self=self.episodes.self, peer=current)
 
     def prune(self, rendered_blocks: list[OverlayPresentationBlock]) -> None:
         visible = {block.id for block in rendered_blocks if block.primary_text.strip()}
-        self_target = self.targets.self if self.targets.self in visible else None
+        self_target = (
+            self.targets.self
+            if (
+                self.targets.self in visible
+                or (self.targets.self == NATIVE_SELF_SCENE_TARGET and visible)
+            )
+            else None
+        )
         peer_target = self.targets.peer if self.targets.peer in visible else None
         if self_target is None:
             self._episode_targets.pop("self", None)
@@ -104,30 +175,6 @@ class NativeRetryIntentProjection:
             peer=self.episodes.peer if peer_target is not None else None,
         )
 
-    def _advance_episode(self, channel: str, event: OverlayEventUnion) -> None:
-        phase = (
-            "final"
-            if isinstance(event, (SelfTranscriptFinal, PeerTranscriptFinal, TranslationFinal))
-            else "stream"
-        )
-        current = self.episodes.self if channel == "self" else self.episodes.peer
-        target = f"{channel}:{event.utterance_id}"
-        current_target = self._episode_targets.get(channel)
-        replace_episode = current is None or current.phase != phase or current_target != target
-        if channel == "self" and isinstance(event, TranslationFinal):
-            replace_episode = True
-        if replace_episode:
-            generation = self.next_generation(self._episode_generations.get(channel))
-            episode = NativeQuietTailEpisode(phase=phase, generation=generation)
-            self._episode_generations[channel] = generation
-        else:
-            episode = current
-        self._episode_targets[channel] = target
-        if channel == "self":
-            self.episodes = NativeQuietTailEpisodes(self=episode, peer=self.episodes.peer)
-        else:
-            self.episodes = NativeQuietTailEpisodes(self=self.episodes.self, peer=episode)
-
     @staticmethod
     def next_generation(current: int | None) -> int:
         if current is None:
@@ -135,3 +182,7 @@ class NativeRetryIntentProjection:
         if current == U64_MAX:
             return 0
         return current + 1
+
+    @staticmethod
+    def next_self_generation(current: int | None) -> int:
+        return 1 if current is None or current >= U64_MAX - 1 else current + 2

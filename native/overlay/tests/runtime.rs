@@ -2420,7 +2420,7 @@ async fn runtime_emits_overlay_ready_only_after_first_texture_submit() {
     );
     assert_eq!(
         ready["capabilities"]["native_presentation_retry"],
-        json!({"version":1,"ownership":"exclusive"})
+        json!({"version":2,"ownership":"exclusive"})
     );
     assert_eq!(
         ready["capabilities"]["speaker_identity_presentation"],
@@ -2648,8 +2648,14 @@ fn runtime_caption_fitting_survives_promotion_and_resets_for_reused_slot_identit
         .font_size_px;
     assert!((shrunk_primary - 132.0 * 0.8).abs() < 0.01);
     assert!((shrunk_secondary - 81.84 * 0.8).abs() < 0.01);
-    assert_eq!(runtime.state().snapshot().blocks[0].primary_text, primary_text);
-    assert_eq!(runtime.state().snapshot().blocks[0].secondary_text, secondary_text);
+    assert_eq!(
+        runtime.state().snapshot().blocks[0].primary_text,
+        primary_text
+    );
+    assert_eq!(
+        runtime.state().snapshot().blocks[0].secondary_text,
+        secondary_text
+    );
 
     occupant.id = "self:finalized".into();
     occupant.block_variant = OverlayPresentationBlockVariant::Finalized;
@@ -2661,9 +2667,16 @@ fn runtime_caption_fitting_survives_promotion_and_resets_for_reused_slot_identit
         ..Default::default()
     });
     let promoted = renderer.render_blocks(runtime.caption_blocks()).unwrap();
-    assert_eq!(promoted.layout().visible_blocks[0].primary_lines[0].font_size_px, shrunk_primary);
     assert_eq!(
-        promoted.layout().visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px,
+        promoted.layout().visible_blocks[0].primary_lines[0].font_size_px,
+        shrunk_primary
+    );
+    assert_eq!(
+        promoted.layout().visible_blocks[0]
+            .secondary_line
+            .as_ref()
+            .unwrap()
+            .font_size_px,
         shrunk_secondary,
     );
 
@@ -2677,9 +2690,16 @@ fn runtime_caption_fitting_survives_promotion_and_resets_for_reused_slot_identit
         ..Default::default()
     });
     let reoccupied = renderer.render_blocks(runtime.caption_blocks()).unwrap();
-    assert!((reoccupied.layout().visible_blocks[0].primary_lines[0].font_size_px - 132.0).abs() < 0.01);
     assert!(
-        (reoccupied.layout().visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px - 81.84)
+        (reoccupied.layout().visible_blocks[0].primary_lines[0].font_size_px - 132.0).abs() < 0.01
+    );
+    assert!(
+        (reoccupied.layout().visible_blocks[0]
+            .secondary_line
+            .as_ref()
+            .unwrap()
+            .font_size_px
+            - 81.84)
             .abs()
             < 0.01
     );
@@ -4453,6 +4473,9 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         .find(|fact| fact.0 == "self" && fact.1 == 8 && fact.2 == "completed")
         .unwrap();
     assert_eq!(completed.3, 1);
+    assert!(!audit
+        .iter()
+        .any(|fact| fact.0 == "self" && fact.1 == 7 && fact.2 == "completed"));
     let successful_attempts = owner.successful_attempt_audit_for_test();
     let normal_completion = successful_attempts
         .iter()
@@ -4461,7 +4484,7 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
                 && attempt.logical_causes.contains(PresentationCause {
                     kind: PresentationCauseKind::NativeFreshRetry,
                     channel: Some(PresentationCauseChannel::SelfChannel),
-                    trigger_generation: Some(7),
+                    trigger_generation: Some(8),
                 })
         })
         .unwrap_or_else(|| panic!("missing retry completion in {successful_attempts:?}"));
@@ -5758,6 +5781,15 @@ async fn production_owner_health_flood_preserves_readiness_budget_and_reports_du
 
 #[tokio::test]
 async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_without_submit() {
+    exercise_readiness_no_progress_churn(false).await;
+}
+
+#[tokio::test]
+async fn production_owner_scene_milestones_do_not_reset_no_progress_or_release_gpu_owner() {
+    exercise_readiness_no_progress_churn(true).await;
+}
+
+async fn exercise_readiness_no_progress_churn(self_scene: bool) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let churn_sent = Arc::new(AtomicUsize::new(0));
@@ -5766,11 +5798,25 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
-        let first = json!({
-            "revision": 1,
-            "native_fresh_render_generations": {"peer": 4},
-            "blocks": [block("peer:timeouts", "peer", "text", "", true)]
-        });
+        let first = if self_scene {
+            json!({
+                "revision": 1,
+                "native_fresh_render_generations": {"self": 1, "peer": 1},
+                "native_fresh_render_targets": {"self": "scene:self", "peer": "peer:timeouts"},
+                "native_quiet_tail_episodes": {
+                    "self": {"phase": "stream", "generation": 1},
+                    "peer": {"phase": "final", "generation": 1}
+                },
+                "blocks": [active_self_block("self:milestones", "synthetic source"),
+                    block("peer:timeouts", "peer", "synthetic peer", "", true)]
+            })
+        } else {
+            json!({
+                "revision": 1,
+                "native_fresh_render_generations": {"peer": 4},
+                "blocks": [block("peer:timeouts", "peer", "text", "", true)]
+            })
+        };
         ws.send(Message::Text(
             json!({"type":"snapshot","payload":first})
                 .to_string()
@@ -5783,11 +5829,25 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
         let mut revision = 2_u64;
         while tokio::time::Instant::now() < churn_deadline {
             let text = format!("text-{revision}");
-            let snapshot = json!({
-                "revision": revision,
-                "native_fresh_render_generations": {"peer": revision},
-                "blocks": [block("peer:timeouts", "peer", &text, "", true)]
-            });
+            let snapshot = if self_scene {
+                json!({
+                    "revision": revision,
+                    "native_fresh_render_generations": {"self": 2 * revision - 1, "peer": 1},
+                    "native_fresh_render_targets": {"self": "scene:self", "peer": "peer:timeouts"},
+                    "native_quiet_tail_episodes": {
+                        "self": {"phase": "stream", "generation": 2 * revision - 1},
+                        "peer": {"phase": "final", "generation": 1}
+                    },
+                    "blocks": [active_self_block("self:milestones", &text),
+                        block("peer:timeouts", "peer", "synthetic peer", "", true)]
+                })
+            } else {
+                json!({
+                    "revision": revision,
+                    "native_fresh_render_generations": {"peer": revision},
+                    "blocks": [block("peer:timeouts", "peer", &text, "", true)]
+                })
+            };
             if ws
                 .send(Message::Text(
                     json!({"type":"snapshot","payload":snapshot})
@@ -5811,20 +5871,27 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
     renderer.set_test_readiness_pending_yields(usize::MAX);
     renderer.set_test_readiness_pending_persists_across_cancellation(true);
     let state = Arc::new(OwnedSubmitterState::default());
-    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
-        snapshot,
-        renderer,
-        OwnedSubmitterProbe {
-            state: state.clone(),
-            fail_submit: false,
-            fail_on_submission: None,
-            submit_delay: Duration::ZERO,
-        },
-        Duration::from_millis(10),
-        Duration::from_millis(100),
-        2,
-    );
-    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(2200));
+    let submitter = OwnedSubmitterProbe {
+        state: state.clone(),
+        fail_submit: false,
+        fail_on_submission: None,
+        submit_delay: Duration::ZERO,
+    };
+    let mut owner = if self_scene {
+        NativePresentationOwner::new(snapshot, renderer, submitter)
+    } else {
+        NativePresentationOwner::new_with_retry_policy_for_test(
+            snapshot,
+            renderer,
+            submitter,
+            Duration::from_millis(10),
+            Duration::from_millis(100),
+            2,
+        )
+    };
+    if !self_scene {
+        owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(2200));
+    }
 
     let failure = tokio::time::timeout(
         Duration::from_millis(4000),
@@ -5850,6 +5917,21 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
     );
     assert!(owner.runtime().state().snapshot().revision > 10);
     assert!(owner.resources_released());
+    if self_scene {
+        assert_eq!(
+            owner
+                .runtime()
+                .presentation_diagnostics()
+                .render_count_for_test(),
+            1
+        );
+        assert!(owner
+            .fresh_retry_audit_for_test()
+            .iter()
+            .any(|fact| fact.0 == "self" && fact.1 > 1 && fact.2 == "scheduled"));
+        assert!(owner.successful_attempt_audit_for_test().is_empty());
+        assert!(owner.fresh_retry_schedules_for_test().is_empty());
+    }
     drop(bridge);
     server.await.unwrap();
 }
@@ -6514,7 +6596,7 @@ fn check_startup_contract_reports_current_contract_version() {
     );
     assert_eq!(
         payload["native_presentation_retry"],
-        json!({"version":1,"ownership":"exclusive"})
+        json!({"version":2,"ownership":"exclusive"})
     );
     assert_eq!(
         payload["speaker_identity_presentation"],
@@ -6525,14 +6607,14 @@ fn check_startup_contract_reports_current_contract_version() {
 
 #[test]
 fn validate_manifest_rejects_old_transition_and_future_contract_versions() {
-    for contract_version in [12, 13, 14, 16] {
+    for contract_version in [12, 13, 14, 15, 17] {
         let manifest = OverlayManifest {
             contract_version,
             ..test_manifest()
         };
         let error = validate_manifest(&manifest).unwrap_err();
         assert!(matches!(error, StartupError::ContractMismatch(_)));
-        assert!(error.to_string().contains("expected contract_version=15"));
+        assert!(error.to_string().contains("expected contract_version=16"));
     }
 }
 
@@ -6588,7 +6670,7 @@ fn cli_emits_startup_failure_event_when_manifest_is_missing() {
 }
 
 #[tokio::test]
-async fn production_owner_renders_python_active_self_without_renewing_exhausted_stream() {
+async fn production_owner_renders_python_active_self_and_rearms_exhausted_stream() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -6663,30 +6745,477 @@ async fn production_owner_renders_python_active_self_without_renewing_exhausted_
         .await
         .unwrap();
     let audit = owner.fresh_retry_audit_for_test();
-    let stream = audit
-        .iter()
-        .filter(|fact| fact.0 == "self" && fact.1 <= 4 && fact.2 == "completed")
-        .collect::<Vec<_>>();
-    assert!(!stream.is_empty());
-    assert!(stream.len() <= 4);
-    assert!(stream.iter().all(|fact| fact.1 <= 2));
-    assert_eq!(stream.last().unwrap().3 as usize, stream.len());
-    for generation in [5, 6] {
+    for generation in [1, 3, 5, 7, 9, 11] {
         let completed = audit
             .iter()
             .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
             .collect::<Vec<_>>();
-        assert!(!completed.is_empty());
-        assert!(completed.len() <= 5);
+        assert!(!completed.is_empty(), "generation {generation}: {audit:?}");
+        assert!(completed.len() <= if generation <= 7 { 4 } else { 5 });
         assert_eq!(completed[0].3, 1);
     }
     assert!(owner
         .successful_attempt_audit_for_test()
         .iter()
-        .any(|attempt| attempt.logical_causes.to_vec().iter().any(|cause|
-            cause.kind == PresentationCauseKind::SceneUpdate
+        .any(|attempt| attempt
+            .logical_causes
+            .to_vec()
+            .iter()
+            .any(|cause| cause.kind == PresentationCauseKind::SceneUpdate
                 && cause.trigger_generation == Some(attempt.logical_revision))));
     assert!(owner.runtime().state().blocks().is_empty());
     assert!(owner.resources_released());
     server.await.unwrap();
+}
+
+fn python_scene_protection_input() -> Value {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let output = Command::new("uv")
+        .args([
+            "run",
+            "--frozen",
+            "python",
+            "-m",
+            "tests.helpers.overlay_scene_protection",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+struct SceneRunEvidence {
+    owner: NativePresentationOwner<PoseRecoverySubmitter>,
+    submissions: usize,
+    elapsed: Duration,
+}
+
+async fn exercise_scene_schedule(
+    schedule: Vec<(OverlayPresentationSnapshot, Duration)>,
+    label: &'static str,
+) -> SceneRunEvidence {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let started = Instant::now();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        for (index, (snapshot, delay)) in schedule.into_iter().enumerate() {
+            tokio::time::sleep(delay).await;
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":snapshot})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            if index == 0 {
+                wait_for_owner_ready(&mut ws).await;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        PoseRecoverySubmitter {
+            state: state.clone(),
+            pose_available_at: Instant::now(),
+            visible: false,
+        },
+    );
+    owner
+        .run(&mut bridge, &test_logger(label).await)
+        .await
+        .unwrap();
+    server.await.unwrap();
+    let submissions = state
+        .operations
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|operation| operation.starts_with("submit"))
+        .count();
+    assert!(owner.resources_released());
+    assert!(owner.fresh_retry_schedules_for_test().is_empty());
+    assert!(owner.runtime().state().blocks().is_empty());
+    SceneRunEvidence {
+        owner,
+        submissions,
+        elapsed: started.elapsed(),
+    }
+}
+
+fn assert_scene_retry_execution(
+    owner: &NativePresentationOwner<PoseRecoverySubmitter>,
+    generation: u64,
+    maximum: usize,
+) {
+    let audit = owner.fresh_retry_audit_for_test();
+    let completed = audit
+        .iter()
+        .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
+        .collect::<Vec<_>>();
+    assert!(
+        !completed.is_empty(),
+        "missing executable tail for {generation}: {audit:?}"
+    );
+    assert!(completed.len() <= maximum);
+    assert_eq!(completed[0].3, 1);
+    let attempts = owner.successful_attempt_audit_for_test();
+    let correlated = attempts
+        .iter()
+        .filter(|attempt| {
+            attempt.logical_causes.to_vec().iter().any(|cause| {
+                cause.channel == Some(PresentationCauseChannel::SelfChannel)
+                    && cause.trigger_generation == Some(generation)
+                    && matches!(
+                        cause.kind,
+                        PresentationCauseKind::NativeFreshRetry
+                            | PresentationCauseKind::ActiveRetryIntent
+                    )
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(correlated.len(), completed.len());
+    assert!(correlated
+        .windows(2)
+        .all(|pair| pair[1].render_generation > pair[0].render_generation
+            && pair[1].submission_attempt > pair[0].submission_attempt));
+    let evidence = owner.fresh_retry_evidence_for_test();
+    assert!(evidence.iter().any(|record| record["channel"] == "self"
+        && record["trigger_generation"] == generation
+        && record["outcome"] == "due"
+        && record["active"] == true));
+    for attempt in correlated {
+        let record = evidence
+            .iter()
+            .find(|record| {
+                record["outcome"] == "completed"
+                    && record["render_generation"] == attempt.render_generation
+                    && record["submission_attempt"] == attempt.submission_attempt
+            })
+            .unwrap();
+        assert_eq!(record["fresh_rendered"], true);
+        assert_eq!(record["producer_ready"], true);
+        assert_eq!(record["submission_succeeded"], true);
+    }
+}
+
+#[tokio::test]
+async fn python_mailbox_scene_coverage_executes_after_retirement_and_partial_removal() {
+    let input = python_scene_protection_input();
+    let scenes: Vec<OverlayPresentationSnapshot> =
+        serde_json::from_value(input["scenes"].clone()).unwrap();
+    assert_eq!(input["pruned"], input["repeated_pruned"]);
+    assert_eq!(scenes[3].blocks.len(), 2);
+    assert_eq!(scenes[5].blocks.len(), 1);
+    assert_eq!(scenes[5].blocks[0].id, scenes[3].blocks[1].id);
+    assert_eq!(scenes[7].blocks.len(), 1);
+    assert_eq!(scenes[7].blocks[0].channel, "peer");
+    assert_eq!(scenes[6].blocks[1], scenes[7].blocks[0]);
+    let mut reduced = OverlayRuntime::new(scenes[2].clone());
+    let before = reduced.state().scene().slots().clone();
+    reduced.apply_snapshot(scenes[3].clone());
+    let after_patch = reduced.state().scene().slots();
+    for (prior, patched) in before.iter().zip(after_patch) {
+        let prior = prior.as_ref().unwrap();
+        let patched = patched.as_ref().unwrap();
+        assert_eq!(prior.id, patched.id);
+        assert_eq!(prior.appearance_seq, patched.appearance_seq);
+        assert_eq!(prior.anchor_top_px, patched.anchor_top_px);
+    }
+    let b_slot = after_patch
+        .iter()
+        .flatten()
+        .find(|slot| slot.id == scenes[3].blocks[1].id)
+        .unwrap()
+        .clone();
+    reduced.apply_snapshot(scenes[5].clone());
+    let survivor = reduced
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    assert_eq!(survivor.id, b_slot.id);
+    assert_eq!(survivor.appearance_seq, b_slot.appearance_seq);
+    assert_eq!(survivor.slot_index, b_slot.slot_index);
+    assert_eq!(survivor.anchor_top_px, b_slot.anchor_top_px);
+    assert!(matches!(
+        reduced.apply_snapshot(scenes[3].clone()),
+        SnapshotApplyOutcome::Ignored { .. }
+    ));
+    assert_eq!(reduced.state().blocks().len(), 1);
+    let last_generation = scenes[7]
+        .native_fresh_render_generations
+        .as_ref()
+        .unwrap()
+        .self_generation
+        .unwrap();
+    let evidence = exercise_scene_schedule(
+        vec![
+            (scenes[0].clone(), Duration::ZERO),
+            (scenes[3].clone(), Duration::from_millis(30)),
+            (scenes[5].clone(), Duration::from_millis(30)),
+            (scenes[6].clone(), Duration::from_millis(30)),
+            (scenes[7].clone(), Duration::from_millis(30)),
+            (scenes[8].clone(), Duration::from_millis(600)),
+        ],
+        "scene-retirement-partial-removal",
+    )
+    .await;
+    assert_scene_retry_execution(&evidence.owner, last_generation, 5);
+    assert!(evidence
+        .owner
+        .fresh_retry_audit_for_test()
+        .iter()
+        .any(|fact| fact.0 == "self" && fact.2 == "replaced"));
+    println!("SCENE_WORK retirement submissions={} elapsed_ms={} mailbox_bytes={} pending={} receipts={}",
+        evidence.submissions, evidence.elapsed.as_millis(), input["mailbox_retained_bytes"],
+        input["mailbox_pending_scenes"], input["mailbox_receipts"]);
+    let pruned: OverlayPresentationSnapshot =
+        serde_json::from_value(input["pruned"].clone()).unwrap();
+    let pruned_generation = pruned
+        .native_fresh_render_generations
+        .as_ref()
+        .unwrap()
+        .self_generation
+        .unwrap();
+    assert_eq!(pruned_generation % 2, 0);
+    let held = exercise_scene_schedule(
+        vec![
+            (scenes[3].clone(), Duration::ZERO),
+            (pruned, Duration::from_millis(800)),
+            (scenes[8].clone(), Duration::from_millis(600)),
+        ],
+        "scene-held-transport-expiry",
+    )
+    .await;
+    assert_scene_retry_execution(&held.owner, pruned_generation, 5);
+}
+
+#[tokio::test]
+async fn python_scene_sparse_and_fast_translation_bursts_keep_bounded_executable_tail() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let output = Command::new("uv")
+        .args([
+            "run",
+            "--frozen",
+            "python",
+            "-m",
+            "tests.helpers.overlay_active_freshness",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let scenes: Vec<OverlayPresentationSnapshot> = serde_json::from_slice(&output.stdout).unwrap();
+    let mut counts = Vec::new();
+    for (label, spacing) in [("scene-sparse", 600), ("scene-fast", 30)] {
+        let schedule = scenes
+            .iter()
+            .enumerate()
+            .map(|(index, snapshot)| {
+                (
+                    snapshot.clone(),
+                    Duration::from_millis(if index == 0 {
+                        0
+                    } else if index == 6 {
+                        600
+                    } else {
+                        spacing
+                    }),
+                )
+            })
+            .collect();
+        let evidence = exercise_scene_schedule(schedule, label).await;
+        assert_scene_retry_execution(&evidence.owner, 11, 5);
+        let attempts = evidence.owner.successful_attempt_audit_for_test();
+        assert_eq!(attempts.len(), evidence.submissions);
+        assert!(attempts
+            .windows(2)
+            .all(|pair| pair[1].render_generation > pair[0].render_generation));
+        for generation in [1, 3, 5, 7, 9, 11] {
+            let audit = evidence.owner.fresh_retry_audit_for_test();
+            let completed = audit
+                .iter()
+                .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
+                .count();
+            assert!(completed <= if generation < 9 { 4 } else { 5 });
+        }
+        assert!(evidence.submissions <= 30);
+        println!(
+            "SCENE_WORK {label} submissions={} renders={} elapsed_ms={} retry_audit_dropped={}",
+            evidence.submissions,
+            attempts.last().unwrap().render_generation,
+            evidence.elapsed.as_millis(),
+            evidence.owner.fresh_retry_audit_dropped_for_test()
+        );
+        counts.push(evidence.submissions);
+    }
+    assert!(counts[0] > counts[1]);
+}
+
+#[tokio::test]
+async fn submission_return_after_native_wall_is_expired_not_credited() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        for (revision, generation) in [(1, 1), (2, 3)] {
+            let snapshot = json!({
+                "revision": revision,
+                "native_fresh_render_generations": {"self": generation},
+                "native_fresh_render_targets": {"self": "scene:self"},
+                "native_quiet_tail_episodes": {"self": {"phase": "stream", "generation": generation}},
+                "blocks": [active_self_block("self:slow-return", &format!("synthetic {revision}"))]
+            });
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":snapshot})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            if revision == 1 {
+                wait_for_owner_ready(&mut ws).await;
+            }
+        }
+        wait_for_test_progress("late-return-current-submit", || {
+            server_state
+                .operations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|operation| operation.starts_with("submit"))
+                .count()
+                >= 2
+        })
+        .await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        OwnedSubmitterProbe {
+            state,
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::from_millis(550),
+        },
+    );
+    owner
+        .run(&mut bridge, &test_logger("late-submission-return").await)
+        .await
+        .unwrap();
+    let audit = owner.fresh_retry_audit_for_test();
+    assert!(audit
+        .iter()
+        .any(|fact| fact.1 == 3 && fact.2 == "expired" && fact.3 == 0));
+    assert!(!audit.iter().any(|fact| fact.2 == "completed"));
+    let submissions = owner.successful_attempt_audit_for_test();
+    assert_eq!(submissions.len(), 2);
+    assert_eq!(submissions[1].scene_generation, 2);
+    assert!(submissions[1].render_generation > submissions[0].render_generation);
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn python_scene_clear_coalescing_rearms_without_delivering_empty_and_fresh_epoch_seeds() {
+    let input = python_scene_protection_input();
+    let prior: OverlayPresentationSnapshot =
+        serde_json::from_value(input["scenes"][0].clone()).unwrap();
+    let after_clear: OverlayPresentationSnapshot =
+        serde_json::from_value(input["clear_rearm"].clone()).unwrap();
+    let fresh_epoch: OverlayPresentationSnapshot =
+        serde_json::from_value(input["fresh_epoch"].clone()).unwrap();
+    let empty: OverlayPresentationSnapshot =
+        serde_json::from_value(input["empty_after_rearm"].clone()).unwrap();
+    let generation = after_clear
+        .native_fresh_render_generations
+        .as_ref()
+        .unwrap()
+        .self_generation
+        .unwrap();
+    assert_ne!(
+        generation,
+        prior
+            .native_fresh_render_generations
+            .as_ref()
+            .unwrap()
+            .self_generation
+            .unwrap()
+    );
+    let coalesced = exercise_scene_schedule(
+        vec![
+            (prior, Duration::ZERO),
+            (after_clear, Duration::from_millis(30)),
+            (empty.clone(), Duration::from_millis(600)),
+        ],
+        "scene-clear-coalesced",
+    )
+    .await;
+    assert_scene_retry_execution(&coalesced.owner, generation, 4);
+    assert!(coalesced
+        .owner
+        .fresh_retry_audit_for_test()
+        .iter()
+        .any(|fact| fact.1 == 1 && fact.2 == "replaced"));
+    assert_eq!(
+        fresh_epoch
+            .native_fresh_render_generations
+            .as_ref()
+            .unwrap()
+            .self_generation,
+        Some(1)
+    );
+    let fresh = exercise_scene_schedule(
+        vec![
+            (fresh_epoch, Duration::ZERO),
+            (empty, Duration::from_millis(600)),
+        ],
+        "scene-fresh-epoch",
+    )
+    .await;
+    assert_scene_retry_execution(&fresh.owner, 1, 4);
 }

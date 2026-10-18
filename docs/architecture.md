@@ -282,7 +282,8 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 - `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests when source closes.
 - Freed speculative capacity resumes only the current open draft; sealed turns retain normal bounded admission.
 - Speculative context is not accepted history. Canonical source is admitted once; logical cancellation does not release occupied provider capacity.
-- `SelfTurnPresentation` carries authoritative turn identity, revisions, and per-target status independently of overlay display state.
+- `SelfTurnPresentation` carries authoritative turn identity, revisions, source closure, speech-end boundary coverage, and per-target status independently of overlay display state.
+- The source owner publishes a mini-turn boundary whenever existing post-end grace starts or restarts. Republishing that boundary does not create a source revision or translation request.
 
 Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestrator/translation_turn.py`, `domain/events.py`. Behavior: `tests/core/test_self_stream_233.py`.
 
@@ -341,6 +342,11 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
   - Chatbox updates are independent of the overlay; newer revisions can replace unsent updates within the same turn.
   - Earlier required corrections retain a sending opportunity without blocking successor translation. Manual bypass and normal pagination supersession remain.
   - Identical successfully sent compatible previews are promoted to final without resending or restarting pagination.
+- **Self caption assembly**
+  - A bounded projection subordinate to `TranslationOutputProjectionOwner` advances merged SELF captions only at published speech-end boundaries, completed displayed-target translations, or source closure. It does not interpret recognition or VAD events.
+  - Source growth retains only the same turn's compatible target translation. Closed source is frozen; terminal failure or unavailability removes an unmatched retained translation.
+  - Admission and retained-caption patches are distinct. Assembly runs before current-dashboard authority can discard a predecessor result; destination admission and presenter retirement still determine whether it can be displayed.
+  - Assembled overlay updates coalesce per caption within the existing bounded shared preview scope. Overlay eligibility and boundary-only publication do not gate or duplicate UI/chatbox progression.
 - **Application turn presentation**
   - Views update turns by identity, revision, and target status. Older results may update their history without replacing the current dashboard turn.
   - Preview rendering is separate from final-only accepted logging and context admission.
@@ -370,6 +376,12 @@ Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_
 - **Caption ownership**
   - `OverlayPresenter` owns caption admission and lifetime independently of providers.
   - Python owns logical caption state. Native rendering must not redefine that lifetime.
+  - Source closure persists a merged SELF caption without ending current-active protection while its translation is pending. A successor can demote that caption in place; late patches cannot restore a displaced or expired identity, reorder captions, or take focus.
+  - Independent recognition units, manual input, and PEER keep their existing publication policies.
+- **Fresh-render ownership**
+  - Effective visible SELF scene changes renew bounded protection under the single native retry owner. Scene coverage survives caption-target retirement and SELF removal while a nonempty PEER scene remains; it does not change PEER selection or content.
+  - Native reconciliation anchors each accepted episode. Coalescing and send-time expiry preserve or supersede applicable scene intent without retaining a queue of old frames. No-op metadata does not renew protection or caption age.
+  - Native readiness and submission receipts establish software progress, not physical headset consumption. Protocol compatibility and retry bounds are documented in the [native overlay guide](../native/overlay/README.md).
 - **Child status and failure ingress**
   - Ingress validates finite safe metadata and rejects stale instances/generations before coalescing.
   - Primary runtime causes and secondary cleanup causes stay separate across the native/Python bridge.
@@ -381,7 +393,7 @@ Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_
   - Invalid declared values are rejected observably before retention or diagnostic artifacts.
   - Ingress does not accept arbitrary strings for later redaction.
 
-Behavior: `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.rs`.
+Behavior: `tests/core/test_self_caption_policy.py`, `tests/core/test_overlay_presenter.py`, `native/overlay/tests/runtime.rs`.
 
 ## Runtime Logging
 

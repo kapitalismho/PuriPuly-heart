@@ -716,6 +716,11 @@ impl PresentationDiagnostics {
         &self.records
     }
 
+    #[doc(hidden)]
+    pub fn render_count_for_test(&self) -> u64 {
+        self.next_render_generation.saturating_sub(1)
+    }
+
     pub fn shutdown(&mut self) {
         self.records.clear();
         self.stopped = true;
