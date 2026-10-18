@@ -7,7 +7,8 @@ from pathlib import Path
 import pytest
 
 from puripuly_heart.app.adapters import nemotron
-from puripuly_heart.app.services.speaker_application import NativeSpeakerAssets
+from puripuly_heart.app.adapters.nemotron import assets as speaker_assets
+from puripuly_heart.app.adapters.nemotron.assets import NativeSpeakerAssets
 
 
 @pytest.mark.asyncio
@@ -100,12 +101,10 @@ async def test_cancel_preserves_previous_install_and_waits_for_conversion_cleanu
 
 @pytest.mark.asyncio
 async def test_download_requires_independent_consent_before_owned_work(tmp_path, monkeypatch):
-    from puripuly_heart.app.services import speaker_application
-
     async def unexpected(**kwargs):
         pytest.fail("download started without independent speaker consent")
 
-    monkeypatch.setattr(speaker_application, "ensure_local_stt_installed", unexpected)
+    monkeypatch.setattr(speaker_assets, "ensure_local_stt_installed", unexpected)
     assets = NativeSpeakerAssets(
         artifact_path=tmp_path / "speaker" / "model.gguf", runtime_dir=tmp_path / "runtime"
     )
@@ -120,8 +119,6 @@ async def test_download_requires_independent_consent_before_owned_work(tmp_path,
 async def test_consented_download_reuses_shared_installer_and_pinned_native_manifest(
     tmp_path, monkeypatch
 ):
-    from puripuly_heart.app.services import speaker_application
-
     destination = tmp_path / "speaker" / "model.gguf"
     calls = []
 
@@ -145,7 +142,7 @@ async def test_consented_download_reuses_shared_installer_and_pinned_native_mani
         path.with_name("model.manifest.json").write_text("{}", encoding="utf-8")
         return {}
 
-    monkeypatch.setattr(speaker_application, "ensure_local_stt_installed", download)
+    monkeypatch.setattr(speaker_assets, "ensure_local_stt_installed", download)
     monkeypatch.setattr(nemotron, "adopt_preconverted_artifact", adopt)
     assets = NativeSpeakerAssets(artifact_path=destination, runtime_dir=tmp_path / "runtime")
     await assets.install(download_consent=True)
@@ -160,8 +157,6 @@ async def test_consented_download_reuses_shared_installer_and_pinned_native_mani
 
 @pytest.mark.asyncio
 async def test_incompatible_download_keeps_previous_install(tmp_path, monkeypatch):
-    from puripuly_heart.app.services import speaker_application
-
     destination = tmp_path / "speaker" / "model.gguf"
     destination.parent.mkdir()
     destination.write_bytes(b"previous")
@@ -174,7 +169,7 @@ async def test_incompatible_download_keeps_previous_install(tmp_path, monkeypatc
     def reject(path):
         raise ValueError("not the qualified pinned F16 artifact")
 
-    monkeypatch.setattr(speaker_application, "ensure_local_stt_installed", download)
+    monkeypatch.setattr(speaker_assets, "ensure_local_stt_installed", download)
     monkeypatch.setattr(nemotron, "adopt_preconverted_artifact", reject)
     assets = NativeSpeakerAssets(artifact_path=destination, runtime_dir=tmp_path / "runtime")
     with pytest.raises(ValueError, match="qualified"):
@@ -210,8 +205,6 @@ async def test_unverified_sidecar_cannot_create_product_readiness(tmp_path, monk
 
 @pytest.mark.asyncio
 async def test_cancel_download_waits_for_shared_installer_and_cleans_staging(tmp_path, monkeypatch):
-    from puripuly_heart.app.services import speaker_application
-
     started = asyncio.Event()
 
     async def download(*, model_root, manifest, preferred_source, cancel_event):
@@ -223,7 +216,7 @@ async def test_cancel_download_waits_for_shared_installer_and_cleans_staging(tmp
             await asyncio.sleep(0)
         raise InterruptedError("cancelled download")
 
-    monkeypatch.setattr(speaker_application, "ensure_local_stt_installed", download)
+    monkeypatch.setattr(speaker_assets, "ensure_local_stt_installed", download)
     assets = NativeSpeakerAssets(
         artifact_path=tmp_path / "speaker" / "model.gguf", runtime_dir=tmp_path / "runtime"
     )

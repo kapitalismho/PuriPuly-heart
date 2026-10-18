@@ -26,6 +26,7 @@ class NemotronBackend:
         self._stderr_task: asyncio.Task | None = None
         self._stderr = bytearray()
         self._lock = asyncio.Lock()
+        self._cleanup_lock = asyncio.Lock()
         self._generation = 0
         self._request_id = 0
         self._epoch = 0
@@ -40,6 +41,8 @@ class NemotronBackend:
             return self._ready
         if self._lock.locked():
             raise RuntimeError("Nemotron operation already in flight")
+        if self._process is not None or self._spawning is not None or self._stderr_task is not None:
+            raise RuntimeError("Nemotron cleanup pending")
         generation = self._generation
         async with self._lock:
             layout = current_runtime_layout()
@@ -69,21 +72,16 @@ class NemotronBackend:
             try:
                 process = await asyncio.shield(spawning)
             except asyncio.CancelledError:
-                process = await spawning
-                self._spawning = None
-                if process.returncode is None:
-                    process.kill()
-                await process.wait()
+                await self._terminate()
                 raise
+            except BaseException:
+                if self._spawning is spawning:
+                    self._spawning = None
+                raise
+            self._adopt_spawn(spawning, process)
             if generation != self._generation:
-                if process.returncode is None:
-                    process.kill()
-                await process.wait()
-                self._spawning = None
+                await self._terminate()
                 raise asyncio.CancelledError
-            self._spawning = None
-            self._process = process
-            self._stderr_task = asyncio.create_task(self._read_stderr(process))
             try:
                 response, payload = await self._exchange(
                     "start",
@@ -115,6 +113,13 @@ class NemotronBackend:
             except BaseException:
                 await self._terminate()
                 raise
+
+    def _adopt_spawn(self, spawning: asyncio.Task, process: asyncio.subprocess.Process) -> None:
+        if self._spawning is not spawning:
+            return
+        self._process = process
+        self._stderr_task = asyncio.create_task(self._read_stderr(process))
+        self._spawning = None
 
     async def _read_stderr(self, process: asyncio.subprocess.Process) -> None:
         assert process.stderr is not None
@@ -251,29 +256,35 @@ class NemotronBackend:
                 raise
 
     async def _terminate(self) -> None:
-        process, self._process = self._process, None
         self._ready = None
-        if process is not None:
-            if process.returncode is None:
+        async with self._cleanup_lock:
+            spawning = self._spawning
+            if spawning is not None:
                 try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
-            await process.wait()
-        task, self._stderr_task = self._stderr_task, None
-        if task is not None:
-            await task
+                    process = await asyncio.shield(spawning)
+                except asyncio.CancelledError:
+                    if spawning.cancelled():
+                        self._spawning = None
+                    raise
+                except BaseException:
+                    if self._spawning is spawning:
+                        self._spawning = None
+                    raise
+                self._adopt_spawn(spawning, process)
+            process = self._process
+            if process is not None:
+                if process.returncode is None:
+                    try:
+                        process.kill()
+                    except ProcessLookupError:
+                        pass
+                await process.wait()
+            if self._stderr_task is not None:
+                await asyncio.shield(self._stderr_task)
+            self._stderr_task = None
+            self._process = None
 
     async def stop(self) -> None:
         self._generation += 1
-        spawning, self._spawning = self._spawning, None
-        if spawning is not None:
-            process = await asyncio.shield(spawning)
-            if process.returncode is None:
-                try:
-                    process.kill()
-                except ProcessLookupError:
-                    pass
-            await process.wait()
         await self._terminate()
         self._cursor, self._processed, self._immutable, self._next_frame = 0, 0, 0, 0

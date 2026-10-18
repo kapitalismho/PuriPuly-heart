@@ -58,9 +58,29 @@ TASK_CREATION_REVIEWS = (
         "GPU worker client retains close and writer-close tasks; shielded close or force-close owns terminal resource cleanup",
     ),
     *_reviews(
+        "app/adapters/nemotron/backend.py",
+        {"NemotronBackend.start": 1, "NemotronBackend._adopt_spawn": 1},
+        "NemotronBackend retains process creation until adoption and one stderr reader; serialized teardown retains both through kill, wait or cancellation failure and blocks replacement until explicit cleanup retry completes",
+    ),
+    *_reviews(
+        "app/adapters/nemotron/artifacts.py",
+        {"acquire_artifact": 1},
+        "Artifact acquisition shield-awaits its local import worker; cancellation signals the cooperative event and gathers the worker before releasing the acquisition boundary",
+    ),
+    *_reviews(
+        "app/adapters/nemotron/assets.py",
+        {"NativeSpeakerAssets.install": 1},
+        "NativeSpeakerAssets retains one installation, rejects overlapping installs, and joins cancellation before releasing staging and the provisioning lease; close prevents further admission",
+    ),
+    *_reviews(
         "app/services/application_control.py",
-        {"ApplicationControlOwner.submit": 1},
-        "ApplicationControlOwner retains each operation independently of its client; freeze_ingress interrupts operations and drain_operations gathers them",
+        {"ApplicationControlOwner.submit": 1, "ApplicationControlOwner._execute_owned": 3},
+        "ApplicationControlOwner retains bounded operations independently of clients; deferred speaker work is directly awaited by its operation, freeze_ingress interrupts it, and drain_operations waits for child cleanup",
+    ),
+    *_reviews(
+        "app/services/speaker_application.py",
+        {"SpeakerApplicationOwner.apply": 1},
+        "SpeakerApplicationOwner retains and generation-fences runtime startup, gathers it on replacement or close, and retains failed runtime cleanup for explicit retry",
     ),
     *_reviews(
         "app/services/application_shutdown.py",
@@ -586,6 +606,31 @@ TASK_CREATION_REVIEWS = (
         "SettingsView uses page.run_task at the UI boundary for bounded asynchronous UI callbacks, including credential saving, while keeping the modal responsive",
         classification="legacy_exception",
         family=RUN_TASK,
+    ),
+    *_reviews(
+        "core/runtime/peer_channel.py",
+        {"_GenerationGuardedVadSink.handle_stream_input": 1},
+        "The guarded Peer sink retains one capture-fenced evidence drain; finish and abort cancel and gather it before generation teardown",
+    ),
+    *_reviews(
+        "core/speaker/runtime.py",
+        {"SpeakerRuntime.start": 1, "SpeakerRuntime._load": 1, "SpeakerRuntime.stop": 1},
+        "SpeakerRuntime retains startup, bounded input worker and shared shutdown tasks; stop fences ingress, gathers work before backend cleanup and preserves failed shutdown debt for retry",
+    ),
+    *_reviews(
+        "core/stt/batch_speaker.py",
+        {"CausalBatchSession.__init__": 1},
+        "CausalBatchSession retains one consumer; stop and close settle it even on inner failure or cancellation, preserve successful terminal draining and retry incomplete inner cleanup before reporting closure",
+    ),
+    *_reviews(
+        "core/stt/streaming_speaker.py",
+        {"StreamingSpeakerSession.__init__": 1},
+        "StreamingSpeakerSession settles its retained consumer on stop or close and keeps failed inner cleanup retryable so a quarantined provider cannot be falsely reclaimed",
+    ),
+    *_reviews(
+        "providers/stt/elevenlabs_scribe.py",
+        {"_ElevenLabsScribeSession._schedule_plain_fallback": 1},
+        "Scribe retains the current fallback and cancelled retirees through settlement; abort, stop and close join retirees while excluding self-await and preserving the irreversible commit winner",
     ),
 )
 REVIEWED_TASK_CREATION = dict(TASK_CREATION_REVIEWS)

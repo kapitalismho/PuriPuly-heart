@@ -538,7 +538,10 @@ class PeerTranslationChannelOwner:
         if not pieces:
             return None
         transcript = contribution_transcript(
-            receipt.segment, terminal, pieces, created_at=self.clock.now(),
+            receipt.segment,
+            terminal,
+            pieces,
+            created_at=self.clock.now(),
             publication_order=self._allocate_publication_order(
                 receipt.identity.activation_generation, source_order=receipt.identity.segment_order
             ),

@@ -199,15 +199,14 @@ async def capture_runtime(channel, transport):
         peer_event_handler=receive,
         retired_event_handler=receive,
     )
+    harness.peer_owner.local_asr_runtime = runtime
     loop = LoopHarness()
     sink = BoundaryRuntimeSink(runtime, channel, harness.self_owner)
     if channel == "self":
         adapter = SelfCaptureProviderAdapter(runtime, harness)
         owner, *_ = build_owner(provider=adapter, sink=sink, loop=loop)
-        owner._provider_request_factory = (
-            lambda _config, warmup: build_self_stt_provider_request_from_vnext(
-                settings, warmup=warmup
-            )
+        owner._provider_request_factory = lambda _config, warmup: (
+            build_self_stt_provider_request_from_vnext(settings, warmup=warmup)
         )
         config = build_self_capture_session_config_from_vnext(settings)
         callbacks.bind_self_capture(owner)
@@ -301,10 +300,13 @@ async def assert_consumer_sources(env, expected):
         assert env.harness.self_owner.merge_buffer.parts == expected
     else:
         await wait_until(
-            lambda: sum(
-                event.type is UIEventType.TRANSCRIPT_FINAL for event in env.harness.ui_events._queue
+            lambda: (
+                sum(
+                    event.type is UIEventType.TRANSCRIPT_FINAL
+                    for event in env.harness.ui_events._queue
+                )
+                >= len(expected)
             )
-            >= len(expected)
         )
         assert [
             event.payload.text
@@ -493,8 +495,10 @@ async def test_real_capture_gap_bypasses_blocked_fifo_retires_both_slots_and_new
         for value in (0.1, 0.2):
             await utterance(env, value)
         await wait_until(
-            lambda: len(transport.sockets) == 2
-            and all(finish_sent(socket) for socket in transport.sockets)
+            lambda: (
+                len(transport.sockets) == 2
+                and all(finish_sent(socket) for socket in transport.sockets)
+            )
         )
         old_sockets = list(transport.sockets)
         engine = env.factory.engines[0]

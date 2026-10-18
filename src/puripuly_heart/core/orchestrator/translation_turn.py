@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Mapping
@@ -264,7 +265,7 @@ class SourceChild:
         start, end = self.text_range
         if start < 0 or end - start != len(self.raw_text):
             raise ValueError("source text range does not conserve raw text")
-        validate_recognition_origins(self.origins, len(self.raw_text))
+        validate_recognition_origins(self.origins, self.raw_text)
 
     @property
     def effective_text(self) -> str:
@@ -491,6 +492,7 @@ class TranslationTurnLifecycleOwner:
     _channel_next_turn_orders: dict[ChannelId, int] = field(
         default_factory=lambda: {"self": 0, "peer": 0}
     )
+    _next_self_source_order: int = field(default=0, init=False)
     _scope: LifecycleScope = field(init=False)
     _self_speech_slots: asyncio.Semaphore = field(init=False)
     _peer_execution_condition: asyncio.Condition = field(init=False)
@@ -675,23 +677,64 @@ class TranslationTurnLifecycleOwner:
         if parent.speculative_occupancy:
             self._start_draft_operations(parent, secondary=True)
 
+    def _finalize_self_sources(self, parent: _TranslationTurnParent) -> None:
+        if parent.channel != "self":
+            return
+        order = self._next_self_source_order
+        self._next_self_source_order += 1
+        sources = {
+            child.source_child.source_id: replace(
+                child.source_child,
+                order=(parent.turn_generation, order, child.source_child.order[2]),
+            )
+            for child in parent.children
+            if child.source_child is not None
+        }
+        parent.children = tuple(
+            (
+                replace(
+                    child,
+                    source_child=sources[child.source_child.source_id],
+                    transcript=replace(
+                        child.transcript, source_child=sources[child.source_child.source_id]
+                    ),
+                )
+                if child.source_child is not None
+                else child
+            )
+            for child in parent.children
+        )
+        if parent.draft_request is not None and len(sources) == 1:
+            source = next(iter(sources.values()))
+            parent.draft_request = replace(
+                parent.draft_request,
+                transcript=replace(
+                    parent.draft_request.transcript,
+                    source_child=source,
+                    source_text_revision=source.revision,
+                ),
+            )
+
     async def seal_draft(self, parent_id: UUID) -> tuple[UUID, ...]:
         parent = self._parents.get(parent_id)
         if parent is None or parent.draft_request is None or parent.source_closed:
             return ()
         parent.source_closed = True
-        if self.prepare_draft_child is not None:
-            parent.children = tuple(
-                self.prepare_draft_child(
-                    replace(child, prepared_request=None, canonical_attempt=True)
-                )
-                for child in parent.children
-            )
+        parent.children = tuple(
+            replace(child, prepared_request=None, canonical_attempt=True)
+            for child in parent.children
+        )
         parent.admitted_at_monotonic_s = asyncio.get_running_loop().time()
         lock = self._channel_admission_locks.setdefault("self", asyncio.Lock())
         async with lock:
+            self._finalize_self_sources(parent)
+            if self.prepare_draft_child is not None:
+                parent.children = tuple(
+                    self.prepare_draft_child(child) for child in parent.children
+                )
             if self.on_parent_admitted is not None:
                 await self.on_parent_admitted(parent.children)
+            self._channel_tails["self"] = parent
         if not self._self_speech_slots.locked():
             await self._self_speech_slots.acquire()
             parent.canonical_slot = True
@@ -1045,6 +1088,7 @@ class TranslationTurnLifecycleOwner:
                 if self._parent_cancellation_requested(parent):
                     await self._terminalize_parent_remaining(parent, "cancelled")
                 else:
+                    self._finalize_self_sources(parent)
                     if self.on_parent_admitted is not None:
                         try:
                             await self.on_parent_admitted(parent.children)
@@ -1097,7 +1141,7 @@ class TranslationTurnLifecycleOwner:
                     name=f"self-speech-waiting-expiry:{parent_id}",
                     eager_start=True,
                 )
-            for child in children:
+            for child in parent.children:
                 if parent.closed:
                     break
                 try:
@@ -1281,7 +1325,7 @@ class TranslationTurnLifecycleOwner:
         turn_order: int,
     ) -> tuple[TranslationTurnChild, ...]:
         validate_recognition_origins(
-            request.transcript.recognition_origins, len(request.transcript.text)
+            request.transcript.recognition_origins, request.transcript.text
         )
         segments = _final_transcript_segments(
             request.transcript,
@@ -1300,7 +1344,10 @@ class TranslationTurnLifecycleOwner:
         }
         children: list[TranslationTurnChild] = []
         sources: dict[int, SourceChild] = {}
-        revision = request.transcript.source_text_revision or str(request.transcript.utterance_id)
+        revision = (
+            request.transcript.source_text_revision
+            or hashlib.sha256(request.transcript.text.encode("utf-8")).hexdigest()[:16]
+        )
         for run_index, segment in enumerate(segments):
             origins = slice_recognition_origins(
                 request.transcript.recognition_origins,
@@ -1313,28 +1360,36 @@ class TranslationTurnLifecycleOwner:
                 revision=revision,
                 channel=request.transcript.channel,
                 order=(
-                    request.transcript.publication_generation
-                    if request.transcript.publication_generation is not None
-                    else turn_generation,
-                    request.transcript.source_order
-                    if request.transcript.source_order is not None
-                    else turn_order,
+                    (
+                        request.transcript.publication_generation
+                        if request.transcript.publication_generation is not None
+                        else turn_generation
+                    ),
+                    (
+                        request.transcript.source_order
+                        if request.transcript.source_order is not None
+                        else turn_order
+                    ),
                     run_index,
                 ),
                 raw_text=segment.text,
                 language=segment.language or None,
                 text_range=(segment.source_text_start, segment.source_text_end),
                 origins=origins,
-                speaker=FinalSpeakerRun(
-                    segment.text,
-                    segment.speaker_id,
-                    segment.speaker_session_scope,
-                    source_start_ms=segment.source_start_ms,
-                    source_end_ms=segment.source_end_ms,
-                    overlaps_previous=segment.overlaps_previous,
-                    source=segment.speaker_source,
-                    attribution_state=segment.attribution_state,
-                ) if request.turn_kind == "peer" else None,
+                speaker=(
+                    FinalSpeakerRun(
+                        segment.text,
+                        segment.speaker_id,
+                        segment.speaker_session_scope,
+                        source_start_ms=segment.source_start_ms,
+                        source_end_ms=segment.source_end_ms,
+                        overlaps_previous=segment.overlaps_previous,
+                        source=segment.speaker_source,
+                        attribution_state=segment.attribution_state,
+                    )
+                    if request.turn_kind == "peer"
+                    else None
+                ),
                 settings=request.config_snapshot,
                 display_group_id=next(iter(groups)) if len(groups) == 1 else None,
             )
@@ -1768,9 +1823,15 @@ class TranslationTurnLifecycleOwner:
                     source_text_hash=None,
                     source_text_len=len(child.source_child.effective_text),
                 )
-            if output.source_child is not child.source_child or translation is not output.translation:
+            if (
+                output.source_child is not child.source_child
+                or translation is not output.translation
+            ):
                 result = replace(
-                    result, output=replace(output, source_child=child.source_child, translation=translation)
+                    result,
+                    output=replace(
+                        output, source_child=child.source_child, translation=translation
+                    ),
                 )
         if result.output is not None and self.output is not None:
             try:

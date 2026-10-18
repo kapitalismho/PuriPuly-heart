@@ -13,6 +13,7 @@ from puripuly_heart.app.adapters.application_runtime_shutdown import (
     ApplicationRuntimeShutdownAdapter,
 )
 from puripuly_heart.app.adapters.local_asr_application import LocalASRApplicationSettings
+from puripuly_heart.app.adapters.nemotron.assets import NativeSpeakerAssets
 from puripuly_heart.app.adapters.peer_application_state import PeerApplicationSettings
 from puripuly_heart.app.adapters.system_directory_opener import SystemDirectoryOpener
 from puripuly_heart.app.adapters.ui_runtime import (
@@ -39,6 +40,7 @@ from puripuly_heart.app.ports.runtime_pipeline_lifecycle import (
     RuntimePipelineStartCallbacks,
 )
 from puripuly_heart.app.ports.settings_secrets import SettingsSecretStorePort
+from puripuly_heart.app.ports.speaker_assets import SpeakerAssetSnapshot
 from puripuly_heart.app.ports.ui_application import UiApplicationPort
 from puripuly_heart.app.ports.ui_models import (
     ManagedGemmaDashboardNotice,
@@ -144,10 +146,7 @@ from puripuly_heart.app.services.settings_runtime_effects import (
     SettingsRuntimeEffectsState,
 )
 from puripuly_heart.app.services.settings_secrets import SettingsSecretsOwner
-from puripuly_heart.app.services.speaker_application import (
-    NativeSpeakerAssets,
-    SpeakerApplicationOwner,
-)
+from puripuly_heart.app.services.speaker_application import SpeakerApplicationOwner
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.app.services.ui_application_state import UiApplicationStateOwner
 from puripuly_heart.app.wiring import (
@@ -247,7 +246,7 @@ from puripuly_heart.config.provider_values import (
 )
 from puripuly_heart.config.resolved import OVERLAY_TARGET_STEAMVR
 from puripuly_heart.config.runtime_resolution import stt_supports_peer_auto_detection
-from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext, SpeakerIntent
 from puripuly_heart.config.translation_values import TranslationModel
 from puripuly_heart.core.chatgpt.session import ChatGptSession
 from puripuly_heart.core.clipboard.watcher import create_clipboard_watcher
@@ -286,6 +285,7 @@ from puripuly_heart.core.self_capture import (
     SelfCaptureSessionSnapshot,
     SelfCaptureSessionState,
 )
+from puripuly_heart.core.speaker import SpeakerRuntime
 from puripuly_heart.core.telemetry import (
     AppActiveDayTelemetryService,
     HttpAppActiveDayTelemetryClient,
@@ -472,6 +472,19 @@ def _managed_gemma_failure_diagnostic(snapshot: ManagedGemmaTranslationSnapshot)
     return " ".join(fields)
 
 
+def create_speaker_runtime(intent: SpeakerIntent, assets: SpeakerAssetSnapshot) -> SpeakerRuntime:
+    from puripuly_heart.app.adapters.nemotron import NemotronBackend
+
+    return SpeakerRuntime(
+        NemotronBackend(
+            artifact_path=assets.artifact_path,
+            runtime_dir=assets.runtime_dir,
+            device=int(intent.vulkan_device_id),
+            profile=intent.profile,
+        )
+    )
+
+
 def compose_application_runtime(
     *,
     presentation: UiPresentationPort,
@@ -518,7 +531,9 @@ def compose_application_runtime(
     vrchat_presence: VrchatOscPresenceProbeOwner | None = None
     managed_account: ManagedAccountComponents | None = None
     runtime_components: RuntimeCompositionComponents | None = None
-    speaker = SpeakerApplicationOwner(assets=NativeSpeakerAssets())
+    speaker = SpeakerApplicationOwner(
+        assets=NativeSpeakerAssets(), runtime_factory=create_speaker_runtime
+    )
 
     def current_settings() -> AppSettingsVNext | None:
         return settings.canonical

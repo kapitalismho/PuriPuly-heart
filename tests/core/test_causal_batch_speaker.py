@@ -341,7 +341,9 @@ async def test_small_proven_replay_intrusion_does_not_outvote_new_speech(
         events = await asyncio.wait_for(terminal_events(session), 2)
         result = events[-1]
         assert result.final_speaker_runs[0].attribution_state == expected
-        assert result.final_speaker_runs[0].speaker_id == ("1" if expected == "identified" else None)
+        assert result.final_speaker_runs[0].speaker_id == (
+            "1" if expected == "identified" else None
+        )
         assert result.source_audio[0].context_ranges == (
             (span(4800 - context_samples, 4800),) if context_only else ()
         )
@@ -1164,22 +1166,29 @@ async def test_each_native_final_snapshots_delivered_evidence_before_ordered_rel
         first_id, second_id = [req.identity for req in inner.requests]
         if second_evidence_before_final:
             await session.observe_speaker_evidence((evidence(16000, 32000, (1,)),))
-        inner.emit(STTProviderTurnTerminal(second_id, "final", "No.", text_authority="authoritative"))
+        inner.emit(
+            STTProviderTurnTerminal(second_id, "final", "No.", text_authority="authoritative")
+        )
         await until(lambda: second_id not in session._slices)
         await session.observe_speaker_evidence(
             (evidence(0, 16000, (0,)), evidence(16000, 32000, (1,)))
         )
-        inner.emit(STTProviderTurnTerminal(first_id, "final", "Alpha.", text_authority="authoritative"))
+        inner.emit(
+            STTProviderTurnTerminal(first_id, "final", "Alpha.", text_authority="authoritative")
+        )
         events = await asyncio.wait_for(terminal_events(session, 2), 2)
         assert [item.text for item in events] == ["Alpha.", "No."]
         assert [item.final_speaker_runs[0].speaker_id for item in events] == [
-            "0", "1" if second_evidence_before_final else None
+            "0",
+            "1" if second_evidence_before_final else None,
         ]
         assert [item.source_audio[0].source_ranges for item in events] == [
-            (span(0, 16000),), (span(16000, 32000),)
+            (span(0, 16000),),
+            (span(16000, 32000),),
         ]
         assert [item.source_audio[0].display_group_id for item in events] == [
-            first.display_group_id, second.display_group_id
+            first.display_group_id,
+            second.display_group_id,
         ]
         assert len(inner.requests) == 2
     finally:
@@ -1202,14 +1211,19 @@ async def test_unresolved_native_request_retains_proof_until_final_with_hard_cac
         await session.begin_turn(second)
         await payload(session, second, 16000, 48000, 1)
         later = (
-            tuple(evidence(16000 + i * 16, 16016 + i * 16, (1,)) for i in range(session.MAX_FRAMES + 1))
+            tuple(
+                evidence(16000 + i * 16, 16016 + i * 16, (1,))
+                for i in range(session.MAX_FRAMES + 1)
+            )
             if exhausted
             else (evidence(16000, 48000, (1,)),)
         )
         await session.observe_speaker_evidence(later)
         assert len(session._frames) <= session.MAX_FRAMES
         inner.emit(
-            STTProviderTurnTerminal(inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative")
+            STTProviderTurnTerminal(
+                inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative"
+            )
         )
         first_final = await asyncio.wait_for(anext(session.turn_events()), 2)
         assert first_final.final_speaker_runs[0].speaker_id == (None if exhausted else "0")
@@ -1244,15 +1258,22 @@ async def test_pending_final_cannot_use_new_epoch_reset_or_other_capture_evidenc
             replacement = evidence(0, 16000, (0,))
         else:
             await session.observe_speaker_evidence(
-                (SpeakerEvidence("capture", 11, 4, (), 16000, 16000, reason="source_discontinuity"),)
+                (
+                    SpeakerEvidence(
+                        "capture", 11, 4, (), 16000, 16000, reason="source_discontinuity"
+                    ),
+                )
             )
             original = evidence(0, 16000, (0,))
             replacement = replace(
-                original, source_map=(replace(original.source_map[0], capture=span(0, 16000, epoch=8)),)
+                original,
+                source_map=(replace(original.source_map[0], capture=span(0, 16000, epoch=8)),),
             )
         await session.observe_speaker_evidence((replacement,))
         inner.emit(
-            STTProviderTurnTerminal(inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative")
+            STTProviderTurnTerminal(
+                inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative"
+            )
         )
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].attribution_state == "unavailable"
@@ -1265,9 +1286,27 @@ async def test_pending_final_cannot_use_new_epoch_reset_or_other_capture_evidenc
 @pytest.mark.parametrize(
     "segments,expected",
     [
-        ([(0, 160, None), (160, 16000, 0), (16000, 16800, None), (16800, 31840, 0), (31840, 32000, None)], "identified"),
+        (
+            [
+                (0, 160, None),
+                (160, 16000, 0),
+                (16000, 16800, None),
+                (16800, 31840, 0),
+                (31840, 32000, None),
+            ],
+            "identified",
+        ),
         ([(0, 14400, 0), (14400, 17600, None), (17600, 32000, 0)], "uncertain"),
-        ([(0, 8000, 0), (8000, 9760, None), (9760, 24000, 0), (24000, 25760, None), (25760, 48000, 0)], "uncertain"),
+        (
+            [
+                (0, 8000, 0),
+                (8000, 9760, None),
+                (9760, 24000, 0),
+                (24000, 25760, None),
+                (25760, 48000, 0),
+            ],
+            "uncertain",
+        ),
         ([(0, 720, 0), (720, 880, None), (880, 1600, 0)], "identified"),
         ([(0, 640, 0), (640, 960, None), (960, 1600, 0)], "uncertain"),
         ([(0, 15840, 0), (15840, 16000, 1), (16000, 32000, 0)], "mixed"),
@@ -1291,7 +1330,9 @@ async def test_representative_utterance_tolerates_bounded_edges_but_never_clear_
         await seal(session, req)
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].attribution_state == expected
-        assert result.final_speaker_runs[0].speaker_id == ("0" if expected == "identified" else None)
+        assert result.final_speaker_runs[0].speaker_id == (
+            "0" if expected == "identified" else None
+        )
         assert len(recognizer.calls) == 1
         assert recognizer.calls[0].samples.size == segments[-1][1]
     finally:
@@ -1315,11 +1356,15 @@ async def test_own_final_uses_only_delivered_immutable_probability_frontier(immu
             (evidence(0, 16000, (0,), immutable=16000 if immutable_at_final else 0, state="open"),)
         )
         inner.emit(
-            STTProviderTurnTerminal(inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative")
+            STTProviderTurnTerminal(
+                inner.requests[0].identity, "final", "Alpha.", text_authority="authoritative"
+            )
         )
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].speaker_id == ("0" if immutable_at_final else None)
-        await session.observe_speaker_evidence((SpeakerEvidence("capture", 11, 4, (), 16000, 16000),))
+        await session.observe_speaker_evidence(
+            (SpeakerEvidence("capture", 11, 4, (), 16000, 16000),)
+        )
         assert result.final_speaker_runs[0].speaker_id == ("0" if immutable_at_final else None)
     finally:
         await session.close()
@@ -1332,7 +1377,9 @@ async def test_missing_central_eligible_evidence_is_not_a_confidence_hole():
     try:
         await session.begin_turn(req)
         await payload(session, req, 0, 32000, 1)
-        await session.observe_speaker_evidence((evidence(0, 15920, (0,)), evidence(16080, 32000, (0,))))
+        await session.observe_speaker_evidence(
+            (evidence(0, 15920, (0,)), evidence(16080, 32000, (0,)))
+        )
         await seal(session, req)
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].attribution_state == "unavailable"
@@ -1357,13 +1404,21 @@ async def test_native_emission_freezes_evidence_before_wrapper_dequeue(late_evid
         await seal(session, req)
         if late_evidence != "new":
             await session.observe_speaker_evidence(
-                (evidence(0, 16000, (0,), immutable=0 if late_evidence == "immutable"
-                          else 16000, state="open"),)
+                (
+                    evidence(
+                        0,
+                        16000,
+                        (0,),
+                        immutable=0 if late_evidence == "immutable" else 16000,
+                        state="open",
+                    ),
+                )
             )
         child_id = inner.requests[0].identity
         child = session._slices[child_id]
-        inner.emit(STTProviderTurnTerminal(child_id, "final", "Alpha.",
-                                          text_authority="authoritative"))
+        inner.emit(
+            STTProviderTurnTerminal(child_id, "final", "Alpha.", text_authority="authoritative")
+        )
         assert child.result is None
         expected = "0" if late_evidence in ("reset", "loss") else None
         assert child.speaker.speaker_id == expected
@@ -1374,8 +1429,7 @@ async def test_native_emission_freezes_evidence_before_wrapper_dequeue(late_evid
         elif late_evidence == "reset":
             late = evidence(0, 16000, (1,), epoch=12, ready=1.0)
         else:
-            late = SpeakerEvidence("capture", 11, 1.0, (), 16000, 16000,
-                                   reason="input_overload")
+            late = SpeakerEvidence("capture", 11, 1.0, (), 16000, 16000, reason="input_overload")
         await session.observe_speaker_evidence((late,))
         result = (await asyncio.wait_for(terminal_events(session), 2))[-1]
         assert result.final_speaker_runs[0].speaker_id == expected

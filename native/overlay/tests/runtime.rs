@@ -6778,5 +6778,12 @@ fn python_presenter_accumulation_reorders_stable_native_cards_and_replays_curren
     ));
     assert_eq!(projected, runtime.caption_blocks());
     let reconnected = OverlayRuntime::new(snapshots[3].clone());
-    assert_eq!(projected, reconnected.caption_blocks());
+    assert_eq!(runtime.state().blocks(), reconnected.state().blocks());
+    let original_renderer = CaptionRenderer::new_for_test().unwrap();
+    let original_frame = original_renderer.render_blocks(projected).unwrap();
+    let reconnected_renderer = CaptionRenderer::new_for_test().unwrap();
+    let reconnected_frame = reconnected_renderer
+        .render_blocks(reconnected.caption_blocks())
+        .unwrap();
+    assert_eq!(original_frame.layout(), reconnected_frame.layout());
 }

@@ -85,7 +85,10 @@ from puripuly_heart.domain.events import (
     UIEventType,
 )
 from puripuly_heart.domain.models import Transcript, Translation
-from puripuly_heart.domain.recognition import RecognitionTextOrigin
+from puripuly_heart.domain.recognition import (
+    RecognitionTextOrigin,
+    recognition_separator_origin,
+)
 
 _PROMO_INTERVAL_SEC = 300.0
 
@@ -812,21 +815,14 @@ class SelfTranslationChannelOwner:
         if any(child.channel != "self" for child in children):
             raise ValueError("Self translation owner received a non-Self parent")
         if children and children[0].draft:
-            if not self.translation_requests.provider_available:
-                return
-            for child in children:
-                prepared = child.prepared_request
-                if prepared is None or not child.config_snapshot.value.translation_enabled:
-                    continue
-                self.translation_requests.remember_context(
-                    child.transcript.text,
-                    self.clock.now(),
-                    channel="self",
-                    config_snapshot=child.config_snapshot,
-                    source_language=prepared.source_language,
-                    target_language=child.target_language,
-                    origin="self",
-                )
+            self.translation_requests.admit(
+                tuple(self._process_request_for_child(child) for child in children),
+                prepared={
+                    child.utterance_id: child.prepared_request
+                    for child in children
+                    if child.prepared_request is not None
+                },
+            )
             return
         if not self.output_projection.admit_self_turn(children):
             raise RuntimeError("Self translation projection rejected parent admission")
@@ -1348,6 +1344,9 @@ class SelfTranslationChannelOwner:
         origins: tuple[RecognitionTextOrigin, ...] = ()
         for utterance_id, part in zip(buffer.utterance_ids, buffer.parts, strict=True):
             if text and self._needs_space(text, part):
+                anchors = origins or buffer.recognition_origins.get(utterance_id, ())
+                if anchors:
+                    origins += (recognition_separator_origin(anchors[-1], len(text)),)
                 text += " "
             offset = len(text)
             origins += tuple(
@@ -1830,8 +1829,9 @@ class SelfTranslationChannelOwner:
                 config_snapshot=self.config_snapshot(),
             ),
             provider_generation=self.translation_requests.provider_generation,
-            compatible=lambda left, right: self.output_projection.soft_reuse_mode(left, right)
-            is not None,
+            compatible=lambda left, right: (
+                self.output_projection.soft_reuse_mode(left, right) is not None
+            ),
             configuration_compatible=self._translation_config_matches,
         )
 
@@ -1932,7 +1932,10 @@ class SelfTranslationChannelOwner:
         self, snapshot: SelfTurnPresentation, request: TranslationTurnRequest
     ) -> None:
         await self.output_projection.project_self_turn(
-            snapshot, request.config_snapshot, source=request.source
+            snapshot,
+            request.config_snapshot,
+            source=request.source,
+            source_child=request.transcript.source_child,
         )
 
 

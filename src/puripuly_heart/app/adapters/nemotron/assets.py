@@ -1,0 +1,193 @@
+from __future__ import annotations
+
+import asyncio
+import shutil
+import threading
+from pathlib import Path
+from uuid import uuid4
+
+from puripuly_heart.app.ports.speaker_assets import SpeakerAssetSnapshot
+from puripuly_heart.core.local_asr.local_stt_runtime_installer import (
+    LocalSTTProvisioningLease,
+    _promote_staging_install,
+    ensure_local_stt_installed,
+)
+from puripuly_heart.runtime_layout import current_runtime_layout
+
+
+class NativeSpeakerAssets:
+    def __init__(
+        self, *, artifact_path: Path | None = None, runtime_dir: Path | None = None
+    ) -> None:
+        layout = current_runtime_layout()
+        self.artifact_path = (
+            artifact_path
+            or layout.model_cache_root
+            / "speaker"
+            / "nemotron-3-diarization-f16-vulkan"
+            / "model.gguf"
+        )
+        self.runtime_dir = runtime_dir or layout.native("nemotron")
+        self._install_task: asyncio.Task | None = None
+        self._cancel_event: threading.Event | None = None
+        self._closed = False
+        self.phase = "idle"
+
+    async def inspect(self) -> SpeakerAssetSnapshot:
+        def inspect() -> SpeakerAssetSnapshot:
+            from puripuly_heart.app.adapters.nemotron import (
+                inspect_artifact,
+                validate_artifact_provenance,
+                validate_runtime,
+            )
+
+            metadata = {}
+            try:
+                metadata["artifact"] = inspect_artifact(self.artifact_path)
+                metadata["provenance"] = validate_artifact_provenance(
+                    self.artifact_path, metadata=metadata["artifact"]
+                )
+                metadata["runtime"] = validate_runtime(self.runtime_dir)
+                return SpeakerAssetSnapshot(
+                    True, self.artifact_path, self.runtime_dir, metadata=metadata
+                )
+            except Exception as exc:
+                return SpeakerAssetSnapshot(
+                    False,
+                    self.artifact_path,
+                    self.runtime_dir,
+                    reason=type(exc).__name__,
+                    metadata=metadata,
+                )
+
+        try:
+            return await asyncio.to_thread(inspect)
+        except ImportError:
+            return SpeakerAssetSnapshot(
+                False, self.artifact_path, self.runtime_dir, reason="native_runtime_unavailable"
+            )
+
+    async def install(
+        self, *, download_consent: bool, source_path: Path | None = None
+    ) -> SpeakerAssetSnapshot:
+        if self._closed:
+            raise RuntimeError("speaker assets are closed")
+        if self._install_task is not None and not self._install_task.done():
+            raise RuntimeError("speaker installation already running")
+        if source_path is None and not download_consent:
+            raise ValueError("explicit independent speaker model download consent is required")
+
+        cancel_event = threading.Event()
+        self._cancel_event = cancel_event
+        self.phase = "installing"
+        self._install_task = asyncio.create_task(
+            (
+                self._install_local(source_path, download_consent, cancel_event)
+                if source_path is not None
+                else self._install_download(cancel_event)
+            ),
+            name="speaker:install",
+        )
+        try:
+            await asyncio.shield(self._install_task)
+            return await self.inspect()
+        except asyncio.CancelledError:
+            await self.cancel()
+            raise
+        finally:
+            if self._install_task.done():
+                self.phase = "idle"
+
+    async def _install_local(
+        self, source_path: Path, download_consent: bool, cancel_event: threading.Event
+    ) -> None:
+        from puripuly_heart.app.adapters.nemotron import (
+            acquire_artifact,
+            validate_artifact_provenance,
+        )
+
+        install_dir = self.artifact_path.parent
+        staging_dir = install_dir.with_name(f"{install_dir.name}.staging-{uuid4().hex}")
+        lease = await asyncio.to_thread(
+            LocalSTTProvisioningLease.acquire,
+            model_root=install_dir.parent,
+            wait=True,
+            cancel_event=cancel_event,
+        )
+        if lease is None:
+            raise RuntimeError("speaker provisioning lease unavailable")
+        try:
+            await acquire_artifact(
+                staging_dir / self.artifact_path.name,
+                download_consent=download_consent,
+                source_path=source_path,
+                cancel_event=cancel_event,
+            )
+            await asyncio.to_thread(
+                validate_artifact_provenance, staging_dir / self.artifact_path.name
+            )
+            await asyncio.to_thread(
+                _promote_staging_install,
+                staging_dir=staging_dir,
+                install_dir=install_dir,
+                cancel_event=cancel_event,
+            )
+        finally:
+            await asyncio.to_thread(shutil.rmtree, staging_dir, ignore_errors=True)
+            await asyncio.to_thread(lease.close)
+
+    async def _install_download(self, cancel_event: threading.Event) -> None:
+        from puripuly_heart.app.adapters.nemotron import (
+            adopt_preconverted_artifact,
+            verified_preconverted_manifest,
+        )
+
+        manifest = verified_preconverted_manifest()
+        install_dir = self.artifact_path.parent
+        download_root = install_dir.parent / f"{install_dir.name}.download-{uuid4().hex}"
+        lease = await asyncio.to_thread(
+            LocalSTTProvisioningLease.acquire,
+            model_root=install_dir.parent,
+            wait=True,
+            cancel_event=cancel_event,
+        )
+        if lease is None:
+            raise RuntimeError("speaker provisioning lease unavailable")
+        try:
+            if self.artifact_path.is_file():
+                try:
+                    await asyncio.to_thread(adopt_preconverted_artifact, self.artifact_path)
+                    return
+                except OSError, ValueError:
+                    pass
+            self.phase = "downloading"
+            await ensure_local_stt_installed(
+                model_root=download_root,
+                manifest=manifest,
+                preferred_source="huggingface",
+                cancel_event=cancel_event,
+            )
+            staging_dir = download_root / manifest.install_dirname
+            await asyncio.to_thread(
+                adopt_preconverted_artifact, staging_dir / self.artifact_path.name
+            )
+            await asyncio.to_thread(
+                _promote_staging_install,
+                staging_dir=staging_dir,
+                install_dir=install_dir,
+                cancel_event=cancel_event,
+            )
+        finally:
+            await asyncio.to_thread(shutil.rmtree, download_root, ignore_errors=True)
+            await asyncio.to_thread(lease.close)
+
+    async def cancel(self) -> None:
+        if self._cancel_event is not None:
+            self._cancel_event.set()
+        if self._install_task is not None:
+            await asyncio.shield(asyncio.gather(self._install_task, return_exceptions=True))
+            self.phase = "idle"
+
+    async def close(self) -> None:
+        self._closed = True
+        await self.cancel()

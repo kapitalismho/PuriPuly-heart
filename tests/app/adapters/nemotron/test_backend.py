@@ -133,6 +133,289 @@ async def test_stop_during_process_creation(worker, monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["kill", "wait"])
+async def test_failed_stop_requires_real_cleanup_before_replacement(
+    worker, monkeypatch, tmp_path, failure
+):
+    original_spawn = asyncio.create_subprocess_exec
+    stderr_settled = asyncio.Event()
+    attempts = 0
+
+    async def spawn(*args, **kwargs):
+        process = await original_spawn(*args, **kwargs)
+        if len(worker) != 1:
+            return process
+        original_read = process.stderr.read
+
+        async def read(*args):
+            block = await original_read(*args)
+            if not block:
+                stderr_settled.set()
+            return block
+
+        monkeypatch.setattr(process.stderr, "read", read)
+        if failure == "kill":
+            original_kill = process.kill
+
+            def kill():
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise OSError("controlled kill failure")
+                original_kill()
+
+            monkeypatch.setattr(process, "kill", kill)
+        else:
+            original_wait = process.wait
+
+            async def wait():
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise OSError("controlled wait failure")
+                return await original_wait()
+
+            monkeypatch.setattr(process, "wait", wait)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    backend = NemotronBackend(
+        artifact_path=tmp_path / "m", runtime_dir=tmp_path, device=0, profile="0.64"
+    )
+    try:
+        await backend.start()
+        process = worker[0]
+        with pytest.raises(OSError, match=f"controlled {failure} failure"):
+            await backend.stop()
+        if failure == "kill":
+            assert process.returncode is None
+        with pytest.raises(RuntimeError, match="cleanup pending"):
+            await backend.start()
+        assert len(worker) == 1
+        await asyncio.wait_for(backend.stop(), timeout=5)
+        assert attempts == 2
+        assert process.returncode is not None
+        assert stderr_settled.is_set()
+        await backend.start()
+        assert len(worker) == 2
+        await backend.stop()
+        assert worker[1].returncode is not None
+    finally:
+        for process in worker:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["kill", "wait"])
+async def test_cancelled_spawn_cleanup_failure_retries_same_child(
+    worker, monkeypatch, tmp_path, failure
+):
+    original_spawn = asyncio.create_subprocess_exec
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    stderr_settled = asyncio.Event()
+    attempts = 0
+
+    async def spawn(*args, **kwargs):
+        entered.set()
+        await release.wait()
+        process = await original_spawn(*args, **kwargs)
+        original_read = process.stderr.read
+
+        async def read(*args):
+            block = await original_read(*args)
+            if not block:
+                stderr_settled.set()
+            return block
+
+        monkeypatch.setattr(process.stderr, "read", read)
+        if failure == "kill":
+            original_kill = process.kill
+
+            def kill():
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise OSError("controlled kill failure")
+                original_kill()
+
+            monkeypatch.setattr(process, "kill", kill)
+        else:
+            original_wait = process.wait
+
+            async def wait():
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise OSError("controlled wait failure")
+                return await original_wait()
+
+            monkeypatch.setattr(process, "wait", wait)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    backend = NemotronBackend(
+        artifact_path=tmp_path / "m", runtime_dir=tmp_path, device=0, profile="0.64"
+    )
+    startup = asyncio.create_task(backend.start())
+    try:
+        await entered.wait()
+        startup.cancel()
+        release.set()
+        with pytest.raises(OSError, match=f"controlled {failure} failure"):
+            await startup
+        process = worker[0]
+        if failure == "kill":
+            assert process.returncode is None
+        with pytest.raises(RuntimeError, match="cleanup pending"):
+            await backend.start()
+        assert len(worker) == 1
+        await asyncio.wait_for(backend.stop(), timeout=5)
+        assert attempts == 2
+        assert process.returncode is not None
+        assert stderr_settled.is_set()
+        await backend.stop()
+    finally:
+        release.set()
+        await asyncio.gather(startup, return_exceptions=True)
+        for process in worker:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("boundary", ["wait", "stderr"])
+async def test_cancelled_stop_keeps_cleanup_owned_for_retry(
+    worker, monkeypatch, tmp_path, boundary
+):
+    original_spawn = asyncio.create_subprocess_exec
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    stderr_settled = asyncio.Event()
+    wait_attempts = 0
+
+    async def spawn(*args, **kwargs):
+        process = await original_spawn(*args, **kwargs)
+        original_read = process.stderr.read
+        original_wait = process.wait
+
+        async def read(*args):
+            block = await original_read(*args)
+            if not block:
+                if boundary == "stderr":
+                    entered.set()
+                    await release.wait()
+                stderr_settled.set()
+            return block
+
+        async def wait():
+            nonlocal wait_attempts
+            wait_attempts += 1
+            if boundary == "wait":
+                entered.set()
+                await release.wait()
+            return await original_wait()
+
+        monkeypatch.setattr(process.stderr, "read", read)
+        monkeypatch.setattr(process, "wait", wait)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    backend = NemotronBackend(
+        artifact_path=tmp_path / "m", runtime_dir=tmp_path, device=0, profile="0.64"
+    )
+    stopped = None
+    retry = None
+    try:
+        await backend.start()
+        stopped = asyncio.create_task(backend.stop())
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        retry = asyncio.create_task(backend.stop())
+        await asyncio.sleep(0)
+        assert wait_attempts == 1
+        stopped.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await stopped
+        with pytest.raises(RuntimeError, match="cleanup pending"):
+            await backend.start()
+        assert len(worker) == 1
+        if boundary == "stderr":
+            await asyncio.sleep(0)
+            assert not retry.done()
+        release.set()
+        await asyncio.wait_for(retry, timeout=5)
+        assert wait_attempts == 2
+        assert worker[0].returncode is not None
+        assert stderr_settled.is_set()
+        await backend.stop()
+    finally:
+        release.set()
+        for task in (stopped, retry):
+            if task is not None:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        for process in worker:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+
+
+@pytest.mark.asyncio
+async def test_repeated_start_cancellation_retains_pending_spawn(worker, monkeypatch, tmp_path):
+    original_spawn = asyncio.create_subprocess_exec
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    stderr_settled = asyncio.Event()
+
+    async def spawn(*args, **kwargs):
+        entered.set()
+        await release.wait()
+        process = await original_spawn(*args, **kwargs)
+        original_read = process.stderr.read
+
+        async def read(*args):
+            block = await original_read(*args)
+            if not block:
+                stderr_settled.set()
+            return block
+
+        monkeypatch.setattr(process.stderr, "read", read)
+        return process
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    backend = NemotronBackend(
+        artifact_path=tmp_path / "m", runtime_dir=tmp_path, device=0, profile="0.64"
+    )
+    startup = asyncio.create_task(backend.start())
+    try:
+        await entered.wait()
+        startup.cancel()
+        await asyncio.sleep(0)
+        startup.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await startup
+        with pytest.raises(RuntimeError, match="cleanup pending"):
+            await backend.start()
+        assert worker == []
+        release.set()
+        await asyncio.wait_for(backend.stop(), timeout=5)
+        assert len(worker) == 1
+        assert worker[0].returncode is not None
+        assert stderr_settled.is_set()
+    finally:
+        release.set()
+        startup.cancel()
+        await asyncio.gather(startup, return_exceptions=True)
+        for process in worker:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+
+
+@pytest.mark.asyncio
 async def test_reject_invalid_input_before_ipc(worker, tmp_path):
     backend = NemotronBackend(
         artifact_path=tmp_path / "m", runtime_dir=tmp_path, device=0, profile="0.64"

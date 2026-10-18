@@ -223,3 +223,108 @@ async def test_overloaded_stalled_speaker_does_not_block_ready_live_asr():
         release.set()
         await owner.close()
         await speaker.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("retirement", ["stop", "replacement", "error"])
+async def test_actual_evidence_drain_progresses_and_joins_gated_receiver(retirement):
+    healthy = asyncio.Event()
+    blocked = asyncio.Event()
+    cancelled = asyncio.Event()
+    cleanup_release = asyncio.Event()
+    fail_capture = asyncio.Event()
+    guards = []
+
+    class DrainObserver(Observer):
+        def __init__(self):
+            super().__init__()
+            self.pending = []
+
+        def observe_input(self, capture_session_id, event):
+            super().observe_input(capture_session_id, event)
+            self.pending.append(
+                SimpleNamespace(capture_session_id=capture_session_id, index=len(self.inputs))
+            )
+
+        def drain_evidence(self, limit):
+            result, self.pending = self.pending[:limit], self.pending[limit:]
+            return tuple(result)
+
+    class Receiver(FakeVadSink):
+        def __init__(self):
+            super().__init__()
+            self.received = []
+
+        async def observe_speaker_evidence(self, evidence):
+            if evidence[0].index == 2:
+                blocked.set()
+                try:
+                    await asyncio.Future()
+                except asyncio.CancelledError:
+                    cancelled.set()
+                    await cleanup_release.wait()
+                    raise
+            self.received.extend(evidence)
+            healthy.set()
+
+    observer = DrainObserver()
+    receiver = Receiver()
+
+    async def capture_loop(*, sink, **_):
+        guards.append(sink)
+        await sink.handle_stream_input(
+            CaptureStreamInput(np.ones(512, dtype=np.float32), (), speech_observed=True)
+        )
+        if len(guards) == 1:
+            await healthy.wait()
+            await sink.handle_stream_input(
+                CaptureStreamInput(np.ones(512, dtype=np.float32), (), speech_observed=True)
+            )
+            await fail_capture.wait()
+            raise RuntimeError("controlled capture failure")
+        await asyncio.Future()
+
+    owner, *_ = make_owner(run_audio_loop=capture_loop, sink=receiver, speaker_observer=observer)
+    operation = None
+    try:
+        await owner.apply_intent(make_config(), enabled=True)
+        await asyncio.wait_for(blocked.wait(), 1)
+        drain = guards[0]._speaker_task
+        assert drain is not None and not drain.done()
+        original_capture = observer.inputs[0][0]
+        assert [item.index for item in receiver.received] == [1]
+        if retirement == "error":
+            fail_capture.set()
+        else:
+            operation = asyncio.create_task(
+                owner.apply_intent(
+                    (
+                        make_config(capture_signature=("replacement", 16000))
+                        if retirement == "replacement"
+                        else make_config()
+                    ),
+                    enabled=retirement == "replacement",
+                )
+            )
+        await asyncio.wait_for(cancelled.wait(), 1)
+        assert not drain.done()
+        assert operation is None or not operation.done()
+        observer.pending.append(SimpleNamespace(capture_session_id=original_capture, index=99))
+        cleanup_release.set()
+        if operation is not None:
+            await asyncio.wait_for(operation, 1)
+        await wait_until(drain.done)
+        assert all(item.index != 2 for item in receiver.received)
+        if retirement == "replacement":
+            await wait_until(lambda: len(receiver.received) == 2)
+            assert receiver.received[-1].capture_session_id != original_capture
+            assert receiver.received[-1].index == 3
+        else:
+            await wait_until(lambda: not owner.snapshot.effective_active)
+        assert all(item.index != 99 for item in receiver.received)
+    finally:
+        cleanup_release.set()
+        fail_capture.set()
+        if operation is not None:
+            await asyncio.gather(operation, return_exceptions=True)
+        await owner.close()

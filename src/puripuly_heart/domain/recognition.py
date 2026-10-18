@@ -108,7 +108,9 @@ class RecognitionTextOrigin:
     text_start: int
     text_end: int
     native: NativeTranscriptionEvidence | None = None
-    source_binding: Literal["stream_scoped", "local_segment", "request_owned"] = "stream_scoped"
+    source_binding: Literal["stream_scoped", "local_segment", "request_owned", "composition"] = (
+        "stream_scoped"
+    )
     order_basis: Literal["provider_receipt", "source_order", "capture_order"] = "provider_receipt"
     request_id: str | None = None
     contribution_id: str | None = None
@@ -116,7 +118,7 @@ class RecognitionTextOrigin:
     source_ranges: tuple[AudioCaptureSpan, ...] = ()
     context_ranges: tuple[AudioCaptureSpan, ...] = ()
     display_group_id: UUID | None = None
-    ownership: Literal["request", "stream", "unresolved"] = "stream"
+    ownership: Literal["request", "stream", "composition", "unresolved"] = "stream"
     audio_settings: AudioSegmentSettingsSnapshot | None = None
     source_available_at_monotonic_s: float | None = None
     speaker_attribution: SpeakerAttribution | None = None
@@ -141,17 +143,38 @@ class RecognitionTextOrigin:
             raise ValueError("source ranges belong to another capture epoch")
 
 
-def validate_recognition_origins(
-    origins: tuple[RecognitionTextOrigin, ...], text_length: int
-) -> None:
+def recognition_separator_origin(
+    anchor: RecognitionTextOrigin, start: int
+) -> RecognitionTextOrigin:
+    return RecognitionTextOrigin(
+        anchor.identity,
+        start,
+        start + 1,
+        source_binding="composition",
+        order_basis=anchor.order_basis,
+        display_group_id=anchor.display_group_id,
+        ownership="composition",
+    )
+
+
+def validate_recognition_origins(origins: tuple[RecognitionTextOrigin, ...], text: str) -> None:
     if not origins:
         return
     cursor = 0
     for origin in origins:
-        if origin.text_start != cursor or origin.text_end > text_length:
+        if origin.text_start != cursor or origin.text_end > len(text):
             raise ValueError("source provenance does not conserve text")
+        if origin.source_binding == "composition" and (
+            origin.ownership != "composition"
+            or text[origin.text_start : origin.text_end] != " "
+            or origin.native is not None
+            or origin.source_ranges
+            or origin.context_ranges
+            or origin.contribution_range is not None
+        ):
+            raise ValueError("source provenance has invalid composition separator")
         cursor = origin.text_end
-    if cursor != text_length:
+    if cursor != len(text):
         raise ValueError("source provenance leaves unresolved text")
 
 

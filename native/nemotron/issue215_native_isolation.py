@@ -3,6 +3,7 @@
 Delivered-packet modes check actual live PCM hashes. Full-waveform mode uses
 the exact uncut returning-A/B source assembly, with no extra context or padding.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,10 +23,13 @@ from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
 async def run(args):
     os.environ["HF_HUB_OFFLINE"] = "1"
     home = Path.home()
-    _, assembled = input_cases(SimpleNamespace(
-        corpus=home / ".cache/puripuly-heart/sim-v02-public-corpus-600-v1",
-        correction_root=ROOT.parent / "listen-mega-integrate-nemotron-speaker-tracking/docs/experiments/issue-212-clarification",
-    ))
+    _, assembled = input_cases(
+        SimpleNamespace(
+            corpus=home / ".cache/puripuly-heart/sim-v02-public-corpus-600-v1",
+            correction_root=ROOT.parent
+            / "listen-mega-integrate-nemotron-speaker-tracking/docs/experiments/issue-212-clarification",
+        )
+    )
     live = json.loads(args.trace.read_text(encoding="utf-8"))
     flush_samples = args.right_flush_ms * 16
     flush_label = f"diagnostic_zero_right_flush_{args.right_flush_ms}ms"
@@ -45,7 +49,11 @@ async def run(args):
         guards = json.loads(args.guards.read_text(encoding="utf-8"))
         if guards["asr_hashes"] != live["asr_hashes"]:
             raise ValueError("guard ASR artifacts differ")
-        selected_cases += [case for case in guards["cases"] if case["case"] in ("six_second_rollover", "linguistic_correction")]
+        selected_cases += [
+            case
+            for case in guards["cases"]
+            if case["case"] in ("six_second_rollover", "linguistic_correction")
+        ]
         report["guard_trace"] = str(args.guards)
         report["guard_trace_sha256"] = digest(args.guards)
     if args.order == "right_flush":
@@ -55,8 +63,8 @@ async def run(args):
             "kind": "diagnostic-only zero suffix, not source ownership/context replay",
             "rationale": (
                 "Upstream Parakeet v3 test_onnx.py aliases v2, whose native ONNX reference adds2s zeros before per-feature normalization and TDT decode; this compares that convention through the installed recognizer, not a parameter sweep."
-                if args.right_flush_ms == 2000 else
-                "One empirical fixed quiet right acoustic window to test native decoder endpoint flush;160ms is not an official requirement."
+                if args.right_flush_ms == 2000
+                else "One empirical fixed quiet right acoustic window to test native decoder endpoint flush;160ms is not an official requirement."
             ),
             "source_timing_changed": False,
             "fed_to_nemotron": False,
@@ -72,7 +80,13 @@ async def run(args):
         if hashlib.sha256(values.tobytes()).hexdigest() != case["input_pcm_f32_sha256"]:
             raise ValueError("live source PCM differs from the approved assembly")
         capture = float32_to_pcm16le_bytes(values)
-        backend = create_local_cpu_backend(report["model"], model_root=home / "AppData/Local/puripuly-heart/models", source_language="en", sample_rate_hz=16000, stream_label="peer")
+        backend = create_local_cpu_backend(
+            report["model"],
+            model_root=home / "AppData/Local/puripuly-heart/models",
+            source_language="en",
+            sample_rate_hz=16000,
+            stream_label="peer",
+        )
         await backend._ensure_recognizer()
         result = {"case": case["case"], "packets": []}
         result["resolved_native_options"] = serial(backend)
@@ -85,12 +99,15 @@ async def run(args):
                 result["full_waveform_source_maps"] = mapping[1:]
                 b_start, b_end = mapping[1]["scenario_sample_range"]
                 a_start, a_end = mapping[2]["scenario_sample_range"]
-                full_a = capture[a_start * 2:a_end * 2]
-                full_b = capture[b_start * 2:b_end * 2]
+                full_a = capture[a_start * 2 : a_end * 2]
+                full_b = capture[b_start * 2 : b_end * 2]
                 support = np.flatnonzero(np.abs(values[a_start:a_end]) > 0.01)
                 result["returning_A_support"] = {
                     "threshold_abs_amplitude": 0.01,
-                    "scenario_sample_range": [a_start + int(support[0]), a_start + int(support[-1]) + 1],
+                    "scenario_sample_range": [
+                        a_start + int(support[0]),
+                        a_start + int(support[-1]) + 1,
+                    ],
                     "kind": "measured waveform support, NOT word timestamps or alignment",
                 }
                 packets = [
@@ -106,7 +123,9 @@ async def run(args):
                     if case["case"] == "short_A_B_A":
                         selected.insert(0, submits[1])  # Actual short-No packet guard.
                     if case["case"] == "six_second_rollover":
-                        selected = [event for event in selected if event["seal_reason"] == "delivery_pause"]
+                        selected = [
+                            event for event in selected if event["seal_reason"] == "delivery_pause"
+                        ]
                     submits = selected
                 if args.order == "tail_first":
                     tails = [event for event in submits if event["seal_reason"] != "speaker"]
@@ -114,32 +133,55 @@ async def run(args):
                     submits = tails + prefixes + tails
                 for event in submits:
                     packet = b"".join(
-                        capture[span["normalized_start_sample"] * 2:span["normalized_end_sample"] * 2]
-                        for payload in event["payloads"] for span in payload["source_ranges"]
+                        capture[
+                            span["normalized_start_sample"] * 2 : span["normalized_end_sample"] * 2
+                        ]
+                        for payload in event["payloads"]
+                        for span in payload["source_ranges"]
                     )
                     if hashlib.sha256(packet).hexdigest() != event["pcm16_sha256"]:
                         raise ValueError("reconstructed packet differs from actual delivered PCM")
-                    packets.append(("actual_delivered_native_packet", packet, event["identity"]["provider_turn_id"]))
+                    packets.append(
+                        (
+                            "actual_delivered_native_packet",
+                            packet,
+                            event["identity"]["provider_turn_id"],
+                        )
+                    )
                     if args.order == "right_flush":
-                        packets.append((flush_label, packet + bytes(flush_samples * 2), event["identity"]["provider_turn_id"]))
+                        packets.append(
+                            (
+                                flush_label,
+                                packet + bytes(flush_samples * 2),
+                                event["identity"]["provider_turn_id"],
+                            )
+                        )
             for label, packet, request_id in packets:
                 started = time.monotonic()
                 text = await backend.decode_pcm16le(packet)
-                result["packets"].append({
-                    "diagnostic_label": label,
-                    "base_native_request_id": request_id,
-                    "samples": len(packet) // 2,
-                    "pcm16_sha256": hashlib.sha256(packet).hexdigest(),
-                    "synthetic_right_context_samples": flush_samples if label == flush_label else 0,
-                    "base_pcm16_sha256": hashlib.sha256(packet[:-flush_samples * 2] if label == flush_label else packet).hexdigest(),
-                    "text": text,
-                    "wall_seconds": time.monotonic() - started,
-                })
+                result["packets"].append(
+                    {
+                        "diagnostic_label": label,
+                        "base_native_request_id": request_id,
+                        "samples": len(packet) // 2,
+                        "pcm16_sha256": hashlib.sha256(packet).hexdigest(),
+                        "synthetic_right_context_samples": (
+                            flush_samples if label == flush_label else 0
+                        ),
+                        "base_pcm16_sha256": hashlib.sha256(
+                            packet[: -flush_samples * 2] if label == flush_label else packet
+                        ).hexdigest(),
+                        "text": text,
+                        "wall_seconds": time.monotonic() - started,
+                    }
+                )
         finally:
             await backend.close()
         report["cases"].append(result)
     text = json.dumps(report, indent=2)
-    text = text.replace(str(home).replace("\\", "\\\\"), "<USER_HOME>").replace(str(home), "<USER_HOME>")
+    text = text.replace(str(home).replace("\\", "\\\\"), "<USER_HOME>").replace(
+        str(home), "<USER_HOME>"
+    )
     args.output.write_text(text + "\n", encoding="utf-8")
 
 
@@ -148,6 +190,10 @@ if __name__ == "__main__":
     parser.add_argument("--trace", type=Path, required=True)
     parser.add_argument("--guards", type=Path)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--order", choices=("capture", "tail_first", "full_waveform", "right_flush"), default="capture")
+    parser.add_argument(
+        "--order",
+        choices=("capture", "tail_first", "full_waveform", "right_flush"),
+        default="capture",
+    )
     parser.add_argument("--right-flush-ms", type=int, choices=(160, 2000), default=160)
     asyncio.run(run(parser.parse_args()))

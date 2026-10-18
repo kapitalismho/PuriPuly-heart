@@ -270,9 +270,7 @@ class ListenDeliveryController:
             else (
                 "segment_changed"
                 if identity.segment_id != self._segment_id
-                else "pause_changed"
-                if identity.pause_id != self._pause_id
-                else None
+                else "pause_changed" if identity.pause_id != self._pause_id else None
             )
         )
         if reason is not None:

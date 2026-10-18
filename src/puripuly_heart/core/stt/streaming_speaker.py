@@ -174,6 +174,7 @@ class _Turn:
     boundaries: set = field(default_factory=set)
     mapping_available: bool = True
     source_endpoints: set = field(default_factory=set)
+    native_inputs: dict = field(default_factory=dict)
 
 
 class StreamingSpeakerSession:
@@ -192,6 +193,7 @@ class StreamingSpeakerSession:
         self._events = STTProviderEventBuffer()
         self._closed = False
         self._lock = asyncio.Lock()
+        self._cleanup_complete = False
         observer = getattr(inner, "set_source_mapping_observer", None)
         if callable(observer):
             observer(self._synthetic_sent)
@@ -312,7 +314,84 @@ class StreamingSpeakerSession:
     def _mapped(self, turn, timing):
         return tuple(span for span, _ in self._mapped_pieces(turn, timing))
 
+    def _remember_native_inputs(self, turn, event):
+        for origin in event.recognition_origins:
+            native = origin.native
+            if (
+                origin.source_binding != "local_segment"
+                or native is None
+                or native.native_task_id is None
+                or native.timestamp_basis != "task_relative_estimated"
+                or native.input_sample_rate_hz != turn.request.settings.target_sample_rate_hz
+            ):
+                continue
+            coverage = turn.native_inputs.setdefault(native.native_task_id, {})
+            for item in native.audio_coverage:
+                coverage[
+                    (
+                        item.input_start_sample,
+                        item.input_end_sample,
+                        item.capture_epoch,
+                        item.normalized_start_sample,
+                    )
+                ] = item
+        if sum(len(items) for items in turn.native_inputs.values()) > self.MAX_MAP_PIECES:
+            turn.native_inputs.clear()
+            turn.mapping_available = False
+
+    def _mapped_native_pieces(self, turn, timing):
+        if (
+            not turn.mapping_available
+            or timing.semantics == "token_point"
+            or timing.raw_start is None
+            or timing.raw_end is None
+        ):
+            return ()
+        rate = turn.request.settings.target_sample_rate_hz
+        scale = rate / (1000 if timing.unit == "ms" else 1)
+        start, end = timing.raw_start * scale, timing.raw_end * scale
+        if not math.isfinite(start) or not math.isfinite(end) or start < 0 or end <= start:
+            return ()
+        cursor, stop = math.floor(start), math.ceil(end)
+        ranges = []
+        for item in sorted(
+            turn.native_inputs[timing.clock_id].values(),
+            key=lambda item: (item.input_start_sample, item.input_end_sample),
+        ):
+            left, right = max(cursor, item.input_start_sample), min(stop, item.input_end_sample)
+            if left >= right:
+                continue
+            if (
+                left != cursor
+                or item.capture_epoch != turn.request.identity.segment.capture_epoch
+                or item.normalized_sample_rate_hz != rate
+                or item.input_end_sample - item.input_start_sample
+                != item.normalized_end_sample - item.normalized_start_sample
+                or item.discontinuity_kind is not None
+            ):
+                return ()
+            source_start = item.normalized_start_sample + left - item.input_start_sample
+            source_end = item.normalized_start_sample + right - item.input_start_sample
+            owned = turn.context if item.context_only else turn.content
+            for span in owned:
+                a, b = (
+                    max(source_start, span.normalized_start_sample),
+                    min(source_end, span.normalized_end_sample),
+                )
+                if span.capture_epoch != item.capture_epoch or a >= b:
+                    continue
+                if a != source_start:
+                    return ()
+                ranges.append((span.slice_normalized(a, b), item.context_only))
+                source_start = b
+            if source_start != source_end:
+                return ()
+            cursor = right
+        return tuple(ranges) if cursor == stop else ()
+
     def _mapped_pieces(self, turn, timing):
+        if timing.clock_id in turn.native_inputs:
+            return self._mapped_native_pieces(turn, timing)
         clock = turn.clocks.get(timing.clock_id)
         if (
             not turn.mapping_available
@@ -714,6 +793,7 @@ class StreamingSpeakerSession:
                         turn = self._turns.get(event.identity)
                         if turn is None:
                             continue
+                        self._remember_native_inputs(turn, event)
                         for clock in event.provenance.audio_clocks:
                             turn.clocks[clock.clock_id] = clock
                         for timing in event.provenance.text_timing:
@@ -750,6 +830,7 @@ class StreamingSpeakerSession:
                     elif isinstance(event, STTProviderTurnTerminal):
                         turn = self._turns.pop(event.identity, None)
                         if turn is not None:
+                            self._remember_native_inputs(turn, event)
                             for provenance in event.provenance:
                                 for clock in provenance.audio_clocks:
                                     turn.clocks[clock.clock_id] = clock
@@ -786,21 +867,29 @@ class StreamingSpeakerSession:
         async for event in self._events.events():
             yield event
 
-    async def stop(self):
-        await self.inner.stop()
-        await self._consumer
-
-    async def close(self):
-        if self._closed:
-            return
-        self._closed = True
-        await self.inner.close()
+    async def _settle_consumer(self):
         if not self._consumer.done():
             self._consumer.cancel()
-        try:
-            await self._consumer
-        except asyncio.CancelledError:
-            pass
+        await asyncio.gather(self._consumer, return_exceptions=True)
         self._turns.clear()
         self._maps.clear()
         self._events.close()
+
+    async def stop(self):
+        self._closed = True
+        try:
+            await self.inner.stop()
+            await asyncio.gather(self._consumer, return_exceptions=True)
+        finally:
+            await self._settle_consumer()
+
+    async def close(self):
+        if self._cleanup_complete:
+            return
+        self._closed = True
+        try:
+            await self.inner.close()
+            await asyncio.gather(self._consumer, return_exceptions=True)
+        finally:
+            await self._settle_consumer()
+        self._cleanup_complete = True

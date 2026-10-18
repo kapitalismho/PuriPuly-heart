@@ -159,10 +159,8 @@ async def self_capture_pipeline(
     loop = LoopHarness()
     adapter = SelfCaptureProviderAdapter(bound.runtime, harness)
     owner, *_ = build_owner(provider=adapter, sink=sink, loop=loop)
-    owner._provider_request_factory = (
-        lambda _config, warmup: build_self_stt_provider_request_from_vnext(
-            settings_box[0], warmup=warmup
-        )
+    owner._provider_request_factory = lambda _config, warmup: (
+        build_self_stt_provider_request_from_vnext(settings_box[0], warmup=warmup)
     )
     bound.callbacks.bind_self_capture(owner)
     env = SimpleNamespace(
@@ -482,7 +480,7 @@ def test_empty_terminal_removes_text_ranges_without_weakening_consumption(
     outcome, already_consumed
 ):
     identity = request("self").identity
-    normalizer = STTScopedTurnNormalizer(identity, preserve_text=True)
+    normalizer = STTScopedTurnNormalizer(identity)
     ledger = STTContributionConsumptionLedger()
     stable = normalizer.apply_update(
         STTProviderTurnUpdate(
@@ -504,8 +502,9 @@ def test_empty_terminal_removes_text_ranges_without_weakening_consumption(
     assert ledger.consume_with_origins(terminal) == ("", ())
     ledger.retire(identity)
     malformed = replace(terminal, included_contributions=(stable.contribution,))
-    with pytest.raises(ValueError, match="invalid assembled contribution range"):
-        ledger.consume(malformed)
+    with pytest.raises(ValueError, match="terminal contribution ranges are invalid"):
+        STTContributionConsumptionLedger().consume(malformed)
+    assert ledger.consume_with_origins(malformed) == ("", ())
 
 
 @pytest.mark.asyncio

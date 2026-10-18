@@ -62,7 +62,8 @@ Broker is a control-plane dependency, not part of the normal utterance data path
 | Peer capture owner      | Peer audio source, segmentation, and capture lifecycle | `core/runtime/peer_channel.py`                       |
 | Audio test owner        | VAD-only audio testing and capture restoration | `app/services/audio_test.py`, `core/runtime/audio_test.py` |
 | Local ASR runtime       | Local recognition channels and backend transitions         | `core/runtime/local_asr_provider_runtime.py`         |
-| Speaker application owner | Independent intent, consent, model acquisition, readiness and cleanup debt | `app/services/speaker_application.py` |
+| Speaker application owner | Independent intent, consent, readiness and cleanup debt; injected asset operations | `app/services/speaker_application.py`, `app/ports/speaker_assets.py` |
+| Native speaker assets | Verified artifact acquisition, staging, provisioning lease and installation cleanup | `app/adapters/nemotron/assets.py` |
 | Speaker evidence runtime | Original-source evidence, bounded stream state, speaker epochs and worker lifetime | `core/speaker/runtime.py`, `app/adapters/nemotron/` |
 | Managed local translation | Local model provisioning and runtime lifecycle | `app/services/managed_gemma_translation.py` and `core/local_translation/runtime.py` |
 | Model assets application | Explicit local-model asset operations and provisioning coordination | `app/services/model_assets.py` |
@@ -272,14 +273,16 @@ Clock validity and source order are separate. Qwen's documented increasing numer
 
 Once the latest stable text is fully consumed, later audio/evidence does not repeat its attribution proof. Audio-boundary recording remains independent, and newly extended or partially pending source is still reevaluated; this avoids blocking capture on already immutable source.
 
+Streaming and causal-batch wrappers settle their own result consumer even when inner stop/close fails or is cancelled. Ingress stays fenced, but incomplete inner cleanup remains retryable; a wrapper's closed flag cannot turn unresolved provider resource debt into successful quarantine reclamation. Successful inner closure still drains already-owned terminal output before local settlement.
+
 An uncertain transfer is an interval, not a fabricated exact acoustic split: the audio-boundary event preserves its start/end and the first established successor position separately. Within one lawful finalized text release, qualified complete lexical cuts separate supported distinct speakers. Confidence-only gray/identified changes stay in the same phrase; representative attribution may identify it, otherwise the coherent phrase stays gray. This adds no wait for another native result and does not merge actual A-B-A or unsupported clock/epoch ownership. Separators retain exact source coverage rather than being reconstructed.
 
 - Soniox uses one final-token path for automatic `<end>` prefixes, serialized manual `<fin>` completion and stream drain. An automatic marker does not seal application input or reset VAD, grouping, pre-roll, the safety deadline, speaker state or the socket. Marker-only events admit no source. Automatic endpointing is ON by default under the [approved policy amendment](https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6135356918), using the native endpoint defaults exercised in the [#212 comparison](https://github.com/kapitalismho/PuriPuly-heart/issues/212#issuecomment-6114014900). Application natural/six-second manual completion remains active, and explicit endpointing OFF retains the manual path.
 - After Soniox's first manual completion, complete text is connection-owned rather than assigned to the current local successor. Raw post-control clocks remain available, but fine-grained capture attribution is unavailable. `<fin>` has no native operation identifier: serialized FIFO acknowledgement is the supported contract, not arbitrary delayed-duplicate disambiguation across different operations.
 - Lawful Soniox idle/maximum-lifetime retirement drains connection-owned final text through the retiring epoch; cancellation/reset still fence stale events. Transport failure preserves already-final tokens once. Returned Soniox text does not refresh source-idle activity, and SELF admits an earlier pending scoped source before a later connection-owned unit.
 - Deepgram preserves `is_final` source independently of `speech_final`, including raw transcript and exact-matched complete native word boundaries. An empty Finalize has no guaranteed Results acknowledgement; absence of one is not empty success.
-- Qwen preserves exact sentence-end contributions and task-local clocks. Task completion, next-task readiness and actual submitted audio determine task ownership; sentence text is not reconstructed by joining stripped fragments. Character/subword entries do not establish internal lexical cuts. Positive timing qualification is limited to the measured Beijing workspace route; other regional paths retain conservative text.
-- Scribe's committed-with-timestamps event supplies its own normal source text. Exact-matched entries explicitly typed as words can supply complete lexical cuts; spacing and unproven item types cannot. A known-owner plain fallback can win only once; later metadata cannot re-admit it or be reassigned to a successor.
+- Qwen preserves exact sentence-end contributions and task-local clocks. Task completion, next-task readiness and actual submitted audio determine task ownership; sentence text is not reconstructed by joining stripped fragments. Estimated task-relative timing maps through actual `NativeAudioCoverage` and the owned capture spans, never a fabricated global clock. Peer consumes completed local segments; Self stable input remains draft until canonical seal. Character/subword entries do not establish internal lexical cuts. Positive timing qualification is limited to the measured Beijing workspace route; other regional paths retain conservative text.
+- Scribe's committed-with-timestamps event supplies its own normal source text. Exact-matched entries explicitly typed as words can supply complete lexical cuts; spacing and unproven item types cannot. A known-owner plain fallback can win only once; later metadata cannot re-admit it or be reassigned to a successor. Cancelled fallback tasks remain owned through settlement and are joined at abort/stop/close without self-await.
 - A first unambiguous Scribe result without usable timing remains normal gray text. A later unlocatable result without a native commit identity cannot establish successor ownership and is retained as unresolved source while the scope retires. Qualified commits still reuse their connection.
 - Gemini Hybrid retains independent authoritative text without inventing a capture association from activity fences, receipt time or native word-looking metadata. Custom offline retains demonstrated request enclosure; Custom realtime remains conservative. Rolling preserves the actual delegate's provenance across switches rather than assigning capability from the family name.
 
@@ -302,17 +305,20 @@ Implementation: `core/stt/streaming_speaker.py`, `core/stt/scoped_normalizer.py`
 
 Implementation: `core/stt/batch_speaker.py`, shared policy bounds in `core/stt/speaker_attribution.py`, and `providers/stt/local_decode.py`. Behavior: `tests/core/test_causal_batch_speaker.py` and `tests/core/test_streaming_speaker.py`. The [approved practical-policy plan](issue218-speaker-attribution-plan.md) records the revised acoustic tradeoff and its evidence. Historical padded runs in [`native/nemotron/issue215_report.json`](../native/nemotron/issue215_report.json) are not post-revert acoustic qualification.
 
-Parakeet's Python wrapper and native core are version-matched at sherpa-onnx 1.13.5, including the packaged license metadata. This runtime includes the NeMo feature-normalization stability correction; no synthetic successor tail is added. Exact native comparison, product smoke and remaining lexical/hard-rollover limitations are recorded in the [Parakeet report](../native/nemotron/issue218_parakeet_report.md).
+Parakeet's Python wrapper and native core are version-matched at sherpa-onnx 1.13.8, including the packaged license metadata. This runtime includes the NeMo feature-normalization stability correction; no synthetic successor tail is added. The [Parakeet report](../native/nemotron/issue218_parakeet_report.md) records the earlier exact native comparison and product smoke on 1.13.5, with remaining lexical/hard-rollover limitations; those measurements are not a new acoustic qualification of 1.13.8.
 
 ### Local speaker evidence
 
 `SpeakerRuntime` owns Peer speaker evidence independently of the selected ASR. The initial adapter runs Nemotron-3-Diarization in an isolated private child process with resident model weights, explicit Vulkan device selection, and no CPU neural-inference fallback.
+
+`SpeakerApplicationOwner` depends on the asset protocol and a required runtime factory. Composition injects `NativeSpeakerAssets` and constructs the native-backed runtime; the service does not select or import concrete adapters. Installation retains its staging/lease obligation through cancellation independently of runtime activation.
 
 - Peer capture supplies each original normalized input range and the existing VAD observation once, before provider routing or ASR onset/continuation replay. Physical capture identity, ASR activation, and speaker epoch are distinct.
 - Ordinary VAD pauses preserve frontend, lookahead, FIFO and speaker-cache state. Pending speech tails use causally available real context and explicitly mapped synthetic padding, never a future speech island or terminal finish.
 - Evidence preserves eight-channel probabilities, overlap, piecewise original-source coverage, actual observation-ready time, and separate processed and immutable-probability frontiers. Probability immutability is not an accuracy or permanent-identity guarantee.
 - PCM, source maps, raw results, returned evidence, IPC and pending work have independent bounds. Slow consumers cannot retain a whole session; missing speech causes explicit unavailable coverage and a new epoch rather than delayed backlog replay.
 - Source children, ASR finalization, hard-rollover context and server endpoints do not reset valid speaker state. Orderly source EOF drains already-owned bounded tails; replacement, loss, manual reset and stop fence stale work. Epoch allocation is process-wide, so disabling/re-enabling the feature or replacing its device/profile cannot reuse an old runtime's speaker identity namespace.
+- Native process creation remains owned until adoption into the process and its single stderr reader. Teardown retains both until confirmed exit and stderr settlement; failed or cancelled cleanup blocks replacement until an explicit stop retry completes.
 - Speaker failure or disable affects only speaker resources. Native Soniox speaker decisions are not a fallback; unavailable attribution remains gray while recognition and translation continue.
 
 The native adapter implements the backend-neutral contract in `core/speaker/contracts.py`. A bounded, physical-capture-fenced evidence drain connects Peer capture to local and streaming recognition independently of incoming VAD events. Both consumers use actual eight-channel probabilities and immutable frontiers; confidence rules are conservative heuristics, not identity guarantees. Behavior: `tests/core/speaker/test_runtime.py`, `tests/core/test_causal_batch_speaker.py`, `tests/core/test_streaming_speaker.py`. Caption aggregation remains a separate outcome.
@@ -334,6 +340,7 @@ Native build and model provenance: `scripts/ci/build-nemotron-runtime.ps1`, `dat
   - The frozen version-1 `SourceChild` in `core/orchestrator/translation_turn.py` is the shared source-unit contract, not another turn owner. Target-language jobs and retries are attempts of that source.
   - Source composition is fixed before translation. Identity/revision, authoritative order, raw text/language, exact text-origin coverage, capture/provider/activation identities, source/context audio ranges, speaker attribution state and settings remain attached through request preparation and publication. `RecognitionTextOrigin` in `domain/recognition.py` owns the provenance schema.
   - Supplied recognition origins must cover the entire transcript before language/speaker slicing. A missing segment cannot become an apparently valid origin-free child; truly origin-free manual/legacy inputs retain their existing path.
+  - A composition-inserted separator has explicit composition ownership, not invented native text or audio timing. Genuine provenance holes, changed native words and invalid lexical boundaries remain rejected.
   - Display grouping scope is independently supplied provenance, never inferred from a translation parent. The Peer capture ledger supplies the enclosing segment identity; internal recognition slices retain it, while natural/hardcut successors start a new scope. A-B-A remains three source/context units regardless of later card aggregation. Prefix normalization is disabled: `SourceChild.effective_text` is its raw text.
   - `TranslationRequestOwner` snapshots prior eligible history for a source's target requests, records that source once, then permits execution. Later sources can use earlier source text before translation completes; a source never includes itself in history. Language/channel/time-window eligibility and configured history caps remain unchanged.
   - Simple one-result routes retain static translation parents. Streaming prefixes use independently admitted existing parents while enclosing audio remains open. Failed predecessors resolve explicitly without discarding successful successors; bounded execution, retry/watchdog/source-only policies and destination isolation remain with existing owners.
@@ -351,10 +358,11 @@ Implementation: `core/orchestrator/translation_turn.py`, `core/orchestrator/tran
 ### Progressive Self turns
 
 - `SelfTranslationChannelOwner` owns source reconciliation, acoustic continuation, grace, and source closure independently of translation completion.
-- `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests when source closes.
+- `TranslationTurnLifecycleOwner` owns draft-to-final translation work and preserves compatible running requests and their original context snapshots when source closes.
 - Freed speculative capacity resumes only the current open draft; sealed turns retain normal bounded admission.
-- Speculative context is not accepted history. Canonical source is admitted once; logical cancellation does not release occupied provider capacity.
+- Speculative context is not accepted history. Canonical source order is allocated at admission/seal, independently of draft-open order. All target contexts are prepared before one canonical source registration; logical cancellation does not release occupied provider capacity.
 - `SelfTurnPresentation` carries authoritative turn identity, revisions, and per-target status independently of overlay display state.
+- Finalized Transcript ingress carries the canonical `SourceChild` for translated, source-only and failure output before source closure. Sealed sources retain channel publication order; an obsolete draft cannot overwrite a newer manual presentation. Draft presentation does not invent a finalized source.
 
 Implementation: `core/orchestrator/self_translation_channel.py`, `core/orchestrator/translation_turn.py`, `domain/events.py`. Behavior: `tests/core/test_self_stream_233.py`.
 
@@ -497,7 +505,7 @@ Logging contracts:
 - **Log selection**
   - Rendered output logs select meaningful effects rather than mirror every owner decision.
   - Expected policy/no-op decisions stay in bounded owner history without routine log rows.
-  - Intermediate overlay handoff/pacing evidence is file-only.
+  - Intermediate overlay handoff/admission evidence is file-only.
   - Typed output failures are not repeated as generic destination or translation-error summaries.
   - GUI overlay notifications do not duplicate owner lifecycle logs.
 - **Delivery and health**

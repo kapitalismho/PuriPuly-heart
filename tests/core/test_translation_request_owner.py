@@ -314,7 +314,9 @@ async def test_peer_segments_use_individual_requests_with_prior_only_context() -
         ("three", "三"),
     ]
     assert [prepared[request.utterance_id].context_texts for request in requests] == [
-        (), (), ("one",)
+        (),
+        (),
+        ("one",),
     ]
     for body in requests_seen:
         assert "speaker=" not in body["messages"][1]["content"]
@@ -976,6 +978,7 @@ async def test_index_prestarted_failure_is_consumed_once_at_final_admission() ->
     assert observed == []
     assert fixture.presentation.messages == []
 
+    assert fixture.self_runtime.translation_history == []
     final = await fixture.owner.process(
         replace(request, terminal_failure=prestarted.terminal_failure)
     )
@@ -987,7 +990,6 @@ async def test_index_prestarted_failure_is_consumed_once_at_final_admission() ->
     assert observed == [failure]
     assert len(fixture.presentation.messages) == 1
     assert [entry.text for entry in fixture.self_runtime.translation_history] == [
-        "request",
         "request",
     ]
 

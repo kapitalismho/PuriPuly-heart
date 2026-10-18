@@ -220,11 +220,11 @@ ObservabilityRunner = Callable[[Awaitable[None]], None]
 _OUTPUT_STAGE_TOKENS = {
     "decision": frozenset({"accepted", "waiting"}),
     "route": frozenset({"subtitle_overlay"}),
-    "reason": frozenset({"accepted_handoff", "logical_pacing_wait"}),
-    "stage": frozenset({"admission_accepted", "logical_pacing"}),
+    "reason": frozenset({"accepted_handoff", "protected_rows_wait"}),
+    "stage": frozenset({"admission_accepted", "presentation_admission"}),
     "outcome": frozenset({"pending", "waiting"}),
     "physical_ack": frozenset({"false"}),
-    "wait_reason": frozenset({"replacement_gate", "protected_rows"}),
+    "wait_reason": frozenset({"protected_rows"}),
 }
 
 
@@ -1431,7 +1431,7 @@ class SessionRuntimeLoggingService:
         if (
             decision.decision == "published"
             and decision.route == "subtitle_overlay"
-            and decision.reason in {"accepted_handoff", "logical_pacing_wait"}
+            and decision.reason in {"accepted_handoff", "protected_rows_wait"}
         ):
             self.emit_diagnostic(_format_output_routing_decision(decision))
             return
@@ -1944,11 +1944,11 @@ def _redact_observability_fields_for_sink(
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
     intermediate = decision.decision == "published" and decision.reason in {
         "accepted_handoff",
-        "logical_pacing_wait",
+        "protected_rows_wait",
     }
     status: str = decision.decision
     if intermediate:
-        status = "waiting" if decision.reason == "logical_pacing_wait" else "accepted"
+        status = "waiting" if decision.reason == "protected_rows_wait" else "accepted"
     parts = [
         "[Output] destination_stage" if intermediate else "[Output] destination_result",
         f"decision={status}",

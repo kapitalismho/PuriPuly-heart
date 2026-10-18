@@ -1284,7 +1284,9 @@ async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translati
     )
 
     snapshot, identity = source_fixture()
-    req = STTProviderTurnRequest(identity, snapshot.settings, display_group_id=snapshot.display_group_id)
+    req = STTProviderTurnRequest(
+        identity, snapshot.settings, display_group_id=snapshot.display_group_id
+    )
     provider = Provider()
     session = StreamingSpeakerSession(provider)
     translator = ControlledProvider()
@@ -1299,8 +1301,14 @@ async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translati
             evidence(gray_start, gray_end, None),
             frame=ProbabilityFrame(gray_start, gray_end, (0.4,) + (0.01,) * 7),
         )
-        clear = evidence(0, 32000 - edge, slot) if uncertain_edge == "trailing" else evidence(edge, 32000, slot)
-        await session.observe_speaker_evidence((clear, gray) if uncertain_edge == "trailing" else (gray, clear))
+        clear = (
+            evidence(0, 32000 - edge, slot)
+            if uncertain_edge == "trailing"
+            else evidence(edge, 32000, slot)
+        )
+        await session.observe_speaker_evidence(
+            (clear, gray) if uncertain_edge == "trailing" else (gray, clear)
+        )
         words = text.split()
         positions = []
         cursor = 0
@@ -1309,16 +1317,24 @@ async def test_final_phrase_confidence_edges_do_not_fragment_source_or_translati
             end = start + len(word)
             positions.append(
                 STTTextTiming(
-                    "phrase-1", start, end, "word_interval",
-                    2 * index / len(words), 2 * (index + 1) / len(words),
-                    clock_id="clock", complete_boundary=True, estimated=True,
+                    "phrase-1",
+                    start,
+                    end,
+                    "word_interval",
+                    2 * index / len(words),
+                    2 * (index + 1) / len(words),
+                    clock_id="clock",
+                    complete_boundary=True,
+                    estimated=True,
                 )
             )
             cursor = end
         event = update(req, text, qualified=qualified, release=True)
         event = replace(event, provenance=replace(event.provenance, text_timing=tuple(positions)))
         provider.events.put(event)
-        result = STTScopedTurnNormalizer(identity).apply_update(await next_text(session.turn_events()))
+        result = STTScopedTurnNormalizer(identity).apply_update(
+            await next_text(session.turn_events())
+        )
         await harness.peer_owner.handle_provider_turn_update(snapshot, result)
         await harness.peer_owner.handle_provider_turn_update(snapshot, result)
         await finish(harness)
@@ -1346,7 +1362,9 @@ async def test_final_phrase_preserves_very_short_clear_no_between_returning_spea
     )
 
     snapshot, identity = source_fixture()
-    req = STTProviderTurnRequest(identity, snapshot.settings, display_group_id=snapshot.display_group_id)
+    req = STTProviderTurnRequest(
+        identity, snapshot.settings, display_group_id=snapshot.display_group_id
+    )
     provider = Provider()
     session = StreamingSpeakerSession(provider)
     translator = ControlledProvider()
@@ -1360,8 +1378,11 @@ async def test_final_phrase_preserves_very_short_clear_no_between_returning_spea
         )
         event = update(req, text, release=True)
         word_ranges = [
-            ("Use", 0, 0.0, 0.4), ("two.", 4, 0.4, 1.0),
-            ("No.", 9, 1.0, 1.05), ("Use", 13, 1.05, 1.45), ("three.", 17, 1.45, 2.05),
+            ("Use", 0, 0.0, 0.4),
+            ("two.", 4, 0.4, 1.0),
+            ("No.", 9, 1.0, 1.05),
+            ("Use", 13, 1.05, 1.45),
+            ("three.", 17, 1.45, 2.05),
         ]
         event = replace(
             event,
@@ -1369,22 +1390,34 @@ async def test_final_phrase_preserves_very_short_clear_no_between_returning_spea
                 event.provenance,
                 text_timing=tuple(
                     STTTextTiming(
-                        "phrase-1", start, start + len(word), "word_interval", a, b,
-                        clock_id="clock", complete_boundary=True,
+                        "phrase-1",
+                        start,
+                        start + len(word),
+                        "word_interval",
+                        a,
+                        b,
+                        clock_id="clock",
+                        complete_boundary=True,
                     )
                     for word, start, a, b in word_ranges
                 ),
             ),
         )
         provider.events.put(event)
-        result = STTScopedTurnNormalizer(identity).apply_update(await next_text(session.turn_events()))
+        result = STTScopedTurnNormalizer(identity).apply_update(
+            await next_text(session.turn_events())
+        )
         await harness.peer_owner.handle_provider_turn_update(snapshot, result)
         await finish(harness)
         sources = [item.source_child for item in trace.items]
         assert [source.raw_text for source in sources] == ["Use two. ", "No. ", "Use three."]
         assert [source.speaker.speaker_id for source in sources] == ["0", "1", "0"]
         assert "".join(source.raw_text for source in sources) == text
-        assert [source.origins[0].contribution_range for source in sources] == [(0, 9), (9, 13), (13, 23)]
+        assert [source.origins[0].contribution_range for source in sources] == [
+            (0, 9),
+            (9, 13),
+            (13, 23),
+        ]
         assert len(harness.peer_runtime.translation_history) == len(translator.calls) == 3
         assert not provider.sealed
     finally:
@@ -1419,22 +1452,36 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
     region_words = 60 // region_count
     contributions = tuple(
         STTTextContribution(
-            f"phrase-{index}", index * region_words * 7,
+            f"phrase-{index}",
+            index * region_words * 7,
             min((index + 1) * region_words * 7, len(text)),
         )
         for index in range(region_count)
     )
     timings = tuple(
         STTTextTiming(
-            f"phrase-{index // region_words}", index * 7, index * 7 + len(word),
-            "word_interval", index * 100, (index + 1) * 100, "ms", "clock", True,
+            f"phrase-{index // region_words}",
+            index * 7,
+            index * 7 + len(word),
+            "word_interval",
+            index * 100,
+            (index + 1) * 100,
+            "ms",
+            "clock",
+            True,
         )
         for index, word in enumerate(words)
     ) + tuple(
         STTTextTiming(
-            contribution.contribution_id, contribution.text_start, contribution.text_end,
-            "result_span", index * region_words * 100, (index + 1) * region_words * 100,
-            "ms", "clock", True,
+            contribution.contribution_id,
+            contribution.text_start,
+            contribution.text_end,
+            "result_span",
+            index * region_words * 100,
+            (index + 1) * region_words * 100,
+            "ms",
+            "clock",
+            True,
         )
         for index, contribution in enumerate(contributions)
     )
@@ -1455,7 +1502,9 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
             contribution=None,
             included_contributions=contributions,
             provenance=replace(
-                event.provenance, text_timing=timings, sent_until_sample=96000,
+                event.provenance,
+                text_timing=timings,
+                sent_until_sample=96000,
             ),
         )
         provider.events.put(event)
@@ -1466,8 +1515,7 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
         assert len(outgoing.final_speaker_runs) == (60 if qualified else region_count)
         assert "".join(run.text for run in outgoing.final_speaker_runs) == text
         assert [run.speaker_id for run in outgoing.final_speaker_runs] == (
-            [str(index % 2) for index in range(60)]
-            if qualified else [None] * region_count
+            [str(index % 2) for index in range(60)] if qualified else [None] * region_count
         )
         result = STTScopedTurnNormalizer(identity).apply_update(outgoing)
         await harness.peer_owner.handle_provider_turn_update(snapshot, result)
@@ -1475,17 +1523,18 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
         sources = [item.source_child for item in trace.items]
         expected_texts = (
             [word + (" " if index < 59 else "") for index, word in enumerate(words)]
-            if qualified else [text]
+            if qualified
+            else [text]
         )
         assert [source.raw_text for source in sources] == expected_texts
         assert "".join(source.raw_text for source in sources) == text
         assert [source.speaker.speaker_id for source in sources] == (
-            [str(index % 2) for index in range(60)]
-            if qualified else [None]
+            [str(index % 2) for index in range(60)] if qualified else [None]
         )
         assert [source.text_range for source in sources] == (
             [(index * 7, min((index + 1) * 7, len(text))) for index in range(60)]
-            if qualified else [(0, len(text))]
+            if qualified
+            else [(0, len(text))]
         )
         assert all(
             source.origins[0].native_provenance[0].audio_clocks[0].qualified == qualified
@@ -1493,7 +1542,7 @@ async def test_high_retention_final_preserves_owned_groups_and_qualified_clock(
         )
         assert len(translator.calls) == len(sources)
         history = harness.peer_runtime.translation_history
-        assert [entry.text for entry in history] == expected_texts[-len(history):]
+        assert [entry.text for entry in history] == expected_texts[-len(history) :]
         assert len({source.source_id for source in sources}) == len(sources)
         assert not provider.sealed
     finally:

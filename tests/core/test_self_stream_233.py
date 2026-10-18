@@ -103,9 +103,8 @@ async def test_preview_before_close_reuses_running_and_identical_final_without_o
             event.type in {UIEventType.TRANSCRIPT_FINAL, UIEventType.TRANSLATION_DONE}
             for event in events
         )
-        assert [entry.text for entry in harness.self_runtime.translation_history] == [
-            "alpha"
-        ] * len(targets)
+        assert [entry.text for entry in harness.self_runtime.translation_history] == ["alpha"]
+        assert harness.self_runtime.translation_history[0].target_languages == targets
     finally:
         await harness.stop()
 

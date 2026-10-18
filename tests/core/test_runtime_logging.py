@@ -1689,3 +1689,100 @@ def test_stt_startup_failure_identity_survives_persisted_redaction_without_exter
     finally:
         runtime_logging.close()
         file_handler.close()
+
+
+@pytest.mark.asyncio
+async def test_protected_caption_admission_stays_file_only_until_retirement(tmp_path) -> None:
+    from puripuly_heart.core.clock import FakeClock
+    from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
+    from puripuly_heart.core.overlay.presenter import OverlayPresenter
+    from puripuly_heart.core.overlay.sink import OverlayEventAdapter
+    from puripuly_heart.core.runtime.output import OutputRuntime
+    from puripuly_heart.domain.models import Transcript
+    from puripuly_heart.ui.overlay_calibration import OverlayCalibration
+    from tests.helpers.fakes import FakeSender
+
+    clock = FakeClock(_now=10)
+    stream = io.StringIO()
+    log_file = tmp_path / "caption-admission.log"
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    root_logger = logging.getLogger(f"test.runtime_logging.admission.root.{uuid4()}")
+    root_logger.propagate = False
+    session_logger = logging.getLogger(f"test.runtime_logging.admission.session.{uuid4()}")
+    session_logger.propagate = False
+    runtime_logging = SessionRuntimeLoggingService(
+        root_logger=root_logger,
+        session_logger=session_logger,
+        sinks=RuntimeLoggingSinks(
+            stream_handler=logging.StreamHandler(stream),
+            file_handler=file_handler,
+            log_file=log_file,
+        ),
+    )
+
+    async def blocked_sleep(_delay: float) -> None:
+        await asyncio.Event().wait()
+
+    presenter = OverlayPresenter(
+        OverlayCalibration(),
+        clock=clock,
+        sleep=blocked_sleep,
+        translation_enabled=False,
+        visible_window_target_blocks=1,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    sender = FakeSender()
+    owner = OutputRuntime(
+        chatbox=ChatboxPaginator(sender=sender, clock=clock),
+        clock=clock,
+        overlay_sink=presenter,
+        routing_observer=runtime_logging.record_output_routing_decision,
+    )
+    try:
+        await presenter.emit(
+            adapter.self_active_update(
+                text="owned Self", utterance_id=uuid4(), occupant_key="self:owned"
+            )
+        )
+        event = adapter.transcript_final(
+            Transcript(uuid4(), "synthetic private caption", True, channel="peer"),
+            source_language="en",
+            target_language="ja",
+        )
+        owner.activate_peer_generation(1)
+        await owner.publish_overlay_event(event, publication_generation=1, source_order=1)
+        async with asyncio.timeout(2):
+            while not any(
+                decision.reason == "protected_rows_wait" for decision in owner.routing_decisions
+            ):
+                await asyncio.sleep(0)
+        file_handler.flush()
+        persisted = log_file.read_text(encoding="utf-8")
+        stages = [
+            dict(token.split("=", 1) for token in line.split() if "=" in token)
+            for line in persisted.splitlines()
+            if "[Output] destination_stage " in line
+        ]
+        assert [stage["decision"] for stage in stages] == ["accepted", "waiting"]
+        assert [stage["stage"] for stage in stages] == [
+            "admission_accepted",
+            "presentation_admission",
+        ]
+        assert stages[-1]["wait_reason"] == "protected_rows"
+        assert all(stage["physical_ack"] == "false" for stage in stages)
+        assert all(stage["publication_id"] == event.event_id for stage in stages)
+        assert stream.getvalue() == ""
+        assert "synthetic private caption" not in persisted
+        assert "untrusted_record_redacted" not in persisted
+        assert sender.sent == []
+        assert [block.channel for block in presenter.snapshot().blocks] == ["self"]
+        owner.retire_peer_generation(1)
+        await owner.wait_for_peer_output_idle()
+        assert owner.routing_decisions[-1].reason == "publication_generation_retired"
+        assert [block.channel for block in presenter.snapshot().blocks] == ["self"]
+    finally:
+        await owner.close()
+        await presenter.close()
+        runtime_logging.close()
+        file_handler.close()

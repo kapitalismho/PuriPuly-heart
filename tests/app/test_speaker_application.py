@@ -8,10 +8,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from puripuly_heart.app.services.speaker_application import (
-    SpeakerApplicationOwner,
-    SpeakerAssetSnapshot,
-)
+from puripuly_heart.app.ports.speaker_assets import SpeakerAssetSnapshot
+from puripuly_heart.app.services.speaker_application import SpeakerApplicationOwner
 from puripuly_heart.composition.headless_application import compose_headless_application
 from puripuly_heart.config.settings_vnext.schema import (
     AppSettingsVNext,
@@ -348,3 +346,81 @@ async def test_headless_authenticated_owner_config_persists_and_missing_runtime_
     assert restored.intent.speaker == SpeakerIntent(
         profile="0.64", vulkan_device_id="0", download_consent=True
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("command", ["speaker.configure", "speaker.install", "speaker.prepare"])
+async def test_control_shutdown_waits_for_active_speaker_operation_cleanup(
+    tmp_path, monkeypatch, command
+):
+    from puripuly_heart.composition import application_runtime
+
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    settled = asyncio.Event()
+
+    class GatedAssets(Assets):
+        async def inspect(self):
+            return await self._wait_for_cleanup()
+
+        async def install(self, *, download_consent, source_path):
+            assert download_consent is True
+            return await self._wait_for_cleanup()
+
+        async def _wait_for_cleanup(self):
+            entered.set()
+            try:
+                await asyncio.Future()
+            finally:
+                cancelled.set()
+                await release_cleanup.wait()
+                settled.set()
+
+    assets = GatedAssets()
+    monkeypatch.setenv("PURIPULY_HEART_SECRETS_PASSPHRASE", "isolated-speaker-shutdown")
+    monkeypatch.setattr(application_runtime, "NativeSpeakerAssets", lambda: assets)
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            osc=replace(settings.intent.osc, connection_mode="off"),
+            telemetry=replace(settings.intent.telemetry, enabled=False),
+            secrets=SecretsIntent(backend="encrypted_file", encrypted_file_path="secrets.json"),
+            speaker=SpeakerIntent(download_consent=True),
+        ),
+    )
+    config = tmp_path / "settings.json"
+    config.write_text(json.dumps(to_dict(settings)), encoding="utf-8")
+    app = compose_headless_application(config)
+    drain = None
+    try:
+        await app.start()
+        control = app.control()
+        control.bind_instance("speaker-shutdown")
+        arguments = (
+            {"enabled": True, "profile": "0.64", "vulkan_device_id": "0"}
+            if command == "speaker.configure"
+            else {}
+        )
+        accepted = await control.submit(command, arguments, request_id=command)
+        await asyncio.wait_for(entered.wait(), 5)
+        control.freeze_ingress()
+        drain = asyncio.create_task(control.drain_operations())
+        await asyncio.wait_for(cancelled.wait(), 5)
+        assert not settled.is_set()
+        assert not drain.done()
+        release_cleanup.set()
+        await asyncio.wait_for(drain, 5)
+        assert settled.is_set()
+        receipt = await control.operation(accepted["operation_id"])
+        assert receipt["status"] == "interrupted"
+        assert receipt["terminal"] is True
+        assert (await control.query("speaker.status", {}))["speaker"]["runtime"] is None
+    finally:
+        release_cleanup.set()
+        if drain is not None:
+            await asyncio.gather(drain, return_exceptions=True)
+        await app.stop()
+    assert assets.closed

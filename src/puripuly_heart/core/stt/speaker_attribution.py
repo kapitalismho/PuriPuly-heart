@@ -119,7 +119,14 @@ def attribute_speaker(ranges, frames, immutable, *, replayed=()):
                 broken |= frame.span.discontinuity_before is not None
                 overlap |= len(frame.slots) > 1 or frame.competing
                 pieces.append(
-                    (span.capture_epoch, left, right, span.normalized_sample_rate_hz, frame, is_replay)
+                    (
+                        span.capture_epoch,
+                        left,
+                        right,
+                        span.normalized_sample_rate_hz,
+                        frame,
+                        is_replay,
+                    )
                 )
                 cursor = right
             missing |= cursor != end
@@ -140,7 +147,11 @@ def attribute_speaker(ranges, frames, immutable, *, replayed=()):
     longest = run = 0.0
     previous = None
     for capture, left, right, rate in sorted(ambiguity):
-        run = run + (right - left) / rate if previous == (capture, left, rate) else (right - left) / rate
+        run = (
+            run + (right - left) / rate
+            if previous == (capture, left, rate)
+            else (right - left) / rate
+        )
         longest = max(longest, run)
         previous = (capture, right, rate)
     exceeds = (
@@ -152,13 +163,15 @@ def attribute_speaker(ranges, frames, immutable, *, replayed=()):
         state = (
             "unavailable"
             if missing or broken
-            else "mixed"
-            if foreign_replay and exceeds
-            else "uncertain"
-            if (candidate is None and active_slots) or exceeds
-            else "unavailable"
-            if candidate is None
-            else "identified"
+            else (
+                "mixed"
+                if foreign_replay and exceeds
+                else (
+                    "uncertain"
+                    if (candidate is None and active_slots) or exceeds
+                    else "unavailable" if candidate is None else "identified"
+                )
+            )
         )
     return FinalSpeakerRun(
         "",

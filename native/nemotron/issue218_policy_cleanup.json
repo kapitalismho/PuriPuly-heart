@@ -501,7 +501,8 @@
     }
   ],
   "bytes_removed": 131109893,
-  "preserved": "AllZIPs, readable rootreports, reproducibledrivers, savedmeasurementsummary and everydirectPNG retained. Earlierissueevidence untouched.",
+  "preserved": "The 14 policy/renderer ZIPs, readable root reports, saved measurement summary and every direct PNG remain published. Earlier raw Gemini wire archives and exact executed drivers are retained locally only; see issue218_gemini_wire_archive_inventory.json publication disclosure. Four earlier presentation JSONs are labeled public derivatives with private execution-path prefixes removed. Current public Python drivers include style/import cleanup and are not byte-identical historical execution snapshots.",
+  "helper_hash_scope": "The following current_helpers hashes describe the original cleanup checkpoint, not the later formatted publication derivatives. Archived execution-source hashes and measured results are unchanged.",
   "current_helpers": {
     "native/nemotron/issue218_policy_visibility.py": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9",
     "native/nemotron/issue218_experiment.py": "a78bf35e3dc61eb4139f27ec6ed54062a7a98088dff38c0db0b84a12922dbe78",

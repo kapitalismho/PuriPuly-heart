@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Any, Literal
+from urllib.parse import urlsplit
 
 from puripuly_heart.config.alibaba_connection import workspace_api_host_region
 from puripuly_heart.core import network_clients
@@ -19,7 +20,6 @@ from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
     LEGACY_STT_SESSION_PROJECTION,
     RecoverableSTTSessionError,
-    STTAudioClock,
     STTBackend,
     STTBackendSession,
     STTBackendTranscriptEvent,
@@ -30,7 +30,6 @@ from puripuly_heart.core.stt.backend import (
     STTProviderTurnUpdate,
     STTSessionProjection,
     STTSourceCapabilities,
-    STTSourceRelease,
     STTTextContribution,
     STTTextTiming,
 )
@@ -43,6 +42,7 @@ from puripuly_heart.domain.recognition import (
     RecognitionStreamIdentity,
     RecognitionTextOrigin,
     RecognitionUnitIdentity,
+    recognition_separator_origin,
 )
 from puripuly_heart.providers.stt.qwen_audio_diagnostics import annotate_qwen_failure
 
@@ -197,6 +197,29 @@ class _QwenTaskCapture:
     context_only: bool
 
 
+def _source_capabilities(endpoint: str, model: str) -> STTSourceCapabilities:
+    try:
+        parsed = urlsplit(endpoint)
+        workspace = workspace_api_host_region(parsed.hostname or "")
+        mapped = (
+            model == QWEN_AUDIO_MODEL
+            and workspace is not None
+            and workspace[0] == "beijing"
+            and parsed.scheme == "wss"
+            and parsed.path == "/api-ws/v1/inference"
+            and not parsed.query
+            and not parsed.fragment
+            and parsed.username is None
+            and parsed.password is None
+            and parsed.port is None
+        )
+    except ValueError:
+        mapped = False
+    return STTSourceCapabilities(
+        "qwen_audio", model, "timed" if mapped else "unknown", optional_progress=False
+    )
+
+
 @dataclass(slots=True)
 class _QwenTask:
     task_id: str
@@ -217,13 +240,17 @@ class _QwenTask:
     text: str = ""
     origins: tuple[RecognitionTextOrigin, ...] = ()
     provenance: list[STTNativeProvenance] = field(default_factory=list)
+    contributions: list[STTTextContribution] = field(default_factory=list)
     final_wait: asyncio.Task[None] | None = None
+    capabilities: STTSourceCapabilities | None = None
+    sample_rate_hz: int = 0
 
 
 @dataclass(slots=True)
 class _QwenSlot:
     number: int
     websocket: Any = None
+    endpoint: str = ""
     receiver: asyncio.Task[None] | None = None
     task: _QwenTask | None = None
     finished_at_s: float | None = None
@@ -314,8 +341,6 @@ class _QwenAudioSession(STTBackendSession):
         self._next_slot = 1 - self._next_slot
         return task
 
-
-
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
         if request.channel != self.backend.channel:
             raise QwenAudioProtocolError("Qwen Audio channel ownership mismatch")
@@ -365,9 +390,10 @@ class _QwenAudioSession(STTBackendSession):
                         self.backend.websocket_factory or network_clients.external_websocket_connect
                     )
                     headers = {"Authorization": f"Bearer {self.backend.api_key}"}
+                    endpoint = self.backend.endpoint
                     try:
                         connection = factory(
-                            self.backend.endpoint,
+                            endpoint,
                             additional_headers=headers,
                             ping_interval=None,
                             open_timeout=self.backend.connect_timeout_s,
@@ -375,17 +401,21 @@ class _QwenAudioSession(STTBackendSession):
                             max_queue=2,
                         )
                     except TypeError:
-                        connection = factory(self.backend.endpoint, headers=headers)
+                        connection = factory(endpoint, headers=headers)
                     slot.websocket = await connection
+                    slot.endpoint = endpoint
                     if self._aborted:
                         await self._close_slot(slot)
                         raise QwenAudioProtocolError("Qwen Audio admission revoked")
                     slot.receiver = asyncio.create_task(
                         self._receive(slot), name=f"qwen-audio-receive:{slot.number}"
                     )
+                model = self.backend.model
+                task.capabilities = _source_capabilities(slot.endpoint, model)
+                task.sample_rate_hz = self.backend.sample_rate_hz
                 parameters: dict[str, object] = {
                     "format": "pcm",
-                    "sample_rate": self.backend.sample_rate_hz,
+                    "sample_rate": task.sample_rate_hz,
                     "semantic_punctuation_enabled": False,
                     "max_sentence_silence": 800 if self.backend.channel == "peer" else 6000,
                     "multi_threshold_mode_enabled": False,
@@ -411,7 +441,7 @@ class _QwenAudioSession(STTBackendSession):
                                 "task_group": "audio",
                                 "task": "asr",
                                 "function": "recognition",
-                                "model": self.backend.model,
+                                "model": model,
                                 "parameters": parameters,
                                 "input": {},
                             },
@@ -710,7 +740,7 @@ class _QwenAudioSession(STTBackendSession):
             timestamp_basis="task_relative_estimated",
             begin_time_ms=begin,
             end_time_ms=end,
-            input_sample_rate_hz=self.backend.sample_rate_hz,
+            input_sample_rate_hz=task.sample_rate_hz,
             task_input_samples=task.samples,
             timed_words=tuple(
                 NativeWordEvidence(
@@ -724,7 +754,9 @@ class _QwenAudioSession(STTBackendSession):
             ),
             audio_coverage=self._coverage(task, begin, end),
         )
-        size = native.retained_bytes + len(text.encode("utf-8")) + 128
+        size = (
+            native.retained_bytes + len(text.encode("utf-8")) + 384 + len(native.timed_words) * 128
+        )
         if (
             len(task.sentence_ids) >= QWEN_AUDIO_MAX_SENTENCES
             or task.metadata_bytes + size > QWEN_AUDIO_MAX_METADATA_BYTES
@@ -733,13 +765,57 @@ class _QwenAudioSession(STTBackendSession):
         task.sentence_ids.add(sentence_id)
         task.last_sentence_id = sentence_id
         task.metadata_bytes += size
-        start = len(task.text) + len(_separator(task.text, text))
-        task.text += _separator(task.text, text) + text
+        contribution_start = len(task.text)
+        separator = _separator(task.text, text)
+        if separator and task.origins:
+            task.origins += (recognition_separator_origin(task.origins[-1], len(task.text)),)
+        start = len(task.text) + len(separator)
+        task.text += separator + text
+        contribution = STTTextContribution(
+            f"{task.task_id}:sentence:{sentence_id}", contribution_start, len(task.text)
+        )
+        timings = [
+            STTTextTiming(
+                contribution.contribution_id,
+                contribution_start,
+                len(task.text),
+                "result_span",
+                begin,
+                end,
+                unit="ms",
+                clock_id=task.task_id,
+                complete_boundary=True,
+                estimated=True,
+            )
+        ]
+        cursor = 0
+        for word in native.timed_words:
+            word_text = (word.text or "") + (word.punctuation or "")
+            if not word_text or not text.startswith(word_text, cursor):
+                break
+            word_end = cursor + len(word_text)
+            timings.append(
+                STTTextTiming(
+                    contribution.contribution_id,
+                    start + cursor,
+                    start + word_end,
+                    "word_interval",
+                    word.begin_time_ms,
+                    word.end_time_ms,
+                    unit="ms",
+                    clock_id=task.task_id,
+                    estimated=True,
+                )
+            )
+            cursor = word_end
+        task.contributions.append(contribution)
         provenance = STTNativeProvenance(
             native_event_id=str(sentence_id),
             native_task_id=task.task_id,
             barrier="sentence_end",
             transcription=native,
+            capabilities=task.capabilities,
+            text_timing=tuple(timings),
         )
         task.provenance.append(provenance)
         identity = task.identity
@@ -778,6 +854,7 @@ class _QwenAudioSession(STTBackendSession):
                         "replace",
                         task.text,
                         provenance=provenance,
+                        contribution=contribution,
                         recognition_origins=task.origins,
                     )
                 ):
@@ -790,7 +867,7 @@ class _QwenAudioSession(STTBackendSession):
     def _coverage(
         self, task: _QwenTask, begin: float | None, end: float | None
     ) -> tuple[NativeAudioCoverage, ...]:
-        rate = self.backend.sample_rate_hz
+        rate = task.sample_rate_hz
         left = math.floor(begin * rate / 1000) if begin is not None else 0
         right = math.ceil(end * rate / 1000) if end is not None else task.samples
         coverage = []
@@ -854,6 +931,7 @@ class _QwenAudioSession(STTBackendSession):
                         ),
                     ),
                     recognition_origins=task.origins,
+                    included_contributions=tuple(task.contributions),
                     failure_diagnostics=(
                         recognition_failure_diagnostics(
                             task.failure,

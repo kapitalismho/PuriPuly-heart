@@ -629,6 +629,8 @@ async def test_installed_sdk_valid_callbacks_preserve_empty_and_cancellation_sem
         assert ended.failure_diagnostics is None
     finally:
         await session.close()
+
+
 def _timed_result(text: str, start: float, duration: float = 0.5, *, speaker: int = 1):
     result = _result(text)
     result.start = start

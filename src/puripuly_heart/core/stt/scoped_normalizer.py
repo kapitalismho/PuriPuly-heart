@@ -37,11 +37,9 @@ class STTScopedTurnNormalizer:
         identity: STTProviderTurnIdentity,
         *,
         diagnostic_sink: Callable[[STTNormalizationDiagnostic], object] | None = None,
-        preserve_text: bool = False,
     ) -> None:
         self.identity = identity
         self._diagnostic_sink = diagnostic_sink
-        self._preserve_text = preserve_text
         self._recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
         self._stable_text = ""
         self._stable_raw_text = ""
@@ -418,8 +416,6 @@ class STTScopedTurnNormalizer:
     ) -> tuple[FinalSpeakerRun, ...]:
         if not runs:
             return ()
-        if self._preserve_text and "".join(item.text for item in runs) == text:
-            return runs
         if "".join(item.text for item in runs) != text:
             self._diagnose("speaker_run_conservation_fallback")
             return (FinalSpeakerRun(text, None, "", attribution_state="malformed"),)

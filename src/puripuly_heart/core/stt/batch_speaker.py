@@ -76,6 +76,7 @@ class CausalBatchSession:
         self._epoch = None
         self._immutable = 0
         self._closed = False
+        self._cleanup_complete = False
         self._consumer = asyncio.create_task(self._consume(), name="causal-batch-results")
         self._lock = asyncio.Lock()
 
@@ -428,9 +429,7 @@ class CausalBatchSession:
                 span.capture_epoch == child.identity.segment.capture_epoch
                 for span in (*child.audio.source_ranges, *child.audio.context_ranges)
             )
-            else FinalSpeakerRun(
-                "", None, "", source="nemotron", attribution_state="unavailable"
-            )
+            else FinalSpeakerRun("", None, "", source="nemotron", attribution_state="unavailable")
         )
         child.audio = replace(child.audio, speaker_attribution=child.speaker.attribution)
 
@@ -444,7 +443,9 @@ class CausalBatchSession:
                         child = self._slices.pop(event.identity, None)
                         if child is not None:
                             if child.speaker is None:
-                                raise RuntimeError("native terminal did not snapshot speaker evidence")
+                                raise RuntimeError(
+                                    "native terminal did not snapshot speaker evidence"
+                                )
                             child.result = event
                             self._prune_frames()
                             await self._release()
@@ -505,11 +506,7 @@ class CausalBatchSession:
                 else (
                     "degraded"
                     if parent.failures and parent.text
-                    else "failed"
-                    if parent.failures
-                    else "final"
-                    if parent.text
-                    else "empty"
+                    else "failed" if parent.failures else "final" if parent.text else "empty"
                 )
             )
             self._events.put(
@@ -548,19 +545,32 @@ class CausalBatchSession:
         async for event in self._events.events():
             yield event
 
-    async def stop(self):
-        await self.inner.stop()
-        await self.close()
-
-    async def close(self):
-        if self._closed:
-            return
-        self._closed = True
-        await self.inner.close()
-        self._consumer.cancel()
+    async def _settle_consumer(self):
+        if not self._consumer.done():
+            self._consumer.cancel()
         await asyncio.gather(self._consumer, return_exceptions=True)
         self._parents.clear()
         self._slices.clear()
         self._frames.clear()
         self._submitted_ranges.clear()
         self._events.close()
+
+    async def stop(self):
+        self._closed = True
+        try:
+            await self.inner.stop()
+        except BaseException:
+            await self._settle_consumer()
+            raise
+        await self.close()
+
+    async def close(self):
+        if self._cleanup_complete:
+            return
+        self._closed = True
+        try:
+            await self.inner.close()
+            await asyncio.gather(self._consumer, return_exceptions=True)
+        finally:
+            await self._settle_consumer()
+        self._cleanup_complete = True

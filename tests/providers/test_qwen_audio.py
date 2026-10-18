@@ -260,7 +260,7 @@ async def test_finals_before_seal_repeats_and_drain_tail_are_conserved_exactly(c
             "  No.  ",
             " tail. ",
         ]
-        normalizer = STTScopedTurnNormalizer(req.identity, preserve_text=True)
+        normalizer = STTScopedTurnNormalizer(req.identity)
         ledger = STTContributionConsumptionLedger()
         consumed = []
         for event in events:

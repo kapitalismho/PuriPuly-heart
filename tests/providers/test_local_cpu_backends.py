@@ -185,9 +185,7 @@ async def test_local_cpu_scoped_decode_snapshots_pcm_and_emits_one_terminal(
         assert session._event_projection.scoped_event_depth == 0
         native_terminals.append(event)
 
-    request = replace(
-        _scoped_request(channel=channel), on_native_terminal=observe_native_terminal
-    )
+    request = replace(_scoped_request(channel=channel), on_native_terminal=observe_native_terminal)
     await session.begin_turn(request)
     await session.send_turn_audio(
         request.identity,

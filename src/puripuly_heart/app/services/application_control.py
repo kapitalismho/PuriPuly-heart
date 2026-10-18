@@ -1613,7 +1613,10 @@ class ApplicationControlOwner:
                                 canonical = self.settings.committed_settings
                                 if canonical is None:
                                     raise RuntimeError("settings not loaded")
-                                intent = replace(canonical.intent.speaker, **arguments)
+                                try:
+                                    intent = replace(canonical.intent.speaker, **arguments)
+                                except ValueError as exc:
+                                    raise InvalidArgumentsError("invalid speaker settings") from exc
                                 updated = replace(
                                     canonical, intent=replace(canonical.intent, speaker=intent)
                                 )
@@ -3011,7 +3014,9 @@ def _validate_command_args(command: str, args: dict, *, locale_choices: tuple[st
             if key in args and type(args[key]) is not bool:
                 raise InvalidArgumentsError("speaker consent/enablement must be boolean")
         try:
-            SpeakerIntent(profile=args.get("profile"), vulkan_device_id=args.get("vulkan_device_id"))
+            SpeakerIntent(
+                profile=args.get("profile"), vulkan_device_id=args.get("vulkan_device_id")
+            )
         except ValueError as exc:
             raise InvalidArgumentsError(str(exc)) from exc
         return

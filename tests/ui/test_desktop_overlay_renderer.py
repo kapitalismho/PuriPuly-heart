@@ -1923,7 +1923,8 @@ def test_desktop_overlay_caption_card_width_grows_only_within_same_block() -> No
     assert first_line_region.width == pytest.approx(shortened_applied.slots[0].card_text_width)
 
 
-def test_desktop_overlay_caption_card_width_resets_for_new_block_even_same_occupant() -> None:
+@pytest.mark.parametrize("reset", ["block", "appearance"])
+def test_desktop_overlay_caption_card_width_resets_for_new_identity(reset: str) -> None:
     window = desktop_overlay.FletDesktopRendererWindow()
 
     old_block = replace(
@@ -1938,7 +1939,7 @@ def test_desktop_overlay_caption_card_width_resets_for_new_block_even_same_occup
     )
     new_block = replace(
         _block(
-            "new-peer",
+            "new-peer" if reset == "block" else "old-peer",
             channel="peer",
             block_variant="finalized",
             appearance_seq=2,
@@ -3886,7 +3887,7 @@ async def test_desktop_overlay_render_page_applies_grow_only_card_width_to_visib
 
         await window.dispatch_snapshot(
             OverlayPresentationSnapshot(
-                revision=4, blocks=[replace(same_short_block, appearance_seq=3, card_revision=2)]
+                revision=4, blocks=[replace(same_short_block, card_revision=2)]
             )
         )
         shortened_width = _caption_card_controls(app.page)[0].width

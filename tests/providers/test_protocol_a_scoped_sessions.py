@@ -73,7 +73,6 @@ async def _next(session):
     return await asyncio.wait_for(anext(session.turn_events()), timeout=1)
 
 
-
 @pytest.mark.asyncio
 async def test_non_soniox_provider_does_not_add_audio_at_listen_hard_boundary(monkeypatch) -> None:
     writes: list[object] = []
@@ -518,7 +517,6 @@ async def test_soniox_empty_error_and_abort_receipts() -> None:
     with pytest.raises(RuntimeError):
         await aborted.begin_turn(_request("soniox", 2))
     await aborted.close()
-
 
 
 @pytest.mark.asyncio
@@ -1321,10 +1319,10 @@ async def test_actual_native_word_boundaries_partition_source_without_word_jobs(
         else:
             expected = ["Alpha, again!  ", "Beta, later."]
             if boundary_case == "crossing":
-                expected.insert(1, "crossing! ")
+                expected[0] += "crossing! "
             assert [source.raw_text for source in sources] == expected
             assert [source.speaker.speaker_id for source in sources] == (
-                ["0", None, "1"] if boundary_case == "crossing" else ["0", "1"]
+                [None, "1"] if boundary_case == "crossing" else ["0", "1"]
             )
             assert len(sources) < len(words)
         assert len(translation.calls) == len(sources)

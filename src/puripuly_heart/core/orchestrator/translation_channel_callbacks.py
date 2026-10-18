@@ -247,6 +247,9 @@ class TranslationChannelOwnerCallbacks:
         )
 
     async def peer_event_handler(self, event: object) -> None:
+        event = scoped_event_for_delivery(event)
+        if event is None:
+            return
         if isinstance(event, STTProviderAudioBoundary):
             async with self._recognition_locks["peer"]:
                 snapshot = self._require_peer_capture().provider_source_snapshot(event.identity)
@@ -270,6 +273,9 @@ class TranslationChannelOwnerCallbacks:
             return
         if isinstance(event, STTProviderTurnUpdate):
             async with self._recognition_locks["peer"]:
+                event = scoped_event_for_delivery(event)
+                if event is None:
+                    return
                 snapshot = self._require_peer_capture().provider_source_snapshot(event.identity)
                 if snapshot is not None and self._peer_provider_identity_is_current(event.identity):
                     await self._require_peer().handle_provider_turn_update(snapshot, event)
@@ -281,6 +287,7 @@ class TranslationChannelOwnerCallbacks:
             return
         if isinstance(event, STTProviderTurnTerminal):
             async with self._recognition_locks["peer"]:
+                event = scoped_event_for_delivery(event)
                 peer = self._require_peer()
                 if not self._peer_provider_identity_is_current(event.identity):
                     peer.retire_provider_turn(event.identity)
@@ -292,6 +299,8 @@ class TranslationChannelOwnerCallbacks:
                         final_language_runs=(),
                         final_speaker_runs=(),
                         included_contributions=(),
+                        recognition_origins=(),
+                        source_audio=(),
                     )
                 admissions = self._require_peer_capture().admit_provider_terminal(event)
                 if (

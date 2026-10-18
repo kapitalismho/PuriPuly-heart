@@ -770,7 +770,6 @@ class TestSpeechEndedTracking:
 
 
 class TestRuntimeLatencyLogging:
-
     @pytest.mark.asyncio
     async def test_low_latency_self_and_peer_success_paths_both_use_translate(
         self,
@@ -1667,12 +1666,9 @@ class TestSpecCommitPaths:
             assert osc.messages[-1].text == "translated zh-CN\ntranslated ja"
             assert len({message.utterance_id for message in osc.messages}) == 1
             assert [
-                (entry.text, entry.target_language)
+                (entry.text, entry.target_languages)
                 for entry in harness.self_runtime.translation_history
-            ] == [
-                ("hello", "zh-CN"),
-                ("hello", "ja"),
-            ]
+            ] == [("hello", ("zh-CN", "ja"))]
         finally:
             for release in llm.releases.values():
                 release.set()
@@ -1802,12 +1798,9 @@ class TestSpecCommitPaths:
             assert [call["target_language"] for call in new.calls] == ["zh-CN", "ja"]
             assert osc.messages[-1].text == "new\nnew"
             assert [
-                (entry.text, entry.target_language)
+                (entry.text, entry.target_languages)
                 for entry in harness.self_runtime.translation_history
-            ] == [
-                ("hello", "zh-CN"),
-                ("hello", "ja"),
-            ]
+            ] == [("hello", ("zh-CN", "ja"))]
         finally:
             for release in old.releases.values():
                 release.set()

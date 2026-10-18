@@ -17,6 +17,8 @@ from puripuly_heart.domain.recognition import (
     RecognitionStreamIdentity,
     RecognitionTextOrigin,
     RecognitionUnitIdentity,
+    slice_recognition_origins,
+    validate_recognition_origins,
 )
 
 
@@ -99,6 +101,7 @@ def contribution_transcript(
 ) -> Transcript:
     if snapshot.identity != event.identity.segment:
         raise ValueError("contribution source request identity mismatch")
+    validate_recognition_origins(event.recognition_origins, event.text)
     identity = event.identity
     text = "".join(piece.text for piece in pieces)
     unit_id = uuid5(
@@ -128,34 +131,60 @@ def contribution_transcript(
         )
         if event.source_audio and audio is None:
             raise ValueError("batch contribution has unresolved audio ownership")
-        origins.append(
-            RecognitionTextOrigin(
-                unit_identity,
-                offset,
-                offset + len(piece.text),
-                request_id=identity.provider_turn_id,
-                contribution_id=piece.contribution_id,
-                contribution_range=(piece.text_start, piece.text_end),
-                source_ranges=audio.source_ranges if audio is not None else snapshot.content_ranges,
-                context_ranges=(
-                    audio.context_ranges if audio is not None else snapshot.context_ranges
-                ),
-                display_group_id=(
-                    audio.display_group_id if audio is not None else snapshot.display_group_id
-                ),
-                source_binding="request_owned",
-                order_basis="capture_order",
-                ownership="request",
-                audio_settings=snapshot.settings,
-                source_available_at_monotonic_s=created_at,
-                speaker_attribution=audio.speaker_attribution if audio is not None else None,
-                native_provenance=(
-                    (event.provenance,)
-                    if isinstance(event, STTProviderTurnUpdate)
-                    else event.provenance
-                ),
-            )
+        request_origin = RecognitionTextOrigin(
+            unit_identity,
+            offset,
+            offset + len(piece.text),
+            request_id=identity.provider_turn_id,
+            contribution_id=piece.contribution_id,
+            contribution_range=(piece.text_start, piece.text_end),
+            source_ranges=audio.source_ranges if audio is not None else snapshot.content_ranges,
+            context_ranges=(audio.context_ranges if audio is not None else snapshot.context_ranges),
+            display_group_id=(
+                audio.display_group_id if audio is not None else snapshot.display_group_id
+            ),
+            source_binding="request_owned",
+            order_basis="capture_order",
+            ownership="request",
+            audio_settings=snapshot.settings,
+            source_available_at_monotonic_s=created_at,
+            speaker_attribution=audio.speaker_attribution if audio is not None else None,
+            native_provenance=(
+                (event.provenance,)
+                if isinstance(event, STTProviderTurnUpdate)
+                else event.provenance
+            ),
         )
+        if event.recognition_origins:
+            for origin in slice_recognition_origins(
+                event.recognition_origins, piece.text_start, piece.text_end
+            ):
+                if origin.source_binding == "composition":
+                    origins.append(
+                        replace(
+                            origin,
+                            text_start=offset + origin.text_start,
+                            text_end=offset + origin.text_end,
+                        )
+                    )
+                else:
+                    origins.append(
+                        replace(
+                            request_origin,
+                            identity=origin.identity,
+                            text_start=offset + origin.text_start,
+                            text_end=offset + origin.text_end,
+                            native=origin.native,
+                            source_binding=origin.source_binding,
+                            order_basis=origin.order_basis,
+                            contribution_range=(
+                                piece.text_start + origin.text_start,
+                                piece.text_start + origin.text_end,
+                            ),
+                        )
+                    )
+        else:
+            origins.append(request_origin)
         offset += len(piece.text)
 
     def sliced_runs(runs):

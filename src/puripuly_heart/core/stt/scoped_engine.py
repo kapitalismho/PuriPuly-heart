@@ -1056,7 +1056,6 @@ class ScopedRecognitionEngine:
             normalizer=STTScopedTurnNormalizer(
                 identity,
                 diagnostic_sink=self._normalization_diagnostic,
-                preserve_text=settings.provider_id == "qwen_audio",
             ),
             retention_profile=(
                 self.retention_profile_resolver(settings)

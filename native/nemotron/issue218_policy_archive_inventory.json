@@ -1437,7 +1437,7 @@
       "native/nemotron/issue218_policy_renderer_numeric_recovered/Deepgram_original_submissions",
       "native/nemotron/issue218_policy_renderer_numeric_recovered"
     ],
-    "preserved": "AllZIPs, readable rootreports, reproducibledrivers, savedmeasurementsummary and everydirectPNG retained. Earlierissueevidence untouched.",
+    "preserved": "The 14 policy/renderer ZIPs, readable root reports, saved measurement summary and every direct PNG remain published. Earlier raw Gemini wire archives and exact executed drivers are retained locally only; see issue218_gemini_wire_archive_inventory.json publication disclosure. Four earlier presentation JSONs are labeled public derivatives with private execution-path prefixes removed. Current public Python drivers include style/import cleanup and are not byte-identical historical execution snapshots.",
     "verification_ledger": "native/nemotron/issue218_policy_cleanup.json"
   },
   "renderer_only_boundary": "Exact previously real-translated source snapshots through current actual Flet; no new ASR/Gemma/cloud qualification, no backfilled E2Elatency, no product/Git/settings mutations. All further desktop/COM experiments stopped after final approved attempt.",
@@ -1448,6 +1448,7 @@
     "result": "Allarchivecontainerhashes, exactmembersets, memberSHA256/bytes and CRCs passed; allpresentdirectcopies matched archivedmembers."
   },
   "historical_execution_paths_note": "Historical command strings, savedsummary inputs and immutable rawtrace embedded paths remain execution-time paths. Currenttrace/counter/preflight/source-snapshot references use archive:member. Filesystem-based drivers require explicit extraction; all directPNG paths remain valid. No probes/modelcalls authorized by reproductionmetadata.",
+  "helper_hash_scope": "The following current_helpers hashes describe the original inventory checkpoint, not the later formatted publication derivatives. Archived execution-source hashes and measured results are unchanged.",
   "current_helpers": {
     "native/nemotron/issue218_policy_visibility.py": "7829a79ea828b924e73f328ac8cd9d4bcea044b37bafb896904deaded0dbedb9",
     "native/nemotron/issue218_experiment.py": "a78bf35e3dc61eb4139f27ec6ed54062a7a98088dff38c0db0b84a12922dbe78",

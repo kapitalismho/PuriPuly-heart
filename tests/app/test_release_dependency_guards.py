@@ -171,9 +171,7 @@ def test_production_export_keeps_matched_sherpa_native_pair(tmp_path: Path) -> N
         assert declared[name].specifier.contains(packages[name]["version"])
         assert any(
             wheel["url"].endswith(
-                "-cp314-cp314-win_amd64.whl"
-                if name == "sherpa-onnx"
-                else "-py3-none-win_amd64.whl"
+                "-cp314-cp314-win_amd64.whl" if name == "sherpa-onnx" else "-py3-none-win_amd64.whl"
             )
             and wheel["hash"].startswith("sha256:")
             for wheel in packages[name]["wheels"]
@@ -237,6 +235,7 @@ def test_packaged_sherpa_license_matches_locked_distribution(tmp_path: Path) -> 
     path.write_text("", encoding="utf-8")
     with pytest.raises(RuntimeError, match="is empty"):
         verify_packaged_license_payloads(tmp_path)
+
 
 def test_uv_lock_pins_soxr_version() -> None:
     uv_lock = (ROOT / "uv.lock").read_text(encoding="utf-8")

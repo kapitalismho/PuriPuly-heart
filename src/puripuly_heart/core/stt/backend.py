@@ -24,6 +24,7 @@ from puripuly_heart.domain.recognition import (
     RecognitionTextOrigin,
     RecognitionUnitIdentity,
     slice_recognition_origins,
+    validate_recognition_origins,
 )
 
 
@@ -365,10 +366,16 @@ class STTContributionConsumptionLedger:
             not event.identity.provider_epoch_id or not event.identity.provider_turn_id
         ):
             raise ValueError("source release requires provider request ownership")
-        if not self._remember_identity(event.identity):
+        segment = event.identity.segment
+        if event.identity not in self._known_identities and (
+            segment.activation_generation <= self._generation_floor
+            or segment.segment_order
+            <= self._retired_floor.get((segment.activation_generation, segment.capture_epoch), -1)
+        ):
             return ()
         if event.identity in self._consumed_terminal_tails:
             return ()
+        validate_recognition_origins(event.recognition_origins, event.text)
         if isinstance(event, STTProviderTurnUpdate):
             if event.stability != "stable":
                 if release is not None:
@@ -528,6 +535,8 @@ class STTContributionConsumptionLedger:
                 if len(merged) > 256:
                     raise ValueError("source split capacity exceeded")
                 commits.append((key, merged, (contribution.text_start, contribution.text_end)))
+        if not self._remember_identity(event.identity):
+            return ()
         for key, merged, declared in commits:
             self._consumed[key] = merged
             self._contribution_ranges[key] = declared

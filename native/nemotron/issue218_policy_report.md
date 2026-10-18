@@ -125,12 +125,12 @@ Across **42/42** valid-input cases: capture and declared native PCM mismatches 0
 
 Speaker peaks: pending 18,432 samples / 17 items; retained map pieces 38; evidence queue 148; evidence evictions/overloads 0; maximum copy 512 samples; pending 0 at drain. The 300 Windows 1 s counter samples had no invalid values. Adapter dedicated-memory sampled peak was 11,329,855,488 bytes; shared peak 2,308,300,800 bytes. Counters include surrounding applications; they are not isolated inference GPU timestamps or whole-host peak-VRAM qualification. Per-process samples, exact queues and native output are retained.
 
-Four invalid task-driver attempts are separated in archives: missing local backend `provider_id`, new-live-VAD/historical receipt cursor mismatch, parallel capture availability mismatch, and omitted current scoped normalizer. None is reported as a provider/product failure or a valid acoustic case. All 14 owned ZIPs passed container SHA-256, exact member-set, member SHA-256/byte-count and CRC verification, including 14 nested execution-source ZIPs. After current readers finished, **18 byte-equivalent non-PNG direct copies (131,109,893 bytes)** were removed; all ZIPs, every direct PNG, root reports, saved summary and drivers remain. Earlier issue evidence was untouched. The [cleanup ledger](issue218_policy_cleanup.json) records exact removed paths and archive-member replacements.
+Four invalid task-driver attempts are separated in archives: missing local backend `provider_id`, new-live-VAD/historical receipt cursor mismatch, parallel capture availability mismatch, and omitted current scoped normalizer. None is reported as a provider/product failure or a valid acoustic case. All 14 owned policy/renderer ZIPs passed container SHA-256, exact member-set, member SHA-256/byte-count and CRC verification, including 14 nested execution-source ZIPs. After current readers finished, **18 byte-equivalent non-PNG direct copies (131,109,893 bytes)** were removed; those 14 ZIPs, every direct PNG, root reports and saved summary remain public. The [cleanup ledger](issue218_policy_cleanup.json) records exact removed paths and archive-member replacements. Separately, the three earlier raw Gemini wire archives and their exact executed drivers remain local-only; see the [publication disclosure](issue218_gemini_wire_archive_inventory.json). Four earlier presentation JSONs are labeled path-sanitized public derivatives. Original local evidence and historical measurements are retained.
 
 - [Per-source/latency/provenance summary](issue218_policy_summary.json)
 - [Complete compact outcome ledger](issue218_policy_report.json)
 - [Commands and failed attempts](issue218_policy_attempts.json)
-- [Exact archive/current-driver/source-snapshot hashes](issue218_policy_archive_inventory.json)
+- [Exact archive/source-snapshot and historical helper hashes](issue218_policy_archive_inventory.json)
 
 Valid raw trace SHA-256:
 
@@ -161,7 +161,7 @@ These are historical execution commands. Their original direct trace paths, incl
 - Each run's counters, preflight and source snapshot are the same ZIP's `gpu_counters.jsonl`, `preflight.json` and `execution_sources.zip` members where present.
 - Each renderer attempt's trace/source snapshot is `native/nemotron/<attempt-name>.zip:trace.json` / `:execution_sources.zip`; exact names and hashes are in the findings/inventory. Direct PNG links above remain unchanged.
 
-The existing filesystem-based drivers are retained unchanged; archive members must be explicitly extracted before supplying their `--trace`, `--gpu-trace` or `--recorded-trace` paths. Their historical default input paths require equivalent extraction to those original locations. No renderer/model execution is authorized by this reproduction metadata.
+Current public filesystem-based drivers include style/import cleanup; they are not byte-identical historical execution snapshots. Use archived execution sources when exact reproduction is required. Archive members must be explicitly extracted before supplying `--trace`, `--gpu-trace` or `--recorded-trace` paths. Historical default input paths require equivalent extraction to those original locations. No renderer/model execution is authorized by this reproduction metadata.
 
 Offline summary reproduction from the two archived valid traces:
 

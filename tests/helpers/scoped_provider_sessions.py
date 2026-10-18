@@ -60,7 +60,14 @@ async def _wait(predicate) -> None:
     raise AssertionError("condition not reached")
 
 
-def _deepgram_result(text: str, *, from_finalize: bool = False, is_final: bool = True):
+def _deepgram_result(
+    text: str,
+    *,
+    from_finalize: bool = False,
+    is_final: bool = True,
+    start: float = 0.0,
+    duration: float = 0.1,
+):
     from deepgram.extensions.types.sockets import ListenV1ResultsEvent
     from deepgram.extensions.types.sockets.listen_v1_results_event import (
         ListenV1Alternative,
@@ -72,8 +79,8 @@ def _deepgram_result(text: str, *, from_finalize: bool = False, is_final: bool =
     return ListenV1ResultsEvent(
         type="Results",
         channel_index=[0, 1],
-        duration=0.1,
-        start=0.0,
+        duration=duration,
+        start=start,
         is_final=is_final,
         speech_final=False,
         channel=ListenV1Channel(
@@ -244,13 +251,13 @@ class _FakeScribeConnection:
         self.closed = True
 
 
-def _scribe_session(*, order: int = 1, epoch: str | None = None):
+def _scribe_session(*, order: int = 1, epoch: str | None = None, model: str = "model"):
     connection = _FakeScribeConnection()
     session = _ElevenLabsScribeSession(
         api_key="k",
         language_code="en",
         keyterms=(),
-        model="model",
+        model=model,
         sample_rate_hz=16000,
         connect_timeout_s=10.0,
         projection=STTSessionProjection(

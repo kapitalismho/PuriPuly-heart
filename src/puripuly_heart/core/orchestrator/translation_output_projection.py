@@ -24,6 +24,7 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
     TranslationReadyDiagnostic,
 )
 from puripuly_heart.core.orchestrator.translation_turn import (
+    SourceChild,
     TranslationOutputSubmission,
     TranslationTurnChild,
     TranslationTurnOutcome,
@@ -1353,6 +1354,7 @@ class TranslationOutputProjectionOwner:
         config_snapshot: TranslationRuntimeConfigSnapshot,
         *,
         source: str,
+        source_child: SourceChild | None = None,
     ) -> None:
         key = (snapshot.turn_generation, snapshot.turn_order)
         parent_utterance_id = snapshot.utterance_id
@@ -1431,6 +1433,13 @@ class TranslationOutputProjectionOwner:
                                 is_final=True,
                                 created_at=snapshot.created_at,
                                 channel="self",
+                                source_child=source_child,
+                                source_text_revision=(
+                                    source_child.revision if source_child is not None else None
+                                ),
+                                recognition_origins=(
+                                    source_child.origins if source_child is not None else ()
+                                ),
                             ),
                             source_language=(
                                 ready.source_language

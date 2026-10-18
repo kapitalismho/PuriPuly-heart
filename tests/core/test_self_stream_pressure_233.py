@@ -131,7 +131,8 @@ async def test_existing_generic_final_fallback_once_keeps_target_obligations(tar
         assert all(target.status == "ready" for target in final.targets)
         assert [entry.text for entry in harness.self_runtime.translation_history] == [
             "failure recovery"
-        ] * len(targets)
+        ]
+        assert harness.self_runtime.translation_history[0].target_languages == targets
     finally:
         await harness.stop()
 
@@ -828,8 +829,10 @@ async def test_open_draft_wakeup_preserves_only_existing_secondary_eligibility(
         for target in ("en", "ja"):
             provider.release(texts[2], target)
         await until(
-            lambda: sum(call["text"] == texts[3] for call in provider.calls)
-            == (2 if eligible_before_release else 1)
+            lambda: (
+                sum(call["text"] == texts[3] for call in provider.calls)
+                == (2 if eligible_before_release else 1)
+            )
         )
         assert harness.self_owner.merge_buffer is not None
         assert texts[3] not in [entry.text for entry in harness.self_runtime.translation_history]
@@ -850,7 +853,8 @@ async def test_open_draft_wakeup_preserves_only_existing_secondary_eligibility(
         ]
         assert [entry.text for entry in harness.self_runtime.translation_history].count(
             texts[3]
-        ) == 2
+        ) == 1
+        assert harness.self_runtime.translation_history[-1].target_languages == ("en", "ja")
         assert provider.active == 4 and semaphore._value == 2 and provider.peak == 6
         assert provider.cancelled == []
     finally:

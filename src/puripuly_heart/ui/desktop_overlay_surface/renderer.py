@@ -1015,8 +1015,8 @@ def _caption_slot_with_dynamic_width(
     return replace(slot, card_width=card_width, card_text_width=card_text_width)
 
 
-def _caption_card_width_memory_key(slot: DesktopCaptionSlot) -> tuple[str, str]:
-    return (slot.block_id, slot.occupant_key)
+def _caption_card_width_memory_key(slot: DesktopCaptionSlot) -> tuple[str, str, int]:
+    return (slot.block_id, slot.occupant_key, slot.appearance_seq)
 
 
 def _caption_plan_with_fitted_fonts(

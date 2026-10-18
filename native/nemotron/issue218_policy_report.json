@@ -4555,7 +4555,7 @@
         "sha256": "7af7b60e0560889295b4b63193123f047db9f99f26d701d33acccf50f415507d"
       }
     ],
-    "serialization": "Actual UTF8 LF sanitized trace bytes and exact execution source snapshots hashed/archive retained; current driver hashes separately recorded. Original prior evidence/drivers preserved unchanged.",
+    "serialization": "Actual UTF8 LF sanitized policy/renderer trace bytes and exact execution source snapshots remain hashed in the 14 published archives. Recorded current-driver hashes describe their historical checkpoint, not later formatted publication derivatives. Original prior evidence is retained locally; three raw Gemini wire ZIPs and their executed drivers are local-only, and four presentation JSONs are labeled path-sanitized public derivatives. See issue218_gemini_wire_archive_inventory.json publication disclosure. No historical measurement or archive hash is relabeled.",
     "cleanup": {
       "earlier_cleanup": {
         "removed_after_archival": [

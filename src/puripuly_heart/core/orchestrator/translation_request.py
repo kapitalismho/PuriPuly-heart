@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
@@ -42,14 +41,15 @@ from puripuly_heart.core.orchestrator.translation_diagnostics import (
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import TranslationUiMessage
 from puripuly_heart.core.orchestrator.translation_turn import (
-    TerminalTranslationFailure,
     SourceChild,
+    TerminalTranslationFailure,
     TranslationOutputSubmission,
     TranslationTurnKind,
     TranslationTurnOutcome,
     TranslationTurnProcessResult,
 )
 from puripuly_heart.core.translation_backend import (
+    LlmTranslationBackend,
     TranslationBackend,
     TranslationBackendRequest,
 )
@@ -158,6 +158,8 @@ class TranslationRequestPort(Protocol):
     def admit(
         self,
         requests: tuple[TranslationProcessRequest, ...],
+        *,
+        prepared: Mapping[UUID, PreparedTranslationRequest] | None = None,
     ) -> Mapping[UUID, PreparedTranslationRequest]: ...
 
     def capture_terminal_failure(
@@ -313,9 +315,9 @@ class TranslationRequestOwner:
     clock: Clock
     scene_provider: SceneSnapshotProvider | None = None
     settled_failure_sink: Callable[[BaseException], None] | None = None
-    _source_requests: OrderedDict[
-        tuple[ChannelId, UUID], dict[str, PreparedTranslationRequest]
-    ] = field(default_factory=OrderedDict, init=False, repr=False)
+    _source_requests: OrderedDict[tuple[ChannelId, UUID], dict[str, PreparedTranslationRequest]] = (
+        field(default_factory=OrderedDict, init=False, repr=False)
+    )
     _source_orders: dict[ChannelId, tuple[int, int, int]] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -504,6 +506,8 @@ class TranslationRequestOwner:
     def admit(
         self,
         requests: tuple[TranslationProcessRequest, ...],
+        *,
+        prepared: Mapping[UUID, PreparedTranslationRequest] | None = None,
     ) -> Mapping[UUID, PreparedTranslationRequest]:
         grouped: dict[tuple[ChannelId, UUID], list[TranslationProcessRequest]] = {}
         for request in requests:
@@ -527,25 +531,30 @@ class TranslationRequestOwner:
                 source.channel, (-1, -1, -1)
             ):
                 raise ValueError("source admission order is retired")
-            prepared_attempts: list[tuple[TranslationProcessRequest, PreparedTranslationRequest]] = []
+            prepared_attempts: list[
+                tuple[TranslationProcessRequest, PreparedTranslationRequest]
+            ] = []
             for request in attempts:
                 if not request.precomputed and (
-                    not self.provider_available or not self.translation_enabled_for(
+                    not self.provider_available
+                    or not self.translation_enabled_for(
                         request.channel, request.config_snapshot.value
                     )
                 ):
                     continue
                 try:
-                    item = self.prepare(
-                        request.text,
-                        channel=request.channel,
-                        detected_language=request.detected_language,
-                        target_language=request.target_language,
-                        context_policy=request.context_policy,
-                        config_snapshot=request.config_snapshot,
-                        parent_utterance_id=request.parent_utterance_id,
-                        target_index=request.target_index,
-                    )
+                    item = prepared.get(request.utterance_id) if prepared is not None else None
+                    if item is None:
+                        item = self.prepare(
+                            request.text,
+                            channel=request.channel,
+                            detected_language=request.detected_language,
+                            target_language=request.target_language,
+                            context_policy=request.context_policy,
+                            config_snapshot=request.config_snapshot,
+                            parent_utterance_id=request.parent_utterance_id,
+                            target_index=request.target_index,
+                        )
                     item = replace(item, provider_generation=self.provider_generation)
                 except _UnmappedDetectedLanguage:
                     continue
@@ -559,11 +568,13 @@ class TranslationRequestOwner:
                 timestamp=item.requested_at,
                 source_language=item.source_language,
                 target_language=item.target_language,
-                target_languages=tuple(dict.fromkeys(
-                    prepared.target_language for _, prepared in prepared_attempts
-                )),
+                target_languages=tuple(
+                    dict.fromkeys(prepared.target_language for _, prepared in prepared_attempts)
+                ),
                 origin=request.turn_kind,
-                source_id=request.source_child.source_id if request.source_child is not None else None,
+                source_id=(
+                    request.source_child.source_id if request.source_child is not None else None
+                ),
                 max_entries=max(
                     configuration.context_max_entries,
                     configuration.integrated_context_max_entries,
