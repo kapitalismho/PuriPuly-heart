@@ -34,6 +34,9 @@ from puripuly_heart.core.messages import (
     DiagnosticFieldValue,
     ErrorDiagnostics,
 )
+from puripuly_heart.core.openrouter.openrouter_credentials import (
+    clear_failed_managed_credential_projection,
+)
 from puripuly_heart.core.owned_thread import run_owned_thread_call
 
 ACK_SOURCE_DISCORD = "discord"
@@ -126,6 +129,18 @@ class ManagedKeyDeliveryAckService:
                 observed.diagnostics or receipt.diagnostics,
             )
         return ManagedCredentialBinding.decode(receipt.value), observed.value
+
+    async def clear_failed_credential_projection(self, source: str) -> None:
+        state = self.managed_state
+        if (
+            not state.active_managed_credential_ref
+            or state.pending_managed_operation_source != source
+        ):
+            return
+        binding, credential = await self.credential_binding(source)
+        clear_failed_managed_credential_projection(
+            state, source=source, binding=binding, credential=credential
+        )
 
     async def store_pending(self, metadata: ManagedKeyDeliveryAckMetadata) -> None:
         key = secret_key_for_ack_source(metadata.source)

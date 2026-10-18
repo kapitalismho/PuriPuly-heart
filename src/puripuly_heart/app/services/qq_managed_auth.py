@@ -383,7 +383,7 @@ class QqManagedAuthService:
                     secret_write_succeeded=True,
                     settings_commit_succeeded=True,
                 )
-            await self._clear_qq_operation()
+            await self._clear_qq_operation(preserve_active_credential=True)
             return TransactionResult(
                 status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                 message=_message("qq_managed_auth.success", severity=SEVERITY_INFO),
@@ -526,12 +526,17 @@ class QqManagedAuthService:
         return DEFAULT_STATUS_POLL_INTERVAL_MS
 
     async def _clear_qq_operation(
-        self, *, primary: ErrorDiagnostics | None = None
+        self,
+        *,
+        primary: ErrorDiagnostics | None = None,
+        preserve_active_credential: bool = False,
     ) -> tuple[ErrorDiagnostics, ...]:
         causes = ()
         cleared = False
         previous = self.managed_state.snapshot()
         try:
+            if not preserve_active_credential:
+                await self._delivery_ack_service().clear_failed_credential_projection(ACK_SOURCE_QQ)
             cleared = clear_pending_operation_if_source(
                 self.managed_state, MANAGED_OPERATION_SOURCE_QQ
             )
@@ -1002,7 +1007,7 @@ class QqManagedAuthService:
             except Exception as exc:
                 _observe_qq_failure("managed_recovery", exc)
                 return _qq_operation_recovery_pending_result(request, operation=operation, polls=0)
-        await self._clear_qq_operation()
+        await self._clear_qq_operation(preserve_active_credential=True)
         return _qq_operation_active_recovered_result(request, operation=operation, probe=probe)
 
     async def _recover_qq_acknowledge_delivery(
@@ -1033,7 +1038,7 @@ class QqManagedAuthService:
                         return _qq_operation_recovery_pending_result(
                             request, operation=operation, polls=0
                         )
-                await self._clear_qq_operation()
+                await self._clear_qq_operation(preserve_active_credential=True)
                 return TransactionResult(
                     status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                     message=(
@@ -1159,7 +1164,7 @@ class QqManagedAuthService:
                 secondary_diagnostics=ack_result.secondary_diagnostics,
                 secondary_omitted_count=ack_result.secondary_omitted_count,
             )
-        await self._clear_qq_operation()
+        await self._clear_qq_operation(preserve_active_credential=True)
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
             message=_message("qq_managed_auth.success", severity=SEVERITY_INFO),

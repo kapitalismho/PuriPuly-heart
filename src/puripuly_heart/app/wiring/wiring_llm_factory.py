@@ -78,10 +78,9 @@ from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     OpenRouterCredentialRuntimeConfig,
     load_managed_openrouter_user_identifier,
+    resolve_openrouter_credentials,
 )
 from puripuly_heart.core.openrouter_routing import (
     OpenRouterProviderRouting,
@@ -117,6 +116,9 @@ class LlmFactoryManagedIdentity:
     active_managed_credential_ref: str | None = None
     active_managed_expires_at: str | None = None
     local_managed_claim_sources: tuple[str, ...] = ()
+    pending_managed_operation_id: str | None = None
+    pending_managed_operation_source: str | None = None
+    pending_delivery_ack_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,6 +136,9 @@ def llm_factory_extras_from_vnext(settings: AppSettingsVNext) -> LlmFactoryResol
             active_managed_credential_ref=identity.active_managed_credential_ref,
             active_managed_expires_at=identity.active_managed_expires_at,
             local_managed_claim_sources=tuple(identity.local_managed_claim_sources),
+            pending_managed_operation_id=identity.pending_managed_operation_id,
+            pending_managed_operation_source=identity.pending_managed_operation_source,
+            pending_delivery_ack_source=identity.pending_delivery_ack_source,
         ),
         gpu_device_id=settings.intent.translation.gpu_device_id,
     )
@@ -318,27 +323,6 @@ def _require_openrouter_byok_api_key(secrets: SecretStore) -> str:
     )
 
 
-def _openrouter_managed_api_key(
-    secrets: SecretStore,
-    credential: ResolvedCredentialRequirement,
-) -> str | None:
-    requested_secret_key = _openrouter_managed_api_key_secret_for_resolved_credential(credential)
-    opposite_secret_key = _opposite_openrouter_managed_api_key_secret(requested_secret_key)
-    requested_value = _normalize_secret_value(secrets.get(requested_secret_key))
-    opposite_value = _normalize_secret_value(secrets.get(opposite_secret_key))
-    if opposite_value is not None:
-        raise ValueError("OpenRouter managed local claim conflict")
-    return requested_value
-
-
-def _openrouter_managed_api_key_secret_for_resolved_credential(
-    credential: ResolvedCredentialRequirement,
-) -> str:
-    if credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ:
-        return OPENROUTER_MANAGED_QQ_API_KEY_SECRET
-    return OPENROUTER_MANAGED_API_KEY_SECRET
-
-
 def _managed_claim_source_for_resolved_credential(
     credential: ResolvedCredentialRequirement,
 ) -> str:
@@ -360,12 +344,6 @@ def _extras_have_opposite_managed_claim_source(
         )
         is not None
     )
-
-
-def _opposite_openrouter_managed_api_key_secret(secret_key: str) -> str:
-    if secret_key == OPENROUTER_MANAGED_QQ_API_KEY_SECRET:
-        return OPENROUTER_MANAGED_API_KEY_SECRET
-    return OPENROUTER_MANAGED_QQ_API_KEY_SECRET
 
 
 def _guarded_managed_release_service_for_claim(
@@ -498,6 +476,15 @@ def _openrouter_credential_config_from_resolved_fields(
         ),
         active_managed_expires_at=(
             None if identity is None else identity.active_managed_expires_at
+        ),
+        pending_managed_operation_id=(
+            None if identity is None else identity.pending_managed_operation_id
+        ),
+        pending_managed_operation_source=(
+            None if identity is None else identity.pending_managed_operation_source
+        ),
+        pending_delivery_ack_source=(
+            None if identity is None else identity.pending_delivery_ack_source
         ),
     )
 
@@ -638,7 +625,7 @@ def _openrouter_provider_from_resolved_fields(
             secrets=secrets,
             credential=credential,
         )
-        managed_api_key = _openrouter_managed_api_key(secrets, credential)
+        managed_api_key = resolve_openrouter_credentials(credential_config, secrets=secrets).api_key
         if force_managed_wrapper or managed_api_key is None:
             from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 

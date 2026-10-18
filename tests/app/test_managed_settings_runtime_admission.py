@@ -90,6 +90,12 @@ from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.core.translation_backend import LlmTranslationBackend
 from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
+from tests.app import test_active_byok_secret_application as active_byok
+from tests.app.test_active_byok_secret_application import (
+    NEW_CREDENTIAL,
+    ROUTES,
+    _assert_live_request,
+)
 from tests.core.runtime.test_local_asr_provider_runtime import (
     GPU_DEVICE,
     FakeGpuRuntime,
@@ -99,6 +105,7 @@ from tests.core.runtime.test_peer_capture_session import FakeSource, FakeVadSink
 
 REFERENCE = "admission-reference-258"
 LATER_REFERENCE = "later-admission-reference-258"
+app_composed = active_byok.composed
 
 
 async def _nothing(*args, **kwargs):
@@ -843,6 +850,127 @@ async def test_actual_gemma_factory_admits_override_but_disposes_retired_constru
         assert context.owner.require_canonical() is selected
         assert context.owner.require_committed() is selected
         assert context.owner.path.read_bytes() == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("persist", [True, False], ids=["committed", "ephemeral"])
+async def test_mixed_effects_admit_current_commit_or_explicit_snapshot_without_losing_authority(
+    app_composed, monkeypatch, persist, tmp_path
+):
+    home = tmp_path / "home"
+    home.mkdir()
+    for key in (
+        "HOME",
+        "USERPROFILE",
+        "APPDATA",
+        "LOCALAPPDATA",
+        "TEMP",
+        "TMP",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+    ):
+        monkeypatch.setenv(key, str(home))
+    route = ROUTES[-1]
+    async with app_composed(route, initial=NEW_CREDENTIAL) as (app, _store, requests, path):
+        owner = app.control().settings
+        identity = CanonicalManagedIdentityStateAdapter(owner)
+        identity.active_managed_credential_ref = REFERENCE
+        await run_owned_thread_call(identity.persist)
+        initial = owner.require_committed()
+        requested = replace(
+            initial,
+            intent=replace(
+                initial.intent,
+                translation=replace(initial.intent.translation, concurrency_limit=3),
+                ui=replace(initial.intent.ui, locale="ja"),
+            ),
+        )
+        application = app._settings.application
+        effects = application.runtime_effects
+        provider_runtime = application.provider_runtime
+        entered, release = asyncio.Event(), asyncio.Event()
+        original_effects = type(effects).apply_after_persist
+        original_common = provider_runtime.common_effect
+        admitted = []
+
+        async def hold_after_effects(runtime, transition, **kwargs):
+            await original_effects(runtime, transition, **kwargs)
+            if runtime is effects:
+                entered.set()
+                await release.wait()
+
+        def observe_admission(settings):
+            admitted.append(settings)
+            original_common(settings)
+
+        monkeypatch.setattr(type(effects), "apply_after_persist", hold_after_effects)
+        monkeypatch.setattr(provider_runtime, "common_effect", observe_admission)
+        if persist:
+            operation = asyncio.create_task(app.apply_settings(requested, provider_requested=True))
+        else:
+            plan = provider_runtime.build_plan(requested, force_rebuild_llm=True)
+            operation = asyncio.create_task(
+                application.apply_direct(requested, persist=False, provider_plan=plan)
+            )
+        try:
+            await asyncio.wait_for(entered.wait(), 5)
+            assert not admitted
+            identity = CanonicalManagedIdentityStateAdapter(owner)
+            identity.active_managed_credential_ref = LATER_REFERENCE
+            await run_owned_thread_call(identity.persist)
+            current = owner.require_committed()
+            await owner.commit_delta_async(
+                current,
+                replace(
+                    current,
+                    intent=replace(
+                        current.intent,
+                        translation=replace(current.intent.translation, concurrency_limit=5),
+                    ),
+                ),
+            )
+            latest = owner.require_committed()
+            latest_bytes = path.read_bytes()
+        finally:
+            release.set()
+            completed = await asyncio.wait_for(operation, 5)
+        assert completed
+        expected = 5 if persist else 3
+        assert len(admitted) == 1
+        assert admitted[0].intent.translation.concurrency_limit == expected
+        assert (
+            app.control()
+            .pipeline.translation_runtime_configuration.snapshot()
+            .value.concurrency_limit
+            == expected
+        )
+        if persist:
+            assert admitted[0] is latest
+            assert (
+                admitted[0].state.managed_connection.active_managed_credential_ref
+                == LATER_REFERENCE
+            )
+        else:
+            assert admitted[0].intent.translation == requested.intent.translation
+        backend = app.control().pipeline.llm_runtime.provider
+        assert isinstance(backend, LlmTranslationBackend)
+        semaphore = backend.provider.semaphore
+        for _ in range(expected):
+            await asyncio.wait_for(semaphore.acquire(), 1)
+        assert semaphore.locked()
+        for _ in range(expected):
+            semaphore.release()
+        await _assert_live_request(app, route, NEW_CREDENTIAL, requests)
+        assert owner.require_canonical() is latest
+        assert owner.require_committed() is latest
+        assert path.read_bytes() == latest_bytes
+        fresh = SettingsVNextCanonicalPersistenceAdapter().load_active(path).canonical_settings
+        for settings in (latest, fresh):
+            assert (
+                settings.state.managed_connection.active_managed_credential_ref == LATER_REFERENCE
+            )
+            assert settings.intent.translation.concurrency_limit == 5
+            assert settings.intent.ui.locale == ("ja" if persist else initial.intent.ui.locale)
 
 
 @pytest.mark.asyncio

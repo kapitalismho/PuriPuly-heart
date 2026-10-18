@@ -22,6 +22,7 @@ from puripuly_heart.core.openrouter_credentials import (
 )
 
 from puripuly_heart.app import wiring_llm_factory
+from puripuly_heart.app.services.managed.managed_operation import new_managed_operation_id
 from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
 from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
@@ -40,6 +41,11 @@ from puripuly_heart.config.runtime_resolution import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+    managed_key_secret,
+)
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
@@ -464,3 +470,60 @@ async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_
     finally:
         finish.set()
         await asyncio.gather(*tasks, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize(
+    "authority", ["missing_view", "unacknowledged", "pending", "acknowledged", "legacy"]
+)
+async def test_real_managed_factory_obeys_canonical_credential_proof(source, authority):
+    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+
+    settings = _managed_china_settings() if source == "qq" else _managed_settings()
+    operation = new_managed_operation_id()
+    managed = replace(
+        settings.state.managed_connection,
+        installation_id="synthetic-installation",
+        active_managed_credential_ref=(
+            None if authority in {"unacknowledged", "legacy"} else "synthetic-ref"
+        ),
+    )
+    if authority == "pending":
+        managed = replace(
+            managed,
+            pending_managed_operation_id=operation,
+            pending_managed_operation_source=source,
+            pending_managed_operation_installation_id=managed.installation_id,
+            pending_managed_operation_state="DELIVERY_PENDING",
+        )
+    settings = replace(settings, state=replace(settings.state, managed_connection=managed))
+    secrets = InMemorySecretStore()
+    secrets.set(managed_key_secret(source), "synthetic-key")
+    if authority != "legacy":
+        secrets.set(
+            credential_binding_secret(source),
+            ManagedCredentialBinding.create(
+                source=source,
+                installation_id=managed.installation_id,
+                operation_id=operation,
+                delivery_id="synthetic-delivery",
+                managed_credential_ref="synthetic-ref",
+                credential="synthetic-key",
+            ).encode(),
+        )
+    provider = create_llm_provider_from_resolved_config(
+        _managed_china_resolved_config() if source == "qq" else _standard_managed_resolved_config(),
+        secrets=secrets,
+        managed_release_service=object(),
+        extras=None if authority == "missing_view" else llm_factory_extras_from_vnext(settings),
+    )
+    try:
+        assert isinstance(provider, SemaphoreLLMProvider)
+        if authority in {"acknowledged", "legacy"}:
+            assert isinstance(provider.inner, OpenRouterLLMProvider)
+            assert provider.inner.api_key == "synthetic-key"
+        else:
+            assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
+    finally:
+        await provider.close()

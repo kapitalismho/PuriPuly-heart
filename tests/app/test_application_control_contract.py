@@ -850,7 +850,7 @@ async def test_mixed_provider_interruption_retains_commit_without_claiming_runti
         initial_provider = control.pipeline.llm_runtime.provider
         entered = asyncio.Event()
 
-        async def block_rebuild():
+        async def block_rebuild(_settings):
             entered.set()
             await asyncio.Event().wait()
 

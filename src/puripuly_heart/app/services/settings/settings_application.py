@@ -1179,7 +1179,9 @@ class SettingsApplicationOwner:
             if provider_plan is not None and self.provider_runtime is not None:
                 runtime_result = await ProviderRuntimeApplyAdapter(
                     owner=self.provider_runtime,
-                    settings=transition.settings,
+                    settings_provider=(
+                        self.settings.require_committed if persist else lambda: transition.settings
+                    ),
                     plan=provider_plan,
                 ).apply_runtime(
                     RuntimeApplyRequest(

@@ -1664,3 +1664,194 @@ async def test_reconstructed_ack_metadata_commit_settles_before_cancellation(
         assert broker.ack_observations == [(True, True)]
     finally:
         await release.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("consumer", ["factory", "core"])
+@pytest.mark.parametrize("metadata", ["missing", "staged"])
+async def test_terminal_delivery_never_promotes_retained_key_on_repeat_or_restart(
+    isolated_home, source, consumer, metadata
+):
+    owner, store, boundary, broker, release, adapter = component(isolated_home, source)
+    operation, installation = pending(
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+    )
+    state = release.managed_state
+    if metadata == "missing":
+        state.pending_delivery_ack_source = None
+        state.pending_delivery_ack_delivery_id = None
+        state.pending_delivery_ack_managed_credential_ref = None
+        state.pending_delivery_ack_expires_at = None
+    else:
+        state.pending_delivery_ack_expires_at = PAST
+        state.active_managed_credential_ref = broker.ref
+        state.active_managed_expires_at = FUTURE
+        state.founder_letter_seen_credential_ref = broker.ref
+    state.persist()
+    receipt = store.get(credential_binding_secret(source))
+    broker.statuses = [
+        ManagedOperationStatusResult(
+            True, "FAILED", "action_required", failed_reason="authorization_expired"
+        )
+    ]
+    try:
+        if consumer == "factory":
+            assert not (await authorize(adapter, source)).succeeded
+        else:
+            first = await release.prepare_for_translation(allow_authorization=False)
+            assert first.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        for _ in range(2):
+            repeated = await release.prepare_for_translation(allow_authorization=False)
+            assert repeated.behavior != ManagedOpenRouterReleaseBehavior.READY
+            assert not repeated.local_key_available
+            assert not adapter.state().local_key_available
+        assert [name for name, _ in broker.calls] == ["status"]
+        assert broker.calls[0][1].operation_id == operation
+        assert not broker.ack_observations
+        saved = (
+            SettingsVNextCanonicalPersistenceAdapter().load_active(owner.path).canonical_settings
+        )
+        current = saved.state.managed_connection
+        assert current == owner.require_canonical().state.managed_connection
+        assert current.installation_id == installation
+        assert current.pending_managed_operation_id is None
+        assert current.pending_delivery_ack_source is None
+        assert current.active_managed_credential_ref is None
+        assert current.active_managed_expires_at is None
+        assert current.founder_letter_seen_credential_ref is None
+        assert store.get(managed_key_secret(source)) == broker.key
+        assert store.get(credential_binding_secret(source)) == receipt
+        assert store.get("unrelated") == "synthetic-unrelated"
+    finally:
+        await release.close()
+    script = """
+import asyncio, json, sys
+from pathlib import Path
+from tests.app.test_managed_auth_reliability_258 import component, ManagedOpenRouterReleaseBehavior
+async def run():
+    p=json.load(sys.stdin)
+    owner,store,boundary,broker,release,adapter=component(Path(p['root']),p['source'],existing=True)
+    try:
+        first=await release.prepare_for_translation(allow_authorization=False)
+        second=await release.prepare_for_translation(allow_authorization=False)
+        print(json.dumps({'first_ready':first.behavior==ManagedOpenRouterReleaseBehavior.READY,'second_ready':second.behavior==ManagedOpenRouterReleaseBehavior.READY,'local_key_available':adapter.state().local_key_available,'broker_calls':len(broker.calls)}))
+    finally:
+        await release.close()
+asyncio.run(run())
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        input=json.dumps({"root": str(isolated_home), "source": source}),
+        env=dict(os.environ, PYTHONPATH=os.pathsep.join(str(path) for path in sys.path if path)),
+        text=True,
+        capture_output=True,
+        timeout=30,
+        check=True,
+    )
+    assert json.loads(result.stdout) == {
+        "first_ready": False,
+        "second_ready": False,
+        "local_key_available": False,
+        "broker_calls": 0,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("consumer", ["factory", "core"])
+@pytest.mark.parametrize("credential_kind", ["legacy", "acknowledged"])
+async def test_terminal_unrelated_operation_preserves_legitimate_existing_credential(
+    isolated_home, source, consumer, credential_kind
+):
+    owner, store, boundary, broker, release, adapter = component(isolated_home, source)
+    try:
+        if credential_kind == "acknowledged":
+            assert (await authorize(adapter, source)).succeeded
+            assert broker.ack_observations == [(True, True)]
+        operation, installation = pending(owner, store, source, key=broker.key)
+        receipt = store.get(credential_binding_secret(source))
+        broker.calls.clear()
+        broker.ack_observations.clear()
+        broker.statuses = [
+            ManagedOperationStatusResult(
+                True, "FAILED", "action_required", failed_reason="authorization_expired"
+            )
+        ]
+        if consumer == "factory":
+            assert not (await authorize(adapter, source)).succeeded
+        else:
+            first = await release.prepare_for_translation(allow_authorization=False)
+            assert first.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        ready = await release.prepare_for_translation(allow_authorization=False)
+        assert ready.behavior == ManagedOpenRouterReleaseBehavior.READY
+        assert ready.api_key == broker.key
+        assert adapter.state().local_key_available
+        assert [name for name, _ in broker.calls] == ["status"]
+        assert broker.calls[0][1].operation_id == operation
+        assert not broker.ack_observations
+        current = owner.require_canonical().state.managed_connection
+        assert current.installation_id == installation
+        assert current.pending_managed_operation_id is None
+        assert current.active_managed_credential_ref == (
+            broker.ref if credential_kind == "acknowledged" else None
+        )
+        assert store.get(managed_key_secret(source)) == broker.key
+        assert store.get(credential_binding_secret(source)) == receipt
+        assert store.get("unrelated") == "synthetic-unrelated"
+    finally:
+        await release.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize("consumer", ["factory", "core"])
+@pytest.mark.parametrize("observation", ["key", "receipt"])
+async def test_terminal_projection_observation_failure_retains_recovery_authority(
+    isolated_home, source, consumer, observation
+):
+    owner, store, boundary, broker, release, adapter = component(isolated_home, source)
+    operation, installation = pending(
+        owner, store, source, ack=broker.metadata(), key=broker.key, bound=True
+    )
+    state = release.managed_state
+    state.pending_delivery_ack_source = None
+    state.pending_delivery_ack_delivery_id = None
+    state.pending_delivery_ack_managed_credential_ref = None
+    state.pending_delivery_ack_expires_at = None
+    state.active_managed_credential_ref = broker.ref
+    state.persist()
+    resume = store.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
+    receipt = store.get(credential_binding_secret(source))
+    terminal = ManagedOperationStatusResult(
+        True, "FAILED", "action_required", failed_reason="authorization_expired"
+    )
+    broker.statuses = [terminal, terminal]
+    boundary.fail_read = (
+        managed_key_secret(source) if observation == "key" else credential_binding_secret(source)
+    )
+    boundary.after_status = broker
+    try:
+        if consumer == "factory":
+            assert not (await authorize(adapter, source)).succeeded
+        else:
+            result = await release.prepare_for_translation(allow_authorization=False)
+            assert result.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        current = owner.require_canonical().state.managed_connection
+        assert current.pending_managed_operation_id == operation
+        assert current.installation_id == installation
+        assert store.get(MANAGED_OPERATION_RESUME_TOKEN_SECRET) == resume
+        assert not adapter.state().local_key_available
+        repeated = await release.prepare_for_translation(allow_authorization=False)
+        assert repeated.behavior == ManagedOpenRouterReleaseBehavior.STOP
+        assert not adapter.state().local_key_available
+        current = owner.require_canonical().state.managed_connection
+        assert current.pending_managed_operation_id is None
+        assert current.active_managed_credential_ref is None
+        assert store.get(managed_key_secret(source)) == broker.key
+        assert store.get(credential_binding_secret(source)) == receipt
+        assert [name for name, _ in broker.calls] == ["status", "status"]
+        assert not broker.ack_observations
+        assert store.get("unrelated") == "synthetic-unrelated"
+    finally:
+        await release.close()

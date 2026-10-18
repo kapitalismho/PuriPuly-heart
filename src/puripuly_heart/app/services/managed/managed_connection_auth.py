@@ -359,7 +359,7 @@ class ManagedConnectionAuthService:
         )
         if claim_result is not None:
             return claim_result
-        await self._clear_terminal_operation_safe()
+        await self._clear_terminal_operation_safe(preserve_active_credential=True)
         return commit_result
 
     def _managed_state(self) -> ManagedIdentityStatePort | None:
@@ -396,10 +396,19 @@ class ManagedConnectionAuthService:
             return request.status_poll_interval_ms
         return DEFAULT_STATUS_POLL_INTERVAL_MS
 
-    async def _clear_terminal_operation(self, state: ManagedIdentityStatePort) -> None:
+    async def _clear_terminal_operation(
+        self, state: ManagedIdentityStatePort, *, preserve_active_credential: bool = False
+    ) -> None:
         cleared = False
         previous = state.snapshot()
         try:
+            if not preserve_active_credential:
+                service = self.delivery_ack_service or ManagedKeyDeliveryAckService(
+                    broker_client=self.broker_client,
+                    secret_store=self.secret_store,
+                    managed_state=state,
+                )
+                await service.clear_failed_credential_projection(ACK_SOURCE_DISCORD)
             cleared = clear_pending_operation_if_source(state, MANAGED_OPERATION_SOURCE_DISCORD)
             if cleared:
                 if state.pending_delivery_ack_source == ACK_SOURCE_DISCORD:
@@ -889,11 +898,15 @@ class ManagedConnectionAuthService:
             emit_progress(request.progress_sink, "recovering")
             pending_probe = "fetch"
 
-    async def _clear_terminal_operation_safe(self) -> None:
+    async def _clear_terminal_operation_safe(
+        self, *, preserve_active_credential: bool = False
+    ) -> None:
         state = self._managed_state()
         if state is None:
             return
-        await self._clear_terminal_operation(state)
+        await self._clear_terminal_operation(
+            state, preserve_active_credential=preserve_active_credential
+        )
 
     async def _recover_active_operation(
         self,
@@ -951,7 +964,7 @@ class ManagedConnectionAuthService:
             except Exception as exc:
                 _observe_managed_failure("managed_authentication", exc)
                 return _operation_recovery_pending_result(request, operation=operation, polls=0)
-        await self._clear_terminal_operation_safe()
+        await self._clear_terminal_operation_safe(preserve_active_credential=True)
         return TransactionResult(
             status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
             message=None,
@@ -998,7 +1011,7 @@ class ManagedConnectionAuthService:
                         return _operation_recovery_pending_result(
                             request, operation=operation, polls=0
                         )
-                await self._clear_terminal_operation_safe()
+                await self._clear_terminal_operation_safe(preserve_active_credential=True)
                 return TransactionResult(
                     status=TRANSACTION_STATUS_SETTINGS_COMMIT_SUCCESS_RUNTIME_APPLIED,
                     message=(

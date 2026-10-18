@@ -759,6 +759,9 @@ def build_openrouter_credential_runtime_config_from_vnext(
         managed_credential_kind=_managed_credential_kind_from_connection(translation.connection),
         active_managed_credential_ref=identity.active_managed_credential_ref,
         active_managed_expires_at=identity.active_managed_expires_at,
+        pending_managed_operation_id=identity.pending_managed_operation_id,
+        pending_managed_operation_source=identity.pending_managed_operation_source,
+        pending_delivery_ack_source=identity.pending_delivery_ack_source,
     )
 
 

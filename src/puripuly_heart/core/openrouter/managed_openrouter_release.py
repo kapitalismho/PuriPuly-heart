@@ -69,6 +69,7 @@ from puripuly_heart.domain.models import Translation
 from .openrouter_credentials import (
     OpenRouterCredentialRuntimeConfig,
     best_effort_store_managed_openrouter_user_identifier,
+    clear_failed_managed_credential_projection,
     clear_temporary_managed_release_state,
     resolve_openrouter_credentials,
 )
@@ -421,6 +422,9 @@ class ManagedOpenRouterReleaseService:
             managed_credential_kind=self.openrouter_config.managed_credential_kind,
             active_managed_credential_ref=self.managed_state.active_managed_credential_ref,
             active_managed_expires_at=self.managed_state.active_managed_expires_at,
+            pending_managed_operation_id=self.managed_state.pending_managed_operation_id,
+            pending_managed_operation_source=self.managed_state.pending_managed_operation_source,
+            pending_delivery_ack_source=self.managed_state.pending_delivery_ack_source,
         )
 
     def _uses_qq_managed_credentials(self) -> bool:
@@ -888,12 +892,21 @@ class ManagedOpenRouterReleaseService:
             return None
         return (operation_id, resume_token)
 
-    def _clear_pending_managed_operation(self) -> None:
+    def _clear_pending_managed_operation(self, *, preserve_active_credential: bool = False) -> None:
         source = self._managed_source()
         if self.managed_state.pending_managed_operation_source not in {None, source}:
             return
         previous = self.managed_state.snapshot()
         try:
+            if not preserve_active_credential and self.managed_state.active_managed_credential_ref:
+                clear_failed_managed_credential_projection(
+                    self.managed_state,
+                    source=source,
+                    binding=ManagedCredentialBinding.decode(
+                        self.secrets.get(credential_binding_secret(source))
+                    ),
+                    credential=self.secrets.get(managed_key_secret(source)),
+                )
             self.managed_state.pending_managed_operation_id = None
             self.managed_state.pending_managed_operation_source = None
             self.managed_state.pending_managed_operation_installation_id = None
@@ -1164,7 +1177,9 @@ class ManagedOpenRouterReleaseService:
                 )
             state.active_managed_credential_ref = binding.managed_credential_ref
             await run_owned_thread_call(state.persist)
-            await run_owned_thread_call(self._clear_pending_managed_operation)
+            await run_owned_thread_call(
+                partial(self._clear_pending_managed_operation, preserve_active_credential=True)
+            )
             return ManagedOpenRouterReleaseResult(
                 behavior=ManagedOpenRouterReleaseBehavior.READY,
                 api_key=credential,
@@ -1429,7 +1444,9 @@ class ManagedOpenRouterReleaseService:
             if pending is not None:
                 return pending
         else:
-            await run_owned_thread_call(self._clear_pending_managed_operation)
+            await run_owned_thread_call(
+                partial(self._clear_pending_managed_operation, preserve_active_credential=True)
+            )
         self._clear_retry_after()
         return ManagedOpenRouterReleaseResult(
             behavior=ManagedOpenRouterReleaseBehavior.READY,
