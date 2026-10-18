@@ -62,7 +62,11 @@ with the next presenter milestone. Fully empty output cancels scene protection
 and retains the successful-empty-frame and Hide-grace contract.
 Same-epoch clear retains internal generation high-water marks so a later scene
 remains distinct even if the empty snapshot coalesces away. Fresh runtime epochs
-reset and seed only currently valid content; they do not replay old retry ticks.
+reset and seed only currently valid content, including applicable SELF scene
+coverage over a drawable PEER survivor after SELF removal. They use fresh
+generation 1 and the current phase without renewing Python caption deadlines
+or replaying old retry ticks. A secondary-only PEER without prior SELF scene
+coverage does not acquire a new SELF or independent PEER episode.
 
 Each P05 window starts when native reconciles the accepted eligible scene, not
 at Python publication time. The bounds remain 100 ms cadence, a 500 ms scheduling

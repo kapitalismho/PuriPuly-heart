@@ -326,3 +326,97 @@ def test_scene_survivor_drawability_preserves_independent_peer_policy(
     ) == drawable
     assert projection.targets.peer is None
     assert projection.episodes.peer is None
+
+
+@pytest.mark.parametrize(
+    ("channel", "active", "prior_intent", "secondary_enabled", "secondary_text", "expected"),
+    [
+        ("peer", False, True, True, "source", True),
+        ("peer", False, False, True, "source", False),
+        ("peer", False, True, False, "hidden", False),
+        ("peer", False, True, True, "", False),
+        ("self", True, False, True, "source", True),
+        ("self", False, False, True, "source", True),
+    ],
+)
+def test_begin_epoch_seeds_only_applicable_drawable_self_scene(
+    channel: str,
+    active: bool,
+    prior_intent: bool,
+    secondary_enabled: bool,
+    secondary_text: str,
+    expected: bool,
+) -> None:
+    survivor = replace(
+        block(f"{channel}:A", active=active),
+        primary_text="",
+        secondary_enabled=secondary_enabled,
+        secondary_text=secondary_text,
+    )
+    projection = NativeRetryIntentProjection(enabled=True)
+    incoming = OverlayPresentationSnapshot(
+        blocks=[survivor],
+        native_fresh_render_generations=NativeFreshRenderGenerations(self=37),
+        native_fresh_render_targets=(
+            NativeFreshRenderTargets(self=NATIVE_SELF_SCENE_TARGET) if prior_intent else None
+        ),
+        native_quiet_tail_episodes=NativeQuietTailEpisodes(
+            self=NativeQuietTailEpisode("stream", 39)
+        ),
+    )
+    projection.begin(enabled=True, snapshot=incoming)
+    assert (projection.targets.self == NATIVE_SELF_SCENE_TARGET) == expected
+    assert projection.generations.self == (1 if expected else None)
+    assert projection.episodes.self == (
+        NativeQuietTailEpisode("stream" if active else "final", 1) if expected else None
+    )
+    assert projection.targets.peer is None
+    assert projection.episodes.peer is None
+    projection.begin(enabled=False, snapshot=incoming)
+    assert projection.targets.self is None
+    assert projection.generations.self is None
+    assert projection.episodes.self is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("peer_mode", ["secondary_only", "translated_primary"])
+async def test_actual_presenter_recovery_keeps_survivor_coverage_and_original_ttl(
+    peer_mode: str,
+) -> None:
+    from tests.helpers.overlay_scene_protection import recovery_scenes
+
+    cases = await recovery_scenes(peer_mode=peer_mode)
+    covered = cases["covered"]
+    before, recovered = covered["before"], covered["recovered"]
+    assert recovered["blocks"] == before["blocks"]
+    assert before["native_fresh_render_generations"]["self"] == 3
+    assert before["native_quiet_tail_episodes"]["self"] == {"phase": "final", "generation": 3}
+    assert recovered["native_fresh_render_targets"]["self"] == NATIVE_SELF_SCENE_TARGET
+    assert recovered["native_fresh_render_generations"]["self"] == 1
+    assert recovered["native_quiet_tail_episodes"]["self"] == {"phase": "final", "generation": 1}
+    assert covered["deadline_after"] == covered["deadline_before"]
+    assert covered["deadline_before"] is not None
+    if peer_mode == "secondary_only":
+        assert recovered["blocks"][0]["primary_text"] == ""
+        assert recovered["blocks"][0]["secondary_enabled"]
+        assert recovered["blocks"][0]["secondary_text"]
+        assert "peer" not in recovered["native_fresh_render_targets"]
+        assert "peer" not in recovered["native_quiet_tail_episodes"]
+    else:
+        assert recovered["blocks"][0]["primary_text"] == "synthetic recovery translation"
+        assert recovered["native_fresh_render_targets"]["peer"] == recovered["blocks"][0]["id"]
+    for case, records in cases.items():
+        current = records["recovered"]
+        if case != "covered":
+            assert "self" not in current.get("native_fresh_render_targets", {})
+            assert "self" not in current.get("native_quiet_tail_episodes", {})
+        assert records["at_original_expiry"]["blocks"] == []
+        assert "native_fresh_render_targets" not in records["at_original_expiry"]
+        assert records["clear_fresh"]["blocks"] == []
+        assert "native_fresh_render_targets" not in records["clear_fresh"]
+    assert cases["ordinary"]["recovered"]["blocks"] == cases["ordinary"]["before"]["blocks"]
+    if peer_mode == "secondary_only":
+        assert "native_quiet_tail_episodes" not in cases["ordinary"]["recovered"]
+    for case in ("hidden", "empty", "expired", "cleared"):
+        assert cases[case]["recovered"]["blocks"] == []
+    assert cases["disabled"]["recovered"]["blocks"] == cases["disabled"]["before"]["blocks"]

@@ -539,6 +539,19 @@ translation owner's configuration-compatibility comparison, and use effective
 drawability for scene-level eligibility. Translated-primary and secondary-only
 survivor controls are both retained.
 
+A subsequent recovery-boundary review found that a fresh native epoch still
+dropped applicable SELF scene coverage over an unchanged secondary-only PEER
+survivor. Fresh-epoch seeding now preserves that eligible scene at trigger 1,
+episode 1 and the current phase without renewing the original caption deadline.
+Actual-presenter checks preserve identity/order and expire at that original
+deadline. Ordinary PEER without prior SELF intent, hidden/empty/expired scenes,
+disabled epochs and cleared scenes remain negative controls. Both secondary-only
+and translated-primary recovery cases cross Python JSON into a fresh native
+owner and require active/due schedules plus correlated render/readiness/submit
+success. The focused Python run passed 26 tests; eight native cross-language
+tests passed, including both new recovery cases. An initial test-only field-name
+compilation error was corrected to the existing wire field, not a product change.
+
 Physical HMD consumption, comfort, sparse-update freshness on an affected
 headset and long-session behavior are **not run**. An installed runtime,
 successful API submission or desktop pixels cannot substitute for those

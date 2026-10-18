@@ -7062,12 +7062,17 @@ fn python_scene_protection_input() -> Value {
 }
 
 fn python_scene_protection_input_for_peer_mode(peer_mode: &str) -> Value {
+    python_scene_protection_input_with_recovery(peer_mode, false)
+}
+
+fn python_scene_protection_input_with_recovery(peer_mode: &str, recovery: bool) -> Value {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .parent()
         .unwrap();
-    let output = Command::new("uv")
+    let mut command = Command::new("uv");
+    command
         .args([
             "run",
             "--frozen",
@@ -7076,9 +7081,11 @@ fn python_scene_protection_input_for_peer_mode(peer_mode: &str) -> Value {
             "tests.helpers.overlay_scene_protection",
         ])
         .args(["--peer-mode", peer_mode])
-        .current_dir(root)
-        .output()
-        .unwrap();
+        .current_dir(root);
+    if recovery {
+        command.arg("--recovery");
+    }
+    let output = command.output().unwrap();
     assert!(
         output.status.success(),
         "{}",
@@ -7578,4 +7585,92 @@ async fn python_scene_clear_coalescing_rearms_without_delivering_empty_and_fresh
     )
     .await;
     assert_scene_retry_execution(&fresh.owner, 1, 4);
+}
+
+#[tokio::test]
+async fn python_scene_secondary_only_peer_recovery_executes_fresh_epoch_and_rejects_ineligible() {
+    assert_python_scene_peer_recovery("secondary_only").await;
+}
+
+#[tokio::test]
+async fn python_scene_translated_primary_peer_recovery_executes_fresh_epoch_and_rejects_ineligible()
+{
+    assert_python_scene_peer_recovery("translated_primary").await;
+}
+
+async fn assert_python_scene_peer_recovery(peer_mode: &str) {
+    let input = python_scene_protection_input_with_recovery(peer_mode, true);
+    let before: OverlayPresentationSnapshot =
+        serde_json::from_value(input["covered"]["before"].clone()).unwrap();
+    let recovered: OverlayPresentationSnapshot =
+        serde_json::from_value(input["covered"]["recovered"].clone()).unwrap();
+    assert_eq!(before.blocks, recovered.blocks);
+    assert_eq!(
+        input["covered"]["deadline_before"],
+        input["covered"]["deadline_after"]
+    );
+    let intent = recovered.native_fresh_render_generations.as_ref().unwrap();
+    assert_eq!(intent.self_generation, Some(1));
+    assert_eq!(intent.self_target.as_deref(), Some("scene:self"));
+    if peer_mode == "secondary_only" {
+        assert!(recovered.blocks[0].primary_text.is_empty());
+        assert!(recovered.blocks[0].secondary_enabled);
+        assert!(!recovered.blocks[0].secondary_text.is_empty());
+        assert!(intent.peer.is_none());
+        assert!(intent.peer_target.is_none());
+    }
+    let old_runtime = OverlayRuntime::new(before);
+    let fresh_runtime = OverlayRuntime::new(recovered.clone());
+    let old_slot = old_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    let new_slot = fresh_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    assert_eq!(old_slot.id, new_slot.id);
+    assert_eq!(old_slot.appearance_seq, new_slot.appearance_seq);
+    assert_eq!(old_slot.slot_index, new_slot.slot_index);
+    assert_eq!(old_slot.anchor_top_px, new_slot.anchor_top_px);
+    for case in [
+        "covered", "ordinary", "hidden", "empty", "expired", "disabled", "cleared",
+    ] {
+        let scene: OverlayPresentationSnapshot =
+            serde_json::from_value(input[case]["recovered"].clone()).unwrap();
+        let empty: OverlayPresentationSnapshot =
+            serde_json::from_value(input[case]["clear_fresh"].clone()).unwrap();
+        let evidence = exercise_scene_schedule(
+            vec![(scene, Duration::ZERO), (empty, Duration::from_millis(600))],
+            "scene-peer-fresh-epoch",
+        )
+        .await;
+        if case == "covered" {
+            assert_scene_retry_execution(&evidence.owner, 1, 5);
+            assert!(!evidence
+                .owner
+                .fresh_retry_audit_for_test()
+                .iter()
+                .any(|fact| { fact.0 == "self" && fact.1 != 1 && fact.2 == "completed" }));
+        } else {
+            assert!(!evidence
+                .owner
+                .fresh_retry_evidence_for_test()
+                .iter()
+                .any(|record| { record["channel"] == "self" && record["active"] == true }));
+            assert!(!evidence
+                .owner
+                .fresh_retry_audit_for_test()
+                .iter()
+                .any(|fact| { fact.0 == "self" && fact.2 == "completed" }));
+        }
+    }
 }

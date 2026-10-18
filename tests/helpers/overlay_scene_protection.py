@@ -150,6 +150,99 @@ async def projected_scenes(*, peer_mode: str = "secondary_only") -> dict[str, ob
         await presenter.close()
 
 
+async def recovery_scenes(*, peer_mode: str = "secondary_only") -> dict[str, object]:
+    cases = {}
+    for case in ("covered", "ordinary", "hidden", "empty", "expired", "disabled", "cleared"):
+        clock = FakeClock(_now=10.0)
+        presenter = OverlayPresenter(
+            calibration=OverlayCalibration(anchor="spatial_locked"),
+            clock=clock,
+            native_retry_enabled=True,
+            show_peer_original=case != "hidden",
+        )
+        adapter = OverlayEventAdapter(clock=clock)
+        self_turn, peer = UUID(int=2661), UUID(int=2662)
+        try:
+            if case != "ordinary":
+                await presenter.emit(
+                    adapter.self_active_update(
+                        text="synthetic recovery self",
+                        utterance_id=self_turn,
+                        occupant_key=f"self:{self_turn}",
+                        caption_revision=1,
+                    )
+                )
+            await presenter.emit(
+                adapter.transcript_final(
+                    Transcript(
+                        utterance_id=peer,
+                        channel="peer",
+                        text="" if case == "empty" else "synthetic recovery peer",
+                        is_final=True,
+                        created_at=clock.now(),
+                    ),
+                    source_language="en",
+                    target_language="ko",
+                )
+            )
+            if peer_mode == "translated_primary" and case not in {"hidden", "empty"}:
+                await presenter.emit(
+                    adapter.translation_final(
+                        utterance_id=peer,
+                        channel="peer",
+                        text="synthetic recovery translation",
+                        source_language="en",
+                        target_language="ko",
+                        applied_context_mode=None,
+                    )
+                )
+            if case != "ordinary":
+                await presenter.emit(
+                    adapter.self_active_update(
+                        text="synthetic recovery self",
+                        utterance_id=self_turn,
+                        occupant_key=f"self:{self_turn}",
+                        caption_revision=2,
+                        caption_source_closed=True,
+                        caption_cancelled=True,
+                        caption_complete=True,
+                    )
+                )
+            before = presenter.snapshot().to_dict()
+            entry = presenter._entries.get(("peer", peer))
+            deadline_before = (
+                presenter._entry_expiration_deadline(entry) if entry is not None else None
+            )
+            clock.advance(1)
+            if case == "expired" and deadline_before is not None:
+                clock.advance(deadline_before - clock.now() + 0.01)
+            if case == "cleared":
+                await presenter.clear_for_runtime_detach()
+            await presenter.begin_native_retry_epoch(enabled=case != "disabled")
+            recovered = presenter.snapshot().to_dict()
+            entry = presenter._entries.get(("peer", peer))
+            deadline_after = (
+                presenter._entry_expiration_deadline(entry) if entry is not None else None
+            )
+            if deadline_before is not None and clock.now() < deadline_before:
+                clock.advance(deadline_before - clock.now() + 0.01)
+            await presenter._publish_if_changed()
+            expired = presenter.snapshot().to_dict()
+            await presenter.clear_for_runtime_detach()
+            await presenter.begin_native_retry_epoch(enabled=True)
+            cases[case] = {
+                "before": before,
+                "recovered": recovered,
+                "deadline_before": deadline_before,
+                "deadline_after": deadline_after,
+                "at_original_expiry": expired,
+                "clear_fresh": presenter.snapshot().to_dict(),
+            }
+        finally:
+            await presenter.close()
+    return cases
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -157,5 +250,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--peer-mode", choices=("secondary_only", "translated_primary"), default="secondary_only"
     )
+    parser.add_argument("--recovery", action="store_true")
     args = parser.parse_args()
-    print(json.dumps(asyncio.run(projected_scenes(peer_mode=args.peer_mode))))
+    project = recovery_scenes if args.recovery else projected_scenes
+    print(json.dumps(asyncio.run(project(peer_mode=args.peer_mode))))

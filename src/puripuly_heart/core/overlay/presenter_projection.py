@@ -51,20 +51,45 @@ class NativeRetryIntentProjection:
         generations: dict[str, int] = {}
         targets: dict[str, str] = {}
         episodes: dict[str, NativeQuietTailEpisode] = {}
+        scene_phase = (
+            "stream"
+            if any(
+                block.channel == "self"
+                and block.block_variant == "active_self"
+                and self._scene_drawable(block)
+                for block in snapshot.blocks
+            )
+            else "final"
+        )
         for block in snapshot.blocks:
             channel = block.channel
-            if channel not in {"self", "peer"} or not block.primary_text.strip():
+            if channel not in {"self", "peer"} or not (
+                self._scene_drawable(block) if channel == "self" else block.primary_text.strip()
+            ):
                 continue
             generations[channel] = 1
             targets[channel] = NATIVE_SELF_SCENE_TARGET if channel == "self" else block.id
             episodes[channel] = NativeQuietTailEpisode(
                 phase=(
-                    self.self_scene_phase(snapshot.blocks)
+                    scene_phase
                     if channel == "self"
                     else ("final" if block.block_variant == "finalized" else "stream")
                 ),
                 generation=1,
             )
+        if (
+            "self" not in targets
+            and snapshot.native_fresh_render_targets is not None
+            and snapshot.native_fresh_render_targets.self == NATIVE_SELF_SCENE_TARGET
+            and snapshot.native_fresh_render_generations is not None
+            and snapshot.native_fresh_render_generations.self is not None
+            and snapshot.native_quiet_tail_episodes is not None
+            and snapshot.native_quiet_tail_episodes.self is not None
+            and any(self._scene_drawable(block) for block in snapshot.blocks)
+        ):
+            generations["self"] = 1
+            targets["self"] = NATIVE_SELF_SCENE_TARGET
+            episodes["self"] = NativeQuietTailEpisode(phase=scene_phase, generation=1)
         self.generations = NativeFreshRenderGenerations(
             self=generations.get("self"), peer=generations.get("peer")
         )
