@@ -1,0 +1,93 @@
+{
+  "issue": 264,
+  "reviewed_candidate": "73ccc93518e75560f44b40b223c937c1d093bc89",
+  "records": [
+    {
+      "RESULT": "repair_failed",
+      "DOMAIN": "Bounded REPAIR_VERIFY — task tooling/evidence/plan delta from 8c01ad689aa8d48c0b5c73dd739f2944c12f5589 to 73ccc93518e75560f44b40b223c937c1d093bc89; original baseline cc75792e9704e8609f38a3aa0794c03a1c7e3416. Product repair review not repeated.",
+      "summary": "E1–E3 are closed at the reviewed task-code boundary. One related material accounting gap remains: native failure stopping/classification depends exclusively on one GPU diagnostic value, rather than the recorded native/provider terminal outcomes. The complete actual matrix remains a later Goal obligation, not a claimed pass.",
+      "finding": {
+        "id": "E4",
+        "severity": "P2 — verification-tooling false-success/stop-policy gap, not a newly observed product defect",
+        "exact_locations": [
+          "native/nemotron/issue264_validation_runtime.py:223-239 — pipeline_status",
+          "native/nemotron/issue264_validation_runtime.py:1394-1398 — stop predicate",
+          "native/nemotron/issue264_validation_summary.py:193-201,233-240 — native failure extraction and disposition"
+        ],
+        "violated_promise": "The repaired task handoff explicitly promises that native failures stop the run independently of surviving output (issue264_validation_repair_handoff.json:22). A native failed/expired terminal must not become requested_pipeline_completed merely because its failure did not emit GPU diagnostic result='decode_failure'.",
+        "reachable_path": "The real LocalGpu backend can emit a failed terminal for local_decode_timeout or other pre-/outside-decode failures, and expired for GpuASRWorkExpired (providers/stt/local_gpu.py:346-396). SessionTrace records these as native_result (issue215_smoke.py:210-215). pipeline_status ignores those terminal outcomes. With another source surviving and no decode_failure diagnostic, it returns pipeline_completed; the matrix continues and can exit zero. Summary likewise leaves scenario_disposition=not_automatically_assessed instead of retaining this native failure explicitly.",
+        "smallest_decisive_observation": "An independent read-only AST execution of the exact repaired pipeline_status with trace=[{event:'native_result', value:{outcome:'failed', failure_reason:'local_decode_timeout'}}], one surviving source and errors=[] returned 'pipeline_completed'. The retained first04 case correctly returned 'pipeline_completed_with_native_failures', showing that the observed diagnostic-specific path is fixed but does not close the terminal-outcome path.",
+        "required_bounded_repair": "Account for recorded failed/expired native/provider terminals as well as diagnostic-only failures, with deduplication where the same failure appears at several boundaries. Add a positive surviving-output control and negative terminal-without-decode-diagnostic controls to runtime stopping and summary disposition. Preserve existing observation-error precedence and the distinct historical first04 label.",
+        "defenses_and_limits": "The new labels explicitly disclaim quality acceptance, and the original first04 is correctly classified failed_native_execution. Those protections prevent relabelling that known run as a pass, but do not satisfy the promised stop on other reachable native failures. No real timeout or new inference failure was executed for this finding."
+      },
+      "closures": {
+        "E1": {
+          "result": "closed at tooling boundary",
+          "evidence": "Launcher:120-126 permits only socket.bind address ('',0) from get_free_tcp_port at the exact installed Flet utils/network.py path. Ordinary wildcard binds, external connections, wrong function/file identities and external DNS remain rejected. The inspected installed helper performs no listen. Retained first04 supplies actual Flet progress after this exception; no OS-sandbox claim was introduced."
+        },
+        "E2": {
+          "result": "closed",
+          "evidence": "Runtime ChatboxGuard:253-254 explicitly declares bind_delivery_observer=None; runtime and caption construct OutputRuntime with that guard. Actual enqueue/send_immediate remain rejected by the inherited guard. The retained behavior checker exercises both constructor expressions against archived real OutputRuntime, not a replacement constructor."
+        },
+        "E3": {
+          "result": "closed",
+          "evidence": "ObservedBatch:187-219 preserves the real delegate outside the observation-only catch, reads current child.audio source/context fields, records observation_exception instead of propagating observation failures, and invalidates nonempty-source observation through pipeline_status. Worker checker includes successful delegate/observer and injected observation-only exception controls. A real delegate failure is not suppressed."
+        }
+      },
+      "COVERAGE": [
+        {
+          "item": "Runtime/launcher repairs and isolation",
+          "status": "inspected",
+          "basis": "E1–E3 closure above. Existing installed FLET_VIEW_PATH, child-local environment, loopback policy and acquisition-only existing-install validator limits remain unchanged. E4 concerns the new failure-accounting mechanism."
+        },
+        {
+          "item": "Public source snapshot schema and summary consumers",
+          "status": "inspected",
+          "basis": "Runtime/caption produce public source_snapshot records; summary requires first_readable_at and assignment.settled, with no obsolete alias. Candidate availability without palette/settlement is excluded from allocated-assignment timing. Observation delays remain explicitly upper bounds; canonical settlement counters remain separate."
+        },
+        {
+          "item": "Observed application versus availability after F5",
+          "status": "inspected",
+          "basis": "Prepared caption schedules hold the existing presenter ownership-transition lock, expose a candidate at logical +0.9s, assert no palette/settlement/delay, and release application at +0.95 or +1.1s. They do not manually call mark_readable or mutate settlement. The scenarios distinguish within-cap gold from expired canonical gray."
+        },
+        {
+          "item": "Requested/authorized/executed inventory",
+          "status": "inspected",
+          "basis": "Typed route/case/profile/repetition records, nonempty selection validation and separate requested_inventory_complete / complete_authorized_smoke_executed fields prevent one selected case being represented as the ten-case matrix. Independent pure execution confirmed ten authorized and one requested for the first-case slice."
+        },
+        {
+          "item": "First01–04 retained attempts and revised first04 summary",
+          "status": "inspected",
+          "basis": "First01/02 remain invalid startup/setup, first03 invalid observer with real native failures retained, first04 genuine failed scenario. Corrected summary retains recorded_pipeline_status='matrix_executed' separately from scenario_disposition='failed_native_execution'; revision3 remains invalid and is not rescued by revision4. No historical trace was rewritten."
+        },
+        {
+          "item": "Diagnosis driver and exact frozen-code provenance",
+          "status": "inspected; independently checked",
+          "basis": "Verified all three recorded diagnosis source hashes against execution_sources.zip and byte-for-byte against 8c01 Git objects; trace hash matches c87b9e87…; six own-final records retain matching reconstructed states/frontiers. Loaded-module records point to the archived checkout. Diagnosis imports no current repaired classifier and prohibits processes/network. Its first-readable/deadline timestamps are observation upper bounds, not fabricated application/physical-onset timestamps."
+        },
+        {
+          "item": "Counterfactual repair record and current plan factual claims",
+          "status": "inspected",
+          "basis": "boundary_repair.json distinguishes original actual failure, controlled recognizer replay, native-lock-delayed terminal snapshots and corrected-footprint attribution at historical times. Exact-PCM/cumulative-report corrections and failed initial replay are retained. Plan:15-23 accurately separates deterministic repairs from renewed inference/GUI evidence and does not claim the returning lexical split/tail fixed."
+        },
+        {
+          "item": "New F3/F5 actual-caption preparation",
+          "status": "inspected, execution unverified as intended",
+          "basis": "All ten caption cases are explicitly unrun. F3 protects late overflow keys/divider, card revision, same gray card/text/order/TTL and known-return append behavior. F5 protects within/after-cap application, in-place text/style/TTL, canonical reuse by another attempt and serialized other target/native retry. FakeClock and private scheduling lock are explicit controls, not acoustic latency measurements. Shared-window target serialization is not concurrent-destination qualification; actual pixels still require qualified readback and inspection."
+        },
+        {
+          "item": "Seven offline behavior groups / hashes / reproducibility",
+          "status": "supported by retained evidence plus bounded independent checks",
+          "basis": "Read the complete retained checker and report. All seven final prepared script hashes independently match current files, including the prepared caption hash acc27035…. Independent read-only execution reached the checker's metadata-report construction after its assertion groups; my wrapper then exited 1 because __file__ was undefined in -c. No report was overwritten and no green wrapper run is claimed. Subsequent pure AST checks and provenance/hash checks completed and produced the E4 counterexample. Worker-reported clean Ruff/Black results were read, not rerun."
+        },
+        {
+          "item": "Preserved independent review JSONs and privacy",
+          "status": "inspected",
+          "basis": "Both review records retain original 8c01 findings and explicit pre-repair/non-acceptance identities. New reports keep local-only execution paths relative or sanitized; no cloud raw frames, credentials, private audio or raw archives were added. Existing Gemini R4 negative disposition and original unaffected FULL_REVIEW coverage are retained."
+        }
+      ],
+      "nonblocking_metadata_note": "repair_handoff.current_task_hashes_for_review.caption still contains the earlier dac85f99… hash, whereas final caption_preparation and tooling_repair_checks correctly record current acc27035…. Use the pinned bytes/final preparation hashes for execution provenance; the earlier handoff is historical, not the current caption snapshot.",
+      "verification_limits": "No GPU/Flet/cloud/VR execution, credential-file reads, product/test/docs edits, builds, formatters or linter runs. The remaining issue is a bounded task-accounting repair; it does not reopen the independently reviewed product repair or justify another full review. New actual repaired-candidate observations remain required after the Director's next pin/decision."
+    }
+  ]
+}

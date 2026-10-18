@@ -1,0 +1,332 @@
+{
+  "reviewer_counterexample": {
+    "trace": [
+      {
+        "event": "native_result",
+        "value": {
+          "outcome": "failed",
+          "failure_reason": "local_decode_timeout"
+        }
+      }
+    ],
+    "sources": [
+      {
+        "text": "surviving source"
+      }
+    ],
+    "errors": []
+  },
+  "e4_controls": [
+    {
+      "name": "surviving_success",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "outcome": "final",
+            "text": "Surviving success."
+          }
+        },
+        {
+          "event": "gpu_asr_diagnostic",
+          "value": {
+            "kind": "decode_attempt",
+            "fields": {
+              "result": "success"
+            }
+          }
+        }
+      ],
+      "failure_groups": 0,
+      "pipeline": "pipeline_completed",
+      "summary": "not_automatically_assessed"
+    },
+    {
+      "name": "failed_terminal_no_decode_diagnostic",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "failed",
+            "failure_reason": "local_decode_timeout"
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "expired_terminal_no_decode_diagnostic",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "expired",
+            "failure_reason": "GpuASRWorkExpired"
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "provider_failed_terminal_only",
+      "events": [
+        {
+          "event": "provider_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "failed",
+            "failure_reason": "local_decode_timeout"
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "provider_expired_terminal_only",
+      "events": [
+        {
+          "event": "provider_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "expired",
+            "failure_reason": "GpuASRWorkExpired"
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "same_failure_native_provider_shared_identity",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "failed",
+            "failure_reason": "local_decode_timeout"
+          }
+        },
+        {
+          "event": "provider_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "failed",
+            "failure_reason": "local_decode_timeout"
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "same_failure_terminal_diagnostic_explicit_request",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "request_id": "explicit-shared-request",
+            "outcome": "failed",
+            "failure_reason": "decode_failure"
+          }
+        },
+        {
+          "event": "gpu_asr_diagnostic",
+          "value": {
+            "kind": "decode_attempt",
+            "fields": {
+              "result": "decode_failure",
+              "request_id": "explicit-shared-request"
+            }
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "diagnostic_only_failure",
+      "events": [
+        {
+          "event": "gpu_asr_diagnostic",
+          "value": {
+            "kind": "decode_attempt",
+            "fields": {
+              "result": "decode_failure"
+            }
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "same_receipt_reason_without_shared_identity_not_linked",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "outcome": "failed",
+            "failure_reason": "decode_failure"
+          }
+        },
+        {
+          "event": "gpu_asr_diagnostic",
+          "value": {
+            "kind": "decode_attempt",
+            "fields": {
+              "result": "decode_failure"
+            }
+          }
+        }
+      ],
+      "failure_groups": 2,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "prestart_diagnostic_only_failure",
+      "events": [
+        {
+          "event": "gpu_asr_diagnostic",
+          "value": {
+            "kind": "work_prestart_failed",
+            "fields": {
+              "failure": "worker_unavailable"
+            }
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "expired_diagnostic_only_failure",
+      "events": [
+        {
+          "event": "gpu_asr_diagnostic",
+          "value": {
+            "kind": "work_expired",
+            "fields": {
+              "reason": "speech_end_ttl"
+            }
+          }
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "pipeline_completed_with_native_failures",
+      "summary": "failed_native_execution"
+    },
+    {
+      "name": "observation_error_precedes_terminal_failure",
+      "events": [
+        {
+          "event": "native_result",
+          "value": {
+            "identity": {
+              "provider_turn_id": "controlled-turn",
+              "provider_epoch_id": "controlled-epoch",
+              "segment": {
+                "capture_epoch": 7,
+                "segment_order": 1,
+                "segment_id": "controlled-segment"
+              }
+            },
+            "outcome": "failed",
+            "failure_reason": "local_decode_timeout"
+          }
+        },
+        {
+          "event": "observation_exception",
+          "stage": "controlled"
+        }
+      ],
+      "failure_groups": 1,
+      "pipeline": "invalid_observation",
+      "summary": "invalid_observation"
+    }
+  ],
+  "schema": "issue264-tooling-e4-behavior-1",
+  "status": "all_checks_passed",
+  "checks": [
+    "Exact inspected Flet helper filename/name plus non-listening ephemeral ('',0) accepted",
+    "Wildcard listeners, external connections and wrong helper callsites rejected; loopback service bind accepted",
+    "Both current runtime/caption OutputRuntime constructor expressions succeed against frozen actual product; both guards reject actual enqueue/send_immediate",
+    "Native-final observer delegates real frozen snapshot and completes without removed slice fields",
+    "Injected observation-only exception is retained and invalidates nonempty-source pipeline without suppressing delegated native snapshot",
+    "Original first04 remains native-failed despite old exit0/nonempty-source status; one requested case is not complete authorized ten-case inventory",
+    "Public first_readable_at/nested assignment.settled parsed; controlled 400ms/750ms/1100ms records enter distinct reporting bands; original first04 has zero late assignments",
+    "E4 authoritative failed/expired terminals and diagnostic-only failures stop runtime and fail summary despite surviving output; exact shared identity dedup and anonymous nonassociation protected",
+    "E4 positive native success remains pipeline-completed/not-quality-assessed; observation exception retains precedence over native failure"
+  ],
+  "scope": "Offline throwaway behavior checks; frozen archived product classes only, current task AST/summary. No GPU/Flet/ASR/translation/cloud/VR or product mutations.",
+  "script_sha256": "324c982f0bf478a86240f8dd24f45a171afb3bd6da0891a9fa1a47cf49619f39",
+  "task_hashes": {
+    "issue264_validation_launch.py": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+    "issue264_validation_runtime.py": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+    "issue264_validation_caption.py": "acc27035f6a627c0c7693cc47176831f03b29ba6a2c309d9d0c4d69068fa6550",
+    "issue264_validation_summary.py": "8298c7c64a581f1229b7301bdef8185ebd5b432c19dd4ce79c05a52671149ae5"
+  },
+  "frozen_product_archive": "build/issue264-validation-first-04/execution_sources.zip"
+}

@@ -21,6 +21,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 import issue218_experiment as local
 from issue218_policy_visibility import GuardedDesktop
+from issue264_validation_summary import native_failures
 
 from puripuly_heart.core.audio.format import float32_to_pcm16le_bytes
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
@@ -225,12 +226,7 @@ def pipeline_status(record):
         return "invalid_observation"
     if any(event["event"] == "unhandled_task_exception" for event in record["trace"]):
         return "pipeline_task_failure"
-    if any(
-        event["event"] == "gpu_asr_diagnostic"
-        and event["value"]["kind"] == "decode_attempt"
-        and event["value"]["fields"].get("result") == "decode_failure"
-        for event in record["trace"]
-    ):
+    if native_failures(record):
         return "pipeline_completed_with_native_failures"
     if record["errors"]:
         return "pipeline_or_cleanup_failure"
@@ -1074,6 +1070,7 @@ async def case_run(
     record["observation_errors"] = [
         event for event in trace if event["event"] == "observation_exception"
     ]
+    record["native_failures"] = native_failures(record)
     if record["status"] == "pipeline_completed":
         record["status"] = pipeline_status(record)
     record["scenario_quality_disposition"] = (

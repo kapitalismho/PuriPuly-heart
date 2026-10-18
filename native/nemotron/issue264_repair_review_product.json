@@ -1,0 +1,85 @@
+{
+  "RESULT": "repair_verified",
+  "DOMAIN": "Bounded REPAIR_VERIFY of accepted F1–F5 and independent foreign-onset/footprint causality",
+  "range": {
+    "original_baseline": "cc75792e9704e8609f38a3aa0794c03a1c7e3416",
+    "previous_failed_candidate": "8c01ad689aa8d48c0b5c73dd739f2944c12f5589",
+    "repaired_candidate": "3f791b3c8d1f6632ed393a920aa7bd060757e0f2"
+  },
+  "assessment": "The pinned repair closes the accepted deterministic failures without a duration floor, forced coloring, text hold, extra recognition retry, or loss of the valid early-progress path. No broader review invalidation requiring FULL_REVIEW was found. This is bounded implementation repair verification, not acoustic/Flet Goal acceptance or publication approval.",
+  "COVERAGE": [
+    {
+      "item": "F1 — one-time actuation independent of submitted PCM cursor",
+      "status": "repair_verified",
+      "basis": "batch_speaker.py:160-180 now partitions at the shared onset and checks/advances committed_transition_sample using the confirmed first-clear coordinate before recursive reevaluation. The removed fallback can no longer reapply the transition at its later nominal coordinate. New ABA regression checks exactly two early children, duplicate/stale reevaluation, three disjoint final inputs, exact PCM conservation and 0–1–0 attribution."
+    },
+    {
+      "item": "Independent foreign-onset/footprint mismatch",
+      "status": "repair_verified",
+      "basis": "speaker_attribution.leading_slot and evidence.transitions share the existing 0.35 candidate-relative eligibility. The transition retains distinct predecessor-clear end, successor onset, first-clear coordinate and observation time. Batch and streaming lexical composition consume the supported onset. The foreign-uncertainty veto and numerical ambiguity budgets were not loosened; old admitted footprints remain uncertain rather than being rewritten."
+    },
+    {
+      "item": "F2 — native-frame identity and predecessor corroboration",
+      "status": "repair_verified",
+      "basis": "Accepted map pieces retain the native compact frame interval. Confirmation increments only for a distinct native interval, with capture/epoch/discontinuity/overlap fences retained. Initial predecessor establishment also requires corroboration. Executed tests reject fragmented/duplicate single-frame evidence and a lone predecessor impulse, while permitting a second distinct frame in the same delivery."
+    },
+    {
+      "item": "F3 — late overflow identity, divider and returning-speaker compatibility",
+      "status": "repair_verified",
+      "basis": "presenter.py:1185-1195 accepts palette_overflow as well as a palette index. Executed behavior test establishes late fifth/sixth keys in place, preserves card identity/text/appearance/TTL, enables the legitimate gray divider, permits a subsequent known return to append, and retains exactly four palette slots."
+    },
+    {
+      "item": "F4 — actual producer-certified omitted quiet versus missing coverage",
+      "status": "repair_verified",
+      "basis": "evidence.py:136-174 accepts the existing omitted_silence/unobserved compact-(0,0) shape while retaining original-audio width checks. Executed actual SpeakerRuntime omission-producer test qualifies the covered quiet but rejects one additional missing sample. Separate test rejects unqualified frame=None coverage and prevents a transition across the missing gap. Quiet contributes no unique speaker support."
+    },
+    {
+      "item": "F5 — candidate availability versus logical application, canonical expiry and metrics",
+      "status": "repair_verified",
+      "basis": "speaker_identity.py:184-255 defers allocation/settlement for an already-readable unresolved source until its mark_readable application boundary. Its deadline stays live; expiration restores the source-wide presented assignment before settlement/release. Executed 10.95/11.1 application cases distinguish valid application from expiration after proof availability at 10.9, preserve TTL/text/card placement, release claims, retain retry/other-target canonical outcomes, and record application delay rather than availability delay."
+    },
+    {
+      "item": "Source-order color allocation and changed allocator fixtures",
+      "status": "repair_verified",
+      "basis": "Both existing fixtures retain their original palette/order/alias/proof-release assertions. They now explicitly call mark_readable before expecting post-readable palette settlement and add pre-application palette-is-None assertions. I executed both changed fixtures. This strengthens the corrected logical-application boundary rather than weakening source-order protection."
+    },
+    {
+      "item": "Shared batch/streaming boundaries, legal lexical cuts and short-turn progress",
+      "status": "inspected; supported_by_executed_and_prior_evidence",
+      "basis": "Streaming consumes successor_onset_sample only within the existing qualified word timing and complete lexical-boundary checks; first-clear/uncertainty semantics remain validated by STTAudioBoundary. The executed Alpha/No/Alpha case preserves three attributed units without a physical provider cut. Existing affected batch/streaming suites in the recorded 369-case run retain short-No, natural completion, six-second safety, replay/onset, submitted-cursor and failure protection."
+    },
+    {
+      "item": "Bounds, immutable source/context/history, ordinary ASR retirement and destination isolation",
+      "status": "inspected; unaffected_prior_coverage_retained",
+      "basis": "New state consists of bounded per-parent/per-frame/per-source metadata within existing ownership limits. No new probability cache, PCM/session retention, translation dispatch, source mutation, target identity, renderer resolver or resource owner was added. Previously reviewed handoff, output disposal, SELF, source/context and ordinary-ASR-close paths remain applicable."
+    },
+    {
+      "item": "Architecture/native README and strict capability/wire behavior",
+      "status": "inspected; unaffected_prior_coverage_retained",
+      "basis": "Maintained guidance matches the repaired watermark, shared onset, native-frame corroboration, certified omission, logical-application expiry and overflow behavior. Capability v3/wire16 and native/Desktop algorithms are unchanged by this repair, so prior strict capability/pure-native evidence remains applicable."
+    }
+  ],
+  "decisive_evidence": {
+    "reviewer_executed": {
+      "command": ".venv/Scripts/python.exe -B -m pytest -o addopts= -p no:cacheprovider -q --tb=short tests/core/test_issue264_boundary_repair.py tests/core/test_issue264_shared_speaker.py::test_reversed_proof_order_defers_only_color_and_settles_in_source_order tests/core/test_issue264_shared_speaker.py::test_source_order_deadline_unblocks_later_color_without_losing_text_obligation",
+      "result": "14 passed in 0.59s; exit 0.",
+      "boundary": "Deterministic production-class/provider and logical presenter tests with controlled recognizer/evidence; no GPU, GUI, cloud or VR."
+    },
+    "recorded_repair_evidence_reviewed": {
+      "reference": "native/nemotron/issue264_boundary_repair.json",
+      "before": "Corrected pre-edit replay matches all five original first-parent native PCM hashes, including both 160-sample inputs. The initial replay that omitted 1024 samples remains explicitly invalid, not product evidence.",
+      "after": "Recorded full-ABA controlled replay selects four native inputs of 47840, 26240, 29664 and 20160 samples, with source cuts at 49568 and 75808, preserved 8000/4800-sample onset/rollover contexts and exact PCM/source accounting. The two duplicate micro-inputs are absent.",
+      "important_limits": "Controlled native execution was delayed until evidence delivery completed. Corrected-footprint attribution at old native-final times is explicitly counterfactual, not new actual recognition timing/content. Historical old-footprint uncertainty remains preserved.",
+      "focused_checks": "Recorded final-product 369 passed; final 12 repair cases passed; scoped Ruff and Black checks passed. Earlier failed repair/test/formatting attempts remain in the report."
+    },
+    "prior_evidence_retained": "The original full review's unaffected coverage, 1181 passes / two unchanged INTEGRATION skips / 252 warnings, pure-native strict-v3/startup reports and pre-existing unrelated Rust whole-file formatting failure remain historical evidence. They were not relabeled as new repaired-candidate executions or rerun here."
+  },
+  "residuals_and_limits": [
+    "The original 8c01 actual GPU/Nemotron/Gemma/Flet failure remains a failed outcome; it is not erased by deterministic closure.",
+    "The repaired actual inference/translation/Flet matrix has not yet executed. Actual useful content, returning identity, late assignment behavior and rendered timing remain Goal obligations at the repaired pin.",
+    "The recorded tail remains conservatively uncertain, and prior actual returning-prefix/tail transcription behavior is not proved repaired by changed PCM boundaries alone.",
+    "No acoustic threshold optimum, profile selection, #211/#218 closure, Gemini experiment acceptance, terminal Goal acceptance or remote approval is implied."
+  ],
+  "changes": "None; read-only bounded review.",
+  "handoff": "The Director can proceed to coordinated actual changed-path validation at 3f791b3c8d1f6632ed393a920aa7bd060757e0f2, preserving original failures and distinguishing controlled replay, counterfactual eligibility, actual inference and actual renderer observations."
+}

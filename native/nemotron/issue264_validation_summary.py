@@ -10,6 +10,65 @@ from issue218_policy_summary import analyze
 from issue264_validation_prerequisites import ROOT, sanitize
 
 
+def native_failures(case):
+    groups = []
+    linked = {}
+    for index, event in enumerate(case["trace"]):
+        boundary = event["event"]
+        value = event.get("value", {})
+        fields = value
+        if boundary in ("native_result", "provider_result"):
+            outcome = value.get("outcome")
+            if outcome not in ("failed", "expired", "degraded"):
+                continue
+            reason = value.get("failure_reason")
+        elif boundary == "gpu_asr_diagnostic":
+            kind = value.get("kind")
+            fields = value.get("fields", {})
+            result = fields.get("result")
+            if kind == "decode_attempt" and result and result != "success":
+                outcome = "expired" if result == "expired" else "failed"
+                reason = result
+            elif kind in ("work_prestart_failed", "work_expired"):
+                outcome = "expired" if kind == "work_expired" else "failed"
+                reason = fields.get("failure_reason", fields.get("failure", fields.get("reason")))
+            else:
+                continue
+        else:
+            continue
+        identity = None
+        if isinstance(fields.get("identity"), dict) and fields["identity"].get("provider_turn_id"):
+            identity = {"kind": "identity", "value": fields["identity"]}
+        else:
+            explicit = {
+                key: fields[key]
+                for key in ("request_id", "attempt_id")
+                if fields.get(key) not in (None, "")
+            }
+            if explicit:
+                identity = {"kind": "explicit_request_attempt", "value": explicit}
+        key = (
+            json.dumps([identity, outcome, reason], sort_keys=True)
+            if identity is not None
+            else None
+        )
+        occurrence = {"trace_index": index, "boundary": boundary, "record": event}
+        if key is not None and key in linked:
+            groups[linked[key]]["occurrences"].append(occurrence)
+        else:
+            if key is not None:
+                linked[key] = len(groups)
+            groups.append(
+                {
+                    "outcome": outcome,
+                    "failure_reason": reason,
+                    "explicit_identity": identity,
+                    "occurrences": [occurrence],
+                }
+            )
+    return groups
+
+
 def assignment_key(assignment):
     attribution = assignment.get("attribution") or {}
     key = attribution.get("key")
@@ -190,13 +249,7 @@ def summarize(path):
     result = analyze(path)
     for case, row in zip(report["cases"], result["cases"]):
         row["pipeline_status_is_not_quality_pass"] = True
-        row["native_decode_failures"] = [
-            event
-            for event in case["trace"]
-            if event["event"] == "gpu_asr_diagnostic"
-            and event["value"]["kind"] == "decode_attempt"
-            and event["value"]["fields"].get("result") == "decode_failure"
-        ]
+        row["native_failures"] = native_failures(case)
         row["observation_errors"] = [
             event for event in case["trace"] if event["event"] == "observation_exception"
         ]
@@ -235,7 +288,7 @@ def summarize(path):
         if any(row["observation_errors"] for row in result["cases"])
         else (
             "failed_native_execution"
-            if any(row["native_decode_failures"] for row in result["cases"])
+            if any(row["native_failures"] for row in result["cases"])
             else "not_automatically_assessed"
         )
     )

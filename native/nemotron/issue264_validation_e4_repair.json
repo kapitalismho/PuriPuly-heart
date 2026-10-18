@@ -1,0 +1,49 @@
+{
+  "schema": "issue264-validation-e4-repair-1",
+  "reviewed_failed_tool_candidate": "73ccc93518e75560f44b40b223c937c1d093bc89",
+  "status": "Task-only E4 repair complete and frozen for Director pin and original-reviewer bounded verification. Actual execution remains HOLD.",
+  "reviewer_counterexample": {
+    "source": "speaker-264-evidence-review bounded REPAIR_VERIFY, E4; Director ACCEPT",
+    "exact_input": {"trace": [{"event": "native_result", "value": {"outcome": "failed", "failure_reason": "local_decode_timeout"}}], "sources": [{"text": "surviving source"}], "errors": []},
+    "original_result_observed_by_reviewer": "pipeline_completed",
+    "repaired_result_observed_in_offline_control": "pipeline_completed_with_native_failures",
+    "limit": "The original counterexample was read from the independent review, not rerun against the old code. No real timeout, expiry, inference, GUI or cloud failure was induced."
+  },
+  "changed_surfaces": [
+    "native/nemotron/issue264_validation_summary.py: one pure native_failures extractor, also consumed by summary disposition",
+    "native/nemotron/issue264_validation_runtime.py: import the same extractor for pipeline stopping and retained per-case failure records",
+    "native/nemotron/issue264_validation_repair_handoff.json: explicit historical pre-F3/F5 caption-hash label and later-preparation/E4 references; original executed hashes unchanged",
+    "build/issue264-validation-tooling-e4/check.py and controlled summary_fixture.json; earlier checker retained unchanged",
+    "native/nemotron/issue264_validation_tooling_e4_checks.json and this bounded repair record"
+  ],
+  "shared_extraction_contract": {
+    "authoritative_boundaries": "Recorded native_result/provider_result terminal outcomes failed, expired or degraded remain failures even when other text survives and no decode diagnostic exists.",
+    "diagnostic_only": "Retain unsuccessful decode_attempt diagnostics and explicit work_prestart_failed/work_expired diagnostics. Original records and reasons are retained, not replaced with a guessed product cause.",
+    "deduplication": "Merge only exact nonempty explicit serialized provider-turn identity or explicit request/attempt identity together with the same outcome and failure reason. Every boundary occurrence remains in the merged group. Anonymous diagnostics/terminals remain separate; receipt order, timestamps, nearby text, equal reasons and string similarity never establish association. Different identity forms are not silently equated.",
+    "precedence": "observation_exception remains invalid_observation ahead of native failure; failed/expired work with surviving sources stops the runtime and produces failed_native_execution in summary. A successful native/source control remains pipeline_completed and not_automatically_assessed, not a quality pass.",
+    "inventory": "Existing typed authorized/requested/executed inventory, one-case versus ten-case distinction and historical first01-04 dispositions are unchanged. Failure groups are evidence groups, not an inferred count of unique physical native attempts."
+  },
+  "offline_checks": {
+    "driver": "build/issue264-validation-tooling-e4/check.py",
+    "driver_sha256": "324c982f0bf478a86240f8dd24f45a171afb3bd6da0891a9fa1a47cf49619f39",
+    "report": "native/nemotron/issue264_validation_tooling_e4_checks.json",
+    "command": ".venv/Scripts/python.exe -B build/issue264-validation-tooling-e4/check.py",
+    "outcome": "Passed all seven prior tooling behavior groups and twelve explicit E4 controls. Runtime classification and actual summary disposition both exercised. Initial ten-control run also passed; two explicit provider-only terminal controls were then added and passed in the final run.",
+    "controls": ["surviving successful native output", "failed/local_decode_timeout native terminal without decode diagnostic", "expired/GpuASRWorkExpired native terminal without decode diagnostic", "provider failed terminal alone", "provider expired terminal alone", "same failure at native/provider boundaries with identical explicit identity deduplicates", "terminal/diagnostic with identical explicit request identity deduplicates", "diagnostic-only decode failure", "anonymous equal-reason observations remain distinct", "diagnostic-only prestart failure", "diagnostic-only expiry", "observation error preserves invalid precedence despite native failure"],
+    "scope": "Existing real constructor/observer checks import only exact first04 archived product classes; current task pipeline helper and summary are pure AST/module execution. Controlled synthetic terminal fixtures are not actual ASR acoustics. No current repaired product startup, model, Flet, network or cloud operation. No original trace/report/checker overwritten."
+  },
+  "formatting": {
+    "command": ".venv/Scripts/python.exe -m ruff check native/nemotron/issue264_validation_prerequisites.py native/nemotron/issue264_validation_inputs.py native/nemotron/issue264_validation_launch.py native/nemotron/issue264_validation_runtime.py native/nemotron/issue264_validation_caption.py native/nemotron/issue264_validation_summary.py native/nemotron/issue264_validation_diagnose.py",
+    "outcome": "All checks passed.",
+    "black_command": ".venv/Scripts/python.exe -m black --check native/nemotron/issue264_validation_prerequisites.py native/nemotron/issue264_validation_inputs.py native/nemotron/issue264_validation_launch.py native/nemotron/issue264_validation_runtime.py native/nemotron/issue264_validation_caption.py native/nemotron/issue264_validation_summary.py native/nemotron/issue264_validation_diagnose.py",
+    "black_outcome": "Passed: all seven files unchanged after targeted Black formatted only the modified summary file."
+  },
+  "final_task_hashes": {
+    "runtime": "421542379782a4a22e4e1f375bda056fba1d396a17256def9d1442a1037a7913",
+    "summary": "8298c7c64a581f1229b7301bdef8185ebd5b432c19dd4ce79c05a52671149ae5",
+    "launcher_unchanged": "17ca6644a46201e906c7f1bf81c0230d41d0aa9bce0f5b922c01aea562b6baa2",
+    "prepared_caption_unchanged": "acc27035f6a627c0c7693cc47176831f03b29ba6a2c309d9d0c4d69068fa6550"
+  },
+  "preserved_history": "First01/02 remain invalid startup/setup, first03 invalid observer with actual native failures retained, first04 genuine failed acoustic scenario with meaningful early translated A and invalid revision3 retained. Historical source/driver hashes, raw traces and actual failure outcomes were not relabelled or rerun. The pre-F3/F5 dac85... caption hash remains historical; final F3/F5 preparation is explicitly linked instead of rewriting that hash.",
+  "next_gate": "Director pins exact task repair and original evidence reviewer assesses bounded E4 closure. No actual models/Flet until that verdict and Director explicit readiness. Repaired ABA, remaining nine GPU cases, four tapes and ten controlled caption cases remain unrun at the repaired candidate."
+}
