@@ -654,3 +654,49 @@ supersedes only that earlier acceptance blocker. Physical results remain
 certified. All R1–R6 software requirements and their preserved contracts remain
 in scope. PR CI, review and normal merge are separate publication obligations.
 
+### PR #267 CI integration repairs
+
+The first [PR CI run](https://github.com/kapitalismho/PuriPuly-heart/actions/runs/39171950809)
+used head `68b80e7c94cd2751099ad2da8a3dfffd1653fcb4` and synthetic merge
+`b28099c1a67f17e582028e4b58250f1cde9da4ff` against `639144cb`.
+Its Windows Python 3.14.7 jobs reported four Contracts, twelve UI and six
+Runtime failures. Lint, Architecture, Providers, Tooling, Broker and Overlay
+passed, including deterministic/graphics native tests and all five required
+real-child integration cases. Codex completed its review of that exact head
+without findings. The failed jobs were not treated as passes or retried
+unchanged.
+
+The four Contracts failures were stale schedules in
+`test_self_ui_isolation.py`: merged stable and provider-final-only input was
+expected to display or send before any eligible boundary. Those cases now
+prove provider/ingress progress and preboundary suppression while UI is held,
+then publish actual source-owner `SpeechEnd` and observe the source-only
+caption before releasing UI or translation. Transport cases establish a
+genuinely blocked send before proving translation progress and exact final
+delivery. Independent recognition-unit controls remain immediate and receive
+no invented VAD event. Existing deadlines, source-closure isolation,
+request-count, identity/order and cleanup assertions remain. The full file,
+four neighboring pressure/isolation cases and caption-policy suite passed
+28 tests. An initial new assertion used `None` instead of the defined zero
+boundary sentinel; it was corrected without changing the visible-behavior
+assertions or production code.
+
+The eighteen UI/Runtime failures came from an inherited test fixture.
+Baseline commit `6591a4d2` added runtime-toggle admission to the application
+boundary, but the shared test helper supplied a minimal `SimpleNamespace`
+without `runtime_toggle_intent`. An isolated baseline source import reproduced
+that exception before the backend was reached, and a baseline Discord success
+case failed at the same enabled-state assertion. The helper now constructs the
+real `ApplicationControlOwner` and `ControlEvents`, not no-op admission hooks.
+The original EULA, capture-takeover and four gated audio-start ordering cases
+are unchanged. Two QQ negative cases now prove their intended activation
+backend was reached; four owner-backed QQ/Discord warmup cases additionally
+cover held progress, repeated-submit rejection, success and rollback.
+
+Local validation passed 1,299 UI cases with the two existing opt-in process
+skips, plus 45 application-boundary/translation-enable cases. The controlled
+checks execute production control/enable owners with synthetic dependencies
+and Flet controls on a test page; they do not claim a new native GUI or live
+authentication observation. These CI repairs change tests and fixtures only,
+not the accepted application or native implementation.
+

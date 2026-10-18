@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from types import SimpleNamespace
 from typing import cast
 
 from puripuly_heart.app.services.settings_application import (
@@ -14,7 +12,6 @@ from puripuly_heart.app.services.settings_application import (
     settings_view_surface_snapshots,
 )
 
-from puripuly_heart.app.ports.application_control import ApplicationControl
 from puripuly_heart.app.ports.application_runtime_logging import (
     ApplicationRuntimeLoggingPort,
 )
@@ -42,6 +39,8 @@ from puripuly_heart.app.ports.ui_application_intents import (
 from puripuly_heart.app.ports.ui_application_state import (
     UiApplicationStateRuntimePort,
 )
+from puripuly_heart.app.services.application_control import ApplicationControlOwner
+from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
@@ -526,14 +525,22 @@ def compose_test_ui_application_boundary(
         osc_state_publisher=osc_state_publisher,
     )
     boundary.attach_control(
-        cast(
-            ApplicationControl,
-            SimpleNamespace(
-                instance_id="00000000-0000-0000-0000-000000000231",
-                _resource_lock=asyncio.Lock(),
-                _lock=asyncio.Lock(),
-                lock_owned_by_current_task=lambda: False,
-            ),
-        )
+        ApplicationControlOwner(
+            application=boundary,
+            settings=None,
+            pipeline=None,
+            results=None,
+            events=ControlEvents(),
+            provisioning=lambda: None,
+            gpu=lambda: None,
+            peer=lambda: None,
+            calibration=lambda: None,
+            gemma=lambda: None,
+            sync_ui=lambda: None,
+            locale_choices=("en",),
+            localize=lambda key: key,
+            gemma_selection=lambda _settings: None,
+            instance_id="00000000-0000-0000-0000-000000000231",
+        ),
     )
     return boundary
