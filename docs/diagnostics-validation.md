@@ -548,9 +548,95 @@ deadline. Ordinary PEER without prior SELF intent, hidden/empty/expired scenes,
 disabled epochs and cleared scenes remain negative controls. Both secondary-only
 and translated-primary recovery cases cross Python JSON into a fresh native
 owner and require active/due schedules plus correlated render/readiness/submit
-success. The focused Python run passed 26 tests; eight native cross-language
-tests passed, including both new recovery cases. An initial test-only field-name
-compilation error was corrected to the existing wire field, not a product change.
+success. An initial test-only field-name compilation error was corrected to the
+existing wire field, not a product change.
+
+### Final software verification
+
+The repaired caption/admission, drawability and event checkpoint was
+`82f37eabf150e4ae7780ad810de13379eb858727`. The final product checkpoint is
+`cc08aee64517989e0e0b883850fb60b420d8940d`: its only additional product change
+is fresh-epoch seeding in `NativeRetryIntentProjection.begin`. Independent
+whole-checkpoint and focused-native repair reviews verified all accepted
+findings, retaining unaffected original review coverage. They are not an
+issue-closure or physical-observation approval.
+
+| Executed selection | Applicable checkpoint | Result |
+| --- | --- | --- |
+| Source, translation, caption, output and pressure regressions | `82f37eab` | 499 passed |
+| Overlay, desktop and configuration regressions | `82f37eab` | 372 passed; 42 existing deprecation warnings |
+| Architecture contracts | `82f37eab` | 378 passed |
+| Full native default-parallel suite | `82f37eab` | 302 passed; one opt-in memory probe ignored by default |
+| Contract/process compatibility selection | Initial contract-16/retry-2 implementation, unchanged afterward | 215 passed; no skips |
+| README real-child integration selection | Initial integrated checkpoint, unchanged contracts afterward | Five passed; no skips |
+| Scene protection and active freshness | `cc08aee6` | 26 passed |
+| Native Python cross-language selection, including two new recovery cases | `cc08aee6` | Eight passed; 102 other runtime tests filtered out |
+
+These selections overlap and are not a summed suite total. The six fixed-schedule
+baseline comparisons were repeated after the admission/configuration repairs
+and remained identical. Global Ruff and Black checks passed at `82f37eab`;
+Black checked 1,123 files. The three Python files changed afterward passed their
+focused Black/Ruff checks. Changed native files passed rustfmt. Whole-tree
+rustfmt still reports differences in unchanged `logging.rs`,
+`renderer/backend.rs`, `renderer/layout.rs` and `tests/renderer.rs`; those files
+were not reformatted. The default-ignored memory probe was separately executed:
+8,192 offscreen render/readiness operations passed, without HMD observation.
+
+An earlier parallel native run had four `overlay control write blocked` failures.
+The serial run passed, and the final default-parallel run passed after other
+native jobs had stopped. An environmental cause was not proven; the failures
+are retained, with no timeout relaxation or weakened product assertion.
+
+Actual desktop pixels at `82f37eab` confirmed repaired queued A/B admission,
+appearance order and focus, plus unchanged sticky translation/provider work
+across a compatible chatbox-only setting change. Safe representative frames
+also covered mini-turns, ready/pending closure, retained updates and mixed PEER.
+The extended driver later exited 1 during a capture safety interruption.
+Six late images and their derived sheet were deleted and excluded; no final
+late-terminal/fast-frame or new interaction pass is claimed. The earlier
+unchanged terminal and drag/pass-through evidence remains separately attributed.
+No further capture was attempted. Owned GUI resources, authenticated manifests,
+runner scripts and generated profiles/caches were removed.
+
+### Final actual OpenVR continuation
+
+The matched release SHA-256 is
+`a4d79740556ec358a3c900f473ee53b23bab7217890142a8418c456c094bd3d9`.
+It was built at `82f37eab`; native production code is unchanged at `cc08aee6`.
+Its recorded startup contract is bridge 16, execution r2, exclusive native
+retry v2 and speaker identity v2. Actual runs used D3D11/OpenVR, P05 and handoff
+`off`, unique owned overlay keys and synthetic local inputs.
+
+The first repaired run at `82f37eab` recorded 26 correlated successful
+fresh-render/readiness/submission completions for sparse updates, exhaustion,
+fast latest-tail protection and normal SELF removal leaving secondary-only
+PEER. It then stopped before empty publication because the probe incorrectly
+equated the Windows Python launcher PID with the helper's actual PID. Native
+remained healthy and shut down gracefully. The failed harness attempt remains
+recorded; the correction distinguishes the two exclusively owned identities.
+
+The authorized bounded continuation at `cc08aee6` passed 22 checks without
+replaying the sparse/fast workload. Minimal setup supplied nine correlated
+completions, including five final opportunities over the secondary-only PEER
+survivor. An existing owner receipt confirmed the successful current empty
+handoff while the overlay remained visible. Only then was the owned background
+helper shut down. An independent observer received its foreign process-quit
+event during the empty grace, while the native-owned overlay remained healthy.
+This proves event generation, not that this child consumed that exact event;
+raw-ingress tests and the actual-owner 17-event, 8/8/1-budget regression provide
+the separate consumption/classification evidence.
+
+Visibility sampling bracketed Hide at 512.572–528.109 ms after Python empty
+publication. This is not an exact native submission-to-Hide measurement.
+The handle remained valid; later samples stayed hidden, the owner reported
+confirmed Hide, and no empty-scene retry episode appeared. Explicit shutdown
+returned `shutdown_complete` and exit 0; lookup of the exact owned key returned
+`UnknownOverlay`. All helper/native/observer/bridge resources closed and the
+private manifest was removed. No user process or runtime setting was changed.
+The original failed run's missing payload remains unknown; this successful
+continuation does not retroactively identify its cause.
+
+### Remaining physical acceptance
 
 Physical HMD consumption, comfort, sparse-update freshness on an affected
 headset and long-session behavior are **not run**. An installed runtime,
