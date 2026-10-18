@@ -332,3 +332,44 @@ async def test_global_asset_cleanup_still_cancels_and_joins_current_install(tmp_
             await asyncio.gather(cleanup, return_exceptions=True)
         await asyncio.gather(install, return_exceptions=True)
         await assets.close()
+
+
+@pytest.mark.asyncio
+async def test_request_cancellation_joins_acquisition_through_repeated_cancel(tmp_path):
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    release_cleanup = asyncio.Event()
+    settled = asyncio.Event()
+
+    class GatedAssets(NativeSpeakerAssets):
+        async def _install_download(self, cancel_event):
+            entered.set()
+            assert await asyncio.to_thread(cancel_event.wait, 5)
+            cancelled.set()
+            await release_cleanup.wait()
+            settled.set()
+            raise asyncio.CancelledError
+
+    assets = GatedAssets(
+        artifact_path=tmp_path / "speaker" / "model.gguf", runtime_dir=tmp_path / "runtime"
+    )
+    install = asyncio.create_task(assets.install(download_consent=True))
+    try:
+        await asyncio.wait_for(entered.wait(), 5)
+        install.cancel()
+        await asyncio.wait_for(cancelled.wait(), 5)
+        for _ in range(3):
+            install.cancel()
+            await asyncio.sleep(0)
+            assert not install.done()
+            assert not settled.is_set()
+            assert assets.phase == "installing"
+        release_cleanup.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(install, 5)
+        assert settled.is_set()
+        assert assets.phase == "idle"
+    finally:
+        release_cleanup.set()
+        await asyncio.gather(install, return_exceptions=True)
+        await assets.close()

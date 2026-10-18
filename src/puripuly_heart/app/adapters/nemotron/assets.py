@@ -94,7 +94,12 @@ class NativeSpeakerAssets:
             return await self.inspect()
         except asyncio.CancelledError:
             cancel_event.set()
-            await asyncio.shield(asyncio.gather(install_task, return_exceptions=True))
+            settled = asyncio.gather(install_task, return_exceptions=True)
+            while not settled.done():
+                try:
+                    await asyncio.shield(settled)
+                except asyncio.CancelledError:
+                    continue
             raise
         finally:
             if self._install_task is install_task and install_task.done():

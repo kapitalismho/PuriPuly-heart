@@ -428,7 +428,10 @@ async def test_control_shutdown_waits_for_active_speaker_operation_cleanup(
 
 
 @pytest.mark.asyncio
-async def test_advertised_speaker_operation_cancel_waits_for_asset_cleanup(tmp_path, monkeypatch):
+@pytest.mark.parametrize("cancel_requests", [1, 2])
+async def test_advertised_speaker_operation_cancel_waits_for_asset_cleanup(
+    tmp_path, monkeypatch, cancel_requests
+):
     from puripuly_heart.composition import application_runtime
 
     entered = asyncio.Event()
@@ -465,6 +468,7 @@ async def test_advertised_speaker_operation_cancel_waits_for_asset_cleanup(tmp_p
     config.write_text(json.dumps(to_dict(settings)), encoding="utf-8")
     app = compose_headless_application(config)
     cancellation = None
+    duplicate_cancellation = None
     try:
         await app.start()
         control = app.control()
@@ -477,11 +481,20 @@ async def test_advertised_speaker_operation_cancel_waits_for_asset_cleanup(tmp_p
         assert not settled.is_set()
         assert not cancellation.done()
         assert not (await control.operation(accepted["operation_id"]))["terminal"]
+        if cancel_requests == 2:
+            duplicate_cancellation = asyncio.create_task(control.cancel(accepted["operation_id"]))
+            completed, _ = await asyncio.wait((cancellation, duplicate_cancellation), timeout=0.05)
+            assert not completed
+            assert not settled.is_set()
+            assert not (await control.operation(accepted["operation_id"]))["terminal"]
         release_cleanup.set()
         receipt = await asyncio.wait_for(cancellation, 5)
         assert settled.is_set()
         assert receipt["status"] == "cancelled"
         assert receipt["terminal"] is True
+        assert receipt["operation_id"] == accepted["operation_id"]
+        if duplicate_cancellation is not None:
+            assert await asyncio.wait_for(duplicate_cancellation, 5) == receipt
         assert assets.phase == "idle"
         assert await control.cancel(accepted["operation_id"]) == receipt
         successor = await control.submit(
@@ -501,4 +514,6 @@ async def test_advertised_speaker_operation_cancel_waits_for_asset_cleanup(tmp_p
         release_cleanup.set()
         if cancellation is not None:
             await asyncio.gather(cancellation, return_exceptions=True)
+        if duplicate_cancellation is not None:
+            await asyncio.gather(duplicate_cancellation, return_exceptions=True)
         await app.stop()
