@@ -842,6 +842,7 @@ def compose_application_runtime(
                 ),
                 sync_local_notice=lambda: require_local_asr().adapters.notice.sync(),
                 presentation_changed=refresh_overlay_presentation,
+                mutation_settled=lambda: publish_osc_state_from_runtime(),
                 disclosure_sink=enqueue_peer_disclosure,
                 superseded_sink=lambda: signatures.mark_superseded(settings.canonical),
                 localize=presentation.localize,

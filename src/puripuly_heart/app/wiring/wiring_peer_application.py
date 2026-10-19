@@ -72,6 +72,7 @@ def compose_peer_application(
     log_diagnostic: Callable[..., object],
     stop_audio_test: Callable[[], Awaitable[None]],
     translation_demand_sink: Callable[[], Awaitable[None]] | None = None,
+    mutation_settled: Callable[[], None] | None = None,
 ) -> PeerApplicationRuntime:
     state = PeerApplicationStateAdapter(
         settings_provider=settings_provider,
@@ -120,6 +121,7 @@ def compose_peer_application(
             **fields,
         ),
         translation_demand_sink=translation_demand_sink,
+        mutation_settled=mutation_settled,
     )
     target = PeerCaptureTargetApplicationOwner(
         settings=settings_owner,

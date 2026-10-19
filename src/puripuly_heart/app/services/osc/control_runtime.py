@@ -520,7 +520,6 @@ class OscControlIntegrationOwner:
 
     def _observe_local_send(self, item: OscPublishedValue) -> None:
         self._peer_comparison[item.parameter] = item.value
-        self._retryable_runtime_ingress.discard(item.parameter)
 
     def _pending_controls(self) -> tuple[tuple[str, bool | int], ...]:
         application = self._application_provider()
