@@ -568,6 +568,7 @@ class SelfCaptureSessionOwner:
         self._desired_active = False
         self._generation = 0
         self._generation_operation: tuple[int, dict[str, str | None]] | None = None
+        self._intent_generations: dict[asyncio.Task | None, int] = {}
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
@@ -811,7 +812,39 @@ class SelfCaptureSessionOwner:
         self._fault_tasks.add(task)
         task.add_done_callback(self._fault_tasks.discard)
 
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        generation = self._intent_generations.get(task)
+        return generation == self._generation if generation is not None else None
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        return tuple(
+            self._desired_active
+            for generation in self._intent_generations.values()
+            if generation == self._generation
+        )
+
     async def apply_intent(
+        self,
+        config: SelfCaptureSessionConfig,
+        *,
+        enabled: bool,
+        restart: bool = False,
+        force_immediate: bool = False,
+        explicit_toggle_off: bool = True,
+    ) -> SelfCaptureSessionSnapshot:
+        try:
+            return await self._apply_intent(
+                config,
+                enabled=enabled,
+                restart=restart,
+                force_immediate=force_immediate,
+                explicit_toggle_off=explicit_toggle_off,
+            )
+        finally:
+            self._intent_generations.pop(asyncio.current_task(), None)
+            self._notify_state_changed()
+
+    async def _apply_intent(
         self,
         config: SelfCaptureSessionConfig,
         *,
@@ -847,6 +880,7 @@ class SelfCaptureSessionOwner:
                 return self.snapshot
             self._generation += 1
             generation = self._generation
+            self._intent_generations[asyncio.current_task()] = generation
             self._generation_operation = (generation, current_diagnostic_operation())
             self._primary_failure = None
             self._desired_active = enabled

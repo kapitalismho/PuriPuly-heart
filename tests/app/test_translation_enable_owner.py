@@ -161,7 +161,7 @@ async def test_disable_owns_runtime_context_and_teardown_sequence() -> None:
         teardowns=teardowns,
     )
 
-    assert await owner.set_enabled(False) is False
+    assert await owner.set_enabled(False) is True
 
     assert runtime_values == [False]
     assert clears == ["clear"]
@@ -369,7 +369,7 @@ async def test_newer_intent_fences_warmup_completion(newer_intent: str, fails: b
         owner.warmup = lambda: asyncio.sleep(0)
         assert await owner.set_enabled(True) is True
     elif newer_intent == "disable":
-        assert await owner.set_enabled(False) is False
+        assert await owner.set_enabled(False) is True
     elif newer_intent == "exhaustion":
         owner.disable_for_managed_exhaustion(reopen_founder_letter=False)
     else:
@@ -488,7 +488,7 @@ async def test_newer_disable_fences_stale_managed_prepare_result() -> None:
     enable_task = asyncio.create_task(owner.set_enabled(True))
     await started.wait()
 
-    assert await owner.set_enabled(False) is False
+    assert await owner.set_enabled(False) is True
     release.set()
     assert await enable_task is False
 

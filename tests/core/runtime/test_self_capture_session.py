@@ -1432,9 +1432,13 @@ async def test_latest_intent_cancels_pending_admission_without_opening_source() 
 
     enable_task = asyncio.create_task(owner.apply_intent(session_config, enabled=True))
     await wait_until(lambda: len(admission.calls) == 1)
+    assert owner.mutation_authority(enable_task) is True
+    assert owner.pending_mutations() == (True,)
     disable_snapshot = await owner.apply_intent(session_config, enabled=False)
     gate.set()
     enable_snapshot = await enable_task
+    assert owner.mutation_authority(enable_task) is None
+    assert owner.pending_mutations() == ()
 
     assert disable_snapshot.state is SelfCaptureSessionState.STOPPED
     assert enable_snapshot.state is SelfCaptureSessionState.STOPPED

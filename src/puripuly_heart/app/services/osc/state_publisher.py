@@ -73,9 +73,11 @@ class OscStatePublisher:
         sender: OscSenderPort,
         *,
         state_provider: Callable[[], OscCanonicalState] | None = None,
+        sent_value_sink: Callable[[OscPublishedValue], None] | None = None,
     ) -> None:
         self._sender = sender
         self._state_provider = state_provider
+        self._sent_value_sink = sent_value_sink
         self._last_published: dict[str, bool | int] = {}
         self._started = False
 
@@ -93,7 +95,7 @@ class OscStatePublisher:
         state: OscCanonicalState,
         parameter: str,
     ) -> bool | int:
-        return cls._values_for_state(state)[parameter]
+        return cls.values_for_state(state)[parameter]
 
     @staticmethod
     def values_equal(
@@ -114,13 +116,13 @@ class OscStatePublisher:
         return self.publish_full(state or self._require_state())
 
     def publish_full(self, state: OscCanonicalState) -> tuple[OscPublishedValue, ...]:
-        values = self._values_for_state(state)
+        values = self.values_for_state(state)
         published = tuple(OscPublishedValue(name, value) for name, value in values.items())
         self._send_batch(published)
         return published
 
     def publish_delta(self, state: OscCanonicalState) -> tuple[OscPublishedValue, ...]:
-        values = self._values_for_state(state)
+        values = self.values_for_state(state)
         changed = tuple(
             OscPublishedValue(name, value)
             for name, value in values.items()
@@ -137,6 +139,12 @@ class OscStatePublisher:
     ) -> tuple[OscPublishedValue, ...]:
         return self.publish_full(state) if full or not self._started else self.publish_delta(state)
 
+    def publish_values(
+        self, values: tuple[OscPublishedValue, ...]
+    ) -> tuple[OscPublishedValue, ...]:
+        self._send_batch(values)
+        return values
+
     def on_avatar_change(self, state: OscCanonicalState) -> tuple[OscPublishedValue, ...]:
         return self.publish_full(state)
 
@@ -149,6 +157,8 @@ class OscStatePublisher:
     def _send(self, item: OscPublishedValue) -> None:
         self._sender.send_message(item.address, item.value)
         self._last_published[item.parameter] = item.value
+        if self._sent_value_sink is not None:
+            self._sent_value_sink(item)
 
     def _send_batch(self, items: tuple[OscPublishedValue, ...]) -> None:
         for completed, item in enumerate(items):
@@ -169,7 +179,7 @@ class OscStatePublisher:
         return self._state_provider()
 
     @staticmethod
-    def _values_for_state(state: OscCanonicalState) -> dict[str, bool | int]:
+    def values_for_state(state: OscCanonicalState) -> dict[str, bool | int]:
         fields_by_name = {field.name: getattr(state, field.name) for field in fields(state)}
         values: dict[str, bool | int] = {}
         for parameter, target in BOOLEAN_CONTROLS.items():

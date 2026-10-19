@@ -6,11 +6,13 @@ import inspect
 import logging
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 
 from puripuly_heart.app.ports.osc_control import (
     OSC_PARAMETER_DEFINITIONS,
     OscConnectionMode,
     OscControlCodecError,
+    OscControlMessage,
     decode_control_message,
 )
 from puripuly_heart.app.ports.oscquery import OscQueryServicePort
@@ -32,7 +34,7 @@ from puripuly_heart.core.runtime.oscquery import (
 )
 
 from .control_application import SettingsBackedOscControlApplication
-from .control_router import OscControlRouter
+from .control_router import RUNTIME_BOOL_CONTROLS, OscControlRouter, OscDispatchResult
 from .noop_query import NoopOscQueryService
 from .state_publisher import (
     OscCanonicalState,
@@ -42,6 +44,12 @@ from .state_publisher import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class _IngressObservation:
+    value: bool | int
+    revision: int
 
 
 class OscControlIntegrationOwner:
@@ -96,6 +104,9 @@ class OscControlIntegrationOwner:
         self._publication_pending: set[str] | None = None
         self._resync_operation_identity: dict[str, str | None] = {}
         self._apply_settings_callback = apply_settings
+        self._ingress_observations: dict[str, _IngressObservation] = {}
+        self._peer_comparison: dict[str, bool | int] = {}
+        self._retryable_runtime_ingress: set[str] = set()
 
         application = SettingsBackedOscControlApplication(
             settings_provider=settings_provider,
@@ -115,6 +126,9 @@ class OscControlIntegrationOwner:
             canonical_state_full_republisher=self._publish_full,
             canonical_state_projector=self._project_ui_state,
             error_sink=error_sink,
+            command_observer=self._observe_ingress,
+            settlement_observer=self._settle_ingress,
+            application_orders_runtime_controls=True,
         )
         self._receiver_owner.set_packet_handlers(
             control_packet_handler=self._handle_control_packet,
@@ -487,22 +501,56 @@ class OscControlIntegrationOwner:
         if sender is None:
             return None
         if self._publisher is None:
-            self._publisher = OscStatePublisher(sender)
+            self._publisher = OscStatePublisher(sender, sent_value_sink=self._observe_local_send)
         return self._publisher
 
-    def _is_echo(self, message: object) -> bool:
-        publisher = self._publisher
-        if publisher is None:
+    def _observe_ingress(self, message: OscControlMessage, revision: int) -> None:
+        self._ingress_observations[message.name] = _IngressObservation(message.value, revision)
+        self._peer_comparison[message.name] = message.value
+        self._retryable_runtime_ingress.discard(message.name)
+
+    def _settle_ingress(
+        self, message: OscControlMessage, revision: int, result: OscDispatchResult | None
+    ) -> None:
+        latest = self._ingress_observations.get(message.name)
+        if latest is not None and latest.revision == revision:
+            if message.name in RUNTIME_BOOL_CONTROLS and (result is None or not result.applied):
+                self._retryable_runtime_ingress.add(message.name)
+        self._publish_delta()
+
+    def _observe_local_send(self, item: OscPublishedValue) -> None:
+        self._peer_comparison[item.parameter] = item.value
+        self._retryable_runtime_ingress.discard(item.parameter)
+
+    def _pending_controls(self) -> tuple[tuple[str, bool | int], ...]:
+        application = self._application_provider()
+        provider = getattr(application, "osc_pending_controls", None)
+        owner_pending = tuple(provider()) if callable(provider) else ()
+        router_pending = tuple(
+            (message.name, message.value)
+            for message in self.router.pending_controls
+            if not callable(provider) or message.name not in RUNTIME_BOOL_CONTROLS
+        )
+        return owner_pending + router_pending
+
+    def _is_echo(self, message: OscControlMessage) -> bool:
+        latest = self._ingress_observations.get(message.name)
+        if (
+            message.name in self._retryable_runtime_ingress
+            and latest is not None
+            and OscStatePublisher.values_equal(message.name, message.value, latest.value)
+        ):
             return False
-        parameter = getattr(message, "name", None)
-        value = getattr(message, "value", None)
-        return (
-            isinstance(parameter, str)
-            and isinstance(value, (bool, int))
-            and publisher.is_echo(
-                parameter,
-                value,
-            )
+        comparison = self._peer_comparison.get(message.name)
+        if comparison is None or not OscStatePublisher.values_equal(
+            message.name, message.value, comparison
+        ):
+            return False
+        canonical = OscStatePublisher.value_for_state(self._state_provider(), message.name)
+        return OscStatePublisher.values_equal(message.name, message.value, canonical) and not any(
+            parameter == message.name
+            and not OscStatePublisher.values_equal(parameter, value, message.value)
+            for parameter, value in self._pending_controls()
         )
 
     def _begin_resync(self) -> int:
@@ -511,6 +559,9 @@ class OscControlIntegrationOwner:
         self._resync_deadline = time.monotonic() + self._resync_timeout_seconds
         self._resync_unsettled = set(OSC_PARAMETER_DEFINITIONS)
         self._resync_ready_generation = None
+        self._ingress_observations.clear()
+        self._peer_comparison.clear()
+        self._retryable_runtime_ingress.clear()
         return self._resync_generation
 
     def _current_resync_generation(self) -> int:
@@ -559,7 +610,17 @@ class OscControlIntegrationOwner:
         if publisher is None:
             return
         try:
-            published = publisher.publish_state(self._state_provider())
+            blocked = {parameter for parameter, _value in self._pending_controls()}
+            values = OscStatePublisher.values_for_state(self._state_provider())
+            last_published = publisher.last_published
+            published = publisher.publish_values(
+                tuple(
+                    OscPublishedValue(parameter, value)
+                    for parameter, value in values.items()
+                    if parameter not in blocked
+                    and self._peer_comparison.get(parameter, last_published.get(parameter)) != value
+                )
+            )
         except Exception as exc:
             self._record_publication_failure("delta_state", exc)
         else:
@@ -575,7 +636,16 @@ class OscControlIntegrationOwner:
         if publisher is None:
             return
         try:
-            published = publisher.publish_full(self._state_provider())
+            blocked = {parameter for parameter, _value in self._pending_controls()}
+            published = publisher.publish_values(
+                tuple(
+                    OscPublishedValue(parameter, value)
+                    for parameter, value in OscStatePublisher.values_for_state(
+                        self._state_provider()
+                    ).items()
+                    if parameter not in blocked
+                )
+            )
         except Exception as exc:
             self._record_publication_failure("full_state", exc)
             return

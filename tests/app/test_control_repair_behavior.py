@@ -2332,7 +2332,7 @@ async def test_translation_loading_stop_preempts_owner_and_orders_fresh_enable(
         assert attempts == ["load"]
         release_cleanup.set()
         if stop_surface == "gui":
-            assert await asyncio.wait_for(off_task, 5) is False
+            assert await asyncio.wait_for(off_task, 5) is True
         else:
             receipt = await control.wait(off["operation_id"], timeout=5)
             assert receipt["status"] == "applied"

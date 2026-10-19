@@ -186,6 +186,16 @@ GUI and headless hosts share application owners, runtime resources and turn-even
 
 Entry points are listed in Runtime Ownership; command and protocol details belong in the [CLI guide](cli.md).
 
+### OSC control reconciliation
+
+- Canonical settings and runtime owners retain application authority and wire-state projection. `OscControlIntegrationOwner` reconciles each parameter across router completion, UI/settings application, direct wrappers, immediate runtime observers, and background-owner settlement before `OscStatePublisher` sends selected values.
+- Latest accepted ingress value/revision is separate from `OscStatePublisher.last_published` (successful local sends) and effective receive/send comparisons. These observations and expectations never assign canonical state or establish remote receipt. Successful-send expectations advance only after the local sender succeeds.
+- Ordinary publication defers affected parameters while admitted work can still mutate them. `UiApplicationBoundary` exposes pending application activity; translation and Self/Peer capture owners expose their existing generation-based mutation authority, including background requests. Settlement after success, failure, or cancellation cleanup reconciles live state. A superseded task without mutation authority is not a publication barrier solely because it is still exiting.
+- Runtime Bool OSC operations delegate cross-surface ordering and matching OFF preemption to `ApplicationControlOwner`, rather than waiting behind an OSC-wide invocation lock. Communication bookkeeping never executes, replays, or autonomously retries application commands. Failed same-state runtime requests remain eligible for explicit ingress retry.
+- Lifecycle full snapshots, per-parameter resync fences, generation guards, and the event-anchored deadline remain separate from normal reconciliation. Local sends cannot settle the fence, and fenced initialization packets cannot become deferred commands or normal ingress observations.
+
+Implementation: `app/services/osc/control_runtime.py`, `app/services/osc/control_router.py`, `app/services/osc/state_publisher.py`, `app/services/ui_application.py`, `app/services/translation_enable.py`, `app/services/peer_application.py`, `core/runtime/self_capture.py`. Behavior: `tests/app/test_osc_reconciliation.py`, `tests/app/test_osc_control_runtime.py`, `tests/app/test_peer_application.py`, `tests/core/runtime/test_self_capture_session.py`.
+
 ## Runtime Pipeline
 
 `RuntimePipelineLauncher` builds and installs the active capture, STT, translation, output, UI-event, and VRChat microphone-state components.

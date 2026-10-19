@@ -123,6 +123,9 @@ class PeerApplicationOwner:
     )
     _last_activation_requested: bool | None = field(init=False, default=None, repr=False)
     _activation_generation: int = field(init=False, default=0, repr=False)
+    _intent_generations: dict[asyncio.Task | None, int] = field(
+        init=False, default_factory=dict, repr=False
+    )
     _activation_starting: bool = field(init=False, default=False, repr=False)
     _model_loading: bool = field(init=False, default=False, repr=False)
     _model_loading_generation: int | None = field(init=False, default=None, repr=False)
@@ -394,7 +397,25 @@ class PeerApplicationOwner:
                 self._runtime = runtime
             raise
 
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        generation = self._intent_generations.get(task)
+        return generation == self._activation_generation if generation is not None else None
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        return tuple(
+            bool(self._last_intent_enabled)
+            for generation in self._intent_generations.values()
+            if generation == self._activation_generation
+        )
+
     async def set_enabled(self, enabled: bool) -> None:
+        try:
+            await self._set_enabled(enabled)
+        finally:
+            self._intent_generations.pop(asyncio.current_task(), None)
+            self.presentation_changed()
+
+    async def _set_enabled(self, enabled: bool) -> None:
         state = self.state_provider()
         if not state.settings_available or self._ingress_stopped or state.ingress_frozen:
             return
@@ -407,6 +428,7 @@ class PeerApplicationOwner:
             return
         self._activation_generation += 1
         generation = self._activation_generation
+        self._intent_generations[asyncio.current_task()] = generation
         if enabled and not state.eula_accepted:
             self.disable_intent()
             self.sync_effective_flags()
