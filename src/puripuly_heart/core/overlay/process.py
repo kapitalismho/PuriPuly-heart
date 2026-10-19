@@ -30,6 +30,7 @@ from .diagnostics import OverlayDiagnosticsRecorder, default_overlay_diagnostics
 from .manifest import (
     OVERLAY_CONTRACT_VERSION,
     OVERLAY_EXECUTION_CONTRACT,
+    OVERLAY_NATIVE_RETRY_CONTRACT,
     OVERLAY_SPEAKER_IDENTITY_CONTRACT,
     OverlayLaunchManifest,
 )
@@ -1302,9 +1303,9 @@ class OverlayProcessManager:
         capability = capabilities.get("native_presentation_retry")
         if not isinstance(capability, dict) or set(capability) != {"version", "ownership"}:
             return False
-        version = capability.get("version")
-        ownership = capability.get("ownership")
-        return type(version) is int and version == 1 and ownership == "exclusive"
+        return (
+            type(capability.get("version")) is int and capability == OVERLAY_NATIVE_RETRY_CONTRACT
+        )
 
     def _handle_desktop_first_visible(
         self, event: dict[str, object], trusted_process_event: bool

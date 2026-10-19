@@ -207,6 +207,8 @@ For bidirectional control setup and the stable parameter ABI, see [VRChat OSC co
 
 SELF translations can appear in the chatbox while a speech turn is still in progress and update as more speech arrives. The app marks previews separately from completed turns. See [progressive Self chatbox translations](docs/vrchat-osc.md#progressive-self-chatbox-translations) for correction, ordering, and pagination behavior.
 
+SELF overlay captions keep one caption per speech turn. On the merged speech route, the original appears at a speech-end boundary, when a translation completes, or when the source closes—not on every stable recognition update. Resumed speech grows that caption in place, keeping its previous same-turn translation until the new one arrives. Late translations update retained captions without taking focus from newer speech; expired or displaced captions are not revived. Chatbox progression and PEER captions keep their existing policies.
+
 ### If audio capture does not work
 If audio capture does not work, open **Settings > General** and follow these steps.
 

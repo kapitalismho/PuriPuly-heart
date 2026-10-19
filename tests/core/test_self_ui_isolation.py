@@ -35,6 +35,7 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
     clock = FakeClock(_now=10.0)
     overlay = OverlayPresenter(calibration=OverlayCalibration(), clock=clock)
     llm = BlockingLLMProvider()
+    llm.response_text = "translated source"
     harness = compose_translation_test_harness(
         stt=None,
         llm=llm,
@@ -101,6 +102,25 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
         ingress = asyncio.create_task(operation)
         await asyncio.wait_for(llm.started.wait(), 1.0)
         await asyncio.wait_for(asyncio.shield(ingress), 1.0)
+        assert len(llm.calls) == 1
+        assert llm.calls[0]["text"] == "source"
+        assert harness.ui_events.full()
+        assert not ui_release.is_set()
+        assert not llm.release.is_set()
+        if route != "independent":
+            assert not overlay.snapshot().blocks
+            source_revision = snapshots[-1].source_revision
+            assert snapshots[-1].boundary_source_revision == 0
+            assert not snapshots[-1].source_closed
+            await asyncio.wait_for(
+                harness.self_owner.handle_vad_event(SpeechEnd(identity.segment.segment_id)),
+                1.0,
+            )
+            assert snapshots[-1].source_revision == source_revision
+            assert snapshots[-1].boundary_source_revision == source_revision
+            assert not snapshots[-1].source_closed
+        else:
+            assert harness.self_owner.merge_buffer is None
         blocks = overlay.snapshot().blocks
         assert [block.primary_text for block in blocks] == ["source"]
         assert [block.secondary_text for block in blocks] == [""]
@@ -120,9 +140,8 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
                     (STTTextContribution("source", 0, 6),) if route == "stable" else ()
                 ),
             )
-            await harness.self_owner.handle_stt_event(terminal)
-            await harness.self_owner.handle_stt_event(terminal)
-            await harness.self_owner.handle_vad_event(SpeechEnd(identity.segment.segment_id))
+            await asyncio.wait_for(harness.self_owner.handle_stt_event(terminal), 1.0)
+            await asyncio.wait_for(harness.self_owner.handle_stt_event(terminal), 1.0)
             buffer = harness.self_owner.merge_buffer
             assert buffer is not None
             assert buffer.finalize_wait_task is not None
@@ -159,6 +178,8 @@ async def test_real_self_owners_start_provider_and_apply_source_before_ui_releas
         await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1.0)
         translated = overlay.snapshot().blocks[0]
         original = blocks[0]
+        assert translated.primary_text == "source"
+        assert translated.secondary_text == "translated source"
         assert (translated.id, translated.occupant_key, translated.appearance_seq) == (
             original.id,
             original.occupant_key,
@@ -189,6 +210,7 @@ async def test_real_self_translation_completes_while_bridge_transport_is_blocked
     bridge._authenticated_connections.add(transport)
     overlay = OverlayPresenter(bridge=bridge, calibration=OverlayCalibration(), clock=clock)
     llm = BlockingLLMProvider()
+    llm.response_text = "translated source"
     harness = compose_translation_test_harness(
         stt=None,
         llm=llm,
@@ -231,14 +253,48 @@ async def test_real_self_translation_completes_while_bridge_transport_is_blocked
             )
             await harness.self_owner.handle_stt_event(event)
         await asyncio.wait_for(llm.started.wait(), 1.0)
+        assert len(llm.calls) == 1
+        assert llm.calls[0]["text"] == "source"
+        assert not llm.release.is_set()
+        if route != "independent":
+            assert not overlay.snapshot().blocks
+            assert not transport.send_started.is_set()
+            await asyncio.wait_for(
+                harness.self_owner.handle_vad_event(SpeechEnd(identity.segment.segment_id)),
+                1.0,
+            )
+        else:
+            assert harness.self_owner.merge_buffer is None
+        source = overlay.snapshot()
+        assert [(block.primary_text, block.secondary_text) for block in source.blocks] == [
+            ("source", "")
+        ]
         await asyncio.wait_for(transport.send_started.wait(), 1.0)
-        source_revision = overlay.snapshot().revision
+        assert not transport.sent_payloads
+        assert not transport.release_send.is_set()
+        assert not llm.release.is_set()
         llm.release.set()
         await _wait_until(lambda: bool(overlay.snapshot().blocks[0].secondary_text))
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), 1.0)
         translated = overlay.snapshot()
-        assert translated.revision > source_revision
+        assert translated.revision > source.revision
+        assert [(block.primary_text, block.secondary_text) for block in translated.blocks] == [
+            ("source", "translated source")
+        ]
+        assert (
+            translated.blocks[0].id,
+            translated.blocks[0].occupant_key,
+            translated.blocks[0].appearance_seq,
+        ) == (
+            source.blocks[0].id,
+            source.blocks[0].occupant_key,
+            source.blocks[0].appearance_seq,
+        )
         assert bridge._mailbox.current_scene.snapshot.revision == translated.revision
-        assert bridge._mailbox.current_scene.snapshot.blocks[0].secondary_text
+        assert [
+            (block.primary_text, block.secondary_text)
+            for block in bridge._mailbox.current_scene.snapshot.blocks
+        ] == [("source", "translated source")]
         assert not transport.sent_payloads
         assert not transport.release_send.is_set()
         assert len(llm.calls) == 1
@@ -250,6 +306,10 @@ async def test_real_self_translation_completes_while_bridge_transport_is_blocked
         revisions = [message["payload"]["revision"] for message in transport.sent_payloads]
         assert revisions == sorted(set(revisions))
         assert revisions[-1] == translated.revision
+        assert [
+            (block["primary_text"], block["secondary_text"])
+            for block in transport.sent_payloads[-1]["payload"]["blocks"]
+        ] == [("source", "translated source")]
     finally:
         llm.release.set()
         transport.release_send.set()

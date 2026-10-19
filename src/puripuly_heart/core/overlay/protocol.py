@@ -5,6 +5,7 @@ from typing import Literal
 
 ChannelId = Literal["self", "peer"]
 U64_MAX = (1 << 64) - 1
+NATIVE_SELF_SCENE_TARGET = "scene:self"
 SPEAKER_IDENTITY_STYLES = ("gold", "cyan", "coral", "blue")
 SpeakerStyle = Literal["gray", "gold", "cyan", "coral", "blue"]
 # `active_peer` remains a reserved compatibility/fallback variant. Normal
@@ -210,6 +211,13 @@ class NativeFreshRenderGenerations:
 class NativeFreshRenderTargets:
     self: str | None = None
     peer: str | None = None
+
+    def __post_init__(self) -> None:
+        for target in (self.self, self.peer):
+            if target is not None and (not isinstance(target, str) or not target.strip()):
+                raise ValueError("native fresh render target must be a non-empty string")
+        if self.peer == NATIVE_SELF_SCENE_TARGET:
+            raise ValueError("SELF scene coverage cannot target the PEER retry channel")
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {}

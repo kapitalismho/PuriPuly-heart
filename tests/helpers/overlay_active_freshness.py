@@ -22,10 +22,16 @@ async def projected_self_lifecycle() -> list[dict[str, object]]:
     turn = UUID("00000000-0000-0000-0000-000000000206")
     snapshots = []
     try:
-        for text in ("source", "source extension", "source extension complete", "source churn"):
+        for index, text in enumerate(
+            ("source", "source extension", "source extension complete", "source churn")
+        ):
             await presenter.emit(
                 adapter.self_active_update(
-                    text=text, utterance_id=turn, occupant_key=f"self:{turn}"
+                    text=text,
+                    secondary_text=f"synthetic completed translation {index}",
+                    utterance_id=turn,
+                    occupant_key=f"self:{turn}",
+                    target_language="ko",
                 )
             )
             snapshots.append(presenter.snapshot().to_dict())

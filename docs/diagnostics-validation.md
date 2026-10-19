@@ -417,3 +417,286 @@ After the final test-only import-order correction, the whole provisioning-owner 
 
 A pre-publication Black check also reported all six affected Python files unchanged.
 
+## SELF mini-turn captions and latest-scene protection — #265
+
+Authority: [issue #265](https://github.com/kapitalismho/PuriPuly-heart/issues/265).
+Implementation started from `639144cb27c3f5fa69a90375e49360c505dbc7b3`.
+The initial integrated product was `458b1faa39f5c728d7e4ca7d20d83899637020b7`;
+`eba9abb81404019e8912d37dc47240599a7bc0f3` changed only a superseded
+same-episode test assertion and blocked-fixture cleanup. These local checkpoints
+are not a published PR, release, or issue-closure receipt.
+
+### Controlled source and output preservation
+
+The locked Python 3.14.7 environment used this checkout's editable package,
+NumPy 2.5.1 and websockets 16.1.1. Actual source, translation, projection,
+output, paginator and presenter owners consumed synthetic input and a held
+local provider. The recording sender was in-process: these results do not claim
+UDP reception or VRChat display.
+
+The baseline/candidate comparison fixed canonical UUID allocation, input order,
+provider releases and the production 400 ms grace. Its schedule was
+`alpha` → `alpha beta`, speech end, translation release, compatible
+`alpha beta.` punctuation reuse, 450 ms timer service, then `bravo`,
+speech end/result release and another 450 ms timer service.
+
+| Route | Overlay delivery | Requests, baseline/candidate | Local-sender payloads, baseline/candidate | Canonical identity, revisions, closure and target coverage |
+| --- | --- | --- | --- | --- |
+| Stable append | Normal | 3 / 3 | 3 / 3 | Identical |
+| Stable append | Blocked | 3 / 3 | 3 / 3 before sink release | Identical |
+| Stable append | Disabled | 3 / 3 | 3 / 3 | Identical |
+| Final only | Normal | 2 / 2 | 3 / 3 | Identical |
+| Final only | Blocked | 2 / 2 | 3 / 3 before sink release | Identical |
+| Final only | Disabled | 2 / 2 | 3 / 3 | Identical |
+
+Payload order was `alpha beta (T(alpha beta))`,
+`alpha beta. (T(alpha beta))`, then `bravo (T(bravo))`.
+All cases ended with zero unsent destination batches. Blocked cases applied no
+overlay blocks before release while requests and sender progression completed.
+This is schedule-controlled preservation, not identical wall-clock timing.
+
+### Initial actual desktop observation
+
+The production Flet desktop child received the actual source-owner → translation
+owner → output → presenter → bridge/mailbox path. Only source/VAD input,
+translation responses and the external sender were controlled. This was the
+actual application overlay, not the full main GUI or a live ASR/LLM service.
+SystemClock, 400 ms grace, contract 16 and Flet/flet-desktop 1.0.0 were recorded.
+Private manifests and ephemeral loopback ports isolated the run. Captures
+covered only the owned synthetic backdrop and overlay region.
+
+Observed pixels showed no caption during a held-translation stable burst, source
+at the first boundary, matching translation attachment, unchanged resumed
+source, second-boundary growth with the prior translation, and newer completed
+source/translation before another boundary. Ready, pending, disabled and failed
+closure paths were observed. A retained predecessor patch changed only its
+translation region; the successor's pixels stayed identical. Mixed PEER input,
+displacement without revival and independent final-only source-first display
+were also observed. Four fast completed translations arrived about 46–47 ms
+apart; the latest mixed scene remained correct.
+
+Actual edit-mode drag moved the owned window from `(0, 0)` to `(40, 40)`.
+Pass-through delivered two clicks to the owned backdrop while caption pixels
+remained unchanged. Earlier launcher/Pillow/privacy-guard failures and a
+synthetic-backdrop activation failure were retained, not counted as passes.
+The final backdrop-only correction enabled the successful interaction check.
+All owned processes exited and private manifests were deleted.
+
+### Native execution, work bounds and the discovered empty-scene failure
+
+The initial Windows release SHA-256 was
+`cce0d5a4a35488baff369a71eabd3b1bda623dca4e47c2981b06e5b00f9ae04b`.
+Its startup contract was bridge 16, execution r2, exclusive native retry v2 and
+speaker identity v2. P05 and handoff `off` were explicit.
+
+Actual Python projection/mailbox JSON crossed a loopback WebSocket into the
+native parser, reducer and presentation owner. Controlled renderer/submitter
+checks required active/due schedules and matching fresh-render, producer-ready
+and successful-submission witnesses. They covered wall/count exhaustion,
+sub-100 ms coalescing, retained patches/removal, transport held 800 ms,
+send-time expiry, delayed readiness, no-progress, clear coalescing and fresh epochs.
+
+| Same-caption workload | Fresh renders / submissions | Observed interval |
+| --- | --- | --- |
+| Six milestones 600 ms apart | 28 / 28 | 4,313 ms |
+| Six milestones 30 ms apart, then silence | 11 / 11 | 1,476 ms |
+
+Intervals start before the loopback owner connection and end after joined
+shutdown, including one empty frame and 600 ms settled-empty service. They
+exclude Python fixture production and compilation. These controlled software
+counts do not measure GPU utilization or HMD latency. Sparse rearmed episodes
+can perform more total work per caption; the preservation claim is about
+per-episode and simultaneous ownership bounds, not identical total work.
+The pressure scenario retained one pending scene and bounded receipt storage.
+
+A separate actual D3D11/OpenVR run with a unique owned overlay key recorded
+31 correlated completions. Sparse rearming, count-exhausted growth, fast latest
+tail and SELF removal with unchanged translated PEER passed. Fully empty
+revision 13 then failed with `openvr_failed`, native exit 1 and no graceful
+shutdown. Handle disappearance before 500 ms was error teardown, not successful
+Hide. The original binary discarded the exact API/event payload; its original
+cause remains unknown.
+
+One separately instrumented archive of the pinned candidate distinguished the
+failure stages. Empty revision 2 rendered a transparent frame, became
+producer-ready and completed `SetOverlayTexture`. An overlay `ProcessQuit`
+event (701) for a different process was then classified fatal with 377 ms of
+Hide grace remaining. No texture/calibration/Hide API error was observed.
+This proves a reachable PID-unaware event-classification defect; it does not
+recover the original run's missing payload. The repair preserves process
+identity through both event sources and ignores unrelated process quits while
+retaining genuine global/owned-process termination. Renderer, P05, event budget
+and the 500 ms Hide contract are unchanged.
+
+### Independent findings and verification limits
+
+Independent whole-checkpoint and focused-native review identified three
+additional defects: queued first admission could be lost behind a blocked
+predecessor; a chatbox-only setting change could blank compatible sticky text;
+and secondary-only PEER survivors could lose SELF scene protection. Repairs
+preserve the queued admission's position and appearance authority, reuse the
+translation owner's configuration-compatibility comparison, and use effective
+drawability for scene-level eligibility. Translated-primary and secondary-only
+survivor controls are both retained.
+
+A subsequent recovery-boundary review found that a fresh native epoch still
+dropped applicable SELF scene coverage over an unchanged secondary-only PEER
+survivor. Fresh-epoch seeding now preserves that eligible scene at trigger 1,
+episode 1 and the current phase without renewing the original caption deadline.
+Actual-presenter checks preserve identity/order and expire at that original
+deadline. Ordinary PEER without prior SELF intent, hidden/empty/expired scenes,
+disabled epochs and cleared scenes remain negative controls. Both secondary-only
+and translated-primary recovery cases cross Python JSON into a fresh native
+owner and require active/due schedules plus correlated render/readiness/submit
+success. An initial test-only field-name compilation error was corrected to the
+existing wire field, not a product change.
+
+### Final software verification
+
+The repaired caption/admission, drawability and event checkpoint was
+`82f37eabf150e4ae7780ad810de13379eb858727`. The final product checkpoint is
+`cc08aee64517989e0e0b883850fb60b420d8940d`: its only additional product change
+is fresh-epoch seeding in `NativeRetryIntentProjection.begin`. Independent
+whole-checkpoint and focused-native repair reviews verified all accepted
+findings, retaining unaffected original review coverage. They are not an
+issue-closure or physical-observation approval.
+
+| Executed selection | Applicable checkpoint | Result |
+| --- | --- | --- |
+| Source, translation, caption, output and pressure regressions | `82f37eab` | 499 passed |
+| Overlay, desktop and configuration regressions | `82f37eab` | 372 passed; 42 existing deprecation warnings |
+| Architecture contracts | `82f37eab` | 378 passed |
+| Full native default-parallel suite | `82f37eab` | 302 passed; one opt-in memory probe ignored by default |
+| Contract/process compatibility selection | Initial contract-16/retry-2 implementation, unchanged afterward | 215 passed; no skips |
+| README real-child integration selection | Initial integrated checkpoint, unchanged contracts afterward | Five passed; no skips |
+| Scene protection and active freshness | `cc08aee6` | 26 passed |
+| Native Python cross-language selection, including two new recovery cases | `cc08aee6` | Eight passed; 102 other runtime tests filtered out |
+
+These selections overlap and are not a summed suite total. The six fixed-schedule
+baseline comparisons were repeated after the admission/configuration repairs
+and remained identical. Global Ruff and Black checks passed at `82f37eab`;
+Black checked 1,123 files. The three Python files changed afterward passed their
+focused Black/Ruff checks. Changed native files passed rustfmt. Whole-tree
+rustfmt still reports differences in unchanged `logging.rs`,
+`renderer/backend.rs`, `renderer/layout.rs` and `tests/renderer.rs`; those files
+were not reformatted. The default-ignored memory probe was separately executed:
+8,192 offscreen render/readiness operations passed, without HMD observation.
+
+An earlier parallel native run had four `overlay control write blocked` failures.
+The serial run passed, and the final default-parallel run passed after other
+native jobs had stopped. An environmental cause was not proven; the failures
+are retained, with no timeout relaxation or weakened product assertion.
+
+Actual desktop pixels at `82f37eab` confirmed repaired queued A/B admission,
+appearance order and focus, plus unchanged sticky translation/provider work
+across a compatible chatbox-only setting change. Safe representative frames
+also covered mini-turns, ready/pending closure, retained updates and mixed PEER.
+The extended driver later exited 1 during a capture safety interruption.
+Six late images and their derived sheet were deleted and excluded; no final
+late-terminal/fast-frame or new interaction pass is claimed. The earlier
+unchanged terminal and drag/pass-through evidence remains separately attributed.
+No further capture was attempted. Owned GUI resources, authenticated manifests,
+runner scripts and generated profiles/caches were removed.
+
+### Final actual OpenVR continuation
+
+The matched release SHA-256 is
+`a4d79740556ec358a3c900f473ee53b23bab7217890142a8418c456c094bd3d9`.
+It was built at `82f37eab`; native production code is unchanged at `cc08aee6`.
+Its recorded startup contract is bridge 16, execution r2, exclusive native
+retry v2 and speaker identity v2. Actual runs used D3D11/OpenVR, P05 and handoff
+`off`, unique owned overlay keys and synthetic local inputs.
+
+The first repaired run at `82f37eab` recorded 26 correlated successful
+fresh-render/readiness/submission completions for sparse updates, exhaustion,
+fast latest-tail protection and normal SELF removal leaving secondary-only
+PEER. It then stopped before empty publication because the probe incorrectly
+equated the Windows Python launcher PID with the helper's actual PID. Native
+remained healthy and shut down gracefully. The failed harness attempt remains
+recorded; the correction distinguishes the two exclusively owned identities.
+
+The authorized bounded continuation at `cc08aee6` passed 22 checks without
+replaying the sparse/fast workload. Minimal setup supplied nine correlated
+completions, including five final opportunities over the secondary-only PEER
+survivor. An existing owner receipt confirmed the successful current empty
+handoff while the overlay remained visible. Only then was the owned background
+helper shut down. An independent observer received its foreign process-quit
+event during the empty grace, while the native-owned overlay remained healthy.
+This proves event generation, not that this child consumed that exact event;
+raw-ingress tests and the actual-owner 17-event, 8/8/1-budget regression provide
+the separate consumption/classification evidence.
+
+Visibility sampling bracketed Hide at 512.572–528.109 ms after Python empty
+publication. This is not an exact native submission-to-Hide measurement.
+The handle remained valid; later samples stayed hidden, the owner reported
+confirmed Hide, and no empty-scene retry episode appeared. Explicit shutdown
+returned `shutdown_complete` and exit 0; lookup of the exact owned key returned
+`UnknownOverlay`. All helper/native/observer/bridge resources closed and the
+private manifest was removed. No user process or runtime setting was changed.
+The original failed run's missing payload remains unknown; this successful
+continuation does not retroactively identify its cause.
+
+### Physical evidence limits and closure scope
+
+Physical HMD consumption, comfort, sparse-update freshness on an affected
+headset and long-session behavior are **not run**. An installed runtime,
+successful API submission or desktop pixels cannot substitute for those
+observations. The finite shared caption window still permits displacement
+before a late translation, and fast completed translations can still cause
+closely spaced visible changes. No cross-turn grouping or new dwell timer was
+introduced.
+
+The maintainer subsequently approved closing #265 on software verification,
+excluding physical HMD and long-session observation from this issue's closure
+criteria. The [recorded scope decision](https://github.com/kapitalismho/PuriPuly-heart/issues/265#issuecomment-6255868549)
+supersedes only that earlier acceptance blocker. Physical results remain
+**not run**, not passed; no historical HMD-freshness fix or P05 equivalence is
+certified. All R1–R6 software requirements and their preserved contracts remain
+in scope. PR CI, review and normal merge are separate publication obligations.
+
+### PR #267 CI integration repairs
+
+The first [PR CI run](https://github.com/kapitalismho/PuriPuly-heart/actions/runs/39171950809)
+used head `68b80e7c94cd2751099ad2da8a3dfffd1653fcb4` and synthetic merge
+`b28099c1a67f17e582028e4b58250f1cde9da4ff` against `639144cb`.
+Its Windows Python 3.14.7 jobs reported four Contracts, twelve UI and six
+Runtime failures. Lint, Architecture, Providers, Tooling, Broker and Overlay
+passed, including deterministic/graphics native tests and all five required
+real-child integration cases. Codex completed its review of that exact head
+without findings. The failed jobs were not treated as passes or retried
+unchanged.
+
+The four Contracts failures were stale schedules in
+`test_self_ui_isolation.py`: merged stable and provider-final-only input was
+expected to display or send before any eligible boundary. Those cases now
+prove provider/ingress progress and preboundary suppression while UI is held,
+then publish actual source-owner `SpeechEnd` and observe the source-only
+caption before releasing UI or translation. Transport cases establish a
+genuinely blocked send before proving translation progress and exact final
+delivery. Independent recognition-unit controls remain immediate and receive
+no invented VAD event. Existing deadlines, source-closure isolation,
+request-count, identity/order and cleanup assertions remain. The full file,
+four neighboring pressure/isolation cases and caption-policy suite passed
+28 tests. An initial new assertion used `None` instead of the defined zero
+boundary sentinel; it was corrected without changing the visible-behavior
+assertions or production code.
+
+The eighteen UI/Runtime failures came from an inherited test fixture.
+Baseline commit `6591a4d2` added runtime-toggle admission to the application
+boundary, but the shared test helper supplied a minimal `SimpleNamespace`
+without `runtime_toggle_intent`. An isolated baseline source import reproduced
+that exception before the backend was reached, and a baseline Discord success
+case failed at the same enabled-state assertion. The helper now constructs the
+real `ApplicationControlOwner` and `ControlEvents`, not no-op admission hooks.
+The original EULA, capture-takeover and four gated audio-start ordering cases
+are unchanged. Two QQ negative cases now prove their intended activation
+backend was reached; four owner-backed QQ/Discord warmup cases additionally
+cover held progress, repeated-submit rejection, success and rollback.
+
+Local validation passed 1,299 UI cases with the two existing opt-in process
+skips, plus 45 application-boundary/translation-enable cases. The controlled
+checks execute production control/enable owners with synthetic dependencies
+and Flet controls on a test page; they do not claim a new native GUI or live
+authentication observation. These CI repairs change tests and fixtures only,
+not the accepted application or native implementation.
+

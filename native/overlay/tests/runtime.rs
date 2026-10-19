@@ -1,5 +1,6 @@
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
+use std::collections::VecDeque;
 use std::process::Command;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -11,6 +12,7 @@ use tokio_tungstenite::{accept_async, tungstenite::Message};
 
 use puripuly_heart_overlay::logging::OverlayLogger;
 use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperiment};
+use puripuly_heart_overlay::openvr::OpenVrEventSource;
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
     load_manifest, resolve_quiet_tail_profile, run_with_manifest, submit_texture,
@@ -593,6 +595,10 @@ struct OwnedSubmitterState {
     drops: AtomicUsize,
     first_texture_ptr: AtomicUsize,
     texture_pointer_mismatches: AtomicUsize,
+    runtime_events: Mutex<VecDeque<OpenVrRuntimeEvent>>,
+    runtime_event_batches: Mutex<Vec<(Instant, usize, Vec<OpenVrRuntimeEvent>)>>,
+    empty_submitted_at: Mutex<Option<Instant>>,
+    hide_requested_at: Mutex<Option<Instant>>,
 }
 
 struct OwnedSubmitterProbe {
@@ -803,6 +809,9 @@ impl OverlayFrameSubmitter for ObservedVisibilitySubmitter {
             } else {
                 "submit:text"
             });
+        if frame.layout().visible_blocks.is_empty() {
+            *self.state.empty_submitted_at.lock().unwrap() = Some(Instant::now());
+        }
         Ok(())
     }
 
@@ -812,12 +821,33 @@ impl OverlayFrameSubmitter for ObservedVisibilitySubmitter {
             .lock()
             .unwrap()
             .push(if visible { "show" } else { "hide" });
+        if !visible {
+            self.state
+                .hide_requested_at
+                .lock()
+                .unwrap()
+                .get_or_insert_with(Instant::now);
+        }
         self.observed = Some(visible);
         Ok(())
     }
 
     fn observed_overlay_visible(&self) -> Option<bool> {
         self.observed
+    }
+
+    fn poll_runtime_events(&mut self, max_events: usize) -> Vec<OpenVrRuntimeEvent> {
+        let mut pending = self.state.runtime_events.lock().unwrap();
+        let count = max_events.min(pending.len());
+        let events = pending.drain(..count).collect::<Vec<_>>();
+        if !events.is_empty() {
+            self.state.runtime_event_batches.lock().unwrap().push((
+                Instant::now(),
+                max_events,
+                events.clone(),
+            ));
+        }
+        events
     }
 }
 
@@ -2420,7 +2450,7 @@ async fn runtime_emits_overlay_ready_only_after_first_texture_submit() {
     );
     assert_eq!(
         ready["capabilities"]["native_presentation_retry"],
-        json!({"version":1,"ownership":"exclusive"})
+        json!({"version":2,"ownership":"exclusive"})
     );
     assert_eq!(
         ready["capabilities"]["speaker_identity_presentation"],
@@ -2648,8 +2678,14 @@ fn runtime_caption_fitting_survives_promotion_and_resets_for_reused_slot_identit
         .font_size_px;
     assert!((shrunk_primary - 132.0 * 0.8).abs() < 0.01);
     assert!((shrunk_secondary - 81.84 * 0.8).abs() < 0.01);
-    assert_eq!(runtime.state().snapshot().blocks[0].primary_text, primary_text);
-    assert_eq!(runtime.state().snapshot().blocks[0].secondary_text, secondary_text);
+    assert_eq!(
+        runtime.state().snapshot().blocks[0].primary_text,
+        primary_text
+    );
+    assert_eq!(
+        runtime.state().snapshot().blocks[0].secondary_text,
+        secondary_text
+    );
 
     occupant.id = "self:finalized".into();
     occupant.block_variant = OverlayPresentationBlockVariant::Finalized;
@@ -2661,9 +2697,16 @@ fn runtime_caption_fitting_survives_promotion_and_resets_for_reused_slot_identit
         ..Default::default()
     });
     let promoted = renderer.render_blocks(runtime.caption_blocks()).unwrap();
-    assert_eq!(promoted.layout().visible_blocks[0].primary_lines[0].font_size_px, shrunk_primary);
     assert_eq!(
-        promoted.layout().visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px,
+        promoted.layout().visible_blocks[0].primary_lines[0].font_size_px,
+        shrunk_primary
+    );
+    assert_eq!(
+        promoted.layout().visible_blocks[0]
+            .secondary_line
+            .as_ref()
+            .unwrap()
+            .font_size_px,
         shrunk_secondary,
     );
 
@@ -2677,9 +2720,16 @@ fn runtime_caption_fitting_survives_promotion_and_resets_for_reused_slot_identit
         ..Default::default()
     });
     let reoccupied = renderer.render_blocks(runtime.caption_blocks()).unwrap();
-    assert!((reoccupied.layout().visible_blocks[0].primary_lines[0].font_size_px - 132.0).abs() < 0.01);
     assert!(
-        (reoccupied.layout().visible_blocks[0].secondary_line.as_ref().unwrap().font_size_px - 81.84)
+        (reoccupied.layout().visible_blocks[0].primary_lines[0].font_size_px - 132.0).abs() < 0.01
+    );
+    assert!(
+        (reoccupied.layout().visible_blocks[0]
+            .secondary_line
+            .as_ref()
+            .unwrap()
+            .font_size_px
+            - 81.84)
             .abs()
             < 0.01
     );
@@ -4453,6 +4503,9 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
         .find(|fact| fact.0 == "self" && fact.1 == 8 && fact.2 == "completed")
         .unwrap();
     assert_eq!(completed.3, 1);
+    assert!(!audit
+        .iter()
+        .any(|fact| fact.0 == "self" && fact.1 == 7 && fact.2 == "completed"));
     let successful_attempts = owner.successful_attempt_audit_for_test();
     let normal_completion = successful_attempts
         .iter()
@@ -4461,7 +4514,7 @@ async fn production_owner_preemption_preserves_due_and_completes_on_pending_snap
                 && attempt.logical_causes.contains(PresentationCause {
                     kind: PresentationCauseKind::NativeFreshRetry,
                     channel: Some(PresentationCauseChannel::SelfChannel),
-                    trigger_generation: Some(7),
+                    trigger_generation: Some(8),
                 })
         })
         .unwrap_or_else(|| panic!("missing retry completion in {successful_attempts:?}"));
@@ -4957,6 +5010,265 @@ async fn production_owner_event_pump_preserves_idle_hide_tail() {
         .unwrap();
     assert!(owner.resources_released());
     server.await.unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_process_quit_preserves_empty_handoff_hide_grace_and_shutdown() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        ws.send(Message::Text(
+            json!({
+                "type":"snapshot",
+                "payload":{
+                    "revision":1,
+                    "blocks":[block("self:process-quit", "self", "visible", "", true)]
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_owner_ready(&mut ws).await;
+        ws.send(Message::Text(
+            json!({"type":"snapshot","payload":{"revision":2,"blocks":[]}})
+                .to_string()
+                .into(),
+        ))
+        .await
+        .unwrap();
+        wait_for_test_progress("successful empty submission", || {
+            server_state.empty_submitted_at.lock().unwrap().is_some()
+        })
+        .await;
+
+        for challenge_id in [2, 3, 4] {
+            if challenge_id == 3 {
+                assert!(!server_state.operations.lock().unwrap().contains(&"hide"));
+                let owned_pid = std::process::id();
+                let foreign_pid = owned_pid.wrapping_add(1).max(1);
+                server_state
+                    .runtime_events
+                    .lock()
+                    .unwrap()
+                    .extend((0..17).map(|index| OpenVrRuntimeEvent::ProcessQuit {
+                        source: if index % 2 == 0 {
+                            OpenVrEventSource::Overlay
+                        } else {
+                            OpenVrEventSource::System
+                        },
+                        pid: foreign_pid,
+                        old_pid: owned_pid,
+                        forced: index % 2 == 0,
+                        connection_lost: index % 3 == 0,
+                    }));
+                wait_for_test_progress("foreign ProcessQuit delivery", || {
+                    server_state.runtime_events.lock().unwrap().is_empty()
+                })
+                .await;
+            } else if challenge_id == 4 {
+                wait_for_test_progress("empty Hide grace completion", || {
+                    server_state.hide_requested_at.lock().unwrap().is_some()
+                })
+                .await;
+            }
+            ws.send(Message::Text(
+                json!({
+                    "type":"health_challenge",
+                    "challenge_id":challenge_id,
+                    "overlay_instance_id":"overlay-test",
+                    "runtime_generation":1
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            let status = tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    let message = next_owner_message(&mut ws).await;
+                    if message["type"] == "owner_status"
+                        && message["health_challenge_id"] == challenge_id
+                    {
+                        break message;
+                    }
+                }
+            })
+            .await
+            .expect("owner stopped answering health challenges");
+            assert_eq!(status["latest_applied_revision"], 2);
+            assert_eq!(status["latest_handoff_revision"], 2);
+            assert_eq!(status["current_covered_handoff"], true);
+            assert_eq!(status["observed_runtime_visible"], challenge_id != 4);
+            assert_eq!(status["desired_visible"], challenge_id != 4);
+            if challenge_id != 4 {
+                assert!(!server_state.operations.lock().unwrap().contains(&"hide"));
+            } else {
+                assert_eq!(status["classification"], "intentional_hidden");
+            }
+        }
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        ObservedVisibilitySubmitter {
+            state: state.clone(),
+            observed: None,
+        },
+    );
+    let logger = test_logger("process-quit-empty-hide-grace").await;
+    tokio::time::timeout(Duration::from_secs(10), owner.run(&mut bridge, &logger))
+        .await
+        .expect("owner failed to finish graceful shutdown")
+        .unwrap();
+    server.await.unwrap();
+    assert!(owner.resources_released());
+    assert_eq!(owner.readiness_timeout_count_for_test(), 0);
+    assert!(owner.fresh_retry_schedules_for_test().is_empty());
+    let attempts = owner.successful_attempt_audit_for_test();
+    assert_eq!(attempts.len(), 2);
+    let empty = attempts[1];
+    assert_eq!(
+        (
+            empty.logical_revision,
+            empty.render_generation,
+            empty.submission_attempt,
+            empty.scene_generation
+        ),
+        (2, 2, 2, 2)
+    );
+    assert_eq!(attempts[0].scene_generation, 1);
+    let operations = state.operations.lock().unwrap().clone();
+    assert!(operations.starts_with(&["submit:text", "show", "submit:empty", "hide"]));
+    assert!(operations[4..].iter().all(|operation| *operation == "hide"));
+    let submitted_at = state.empty_submitted_at.lock().unwrap().unwrap();
+    let hidden_at = state.hide_requested_at.lock().unwrap().unwrap();
+    assert!(hidden_at.duration_since(submitted_at) >= Duration::from_millis(500));
+    let batches = state.runtime_event_batches.lock().unwrap();
+    assert_eq!(
+        batches
+            .iter()
+            .map(|(_, _, events)| events.len())
+            .collect::<Vec<_>>(),
+        vec![8, 8, 1]
+    );
+    for (polled_at, maximum, events) in batches.iter() {
+        assert_eq!(*maximum, 8);
+        assert!(*polled_at >= submitted_at);
+        assert!(polled_at.duration_since(submitted_at) < Duration::from_millis(500));
+        assert!(*polled_at < hidden_at);
+        assert!(events.iter().all(|event| matches!(
+            event,
+            OpenVrRuntimeEvent::ProcessQuit { pid, .. } if *pid != std::process::id()
+        )));
+    }
+    logger.shutdown().unwrap();
+}
+
+#[tokio::test]
+async fn production_owner_process_quit_and_genuine_quit_events_remain_fatal() {
+    for event in [
+        OpenVrRuntimeEvent::Quit,
+        OpenVrRuntimeEvent::DriverRequestedQuit,
+        OpenVrRuntimeEvent::ProcessQuit {
+            source: OpenVrEventSource::Overlay,
+            pid: std::process::id(),
+            old_pid: 0,
+            forced: false,
+            connection_lost: false,
+        },
+        OpenVrRuntimeEvent::ProcessQuit {
+            source: OpenVrEventSource::System,
+            pid: std::process::id(),
+            old_pid: 0,
+            forced: false,
+            connection_lost: false,
+        },
+    ] {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let state = Arc::new(OwnedSubmitterState::default());
+        let server_state = state.clone();
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            let _auth = ws.next().await.unwrap().unwrap();
+            ws.send(Message::Text(
+                json!({
+                    "type":"snapshot",
+                    "payload":{
+                        "revision":1,
+                        "blocks":[block("self:fatal-quit", "self", "visible", "", true)]
+                    }
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            wait_for_owner_ready(&mut ws).await;
+            server_state.runtime_events.lock().unwrap().push_back(event);
+            tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    let message = next_owner_message(&mut ws).await;
+                    if message["type"] == "owner_status"
+                        && message["classification"] == "terminal_failed"
+                    {
+                        assert_eq!(message["primary_failure_reason"], "openvr_failed");
+                        assert_eq!(message["cleanup_failure_reason"], Value::Null);
+                        assert_eq!(message["desired_visible"], false);
+                        break;
+                    }
+                }
+            })
+            .await
+            .expect("genuine quit event did not produce terminal failure");
+        });
+        let mut manifest = test_manifest();
+        manifest.bridge_url = format!("ws://{address}");
+        let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+        let mut owner = NativePresentationOwner::new(
+            snapshot,
+            CaptionRenderer::new_for_test().unwrap(),
+            ObservedVisibilitySubmitter {
+                state: state.clone(),
+                observed: None,
+            },
+        );
+        let logger = test_logger("process-quit-owned-fatal").await;
+        let failure = tokio::time::timeout(Duration::from_secs(5), owner.run(&mut bridge, &logger))
+            .await
+            .expect("genuine quit event did not stop the owner")
+            .unwrap_err();
+        assert!(
+            matches!(&failure, RuntimeFailure::OpenVr(message)
+                if message == &format!("event={}", event.as_str())),
+            "wrong terminal result for {event:?}: {failure:?}"
+        );
+        assert!(owner.resources_released());
+        assert_eq!(
+            state.operations.lock().unwrap().as_slice(),
+            ["submit:text", "show", "hide"]
+        );
+        let batches = state.runtime_event_batches.lock().unwrap();
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].1, 8);
+        assert_eq!(batches[0].2, vec![event]);
+        server.await.unwrap();
+        logger.shutdown().unwrap();
+    }
 }
 
 #[tokio::test]
@@ -5758,6 +6070,15 @@ async fn production_owner_health_flood_preserves_readiness_budget_and_reports_du
 
 #[tokio::test]
 async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_without_submit() {
+    exercise_readiness_no_progress_churn(false).await;
+}
+
+#[tokio::test]
+async fn production_owner_scene_milestones_do_not_reset_no_progress_or_release_gpu_owner() {
+    exercise_readiness_no_progress_churn(true).await;
+}
+
+async fn exercise_readiness_no_progress_churn(self_scene: bool) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let churn_sent = Arc::new(AtomicUsize::new(0));
@@ -5766,11 +6087,25 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
         let (stream, _) = listener.accept().await.unwrap();
         let mut ws = accept_async(stream).await.unwrap();
         let _auth = ws.next().await.unwrap().unwrap();
-        let first = json!({
-            "revision": 1,
-            "native_fresh_render_generations": {"peer": 4},
-            "blocks": [block("peer:timeouts", "peer", "text", "", true)]
-        });
+        let first = if self_scene {
+            json!({
+                "revision": 1,
+                "native_fresh_render_generations": {"self": 1, "peer": 1},
+                "native_fresh_render_targets": {"self": "scene:self", "peer": "peer:timeouts"},
+                "native_quiet_tail_episodes": {
+                    "self": {"phase": "stream", "generation": 1},
+                    "peer": {"phase": "final", "generation": 1}
+                },
+                "blocks": [active_self_block("self:milestones", "synthetic source"),
+                    block("peer:timeouts", "peer", "synthetic peer", "", true)]
+            })
+        } else {
+            json!({
+                "revision": 1,
+                "native_fresh_render_generations": {"peer": 4},
+                "blocks": [block("peer:timeouts", "peer", "text", "", true)]
+            })
+        };
         ws.send(Message::Text(
             json!({"type":"snapshot","payload":first})
                 .to_string()
@@ -5783,11 +6118,25 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
         let mut revision = 2_u64;
         while tokio::time::Instant::now() < churn_deadline {
             let text = format!("text-{revision}");
-            let snapshot = json!({
-                "revision": revision,
-                "native_fresh_render_generations": {"peer": revision},
-                "blocks": [block("peer:timeouts", "peer", &text, "", true)]
-            });
+            let snapshot = if self_scene {
+                json!({
+                    "revision": revision,
+                    "native_fresh_render_generations": {"self": 2 * revision - 1, "peer": 1},
+                    "native_fresh_render_targets": {"self": "scene:self", "peer": "peer:timeouts"},
+                    "native_quiet_tail_episodes": {
+                        "self": {"phase": "stream", "generation": 2 * revision - 1},
+                        "peer": {"phase": "final", "generation": 1}
+                    },
+                    "blocks": [active_self_block("self:milestones", &text),
+                        block("peer:timeouts", "peer", "synthetic peer", "", true)]
+                })
+            } else {
+                json!({
+                    "revision": revision,
+                    "native_fresh_render_generations": {"peer": revision},
+                    "blocks": [block("peer:timeouts", "peer", &text, "", true)]
+                })
+            };
             if ws
                 .send(Message::Text(
                     json!({"type":"snapshot","payload":snapshot})
@@ -5811,20 +6160,27 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
     renderer.set_test_readiness_pending_yields(usize::MAX);
     renderer.set_test_readiness_pending_persists_across_cancellation(true);
     let state = Arc::new(OwnedSubmitterState::default());
-    let mut owner = NativePresentationOwner::new_with_retry_policy_for_test(
-        snapshot,
-        renderer,
-        OwnedSubmitterProbe {
-            state: state.clone(),
-            fail_submit: false,
-            fail_on_submission: None,
-            submit_delay: Duration::ZERO,
-        },
-        Duration::from_millis(10),
-        Duration::from_millis(100),
-        2,
-    );
-    owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(2200));
+    let submitter = OwnedSubmitterProbe {
+        state: state.clone(),
+        fail_submit: false,
+        fail_on_submission: None,
+        submit_delay: Duration::ZERO,
+    };
+    let mut owner = if self_scene {
+        NativePresentationOwner::new(snapshot, renderer, submitter)
+    } else {
+        NativePresentationOwner::new_with_retry_policy_for_test(
+            snapshot,
+            renderer,
+            submitter,
+            Duration::from_millis(10),
+            Duration::from_millis(100),
+            2,
+        )
+    };
+    if !self_scene {
+        owner.set_readiness_no_progress_timeout_for_test(Duration::from_millis(2200));
+    }
 
     let failure = tokio::time::timeout(
         Duration::from_millis(4000),
@@ -5850,6 +6206,21 @@ async fn production_owner_readiness_no_progress_escalates_under_snapshot_churn_w
     );
     assert!(owner.runtime().state().snapshot().revision > 10);
     assert!(owner.resources_released());
+    if self_scene {
+        assert_eq!(
+            owner
+                .runtime()
+                .presentation_diagnostics()
+                .render_count_for_test(),
+            1
+        );
+        assert!(owner
+            .fresh_retry_audit_for_test()
+            .iter()
+            .any(|fact| fact.0 == "self" && fact.1 > 1 && fact.2 == "scheduled"));
+        assert!(owner.successful_attempt_audit_for_test().is_empty());
+        assert!(owner.fresh_retry_schedules_for_test().is_empty());
+    }
     drop(bridge);
     server.await.unwrap();
 }
@@ -6514,7 +6885,7 @@ fn check_startup_contract_reports_current_contract_version() {
     );
     assert_eq!(
         payload["native_presentation_retry"],
-        json!({"version":1,"ownership":"exclusive"})
+        json!({"version":2,"ownership":"exclusive"})
     );
     assert_eq!(
         payload["speaker_identity_presentation"],
@@ -6525,14 +6896,14 @@ fn check_startup_contract_reports_current_contract_version() {
 
 #[test]
 fn validate_manifest_rejects_old_transition_and_future_contract_versions() {
-    for contract_version in [12, 13, 14, 16] {
+    for contract_version in [12, 13, 14, 15, 17] {
         let manifest = OverlayManifest {
             contract_version,
             ..test_manifest()
         };
         let error = validate_manifest(&manifest).unwrap_err();
         assert!(matches!(error, StartupError::ContractMismatch(_)));
-        assert!(error.to_string().contains("expected contract_version=15"));
+        assert!(error.to_string().contains("expected contract_version=16"));
     }
 }
 
@@ -6588,7 +6959,7 @@ fn cli_emits_startup_failure_event_when_manifest_is_missing() {
 }
 
 #[tokio::test]
-async fn production_owner_renders_python_active_self_without_renewing_exhausted_stream() {
+async fn production_owner_renders_python_active_self_and_rearms_exhausted_stream() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -6663,30 +7034,643 @@ async fn production_owner_renders_python_active_self_without_renewing_exhausted_
         .await
         .unwrap();
     let audit = owner.fresh_retry_audit_for_test();
-    let stream = audit
-        .iter()
-        .filter(|fact| fact.0 == "self" && fact.1 <= 4 && fact.2 == "completed")
-        .collect::<Vec<_>>();
-    assert!(!stream.is_empty());
-    assert!(stream.len() <= 4);
-    assert!(stream.iter().all(|fact| fact.1 <= 2));
-    assert_eq!(stream.last().unwrap().3 as usize, stream.len());
-    for generation in [5, 6] {
+    for generation in [1, 3, 5, 7, 9, 11] {
         let completed = audit
             .iter()
             .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
             .collect::<Vec<_>>();
-        assert!(!completed.is_empty());
-        assert!(completed.len() <= 5);
+        assert!(!completed.is_empty(), "generation {generation}: {audit:?}");
+        assert!(completed.len() <= if generation <= 7 { 4 } else { 5 });
         assert_eq!(completed[0].3, 1);
     }
     assert!(owner
         .successful_attempt_audit_for_test()
         .iter()
-        .any(|attempt| attempt.logical_causes.to_vec().iter().any(|cause|
-            cause.kind == PresentationCauseKind::SceneUpdate
+        .any(|attempt| attempt
+            .logical_causes
+            .to_vec()
+            .iter()
+            .any(|cause| cause.kind == PresentationCauseKind::SceneUpdate
                 && cause.trigger_generation == Some(attempt.logical_revision))));
     assert!(owner.runtime().state().blocks().is_empty());
     assert!(owner.resources_released());
     server.await.unwrap();
+}
+
+fn python_scene_protection_input() -> Value {
+    python_scene_protection_input_for_peer_mode("secondary_only")
+}
+
+fn python_scene_protection_input_for_peer_mode(peer_mode: &str) -> Value {
+    python_scene_protection_input_with_recovery(peer_mode, false)
+}
+
+fn python_scene_protection_input_with_recovery(peer_mode: &str, recovery: bool) -> Value {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let mut command = Command::new("uv");
+    command
+        .args([
+            "run",
+            "--frozen",
+            "python",
+            "-m",
+            "tests.helpers.overlay_scene_protection",
+        ])
+        .args(["--peer-mode", peer_mode])
+        .current_dir(root);
+    if recovery {
+        command.arg("--recovery");
+    }
+    let output = command.output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+struct SceneRunEvidence {
+    owner: NativePresentationOwner<PoseRecoverySubmitter>,
+    submissions: usize,
+    elapsed: Duration,
+}
+
+async fn exercise_scene_schedule(
+    schedule: Vec<(OverlayPresentationSnapshot, Duration)>,
+    label: &'static str,
+) -> SceneRunEvidence {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let started = Instant::now();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        for (index, (snapshot, delay)) in schedule.into_iter().enumerate() {
+            tokio::time::sleep(delay).await;
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":snapshot})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            if index == 0 {
+                wait_for_owner_ready(&mut ws).await;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        PoseRecoverySubmitter {
+            state: state.clone(),
+            pose_available_at: Instant::now(),
+            visible: false,
+        },
+    );
+    owner
+        .run(&mut bridge, &test_logger(label).await)
+        .await
+        .unwrap();
+    server.await.unwrap();
+    let submissions = state
+        .operations
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|operation| operation.starts_with("submit"))
+        .count();
+    assert!(owner.resources_released());
+    assert!(owner.fresh_retry_schedules_for_test().is_empty());
+    assert!(owner.runtime().state().blocks().is_empty());
+    SceneRunEvidence {
+        owner,
+        submissions,
+        elapsed: started.elapsed(),
+    }
+}
+
+fn assert_scene_retry_execution(
+    owner: &NativePresentationOwner<PoseRecoverySubmitter>,
+    generation: u64,
+    maximum: usize,
+) {
+    let audit = owner.fresh_retry_audit_for_test();
+    let completed = audit
+        .iter()
+        .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
+        .collect::<Vec<_>>();
+    assert!(
+        !completed.is_empty(),
+        "missing executable tail for {generation}: {audit:?}"
+    );
+    assert!(completed.len() <= maximum);
+    assert_eq!(completed[0].3, 1);
+    let attempts = owner.successful_attempt_audit_for_test();
+    let correlated = attempts
+        .iter()
+        .filter(|attempt| {
+            attempt.logical_causes.to_vec().iter().any(|cause| {
+                cause.channel == Some(PresentationCauseChannel::SelfChannel)
+                    && cause.trigger_generation == Some(generation)
+                    && matches!(
+                        cause.kind,
+                        PresentationCauseKind::NativeFreshRetry
+                            | PresentationCauseKind::ActiveRetryIntent
+                    )
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(correlated.len(), completed.len());
+    assert!(correlated
+        .windows(2)
+        .all(|pair| pair[1].render_generation > pair[0].render_generation
+            && pair[1].submission_attempt > pair[0].submission_attempt));
+    let evidence = owner.fresh_retry_evidence_for_test();
+    assert!(evidence.iter().any(|record| record["channel"] == "self"
+        && record["trigger_generation"] == generation
+        && record["outcome"] == "due"
+        && record["active"] == true));
+    for attempt in correlated {
+        let record = evidence
+            .iter()
+            .find(|record| {
+                record["outcome"] == "completed"
+                    && record["render_generation"] == attempt.render_generation
+                    && record["submission_attempt"] == attempt.submission_attempt
+            })
+            .unwrap();
+        assert_eq!(record["fresh_rendered"], true);
+        assert_eq!(record["producer_ready"], true);
+        assert_eq!(record["submission_succeeded"], true);
+    }
+}
+
+#[tokio::test]
+async fn python_mailbox_scene_coverage_executes_after_retirement_and_partial_removal() {
+    assert_python_mailbox_scene_coverage("secondary_only").await;
+}
+
+#[tokio::test]
+async fn python_mailbox_translated_primary_peer_survivor_executes_after_removal_and_expiry() {
+    assert_python_mailbox_scene_coverage("translated_primary").await;
+}
+
+async fn assert_python_mailbox_scene_coverage(peer_mode: &str) {
+    let input = python_scene_protection_input_for_peer_mode(peer_mode);
+    let scenes: Vec<OverlayPresentationSnapshot> =
+        serde_json::from_value(input["scenes"].clone()).unwrap();
+    assert_eq!(input["pruned"], input["repeated_pruned"]);
+    assert_eq!(scenes[3].blocks.len(), 2);
+    assert_eq!(scenes[5].blocks.len(), 1);
+    assert_eq!(scenes[5].blocks[0].id, scenes[3].blocks[1].id);
+    assert_eq!(scenes[7].blocks.len(), 1);
+    assert_eq!(scenes[7].blocks[0].channel, "peer");
+    assert_eq!(scenes[6].blocks[1], scenes[7].blocks[0]);
+    assert_eq!(
+        scenes[7].blocks[0].primary_text.is_empty(),
+        peer_mode == "secondary_only"
+    );
+    assert!(scenes[7].blocks[0].secondary_enabled);
+    assert!(!scenes[7].blocks[0].secondary_text.is_empty());
+    let mut peer_runtime = OverlayRuntime::new(scenes[6].clone());
+    let peer_before = peer_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .find(|slot| slot.id == scenes[7].blocks[0].id)
+        .unwrap()
+        .clone();
+    peer_runtime.apply_snapshot(scenes[7].clone());
+    let peer_after = peer_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    assert_eq!(peer_before.id, peer_after.id);
+    assert_eq!(peer_before.appearance_seq, peer_after.appearance_seq);
+    assert_eq!(peer_before.slot_index, peer_after.slot_index);
+    assert_eq!(peer_before.anchor_top_px, peer_after.anchor_top_px);
+    let mut reduced = OverlayRuntime::new(scenes[2].clone());
+    let before = reduced.state().scene().slots().clone();
+    reduced.apply_snapshot(scenes[3].clone());
+    let after_patch = reduced.state().scene().slots();
+    for (prior, patched) in before.iter().zip(after_patch) {
+        let prior = prior.as_ref().unwrap();
+        let patched = patched.as_ref().unwrap();
+        assert_eq!(prior.id, patched.id);
+        assert_eq!(prior.appearance_seq, patched.appearance_seq);
+        assert_eq!(prior.anchor_top_px, patched.anchor_top_px);
+    }
+    let b_slot = after_patch
+        .iter()
+        .flatten()
+        .find(|slot| slot.id == scenes[3].blocks[1].id)
+        .unwrap()
+        .clone();
+    reduced.apply_snapshot(scenes[5].clone());
+    let survivor = reduced
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    assert_eq!(survivor.id, b_slot.id);
+    assert_eq!(survivor.appearance_seq, b_slot.appearance_seq);
+    assert_eq!(survivor.slot_index, b_slot.slot_index);
+    assert_eq!(survivor.anchor_top_px, b_slot.anchor_top_px);
+    assert!(matches!(
+        reduced.apply_snapshot(scenes[3].clone()),
+        SnapshotApplyOutcome::Ignored { .. }
+    ));
+    assert_eq!(reduced.state().blocks().len(), 1);
+    let last_generation = scenes[7]
+        .native_fresh_render_generations
+        .as_ref()
+        .unwrap()
+        .self_generation
+        .unwrap();
+    let evidence = exercise_scene_schedule(
+        vec![
+            (scenes[0].clone(), Duration::ZERO),
+            (scenes[3].clone(), Duration::from_millis(30)),
+            (scenes[5].clone(), Duration::from_millis(30)),
+            (scenes[6].clone(), Duration::from_millis(30)),
+            (scenes[7].clone(), Duration::from_millis(30)),
+            (scenes[8].clone(), Duration::from_millis(600)),
+        ],
+        "scene-retirement-partial-removal",
+    )
+    .await;
+    assert_scene_retry_execution(&evidence.owner, last_generation, 5);
+    assert!(evidence
+        .owner
+        .fresh_retry_audit_for_test()
+        .iter()
+        .any(|fact| fact.0 == "self" && fact.2 == "replaced"));
+    println!("SCENE_WORK retirement submissions={} elapsed_ms={} mailbox_bytes={} pending={} receipts={}",
+        evidence.submissions, evidence.elapsed.as_millis(), input["mailbox_retained_bytes"],
+        input["mailbox_pending_scenes"], input["mailbox_receipts"]);
+    let pruned: OverlayPresentationSnapshot =
+        serde_json::from_value(input["pruned"].clone()).unwrap();
+    let pruned_generation = pruned
+        .native_fresh_render_generations
+        .as_ref()
+        .unwrap()
+        .self_generation
+        .unwrap();
+    assert_eq!(pruned_generation % 2, 0);
+    let held = exercise_scene_schedule(
+        vec![
+            (scenes[3].clone(), Duration::ZERO),
+            (pruned, Duration::from_millis(800)),
+            (scenes[8].clone(), Duration::from_millis(600)),
+        ],
+        "scene-held-transport-expiry",
+    )
+    .await;
+    assert_scene_retry_execution(&held.owner, pruned_generation, 5);
+    for secondary_enabled in [false, true]
+        .into_iter()
+        .filter(|_| peer_mode == "secondary_only")
+    {
+        let mut hidden = scenes[7].clone();
+        hidden.blocks[0].secondary_enabled = secondary_enabled;
+        if secondary_enabled {
+            hidden.blocks[0].secondary_text.clear();
+        }
+        let rejected = exercise_scene_schedule(
+            vec![
+                (hidden, Duration::ZERO),
+                (scenes[8].clone(), Duration::from_millis(600)),
+            ],
+            "scene-nondrawable-survivor",
+        )
+        .await;
+        assert!(!rejected
+            .owner
+            .fresh_retry_evidence_for_test()
+            .iter()
+            .any(|record| record["channel"] == "self" && record["active"] == true));
+        assert!(!rejected
+            .owner
+            .fresh_retry_audit_for_test()
+            .iter()
+            .any(|fact| fact.0 == "self" && fact.2 == "completed"));
+    }
+}
+
+#[tokio::test]
+async fn python_scene_sparse_and_fast_translation_bursts_keep_bounded_executable_tail() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let output = Command::new("uv")
+        .args([
+            "run",
+            "--frozen",
+            "python",
+            "-m",
+            "tests.helpers.overlay_active_freshness",
+        ])
+        .current_dir(root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let scenes: Vec<OverlayPresentationSnapshot> = serde_json::from_slice(&output.stdout).unwrap();
+    let mut counts = Vec::new();
+    for (label, spacing) in [("scene-sparse", 600), ("scene-fast", 30)] {
+        let schedule = scenes
+            .iter()
+            .enumerate()
+            .map(|(index, snapshot)| {
+                (
+                    snapshot.clone(),
+                    Duration::from_millis(if index == 0 {
+                        0
+                    } else if index == 6 {
+                        600
+                    } else {
+                        spacing
+                    }),
+                )
+            })
+            .collect();
+        let evidence = exercise_scene_schedule(schedule, label).await;
+        assert_scene_retry_execution(&evidence.owner, 11, 5);
+        let attempts = evidence.owner.successful_attempt_audit_for_test();
+        assert_eq!(attempts.len(), evidence.submissions);
+        assert!(attempts
+            .windows(2)
+            .all(|pair| pair[1].render_generation > pair[0].render_generation));
+        for generation in [1, 3, 5, 7, 9, 11] {
+            let audit = evidence.owner.fresh_retry_audit_for_test();
+            let completed = audit
+                .iter()
+                .filter(|fact| fact.0 == "self" && fact.1 == generation && fact.2 == "completed")
+                .count();
+            assert!(completed <= if generation < 9 { 4 } else { 5 });
+        }
+        assert!(evidence.submissions <= 30);
+        println!(
+            "SCENE_WORK {label} submissions={} renders={} elapsed_ms={} retry_audit_dropped={}",
+            evidence.submissions,
+            attempts.last().unwrap().render_generation,
+            evidence.elapsed.as_millis(),
+            evidence.owner.fresh_retry_audit_dropped_for_test()
+        );
+        counts.push(evidence.submissions);
+    }
+    assert!(counts[0] > counts[1]);
+}
+
+#[tokio::test]
+async fn submission_return_after_native_wall_is_expired_not_credited() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let state = Arc::new(OwnedSubmitterState::default());
+    let server_state = state.clone();
+    let server = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = accept_async(stream).await.unwrap();
+        let _auth = ws.next().await.unwrap().unwrap();
+        for (revision, generation) in [(1, 1), (2, 3)] {
+            let snapshot = json!({
+                "revision": revision,
+                "native_fresh_render_generations": {"self": generation},
+                "native_fresh_render_targets": {"self": "scene:self"},
+                "native_quiet_tail_episodes": {"self": {"phase": "stream", "generation": generation}},
+                "blocks": [active_self_block("self:slow-return", &format!("synthetic {revision}"))]
+            });
+            ws.send(Message::Text(
+                json!({"type":"snapshot","payload":snapshot})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+            if revision == 1 {
+                wait_for_owner_ready(&mut ws).await;
+            }
+        }
+        wait_for_test_progress("late-return-current-submit", || {
+            server_state
+                .operations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|operation| operation.starts_with("submit"))
+                .count()
+                >= 2
+        })
+        .await;
+        ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    });
+    let mut manifest = test_manifest();
+    manifest.bridge_url = format!("ws://{address}");
+    let (mut bridge, snapshot) = BridgeClient::connect(&manifest).await.unwrap();
+    let mut owner = NativePresentationOwner::new(
+        snapshot,
+        CaptionRenderer::new_for_test().unwrap(),
+        OwnedSubmitterProbe {
+            state,
+            fail_submit: false,
+            fail_on_submission: None,
+            submit_delay: Duration::from_millis(550),
+        },
+    );
+    owner
+        .run(&mut bridge, &test_logger("late-submission-return").await)
+        .await
+        .unwrap();
+    let audit = owner.fresh_retry_audit_for_test();
+    assert!(audit
+        .iter()
+        .any(|fact| fact.1 == 3 && fact.2 == "expired" && fact.3 == 0));
+    assert!(!audit.iter().any(|fact| fact.2 == "completed"));
+    let submissions = owner.successful_attempt_audit_for_test();
+    assert_eq!(submissions.len(), 2);
+    assert_eq!(submissions[1].scene_generation, 2);
+    assert!(submissions[1].render_generation > submissions[0].render_generation);
+    assert!(owner.resources_released());
+    server.await.unwrap();
+}
+
+#[tokio::test]
+async fn python_scene_clear_coalescing_rearms_without_delivering_empty_and_fresh_epoch_seeds() {
+    let input = python_scene_protection_input();
+    let prior: OverlayPresentationSnapshot =
+        serde_json::from_value(input["scenes"][0].clone()).unwrap();
+    let after_clear: OverlayPresentationSnapshot =
+        serde_json::from_value(input["clear_rearm"].clone()).unwrap();
+    let fresh_epoch: OverlayPresentationSnapshot =
+        serde_json::from_value(input["fresh_epoch"].clone()).unwrap();
+    let empty: OverlayPresentationSnapshot =
+        serde_json::from_value(input["empty_after_rearm"].clone()).unwrap();
+    let generation = after_clear
+        .native_fresh_render_generations
+        .as_ref()
+        .unwrap()
+        .self_generation
+        .unwrap();
+    assert_ne!(
+        generation,
+        prior
+            .native_fresh_render_generations
+            .as_ref()
+            .unwrap()
+            .self_generation
+            .unwrap()
+    );
+    let coalesced = exercise_scene_schedule(
+        vec![
+            (prior, Duration::ZERO),
+            (after_clear, Duration::from_millis(30)),
+            (empty.clone(), Duration::from_millis(600)),
+        ],
+        "scene-clear-coalesced",
+    )
+    .await;
+    assert_scene_retry_execution(&coalesced.owner, generation, 4);
+    assert!(coalesced
+        .owner
+        .fresh_retry_audit_for_test()
+        .iter()
+        .any(|fact| fact.1 == 1 && fact.2 == "replaced"));
+    assert_eq!(
+        fresh_epoch
+            .native_fresh_render_generations
+            .as_ref()
+            .unwrap()
+            .self_generation,
+        Some(1)
+    );
+    let fresh = exercise_scene_schedule(
+        vec![
+            (fresh_epoch, Duration::ZERO),
+            (empty, Duration::from_millis(600)),
+        ],
+        "scene-fresh-epoch",
+    )
+    .await;
+    assert_scene_retry_execution(&fresh.owner, 1, 4);
+}
+
+#[tokio::test]
+async fn python_scene_secondary_only_peer_recovery_executes_fresh_epoch_and_rejects_ineligible() {
+    assert_python_scene_peer_recovery("secondary_only").await;
+}
+
+#[tokio::test]
+async fn python_scene_translated_primary_peer_recovery_executes_fresh_epoch_and_rejects_ineligible()
+{
+    assert_python_scene_peer_recovery("translated_primary").await;
+}
+
+async fn assert_python_scene_peer_recovery(peer_mode: &str) {
+    let input = python_scene_protection_input_with_recovery(peer_mode, true);
+    let before: OverlayPresentationSnapshot =
+        serde_json::from_value(input["covered"]["before"].clone()).unwrap();
+    let recovered: OverlayPresentationSnapshot =
+        serde_json::from_value(input["covered"]["recovered"].clone()).unwrap();
+    assert_eq!(before.blocks, recovered.blocks);
+    assert_eq!(
+        input["covered"]["deadline_before"],
+        input["covered"]["deadline_after"]
+    );
+    let intent = recovered.native_fresh_render_generations.as_ref().unwrap();
+    assert_eq!(intent.self_generation, Some(1));
+    assert_eq!(intent.self_target.as_deref(), Some("scene:self"));
+    if peer_mode == "secondary_only" {
+        assert!(recovered.blocks[0].primary_text.is_empty());
+        assert!(recovered.blocks[0].secondary_enabled);
+        assert!(!recovered.blocks[0].secondary_text.is_empty());
+        assert!(intent.peer.is_none());
+        assert!(intent.peer_target.is_none());
+    }
+    let old_runtime = OverlayRuntime::new(before);
+    let fresh_runtime = OverlayRuntime::new(recovered.clone());
+    let old_slot = old_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    let new_slot = fresh_runtime
+        .state()
+        .scene()
+        .slots()
+        .iter()
+        .flatten()
+        .next()
+        .unwrap();
+    assert_eq!(old_slot.id, new_slot.id);
+    assert_eq!(old_slot.appearance_seq, new_slot.appearance_seq);
+    assert_eq!(old_slot.slot_index, new_slot.slot_index);
+    assert_eq!(old_slot.anchor_top_px, new_slot.anchor_top_px);
+    for case in [
+        "covered", "ordinary", "hidden", "empty", "expired", "disabled", "cleared",
+    ] {
+        let scene: OverlayPresentationSnapshot =
+            serde_json::from_value(input[case]["recovered"].clone()).unwrap();
+        let empty: OverlayPresentationSnapshot =
+            serde_json::from_value(input[case]["clear_fresh"].clone()).unwrap();
+        let evidence = exercise_scene_schedule(
+            vec![(scene, Duration::ZERO), (empty, Duration::from_millis(600))],
+            "scene-peer-fresh-epoch",
+        )
+        .await;
+        if case == "covered" {
+            assert_scene_retry_execution(&evidence.owner, 1, 5);
+            assert!(!evidence
+                .owner
+                .fresh_retry_audit_for_test()
+                .iter()
+                .any(|fact| { fact.0 == "self" && fact.1 != 1 && fact.2 == "completed" }));
+        } else {
+            assert!(!evidence
+                .owner
+                .fresh_retry_evidence_for_test()
+                .iter()
+                .any(|record| { record["channel"] == "self" && record["active"] == true }));
+            assert!(!evidence
+                .owner
+                .fresh_retry_audit_for_test()
+                .iter()
+                .any(|fact| { fact.0 == "self" && fact.2 == "completed" }));
+        }
+    }
 }

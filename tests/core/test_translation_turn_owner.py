@@ -11,9 +11,7 @@ from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
     TranslationRuntimeConfigSnapshot,
-)
-from puripuly_heart.core.orchestrator.self_translation_channel import (
-    SelfTranslationChannelOwner,
+    translation_configs_match,
 )
 from puripuly_heart.core.orchestrator.translation_output_projection import (
     TranslationUiMessageQueue,
@@ -557,14 +555,14 @@ def test_speculative_configuration_match_includes_secondary_target() -> None:
         self_target_languages=("zh-CN", "fr"),
     )
 
-    assert not SelfTranslationChannelOwner._translation_config_matches(before, after)
+    assert not translation_configs_match(before, after)
 
 
 def test_speculative_configuration_match_includes_peer_source_mode() -> None:
     before = TranslationRuntimeConfig(peer_source_mode="manual")
     after = TranslationRuntimeConfig(peer_source_mode="auto")
 
-    assert not SelfTranslationChannelOwner._translation_config_matches(before, after)
+    assert not translation_configs_match(before, after)
 
 
 def test_channel_owners_use_one_injected_generic_translation_owner() -> None:
