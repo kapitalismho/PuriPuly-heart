@@ -504,6 +504,7 @@ def compose_managed_account(
         ),
         dashboard_sink=dashboard_sink,
         starting_sink=starting_sink,
+        mutation_settled=runtime_state_changed,
         clear_context=runtime.clear_context,
         warmup=warmup_translation,
         message_sink=message_sink,

@@ -7,6 +7,7 @@ import logging
 import os
 import time
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
@@ -175,12 +176,25 @@ _ORDERED_INTENTS = frozenset(
     }
 )
 
+_RUNTIME_OSC_PARAMETERS = {
+    "set_stt_enabled": "PuriPuly_Talk",
+    "set_peer_translation_enabled": "PuriPuly_Listen",
+    "set_translation_enabled": "PuriPuly_Trans",
+    "set_overlay_enabled": "PuriPuly_Captions",
+}
+
+
+@dataclass(slots=True)
+class _RuntimeControlActivity:
+    parameter: str
+    value: bool
+    has_authority: Callable[[], bool]
+
 
 def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
     if inspect.iscoroutinefunction(method):
 
-        @functools.wraps(method)
-        async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
+        async def invoke_ordered(self, *args: Any, **kwargs: Any) -> Any:
             self._admit_application_intent(method.__name__)
             if method.__name__ == "start_audio_test" and kwargs.get("admission_revision") is None:
                 kwargs["admission_revision"] = self.audio_test_start_revision()
@@ -197,6 +211,15 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                 if control is not None and toggle_resource is not None
                 else None
             )
+            activity = self._osc_runtime_activity.get(asyncio.current_task())
+            if activity is not None and toggle_intent is not None:
+                activity.has_authority = lambda: control.runtime_toggle_is_current(toggle_intent)
+
+            async def apply() -> Any:
+                if activity is not None:
+                    activity.has_authority = lambda: True
+                return await method(self, *args, **kwargs)
+
             if method.__name__ == "set_translation_enabled":
                 preparation = kwargs.get("preparation")
                 if preparation is not None:
@@ -208,6 +231,14 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                         return False
                 self._translation_selection_intent += 1
                 intent = self._translation_selection_intent
+                if activity is not None:
+                    activity.has_authority = lambda: (
+                        intent == self._translation_selection_intent
+                        and (
+                            toggle_intent is None
+                            or control.runtime_toggle_is_current(toggle_intent)
+                        )
+                    )
                 enabled = args[0] if args else kwargs.get("enabled")
                 if (
                     enabled
@@ -226,27 +257,40 @@ def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
                             return False
                         self._admit_application_intent(method.__name__)
                         if control is None:
-                            return await method(self, *args, **kwargs)
+                            return await apply()
                         async with control.runtime_toggle_lock(toggle_intent):
                             if intent != self._translation_selection_intent:
                                 return False
                             if not self.translation_preparation_needs_refresh(preparation):
-                                return await control.run_runtime_toggle(
-                                    toggle_intent, lambda: method(self, *args, **kwargs)
-                                )
+                                return await control.run_runtime_toggle(toggle_intent, apply)
             if toggle_intent is not None:
-                return await control.run_runtime_toggle(
-                    toggle_intent, lambda: method(self, *args, **kwargs)
-                )
+                return await control.run_runtime_toggle(toggle_intent, apply)
             if (
                 method.__name__ not in _ORDERED_INTENTS
                 or control is None
                 or control.lock_owned_by_current_task()
             ):
-                return await method(self, *args, **kwargs)
+                return await apply()
             async with control._resource_lock:
                 async with control._lock:
-                    return await method(self, *args, **kwargs)
+                    return await apply()
+
+        @functools.wraps(method)
+        async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
+            parameter = _RUNTIME_OSC_PARAMETERS.get(method.__name__)
+            if parameter is None:
+                return await invoke_ordered(self, *args, **kwargs)
+            task = asyncio.current_task()
+            self._osc_runtime_activity[task] = _RuntimeControlActivity(
+                parameter,
+                bool(args[0] if args else kwargs.get("enabled")),
+                lambda: True,
+            )
+            try:
+                return await invoke_ordered(self, *args, **kwargs)
+            finally:
+                self._osc_runtime_activity.pop(task, None)
+                await self._publish_osc_state()
 
         return invoke_async
 
@@ -281,6 +325,8 @@ class UiApplicationBoundary:
         http_extension_registry: object | None = None,
         scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
         index_selection: IndexSelectionOwner | None = None,
+        runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
+        runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
@@ -300,9 +346,12 @@ class UiApplicationBoundary:
         self._osc_state_publisher = osc_state_publisher
         self._output_status_provider = output_status_provider
         self._scene_observation_provider = scene_observation_provider
+        self._runtime_control_authority = runtime_control_authority
+        self._runtime_control_activity = runtime_control_activity
         self._index_selection = index_selection
         self._translation_selection_intent = 0
         self._audio_test_start_revision = 0
+        self._osc_runtime_activity: dict[asyncio.Task | None, _RuntimeControlActivity] = {}
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )
@@ -351,6 +400,20 @@ class UiApplicationBoundary:
 
     def attach_control(self, control: ApplicationControl) -> None:
         self._control = control
+
+    def osc_pending_controls(self) -> tuple[tuple[str, bool], ...]:
+        pending = []
+        for task, activity in self._osc_runtime_activity.items():
+            authority = (
+                self._runtime_control_authority(activity.parameter, task)
+                if self._runtime_control_authority is not None
+                else None
+            )
+            if authority if authority is not None else activity.has_authority():
+                pending.append((activity.parameter, activity.value))
+        if self._runtime_control_activity is not None:
+            pending.extend(self._runtime_control_activity())
+        return tuple(pending)
 
     def bind_presentation_close(self, callback: Callable[[], Awaitable[None]]) -> None:
         if self._presentation_close is not None:

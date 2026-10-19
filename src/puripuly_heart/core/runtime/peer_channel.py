@@ -185,6 +185,13 @@ class _CaptureGeneration:
 
 
 @dataclass(frozen=True, slots=True)
+class _MutationObservation:
+    generation: int
+    enabled: bool
+    requires_setup_authority: bool
+
+
+@dataclass(frozen=True, slots=True)
 class _QueuedVadEvent:
     event: object
     pcm_samples: int
@@ -752,6 +759,7 @@ class PeerCaptureSessionOwner:
         self._state = PeerCaptureSessionState.STOPPED
         self._generation = 0
         self._generation_operation: tuple[int, dict[str, str | None]] | None = None
+        self._mutation_observations: dict[asyncio.Task | None, _MutationObservation] = {}
         self._desired_active = False
         self._closed = False
         self._close_task: asyncio.Task[None] | None = None
@@ -1053,7 +1061,38 @@ class PeerCaptureSessionOwner:
             "local_asr_transition": self._transition_coordinator.lifecycle_snapshot(),
         }
 
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        observation = self._mutation_observations.get(task)
+        if observation is None:
+            return None
+        return observation.generation == self._generation and (
+            not observation.requires_setup_authority or self._provider_setup_task is task
+        )
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        return tuple(
+            observation.enabled
+            for task, observation in self._mutation_observations.items()
+            if self.mutation_authority(task)
+        )
+
     async def apply_intent(
+        self,
+        config: PeerCaptureSessionConfig,
+        *,
+        enabled: bool,
+        restart: bool = False,
+        stop_mode: Literal["retain", "release"] = "retain",
+    ) -> PeerCaptureSessionSnapshot:
+        try:
+            return await self._apply_intent(
+                config, enabled=enabled, restart=restart, stop_mode=stop_mode
+            )
+        finally:
+            self._mutation_observations.pop(asyncio.current_task(), None)
+            self._notify_state_changed()
+
+    async def _apply_intent(
         self,
         config: PeerCaptureSessionConfig,
         *,
@@ -1122,6 +1161,9 @@ class PeerCaptureSessionOwner:
                     self._provider_setup_task = current_task
                 else:
                     setup_to_cancel = self._provider_setup_task
+            self._mutation_observations[current_task] = _MutationObservation(
+                generation, enabled, requires_setup_authority=enabled
+            )
             self._notify_state_changed()
         if setup_to_cancel is not None and setup_to_cancel is not current_task:
             setup_to_cancel.cancel()
@@ -1299,6 +1341,17 @@ class PeerCaptureSessionOwner:
         *,
         config: PeerCaptureSessionConfig | None = None,
     ) -> bool:
+        try:
+            return await self._retry_process_capture(config=config)
+        finally:
+            self._mutation_observations.pop(asyncio.current_task(), None)
+            self._notify_state_changed()
+
+    async def _retry_process_capture(
+        self,
+        *,
+        config: PeerCaptureSessionConfig | None = None,
+    ) -> bool:
         target_config = config or self._config
         if target_config is None:
             return False
@@ -1316,6 +1369,9 @@ class PeerCaptureSessionOwner:
             self._config = target_config
             self._desired_active = True
             self._retry_required_capture_target = None
+            self._mutation_observations[asyncio.current_task()] = _MutationObservation(
+                generation, True, requires_setup_authority=False
+            )
             self._state = PeerCaptureSessionState.STARTING
             self._notify_state_changed()
         async with self._activation_lock:

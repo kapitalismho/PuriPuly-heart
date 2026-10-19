@@ -56,7 +56,9 @@
 - Int payload: fixed ABI ID
 - Int ID policy: append-only; never reuse an ID
 - Int IDs are the OSC payload; the tables below map each ID to its human-readable name
-- Bool commands: absolute and idempotent
+- Bool controls request absolute enabled states; explicit runtime retries remain supported.
+- State synchronization: suppress equal input reflections; publish app changes and corrections.
+- Delivery is unacknowledged; delayed Bool packets may be interpreted as new commands.
 
 ### Language IDs
 

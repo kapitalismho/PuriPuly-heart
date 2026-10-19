@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -498,6 +499,8 @@ def compose_test_ui_application_boundary(
     runtime_shutdown: ApplicationRuntimeShutdownPort | None = None,
     runtime_logging: ApplicationRuntimeLoggingPort | None = None,
     osc_state_publisher: Callable[[], object] | None = None,
+    runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
+    runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
 ) -> UiApplicationBoundary:
     logging_port = runtime_logging or ApplicationRuntimeLoggingStub(backend)
     state_runtime = cast(
@@ -523,6 +526,8 @@ def compose_test_ui_application_boundary(
             secret_store_factory=EmptySettingsSecretStore,
         ),
         osc_state_publisher=osc_state_publisher,
+        runtime_control_authority=runtime_control_authority,
+        runtime_control_activity=runtime_control_activity,
     )
     boundary.attach_control(
         ApplicationControlOwner(

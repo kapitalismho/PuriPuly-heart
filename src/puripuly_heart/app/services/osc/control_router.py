@@ -36,6 +36,10 @@ _COALESCED_CONTROLS = frozenset(
     }
 )
 
+RUNTIME_BOOL_CONTROLS = frozenset(
+    {"PuriPuly_Talk", "PuriPuly_Listen", "PuriPuly_Trans", "PuriPuly_Captions"}
+)
+
 
 @dataclass(frozen=True, slots=True)
 class OscDispatchResult:
@@ -64,6 +68,11 @@ class OscControlRouter:
         canonical_state_full_republisher: Callable[[], object] | None = None,
         canonical_state_projector: Callable[[OscControlPresentationName], object] | None = None,
         error_sink: Callable[[str], None] | None = None,
+        command_observer: Callable[[OscControlMessage, int], None] | None = None,
+        settlement_observer: (
+            Callable[[OscControlMessage, int, OscDispatchResult | None], None] | None
+        ) = None,
+        application_orders_runtime_controls: bool = False,
     ) -> None:
         self._application = application
         self._error_sink = error_sink
@@ -72,6 +81,9 @@ class OscControlRouter:
         self._canonical_state_republisher = canonical_state_republisher
         self._canonical_state_full_republisher = canonical_state_full_republisher
         self._canonical_state_projector = canonical_state_projector
+        self._command_observer = command_observer
+        self._settlement_observer = settlement_observer
+        self._application_orders_runtime_controls = application_orders_runtime_controls
         self._language_values = (
             language_state_provider()
             if language_state_provider is not None
@@ -87,8 +99,10 @@ class OscControlRouter:
         self._closed = False
         self._ingress_enabled = True
         self._generation = 0
-        self._unsettled_by_parameter: dict[str, int] = {}
+        self._admission_sequence = 0
+        self._unsettled_commands: dict[int, OscControlMessage] = {}
         self._active_invocation_tasks: set[asyncio.Task[Any]] = set()
+        self._invocation_messages: dict[asyncio.Task[Any], OscControlMessage] = {}
 
     def set_ingress_enabled(self, enabled: bool) -> None:
         self._generation += 1
@@ -103,20 +117,25 @@ class OscControlRouter:
             return OscDispatchResult(False, message.name, error="router_closed")
         if not self._ingress_enabled:
             return OscDispatchResult(False, message.name, error="router_disabled")
-        if (
-            not self._has_unsettled_command(message.name)
-            and self._echo_suppression_provider is not None
-            and self._echo_suppression_provider(message)
-        ):
+        if self._echo_suppression_provider is not None and self._echo_suppression_provider(message):
             return OscDispatchResult(False, message.name, error="echo_suppressed")
         generation = self._generation
-        self._mark_unsettled(message.name)
+        self._admission_sequence += 1
+        admission = self._admission_sequence
+        self._unsettled_commands[admission] = message
+        if self._command_observer is not None:
+            self._command_observer(message, admission)
+        result: OscDispatchResult | None = None
         try:
             if message.name in _COALESCED_CONTROLS:
-                return await self._enqueue_coalesced(message, generation)
-            return await self._apply_serialized(message, generation=generation)
+                result = await self._enqueue_coalesced(message, generation)
+            else:
+                result = await self._apply_serialized(message, generation=generation)
+            return result
         finally:
-            self._mark_settled(message.name)
+            self._unsettled_commands.pop(admission, None)
+            if self._settlement_observer is not None:
+                self._settlement_observer(message, admission, result)
 
     async def dispatch_packet(self, address: str, *args: Any) -> OscDispatchResult:
         message = decode_control_message(address, *args)
@@ -232,27 +251,36 @@ class OscControlRouter:
         generation: int,
         cancelled: Callable[[], bool] | None = None,
     ) -> OscDispatchResult:
+        if self._application_orders_runtime_controls and message.name in RUNTIME_BOOL_CONTROLS:
+            return await self._apply_command(message, generation=generation, cancelled=cancelled)
+        async with self._serial_lock:
+            return await self._apply_command(message, generation=generation, cancelled=cancelled)
+
+    async def _apply_command(
+        self,
+        message: OscControlMessage,
+        *,
+        generation: int,
+        cancelled: Callable[[], bool] | None = None,
+    ) -> OscDispatchResult:
         if not self._is_generation_current(generation):
             return OscDispatchResult(False, message.name, error=self._generation_error())
         if cancelled is not None and cancelled():
             return OscDispatchResult(False, message.name, error="cancelled")
         invocation_task: asyncio.Task[Any] | None = None
         try:
-            async with self._serial_lock:
-                if not self._is_generation_current(generation):
-                    return OscDispatchResult(False, message.name, error=self._generation_error())
-                if cancelled is not None and cancelled():
-                    return OscDispatchResult(False, message.name, error="cancelled")
-                invocation_task = asyncio.current_task()
+            invocation_task = asyncio.current_task()
+            if invocation_task is not None:
+                self._active_invocation_tasks.add(invocation_task)
+                self._invocation_messages[invocation_task] = message
+            try:
+                result = await self._invoke(message)
+            finally:
                 if invocation_task is not None:
-                    self._active_invocation_tasks.add(invocation_task)
-                try:
-                    result = await self._invoke(message)
-                finally:
-                    if invocation_task is not None:
-                        self._active_invocation_tasks.discard(invocation_task)
+                    self._active_invocation_tasks.discard(invocation_task)
+                    self._invocation_messages.pop(invocation_task, None)
         except Exception as exc:
-            self._republish_canonical_state()
+            self._publish_canonical_delta()
             self._report_error(f"{message.name}: {type(exc).__name__}")
             return OscDispatchResult(False, message.name, error=type(exc).__name__)
         if self._closed:
@@ -264,7 +292,7 @@ class OscControlRouter:
         if not self._is_generation_current(generation):
             return OscDispatchResult(False, message.name, error=self._generation_error())
         if _application_result_rejected(result):
-            self._republish_canonical_state()
+            self._publish_canonical_delta()
             if (
                 _application_result_changed_canonical_state(result)
                 and self._is_generation_current(generation)
@@ -273,10 +301,7 @@ class OscControlRouter:
                 self._project_canonical_state(cast(OscControlPresentationName, message.name))
             self._report_error(f"{message.name}: application_rejected")
             return OscDispatchResult(False, message.name, error="application_rejected")
-        if message.name == "PuriPuly_Translator" and message.value in (1, 2):
-            self._republish_canonical_state()
-        else:
-            self._publish_canonical_delta()
+        self._publish_canonical_delta()
         if (cancelled is not None and cancelled()) or (
             invocation_task is not None and invocation_task.cancelling()
         ):
@@ -383,18 +408,9 @@ class OscControlRouter:
     def _generation_error(self) -> str:
         return "router_closed" if self._closed else "router_disabled"
 
-    def _has_unsettled_command(self, parameter: str) -> bool:
-        return self._unsettled_by_parameter.get(parameter, 0) > 0
-
-    def _mark_unsettled(self, parameter: str) -> None:
-        self._unsettled_by_parameter[parameter] = self._unsettled_by_parameter.get(parameter, 0) + 1
-
-    def _mark_settled(self, parameter: str) -> None:
-        remaining = self._unsettled_by_parameter.get(parameter, 0) - 1
-        if remaining > 0:
-            self._unsettled_by_parameter[parameter] = remaining
-            return
-        self._unsettled_by_parameter.pop(parameter, None)
+    @property
+    def pending_controls(self) -> tuple[OscControlMessage, ...]:
+        return tuple(self._unsettled_commands.values()) + tuple(self._invocation_messages.values())
 
     def _cancel_active_invocations(self) -> None:
         current = asyncio.current_task()

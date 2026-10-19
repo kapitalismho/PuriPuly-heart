@@ -471,9 +471,7 @@ async def test_gemma_osc_inputs_restore_connection_and_publish_canonical_after_r
     assert current[0].intent.translation.connection == "openrouter"
     assert current[0].intent.translation.connection_history["gpt_6_luna"] == "official_byok"
     assert current[0].intent.translation.connection_history["gemma4_26b_31b"] == "openrouter"
-    assert (address, 0) in sender.messages
-    if model_id in (1, 2):
-        assert (address, 0) in sender.messages[15:]
+    assert sender.messages[15:] == ([(address, 0)] if model_id in (1, 2) else [])
     assert saved and saved[-1]["intent"]["translation"]["model"] == "gemma4_26b_31b"
     await owner.close()
 
@@ -1270,7 +1268,7 @@ async def test_invalid_control_republishes_full_canonical_state() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rejected_dashboard_command_republishes_actual_full_canonical_state() -> None:
+async def test_rejected_dashboard_command_corrects_only_actual_canonical_divergence() -> None:
     settings = AppSettingsVNext()
     receiver_owner = FakeReceiverOwner()
     sender = FakeSender()
@@ -1297,7 +1295,7 @@ async def test_rejected_dashboard_command_republishes_actual_full_canonical_stat
 
     assert result.applied is False
     assert result.error == "application_rejected"
-    assert len(sender.messages) == 15
+    assert sender.messages == [("/avatar/parameters/PuriPuly_Talk", False)]
     await integration.close()
 
 
@@ -1348,8 +1346,10 @@ async def test_off_transition_drains_an_admitted_dashboard_command() -> None:
     assert result.error == "router_disabled"
     assert application.completed is True
     assert integration.connection_mode == "off"
-    assert len(sender.messages) == 16
-    assert sender.messages[-1] == ("/avatar/parameters/PuriPuly_Talk", True)
+    assert len(sender.messages) == 15
+    assert ("/avatar/parameters/PuriPuly_Talk", True) not in sender.messages
+    await integration.configure_connection(mode="manual", send_port=9020, receive_port=9021)
+    assert ("/avatar/parameters/PuriPuly_Talk", True) in sender.messages[15:]
     await integration.close()
 
 

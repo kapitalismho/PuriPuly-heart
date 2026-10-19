@@ -363,7 +363,7 @@ TASK_CREATION_REVIEWS = (
             "_GenerationGuardedVadSink.handle_vad_event": 1,
             "_GenerationGuardedVadSink._admit_unsent_segment": 1,
             "SelfCaptureSessionOwner.note_recognition_failure": 1,
-            "SelfCaptureSessionOwner.apply_intent": 1,
+            "SelfCaptureSessionOwner._apply_intent": 1,
             "SelfCaptureSessionOwner._start_generation": 1,
             "SelfCaptureSessionOwner._on_loop_task_done": 1,
         },

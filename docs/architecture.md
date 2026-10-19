@@ -350,7 +350,8 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
 - **Application turn presentation**
   - Views update turns by identity, revision, and target status. Older results may update their history without replacing the current dashboard turn.
   - Preview rendering is separate from final-only accepted logging and context admission.
-- **OSC recovery**
+- **OSC state synchronization**
+  - OSC integration reconciles publication per parameter; application owners retain state and execution authority.
   - OSC owners retain a failed publication obligation until actual local sends complete it.
   - An empty or unrelated delta and old cache equality cannot establish recovery.
   - No local send acknowledges remote receipt.

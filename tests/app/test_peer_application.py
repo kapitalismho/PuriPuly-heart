@@ -422,9 +422,16 @@ async def test_peer_owner_rejects_post_readiness_completion_after_newer_intent()
 
     enabling = asyncio.create_task(owner.set_enabled(True))
     await harness.readiness_entered.wait()
+    assert owner.mutation_authority(enabling) is True
+    assert owner.pending_mutations() == (True,)
     await owner.set_enabled(False)
+    assert not enabling.done()
+    assert owner.mutation_authority(enabling) is False
+    assert owner.pending_mutations() == ()
     harness.readiness_release.set()
     await enabling
+    assert owner.mutation_authority(enabling) is None
+    assert owner.pending_mutations() == ()
 
     assert harness.settings.ui.peer_translation_enabled is False
     assert "overlay_start" not in harness.events

@@ -525,7 +525,7 @@ async def test_paused_start_applies_latest_translation_request(
     start_task = runtime.start_task
     try:
         await runner.entered.wait()
-        assert await enable_owner.set_enabled(False) is False
+        assert await enable_owner.set_enabled(False) is True
         runner.gate.set()
         await start_task
         await _drain()
@@ -622,7 +622,7 @@ async def test_composed_app_translation_disable_rebuilds_overlay_source_primary(
         )
         assert presenter.snapshot().blocks[0].primary_text == "peer translation toggle"
         snapshots_before = len(bridge.snapshots)
-        assert await app._input_runtime.translation.set_enabled(False) is False
+        assert await app._input_runtime.translation.set_enabled(False) is True
         await _drain()
         assert config_owner.snapshot().value.translation_enabled is False
         off_block = presenter.snapshot().blocks[0]
@@ -674,7 +674,7 @@ async def test_accepted_toggle_round_trip_rebuilds_without_new_speech() -> None:
     )
     enable_owner, _dashboard = make_enable_owner(config_owner, owner, llm_available=True)
     snapshots_before = len(bridge.snapshots)
-    assert await enable_owner.set_enabled(False) is False
+    assert await enable_owner.set_enabled(False) is True
     await _drain()
     off_block = presenter.snapshot().blocks[0]
     assert off_block.primary_text == "peer source toggle"

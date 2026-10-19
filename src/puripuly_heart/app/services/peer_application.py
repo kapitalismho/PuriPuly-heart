@@ -67,6 +67,13 @@ PeerApplicationLifecycleTraceSink = Callable[[str, dict[str, object]], None]
 PeerApplicationTranslationDemandSink = Callable[[], Awaitable[None]]
 
 
+@dataclass(frozen=True, slots=True)
+class _MutationObservation:
+    generation: int
+    enabled: bool
+    runtime: PeerCaptureSessionOwner | None = None
+
+
 @dataclass(slots=True)
 class PeerApplicationOwner:
     state_provider: PeerApplicationStateProvider = field(repr=False)
@@ -99,6 +106,7 @@ class PeerApplicationOwner:
         default=None,
         repr=False,
     )
+    mutation_settled: PeerApplicationEffect | None = field(default=None, repr=False)
     _runtime: PeerCaptureSessionOwner | None = field(init=False, default=None, repr=False)
     _rebuild: ProviderRuntimeRebuildService = field(
         init=False,
@@ -123,6 +131,9 @@ class PeerApplicationOwner:
     )
     _last_activation_requested: bool | None = field(init=False, default=None, repr=False)
     _activation_generation: int = field(init=False, default=0, repr=False)
+    _mutation_observations: dict[asyncio.Task | None, _MutationObservation] = field(
+        init=False, default_factory=dict, repr=False
+    )
     _activation_starting: bool = field(init=False, default=False, repr=False)
     _model_loading: bool = field(init=False, default=False, repr=False)
     _model_loading_generation: int | None = field(init=False, default=None, repr=False)
@@ -394,7 +405,40 @@ class PeerApplicationOwner:
                 self._runtime = runtime
             raise
 
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        runtime = self._runtime
+        if runtime is not None:
+            authority = runtime.mutation_authority(task)
+            if authority is not None:
+                return authority
+        observation = self._mutation_observations.get(task)
+        if observation is None:
+            return None
+        return observation.generation == self._activation_generation and (
+            observation.runtime is None or observation.runtime is runtime
+        )
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        pending = tuple(
+            observation.enabled
+            for task, observation in self._mutation_observations.items()
+            if self.mutation_authority(task)
+        )
+        runtime = self._runtime
+        return pending + (runtime.pending_mutations() if runtime is not None else ())
+
     async def set_enabled(self, enabled: bool) -> None:
+        try:
+            await self._set_enabled(enabled)
+        finally:
+            self._mutation_observations.pop(asyncio.current_task(), None)
+            try:
+                self.presentation_changed()
+            finally:
+                if self.mutation_settled is not None:
+                    self.mutation_settled()
+
+    async def _set_enabled(self, enabled: bool) -> None:
         state = self.state_provider()
         if not state.settings_available or self._ingress_stopped or state.ingress_frozen:
             return
@@ -407,6 +451,9 @@ class PeerApplicationOwner:
             return
         self._activation_generation += 1
         generation = self._activation_generation
+        self._mutation_observations[asyncio.current_task()] = _MutationObservation(
+            generation, enabled
+        )
         if enabled and not state.eula_accepted:
             self.disable_intent()
             self.sync_effective_flags()
@@ -615,6 +662,14 @@ class PeerApplicationOwner:
         self.sync_effective_flags()
 
     async def retry_process_capture(self) -> bool:
+        try:
+            return await self._retry_process_capture()
+        finally:
+            self._mutation_observations.pop(asyncio.current_task(), None)
+            if self.mutation_settled is not None:
+                self.mutation_settled()
+
+    async def _retry_process_capture(self) -> bool:
         generation = self._activation_generation
         state = self.state_provider()
         runtime = self._runtime
@@ -624,6 +679,9 @@ class PeerApplicationOwner:
             runtime=runtime,
         ):
             return False
+        self._mutation_observations[asyncio.current_task()] = _MutationObservation(
+            generation, True, runtime
+        )
         if not await self.ensure_local_ready(generation):
             return False
         current = self.state_provider()

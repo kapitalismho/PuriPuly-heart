@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import copy
 import logging
@@ -841,6 +842,7 @@ def compose_application_runtime(
                 ),
                 sync_local_notice=lambda: require_local_asr().adapters.notice.sync(),
                 presentation_changed=refresh_overlay_presentation,
+                mutation_settled=lambda: publish_osc_state_from_runtime(),
                 disclosure_sink=enqueue_peer_disclosure,
                 superseded_sink=lambda: signatures.mark_superseded(settings.canonical),
                 localize=presentation.localize,
@@ -2322,6 +2324,28 @@ def compose_application_runtime(
     github_owner = require_github_prompt()
     audio_owner = require_audio_diagnostics()
 
+    def runtime_control_authority(parameter: str, task: asyncio.Task | None) -> bool | None:
+        if parameter == "PuriPuly_Trans":
+            return managed_account.translation.mutation_authority(task)
+        if parameter == "PuriPuly_Listen":
+            return peer_runtime.owner.mutation_authority(task)
+        if parameter == "PuriPuly_Talk" and pipeline.self_capture is not None:
+            return pipeline.self_capture.mutation_authority(task)
+        return None
+
+    def runtime_control_activity() -> tuple[tuple[str, bool], ...]:
+        pending = [
+            ("PuriPuly_Trans", value) for value in managed_account.translation.pending_mutations()
+        ]
+        pending.extend(
+            ("PuriPuly_Listen", value) for value in peer_runtime.owner.pending_mutations()
+        )
+        if pipeline.self_capture is not None:
+            pending.extend(
+                ("PuriPuly_Talk", value) for value in pipeline.self_capture.pending_mutations()
+            )
+        return tuple(pending)
+
     application = UiApplicationBoundary(
         startup=startup,
         input_runtime=UiInputRuntimeAdapter(
@@ -2399,6 +2423,8 @@ def compose_application_runtime(
         ),
         index_selection=index_selection,
         osc_state_publisher=lambda: require_vrc_mic_sync().publish_delta(),
+        runtime_control_authority=runtime_control_authority,
+        runtime_control_activity=runtime_control_activity,
         output_status_provider=lambda: {
             "overlay": {
                 **overlay_owner.output_snapshot(),

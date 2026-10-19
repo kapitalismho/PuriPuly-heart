@@ -275,7 +275,12 @@ async def test_echo_suppression_does_not_drop_a_newer_boolean_reversal() -> None
     router = OscControlRouter(
         application,
         echo_suppression_provider=lambda message: (
-            message.name == "PuriPuly_Talk" and message.value is False
+            message.name == "PuriPuly_Talk"
+            and message.value is False
+            and not any(
+                pending.name == message.name and pending.value is True
+                for pending in router.pending_controls
+            )
         ),
     )
     first = asyncio.create_task(router.dispatch_packet("/avatar/parameters/PuriPuly_Talk", True))
@@ -439,16 +444,17 @@ async def test_router_republishes_after_rejected_application_result(
     application_result: object,
 ) -> None:
     application = RejectingApplication(application_result)
-    full_republish_calls = 0
+    delta_calls: list[str] = []
+    full_calls: list[str] = []
     projected: list[str] = []
 
-    def republish_full() -> None:
-        nonlocal full_republish_calls
-        full_republish_calls += 1
+    def publish_delta() -> None:
+        delta_calls.append("delta")
 
     router = OscControlRouter(
         application,
-        canonical_state_full_republisher=republish_full,
+        canonical_state_republisher=publish_delta,
+        canonical_state_full_republisher=lambda: full_calls.append("full"),
         canonical_state_projector=projected.append,
     )
 
@@ -456,7 +462,8 @@ async def test_router_republishes_after_rejected_application_result(
 
     assert result.applied is False
     assert result.error == "application_rejected"
-    assert full_republish_calls == 1
+    assert delta_calls == ["delta"]
+    assert full_calls == []
     assert projected == []
     await router.close()
 
@@ -468,16 +475,17 @@ async def test_router_republishes_after_application_exception() -> None:
             raise RuntimeError("application failed")
 
     application = RaisingApplication()
-    full_republish_calls = 0
+    delta_calls: list[str] = []
+    full_calls: list[str] = []
     projected: list[str] = []
 
-    def republish_full() -> None:
-        nonlocal full_republish_calls
-        full_republish_calls += 1
+    def publish_delta() -> None:
+        delta_calls.append("delta")
 
     router = OscControlRouter(
         application,
-        canonical_state_full_republisher=republish_full,
+        canonical_state_republisher=publish_delta,
+        canonical_state_full_republisher=lambda: full_calls.append("full"),
         canonical_state_projector=projected.append,
     )
 
@@ -485,7 +493,8 @@ async def test_router_republishes_after_application_exception() -> None:
 
     assert result.applied is False
     assert result.error == "RuntimeError"
-    assert full_republish_calls == 1
+    assert delta_calls == ["delta"]
+    assert full_calls == []
     assert projected == []
     await router.close()
 
