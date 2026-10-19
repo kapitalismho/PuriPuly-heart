@@ -56,17 +56,14 @@
 - Int payload: fixed ABI ID
 - Int ID policy: append-only; never reuse an ID
 - Int IDs are the OSC payload; the tables below map each ID to its human-readable name
-- Bool controls carry absolute enabled-state requests. Explicit runtime retries retain the application owner's recovery behavior.
+- Bool controls request absolute enabled states; explicit runtime retries remain supported.
 
 ### State synchronization and feedback
 
-- Existing Bool Toggle menus, parameter names/types, local-only parameters, and automatic/manual connection settings remain unchanged. No avatar or configuration migration is required for feedback prevention.
-- A successfully applied OSC value is not reflected back unchanged. App UI and background changes still synchronize, including a UI OFF after an OSC ON that required no outbound send.
-- Failed, cancelled, or degraded runtime Bool requests reconcile current canonical divergence after the relevant cleanup, rather than republishing every parameter. Successful OFF is an applied operation, not a rejection because the resulting enabled state is false. Collateral changes such as Talk's SelfASR or Listen's PeerASR/Captions publish independently.
-- An OFF received during slow ON preparation reaches the existing application stop/preemption owner. Ordinary publication waits while admitted work can still mutate that parameter. Superseded work that has lost mutation authority does not hold publication until its Task exits.
-- Startup, reconnect, avatar change, and discovery retain explicit canonical full snapshots and the existing per-parameter resync fence. Fenced initialization/reset packets are not buffered as commands or accepted-command observations. A local send does not settle the fence.
-- Successful local sends, received values, and communication expectations are separate bookkeeping, not remote acknowledgement or authoritative remote state. Partial/failed sends retain truthful successful-send records and outstanding publication diagnostics. Suppressed values are not counted as sent or recovered. Sending current state does not recover a failed runtime operation or remove eligibility for its explicit retry.
-- The unchanged Bool protocol cannot distinguish every delayed, reordered, or duplicated old value from a new user request. Reconciliation does not guarantee exactly-once commands, remote delivery/ACK, or perfect last-real-user-intent ordering. An older ON arriving after a UI OFF can still be interpreted as a new ON.
+- No avatar, Toggle, parameter, or connection-setting changes are required.
+- Successful OSC inputs are not echoed back unchanged. UI/background changes and corrections after failed or cancelled operations still synchronize per parameter.
+- OFF can interrupt slow ON preparation. Startup, reconnect, and avatar resynchronization remain unchanged.
+- Local sends do not confirm delivery. Delayed Bool packets can resemble new inputs, so exact echo identification and user-action ordering are not guaranteed.
 
 ### Language IDs
 
