@@ -27,10 +27,6 @@ ROUTES = {
         "languages": {"en", "ko", "ja"},
         "secrets": {"deepgram_api_key": "DEEPGRAM_API_KEY"},
     },
-    "elevenlabs_scribe": {
-        "languages": {"en", "ko", "ja"},
-        "secrets": {"elevenlabs_scribe_api_key": "ElevenLabs_API_KEY"},
-    },
     "gemini_transcribe": {
         "languages": {"en", "ko", "ja"},
         "secrets": {"gemini_transcribe_api_key": "GOOGLE_API_KEY2"},
