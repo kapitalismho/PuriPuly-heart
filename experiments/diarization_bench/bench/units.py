@@ -116,7 +116,7 @@ def load_events(path: Path) -> list[dict]:
         return [json.loads(line) for line in stream if line.strip()]
 
 
-def case_run(events: list[dict], case_id: str, *, max_frame_lag_s: float) -> CaseRun:
+def case_run(events: list[dict], case_id: str, *, max_frame_lag_s: float | None) -> CaseRun:
     own = [e for e in events if e.get("case_id") == case_id]
     closes = [e for e in own if e["event"] == "source_close"]
     invalid: list[str] = []
@@ -125,7 +125,7 @@ def case_run(events: list[dict], case_id: str, *, max_frame_lag_s: float) -> Cas
     record = closes[-1]["record"]
     if not record.get("case_completed"):
         invalid.append("case_audio_incomplete")
-    if record["frame_lag_s"]["max"] > max_frame_lag_s:
+    if max_frame_lag_s is not None and record["frame_lag_s"]["max"] > max_frame_lag_s:
         invalid.append("frame_lag_exceeded")
     lead = int(record["lead_in_samples"])
     start = float(record["case_start_monotonic"])

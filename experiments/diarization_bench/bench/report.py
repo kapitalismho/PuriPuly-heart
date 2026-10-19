@@ -14,7 +14,8 @@ from bench.score import PARAMETERS, score_case
 BENCH_ROOT = Path(__file__).resolve().parents[1]
 REFERENCES = BENCH_ROOT / "corpus" / "references"
 DEFAULT_GAP_S = 0.5
-MAX_FRAME_LAG_S = 1.0
+MAX_FRAME_LAG_S = None
+DEVICE_QUEUE_S = 64 * 1024 / 48000
 ARM_ORDER = ["baseline", "p104", "p064"]
 
 
@@ -67,6 +68,8 @@ def score_runs(root: Path) -> list[dict]:
             result = score_case(ref, run)
             result["drain_timed_out"] = status.get("drain_timed_out")
             result["attempt"] = status.get("attempt", 1)
+            lag = (run.source_record.get("frame_lag_s") or {}).get("max") or 0.0
+            result["flags"] = ["stall_over_device_queue"] if lag > DEVICE_QUEUE_S else []
             result["incidents"] = status.get("incidents", [])
             result["frame_lag_s"] = run.source_record.get("frame_lag_s")
             result["stalls_over_100ms"] = run.source_record.get("stalls_over_100ms")
@@ -107,6 +110,8 @@ def summarize(rows: list[dict]) -> dict:
         delays, completion, short = [], [], []
         returns = Counter()
         mixed = colored_mixed = scored_units = bursts = 0
+        stalled_cases = 0
+        incident_cases = 0
         speech_s = 0.0
         leads, completion_delta = [], []
         cuts = Counter()
@@ -125,6 +130,8 @@ def summarize(rows: list[dict]) -> dict:
             colored_mixed += s["colored_mixed_units"]
             scored_units += s["scored_units"]
             bursts += s["bursts"]
+            stalled_cases += "stall_over_device_queue" in s.get("flags", [])
+            incident_cases += bool(s.get("incidents"))
             kinds = {t["id"]: t["kind"] for t in s["transitions"]}
             for cut in s.get("speaker_cuts", []):
                 cuts["total"] += 1
@@ -157,6 +164,11 @@ def summarize(rows: list[dict]) -> dict:
             "route": route,
             "arm": arm,
             "cases": len(group),
+            "cases_stalled_over_device_queue": stalled_cases,
+            "cases_with_overlay_incident": incident_cases,
+            "max_frame_lag_s": max(
+                (r["score"].get("frame_lag_s") or {}).get("max", 0.0) for r in group
+            ),
             "speech_minutes": round(speech_s / 60, 2),
             "attribution": {
                 "recognized_tokens": recognized,
@@ -284,11 +296,24 @@ def _fmt(value, kind="pct"):
 
 
 def markdown(summary: dict, rows: list[dict]) -> str:
-    lines = ["# Speaker benchmark results", ""]
+    lines = ["# Diarization benchmark results", ""]
     statuses = Counter((r["route"], r["arm"], r["status"]) for r in rows)
     lines += ["## Run status", "", "| Route | Arm | Status | Cases |", "| --- | --- | --- | ---: |"]
     for (route, arm, status), count in sorted(statuses.items()):
         lines.append(f"| {route} | {arm} | {status} | {count} |")
+    lines += [
+        "",
+        "## Event-loop stalls",
+        "",
+        f"A stall longer than the production loopback queue ({DEVICE_QUEUE_S:.2f} s) could drop audio on a real device. Cases are scored either way.",
+        "",
+        "| Route / arm | Scored cases | Max frame lag (s) | Cases over device queue | Cases with overlay incident |",
+        "| --- | ---: | ---: | ---: | ---: |",
+    ]
+    for name, s in summary.items():
+        lines.append(
+            f"| {name} | {s['cases']} | {s['max_frame_lag_s']:.2f} | {s['cases_stalled_over_device_queue']} | {s['cases_with_overlay_incident']} |"
+        )
     lines += [
         "",
         "## Early boundaries (continuous transfers)",
