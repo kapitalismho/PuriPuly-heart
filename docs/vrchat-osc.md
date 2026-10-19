@@ -57,13 +57,8 @@
 - Int ID policy: append-only; never reuse an ID
 - Int IDs are the OSC payload; the tables below map each ID to its human-readable name
 - Bool controls request absolute enabled states; explicit runtime retries remain supported.
-
-### State synchronization and feedback
-
-- No avatar, Toggle, parameter, or connection-setting changes are required.
-- Successful OSC inputs are not echoed back unchanged. UI/background changes and corrections after failed or cancelled operations still synchronize per parameter.
-- OFF can interrupt slow ON preparation. Startup, reconnect, and avatar resynchronization remain unchanged.
-- Local sends do not confirm delivery. Delayed Bool packets can resemble new inputs, so exact echo identification and user-action ordering are not guaranteed.
+- State synchronization: suppress equal input reflections; publish app changes and corrections.
+- Delivery is unacknowledged; delayed Bool packets may be interpreted as new commands.
 
 ### Language IDs
 

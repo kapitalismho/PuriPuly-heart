@@ -186,15 +186,6 @@ GUI and headless hosts share application owners, runtime resources and turn-even
 
 Entry points are listed in Runtime Ownership; command and protocol details belong in the [CLI guide](cli.md).
 
-### OSC control reconciliation
-
-- `OscControlIntegrationOwner` reconciles every outbound path per parameter before `OscStatePublisher`. Canonical settings/runtime owners remain authoritative; ingress observations and successful-send records are communication evidence only.
-- Publication waits for current mutation authority and cleanup, not superseded Task exit. UI and background owners notify settlement; unrelated fields remain independent.
-- `ApplicationControlOwner` retains ordering and OFF preemption. Reconciliation neither replays commands nor treats local sends as runtime recovery.
-- Lifecycle snapshots and resync fences remain separate. Local sends neither acknowledge delivery nor settle a fence.
-
-Implementation: `app/services/osc/control_runtime.py`. Behavior: `tests/app/test_osc_reconciliation.py`, `tests/app/test_osc_peer_reconciliation.py`. Protocol: [VRChat OSC](vrchat-osc.md).
-
 ## Runtime Pipeline
 
 `RuntimePipelineLauncher` builds and installs the active capture, STT, translation, output, UI-event, and VRChat microphone-state components.
@@ -359,7 +350,8 @@ Implementation: `app/services/chatgpt_account.py`, `providers/llm/chatgpt_plan.p
 - **Application turn presentation**
   - Views update turns by identity, revision, and target status. Older results may update their history without replacing the current dashboard turn.
   - Preview rendering is separate from final-only accepted logging and context admission.
-- **OSC recovery**
+- **OSC state synchronization**
+  - OSC integration reconciles publication per parameter; application owners retain state and execution authority.
   - OSC owners retain a failed publication obligation until actual local sends complete it.
   - An empty or unrelated delta and old cache equality cannot establish recovery.
   - No local send acknowledges remote receipt.
