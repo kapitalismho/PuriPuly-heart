@@ -320,7 +320,8 @@ class Runner:
                     _save(route_dir / "blocked.json", {"route": route, "error": repr(exc)})
                     continue
                 arms = list(args.arms)
-                arms = arms[index % len(arms) :] + arms[: index % len(arms)]
+                if args.rotate_arms:
+                    arms = arms[index % len(arms) :] + arms[: index % len(arms)]
                 for arm in arms:
                     try:
                         arm_receipt = await self.configure_arm(arm)
@@ -430,6 +431,12 @@ def main() -> int:
     parser.add_argument("--cases", type=lambda s: s.split(","), default=None)
     parser.add_argument("--repeat", type=int, default=1)
     parser.add_argument("--vulkan-device", default="0")
+    parser.add_argument(
+        "--rotate-arms",
+        action="store_true",
+        help="rotate arm order per route; off by default because disabled-speaker arms "
+        "after enabled arms inherit stale evidence (audit D10)",
+    )
     args = parser.parse_args()
     unknown = [r for r in args.routes if r not in ROUTES] + [a for a in args.arms if a not in ARMS]
     if unknown:
