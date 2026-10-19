@@ -418,9 +418,10 @@ def simulate_run(run_dir: Path, case_ids=None, gap_s=0.5):
         if status.get("status") != "completed" or (case_ids and case_id not in case_ids):
             continue
         ref = reference.load(REFERENCES / f"{case_id}.json", gap_s=gap_s)
-        sim = CaseSimulation(ref, events, case_id, latency, readable)
+        tag = status.get("observation_tag") or case_id
+        sim = CaseSimulation(ref, events, tag, latency, readable)
         simulated_units = asyncio.run(sim.run())
-        live = units.case_run(events, case_id, max_frame_lag_s=10.0)
+        live = units.case_run(events, tag, max_frame_lag_s=10.0)
         run = units.CaseRun(
             case_id,
             sim.start,

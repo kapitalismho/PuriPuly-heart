@@ -55,13 +55,19 @@ def score_runs(root: Path) -> list[dict]:
             gap_s = hangover / 1000 if hangover else DEFAULT_GAP_S
             ref = reference.load(REFERENCES / f"{case_id}.json", gap_s=gap_s)
             try:
-                run = units.case_run(events, case_id, max_frame_lag_s=MAX_FRAME_LAG_S)
+                run = units.case_run(
+                    events,
+                    status.get("observation_tag") or case_id,
+                    max_frame_lag_s=MAX_FRAME_LAG_S,
+                )
             except ValueError as exc:
                 row.update({"status": "invalid", "reason": str(exc)})
                 rows.append(row)
                 continue
             result = score_case(ref, run)
             result["drain_timed_out"] = status.get("drain_timed_out")
+            result["attempt"] = status.get("attempt", 1)
+            result["incidents"] = status.get("incidents", [])
             result["frame_lag_s"] = run.source_record.get("frame_lag_s")
             result["stalls_over_100ms"] = run.source_record.get("stalls_over_100ms")
             if run.invalid:

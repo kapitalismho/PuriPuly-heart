@@ -202,16 +202,21 @@ class Runner:
             self.diagnostic_after = max(self.diagnostic_after, history["latest_sequence"])
         return records
 
-    async def run_case(self, case_id: str, run_dir: Path, arm: str) -> dict:
+    async def run_case(self, case_id: str, run_dir: Path, arm: str, attempt: int = 1) -> dict:
         from bench import observe
 
         case = self.manifest_cases[case_id]
+        tag = case_id if attempt == 1 else f"{case_id}#a{attempt}"
         wav = sources.CACHE / "cases" / f"{case_id}.wav"
-        record_path = run_dir / "sources" / f"{case_id}.json"
+        record_path = (
+            run_dir
+            / "sources"
+            / (f"{case_id}.json" if attempt == 1 else f"{case_id}.a{attempt}.json")
+        )
         (self.app.control_dir / "next_case.json").write_text(
             json.dumps(
                 {
-                    "case_id": case_id,
+                    "case_id": tag,
                     "wav": str(wav),
                     "record_path": str(record_path),
                     "lead_in_s": LEAD_IN_S,
@@ -260,11 +265,17 @@ class Runner:
         if ARMS[arm] is not None:
             await self.app.command("speaker.reset", {}, accept=("applied", "degraded"))
         diagnostics = await self.new_diagnostics()
-        failed = peer.get("failure_reason") or any(
-            d.get("severity") == "error" for d in diagnostics
-        )
+        errors = [d for d in diagnostics if d.get("severity") == "error"]
+        incidents = [d for d in errors if str(d.get("component", "")).startswith("overlay")]
+        failed = peer.get("failure_reason") or len(errors) > len(incidents)
         return {
             "status": "failed" if failed else "completed",
+            "observation_tag": tag,
+            "attempt": attempt,
+            "incidents": [
+                {k: d.get(k) for k in ("component", "stage", "code", "occurred_at")}
+                for d in incidents
+            ],
             "drain_timed_out": timed_out,
             "elapsed_s": round(time.monotonic() - started, 2),
             "effective_vad_hangover_ms": peer.get("capture", {}).get("effective_vad_hangover_ms"),
@@ -337,10 +348,27 @@ class Runner:
                         observe.set_path(run_dir / "observations.jsonl")
                         for case_id in cases:
                             out = run_dir / "cases" / f"{case_id}.json"
-                            if out.is_file() and json.loads(out.read_text(encoding="utf-8")).get(
-                                "status"
-                            ) in ("completed", "not_applicable"):
+                            previous = (
+                                json.loads(out.read_text(encoding="utf-8"))
+                                if out.is_file()
+                                else None
+                            )
+                            if previous and previous.get("status") in (
+                                "completed",
+                                "not_applicable",
+                            ):
                                 continue
+                            prior_attempts = (
+                                [] if previous is None else previous.get("prior_attempts", [])
+                            )
+                            if previous is not None:
+                                prior_attempts = prior_attempts + [
+                                    {
+                                        k: previous.get(k)
+                                        for k in ("status", "reason", "attempt", "diagnostics")
+                                    }
+                                ]
+                            attempt = len(prior_attempts) + 1
                             language = self.manifest_cases[case_id]["language"]
                             if language not in ROUTES[route]["languages"]:
                                 _save(
@@ -353,7 +381,7 @@ class Runner:
                                 continue
                             try:
                                 await self.set_language(language)
-                                result = await self.run_case(case_id, run_dir, arm)
+                                result = await self.run_case(case_id, run_dir, arm, attempt)
                             except Exception as exc:
                                 result = {
                                     "status": "failed",
@@ -375,6 +403,7 @@ class Runner:
                                     "route": route,
                                     "arm": arm,
                                     "repetition": rep + 1,
+                                    "prior_attempts": prior_attempts,
                                     **result,
                                 },
                             )
