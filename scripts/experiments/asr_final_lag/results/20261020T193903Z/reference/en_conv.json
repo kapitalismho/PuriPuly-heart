@@ -1,0 +1,281 @@
+{
+ "version": 1,
+ "config": "en_conv",
+ "source": "https://huggingface.co/datasets/espnet/yodas2/resolve/main/data/en000/audio/00000004.tar.gz#06inwHyT7l0",
+ "license": "CC-BY-3.0 (espnet/yodas2)",
+ "audio_id": "06inwHyT7l0",
+ "window_s": [
+  22.0,
+  147.0
+ ],
+ "unit": "caption",
+ "sample_rate": 16000,
+ "duration_s": 125.0,
+ "sentences": [
+  {
+   "start_s": 0.47,
+   "end_s": 2.3,
+   "text": "Welcome to a special bonus"
+  },
+  {
+   "start_s": 2.3,
+   "end_s": 4.55,
+   "text": "episode of character creation spotlight."
+  },
+  {
+   "start_s": 4.55,
+   "end_s": 7.22,
+   "text": "Everyone in this bonus segment will be"
+  },
+  {
+   "start_s": 7.22,
+   "end_s": 9.26,
+   "text": "shining a light on some current or up and"
+  },
+  {
+   "start_s": 9.26,
+   "end_s": 11.6,
+   "text": "coming games to keep an eye out for. I'm"
+  },
+  {
+   "start_s": 11.6,
+   "end_s": 14.24,
+   "text": "one of your hosts, Amelia. And today, my"
+  },
+  {
+   "start_s": 14.24,
+   "end_s": 16.94,
+   "text": "co host Ryan and I are welcoming Ben"
+  },
+  {
+   "start_s": 16.94,
+   "end_s": 19.67,
+   "text": "Wallace to talk about broken a two player"
+  },
+  {
+   "start_s": 19.67,
+   "end_s": 21.65,
+   "text": "tragic romance RPG."
+  },
+  {
+   "start_s": 22.73,
+   "end_s": 23.84,
+   "text": "Welcome to Character"
+  },
+  {
+   "start_s": 23.84,
+   "end_s": 25.79,
+   "text": "Creation, Cast spotlight. Ben, it is"
+  },
+  {
+   "start_s": 25.79,
+   "end_s": 27.32,
+   "text": "really great to have you here with us."
+  },
+  {
+   "start_s": 27.86,
+   "end_s": 29.69,
+   "text": "Thank you so much. I really"
+  },
+  {
+   "start_s": 29.69,
+   "end_s": 31.55,
+   "text": "can't tell you how much it means to be"
+  },
+  {
+   "start_s": 31.55,
+   "end_s": 33.05,
+   "text": "here. I'm really excited to be talking"
+  },
+  {
+   "start_s": 33.05,
+   "end_s": 33.86,
+   "text": "with you both. I'm"
+  },
+  {
+   "start_s": 33.86,
+   "end_s": 36.74,
+   "text": "so excited. I'm so it's so"
+  },
+  {
+   "start_s": 36.74,
+   "end_s": 38.21,
+   "text": "good. Like whisper it. And then Ryan, you"
+  },
+  {
+   "start_s": 38.21,
+   "end_s": 40.16,
+   "text": "can make it louder. And I'm so excited for"
+  },
+  {
+   "start_s": 40.16,
+   "end_s": 40.61,
+   "text": "this."
+  },
+  {
+   "start_s": 42.73,
+   "end_s": 44.59,
+   "text": "Yeah, I am very excited."
+  },
+  {
+   "start_s": 45.46,
+   "end_s": 48.13,
+   "text": "Ben, could you start off by telling us a"
+  },
+  {
+   "start_s": 48.13,
+   "end_s": 49.6,
+   "text": "bit about yourself and what sort of"
+  },
+  {
+   "start_s": 49.6,
+   "end_s": 51.7,
+   "text": "projects you have going on right now?"
+  },
+  {
+   "start_s": 51.7,
+   "end_s": 54.04,
+   "text": "Aside from broken and maybe where people"
+  },
+  {
+   "start_s": 54.04,
+   "end_s": 55.06,
+   "text": "can find you online?"
+  },
+  {
+   "start_s": 55.66,
+   "end_s": 58.93,
+   "text": "Yeah, absolutely. So I am Ben."
+  },
+  {
+   "start_s": 58.93,
+   "end_s": 60.91,
+   "text": "And I'm also known sometimes on social"
+  },
+  {
+   "start_s": 60.91,
+   "end_s": 63.88,
+   "text": "media as that gamer priest. So you don't"
+  },
+  {
+   "start_s": 63.88,
+   "end_s": 65.53,
+   "text": "forget me? Oh, yeah, that's that gamer"
+  },
+  {
+   "start_s": 65.53,
+   "end_s": 65.83,
+   "text": "priest,"
+  },
+  {
+   "start_s": 66.4,
+   "end_s": 68.05,
+   "text": "and not the other one."
+  },
+  {
+   "start_s": 68.08,
+   "end_s": 71.17,
+   "text": "Exactly. And, ya know, I'm the"
+  },
+  {
+   "start_s": 71.17,
+   "end_s": 73.39,
+   "text": "co founder of the all ports open network,"
+  },
+  {
+   "start_s": 73.6,
+   "end_s": 75.67,
+   "text": "the Opportunity Network has been around"
+  },
+  {
+   "start_s": 75.67,
+   "end_s": 78.4,
+   "text": "for about five years, we do podcasts and"
+  },
+  {
+   "start_s": 78.4,
+   "end_s": 80.47,
+   "text": "streams really to teach RBG content and"
+  },
+  {
+   "start_s": 80.47,
+   "end_s": 84.73,
+   "text": "stories, audio dramas. And we recently"
+  },
+  {
+   "start_s": 84.73,
+   "end_s": 87.82,
+   "text": "launched a pong games, which is our TTRPG"
+  },
+  {
+   "start_s": 87.82,
+   "end_s": 90.94,
+   "text": "publishing wing of the portrait network."
+  },
+  {
+   "start_s": 90.97,
+   "end_s": 93.64,
+   "text": "And we so we sort of specialize in making"
+  },
+  {
+   "start_s": 93.64,
+   "end_s": 95.53,
+   "text": "games that are all about telling great"
+  },
+  {
+   "start_s": 95.53,
+   "end_s": 97.87,
+   "text": "stories, they also are good at doing, like"
+  },
+  {
+   "start_s": 97.9,
+   "end_s": 99.76,
+   "text": "background work for a lot of them are good"
+  },
+  {
+   "start_s": 99.76,
+   "end_s": 101.53,
+   "text": "at doing background work for storytelling,"
+  },
+  {
+   "start_s": 101.53,
+   "end_s": 105.61,
+   "text": "so world building, and sort of like"
+  },
+  {
+   "start_s": 105.64,
+   "end_s": 109.18,
+   "text": "expanding a setting or even games that"
+  },
+  {
+   "start_s": 109.21,
+   "end_s": 112.09,
+   "text": "might be for like that a author might use"
+  },
+  {
+   "start_s": 112.09,
+   "end_s": 114.88,
+   "text": "to help set groundwork for a fictional"
+  },
+  {
+   "start_s": 114.88,
+   "end_s": 116.65,
+   "text": "setting or something like that. So that's"
+  },
+  {
+   "start_s": 116.65,
+   "end_s": 119.38,
+   "text": "kind of our heart and soul of what we do"
+  },
+  {
+   "start_s": 119.71,
+   "end_s": 124.15,
+   "text": "in our, in our in our a pawn Games Game"
+  },
+  {
+   "start_s": 124.15,
+   "end_s": 125.0,
+   "text": "wing that we recently launched. So we just"
+  }
+ ]
+}

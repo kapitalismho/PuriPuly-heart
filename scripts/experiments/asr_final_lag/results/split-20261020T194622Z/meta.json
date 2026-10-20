@@ -1,0 +1,79 @@
+{
+ "started_utc": "20261020T194622Z",
+ "elapsed_s": 486.7,
+ "fake": false,
+ "sources": {
+  "ko_conv": "20261020T193903Z",
+  "ja_conv": "20261020T193903Z",
+  "en_conv": "20261020T193903Z"
+ },
+ "streams": [
+  "ko_conv/soniox",
+  "ko_conv/deepgram",
+  "ko_conv/gemini",
+  "ja_conv/soniox",
+  "ja_conv/deepgram",
+  "ja_conv/gemini",
+  "en_conv/soniox",
+  "en_conv/deepgram",
+  "en_conv/gemini"
+ ],
+ "models": [
+  "perplexity/pplx-decider-v1.2",
+  "inception/mercury-decide"
+ ],
+ "translator": "google/gemma-4-26b-a4b-it",
+ "judge": "openai/gpt-6.1-sol",
+ "targets": {
+  "ko_conv": "English",
+  "ja_conv": "Korean",
+  "en_conv": "Korean"
+ },
+ "trigger_s": 3.0,
+ "finalize_s": 0.4,
+ "min_before_chars": {
+  "Korean": 4,
+  "Japanese": 4,
+  "English": 8
+ },
+ "right_chars": {
+  "Korean": 2,
+  "Japanese": 3,
+  "English": 3
+ },
+ "after_chars": {
+  "Korean": 40,
+  "Japanese": 40,
+  "English": 120
+ },
+ "questions": {
+  "sentence": {
+   "type": "noul",
+   "instructions": "`previous` is earlier speech, `before` is live speech recognition and `after` is what the speaker said next. Does `before` end exactly where a sentence or a self-contained clause ends, so that `before` can be translated without the words in `after`?",
+   "criteria": {
+    "true": "`before` ends a complete sentence or clause; `after` starts a new one.",
+    "false": "`after` continues the sentence or clause that `before` ends with."
+   }
+  },
+  "translation": {
+   "English": {
+    "type": "noul",
+    "instructions": "`before` is live speech recognition of what a speaker just said, `after` is what the speaker said next, and `previous` was already shown as subtitles. An interpreter wants to show a English subtitle for `before` now and translate `after` as the next subtitle. Would the English translation of `before` alone stay correct and natural once `after` is heard?",
+    "criteria": {
+     "true": "`before` can be translated into English now; `after` does not change it.",
+     "false": "Translating `before` into English now would be wrong, misleading or unnatural because it depends on `after`."
+    }
+   },
+   "Korean": {
+    "type": "noul",
+    "instructions": "`before` is live speech recognition of what a speaker just said, `after` is what the speaker said next, and `previous` was already shown as subtitles. An interpreter wants to show a Korean subtitle for `before` now and translate `after` as the next subtitle. Would the Korean translation of `before` alone stay correct and natural once `after` is heard?",
+    "criteria": {
+     "true": "`before` can be translated into Korean now; `after` does not change it.",
+     "false": "Translating `before` into Korean now would be wrong, misleading or unnatural because it depends on `after`."
+    }
+   }
+  }
+ },
+ "judge_system": "You review live subtitle translation for a social VR app. A remote speaker's utterance was split into consecutive chunks. Each chunk was translated as its own subtitle as soon as it was released, with earlier source lines as context. Compare the chunked subtitles with a translation of the whole utterance made after it ended. The source is speech recognition and may contain errors; judge only the effect of splitting, not problems that the whole translation shares.\n\nAnswer with a JSON object:\n{\"verdict\": \"same\" | \"minor\" | \"changed\", \"premature\": true | false, \"reason\": \"<one short English sentence>\"}\n\nverdict:\n- same: read in order, the chunked subtitles convey the same meaning as the whole translation, and each chunk reads acceptably as a subtitle.\n- minor: the meaning is preserved, but a chunk is awkward, a nuance is lost, or a word is repeated or dropped without changing the meaning.\n- changed: meaning is lost, added or wrong, or a chunk cannot be understood on its own.\npremature: true when an earlier subtitle, read before the next one appears, would make a reader believe something that the rest of the utterance contradicts, such as a missing negation, a question or condition shown as a plain statement, or the wrong subject or object.",
+ "translation_prompt": "translation_prompt"
+}
