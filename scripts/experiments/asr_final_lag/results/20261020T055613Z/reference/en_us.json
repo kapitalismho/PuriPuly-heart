@@ -1,0 +1,156 @@
+{
+ "version": 2,
+ "config": "en_us",
+ "source": "https://huggingface.co/datasets/google/fleurs/resolve/main/data/en_us/audio/test.tar.gz",
+ "license": "CC-BY-4.0 (google/fleurs)",
+ "sample_rate": 16000,
+ "gap_s": 0.1,
+ "speech_bounds": "silero_vad.onnx p>=0.5, 2 frames",
+ "duration_s": 124.288,
+ "sentences": [
+  {
+   "id": 1904,
+   "file": "1003119935936341070.wav",
+   "start_s": 0.0,
+   "end_s": 7.876,
+   "speech_start_s": 0.05,
+   "speech_end_s": 7.826,
+   "text": "However, due to the slow communication channels, styles in the west could lag behind by 25 to 30 year."
+  },
+  {
+   "id": 1675,
+   "file": "10052240106321793346.wav",
+   "start_s": 7.976,
+   "end_s": 15.596,
+   "speech_start_s": 8.026,
+   "speech_end_s": 15.546,
+   "text": "All nouns, alongside the word Sie for you, always begin with a capital letter, even in the middle of a sentence."
+  },
+  {
+   "id": 1950,
+   "file": "10167324587744183095.wav",
+   "start_s": 15.696,
+   "end_s": 26.26,
+   "speech_start_s": 15.746,
+   "speech_end_s": 26.21,
+   "text": "To the north and within easy reach is the romantic and fascinating town of Sintra and which was made famous to foreigners after a glowing account of its splendours recorded by Lord Byron."
+  },
+  {
+   "id": 1728,
+   "file": "10197164397713068203.wav",
+   "start_s": 26.36,
+   "end_s": 31.452,
+   "speech_start_s": 26.41,
+   "speech_end_s": 31.402,
+   "text": "The cabbage juice changes color depending on how acidic or basic (alkaline) the chemical is."
+  },
+  {
+   "id": 1972,
+   "file": "10233995782544396174.wav",
+   "start_s": 31.552,
+   "end_s": 35.332,
+   "speech_start_s": 31.602,
+   "speech_end_s": 35.282,
+   "text": "Many people don't think about them as dinosaurs because they have feathers and can fly."
+  },
+  {
+   "id": 1938,
+   "file": "10235738076911595987.wav",
+   "start_s": 35.432,
+   "end_s": 45.068,
+   "speech_start_s": 35.482,
+   "speech_end_s": 45.018,
+   "text": "The hospital has followed protocol for infection control, including separating the patient from others to prevent possible infection of others."
+  },
+  {
+   "id": 1876,
+   "file": "10323357556845456822.wav",
+   "start_s": 45.168,
+   "end_s": 51.956,
+   "speech_start_s": 45.218,
+   "speech_end_s": 51.906,
+   "text": "The Northern Marianas emergency management office said that there were no damages reported in the nation."
+  },
+  {
+   "id": 1914,
+   "file": "10335587906469246566.wav",
+   "start_s": 52.056,
+   "end_s": 57.02,
+   "speech_start_s": 52.106,
+   "speech_end_s": 56.97,
+   "text": "Twentieth century research has shown that there are two pools of genetic variation: hidden and expressed."
+  },
+  {
+   "id": 1846,
+   "file": "10344335557154974057.wav",
+   "start_s": 57.12,
+   "end_s": 66.212,
+   "speech_start_s": 57.17,
+   "speech_end_s": 66.162,
+   "text": "The aspect ratio of this format (dividing by twelve to obtain the simplest whole-number ratio) is therefore said to be 3:2."
+  },
+  {
+   "id": 1806,
+   "file": "1036771894648013441.wav",
+   "start_s": 66.312,
+   "end_s": 74.284,
+   "speech_start_s": 66.362,
+   "speech_end_s": 74.234,
+   "text": "As light pollution in their heyday was not the kind of problem it is today, they are usually located in cities or at campuses, easier to reach than those built in modern times."
+  },
+  {
+   "id": 1776,
+   "file": "1038214857203833067.wav",
+   "start_s": 74.384,
+   "end_s": 78.676,
+   "speech_start_s": 74.434,
+   "speech_end_s": 78.626,
+   "text": "Through the night between 150 and 200 copies were made, now known as \"Dunlap broadsides\"."
+  },
+  {
+   "id": 1729,
+   "file": "10383288285905292158.wav",
+   "start_s": 78.776,
+   "end_s": 89.404,
+   "speech_start_s": 78.826,
+   "speech_end_s": 89.354,
+   "text": "For example, each year students from Bennet School in North Carolina design a website about their trip to the State Capital, each year the website gets remodeled, but old versions are kept online to serve as a scrapbook."
+  },
+  {
+   "id": 1855,
+   "file": "10405958125670257178.wav",
+   "start_s": 89.504,
+   "end_s": 98.724,
+   "speech_start_s": 89.554,
+   "speech_end_s": 98.674,
+   "text": "Lion prides act much like packs of wolves or dogs, animals surprisingly similar to lions (but not other big cats) in behavior, and also very deadly to their prey."
+  },
+  {
+   "id": 1919,
+   "file": "10411016628242228511.wav",
+   "start_s": 98.824,
+   "end_s": 107.276,
+   "speech_start_s": 98.874,
+   "speech_end_s": 107.226,
+   "text": "The city is also the base to climb the Nyiragongo volcano along with some of the cheapest Mountain Gorilla tracking in Africa."
+  },
+  {
+   "id": 1802,
+   "file": "1042003289011443756.wav",
+   "start_s": 107.376,
+   "end_s": 111.604,
+   "speech_start_s": 107.426,
+   "speech_end_s": 111.554,
+   "text": "The Internet combines elements of both mass and interpersonal communication."
+  },
+  {
+   "id": 1711,
+   "file": "1043394666292127188.wav",
+   "start_s": 111.704,
+   "end_s": 124.188,
+   "speech_start_s": 111.754,
+   "speech_end_s": 124.138,
+   "text": "These theories look at what it is about certain people that make them want the things that they do and what things in their environment will make them do or not do certain things."
+  }
+ ]
+}
