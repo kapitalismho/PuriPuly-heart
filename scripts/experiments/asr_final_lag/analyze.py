@@ -14,11 +14,41 @@ TOLERANCE = 0
 END_EXCLUSION_S = 2.0
 GAP_FINALIZE_OFFSET_S = 0.10
 DEFAULT_DECIDER_RTT_S = 0.25
+PUNCT_WINDOW_S = 8.0
+PUNCT_SLACK = 3
+TERMINAL = ".?!。？！…"
+CLOSERS = "\"'”’」』)）"
 
 
 def normalize(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).lower()
     return "".join(ch for ch in text if unicodedata.category(ch)[0] in "LN")
+
+
+def _index_normalized(raw: str) -> tuple[str, list[int]]:
+    chars, positions = [], []
+    for i, ch in enumerate(raw):
+        for c in unicodedata.normalize("NFKC", ch).lower():
+            if unicodedata.category(c)[0] in "LN":
+                chars.append(c)
+                positions.append(i)
+    return "".join(chars), positions
+
+
+def _terminal_after(raw: str, positions: list[int], index: int) -> bool:
+    if not 0 < index <= len(positions):
+        return False
+    j = positions[index - 1] + 1
+    while j < len(raw) and (raw[j].isspace() or raw[j] in CLOSERS):
+        j += 1
+    if j + 1 < len(raw) and raw[j] == "." and raw[j + 1].isdigit():
+        return False
+    return j < len(raw) and raw[j] in TERMINAL
+
+
+def _terminal_indices(raw: str) -> tuple[str, list[int]]:
+    norm, positions = _index_normalized(raw)
+    return norm, [i for i in range(1, len(norm) + 1) if _terminal_after(raw, positions, i)]
 
 
 def _semi_global_end(hyp: str, ref: str) -> tuple[float, int]:
@@ -110,10 +140,12 @@ def analyze_run(reference: dict, run: dict) -> dict:
     final, tail = "", ""
     series = []
     hyps = []
+    raws = []
     for event in run["events"]:
         final += event.get("fa", "")
         tail = event.get("tail", tail)
-        hyps.append(normalize(final + tail))
+        raws.append(final + tail)
+        hyps.append(normalize(raws[-1]))
         series.append(
             (
                 event["t"],
@@ -127,7 +159,8 @@ def analyze_run(reference: dict, run: dict) -> dict:
     rows = []
     for k, sentence in enumerate(sentences[:-1]):
         target = ends[k] - TOLERANCE
-        first_partial = next((t for t, _, p in series if p >= target), None)
+        first_index = next((i for i, (_, _, p) in enumerate(series) if p >= target), None)
+        first_partial = None if first_index is None else series[first_index][0]
         first_final = next((t for t, f, _ in series if f >= target), None)
         stable, release_diff = None, None
         for i, (t, _, p) in enumerate(series):
@@ -141,6 +174,17 @@ def analyze_run(reference: dict, run: dict) -> dict:
                     Levenshtein.distance(hyps[i][a:b], hypothesis[lo:hi]) / max(1, hi - lo), 4
                 )
                 break
+        punct = None
+        for i in range(first_index if first_index is not None else len(series), len(series)):
+            if series[i][0] > first_partial + PUNCT_WINDOW_S:
+                break
+            norm, positions = _index_normalized(raws[i])
+            cost, index = _semi_global_end(ref[max(0, ends[k] - TAIL_CHARS) : ends[k]], norm)
+            if cost <= 0.5 * min(TAIL_CHARS, ends[k]) and any(
+                _terminal_after(raws[i], positions, index + d) for d in range(PUNCT_SLACK + 1)
+            ):
+                punct = series[i][0]
+                break
         end_s = speech_end(sentence)
         rows.append(
             {
@@ -150,6 +194,7 @@ def analyze_run(reference: dict, run: dict) -> dict:
                 "partial_stable": None if stable is None else round(stable - end_s, 3),
                 "final": None if first_final is None else round(first_final - end_s, 3),
                 "release_diff": release_diff,
+                "punct": None if punct is None else round(punct - end_s, 3),
             }
         )
 
@@ -179,6 +224,14 @@ def analyze_run(reference: dict, run: dict) -> dict:
         if later:
             ack_lags.append(later[0] - sent)
 
+    ref_terminals = []
+    for k, sentence in enumerate(sentences):
+        offset = ends[k - 1] if k else 0
+        ref_terminals += [offset + i for i in _terminal_indices(sentence["text"])[1]]
+    norm_final, final_terminals = _terminal_indices(final)
+    boundaries = _map(ref, norm_final, sorted(set(ref_terminals + ends)))
+    extra_ends = sum(1 for i in final_terminals if all(abs(i - b) > 2 for b in boundaries))
+
     counts = {"insert": 0, "delete": 0, "replace": 0}
     for op in Levenshtein.editops(ref, hypothesis):
         counts[op.tag] += 1
@@ -203,6 +256,11 @@ def analyze_run(reference: dict, run: dict) -> dict:
         "sentence_final_missing": sum(1 for r in rows if r["final"] is None),
         "release_diff": _stats([r["release_diff"] for r in rows if r["release_diff"] is not None]),
         "release_changed": sum(1 for r in rows if r["release_diff"]),
+        "sentence_punct": _stats([r["punct"] for r in rows if r["punct"] is not None]),
+        "punct_missing": sum(
+            1 for r in rows if r["partial_first"] is not None and r["punct"] is None
+        ),
+        "extra_ends": extra_ends,
         "word_final_lag": _stats([w["t"] - w["end_s"] for w in final_words]),
         "word_partial_first_lag": _stats(partial_lags),
         "finalize_ack_lag": _stats(ack_lags),
@@ -241,6 +299,7 @@ def _partial_path(natural: dict, gap: dict | None, decider_rtt_s: float) -> dict
         "finalize_at_gap_final": _stats(gap_final),
         "partial_release": _stats(release),
         "partial_finalize": _stats(finalized),
+        "punct_rule": natural["sentence_punct"],
         "release_saving": _stats([a - b for a, b in zip(natural_final, release)]),
     }
 
@@ -282,6 +341,11 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
         "- `release diff`: character error rate of the partial text of a sentence at its "
         "`partial stable` time against the final text of the same sentence; mean and the "
         "number of sentences whose partial differs.",
+        "- `punct (missing)`: the partial text first shows terminal punctuation at the sentence "
+        f"end, within {PUNCT_SLACK} characters after the aligned reference end (searched for "
+        f"{PUNCT_WINDOW_S:.0f} s after `partial first`).",
+        "- `extra ends`: terminal punctuation in the final text that is not at a reference "
+        "sentence end or at terminal punctuation inside a reference sentence.",
         "- `fin ack`: finalize request to the provider's finalize acknowledgement.",
         "",
     ]
@@ -293,8 +357,9 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
             f"Silence between sentences (speech end to next speech start): {_fmt(pause)} s.",
             "",
             "| provider | variant | error | CER | finals | partial first | partial stable "
-            "| release diff | final (missing) | word final | word partial | fin ack | connect s |",
-            "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+            "| release diff | punct (missing) | extra ends | final (missing) | word final "
+            "| word partial | fin ack | connect s |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         for a in sorted(
             (a for a in analyses if a["lang"] == lang), key=lambda a: (a["provider"], a["variant"])
@@ -304,6 +369,7 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
                 f"| {a['provider']} | {a['variant']} | {error} | {a['cer']:.3f} "
                 f"| {a['final_events']} | {_fmt(a['sentence_partial_first'])} "
                 f"| {_fmt(a['sentence_partial_stable'])} | {_release(a)} "
+                f"| {_fmt(a['sentence_punct'])} ({a['punct_missing']}) | {a['extra_ends']} "
                 f"| {_fmt(a['sentence_final'])} "
                 f"({a['sentence_final_missing']}) | {_fmt(a['word_final_lag'])} "
                 f"| {_fmt(a['word_partial_first_lag'])} | {_fmt(a['finalize_ack_lag'])} "
@@ -320,11 +386,13 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
         "run: translation waits for a forced final.",
         f"- `finalize at gap` = measured final lag when finalize is sent "
         f"{GAP_FINALIZE_OFFSET_S:.2f} s after each sentence's speech end.",
+        "- `punct rule` = `punct` of the natural run: translation starts when the partial text "
+        "punctuates the sentence end, without a decider.",
         "- `saving` = natural final - partial release.",
         "",
-        "| provider | lang | natural final | finalize at gap | partial release "
+        "| provider | lang | natural final | finalize at gap | punct rule | partial release "
         "| partial + finalize | saving |",
-        "|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|",
     ]
     index = {(a["provider"], a["variant"], a["lang"]): a for a in analyses}
     for provider, variant, lang in sorted(index):
@@ -337,7 +405,8 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
         )
         lines.append(
             f"| {provider} | {lang} | {_fmt(path['natural_final'])} "
-            f"| {_fmt(path['finalize_at_gap_final'])} | {_fmt(path['partial_release'])} "
+            f"| {_fmt(path['finalize_at_gap_final'])} | {_fmt(path['punct_rule'])} "
+            f"| {_fmt(path['partial_release'])} "
             f"| {_fmt(path['partial_finalize'])} | {_fmt(path['release_saving'])} |"
         )
     lines.append("")
