@@ -1,0 +1,51 @@
+{
+ "started_utc": "20261020T070225Z",
+ "platform": {
+  "system": "Windows",
+  "release": "11",
+  "python": "3.14.7"
+ },
+ "packages": {
+  "websockets": "16.1.1",
+  "google-genai": "2.31.0",
+  "httpx": "0.28.1",
+  "numpy": "2.5.4",
+  "onnxruntime": "1.28.0",
+  "rapidfuzz": "3.14.6"
+ },
+ "data": [
+  "ko_conv",
+  "ja_conv",
+  "en_conv"
+ ],
+ "providers": [
+  "soniox",
+  "deepgram",
+  "qwen",
+  "gemini"
+ ],
+ "variants": {
+  "soniox": [
+   "natural"
+  ],
+  "deepgram": [
+   "natural"
+  ],
+  "qwen": [
+   "natural"
+  ],
+  "gemini": [
+   "natural"
+  ]
+ },
+ "key_variables": {
+  "soniox": "SONIOX_API_KEY",
+  "deepgram": "DEEPGRAM_API_KEY",
+  "qwen": "ALIBABA_API_KEY_BEIJING",
+  "gemini": "GOOGLE_API_KEY2"
+ },
+ "qwen_endpoint": "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+ "chunk_ms": 40,
+ "gap_finalize_offset_s": 0.1,
+ "mid_finalize_every_s": 2.5
+}
