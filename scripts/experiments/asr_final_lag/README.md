@@ -49,7 +49,7 @@ Results contain no API keys, host names or user names. The runner refuses to wri
 | --- | --- | --- |
 | `natural` | all | Application settings, no forced finalize. Deepgram enables `interim_results` to observe partials. |
 | `nointerim` | Deepgram | Exact application settings (`interim_results=false`) to check that interim results do not change final timing. |
-| `finalize_gap` | Soniox, Deepgram | Finalize 0.10 s after each sentence end, inside the 150 ms gap (best case for a pause-aligned finalize). |
+| `finalize_gap` | Soniox, Deepgram | Finalize 0.10 s after each sentence's speech end, inside the 0.2 s silence before the next sentence (best case for a pause-aligned finalize). |
 | `finalize_mid` | Soniox, Deepgram | Finalize every 2.5 s regardless of speech (worst case for word damage). |
 | `semantic` | Qwen Audio | `semantic_punctuation_enabled=true`; the application uses `false`. |
 
@@ -57,11 +57,13 @@ Provider settings mirror the application adapters: Soniox `stt-rt-v5` with endpo
 
 ## Input audio
 
-The first files of each language's FLEURS test archive (CC-BY-4.0) are level-normalized, edge-trimmed and joined with 150 ms gaps into about 2 minutes of continuous read speech. The first run builds them into `data/` (ignored by git) by streaming only the needed part of the archive.
+The first files of each language's FLEURS test archive (CC-BY-4.0) are level-normalized, trimmed to their speech and joined into about 2 minutes of continuous read speech with 0.2 s of silence between sentences. Speech bounds come from the repository's bundled Silero VAD model (`src/puripuly_heart/data/vad/silero_vad.onnx`). The first run builds the audio into `data/` (ignored by git) by streaming only the needed part of the archive, and rebuilds it when the data version changes.
+
+Each reference sentence records its clip bounds (`start_s`, `end_s`) and its speech bounds (`speech_start_s`, `speech_end_s`). Sentence-end timings and `finalize_gap` use `speech_end_s`.
 
 ## Metrics
 
-`summary.md` defines each column. Sentence-end timings compare when the text covers each reference sentence end with that sentence's speech end. Word timings use provider word or token end timestamps.
+`summary.md` defines each column. Sentence-end timings compare when the text covers each reference sentence end with that sentence's speech end (last Silero speech frame; provider word end timestamps are typically 0.1-0.3 s earlier). Word timings use provider word or token end timestamps. `release diff` compares the partial text of each sentence at its `partial stable` time with the final text of that sentence, which shows whether a partial-text release would translate different words than the final.
 
 Re-analyze an existing results folder:
 
@@ -76,3 +78,4 @@ The last argument is the assumed decider round trip in seconds for the estimated
 - Read speech with clear sentence ends, not conversation.
 - Coverage uses character alignment to the reference. A recognized sentence end that differs from the reference (for example kanji versus kana) can be reported as missing or late.
 - Timings include the network path from the machine that runs the probe; `connect s` records connection setup time.
+- Soniox token timestamps advance by about 70-80 ms per finalize request, so Soniox word timings in the `finalize_*` variants drift ahead of the audio clock. Sentence-end timings do not depend on provider timestamps.

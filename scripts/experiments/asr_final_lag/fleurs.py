@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import json
 import struct
+import sys
 import tarfile
 import wave
 from collections.abc import Iterator
@@ -11,11 +12,22 @@ from pathlib import Path
 import httpx
 import numpy as np
 
+REPO_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
+from puripuly_heart.core.vad.silero import SileroVadOnnx
+
+DATA_VERSION = 2
 SAMPLE_RATE = 16000
 TARGET_S = 120.0
-GAP_S = 0.15
-EDGE_S = 0.08
+GAP_S = 0.10
+LEAD_S = 0.05
+TAIL_S = 0.05
 TARGET_RMS = 0.1
+VAD_FRAME = 512
+VAD_THRESHOLD = 0.5
+VAD_MIN_FRAMES = 2
+VAD_MODEL = REPO_ROOT / "src" / "puripuly_heart" / "data" / "vad" / "silero_vad.onnx"
 BASE_URL = "https://huggingface.co/datasets/google/fleurs/resolve/main/data/{config}"
 
 
@@ -85,19 +97,32 @@ def _level(pcm: np.ndarray) -> np.ndarray:
     return pcm * (0.95 / peak) if peak > 0.95 else pcm
 
 
-def _trim(pcm: np.ndarray) -> np.ndarray:
-    frame = int(0.02 * SAMPLE_RATE)
-    energy = _frame_rms(pcm)
-    if energy.size == 0:
-        return pcm
-    threshold = 0.08 * float(np.percentile(energy, 95))
-    voiced = np.nonzero(energy > threshold)[0]
-    if voiced.size == 0:
-        return pcm
-    edge = int(EDGE_S * SAMPLE_RATE)
-    start = max(0, int(voiced[0]) * frame - edge)
-    end = min(len(pcm), (int(voiced[-1]) + 1) * frame + edge)
-    return pcm[start:end]
+def speech_bounds(pcm: np.ndarray, vad: SileroVadOnnx) -> tuple[int, int] | None:
+    vad.reset()
+    count = len(pcm) // VAD_FRAME
+    voiced = np.array(
+        [
+            vad.speech_probability(
+                pcm[i * VAD_FRAME : (i + 1) * VAD_FRAME], sample_rate_hz=SAMPLE_RATE
+            )
+            >= VAD_THRESHOLD
+            for i in range(count)
+        ]
+    )
+    runs = np.convolve(voiced, np.ones(VAD_MIN_FRAMES), mode="valid") >= VAD_MIN_FRAMES
+    starts = np.nonzero(runs)[0]
+    if starts.size == 0:
+        return None
+    return int(starts[0]) * VAD_FRAME, (int(starts[-1]) + VAD_MIN_FRAMES) * VAD_FRAME
+
+
+def _trim(pcm: np.ndarray, vad: SileroVadOnnx) -> tuple[np.ndarray, float, float]:
+    bounds = speech_bounds(pcm, vad)
+    if bounds is None:
+        return pcm, 0.0, len(pcm) / SAMPLE_RATE
+    start = max(0, bounds[0] - int(LEAD_S * SAMPLE_RATE))
+    end = min(len(pcm), bounds[1] + int(TAIL_S * SAMPLE_RATE))
+    return pcm[start:end], (bounds[0] - start) / SAMPLE_RATE, (bounds[1] - start) / SAMPLE_RATE
 
 
 def _write_wav(path: Path, pcm: np.ndarray) -> None:
@@ -125,6 +150,7 @@ def build(config: str, data_dir: Path) -> None:
     pieces: list[np.ndarray] = []
     sentences = []
     cursor = 0.0
+    vad = SileroVadOnnx(VAD_MODEL)
     with httpx.Client(timeout=120, follow_redirects=True) as client:
         transcripts = _transcripts(client, config)
         url = f"{BASE_URL.format(config=config)}/audio/test.tar.gz"
@@ -140,7 +166,9 @@ def build(config: str, data_dir: Path) -> None:
                     if sentence_id in seen:
                         continue
                     seen.add(sentence_id)
-                    pcm = _trim(_level(_decode_wav(archive.extractfile(member).read())))
+                    pcm, speech_start, speech_end = _trim(
+                        _level(_decode_wav(archive.extractfile(member).read())), vad
+                    )
                     start = cursor
                     end = start + len(pcm) / SAMPLE_RATE
                     pieces.append(pcm)
@@ -151,6 +179,8 @@ def build(config: str, data_dir: Path) -> None:
                             "file": name,
                             "start_s": round(start, 3),
                             "end_s": round(end, 3),
+                            "speech_start_s": round(start + speech_start, 3),
+                            "speech_end_s": round(start + speech_end, 3),
                             "text": text,
                         }
                     )
@@ -161,11 +191,13 @@ def build(config: str, data_dir: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
     _write_wav(data_dir / f"{config}.wav", audio)
     reference = {
+        "version": DATA_VERSION,
         "config": config,
         "source": f"{BASE_URL.format(config=config)}/audio/test.tar.gz",
         "license": "CC-BY-4.0 (google/fleurs)",
         "sample_rate": SAMPLE_RATE,
         "gap_s": GAP_S,
+        "speech_bounds": f"silero_vad.onnx p>={VAD_THRESHOLD}, {VAD_MIN_FRAMES} frames",
         "duration_s": round(len(audio) / SAMPLE_RATE, 3),
         "sentences": sentences,
     }
@@ -176,8 +208,10 @@ def build(config: str, data_dir: Path) -> None:
 
 def ensure(configs: list[str], data_dir: Path) -> None:
     for config in configs:
-        if (data_dir / f"{config}.wav").exists() and (data_dir / f"{config}.json").exists():
-            continue
+        meta = data_dir / f"{config}.json"
+        if (data_dir / f"{config}.wav").exists() and meta.exists():
+            if json.loads(meta.read_text(encoding="utf-8")).get("version") == DATA_VERSION:
+                continue
         print(f"[data] building {config} from FLEURS test split", flush=True)
         build(config, data_dir)
 

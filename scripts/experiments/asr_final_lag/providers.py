@@ -103,7 +103,10 @@ class Recorder:
 
 def finalize_schedule(variant: str, reference: dict) -> list[float]:
     if variant == "finalize_gap":
-        return [s["end_s"] + GAP_FINALIZE_OFFSET_S for s in reference["sentences"][:-1]]
+        return [
+            s.get("speech_end_s", s["end_s"]) + GAP_FINALIZE_OFFSET_S
+            for s in reference["sentences"][:-1]
+        ]
     if variant == "finalize_mid":
         points, t = [], MID_FINALIZE_EVERY_S
         while t < reference["duration_s"] - 0.5:

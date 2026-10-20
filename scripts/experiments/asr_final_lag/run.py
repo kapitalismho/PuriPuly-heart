@@ -5,6 +5,7 @@
 #   "google-genai>=2.21.0,<3.0.0",
 #   "httpx>=0.27",
 #   "numpy>=2.0",
+#   "onnxruntime==1.28.0",
 #   "rapidfuzz>=3.9",
 # ]
 # ///
@@ -126,7 +127,7 @@ async def _run_one(provider, variant, lang, data_dir, key, options, runs_dir) ->
 
 def _package_versions() -> dict[str, str]:
     versions = {}
-    for name in ("websockets", "google-genai", "httpx", "numpy", "rapidfuzz"):
+    for name in ("websockets", "google-genai", "httpx", "numpy", "onnxruntime", "rapidfuzz"):
         try:
             versions[name] = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
