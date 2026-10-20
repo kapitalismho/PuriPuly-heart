@@ -1,0 +1,74 @@
+{
+ "started_utc": "20261020T185455Z",
+ "platform": {
+  "system": "Windows",
+  "release": "11",
+  "python": "3.14.7"
+ },
+ "packages": {
+  "websockets": "16.1.1",
+  "google-genai": "2.31.0",
+  "httpx": "0.28.1",
+  "numpy": "2.5.4",
+  "onnxruntime": "1.28.0",
+  "rapidfuzz": "3.14.6"
+ },
+ "data": [
+  "ko_conv",
+  "ja_conv",
+  "en_conv"
+ ],
+ "providers": [
+  "qwen",
+  "gemini",
+  "soniox"
+ ],
+ "variants": {
+  "qwen": [
+   "natural",
+   "cut_app",
+   "cut_pause",
+   "cut_smart",
+   "cut_fixed3",
+   "cut_smart_ctx"
+  ],
+  "gemini": [
+   "natural",
+   "end_app",
+   "end_smart"
+  ],
+  "soniox": [
+   "natural"
+  ]
+ },
+ "key_variables": {
+  "qwen": "ALIBABA_API_KEY_BEIJING",
+  "gemini": "GOOGLE_API_KEY2",
+  "soniox": "SONIOX_API_KEY"
+ },
+ "qwen_endpoint": "wss://dashscope.aliyuncs.com/api-ws/v1/inference",
+ "chunk_ms": 40,
+ "gap_finalize_offset_s": 0.1,
+ "mid_finalize_every_s": 2.5,
+ "parallel_per_provider": 3,
+ "segmentation": {
+  "vad_frame_s": 0.032,
+  "smart_turn_probe_s": 0.2,
+  "smart_threshold": 0.5,
+  "app_smart_threshold": 0.75,
+  "turn_end_s": 0.8,
+  "pre_roll_s": 0.5,
+  "app_replay_s": 0.3,
+  "qwen_cuts": {
+   "cut_app": "app",
+   "cut_pause": "pause",
+   "cut_smart": "smart",
+   "cut_fixed3": "fixed3",
+   "cut_smart_ctx": "smart"
+  },
+  "gemini_ends": {
+   "end_app": "app",
+   "end_smart": "smart"
+  }
+ }
+}

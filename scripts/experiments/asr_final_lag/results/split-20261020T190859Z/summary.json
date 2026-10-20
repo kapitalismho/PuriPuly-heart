@@ -1,0 +1,7601 @@
+{
+ "pooled": {
+  "punctuation only": {
+   "splits": 0,
+   "splits_per_min": 0.0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.056,
+    "p90": 6.374
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.431,
+    "p90": 8.636
+   },
+   "judged": 0,
+   "verdicts": {
+    "same": 0,
+    "minor": 0,
+    "changed": 0
+   },
+   "premature": 0
+  },
+  "time cut (latest word)": {
+   "splits": 72,
+   "splits_per_min": 5.76,
+   "kinds": {
+    "sentence": 0,
+    "clause": 4,
+    "mid": 68
+   },
+   "latency_all": {
+    "n": 5655,
+    "p50": 1.877,
+    "p90": 3.683
+   },
+   "latency_long": {
+    "n": 3061,
+    "p50": 2.481,
+    "p90": 3.962
+   },
+   "judged": 52,
+   "verdicts": {
+    "same": 9,
+    "minor": 27,
+    "changed": 16
+   },
+   "premature": 4
+  },
+  "provider comma": {
+   "splits": 26,
+   "splits_per_min": 2.08,
+   "kinds": {
+    "sentence": 2,
+    "clause": 24,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.045,
+    "p90": 5.37
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.241,
+    "p90": 6.956
+   },
+   "judged": 23,
+   "verdicts": {
+    "same": 13,
+    "minor": 6,
+    "changed": 4
+   },
+   "premature": 1
+  },
+  "longest pause": {
+   "splits": 61,
+   "splits_per_min": 4.88,
+   "kinds": {
+    "sentence": 0,
+    "clause": 10,
+    "mid": 51
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 1.993,
+    "p90": 4.072
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 2.939,
+    "p90": 4.746
+   },
+   "judged": 43,
+   "verdicts": {
+    "same": 19,
+    "minor": 17,
+    "changed": 7
+   },
+   "premature": 5
+  },
+  "pplx-decider-v1.2 Q1 p>=0.5": {
+   "splits": 2,
+   "splits_per_min": 0.16,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.056,
+    "p90": 6.15
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.425,
+    "p90": 8.176
+   },
+   "judged": 2,
+   "verdicts": {
+    "same": 1,
+    "minor": 0,
+    "changed": 1
+   },
+   "premature": 1
+  },
+  "pplx-decider-v1.2 Q1 p>=0.5 +forced": {
+   "splits": 16,
+   "splits_per_min": 1.28,
+   "kinds": {
+    "sentence": 1,
+    "clause": 3,
+    "mid": 12
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.056,
+    "p90": 5.85
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.425,
+    "p90": 7.147
+   },
+   "judged": 9,
+   "verdicts": {
+    "same": 1,
+    "minor": 4,
+    "changed": 4
+   },
+   "premature": 2
+  },
+  "pplx-decider-v1.2 Q2 p>=0.3": {
+   "splits": 43,
+   "splits_per_min": 3.44,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 41
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.026,
+    "p90": 4.46
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.013,
+    "p90": 4.904
+   },
+   "judged": 29,
+   "verdicts": {
+    "same": 7,
+    "minor": 13,
+    "changed": 9
+   },
+   "premature": 3
+  },
+  "pplx-decider-v1.2 Q2 p>=0.5": {
+   "splits": 41,
+   "splits_per_min": 3.28,
+   "kinds": {
+    "sentence": 0,
+    "clause": 6,
+    "mid": 35
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.044,
+    "p90": 4.589
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.091,
+    "p90": 5.096
+   },
+   "judged": 27,
+   "verdicts": {
+    "same": 9,
+    "minor": 6,
+    "changed": 12
+   },
+   "premature": 6
+  },
+  "pplx-decider-v1.2 Q2 p>=0.7": {
+   "splits": 33,
+   "splits_per_min": 2.64,
+   "kinds": {
+    "sentence": 0,
+    "clause": 8,
+    "mid": 25
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.044,
+    "p90": 4.805
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.195,
+    "p90": 5.66
+   },
+   "judged": 26,
+   "verdicts": {
+    "same": 13,
+    "minor": 4,
+    "changed": 9
+   },
+   "premature": 3
+  },
+  "pplx-decider-v1.2 Q2 p>=0.5 +forced": {
+   "splits": 41,
+   "splits_per_min": 3.28,
+   "kinds": {
+    "sentence": 0,
+    "clause": 6,
+    "mid": 35
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.044,
+    "p90": 4.589
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.091,
+    "p90": 5.096
+   },
+   "judged": 27,
+   "verdicts": {
+    "same": 9,
+    "minor": 6,
+    "changed": 12
+   },
+   "premature": 6
+  },
+  "mercury-decide Q1 p>=0.5": {
+   "splits": 9,
+   "splits_per_min": 0.72,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 7
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.056,
+    "p90": 5.644
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.364,
+    "p90": 7.117
+   },
+   "judged": 8,
+   "verdicts": {
+    "same": 2,
+    "minor": 3,
+    "changed": 3
+   },
+   "premature": 1
+  },
+  "mercury-decide Q1 p>=0.5 +forced": {
+   "splits": 22,
+   "splits_per_min": 1.76,
+   "kinds": {
+    "sentence": 0,
+    "clause": 6,
+    "mid": 16
+   },
+   "latency_all": {
+    "n": 5633,
+    "p50": 2.055,
+    "p90": 5.25
+   },
+   "latency_long": {
+    "n": 3039,
+    "p50": 3.316,
+    "p90": 6.351
+   },
+   "judged": 15,
+   "verdicts": {
+    "same": 5,
+    "minor": 6,
+    "changed": 4
+   },
+   "premature": 1
+  },
+  "mercury-decide Q2 p>=0.3": {
+   "splits": 48,
+   "splits_per_min": 3.84,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 45
+   },
+   "latency_all": {
+    "n": 5650,
+    "p50": 2.045,
+    "p90": 4.32
+   },
+   "latency_long": {
+    "n": 3056,
+    "p50": 3.002,
+    "p90": 4.628
+   },
+   "judged": 33,
+   "verdicts": {
+    "same": 10,
+    "minor": 10,
+    "changed": 13
+   },
+   "premature": 7
+  },
+  "mercury-decide Q2 p>=0.5": {
+   "splits": 42,
+   "splits_per_min": 3.36,
+   "kinds": {
+    "sentence": 1,
+    "clause": 3,
+    "mid": 38
+   },
+   "latency_all": {
+    "n": 5647,
+    "p50": 2.051,
+    "p90": 4.501
+   },
+   "latency_long": {
+    "n": 3053,
+    "p50": 3.122,
+    "p90": 5.035
+   },
+   "judged": 29,
+   "verdicts": {
+    "same": 11,
+    "minor": 8,
+    "changed": 10
+   },
+   "premature": 3
+  },
+  "mercury-decide Q2 p>=0.7": {
+   "splits": 30,
+   "splits_per_min": 2.4,
+   "kinds": {
+    "sentence": 1,
+    "clause": 2,
+    "mid": 27
+   },
+   "latency_all": {
+    "n": 5645,
+    "p50": 2.052,
+    "p90": 4.727
+   },
+   "latency_long": {
+    "n": 3051,
+    "p50": 3.195,
+    "p90": 5.528
+   },
+   "judged": 20,
+   "verdicts": {
+    "same": 8,
+    "minor": 5,
+    "changed": 7
+   },
+   "premature": 2
+  },
+  "mercury-decide Q2 p>=0.5 +forced": {
+   "splits": 44,
+   "splits_per_min": 3.52,
+   "kinds": {
+    "sentence": 1,
+    "clause": 3,
+    "mid": 40
+   },
+   "latency_all": {
+    "n": 5647,
+    "p50": 2.051,
+    "p90": 4.469
+   },
+   "latency_long": {
+    "n": 3053,
+    "p50": 3.122,
+    "p90": 4.996
+   },
+   "judged": 30,
+   "verdicts": {
+    "same": 12,
+    "minor": 8,
+    "changed": 10
+   },
+   "premature": 3
+  }
+ },
+ "by_data": {
+  "en_conv": {
+   "punctuation only": {
+    "splits": 0,
+    "splits_per_min": 0.0,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.784,
+     "p90": 8.73
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.732,
+     "p90": 10.17
+    },
+    "judged": 0,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "time cut (latest word)": {
+    "splits": 39,
+    "splits_per_min": 9.36,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 39
+    },
+    "latency_all": {
+     "n": 2965,
+     "p50": 2.19,
+     "p90": 3.893
+    },
+    "latency_long": {
+     "n": 2110,
+     "p50": 2.573,
+     "p90": 4.016
+    },
+    "judged": 22,
+    "verdicts": {
+     "same": 3,
+     "minor": 13,
+     "changed": 6
+    },
+    "premature": 2
+   },
+   "provider comma": {
+    "splits": 15,
+    "splits_per_min": 3.6,
+    "kinds": {
+     "sentence": 2,
+     "clause": 13,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.77,
+     "p90": 6.93
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.498,
+     "p90": 7.715
+    },
+    "judged": 12,
+    "verdicts": {
+     "same": 9,
+     "minor": 2,
+     "changed": 1
+    },
+    "premature": 0
+   },
+   "longest pause": {
+    "splits": 36,
+    "splits_per_min": 8.64,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 33
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.516,
+     "p90": 4.558
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.055,
+     "p90": 4.94
+    },
+    "judged": 20,
+    "verdicts": {
+     "same": 5,
+     "minor": 10,
+     "changed": 5
+    },
+    "premature": 4
+   },
+   "pplx-decider-v1.2 Q1 p>=0.5": {
+    "splits": 1,
+    "splits_per_min": 0.24,
+    "kinds": {
+     "sentence": 0,
+     "clause": 1,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.784,
+     "p90": 8.298
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.682,
+     "p90": 9.784
+    },
+    "judged": 1,
+    "verdicts": {
+     "same": 1,
+     "minor": 0,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q1 p>=0.5 +forced": {
+    "splits": 14,
+    "splits_per_min": 3.36,
+    "kinds": {
+     "sentence": 1,
+     "clause": 3,
+     "mid": 10
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.784,
+     "p90": 7.147
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.675,
+     "p90": 7.677
+    },
+    "judged": 7,
+    "verdicts": {
+     "same": 1,
+     "minor": 4,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q2 p>=0.3": {
+    "splits": 29,
+    "splits_per_min": 6.96,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 29
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.621,
+     "p90": 4.818
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.136,
+     "p90": 5.116
+    },
+    "judged": 16,
+    "verdicts": {
+     "same": 4,
+     "minor": 8,
+     "changed": 4
+    },
+    "premature": 2
+   },
+   "pplx-decider-v1.2 Q2 p>=0.5": {
+    "splits": 28,
+    "splits_per_min": 6.72,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 25
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.653,
+     "p90": 5.055
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.25,
+     "p90": 5.384
+    },
+    "judged": 15,
+    "verdicts": {
+     "same": 5,
+     "minor": 3,
+     "changed": 7
+    },
+    "premature": 5
+   },
+   "pplx-decider-v1.2 Q2 p>=0.7": {
+    "splits": 20,
+    "splits_per_min": 4.8,
+    "kinds": {
+     "sentence": 0,
+     "clause": 5,
+     "mid": 15
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.697,
+     "p90": 5.721
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.417,
+     "p90": 6.344
+    },
+    "judged": 14,
+    "verdicts": {
+     "same": 9,
+     "minor": 1,
+     "changed": 4
+    },
+    "premature": 2
+   },
+   "pplx-decider-v1.2 Q2 p>=0.5 +forced": {
+    "splits": 28,
+    "splits_per_min": 6.72,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 25
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.653,
+     "p90": 5.055
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.25,
+     "p90": 5.384
+    },
+    "judged": 15,
+    "verdicts": {
+     "same": 5,
+     "minor": 3,
+     "changed": 7
+    },
+    "premature": 5
+   },
+   "mercury-decide Q1 p>=0.5": {
+    "splits": 6,
+    "splits_per_min": 1.44,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 6
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.773,
+     "p90": 7.05
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.66,
+     "p90": 7.83
+    },
+    "judged": 5,
+    "verdicts": {
+     "same": 2,
+     "minor": 2,
+     "changed": 1
+    },
+    "premature": 0
+   },
+   "mercury-decide Q1 p>=0.5 +forced": {
+    "splits": 18,
+    "splits_per_min": 4.32,
+    "kinds": {
+     "sentence": 0,
+     "clause": 4,
+     "mid": 14
+    },
+    "latency_all": {
+     "n": 2943,
+     "p50": 2.765,
+     "p90": 6.212
+    },
+    "latency_long": {
+     "n": 2088,
+     "p50": 3.591,
+     "p90": 6.644
+    },
+    "judged": 11,
+    "verdicts": {
+     "same": 4,
+     "minor": 5,
+     "changed": 2
+    },
+    "premature": 0
+   },
+   "mercury-decide Q2 p>=0.3": {
+    "splits": 30,
+    "splits_per_min": 7.2,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 30
+    },
+    "latency_all": {
+     "n": 2960,
+     "p50": 2.586,
+     "p90": 4.547
+    },
+    "latency_long": {
+     "n": 2105,
+     "p50": 3.079,
+     "p90": 4.749
+    },
+    "judged": 16,
+    "verdicts": {
+     "same": 4,
+     "minor": 6,
+     "changed": 6
+    },
+    "premature": 5
+   },
+   "mercury-decide Q2 p>=0.5": {
+    "splits": 26,
+    "splits_per_min": 6.24,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 26
+    },
+    "latency_all": {
+     "n": 2957,
+     "p50": 2.687,
+     "p90": 4.976
+    },
+    "latency_long": {
+     "n": 2102,
+     "p50": 3.294,
+     "p90": 5.283
+    },
+    "judged": 14,
+    "verdicts": {
+     "same": 4,
+     "minor": 7,
+     "changed": 3
+    },
+    "premature": 2
+   },
+   "mercury-decide Q2 p>=0.7": {
+    "splits": 19,
+    "splits_per_min": 4.56,
+    "kinds": {
+     "sentence": 0,
+     "clause": 1,
+     "mid": 18
+    },
+    "latency_all": {
+     "n": 2955,
+     "p50": 2.715,
+     "p90": 5.362
+    },
+    "latency_long": {
+     "n": 2100,
+     "p50": 3.37,
+     "p90": 5.987
+    },
+    "judged": 10,
+    "verdicts": {
+     "same": 3,
+     "minor": 4,
+     "changed": 3
+    },
+    "premature": 2
+   },
+   "mercury-decide Q2 p>=0.5 +forced": {
+    "splits": 28,
+    "splits_per_min": 6.72,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 28
+    },
+    "latency_all": {
+     "n": 2957,
+     "p50": 2.687,
+     "p90": 4.881
+    },
+    "latency_long": {
+     "n": 2102,
+     "p50": 3.294,
+     "p90": 5.173
+    },
+    "judged": 15,
+    "verdicts": {
+     "same": 5,
+     "minor": 7,
+     "changed": 3
+    },
+    "premature": 2
+   }
+  },
+  "ja_conv": {
+   "punctuation only": {
+    "splits": 0,
+    "splits_per_min": 0.0,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.726
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.435,
+     "p90": 5.849
+    },
+    "judged": 0,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "time cut (latest word)": {
+    "splits": 12,
+    "splits_per_min": 2.88,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 12
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.511,
+     "p90": 3.13
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 2.414,
+     "p90": 3.94
+    },
+    "judged": 11,
+    "verdicts": {
+     "same": 0,
+     "minor": 5,
+     "changed": 6
+    },
+    "premature": 1
+   },
+   "provider comma": {
+    "splits": 6,
+    "splits_per_min": 1.44,
+    "kinds": {
+     "sentence": 0,
+     "clause": 6,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.407
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 2.897,
+     "p90": 4.431
+    },
+    "judged": 6,
+    "verdicts": {
+     "same": 3,
+     "minor": 1,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "longest pause": {
+    "splits": 8,
+    "splits_per_min": 1.92,
+    "kinds": {
+     "sentence": 0,
+     "clause": 7,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.483
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.137,
+     "p90": 4.743
+    },
+    "judged": 7,
+    "verdicts": {
+     "same": 4,
+     "minor": 2,
+     "changed": 1
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q1 p>=0.5": {
+    "splits": 1,
+    "splits_per_min": 0.24,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.726
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.435,
+     "p90": 5.541
+    },
+    "judged": 1,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 1
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q1 p>=0.5 +forced": {
+    "splits": 1,
+    "splits_per_min": 0.24,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.726
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.435,
+     "p90": 5.541
+    },
+    "judged": 1,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 1
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q2 p>=0.3": {
+    "splits": 5,
+    "splits_per_min": 1.2,
+    "kinds": {
+     "sentence": 0,
+     "clause": 2,
+     "mid": 3
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.607
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.193,
+     "p90": 4.817
+    },
+    "judged": 5,
+    "verdicts": {
+     "same": 0,
+     "minor": 2,
+     "changed": 3
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q2 p>=0.5": {
+    "splits": 4,
+    "splits_per_min": 0.96,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.62
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.345,
+     "p90": 4.878
+    },
+    "judged": 4,
+    "verdicts": {
+     "same": 1,
+     "minor": 1,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q2 p>=0.7": {
+    "splits": 4,
+    "splits_per_min": 0.96,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.628
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.421,
+     "p90": 4.946
+    },
+    "judged": 4,
+    "verdicts": {
+     "same": 1,
+     "minor": 1,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "pplx-decider-v1.2 Q2 p>=0.5 +forced": {
+    "splits": 4,
+    "splits_per_min": 0.96,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.62
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.345,
+     "p90": 4.878
+    },
+    "judged": 4,
+    "verdicts": {
+     "same": 1,
+     "minor": 1,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "mercury-decide Q1 p>=0.5": {
+    "splits": 2,
+    "splits_per_min": 0.48,
+    "kinds": {
+     "sentence": 0,
+     "clause": 2,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.614
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.308,
+     "p90": 5.054
+    },
+    "judged": 2,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "mercury-decide Q1 p>=0.5 +forced": {
+    "splits": 2,
+    "splits_per_min": 0.48,
+    "kinds": {
+     "sentence": 0,
+     "clause": 2,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.614
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.308,
+     "p90": 5.054
+    },
+    "judged": 2,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "mercury-decide Q2 p>=0.3": {
+    "splits": 5,
+    "splits_per_min": 1.2,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 2
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.449
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.124,
+     "p90": 4.586
+    },
+    "judged": 5,
+    "verdicts": {
+     "same": 2,
+     "minor": 1,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "mercury-decide Q2 p>=0.5": {
+    "splits": 4,
+    "splits_per_min": 0.96,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.515
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.194,
+     "p90": 4.648
+    },
+    "judged": 4,
+    "verdicts": {
+     "same": 2,
+     "minor": 0,
+     "changed": 2
+    },
+    "premature": 1
+   },
+   "mercury-decide Q2 p>=0.7": {
+    "splits": 2,
+    "splits_per_min": 0.48,
+    "kinds": {
+     "sentence": 0,
+     "clause": 1,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.614
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.289,
+     "p90": 5.415
+    },
+    "judged": 2,
+    "verdicts": {
+     "same": 1,
+     "minor": 0,
+     "changed": 1
+    },
+    "premature": 0
+   },
+   "mercury-decide Q2 p>=0.5 +forced": {
+    "splits": 4,
+    "splits_per_min": 0.96,
+    "kinds": {
+     "sentence": 0,
+     "clause": 3,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1230,
+     "p50": 1.515,
+     "p90": 3.515
+    },
+    "latency_long": {
+     "n": 280,
+     "p50": 3.194,
+     "p90": 4.648
+    },
+    "judged": 4,
+    "verdicts": {
+     "same": 2,
+     "minor": 0,
+     "changed": 2
+    },
+    "premature": 1
+   }
+  },
+  "ko_conv": {
+   "punctuation only": {
+    "splits": 0,
+    "splits_per_min": 0.0,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 4.05
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.662,
+     "p90": 5.073
+    },
+    "judged": 0,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "time cut (latest word)": {
+    "splits": 21,
+    "splits_per_min": 5.04,
+    "kinds": {
+     "sentence": 0,
+     "clause": 4,
+     "mid": 17
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.612,
+     "p90": 3.52
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.285,
+     "p90": 3.866
+    },
+    "judged": 19,
+    "verdicts": {
+     "same": 6,
+     "minor": 9,
+     "changed": 4
+    },
+    "premature": 1
+   },
+   "provider comma": {
+    "splits": 5,
+    "splits_per_min": 1.2,
+    "kinds": {
+     "sentence": 0,
+     "clause": 5,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.645,
+     "p90": 3.975
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.565,
+     "p90": 5.034
+    },
+    "judged": 5,
+    "verdicts": {
+     "same": 1,
+     "minor": 3,
+     "changed": 1
+    },
+    "premature": 0
+   },
+   "longest pause": {
+    "splits": 17,
+    "splits_per_min": 4.08,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 17
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.642,
+     "p90": 3.647
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.52,
+     "p90": 4.046
+    },
+    "judged": 16,
+    "verdicts": {
+     "same": 10,
+     "minor": 5,
+     "changed": 1
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q1 p>=0.5": {
+    "splits": 0,
+    "splits_per_min": 0.0,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 0
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 4.05
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.662,
+     "p90": 5.073
+    },
+    "judged": 0,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q1 p>=0.5 +forced": {
+    "splits": 1,
+    "splits_per_min": 0.24,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 4.05
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.662,
+     "p90": 5.062
+    },
+    "judged": 1,
+    "verdicts": {
+     "same": 0,
+     "minor": 0,
+     "changed": 1
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q2 p>=0.3": {
+    "splits": 9,
+    "splits_per_min": 2.16,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 9
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.645,
+     "p90": 3.859
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.654,
+     "p90": 4.399
+    },
+    "judged": 8,
+    "verdicts": {
+     "same": 3,
+     "minor": 3,
+     "changed": 2
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q2 p>=0.5": {
+    "splits": 9,
+    "splits_per_min": 2.16,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 9
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.645,
+     "p90": 3.859
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.654,
+     "p90": 4.406
+    },
+    "judged": 8,
+    "verdicts": {
+     "same": 3,
+     "minor": 2,
+     "changed": 3
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q2 p>=0.7": {
+    "splits": 9,
+    "splits_per_min": 2.16,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 9
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.645,
+     "p90": 3.859
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.654,
+     "p90": 4.406
+    },
+    "judged": 8,
+    "verdicts": {
+     "same": 3,
+     "minor": 2,
+     "changed": 3
+    },
+    "premature": 0
+   },
+   "pplx-decider-v1.2 Q2 p>=0.5 +forced": {
+    "splits": 9,
+    "splits_per_min": 2.16,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 9
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.645,
+     "p90": 3.859
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.654,
+     "p90": 4.406
+    },
+    "judged": 8,
+    "verdicts": {
+     "same": 3,
+     "minor": 2,
+     "changed": 3
+    },
+    "premature": 0
+   },
+   "mercury-decide Q1 p>=0.5": {
+    "splits": 1,
+    "splits_per_min": 0.24,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 1
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 4.042
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.662,
+     "p90": 5.073
+    },
+    "judged": 1,
+    "verdicts": {
+     "same": 0,
+     "minor": 1,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "mercury-decide Q1 p>=0.5 +forced": {
+    "splits": 2,
+    "splits_per_min": 0.48,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 2
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 4.042
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.662,
+     "p90": 5.005
+    },
+    "judged": 2,
+    "verdicts": {
+     "same": 1,
+     "minor": 1,
+     "changed": 0
+    },
+    "premature": 0
+   },
+   "mercury-decide Q2 p>=0.3": {
+    "splits": 13,
+    "splits_per_min": 3.12,
+    "kinds": {
+     "sentence": 0,
+     "clause": 0,
+     "mid": 13
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 3.798
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.6,
+     "p90": 4.316
+    },
+    "judged": 12,
+    "verdicts": {
+     "same": 4,
+     "minor": 3,
+     "changed": 5
+    },
+    "premature": 1
+   },
+   "mercury-decide Q2 p>=0.5": {
+    "splits": 12,
+    "splits_per_min": 2.88,
+    "kinds": {
+     "sentence": 1,
+     "clause": 0,
+     "mid": 11
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 3.865
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.638,
+     "p90": 4.398
+    },
+    "judged": 11,
+    "verdicts": {
+     "same": 5,
+     "minor": 1,
+     "changed": 5
+    },
+    "premature": 0
+   },
+   "mercury-decide Q2 p>=0.7": {
+    "splits": 9,
+    "splits_per_min": 2.16,
+    "kinds": {
+     "sentence": 1,
+     "clause": 0,
+     "mid": 8
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 3.915
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.638,
+     "p90": 4.49
+    },
+    "judged": 8,
+    "verdicts": {
+     "same": 4,
+     "minor": 1,
+     "changed": 3
+    },
+    "premature": 0
+   },
+   "mercury-decide Q2 p>=0.5 +forced": {
+    "splits": 12,
+    "splits_per_min": 2.88,
+    "kinds": {
+     "sentence": 1,
+     "clause": 0,
+     "mid": 11
+    },
+    "latency_all": {
+     "n": 1460,
+     "p50": 1.646,
+     "p90": 3.865
+    },
+    "latency_long": {
+     "n": 671,
+     "p50": 2.638,
+     "p90": 4.398
+    },
+    "judged": 11,
+    "verdicts": {
+     "same": 5,
+     "minor": 1,
+     "changed": 5
+    },
+    "premature": 0
+   }
+  }
+ },
+ "detail": [
+  {
+   "policy": "punctuation only",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.457
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 5.384
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "punctuation only",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.795
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.938
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "punctuation only",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 4.395
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.704,
+    "p90": 6.136
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "punctuation only",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "punctuation only",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.836,
+    "p90": 7.976
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.675,
+    "p90": 8.936
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "punctuation only",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.735,
+    "p90": 10.17
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.764,
+    "p90": 13.83
+   },
+   "unreleased_chars": 24,
+   "judged": []
+  },
+  {
+   "policy": "time cut (latest word)",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 14,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 11
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.798,
+    "p90": 3.596
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.243,
+    "p90": 3.898
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      98
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks leave the product description unfinished rather than explicitly saying it has not opened, but the overall meaning remains clear."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      172
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the order and timing of both activities, with only an inconsequential variation in the place-name spelling."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      288
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      327
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle awkwardly repeats the area's incomplete development as a subjectless fragment."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      375
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first chunk asserts that it is possible, while the whole translation only says that quite a few people still want to do it."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      407
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment and renders 'as always' less naturally."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      467
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but leave the commercial district dangling rather than clearly linking it to the facilities underneath."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      548,
+      570
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting 'dome-shaped' across chunks awkwardly repeats the dome reference."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    },
+    {
+     "gap": 13,
+     "cuts": [
+      662
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally in sequence."
+    },
+    {
+     "gap": 14,
+     "cuts": [
+      692
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle leaves an awkward dangling clause that the second restarts rather than completes."
+    }
+   ]
+  },
+  {
+   "policy": "time cut (latest word)",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 7,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 6
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.371,
+    "p90": 3.365
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.386,
+    "p90": 3.845
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      50
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk introduces a definite dislike of Danji that the whole translation leaves unresolved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      294
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked subtitles attribute the disappointment to the speaker rather than to the people described in the whole translation."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      382
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle's trailing 'want to' is awkward and less explicit than 'want to do it.'"
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      415
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment and the second shifts from inclusive “we” to “I.”"
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      573
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunks make the dome description more hypothetical and add a temporary nuance to its prettiness."
+    },
+    {
+     "gap": 7,
+     "cuts": [
+      651
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Splitting turns the causal phrase into a statement followed by an unrelated, incomplete observation."
+    }
+   ]
+  },
+  {
+   "policy": "time cut (latest word)",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 8,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 8
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.819,
+    "p90": 3.406
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 2.562,
+    "p90": 3.958
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      52
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split breaks the verb construction, leaving the second subtitle unintelligible on its own instead of describing a video that determines the minimum."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      202
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misreads the split continuation as 'but,' adding a contrast absent from the whole translation."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      280,
+      289
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The chunks turn a conditional realization into an actual past realization and replace the final causal ending with an unrelated phrase."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      321
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the detached ending \"였나\" makes the chunked subtitles awkward compared with the natural whole translation."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      485
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Splitting the greeting turns it into 'tonight' and an unclear suffix, losing the question about starting with a greeting."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      579
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle ends awkwardly and uses a possessive where the whole translation uses a subject marker."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "time cut (latest word)",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 4
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.084,
+    "p90": 2.437
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.09,
+    "p90": 3.825
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      36
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment ending with a possessive marker."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      425
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the split leaves an awkward sentence fragment and adds a hesitant phrasing absent from the whole translation."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      495
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the meaning, but the possessive phrasing in the first subtitle makes the connection to the greeting slightly awkward."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      550
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split breaks 응원 into an unfinished cheering phrase followed by 원하고 있어요, which means wanting rather than cheering."
+    }
+   ]
+  },
+  {
+   "policy": "time cut (latest word)",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 20,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 20
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.244,
+    "p90": 3.893
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 2.581,
+    "p90": 4.013
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      40
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The welcome is repeated and the title is initially incomplete, but the second subtitle supplies the full meaning."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      182,
+      211,
+      243
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Splitting Ben Wallace across two welcoming statements makes one guest sound like two separate guests."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      621,
+      669,
+      716
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The third subtitle incorrectly excludes current projects as well as Broken, whereas the whole translation asks about current projects other than Broken."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      753
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally convey Ben's introduction and social media alias without changing the meaning."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      910
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The organization name is awkwardly split across subtitles, but the co-founder claim and overall meaning are preserved."
+    },
+    {
+     "gap": 7,
+     "cuts": [
+      1005
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle is an awkward detached fragment rather than clearly completing the TTRPG topic."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059,
+      1089
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting the name Aepon Games causes an awkward repetition and clarification across subtitles."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1161
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning but awkwardly repeat specialization and weaken the link between the games and their storytelling focus."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1311,
+      1333,
+      1369
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the fragmented phrasing and repeated references to setting make the chunked subtitles awkward."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1452,
+      1458
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The later chunks leave the description of the team's work and game division as disconnected, unfinished fragments rather than the whole translation's coherent statement."
+    }
+   ]
+  },
+  {
+   "policy": "time cut (latest word)",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 19,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 19
+   },
+   "latency_all": {
+    "n": 1496,
+    "p50": 2.101,
+    "p90": 3.896
+   },
+   "latency_long": {
+    "n": 1042,
+    "p50": 2.538,
+    "p90": 4.042
+   },
+   "unreleased_chars": 2,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      40
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The second subtitle repeats the entire welcome while completing the title, but the overall meaning is preserved."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      208,
+      239
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle wrongly says Amelia and Ryan are welcoming the audience rather than Ben Wallace, who is introduced in the next subtitle."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      516
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles preserve the whole translation's meaning and read naturally in sequence."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      603,
+      647
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle contains an awkward placeholder and the later chunks repeat the request."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      743
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural pause before completing the thought."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1041,
+      1068
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle ends awkwardly with the dangling possessive “저희의.”"
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1149
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle repeats that they make games instead of smoothly completing the first."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1238,
+      1266,
+      1306,
+      1333,
+      1367,
+      1394
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The subtitles preserve the overall meaning but repeat the background-work claim and loosely connect the games to authors laying groundwork for fictional settings."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1495
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Splitting breaks the name A Pawn Games and turns its game division into game planning, obscuring the organizational meaning."
+    }
+   ]
+  },
+  {
+   "policy": "provider comma",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 0,
+    "clause": 5,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.822,
+    "p90": 4.243
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.482,
+    "p90": 5.204
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      98
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks leave the product description unfinished rather than explicitly saying it has not opened, but the overall meaning remains clear."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      170
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle replaces Geobnan with a generic review, losing which project will be covered next week."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      288
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      556
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is largely preserved, but the final subtitle shifts “pretty for now” to “pretty regardless.”"
+    },
+    {
+     "gap": 14,
+     "cuts": [
+      692
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle leaves an awkward dangling clause that the second restarts rather than completes."
+    }
+   ]
+  },
+  {
+   "policy": "provider comma",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.795
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.938
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "provider comma",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 6,
+   "kinds": {
+    "sentence": 0,
+    "clause": 6,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.875,
+    "p90": 3.605
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.007,
+    "p90": 4.36
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      193
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the viewer's perspective and the suggestion that the subchannel should be recognizable from the start."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      312
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles match the whole translation and preserve the speaker's unfinished thought followed by a reflective question."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      576
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward dangling possessive rather than a natural standalone subtitle."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      646
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk says “just volleyball” instead of the whole translation’s reference to a belly, changing the meaning."
+    }
+   ]
+  },
+  {
+   "policy": "provider comma",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "provider comma",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 8,
+   "kinds": {
+    "sentence": 0,
+    "clause": 8,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.822,
+    "p90": 6.67
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.538,
+    "p90": 7.444
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      83
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the whole translation’s meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      235
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally introduce the hosts and guest, then clarify Broken's genre without changing the meaning."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      672
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle attaches 'aside from Broken' to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      744
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles preserve the introduction and social media alias naturally without any misleading early meaning."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      879
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles naturally convey the same affirmation and co-founder introduction as the whole translation."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1064
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The two subtitles naturally convey the launch of Aepon Games and its role as the network's TTRPG publishing division."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1292
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks read naturally in sequence and preserve the examples of world-building, expanding settings, and games that help authors develop fictional settings."
+    }
+   ]
+  },
+  {
+   "policy": "provider comma",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 7,
+   "kinds": {
+    "sentence": 2,
+    "clause": 5,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.709,
+    "p90": 7.072
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.498,
+    "p90": 8.032
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      83
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles preserve the whole translation's meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      235
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the introduction and clearly describe Broken as a two-player tragic romance RPG."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      495
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is largely preserved, but the request for Ryan to raise the volume becomes permission to do so."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1028,
+      1058
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the audio-drama activity, the launch of Epon Games, and its role as the network's TTRPG publishing division."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1278
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning but repeat the background-work point and describe dealing with games rather than potentially making them."
+    }
+   ]
+  },
+  {
+   "policy": "longest pause",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 12,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 12
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.822,
+    "p90": 3.821
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.502,
+    "p90": 4.078
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      92
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read acceptably as consecutive subtitles."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      168
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk replaces Geobnan with a generic review, losing which subject will be covered next week."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      276
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning, and the brief connective reads acceptably as a lead-in."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      320
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles together convey that the surrounding area is not yet well-developed, with an acceptable introductory fragment."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      365
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the whole translation’s meaning, and the separate introductory phrase reads acceptably."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      407
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment and renders 'as always' less naturally."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      467
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but leave the commercial district dangling rather than clearly linking it to the facilities underneath."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547,
+      553
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the isolated dome-shape fragment is awkward and the final chunk slightly shifts the closing nuance."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    },
+    {
+     "gap": 13,
+     "cuts": [
+      662
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally in sequence."
+    },
+    {
+     "gap": 14,
+     "cuts": [
+      682
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the whole translation's meaning and read naturally in sequence."
+    }
+   ]
+  },
+  {
+   "policy": "longest pause",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 5
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.382,
+    "p90": 3.496
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.545,
+    "p90": 3.994
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      372
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      415
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment and the second shifts from inclusive “we” to “I.”"
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      572
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the dome construction is repeated and 'for the time being' makes the praise sound more temporary."
+    },
+    {
+     "gap": 7,
+     "cuts": [
+      645
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the contrast and causal meaning of the whole translation without introducing a contradictory interpretation."
+    }
+   ]
+  },
+  {
+   "policy": "longest pause",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 6,
+   "kinds": {
+    "sentence": 0,
+    "clause": 5,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.877,
+    "p90": 3.781
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.314,
+    "p90": 5.334
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      192
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the viewer's perspective and the preference for recognizing the subchannel from the start."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      264,
+      286
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle turns a quoted realization within a condition into a standalone question about a secondary account."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      312
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles match the whole translation and preserve the speaker's unfinished thought followed by a reflective question."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      576
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward dangling possessive rather than a natural standalone subtitle."
+    }
+   ]
+  },
+  {
+   "policy": "longest pause",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 2,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.717
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.526,
+    "p90": 4.093
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      409
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning and read naturally in sequence."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      492
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the core meaning, but the second subtitle adds a slight sense of intention to copy."
+    }
+   ]
+  },
+  {
+   "policy": "longest pause",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 19,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 17
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.586,
+    "p90": 4.434
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.052,
+    "p90": 4.739
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      17
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The welcome is repeated and “special” becomes a generic special occasion, but the overall meaning is preserved."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      83
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the whole translation’s meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      180,
+      208,
+      229
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle incorrectly says Amelia and Ryan will welcome the audience rather than Ben Wallace, and the final subtitle weakens the link between Broken and the discussion topic."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      612,
+      664,
+      681
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The split makes the exclusion refer to current projects rather than Broken, misleading readers about which projects Ben is being asked to discuss."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      753
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally convey Ben's introduction and social media alias without changing the meaning."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      910
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The organization name is awkwardly split across subtitles, but the co-founder claim and overall meaning are preserved."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1054,
+      1089
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunked subtitles awkwardly separate the launch from its object and describe the publishing wing across two sentences."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1155
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunked subtitles awkwardly repeat the idea of making games."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1207
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle leaves an awkward placeholder for the activity, but the next subtitle supplies it and preserves the overall meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1292,
+      1324,
+      1340
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The third subtitle suggests something might become a game, rather than introducing games an author might use to develop a fictional setting."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1434,
+      1456
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The main meaning is preserved, but the final chunk trails off awkwardly instead of conveying the whole translation’s recently started game division."
+    }
+   ]
+  },
+  {
+   "policy": "longest pause",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 17,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 16
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.43,
+    "p90": 4.672
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.099,
+    "p90": 5.212
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      17
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle adds a generic welcome to a special occasion, then the second repeats the welcome with the full episode details."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      83
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles preserve the whole translation's meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      208,
+      229
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle incorrectly says the hosts are welcoming the audience rather than Ben Wallace, and the final subtitle awkwardly presents Broken without linking it to the discussion."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      516
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles preserve the whole translation's meaning and read naturally in sequence."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      602,
+      632
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle trails off awkwardly and the request is repeated in the third."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      743
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural pause before completing the thought."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1049
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the launch statement and its object are awkwardly separated into two standalone sentences."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1144
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the meaning, but the first leaves production vague and the second repeats the idea of making games."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1205,
+      1226,
+      1295,
+      1333,
+      1349,
+      1377
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Several chunks are unintelligible placeholder fragments, and the games' intended use is obscured by rendering them as something that might become a game."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.457
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 5.384
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.795
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.938
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 1,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 4.394
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.704,
+    "p90": 5.734
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      271
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle turns a quoted realization into a direct question, and the second misreads the quotation ending as 'but'."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 1,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.836,
+    "p90": 7.584
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.674,
+    "p90": 8.295
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      172
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles convey the same introduction and guest welcome as the whole translation, with no misleading split."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.735,
+    "p90": 10.17
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.764,
+    "p90": 13.83
+   },
+   "unreleased_chars": 24,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 1,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.457
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 5.307
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes the subject from “we” to “I,” making the switch to Mia an individual rather than a group action."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.795
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.938
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 1,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 4.394
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.704,
+    "p90": 5.734
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      271
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle turns a quoted realization into a direct question, and the second misreads the quotation ending as 'but'."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 7,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 5
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.836,
+    "p90": 6.493
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.616,
+    "p90": 6.995
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      175
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the standalone subtitle “그리고” is an awkward connective fragment."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      669
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle attaches “aside from Broken” to where Ben can be found online rather than to his current projects."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1292,
+      1318,
+      1344
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the third subtitle is awkward and vague until the final chunk explains how an author might use the games."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1456
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles read naturally in sequence and preserve the whole translation’s meaning without a misleading early commitment."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q1 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 7,
+   "kinds": {
+    "sentence": 1,
+    "clause": 1,
+    "mid": 5
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.735,
+    "p90": 7.59
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.764,
+    "p90": 8.036
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      175
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the isolated conjunction reads awkwardly as a standalone subtitle."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward dangling list fragment rather than the whole translation's completed clause."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1235,
+      1278,
+      1295,
+      1338
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle wrongly treats “all of them” as the things receiving background work rather than the people skilled at it."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.3",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 6,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 6
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.108
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 4.455
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      463
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but the first leaves the causal link dangling and describes the ceiling's state rather than its having been opened up."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      548
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The dome description is awkwardly repeated across chunks, but the overall meaning is preserved."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.3",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 3,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 3
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.601
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.638,
+    "p90": 4.161
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      573
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunks make the dome description more hypothetical and add a temporary nuance to its prettiness."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.3",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 3
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.865
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.439,
+    "p90": 4.835
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      202
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misreads the split continuation as 'but,' adding a contrast absent from the whole translation."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      482
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the split turns the start of the greeting into an awkward trailing filler in the first subtitle."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      579
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle ends awkwardly and uses a possessive where the whole translation uses a subject marker."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.3",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.3",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 15,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 15
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.703,
+    "p90": 5.122
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.196,
+    "p90": 5.479
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      180,
+      211
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Splitting Ben Wallace's name across two separate welcoming statements makes him sound like two different guests."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      616,
+      664
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting repeats the request to speak and the question about current projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      749
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural trailing pause in the first subtitle."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059,
+      1089
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting the name Aepon Games causes an awkward repetition and clarification across subtitles."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1158
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The second subtitle naturally completes the first, preserving the focus on making games centered on telling great stories."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1311,
+      1333,
+      1369
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the fragmented phrasing and repeated references to setting make the chunked subtitles awkward."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1446,
+      1458
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The later chunks are dangling fragments and omit the whole translation’s claim that the game division was recently started."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.3",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 14,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 14
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.499,
+    "p90": 4.677
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.094,
+    "p90": 4.792
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      208
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle incorrectly says the hosts will welcome the audience rather than Ben Wallace, whose identity appears in the next subtitle."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      602,
+      640
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the full request but awkwardly repeat the invitation to speak and the question about projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      739
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural pause before completing the thought."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1065
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally continue the earlier list and preserve the launch of Epon Games and its role as the network’s TTRPG publishing division."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1149
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle repeats that they make games instead of smoothly completing the first."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1238,
+      1263,
+      1306,
+      1333,
+      1367
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The subtitles preserve the overall meaning but repeat the background-work point and awkwardly split the explanation of games authors could use."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 6,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 6
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.128
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 4.466
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      463
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but the first leaves the causal link dangling and describes the ceiling's state rather than its having been opened up."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked version replaces some facilities being dome-shaped with a singular subject and changes the final assessment from pretty for now to pretty for the most part."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 3,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 3
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.601
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.638,
+    "p90": 4.161
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      573
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunks make the dome description more hypothetical and add a temporary nuance to its prettiness."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.894
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.559,
+    "p90": 4.892
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      576
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward dangling possessive rather than a natural standalone subtitle."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 15,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 14
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.707,
+    "p90": 5.467
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.257,
+    "p90": 5.829
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      208
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle prematurely makes the audience the object of the welcome, whereas the full utterance welcomes Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      601,
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The last chunk misattaches the exclusion of Broken to the online-location question rather than to the projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      749
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural trailing pause in the first subtitle."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1054,
+      1079
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle identifies Aepon Games as their TTRPG rather than their TTRPG publishing division, which the final subtitle then corrects."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1158
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The second subtitle naturally completes the first, preserving the focus on making games centered on telling great stories."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1311,
+      1329,
+      1340
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Chunk 3 turns a relative-clause fragment into a standalone expression of agreement, obscuring the connection between the games and their use by an author."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1446,
+      1456
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the later subtitles read as awkward, dangling fragments rather than the whole translation's integrated sentence."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 13,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 11
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.555,
+    "p90": 4.737
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.245,
+    "p90": 5.01
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      208
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle says the hosts are welcoming the audience, whereas the completed utterance says they are welcoming Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      591,
+      619
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles naturally divide the request into starting, introducing himself, and describing current projects aside from Broken."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      739
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural pause before completing the thought."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1058
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the list continuation, launch announcement, and explanation of Epon Games without misleading the reader."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1235,
+      1259,
+      1306,
+      1329,
+      1367
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The chunks misread “all of them” as an object and turn games an author might use into games intended for an author, obscuring the final relationship."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.7",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 6,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 6
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.128
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 4.466
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      463
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but the first leaves the causal link dangling and describes the ceiling's state rather than its having been opened up."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked version replaces some facilities being dome-shaped with a singular subject and changes the final assessment from pretty for now to pretty for the most part."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.7",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 3,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 3
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.601
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.638,
+    "p90": 4.161
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      573
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunks make the dome description more hypothetical and add a temporary nuance to its prettiness."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.7",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 4.045
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.614,
+    "p90": 5.012
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      271
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle turns a quoted realization into a direct question, and the second misreads the quotation ending as 'but'."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      576
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward dangling possessive rather than a natural standalone subtitle."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      646
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk says “just volleyball” instead of the whole translation’s reference to a belly, changing the meaning."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.7",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.7",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 10,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 8
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.756,
+    "p90": 6.151
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.432,
+    "p90": 6.858
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles convey the same introduction and guest welcome as the whole translation, with no misleading split."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misattaches the exclusion of Broken to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      747
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally preserve Ben's introduction and social media alias without changing the meaning."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1054,
+      1064
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but separating the launch from its object makes the first two subtitles slightly awkward."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1158
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The second subtitle naturally completes the first, preserving the focus on making games centered on telling great stories."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1295,
+      1320
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunks present examples as statements, while the whole translation asks for confirmation of what the other person means."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1456
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles read naturally in sequence and preserve the whole translation’s meaning without a misleading early commitment."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.7",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 10,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 7
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.597,
+    "p90": 5.019
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.399,
+    "p90": 5.747
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      83
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles preserve the whole translation's meaning and read acceptably in sequence."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunked subtitles convey the same introduction and guest announcement as the whole translation."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      619
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "Both subtitles naturally preserve the request for Ben to introduce himself and describe his current projects aside from Broken."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      737
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias without any contradictory implication."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1058
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the list continuation, launch announcement, and explanation of Epon Games without misleading the reader."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1235,
+      1306,
+      1329,
+      1367
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle misreads “all of them” as the object of background work, and the later subtitle about games for an author is unclear on its own."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 6,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 6
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.128
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 4.466
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      463
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but the first leaves the causal link dangling and describes the ceiling's state rather than its having been opened up."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked version replaces some facilities being dome-shaped with a singular subject and changes the final assessment from pretty for now to pretty for the most part."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 3,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 3
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.601
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.638,
+    "p90": 4.161
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      573
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunks make the dome description more hypothetical and add a temporary nuance to its prettiness."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.894
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.559,
+    "p90": 4.892
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      576
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward dangling possessive rather than a natural standalone subtitle."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 15,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 14
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.707,
+    "p90": 5.467
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.257,
+    "p90": 5.829
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      208
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle prematurely makes the audience the object of the welcome, whereas the full utterance welcomes Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      601,
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The last chunk misattaches the exclusion of Broken to the online-location question rather than to the projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      749
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural trailing pause in the first subtitle."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1054,
+      1079
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle identifies Aepon Games as their TTRPG rather than their TTRPG publishing division, which the final subtitle then corrects."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1158
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The second subtitle naturally completes the first, preserving the focus on making games centered on telling great stories."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1311,
+      1329,
+      1340
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "Chunk 3 turns a relative-clause fragment into a standalone expression of agreement, obscuring the connection between the games and their use by an author."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1446,
+      1456
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the later subtitles read as awkward, dangling fragments rather than the whole translation's integrated sentence."
+    }
+   ]
+  },
+  {
+   "policy": "pplx-decider-v1.2 Q2 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 13,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 11
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.555,
+    "p90": 4.737
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.245,
+    "p90": 5.01
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      208
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle says the hosts are welcoming the audience, whereas the completed utterance says they are welcoming Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      591,
+      619
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles naturally divide the request into starting, introducing himself, and describing current projects aside from Broken."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      739
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias, with a natural pause before completing the thought."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1058
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the list continuation, launch announcement, and explanation of Epon Games without misleading the reader."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1235,
+      1259,
+      1306,
+      1329,
+      1367
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The chunks misread “all of them” as an object and turn games an author might use into games intended for an author, obscuring the final relationship."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 1,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.432
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 5.384
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 12,
+     "cuts": [
+      628
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the main meaning but replace the explicit causal link with an awkward 'Looking at it.'"
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.795
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.938
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 2,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.964
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.435,
+    "p90": 5.056
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      646
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk says “just volleyball” instead of the whole translation’s reference to a belly, changing the meaning."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 4
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.778,
+    "p90": 7.257
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.576,
+    "p90": 7.848
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 4,
+     "cuts": [
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misattaches the exclusion of Broken to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 7,
+     "cuts": [
+      991
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles naturally convey the same meaning in sequence, with the second specifying the topic of the podcasts and streams."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1456
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles read naturally in sequence and preserve the whole translation’s meaning without a misleading early commitment."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 2,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 2
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.735,
+    "p90": 6.974
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.759,
+    "p90": 7.83
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 10,
+     "cuts": [
+      1263,
+      1295
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning but repeat the praise for background work and loosely connect storytelling with worldbuilding."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 2,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 2
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.871,
+    "p90": 4.409
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.654,
+    "p90": 5.203
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The first subtitle leaves the original choice open, and the second completes it consistently with the whole translation."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      628
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the main meaning but replace the explicit causal link with an awkward 'Looking at it.'"
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.795
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.938
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 2,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.964
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.435,
+    "p90": 5.056
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      646
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk says “just volleyball” instead of the whole translation’s reference to a belly, changing the meaning."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 10,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 8
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.771,
+    "p90": 6.212
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.551,
+    "p90": 6.616
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      218
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the invitation phrase is awkwardly repeated across the second and third subtitles."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misattaches the exclusion of Broken to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 7,
+     "cuts": [
+      991
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles naturally convey the same meaning in sequence, with the second specifying the topic of the podcasts and streams."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split breaks the name Aepon Games and presents Games as a separate entity rather than part of the publishing wing's name."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1292,
+      1318,
+      1369
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but splitting the author's groundwork-setting purpose across the last two subtitles makes the phrasing repetitive and loosely connected."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1456
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles read naturally in sequence and preserve the whole translation’s meaning without a misleading early commitment."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q1 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 8,
+   "kinds": {
+    "sentence": 0,
+    "clause": 2,
+    "mid": 6
+   },
+   "latency_all": {
+    "n": 1474,
+    "p50": 2.73,
+    "p90": 6.165
+   },
+   "latency_long": {
+    "n": 1020,
+    "p50": 3.67,
+    "p90": 6.717
+   },
+   "unreleased_chars": 24,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      239
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the two-player description is unnecessarily repeated across consecutive subtitles."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      619
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "Both subtitles naturally preserve the request for Ben to introduce himself and describe his current projects aside from Broken."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1058
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning and naturally introduce Epon Games before explaining its publishing role."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1263,
+      1295,
+      1300,
+      1360
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning but repeat the praise for background work and express the connection between games and authors less smoothly."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.3",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 8,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 8
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.835,
+    "p90": 4.04
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.598,
+    "p90": 4.398
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      92
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read acceptably as consecutive subtitles."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      285
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first chunk attributes the visit to others, while the continuation and whole translation describe the speaker's own visit."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      463
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but the first leaves the causal link dangling and describes the ceiling's state rather than its having been opened up."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked version replaces some facilities being dome-shaped with a singular subject and changes the final assessment from pretty for now to pretty for the most part."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.3",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 5
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.61
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.664,
+    "p90": 4.105
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      48
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle turns the whole translation's unfinished remark about Danji and the speaker into a claim that the viewers' choice was not originally this crazy."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      283
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked subtitles attribute the visit and disappointment to the speaker rather than to other people as in the whole translation."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      323
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve both the small site and the surrounding area's lack of development without introducing a misleading claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      382
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the second subtitle's trailing 'want to' is awkward and less explicit than 'want to do it.'"
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      573
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the chunks make the dome description more hypothetical and add a temporary nuance to its prettiness."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.3",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 2
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.674
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.247,
+    "p90": 4.594
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      193
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the viewer's perspective and the suggestion that the subchannel should be recognizable from the start."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      275
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle presents the sub-account identification as a fact rather than part of a later hypothetical realization, which the second subtitle then repeats."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      579
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle ends awkwardly and uses a possessive where the whole translation uses a subject marker."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.3",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.3",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 15,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 15
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.656,
+    "p90": 4.539
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.077,
+    "p90": 4.701
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      180,
+      211,
+      243
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "Splitting Ben Wallace’s name across two separate welcomes makes him appear to be two different guests."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      621,
+      664
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle has an awkward placeholder and the later subtitles repeat the request about current projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      747
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally preserve Ben's introduction and social media alias without changing the meaning."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059,
+      1071
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "Splitting the name Aepon Games makes the second subtitle describe it as a game rather than a TTRPG publishing division."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1221
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks repeat the point about being good at background work, but preserve the whole translation's meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1311,
+      1333,
+      1362
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the overall meaning, but the split across expanding a setting creates an awkward, repetitive fragment."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1452,
+      1456
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The final chunk trails off at “recently,” losing the whole translation’s meaning that the game division was recently started."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.3",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 15,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 15
+   },
+   "latency_all": {
+    "n": 1491,
+    "p50": 2.499,
+    "p90": 4.55
+   },
+   "latency_long": {
+    "n": 1037,
+    "p50": 3.079,
+    "p90": 4.775
+   },
+   "unreleased_chars": 7,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      208
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle incorrectly says the hosts will welcome the audience rather than Ben Wallace, whose identity appears in the next subtitle."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      622
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The two subtitles naturally split the request into self-introduction and current projects, preserving the whole translation's meaning."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      737
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias without any contradictory implication."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1041,
+      1065
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the full meaning and read acceptably as consecutive subtitles without introducing any contradiction."
+    },
+    {
+     "gap": 9,
+     "cuts": [
+      1144
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the meaning, but the first leaves production vague and the second repeats the idea of making games."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1235,
+      1266,
+      1306,
+      1333,
+      1367,
+      1394
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first chunk assigns background work to all the preceding items, while later chunks obscure that authors use the games to establish fictional settings."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1490
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the unfinished meaning, but repeat fillers and use a less natural subject marker than the whole translation."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 7,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 7
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.835,
+    "p90": 4.051
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.598,
+    "p90": 4.455
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      92
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read acceptably as consecutive subtitles."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      280
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the sequence of watching the video, visiting, and feeling more disappointed than expected."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked version replaces some facilities being dome-shaped with a singular subject and changes the final assessment from pretty for now to pretty for the most part."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 1,
+    "clause": 0,
+    "mid": 4
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.663
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.325
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      45
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk replaces Danji with “the word” and changes the speaker’s unfinished self-description into a statement about something else."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      283
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked subtitles attribute the visit and disappointment to the speaker rather than to other people as in the whole translation."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      320
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve both the small site and the surrounding area's lack of development without any misleading early claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      564
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting the word for 'like this' leaves an awkward dangling 'this...' in the first subtitle."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.726
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.315,
+    "p90": 4.676
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      192
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the viewer's perspective and the preference for recognizing the subchannel from the start."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 13,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 13
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.749,
+    "p90": 5.055
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.257,
+    "p90": 5.324
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      208,
+      243
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle says Amelia and Ryan will welcome the audience, whereas the completed utterance says they are welcoming Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misattaches the exclusion of Broken to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      747
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally preserve Ben's introduction and social media alias without changing the meaning."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059,
+      1069
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "Splitting the name Aepon Games makes the second subtitle awkward, but the combined subtitles preserve the overall meaning."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1193
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment and the chunked version slightly strengthens the praise."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1295,
+      1333
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the chunks awkwardly trail off and omit the explicit reference to games."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1442,
+      1456
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the main meaning but repeat 'core' and leave the final organizational phrase awkwardly unfinished."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 13,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 13
+   },
+   "latency_all": {
+    "n": 1488,
+    "p50": 2.597,
+    "p90": 4.83
+   },
+   "latency_long": {
+    "n": 1034,
+    "p50": 3.314,
+    "p90": 5.169
+   },
+   "unreleased_chars": 10,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      196
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The consecutive subtitles preserve the whole translation's meaning and read acceptably as a continuing introduction."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      737
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias without any contradictory implication."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1065
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally continue the earlier list and preserve the launch of Epon Games and its role as the network’s TTRPG publishing division."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1223,
+      1266,
+      1306,
+      1333,
+      1367,
+      1394
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The subtitles repeat the background-work claim and awkwardly separate the games from their use by authors, but preserve the overall meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1487
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle awkwardly repeats an unfinished possessive phrase."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.7",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 5
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.835,
+    "p90": 4.218
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.598,
+    "p90": 4.533
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      276
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning, and the brief connective reads acceptably as a lead-in."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.7",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 1,
+    "clause": 0,
+    "mid": 3
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.695
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.33
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 2,
+     "cuts": [
+      283
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked subtitles attribute the visit and disappointment to the speaker rather than to other people as in the whole translation."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      320
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve both the small site and the surrounding area's lack of development without any misleading early claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      564
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting the word for 'like this' leaves an awkward dangling 'this...' in the first subtitle."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.7",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 2,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.904
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.435,
+    "p90": 5.775
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.7",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.7",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 8,
+   "kinds": {
+    "sentence": 0,
+    "clause": 1,
+    "mid": 7
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.757,
+    "p90": 5.594
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.318,
+    "p90": 6.359
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      172,
+      208,
+      243
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle prematurely says Amelia and Ryan will welcome the audience rather than their guest Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misattaches the exclusion of Broken to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059,
+      1069
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "Splitting the name Aepon Games makes the second subtitle awkward, but the combined subtitles preserve the overall meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1320
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The second subtitle naturally extends the examples in the first, preserving the whole translation’s meaning and questioning tone."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.7",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 11,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 11
+   },
+   "latency_all": {
+    "n": 1486,
+    "p50": 2.653,
+    "p90": 5.169
+   },
+   "latency_long": {
+    "n": 1032,
+    "p50": 3.399,
+    "p90": 5.541
+   },
+   "unreleased_chars": 12,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      188
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The split leaves an awkward unfinished topic about the co-host, but the subtitles together preserve the intended meaning."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1063
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally preserve the list continuation, launch announcement, and explanation of Epon Games as the network's TTRPG publishing wing."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1223,
+      1263,
+      1300,
+      1333,
+      1367,
+      1394
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The overall meaning is preserved, but the chunks repeat the background-work claim and awkwardly separate storytelling from the work it describes."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1485
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation’s meaning and unfinished phrasing without introducing a contradiction."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 7,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 7
+   },
+   "latency_all": {
+    "n": 717,
+    "p50": 1.835,
+    "p90": 4.051
+   },
+   "latency_long": {
+    "n": 420,
+    "p50": 2.598,
+    "p90": 4.455
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      53,
+      56
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve the original plan and subsequent switch to Mia without introducing a contradictory claim."
+    },
+    {
+     "gap": 1,
+     "cuts": [
+      92
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read acceptably as consecutive subtitles."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      280
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the sequence of watching the video, visiting, and feeling more disappointed than expected."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      373
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk changes wanting to do it into wanting to become something."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      547
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked version replaces some facilities being dome-shaped with a singular subject and changes the final assessment from pretty for now to pretty for the most part."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      631
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the whole translation's meaning and read naturally as consecutive subtitles."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5 +forced",
+   "data": "ko_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 5,
+   "kinds": {
+    "sentence": 1,
+    "clause": 0,
+    "mid": 4
+   },
+   "latency_all": {
+    "n": 743,
+    "p50": 1.384,
+    "p90": 3.663
+   },
+   "latency_long": {
+    "n": 251,
+    "p50": 2.718,
+    "p90": 4.325
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 0,
+     "cuts": [
+      45
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second chunk replaces Danji with “the word” and changes the speaker’s unfinished self-description into a statement about something else."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      283
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The chunked subtitles attribute the visit and disappointment to the speaker rather than to other people as in the whole translation."
+    },
+    {
+     "gap": 3,
+     "cuts": [
+      320
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The subtitles preserve both the small site and the surrounding area's lack of development without any misleading early claim."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      380
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle changes wanting to do it into wanting to become something unspecified."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      564
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but splitting the word for 'like this' leaves an awkward dangling 'this...' in the first subtitle."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 4,
+   "kinds": {
+    "sentence": 0,
+    "clause": 3,
+    "mid": 1
+   },
+   "latency_all": {
+    "n": 673,
+    "p50": 1.878,
+    "p90": 3.726
+   },
+   "latency_long": {
+    "n": 188,
+    "p50": 3.315,
+    "p90": 4.676
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      192
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the viewer's perspective and the preference for recognizing the subchannel from the start."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      274
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle asserts that this is a secondary account rather than presenting it as a thought someone might have later."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      481
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve the reason and ensuing question, with only inconsequential wording differences."
+    },
+    {
+     "gap": 6,
+     "cuts": [
+      648
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The split turns the final phrase into an unintelligible fragment and loses the whole translation's meaning of being merely a belly."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5 +forced",
+   "data": "ja_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 0,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 0
+   },
+   "latency_all": {
+    "n": 557,
+    "p50": 1.085,
+    "p90": 2.76
+   },
+   "latency_long": {
+    "n": 92,
+    "p50": 2.616,
+    "p90": 4.539
+   },
+   "unreleased_chars": 0,
+   "judged": []
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "soniox",
+   "minutes": 2.0833333333333335,
+   "splits": 14,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 14
+   },
+   "latency_all": {
+    "n": 1469,
+    "p50": 2.749,
+    "p90": 4.995
+   },
+   "latency_long": {
+    "n": 1068,
+    "p50": 3.257,
+    "p90": 5.279
+   },
+   "unreleased_chars": 0,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      108
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The first subtitle says the segment will spotlight people, but the continuation reveals that the subjects are games."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      208,
+      243
+     ],
+     "verdict": "changed",
+     "premature": true,
+     "reason": "The second subtitle says Amelia and Ryan will welcome the audience, whereas the completed utterance says they are welcoming Ben Wallace."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      664
+     ],
+     "verdict": "changed",
+     "premature": false,
+     "reason": "The second subtitle misattaches the exclusion of Broken to where people can find Ben online rather than to his current projects."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      747
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally preserve Ben's introduction and social media alias without changing the meaning."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1059,
+      1069
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "Splitting the name Aepon Games makes the second subtitle awkward, but the combined subtitles preserve the overall meaning."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1193
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle is an awkward fragment and the chunked version slightly strengthens the praise."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1295,
+      1333,
+      1360
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the general meaning but awkwardly trail off and replace the explicit reference to games with generic things."
+    },
+    {
+     "gap": 12,
+     "cuts": [
+      1442,
+      1456
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The chunks preserve the main meaning but repeat 'core' and leave the final organizational phrase awkwardly unfinished."
+    }
+   ]
+  },
+  {
+   "policy": "mercury-decide Q2 p>=0.5 +forced",
+   "data": "en_conv",
+   "provider": "gemini",
+   "minutes": 2.0833333333333335,
+   "splits": 14,
+   "kinds": {
+    "sentence": 0,
+    "clause": 0,
+    "mid": 14
+   },
+   "latency_all": {
+    "n": 1488,
+    "p50": 2.597,
+    "p90": 4.749
+   },
+   "latency_long": {
+    "n": 1034,
+    "p50": 3.314,
+    "p90": 5.019
+   },
+   "unreleased_chars": 10,
+   "judged": [
+    {
+     "gap": 1,
+     "cuts": [
+      104
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The first subtitle awkwardly leaves a placeholder for the games and the second repeats the introductory action, but the overall meaning is preserved."
+    },
+    {
+     "gap": 2,
+     "cuts": [
+      175,
+      196
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The consecutive subtitles preserve the whole translation's meaning and read acceptably as a continuing introduction."
+    },
+    {
+     "gap": 4,
+     "cuts": [
+      622
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The two subtitles naturally split the request into self-introduction and current projects, preserving the whole translation's meaning."
+    },
+    {
+     "gap": 5,
+     "cuts": [
+      737
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks preserve Ben's introduction and social media alias without any contradictory implication."
+    },
+    {
+     "gap": 8,
+     "cuts": [
+      1031,
+      1065
+     ],
+     "verdict": "same",
+     "premature": false,
+     "reason": "The chunks naturally continue the earlier list and preserve the launch of Epon Games and its role as the network’s TTRPG publishing division."
+    },
+    {
+     "gap": 10,
+     "cuts": [
+      1223,
+      1266,
+      1306,
+      1333,
+      1367,
+      1394
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The subtitles repeat the background-work claim and awkwardly separate the games from their use by authors, but preserve the overall meaning."
+    },
+    {
+     "gap": 11,
+     "cuts": [
+      1487
+     ],
+     "verdict": "minor",
+     "premature": false,
+     "reason": "The meaning is preserved, but the first subtitle awkwardly repeats an unfinished possessive phrase."
+    }
+   ]
+  }
+ ],
+ "calls": [
+  {
+   "model": "perplexity/pplx-decider-v1.2",
+   "role": "decision",
+   "calls": 1210,
+   "errors": 0,
+   "cost": 0.00627628,
+   "rtt_p50": 0.569
+  },
+  {
+   "model": "inception/mercury-decide",
+   "role": "decision",
+   "calls": 1210,
+   "errors": 0,
+   "cost": 0.0056603800000000004,
+   "rtt_p50": 0.428
+  },
+  {
+   "model": "google/gemma-4-26b-a4b-it",
+   "role": "translation",
+   "calls": 485,
+   "errors": 0,
+   "cost": 0.024904458,
+   "rtt_p50": 0.492
+  },
+  {
+   "model": "openai/gpt-6.1-sol",
+   "role": "judge",
+   "calls": 185,
+   "errors": 0,
+   "cost": 0.295996,
+   "rtt_p50": 2.769
+  }
+ ],
+ "failures": {}
+}
