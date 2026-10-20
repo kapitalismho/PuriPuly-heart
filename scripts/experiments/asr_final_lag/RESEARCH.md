@@ -252,7 +252,7 @@ Where a decision model could still fit, and what the data says:
 | Replace Qwen's late punctuation | Rejected: no faster (4.3) |
 | Choose a split point after 3 s without punctuation | Not better than comma or longest pause in two runs; noisy (4.6) |
 | Choose a Qwen cut point in real time | Not possible: Qwen text arrives 1-2 s late, so audio cues must decide (4.7) |
-| Shadow questions (filler, ASR hallucination, needs previous context) | Not tested |
+| Shadow questions (filler, ASR hallucination, needs previous context) | Not tested; kept as context only (5.3) |
 
 ### 5.2 Early release for utterances of 3 s or more
 
@@ -266,6 +266,51 @@ Per provider, the best measured path:
 | Qwen Audio 3.1 | Task finals; cut tasks at pauses (200 ms after 2 s) and pass previous text as context; English may also release partial at terminal marks | No good answer yet (p90 6-9 s) | about 3 s |
 
 The latency definitions differ slightly between sources (speech end of a sentence, caption line end, or Soniox character end), so compare rows only roughly. Translation time is not included.
+
+### 5.3 Decision model: status and remaining directions
+
+Status: in every role tested so far (5.1), a decision model did not beat a simpler signal. It is off the common path of the proposed structure (section 7). The maintainer asked to keep the following directions on record.
+
+**Context only (not a planned experiment): auxiliary questions.** The early design (before any measurement) proposed asking extra `noul` questions on the same state, logged as shadow answers only:
+
+- `filler_only`: the chunk is only a filler or backchannel ("음", "네", "うん", "yeah") and may not need a subtitle.
+- `asr_artifact`: the text is an ASR hallucination such as "시청해주셔서 감사합니다". The application currently matches only two exact phrases (`src/puripuly_heart/core/stt/local_qwen_hallucination.py`).
+- `needs_previous`: the chunk is an elliptical reply that needs earlier context to translate.
+
+These do not decide when text is released, so the 2 s right-context floor does not apply to them. Decider Flash's model card says single-question requests are more accurate than bundled ones. Dropping or hiding text based on them would conflict with the #211 rule to preserve valid text and needs a separate decision.
+
+**Direction A: re-score with better boundary labels.**
+
+- Why: every boundary score so far uses Soniox final punctuation as the label. That favors the punctuation rule (circular for Soniox) and is noisy. Sampled disagreements in `decide-20261020T072017Z/NOTE.md` include a model scoring 0.98 at "where people can find you online | yeah absolutely" with no label, labels inside a Korean or Japanese word within the 1-character slack, and Soniox commas inside lists counted as clause ends. The measured AUC values (0.76-0.88) are lower bounds.
+- What: have a strong LLM (or a person) read each full transcript and mark sentence ends, clause ends and "a subtitle could end here" points. Map the marks onto each provider's text the way `decide.py` maps Soniox labels.
+- Cost: no new decision-model calls are needed. The call logs store every decision call with its virtual time, the state sent and the answer: `decide-*/calls/*.jsonl.gz` (proposal choices and right-context `before` / `after` checks) and `split-*/calls/decide_*.jsonl.gz` (Q1/Q2 probabilities with candidate position). Recall, mid-sentence share, AUC and the split policies can be re-scored offline. Only the labeling calls cost money (a few dollars).
+- Decision it informs: whether decision models lost partly because of label bias. If the right-context check scores well above 0.88 under fair labels, the split role (4.6) and direction B deserve another run; if not, the decision model can be dropped.
+
+**Direction B: ASR without usable punctuation.**
+
+- Why: the maintainer considers the punctuation rule not generally usable (open question 7). If the reason is a route without punctuation (for example a local ASR, punctuation turned off, or punctuation that is too unreliable), the punctuation rule has nothing to work with and a text decision becomes the main boundary signal again.
+- Known from the replay (4.3): the right-context `noul` check discriminates (AUC 0.81-0.88 for pplx-decider-v1.2 and Mercury), the marker-choice proposal question is the bottleneck, and any right-context policy has a floor near 2 s (Qwen-like partials 2.7-3.2 s). That is still about 3 s faster than waiting for Soniox finals.
+- Design to test (from the question and structure candidates discussed earlier):
+  - Ask the binary right-context question at every word boundary once 2-3 characters of right context arrive (removes the never-re-asked flaw). Compare Q1 (sentence or clause end) and Q2 (translation stays correct in the target language) at thresholds 0.3-0.5.
+  - Add a latency cap: after N s without a release, release at the highest-scored boundary so far (ranking instead of a fixed threshold).
+  - Release immediately on external signals: speaker change (#211), long silence, provider final.
+  - Optionally start translating at a candidate before the check returns and show it only when confirmed, to hide the check round trip.
+- For segment-only routes (Qwen Audio tasks, local batch ASR), text arrives only after a segment ends. There the decision model cannot choose a cut in real time. The fitting variant is a merge gate: cut audio aggressively, transcribe, then ask whether the text can be translated on its own, and hold it to merge with the next segment when not (with a time limit).
+- Data needed: punctuation-stripped replays of the recorded partials (`decide.py` already strips punctuation) and, ideally, a recording from the actual route that lacks punctuation. About 100-350 calls per minute of audio for per-boundary checks, $0.06-0.12 per audio hour.
+
+**Direction C: combine audio and text signals.**
+
+- Why: text alone fails at the moment speech pauses, and audio alone is weak in conversation. Smart Turn at 200 ms separates sentence ends from other pauses with AUC 0.725 in conversation (0.911 read). Pause length alone gives 0.68-0.74. The decision model's right-context check gives 0.81-0.88. ASR punctuation is a further signal. None was combined so far.
+- Where it can help:
+  - Choosing the split point after 3 s without punctuation (4.6). Right context is already there, so the decision probability is available, and each candidate word end also has a pause length and, for pauses of 200 ms or more, a Smart Turn score. A combined ranking may beat "longest pause" and "provider comma".
+  - Deciding a turn end at a pause sooner than 512/800 ms when both Smart Turn and the text agree (the original turn-detector idea, structure C in the early design).
+- It cannot fix Qwen cut timing in real time, because Qwen text arrives 1-2 s after the audio.
+- How to test offline first:
+  - `smartturn-*/pauses.jsonl.gz` has, per pause, the data set, start, duration, Smart Turn score, Soniox label and the word that ended before it.
+  - `split-*/calls/decide_*.jsonl.gz` has Q1/Q2 probabilities at every candidate word end in triggered stretches, with its time and position.
+  - Join them by time, add pause length and provider punctuation, and fit a simple rule or a small logistic regression with cross-validation by data set. Score it against the labels from direction A to avoid the Soniox-label bias.
+  - Smart Turn scores exist only for pauses of 200 ms or more; shorter gaps would need scoring at the gap or a missing-value flag.
+- Cost: none for the offline step. A live check would follow only if the offline ranking clearly beats the simple rules.
 
 ## 6. Lessons from the Gemini and Qwen issue history
 
@@ -300,7 +345,7 @@ audio ─ acoustic layer (kept): VAD, Smart Turn turn end, speaker change (#211)
 - Smart Turn: keep for turn ends only. It adds nothing over a plain 200 ms pause for mid-utterance cuts.
 - 4 s/192 ms and 5 s/128 ms steps: drop for Soniox, Deepgram and Gemini; for Qwen replace with "200 ms pause after 2 s".
 - 6 s hard cut: remove for Gemini (send `audio_stream_end` only at turn ends). For Qwen, do not cut during speech except a 10 s safety cut, and drop the 300 ms replay.
-- Decision model: off the common path. Re-test only if a better split question or more data changes 4.6.
+- Decision model: off the common path. Directions A-C in 5.3 are the recorded ways it could come back.
 
 ## 8. Open questions and doubts
 
@@ -315,7 +360,7 @@ Measurement validity:
 
 Product and design questions:
 
-7. Why does the user consider the punctuation rule not generally usable? Partial punctuation that disappears, providers without punctuation, run-on speech, or something else? The answer decides what a fallback must cover.
+7. Why does the user consider the punctuation rule not generally usable? Partial punctuation that disappears, providers without punctuation, run-on speech, or something else? The answer decides what a fallback must cover, and whether direction B in 5.3 applies.
 8. Which open-source sentence-end model was used in the earlier simultaneous-interpretation experiment, and did it fail by missing ends, being late, or cutting wrongly?
 9. How should released partial or interim text be reconciled when the final differs (correct the shown subtitle, ignore, or append)? Gemini finals can drop or reword content; Deepgram partials differ in 22-35% of chunks.
 10. Is 3 s the right trigger for splitting, and how should premature subtitles be weighed against latency? A split cannot help p50 below about 3.4 s.
@@ -340,8 +385,10 @@ Provider questions:
 | C | Repeat the key live variants 2-3 times (Qwen `cut_pause`, `cut_smart_ctx`; Gemini natural and `end_smart`) | about 40 min Qwen audio, 20 min Gemini | Separates real effects from noise |
 | D | Qwen long-utterance variants: age-dependent pause thresholds, overlap + timestamp stitching, context wait | about 20 min Qwen audio | Qwen p90 |
 | E | Deepgram Finalize at "terminal mark + pause"; Gemini `silence_duration_ms` 150-200 ms | about 15 min audio | Provider-specific release paths |
-| F | Boundary labels from a strong LLM over full transcripts, then re-score split policies | a few dollars | Fair split comparison |
+| F | Boundary labels from a strong LLM over full transcripts, then re-score the decision replay and split policies from the stored call logs (5.3, direction A) | a few dollars | Whether decision models lost because of label bias |
 | G | More conversation data (other videos, ideally VRChat-like audio without private data) | depends | Generality |
+| H | Punctuation-free route: per-boundary right-context check (Q1/Q2), latency cap and external signals; merge gate for segment-only routes (5.3, direction B) | $0.06-0.12 per audio hour of decisions, plus ASR audio if a new route is recorded | Whether a decision model is needed when punctuation is unavailable |
+| I | Offline fusion of Smart Turn, pause length, decision probability and ASR punctuation for split-point ranking and turn ends (5.3, direction C) | none offline | Whether combined signals beat "longest pause" and "provider comma" |
 
 ## 10. Practical notes
 
