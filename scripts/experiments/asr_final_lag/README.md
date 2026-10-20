@@ -4,7 +4,7 @@ Measures how soon each streaming ASR route turns continuous speech into partial 
 
 ## Next step
 
-The runs listed in `HANDOFF.md` are recorded. Findings are in the `NOTE.md` files of `results/20261020T185455Z` (Qwen Audio cut and Gemini end variants), `results/interim-20261020T190834Z` (Gemini interim release) and `results/split-20261020T194622Z` (long-utterance split probe).
+`RESEARCH.md` summarizes the goal, all experiments, conclusions and open questions for the next session. The runs listed in `HANDOFF.md` are recorded. Findings are in the `NOTE.md` files of `results/20261020T185455Z` (Qwen Audio cut and Gemini end variants), `results/interim-20261020T190834Z` (Gemini interim release) and `results/split-20261020T194622Z` (long-utterance split probe).
 
 ## Run the ASR probe
 
