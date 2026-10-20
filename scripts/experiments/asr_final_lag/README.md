@@ -1,20 +1,24 @@
 # ASR partial/final timing probe
 
-Measures how soon each streaming ASR route turns continuous speech into partial and final text without forced finalization, and what finalize requests change. A second script replays the recorded partial transcripts through decision models to test when text could be released for translation. The results decide how Peer early release should find release points.
+Measures how soon each streaming ASR route turns continuous speech into partial and final text without forced finalization, and what finalize requests change. A second script replays the recorded partial transcripts through decision models to test when text could be released for translation. A third script tests decision-model splits of long utterances and judges the chunked translations. The results decide how Peer early release should find release points.
 
-## Next step: conversation run and decision model replay
+## Next step: long-utterance split probe
 
 ```powershell
 git pull
-uv run scripts/experiments/asr_final_lag/run.py --data ko_conv ja_conv en_conv --variants natural
-uv run scripts/experiments/asr_final_lag/decide.py
+uv run scripts/experiments/asr_final_lag/split.py
 git add scripts/experiments/asr_final_lag/results
-git commit -m "Record conversation run and decision model replay"
+git commit -m "Record long-utterance split probe"
 git push
 ```
 
-- The ASR run takes about 7 minutes (three conversations of about 2 minutes, streamed one after another) and bills about 25 minutes of audio (4 providers x 3 conversations). Its first start streams about 1.1 GB of YODAS2 archives and keeps 12 MB of audio in `data/`.
-- The replay uses `OPENROUTER_API_KEY` and takes about 15-25 minutes. It checks every model with two small requests first and stops a model on an authorization or not-found error. At list prices the input tokens cost well under 1 USD.
+- It replays the recorded conversation runs (Soniox and Deepgram) and needs no new ASR run.
+- It uses `OPENROUTER_API_KEY` and takes about 10 minutes. It checks each model with one small request first.
+- Expected calls and cost at list prices:
+  - About 1,300 decision calls per model (two models, two questions): a few cents.
+  - About 330 translation calls with `google/gemma-4-26b-a4b-it`: a few cents.
+  - About 120 judge calls with `openai/gpt-6.1-sol`: about 1 USD.
+- `--no-judge` skips the judge, `--no-translate` skips translation and judging, `--judge MODEL` and `--translator MODEL` change the models.
 
 ## Run the ASR probe
 
@@ -40,7 +44,7 @@ uv run scripts/experiments/asr_final_lag/run.py
 
 ## Share results
 
-Each ASR run writes `results/<UTC timestamp>/` and each replay writes `results/decide-<UTC timestamp>/`. Commit and push those folders:
+Each ASR run writes `results/<UTC timestamp>/`, each decision replay writes `results/decide-<UTC timestamp>/` and each split probe writes `results/split-<UTC timestamp>/`. Commit and push those folders:
 
 ```powershell
 git add scripts/experiments/asr_final_lag/results
@@ -113,6 +117,24 @@ The last argument is the assumed decider round trip in seconds for the estimated
 Defaults: models `typesafe/jev-1.14`, `inception/mercury-decide`, `perplexity/pplx-decider-v1.2`, `perplexity/pplx-decider-flash-v1.2`; providers Soniox, Deepgram, Gemini and Qwen Audio; all six data sets. Options: `--models`, `--providers`, `--data`, `--results <folders>`, `--concurrency` (in-flight requests per model, default 6), `--key MY_VARIABLE`.
 
 `--fake-decider` replaces the models with a label oracle and makes no API calls. It checks the replay and scoring: the oracle should reach close to 100% recall with no mid-sentence releases.
+
+## Long-utterance split probe
+
+`split.py` tests whether a decision model can split long utterances that have no punctuation release, before the speaker reaches a sentence end. The results decide whether Peer should replace its 4-6 s acoustic cut rules with text splits for streaming routes.
+
+- Punctuation in the partial text releases text as usual (the `punct rule` of the replay above).
+- When no punctuation release happens for 3 s (`--trigger`) after new text starts, a split policy may release an earlier part of the unreleased text. Each later trigger repeats this every 3 s until the next punctuation release.
+- Candidates are word ends (characters in Japanese) with at least 4 Korean or Japanese characters or 8 English characters before them and 2-3 characters of right context.
+- Each candidate is asked once per model and question, with the earlier text as `previous`, the unreleased text up to the candidate as `before`, and the rest of the partial text as `after`:
+  - `Q1` (sentence): whether `before` ends a sentence or self-contained clause.
+  - `Q2` (translation): whether a subtitle for `before` in the target language would stay correct once `after` is heard. Targets: Korean to English, Japanese to Korean, English to Korean (`--target ko=Japanese` changes one).
+- Decision policies release the latest candidate at or above a threshold. `+forced` releases the highest-scored candidate at the second trigger (6 s) when none passes.
+- Baselines: no split, the latest word end (a stand-in for time-based acoustic cuts), the latest provider comma, and the longest pause in Soniox word timing.
+- A split is released at its trigger time plus a 0.4 s finalize allowance plus, for decision models, the slowest round trip of that trigger's calls.
+- Quality: every split utterance is translated chunk by chunk with the application's translation prompt and earlier source lines as context, and as a whole. A judge model compares them (`same`, `minor`, `changed`) and flags `premature` subtitles that mislead before the next chunk appears.
+- `--fake` replaces decision models with a punctuation-label oracle and translation with an echo, and makes no API calls.
+
+Results go to `results/split-<UTC timestamp>/` with the same layout as the replay: `summary.md`, `summary.json`, `meta.json` and `calls/` (decision calls, translations and judgments).
 
 ## Limits
 
