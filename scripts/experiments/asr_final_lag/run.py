@@ -36,7 +36,13 @@ LANGS = ("ko_kr", "ja_jp", "en_us")
 KEY_CANDIDATES = {
     "soniox": ("SONIOX_API_KEY",),
     "deepgram": ("DEEPGRAM_API_KEY",),
-    "qwen": ("DASHSCOPE_API_KEY", "QWEN_API_KEY", "ALIBABA_API_KEY", "ALIBABA_CLOUD_API_KEY"),
+    "qwen": (
+        "ALIBABA_API_KEY_BEIJING",
+        "ALIBABA_API_KEY",
+        "DASHSCOPE_API_KEY",
+        "QWEN_API_KEY",
+        "ALIBABA_CLOUD_API_KEY",
+    ),
     "gemini": ("GOOGLE_API_KEY_2", "GOOGLE_API_KEY2", "GEMINI_API_KEY_2", "GOOGLE2_API_KEY"),
 }
 

@@ -10,7 +10,7 @@ Requirements: [uv](https://docs.astral.sh/uv/) and API keys in the repository-ro
 | --- | --- |
 | Soniox | `SONIOX_API_KEY` |
 | Deepgram | `DEEPGRAM_API_KEY` |
-| Qwen Audio (DashScope) | `DASHSCOPE_API_KEY`, `QWEN_API_KEY`, `ALIBABA_API_KEY`, `ALIBABA_CLOUD_API_KEY` |
+| Qwen Audio (DashScope) | `ALIBABA_API_KEY_BEIJING`, `ALIBABA_API_KEY`, `DASHSCOPE_API_KEY`, `QWEN_API_KEY`, `ALIBABA_CLOUD_API_KEY` |
 | Gemini Transcribe | `GOOGLE_API_KEY_2`, `GOOGLE_API_KEY2`, `GEMINI_API_KEY_2`, `GOOGLE2_API_KEY` |
 
 ```powershell
@@ -19,7 +19,8 @@ uv run scripts/experiments/asr_final_lag/run.py
 
 - Other variable names: `--key gemini=MY_VARIABLE` (repeatable).
 - Subsets: `--langs ko_kr`, `--providers soniox deepgram`, `--variants natural`.
-- DashScope international keys: `--qwen-endpoint wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference`. The default is the application's endpoint.
+- Qwen uses `ALIBABA_API_KEY_BEIJING` first. The default endpoint is the Beijing host `wss://dashscope.aliyuncs.com/api-ws/v1/inference`.
+- International DashScope keys need `--qwen-endpoint wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference`.
 - A full run takes about 8 minutes. Each language streams about 2 minutes in real time with all of its runs in parallel. Billed audio is about 1 hour in total: Soniox 18 min, Deepgram 24 min, Qwen Audio 12 min, Gemini 6 min.
 
 ## Share results
