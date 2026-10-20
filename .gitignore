@@ -247,6 +247,9 @@ refactoring/
 !/scripts/release/console_bootstrap.py
 !/scripts/release/unattended-runtime-evidence.py
 !/scripts/release/huggingface-xet-frozen-smoke.py
+!/scripts/experiments/
+/scripts/experiments/*
+!/scripts/experiments/asr_final_lag/
 .codex/
 .agent/
 .agents/
