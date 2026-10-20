@@ -79,7 +79,7 @@ class _Coverage:
         delta = len(hyp) - self.length
         lo = max(0, self.value - 60 - max(0, -delta) * 2)
         hi = min(len(self.ref), self.value + 2 * max(0, delta) + 80)
-        if self.length == 0 or delta > TAIL_CHARS * 4:
+        if self.length and delta > TAIL_CHARS * 4:
             lo, hi = 0, len(self.ref)
         cost, end = _semi_global_end(tail, self.ref[lo:hi])
         if cost <= 0.5 * len(tail):

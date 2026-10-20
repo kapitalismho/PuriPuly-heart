@@ -4,7 +4,7 @@ Measures how soon each streaming ASR route turns continuous speech into partial 
 
 ## Next step
 
-`HANDOFF.md` lists the commands for the local run: the Qwen Audio cut and Gemini end variants, the Gemini interim replay that includes them, and the long-utterance split probe. The Smart Turn pause evaluation and the interim replay of the earlier runs are already recorded (`results/smartturn-*`, `results/interim-*`).
+The runs listed in `HANDOFF.md` are recorded. Findings are in the `NOTE.md` files of `results/20261020T185455Z` (Qwen Audio cut and Gemini end variants), `results/interim-20261020T190834Z` (Gemini interim release) and `results/split-20261020T194622Z` (long-utterance split probe).
 
 ## Run the ASR probe
 
