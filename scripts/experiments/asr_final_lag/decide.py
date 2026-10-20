@@ -358,7 +358,9 @@ def _record(result: dict, **fields) -> dict:
     return fields | {k: result[k] for k in keep if result.get(k) is not None}
 
 
-async def simulate(stream: Stream, decider: Decider) -> Simulation:
+async def simulate(
+    stream: Stream, decider: Decider, progress: "_ReplayProgress | None" = None
+) -> Simulation:
     sim = Simulation()
     lanes = {"propose": stream.times[0], "verify": math.inf}
     verify_idle = True
@@ -400,6 +402,8 @@ async def simulate(stream: Stream, decider: Decider) -> Simulation:
                     state=state,
                 )
             )
+            if progress is not None:
+                progress.mark(decider.model, stream, lane)
             lanes[lane] = now + result["rtt"]
             if choice not in (None, "none") and choice.isdigit() and p is not None:
                 index = int(choice) - 1
@@ -446,6 +450,8 @@ async def simulate(stream: Stream, decider: Decider) -> Simulation:
         sim.calls.append(
             _record(result, lane=lane, t=round(now, 4), count=head.count, p=p, state=state)
         )
+        if progress is not None:
+            progress.mark(decider.model, stream, lane)
         head.verify = {"t": now + result["rtt"], "p": p}
         lanes[lane] = now + result["rtt"]
         verify_idle = False
@@ -687,17 +693,47 @@ def render(summary: dict, meta: dict) -> str:
     return "\n".join(lines)
 
 
+class _ReplayProgress:
+    def __init__(self, total: int) -> None:
+        self.total = total
+        self.calls = 0
+        self.done = 0
+        self.started = time.monotonic()
+        self.last_print = 0.0
+        self.last = ""
+
+    def line(self) -> str:
+        tail = f"  {self.last}" if self.last else ""
+        return (
+            f"[decide] in progress  calls={self.calls}  streams={self.done}/{self.total}  "
+            f"{time.monotonic() - self.started:.0f}s{tail}"
+        )
+
+    def mark(self, model: str, stream: Stream, lane: str) -> None:
+        self.calls += 1
+        self.last = f"{model} {stream.data} {stream.provider} {lane}"
+        self.show(self.calls == 1)
+
+    def show(self, force: bool = False) -> None:
+        now = time.monotonic()
+        if not force and now - self.last_print < 10:
+            return
+        self.last_print = now
+        print(self.line(), flush=True)
+
+
 async def _simulate_all(streams, models, key, args, out_dir) -> dict:
     deciders = {m: Decider(m, key, args.concurrency, args.fake_decider) for m in models}
     results: dict[str, list[tuple[Stream, Simulation]]] = {m: [] for m in models}
     failures: dict[str, str] = {}
+    progress = _ReplayProgress(len(streams) * len(models))
 
     async def one(stream: Stream, model: str) -> None:
         if model in failures:
             return
         started = time.monotonic()
         try:
-            sim = await simulate(stream, deciders[model])
+            sim = await simulate(stream, deciders[model], progress)
         except FatalDeciderError as exc:
             if model not in failures:
                 failures[model] = str(exc).replace(key or "<none>", "<key>")
@@ -709,6 +745,7 @@ async def _simulate_all(streams, models, key, args, out_dir) -> dict:
             for call in sim.calls:
                 handle.write(json.dumps(call, ensure_ascii=False) + "\n")
         errors = sum(1 for c in sim.calls if "error" in c)
+        progress.done += 1
         print(
             f"[decide] {model:38} {stream.data:8} {stream.provider:8} calls={len(sim.calls):4} "
             f"errors={errors:3} {time.monotonic() - started:5.0f} s",
@@ -739,10 +776,27 @@ async def _simulate_all(streams, models, key, args, out_dir) -> dict:
             failures[model] = str(exc).replace(key or "<none>", "<key>")
             print(f"[check] {model}: stopped, {failures[model]}", flush=True)
 
+    async def heartbeat() -> None:
+        while True:
+            await asyncio.sleep(10)
+            progress.show(force=True)
+
+    beat: asyncio.Task | None = None
     try:
         await asyncio.gather(*(preflight(m) for m in models))
+        progress.total = len(streams) * sum(1 for model in models if model not in failures)
+        progress.started = time.monotonic()
+        print("[decide] checks done, replaying", flush=True)
+        progress.show(force=True)
+        beat = asyncio.create_task(heartbeat())
         await asyncio.gather(*(one(s, m) for s in streams for m in models))
     finally:
+        if beat is not None:
+            beat.cancel()
+            try:
+                await beat
+            except asyncio.CancelledError:
+                pass
         for decider in deciders.values():
             await decider.close()
     return {m: sims for m, sims in results.items() if m not in failures}, failures
