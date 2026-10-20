@@ -17,7 +17,6 @@ import datetime as dt
 import gzip
 import importlib.metadata
 import json
-import os
 import platform
 import shutil
 import sys
@@ -30,10 +29,20 @@ REPO_ROOT = HERE.parents[2]
 sys.path.insert(0, str(HERE))
 
 import analyze
+import envkeys
 import fleurs
 import providers
+import yodas
 
-LANGS = ("ko_kr", "ja_jp", "en_us")
+DATASETS = {
+    "ko_kr": "ko_kr",
+    "ja_jp": "ja_jp",
+    "en_us": "en_us",
+    "ko_conv": "ko_kr",
+    "ja_conv": "ja_jp",
+    "en_conv": "en_us",
+}
+DEFAULT_DATA = ("ko_kr", "ja_jp", "en_us")
 KEY_CANDIDATES = {
     "soniox": ("SONIOX_API_KEY",),
     "deepgram": ("DEEPGRAM_API_KEY",),
@@ -48,38 +57,6 @@ KEY_CANDIDATES = {
 }
 
 
-def _read_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not path.exists():
-        return values
-    for line in path.read_text(encoding="utf-8-sig").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        name, value = line.split("=", 1)
-        name = name.strip().removeprefix("export ").strip()
-        value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-            value = value[1:-1]
-        values[name] = value
-    return values
-
-
-def _resolve_keys(env_files: list[Path], overrides: dict[str, str]) -> dict[str, tuple[str, str]]:
-    merged: dict[str, str] = {}
-    for path in env_files:
-        merged.update(_read_env_file(path))
-    merged.update({k: v for k, v in os.environ.items() if k not in merged})
-    resolved: dict[str, tuple[str, str]] = {}
-    for provider, candidates in KEY_CANDIDATES.items():
-        names = (overrides[provider],) if provider in overrides else candidates
-        for name in names:
-            if merged.get(name):
-                resolved[provider] = (name, merged[name])
-                break
-    return resolved
-
-
 async def _run_one(provider, variant, lang, data_dir, key, options, runs_dir) -> None:
     reference, pcm = fleurs.load(lang, data_dir)
     rec = providers.Recorder()
@@ -92,7 +69,7 @@ async def _run_one(provider, variant, lang, data_dir, key, options, runs_dir) ->
             providers.RUNNERS[provider](
                 rec,
                 pcm,
-                providers.LANGUAGE_CODES[lang][provider],
+                providers.LANGUAGE_CODES[DATASETS[lang]][provider],
                 variant,
                 schedule,
                 key,
@@ -140,7 +117,7 @@ async def _main(args: argparse.Namespace) -> Path:
     env_files = [REPO_ROOT / name for name in (".env", ".env.local")]
     if args.env_file:
         env_files = [Path(path) for path in args.env_file]
-    keys = _resolve_keys(env_files, overrides)
+    keys = envkeys.resolve(KEY_CANDIDATES, env_files, overrides)
     selected = [p for p in args.providers if p in keys]
     for provider in args.providers:
         if provider in keys:
@@ -152,14 +129,15 @@ async def _main(args: argparse.Namespace) -> Path:
         raise SystemExit("no provider keys found")
 
     data_dir = HERE / "data"
-    fleurs.ensure(list(args.langs), data_dir)
+    fleurs.ensure([d for d in args.data if d not in yodas.SOURCES], data_dir)
+    yodas.ensure([d for d in args.data if d in yodas.SOURCES], data_dir)
 
     stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%SZ")
     results_dir = Path(args.out) if args.out else HERE / "results" / stamp
     runs_dir = results_dir / "runs"
     runs_dir.mkdir(parents=True, exist_ok=True)
     (results_dir / "reference").mkdir(exist_ok=True)
-    for lang in args.langs:
+    for lang in args.data:
         shutil.copy(data_dir / f"{lang}.json", results_dir / "reference" / f"{lang}.json")
 
     options = {"qwen_endpoint": args.qwen_endpoint}
@@ -171,7 +149,7 @@ async def _main(args: argparse.Namespace) -> Path:
             "python": platform.python_version(),
         },
         "packages": _package_versions(),
-        "langs": list(args.langs),
+        "data": list(args.data),
         "providers": selected,
         "variants": {p: [v for v in providers.VARIANTS[p] if v in args.variants] for p in selected},
         "key_variables": {p: keys[p][0] for p in selected},
@@ -182,7 +160,7 @@ async def _main(args: argparse.Namespace) -> Path:
     }
     (results_dir / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
 
-    for lang in args.langs:
+    for lang in args.data:
         print(f"[lang] {lang}: streaming in real time", flush=True)
         started = time.monotonic()
         await asyncio.gather(
@@ -203,7 +181,9 @@ def main() -> None:
     sys.stdout.reconfigure(errors="replace")
     all_variants = sorted({v for vs in providers.VARIANTS.values() for v in vs})
     parser = argparse.ArgumentParser(description="Measure ASR partial/final timing on FLEURS.")
-    parser.add_argument("--langs", nargs="+", default=list(LANGS), choices=LANGS)
+    parser.add_argument(
+        "--data", "--langs", nargs="+", default=list(DEFAULT_DATA), choices=list(DATASETS)
+    )
     parser.add_argument(
         "--providers", nargs="+", default=list(providers.RUNNERS), choices=list(providers.RUNNERS)
     )

@@ -1,8 +1,22 @@
 # ASR partial/final timing probe
 
-Measures how soon each streaming ASR route turns continuous speech into partial and final text without forced finalization, and what finalize requests change. The result decides whether Peer early release can rely on provider finals alone or needs a partial-text decision plus a forced finalize.
+Measures how soon each streaming ASR route turns continuous speech into partial and final text without forced finalization, and what finalize requests change. A second script replays the recorded partial transcripts through decision models to test when text could be released for translation. The results decide how Peer early release should find release points.
 
-## Run
+## Next step: conversation run and decision model replay
+
+```powershell
+git pull
+uv run scripts/experiments/asr_final_lag/run.py --data ko_conv ja_conv en_conv --variants natural
+uv run scripts/experiments/asr_final_lag/decide.py
+git add scripts/experiments/asr_final_lag/results
+git commit -m "Record conversation run and decision model replay"
+git push
+```
+
+- The ASR run takes about 7 minutes (three conversations of about 2 minutes, streamed one after another) and bills about 25 minutes of audio (4 providers x 3 conversations). Its first start streams about 1.1 GB of YODAS2 archives and keeps 12 MB of audio in `data/`.
+- The replay uses `OPENROUTER_API_KEY` and takes about 15-25 minutes. It checks every model with two small requests first and stops a model on an authorization or not-found error. At list prices the input tokens cost well under 1 USD.
+
+## Run the ASR probe
 
 Requirements: [uv](https://docs.astral.sh/uv/) and API keys in the repository-root `.env.local` (`.env` and process environment variables also work). Providers without a key are skipped.
 
@@ -18,32 +32,34 @@ uv run scripts/experiments/asr_final_lag/run.py
 ```
 
 - Other variable names: `--key gemini=MY_VARIABLE` (repeatable).
-- Subsets: `--langs ko_kr`, `--providers soniox deepgram`, `--variants natural`.
+- Data: `--data ko_kr ja_jp en_us` (FLEURS read speech, the default) and `ko_conv ja_conv en_conv` (YODAS2 conversation).
+- Subsets: `--providers soniox deepgram`, `--variants natural`.
 - Qwen uses `ALIBABA_API_KEY_BEIJING` first. The default endpoint is the Beijing host `wss://dashscope.aliyuncs.com/api-ws/v1/inference`.
 - International DashScope keys need `--qwen-endpoint wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference`.
-- A full run takes about 8 minutes. Each language streams about 2 minutes in real time with all of its runs in parallel. Billed audio is about 1 hour 10 minutes in total: Soniox 18 min, Deepgram 24 min, Qwen Audio 12 min, Gemini 18 min.
+- A full FLEURS run takes about 8 minutes. Each data set streams about 2 minutes in real time with all of its runs in parallel. Billed audio is about 1 hour 10 minutes in total: Soniox 18 min, Deepgram 24 min, Qwen Audio 12 min, Gemini 18 min.
 
 ## Share results
 
-Each run writes `results/<UTC timestamp>/`. Commit and push that folder:
+Each ASR run writes `results/<UTC timestamp>/` and each replay writes `results/decide-<UTC timestamp>/`. Commit and push those folders:
 
 ```powershell
-git add scripts/experiments/asr_final_lag/results/<timestamp>
+git add scripts/experiments/asr_final_lag/results
 git commit -m "Record ASR timing probe results"
 git push
 ```
 
 | File | Content |
 | --- | --- |
-| `summary.md` | Readable tables per language and the final-only versus partial-decision comparison |
-| `summary.json` | The same metrics with per-sentence rows |
-| `runs/*.json.gz` | Per-run event log: text deltas, word timestamps, finalize controls, a small raw-message sample, errors |
-| `reference/*.json` | Sentence texts and speech boundaries of the input audio |
-| `meta.json` | OS name and version, Python and package versions, selected variants, key variable names |
+| `summary.md` | Readable tables |
+| `summary.json` | The same metrics with per-sentence (ASR) or per-stream (replay) rows |
+| `runs/*.json.gz` | ASR event log: text deltas, word timestamps, finalize controls, a small raw-message sample, errors |
+| `reference/*.json` | Reference texts and timing of the input audio |
+| `calls/*.jsonl.gz` | Replay call log: virtual time, round trip, answer, the state sent to the model |
+| `meta.json` | Run settings, package versions, key variable names |
 
-Results contain no API keys, host names or user names. The runner refuses to write a result file that contains a key.
+Results contain no API keys, host names or user names. The scripts refuse to write a result that contains a key.
 
-## Variants
+## ASR variants
 
 | Variant | Providers | Behavior |
 | --- | --- | --- |
@@ -57,11 +73,21 @@ Provider settings mirror the application adapters: Soniox `stt-rt-v5` with endpo
 
 ## Input audio
 
-The first files of each language's FLEURS test archive (CC-BY-4.0) are level-normalized, trimmed to their speech and joined into about 2 minutes of continuous read speech with 0.2 s of silence between sentences. Speech bounds come from the repository's bundled Silero VAD model (`src/puripuly_heart/data/vad/silero_vad.onnx`). The first run builds the audio into `data/` (ignored by git) by streaming only the needed part of the archive, and rebuilds it when the data version changes.
+FLEURS read speech: the first files of each language's FLEURS test archive (CC-BY-4.0) are level-normalized, trimmed to their speech and joined into about 2 minutes of continuous read speech with 0.2 s of silence between sentences. Speech bounds come from the repository's bundled Silero VAD model (`src/puripuly_heart/data/vad/silero_vad.onnx`). Each reference sentence records its clip bounds (`start_s`, `end_s`) and its speech bounds (`speech_start_s`, `speech_end_s`). Sentence-end timings and `finalize_gap` use `speech_end_s`.
 
-Each reference sentence records its clip bounds (`start_s`, `end_s`) and its speech bounds (`speech_start_s`, `speech_end_s`). Sentence-end timings and `finalize_gap` use `speech_end_s`.
+YODAS2 conversation (CC-BY-3.0 YouTube audio with uploaded captions): 125 s from one video per language, resampled from 24 kHz to 16 kHz and level-normalized.
 
-## Metrics
+| Data | Video id | Window | Content |
+| --- | --- | --- | --- |
+| `ko_conv` | `3BPeG47L7Hc` (`ko000` shard 12) | 0-125 s | Two hosts discussing a housing development, overlapping turns |
+| `ja_conv` | `19cQStzeIgE` (`ja000` shard 3) | 0-125 s | Two creators chatting, short turns and laughter |
+| `en_conv` | `06inwHyT7l0` (`en000` shard 4) | 22-147 s | Three podcast hosts talking about a tabletop game |
+
+Caption lines become the reference units after speaker labels, sound tags and laughter runs are removed. Captions are uploader text: they are not sentence-segmented and can differ from the speech, so the ASR summary marks these data sets as caption units.
+
+The first run builds the audio into `data/` (ignored by git) by streaming only the needed part of each archive, and rebuilds it when the data version changes.
+
+## ASR metrics
 
 `summary.md` defines each column. Sentence-end timings compare when the text covers each reference sentence end with that sentence's speech end (last Silero speech frame; provider word end timestamps are typically 0.1-0.3 s earlier). Word timings use provider word or token end timestamps. `release diff` compares the partial text of each sentence at its `partial stable` time with the final text of that sentence, which shows whether a partial-text release would translate different words than the final.
 
@@ -73,9 +99,25 @@ uv run --with numpy --with rapidfuzz python scripts/experiments/asr_final_lag/an
 
 The last argument is the assumed decider round trip in seconds for the estimated partial-decision path.
 
+## Decision model replay
+
+`decide.py` takes the newest ASR results that contain each data set's `natural` runs and replays every provider's partial transcript in virtual time. Each model call advances that stream's clock by the measured round trip, so the number of calls and the release times match what one in-flight request per lane would give.
+
+- Text sent to the models is lowercased and has punctuation removed.
+- Proposal lane: whenever the transcript changes, a `choice` question over numbered markers placed after each new word (each new character in Japanese, at most 12) asks for the last marker where a sentence or self-contained clause ends.
+- Verify lane: a candidate is checked once more with a `noul` question when 3 English, 2 Korean or 3 Japanese characters of right context have arrived (`before` / `after` state).
+- Policies computed from the same calls: release at the proposal answer (`immediate`), release when the right-context check agrees (`verify`), and `verify +silence`, which also releases a candidate after 0.8 s without transcript change.
+- Baselines: natural finals, a punctuation rule on partials, and whole-transcript debounce at 0.3 s and 0.6 s.
+- Labels are sentence-final punctuation and commas in the Soniox final transcript of the same audio (hindsight), mapped onto each provider's transcript. Latency is measured from the Soniox end timestamp of the labeled sentence's last character.
+
+Defaults: models `typesafe/jev-1.14`, `inception/mercury-decide`, `perplexity/pplx-decider-v1.2`, `perplexity/pplx-decider-flash-v1.2`; providers Soniox, Deepgram, Gemini and Qwen Audio; all six data sets. Options: `--models`, `--providers`, `--data`, `--results <folders>`, `--concurrency` (in-flight requests per model, default 6), `--key MY_VARIABLE`.
+
+`--fake-decider` replaces the models with a label oracle and makes no API calls. It checks the replay and scoring: the oracle should reach close to 100% recall with no mid-sentence releases.
+
 ## Limits
 
-- Read speech with clear sentence ends, not conversation.
+- FLEURS is read speech with a pause at every sentence boundary. YODAS2 windows are three single videos, not a balanced conversation set.
 - Coverage uses character alignment to the reference. A recognized sentence end that differs from the reference (for example kanji versus kana) can be reported as missing or late.
-- Timings include the network path from the machine that runs the probe; `connect s` records connection setup time.
+- Replay labels come from Soniox punctuation, so the punctuation-rule baseline is close to the labels by construction, and clause-level releases are only credited at commas.
+- Timings include the network path from the machine that runs the probe; `connect s` and the replay round trips record it.
 - Soniox token timestamps advance by about 70-80 ms per finalize request, so Soniox word timings in the `finalize_*` variants drift ahead of the audio clock. Sentence-end timings do not depend on provider timestamps.

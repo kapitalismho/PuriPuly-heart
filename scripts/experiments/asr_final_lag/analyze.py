@@ -241,6 +241,7 @@ def analyze_run(reference: dict, run: dict) -> dict:
         "lang": run["lang"],
         "error": run["error"],
         "connect_s": run.get("connect_s"),
+        "unit": reference.get("unit", "sentence"),
         "sentence_pause": _stats(_pauses(sentences)),
         "cer": round(Levenshtein.distance(ref, hypothesis) / max(1, len(ref)), 4),
         "edit_counts": counts,
@@ -350,11 +351,18 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
         "",
     ]
     for lang in sorted({a["lang"] for a in analyses}):
-        pause = next(a["sentence_pause"] for a in analyses if a["lang"] == lang)
+        first = next(a for a in analyses if a["lang"] == lang)
+        note = (
+            "Reference units are caption lines, not sentences: sentence columns measure "
+            "caption line ends, and the CER reference is the uploaded caption text."
+            if first.get("unit") == "caption"
+            else "Silence between sentences (speech end to next speech start): "
+            f"{_fmt(first['sentence_pause'])} s."
+        )
         lines += [
             f"## {lang}",
             "",
-            f"Silence between sentences (speech end to next speech start): {_fmt(pause)} s.",
+            note,
             "",
             "| provider | variant | error | CER | finals | partial first | partial stable "
             "| release diff | punct (missing) | extra ends | final (missing) | word final "
@@ -396,7 +404,12 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
     ]
     index = {(a["provider"], a["variant"], a["lang"]): a for a in analyses}
     for provider, variant, lang in sorted(index):
-        if variant != "natural" or not index[(provider, variant, lang)].get("partial_events"):
+        analysis = index[(provider, variant, lang)]
+        if (
+            variant != "natural"
+            or not analysis.get("partial_events")
+            or analysis.get("unit") == "caption"
+        ):
             continue
         path = _partial_path(
             index[(provider, variant, lang)],
