@@ -1,0 +1,18 @@
+{
+ "started_utc": "20261020T185034Z",
+ "sources": {
+  "ko_conv/natural": "20261020T070225Z",
+  "ja_conv/natural": "20261020T070225Z",
+  "en_conv/natural": "20261020T070225Z",
+  "ko_kr/natural": "20261020T055613Z",
+  "ja_jp/natural": "20261020T055613Z",
+  "en_us/natural": "20261020T055613Z"
+ },
+ "windows": [
+  0.0,
+  0.6,
+  1.0
+ ],
+ "step_s": 0.05,
+ "match_max_cost": 0.35
+}

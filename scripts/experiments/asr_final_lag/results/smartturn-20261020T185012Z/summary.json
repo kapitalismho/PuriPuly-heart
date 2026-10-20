@@ -1,0 +1,817 @@
+{
+ "pooled": {
+  "read speech": {
+   "minutes": 6.31,
+   "pauses_200ms": 52,
+   "sentence_ends": 51,
+   "sentence_ends_with_200ms_pause": 14,
+   "thresholds": {
+    "0.0": {
+     "cuts": 52,
+     "sentence": 14,
+     "clause": 21,
+     "mid": 16,
+     "unlabeled": 1,
+     "cuts_per_min": 8.25,
+     "sentence_recall": 0.275
+    },
+    "0.3": {
+     "cuts": 30,
+     "sentence": 12,
+     "clause": 14,
+     "mid": 4,
+     "unlabeled": 0,
+     "cuts_per_min": 4.76,
+     "sentence_recall": 0.235
+    },
+    "0.5": {
+     "cuts": 29,
+     "sentence": 12,
+     "clause": 13,
+     "mid": 4,
+     "unlabeled": 0,
+     "cuts_per_min": 4.6,
+     "sentence_recall": 0.235
+    },
+    "0.75": {
+     "cuts": 28,
+     "sentence": 12,
+     "clause": 13,
+     "mid": 3,
+     "unlabeled": 0,
+     "cuts_per_min": 4.44,
+     "sentence_recall": 0.235
+    },
+    "0.9": {
+     "cuts": 26,
+     "sentence": 12,
+     "clause": 11,
+     "mid": 3,
+     "unlabeled": 0,
+     "cuts_per_min": 4.12,
+     "sentence_recall": 0.235
+    }
+   },
+   "auc_sentence_vs_mid": 0.9107142857142857,
+   "mean_score": {
+    "sentence": 0.858,
+    "clause": 0.625,
+    "mid": 0.266
+   }
+  },
+  "conversation": {
+   "minutes": 6.25,
+   "pauses_200ms": 77,
+   "sentence_ends": 140,
+   "sentence_ends_with_200ms_pause": 49,
+   "thresholds": {
+    "0.0": {
+     "cuts": 77,
+     "sentence": 43,
+     "clause": 9,
+     "mid": 21,
+     "unlabeled": 4,
+     "cuts_per_min": 12.32,
+     "sentence_recall": 0.3
+    },
+    "0.3": {
+     "cuts": 59,
+     "sentence": 38,
+     "clause": 5,
+     "mid": 13,
+     "unlabeled": 3,
+     "cuts_per_min": 9.44,
+     "sentence_recall": 0.264
+    },
+    "0.5": {
+     "cuts": 58,
+     "sentence": 37,
+     "clause": 5,
+     "mid": 13,
+     "unlabeled": 3,
+     "cuts_per_min": 9.28,
+     "sentence_recall": 0.257
+    },
+    "0.75": {
+     "cuts": 51,
+     "sentence": 34,
+     "clause": 5,
+     "mid": 10,
+     "unlabeled": 2,
+     "cuts_per_min": 8.16,
+     "sentence_recall": 0.236
+    },
+    "0.9": {
+     "cuts": 43,
+     "sentence": 30,
+     "clause": 5,
+     "mid": 7,
+     "unlabeled": 1,
+     "cuts_per_min": 6.88,
+     "sentence_recall": 0.207
+    }
+   },
+   "auc_sentence_vs_mid": 0.7248062015503877,
+   "mean_score": {
+    "sentence": 0.826,
+    "clause": 0.539,
+    "mid": 0.545
+   }
+  }
+ },
+ "data": [
+  {
+   "data": "ko_kr",
+   "minutes": 2.07,
+   "voiced_share": 0.908,
+   "pauses_total": 49,
+   "pauses_200ms": 25,
+   "sentence_ends": 18,
+   "sentence_ends_with_200ms_pause": 5,
+   "thresholds": {
+    "0.0": {
+     "cuts": 25,
+     "cuts_per_min": 12.08,
+     "sentence": 5,
+     "clause": 10,
+     "mid": 9,
+     "unlabeled": 1,
+     "sentence_recall": 0.278
+    },
+    "0.3": {
+     "cuts": 9,
+     "cuts_per_min": 4.35,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    },
+    "0.5": {
+     "cuts": 9,
+     "cuts_per_min": 4.35,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    },
+    "0.75": {
+     "cuts": 8,
+     "cuts_per_min": 3.86,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 0,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    },
+    "0.9": {
+     "cuts": 8,
+     "cuts_per_min": 3.86,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 0,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    }
+   },
+   "auc_sentence_vs_mid": 0.9777777777777777,
+   "mean_score": {
+    "sentence": 0.822,
+    "clause": 0.412,
+    "mid": 0.121
+   },
+   "preview": {
+    "app": {
+     "segments": 23,
+     "segments_per_min": 11.11,
+     "mean_s": 5.56,
+     "max_s": 6.32,
+     "sent_s": 127.8,
+     "cuts": {
+      "in speech": 8,
+      "pause sentence": 6,
+      "pause clause": 5,
+      "pause mid": 3
+     }
+    },
+    "pause": {
+     "segments": 27,
+     "segments_per_min": 13.04,
+     "mean_s": 4.6,
+     "max_s": 10.14,
+     "sent_s": 124.2,
+     "cuts": {
+      "pause sentence": 7,
+      "in speech": 1,
+      "pause none": 1,
+      "pause mid": 9,
+      "pause clause": 8
+     }
+    },
+    "smart": {
+     "segments": 19,
+     "segments_per_min": 9.18,
+     "mean_s": 6.54,
+     "max_s": 10.14,
+     "sent_s": 124.2,
+     "cuts": {
+      "pause sentence": 6,
+      "in speech": 1,
+      "pause mid": 7,
+      "pause clause": 4
+     }
+    },
+    "fixed3": {
+     "segments": 41,
+     "segments_per_min": 19.81,
+     "mean_s": 3.03,
+     "max_s": 3.42,
+     "sent_s": 124.2,
+     "cuts": {
+      "in speech": 34,
+      "pause sentence": 2,
+      "pause mid": 3,
+      "pause clause": 1
+     }
+    }
+   },
+   "group": "read speech"
+  },
+  {
+   "data": "ja_jp",
+   "minutes": 2.165,
+   "voiced_share": 0.93,
+   "pauses_total": 49,
+   "pauses_200ms": 13,
+   "sentence_ends": 18,
+   "sentence_ends_with_200ms_pause": 5,
+   "thresholds": {
+    "0.0": {
+     "cuts": 13,
+     "cuts_per_min": 6.0,
+     "sentence": 5,
+     "clause": 5,
+     "mid": 3,
+     "unlabeled": 0,
+     "sentence_recall": 0.278
+    },
+    "0.3": {
+     "cuts": 11,
+     "cuts_per_min": 5.08,
+     "sentence": 4,
+     "clause": 5,
+     "mid": 2,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    },
+    "0.5": {
+     "cuts": 11,
+     "cuts_per_min": 5.08,
+     "sentence": 4,
+     "clause": 5,
+     "mid": 2,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    },
+    "0.75": {
+     "cuts": 11,
+     "cuts_per_min": 5.08,
+     "sentence": 4,
+     "clause": 5,
+     "mid": 2,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    },
+    "0.9": {
+     "cuts": 10,
+     "cuts_per_min": 4.62,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 2,
+     "unlabeled": 0,
+     "sentence_recall": 0.222
+    }
+   },
+   "auc_sentence_vs_mid": 0.8,
+   "mean_score": {
+    "sentence": 0.796,
+    "clause": 0.947,
+    "mid": 0.658
+   },
+   "preview": {
+    "app": {
+     "segments": 23,
+     "segments_per_min": 10.62,
+     "mean_s": 5.82,
+     "max_s": 6.32,
+     "sent_s": 133.8,
+     "cuts": {
+      "in speech": 13,
+      "pause mid": 2,
+      "pause sentence": 5,
+      "pause clause": 2
+     }
+    },
+    "pause": {
+     "segments": 24,
+     "segments_per_min": 11.08,
+     "mean_s": 5.41,
+     "max_s": 8.64,
+     "sent_s": 129.9,
+     "cuts": {
+      "pause clause": 8,
+      "pause mid": 7,
+      "pause sentence": 8
+     }
+    },
+    "smart": {
+     "segments": 23,
+     "segments_per_min": 10.62,
+     "mean_s": 5.65,
+     "max_s": 8.64,
+     "sent_s": 129.9,
+     "cuts": {
+      "pause clause": 7,
+      "pause mid": 7,
+      "pause sentence": 8
+     }
+    },
+    "fixed3": {
+     "segments": 44,
+     "segments_per_min": 20.32,
+     "mean_s": 2.95,
+     "max_s": 3.07,
+     "sent_s": 129.9,
+     "cuts": {
+      "in speech": 42,
+      "pause clause": 1
+     }
+    }
+   },
+   "group": "read speech"
+  },
+  {
+   "data": "en_us",
+   "minutes": 2.071,
+   "voiced_share": 0.937,
+   "pauses_total": 40,
+   "pauses_200ms": 14,
+   "sentence_ends": 15,
+   "sentence_ends_with_200ms_pause": 4,
+   "thresholds": {
+    "0.0": {
+     "cuts": 14,
+     "cuts_per_min": 6.76,
+     "sentence": 4,
+     "clause": 6,
+     "mid": 4,
+     "unlabeled": 0,
+     "sentence_recall": 0.267
+    },
+    "0.3": {
+     "cuts": 10,
+     "cuts_per_min": 4.83,
+     "sentence": 4,
+     "clause": 5,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.267
+    },
+    "0.5": {
+     "cuts": 9,
+     "cuts_per_min": 4.34,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.267
+    },
+    "0.75": {
+     "cuts": 9,
+     "cuts_per_min": 4.34,
+     "sentence": 4,
+     "clause": 4,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.267
+    },
+    "0.9": {
+     "cuts": 8,
+     "cuts_per_min": 3.86,
+     "sentence": 4,
+     "clause": 3,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.267
+    }
+   },
+   "auc_sentence_vs_mid": 1.0,
+   "mean_score": {
+    "sentence": 0.981,
+    "clause": 0.711,
+    "mid": 0.298
+   },
+   "preview": {
+    "app": {
+     "segments": 22,
+     "segments_per_min": 10.62,
+     "mean_s": 5.87,
+     "max_s": 6.32,
+     "sent_s": 129.1,
+     "cuts": {
+      "in speech": 16,
+      "pause mid": 3,
+      "pause sentence": 1,
+      "pause clause": 1
+     }
+    },
+    "pause": {
+     "segments": 20,
+     "segments_per_min": 9.65,
+     "mean_s": 6.21,
+     "max_s": 10.27,
+     "sent_s": 124.3,
+     "cuts": {
+      "pause clause": 6,
+      "pause sentence": 4,
+      "pause mid": 6,
+      "in speech": 3
+     }
+    },
+    "smart": {
+     "segments": 21,
+     "segments_per_min": 10.14,
+     "mean_s": 5.92,
+     "max_s": 10.27,
+     "sent_s": 124.3,
+     "cuts": {
+      "pause clause": 6,
+      "pause sentence": 5,
+      "pause none": 1,
+      "pause mid": 5,
+      "in speech": 3
+     }
+    },
+    "fixed3": {
+     "segments": 42,
+     "segments_per_min": 20.28,
+     "mean_s": 2.96,
+     "max_s": 3.26,
+     "sent_s": 124.3,
+     "cuts": {
+      "pause clause": 2,
+      "in speech": 38,
+      "pause sentence": 1
+     }
+    }
+   },
+   "group": "read speech"
+  },
+  {
+   "data": "ko_conv",
+   "minutes": 2.083,
+   "voiced_share": 0.885,
+   "pauses_total": 54,
+   "pauses_200ms": 25,
+   "sentence_ends": 45,
+   "sentence_ends_with_200ms_pause": 12,
+   "thresholds": {
+    "0.0": {
+     "cuts": 25,
+     "cuts_per_min": 12.0,
+     "sentence": 11,
+     "clause": 0,
+     "mid": 10,
+     "unlabeled": 4,
+     "sentence_recall": 0.244
+    },
+    "0.3": {
+     "cuts": 19,
+     "cuts_per_min": 9.12,
+     "sentence": 11,
+     "clause": 0,
+     "mid": 5,
+     "unlabeled": 3,
+     "sentence_recall": 0.244
+    },
+    "0.5": {
+     "cuts": 18,
+     "cuts_per_min": 8.64,
+     "sentence": 10,
+     "clause": 0,
+     "mid": 5,
+     "unlabeled": 3,
+     "sentence_recall": 0.222
+    },
+    "0.75": {
+     "cuts": 14,
+     "cuts_per_min": 6.72,
+     "sentence": 9,
+     "clause": 0,
+     "mid": 3,
+     "unlabeled": 2,
+     "sentence_recall": 0.2
+    },
+    "0.9": {
+     "cuts": 11,
+     "cuts_per_min": 5.28,
+     "sentence": 9,
+     "clause": 0,
+     "mid": 1,
+     "unlabeled": 1,
+     "sentence_recall": 0.2
+    }
+   },
+   "auc_sentence_vs_mid": 0.8909090909090909,
+   "mean_score": {
+    "sentence": 0.898,
+    "clause": null,
+    "mid": 0.403
+   },
+   "preview": {
+    "app": {
+     "segments": 25,
+     "segments_per_min": 12.0,
+     "mean_s": 5.05,
+     "max_s": 6.32,
+     "sent_s": 126.3,
+     "cuts": {
+      "in speech": 7,
+      "pause none": 3,
+      "pause mid": 6,
+      "pause sentence": 8
+     }
+    },
+    "pause": {
+     "segments": 23,
+     "segments_per_min": 11.04,
+     "mean_s": 5.39,
+     "max_s": 10.14,
+     "sent_s": 124.1,
+     "cuts": {
+      "pause mid": 9,
+      "pause none": 3,
+      "pause sentence": 7,
+      "in speech": 3
+     }
+    },
+    "smart": {
+     "segments": 26,
+     "segments_per_min": 12.48,
+     "mean_s": 4.75,
+     "max_s": 10.11,
+     "sent_s": 123.4,
+     "cuts": {
+      "pause mid": 8,
+      "pause none": 3,
+      "pause sentence": 10,
+      "in speech": 4
+     }
+    },
+    "fixed3": {
+     "segments": 42,
+     "segments_per_min": 20.16,
+     "mean_s": 2.97,
+     "max_s": 3.51,
+     "sent_s": 124.5,
+     "cuts": {
+      "in speech": 38,
+      "pause sentence": 1,
+      "pause none": 1,
+      "pause mid": 1
+     }
+    }
+   },
+   "group": "conversation"
+  },
+  {
+   "data": "ja_conv",
+   "minutes": 2.083,
+   "voiced_share": 0.676,
+   "pauses_total": 75,
+   "pauses_200ms": 44,
+   "sentence_ends": 64,
+   "sentence_ends_with_200ms_pause": 33,
+   "thresholds": {
+    "0.0": {
+     "cuts": 44,
+     "cuts_per_min": 21.12,
+     "sentence": 28,
+     "clause": 9,
+     "mid": 7,
+     "unlabeled": 0,
+     "sentence_recall": 0.422
+    },
+    "0.3": {
+     "cuts": 36,
+     "cuts_per_min": 17.28,
+     "sentence": 24,
+     "clause": 5,
+     "mid": 7,
+     "unlabeled": 0,
+     "sentence_recall": 0.359
+    },
+    "0.5": {
+     "cuts": 36,
+     "cuts_per_min": 17.28,
+     "sentence": 24,
+     "clause": 5,
+     "mid": 7,
+     "unlabeled": 0,
+     "sentence_recall": 0.359
+    },
+    "0.75": {
+     "cuts": 34,
+     "cuts_per_min": 16.32,
+     "sentence": 22,
+     "clause": 5,
+     "mid": 7,
+     "unlabeled": 0,
+     "sentence_recall": 0.328
+    },
+    "0.9": {
+     "cuts": 30,
+     "cuts_per_min": 14.4,
+     "sentence": 19,
+     "clause": 5,
+     "mid": 6,
+     "unlabeled": 0,
+     "sentence_recall": 0.281
+    }
+   },
+   "auc_sentence_vs_mid": 0.40816326530612246,
+   "mean_score": {
+    "sentence": 0.812,
+    "clause": 0.539,
+    "mid": 0.955
+   },
+   "preview": {
+    "app": {
+     "segments": 31,
+     "segments_per_min": 14.88,
+     "mean_s": 3.7,
+     "max_s": 6.52,
+     "sent_s": 114.6,
+     "cuts": {
+      "pause mid": 4,
+      "pause sentence": 18,
+      "in speech": 4,
+      "pause clause": 4
+     }
+    },
+    "pause": {
+     "segments": 28,
+     "segments_per_min": 13.44,
+     "mean_s": 4.0,
+     "max_s": 8.6,
+     "sent_s": 112.1,
+     "cuts": {
+      "pause sentence": 18,
+      "pause mid": 5,
+      "pause clause": 4
+     }
+    },
+    "smart": {
+     "segments": 42,
+     "segments_per_min": 20.16,
+     "mean_s": 2.64,
+     "max_s": 6.85,
+     "sent_s": 110.8,
+     "cuts": {
+      "pause sentence": 26,
+      "pause mid": 8,
+      "pause clause": 7
+     }
+    },
+    "fixed3": {
+     "segments": 40,
+     "segments_per_min": 19.2,
+     "mean_s": 2.88,
+     "max_s": 3.51,
+     "sent_s": 115.4,
+     "cuts": {
+      "in speech": 22,
+      "pause sentence": 11,
+      "pause clause": 3,
+      "pause mid": 3
+     }
+    }
+   },
+   "group": "conversation"
+  },
+  {
+   "data": "en_conv",
+   "minutes": 2.083,
+   "voiced_share": 0.949,
+   "pauses_total": 33,
+   "pauses_200ms": 8,
+   "sentence_ends": 31,
+   "sentence_ends_with_200ms_pause": 4,
+   "thresholds": {
+    "0.0": {
+     "cuts": 8,
+     "cuts_per_min": 3.84,
+     "sentence": 4,
+     "clause": 0,
+     "mid": 4,
+     "unlabeled": 0,
+     "sentence_recall": 0.129
+    },
+    "0.3": {
+     "cuts": 4,
+     "cuts_per_min": 1.92,
+     "sentence": 3,
+     "clause": 0,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.097
+    },
+    "0.5": {
+     "cuts": 4,
+     "cuts_per_min": 1.92,
+     "sentence": 3,
+     "clause": 0,
+     "mid": 1,
+     "unlabeled": 0,
+     "sentence_recall": 0.097
+    },
+    "0.75": {
+     "cuts": 3,
+     "cuts_per_min": 1.44,
+     "sentence": 3,
+     "clause": 0,
+     "mid": 0,
+     "unlabeled": 0,
+     "sentence_recall": 0.097
+    },
+    "0.9": {
+     "cuts": 2,
+     "cuts_per_min": 0.96,
+     "sentence": 2,
+     "clause": 0,
+     "mid": 0,
+     "unlabeled": 0,
+     "sentence_recall": 0.065
+    }
+   },
+   "auc_sentence_vs_mid": 0.9375,
+   "mean_score": {
+    "sentence": 0.719,
+    "clause": null,
+    "mid": 0.181
+   },
+   "preview": {
+    "app": {
+     "segments": 23,
+     "segments_per_min": 11.04,
+     "mean_s": 5.6,
+     "max_s": 6.43,
+     "sent_s": 128.8,
+     "cuts": {
+      "pause sentence": 5,
+      "pause mid": 5,
+      "in speech": 12
+     }
+    },
+    "pause": {
+     "segments": 17,
+     "segments_per_min": 8.16,
+     "mean_s": 7.32,
+     "max_s": 10.52,
+     "sent_s": 124.5,
+     "cuts": {
+      "pause sentence": 4,
+      "in speech": 8,
+      "pause mid": 4
+     }
+    },
+    "smart": {
+     "segments": 16,
+     "segments_per_min": 7.68,
+     "mean_s": 7.78,
+     "max_s": 10.52,
+     "sent_s": 124.5,
+     "cuts": {
+      "pause mid": 6,
+      "pause sentence": 3,
+      "in speech": 6
+     }
+    },
+    "fixed3": {
+     "segments": 42,
+     "segments_per_min": 20.16,
+     "mean_s": 2.97,
+     "max_s": 3.51,
+     "sent_s": 124.9,
+     "cuts": {
+      "in speech": 38,
+      "pause sentence": 1,
+      "pause mid": 2
+     }
+    }
+   },
+   "group": "conversation"
+  }
+ ]
+}

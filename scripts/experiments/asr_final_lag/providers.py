@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import collections
+import contextlib
+import dataclasses
 import json
 import time
 import uuid
@@ -14,6 +16,9 @@ MID_FINALIZE_EVERY_S = 2.5
 GAP_FINALIZE_OFFSET_S = 0.10
 RAW_HEAD = 20
 RAW_TAIL = 5
+QWEN_CONTEXT_CHARS = 400
+QWEN_START_TIMEOUT_S = 10.0
+QWEN_REUSE_WAIT_S = 5.0
 
 SONIOX_URL = "wss://stt-rt.soniox.com/transcribe-websocket"
 SONIOX_MODEL = "stt-rt-v5"
@@ -32,9 +37,27 @@ LANGUAGE_CODES = {
 VARIANTS = {
     "soniox": ("natural", "finalize_gap", "finalize_mid"),
     "deepgram": ("natural", "nointerim", "finalize_gap", "finalize_mid"),
-    "qwen": ("natural", "semantic"),
-    "gemini": ("natural", "finalize_gap", "finalize_mid"),
+    "qwen": (
+        "natural",
+        "semantic",
+        "cut_app",
+        "cut_pause",
+        "cut_smart",
+        "cut_fixed3",
+        "cut_smart_ctx",
+    ),
+    "gemini": ("natural", "finalize_gap", "finalize_mid", "end_app", "end_smart"),
 }
+QWEN_CUTS = {
+    "cut_app": "app",
+    "cut_pause": "pause",
+    "cut_smart": "smart",
+    "cut_fixed3": "fixed3",
+    "cut_smart_ctx": "smart",
+}
+GEMINI_ENDS = {"end_app": "app", "end_smart": "smart"}
+SEGMENTED = frozenset(QWEN_CUTS) | frozenset(GEMINI_ENDS)
+_ANALYSES: dict[str, object] = {}
 
 
 class Recorder:
@@ -99,6 +122,29 @@ class Recorder:
             "partial_words": self.partial_words,
             "raw_sample": self.raw_head + list(self.raw_tail),
         }
+
+
+def prepare_segmentation(name: str, pcm: bytes) -> None:
+    import segmenter
+
+    if name not in _ANALYSES:
+        _ANALYSES[name] = segmenter.analyze_audio(pcm, segmenter.SmartTurn())
+
+
+def build_schedule(variant: str, name: str, reference: dict, pcm: bytes) -> list:
+    if variant not in SEGMENTED:
+        return finalize_schedule(variant, reference)
+    import segmenter
+
+    prepare_segmentation(name, pcm)
+    analysis = _ANALYSES[name]
+    if variant in GEMINI_ENDS:
+        cuts = segmenter.cut_schedule(analysis, GEMINI_ENDS[variant])
+        if variant == "end_smart":
+            cuts = [c for c in cuts if c.kind in ("smart", "end")]
+        return [round(c.t, 3) for c in cuts]
+    cuts = segmenter.cut_schedule(analysis, QWEN_CUTS[variant])
+    return [dataclasses.asdict(s) for s in segmenter.segments(analysis, cuts)]
 
 
 def finalize_schedule(variant: str, reference: dict) -> list[float]:
@@ -247,7 +293,234 @@ async def run_deepgram(rec, pcm, lang, variant, schedule, key, options) -> dict:
     return {"endpoint": DEEPGRAM_URL, "config": params}
 
 
+async def _sleep_until(rec: Recorder, audio_s: float) -> None:
+    delay = rec.t0 + audio_s - time.monotonic()
+    if delay > 0:
+        await asyncio.sleep(delay)
+
+
+async def run_qwen_cuts(rec, pcm, lang, variant, schedule, key, options) -> dict:
+    import websockets
+
+    endpoint = options.get("qwen_endpoint") or QWEN_URL
+    parameters = {
+        "format": "pcm",
+        "sample_rate": SAMPLE_RATE,
+        "semantic_punctuation_enabled": False,
+        "max_sentence_silence": 800,
+        "multi_threshold_mode_enabled": False,
+        "heartbeat": True,
+        "language_hints": [lang],
+    }
+    use_context = variant == "cut_smart_ctx"
+    loop = asyncio.get_running_loop()
+    tasks: list[dict] = []
+    by_id: dict[str, dict] = {}
+    published = 0
+
+    def task_text(task: dict) -> str:
+        return " ".join(task["sentences"][k] for k in sorted(task["sentences"]))
+
+    def publish() -> None:
+        nonlocal published
+        appended = ""
+        while published < len(tasks) and tasks[published]["finished"].done():
+            text = task_text(tasks[published])
+            appended += f" {text}" if text else ""
+            published += 1
+        pending = " ".join(task_text(t) + t["partial"] for t in tasks[published:]).strip()
+        rec.update(final_append=appended, tail=pending)
+
+    def settle(task: dict, ok: bool) -> None:
+        for name in ("started", "finished"):
+            if not task[name].done():
+                task[name].set_result(ok)
+
+    async def receive(ws) -> None:
+        async for message in ws:
+            if isinstance(message, bytes):
+                continue
+            data = json.loads(message)
+            rec.raw(data)
+            header = data.get("header") or {}
+            task = by_id.get(header.get("task_id"))
+            if task is None:
+                continue
+            event = header.get("event")
+            if event == "task-started":
+                task["t_started"] = rec.now()
+                if not task["started"].done():
+                    task["started"].set_result(True)
+            elif event == "task-failed":
+                task["error"] = f"{header.get('error_code')} {header.get('error_message')}"
+                rec.notes.append(f"task {task['index']} failed: {task['error']}")
+                settle(task, False)
+                publish()
+            elif event == "task-finished":
+                task["t_finished"] = rec.now()
+                task["usage"] = (data.get("payload") or {}).get("usage")
+                rec.control("fin_ack")
+                settle(task, True)
+                publish()
+            elif event == "result-generated":
+                output = (data.get("payload") or {}).get("output") or {}
+                sentence = output.get("sentence") or {}
+                if sentence.get("heartbeat"):
+                    continue
+                text = sentence.get("text") or ""
+                sentence_end = bool(sentence.get("sentence_end"))
+                for w in sentence.get("words") or []:
+                    end = w.get("end_time")
+                    if end is not None:
+                        rec.word(w.get("text", ""), task["start_s"] + end / 1000.0, sentence_end)
+                if sentence_end:
+                    task["sentences"][sentence.get("sentence_id", len(task["sentences"]))] = text
+                    task["partial"] = ""
+                else:
+                    task["partial"] = text
+                publish()
+
+    step = SAMPLE_RATE * CHUNK_MS // 1000 * 2
+    headers = {"Authorization": f"Bearer {key}"}
+    async with contextlib.AsyncExitStack() as stack:
+        started = time.monotonic()
+        conns = [
+            await stack.enter_async_context(
+                websockets.connect(
+                    endpoint, additional_headers=headers, open_timeout=20, max_size=None
+                )
+            )
+            for _ in range(2)
+        ]
+        rec.connect_s = round(time.monotonic() - started, 4)
+        receivers = [asyncio.create_task(receive(ws)) for ws in conns]
+        rec.t0 = time.monotonic()
+        for index, segment in enumerate(schedule):
+            ws = conns[index % 2]
+            await _sleep_until(rec, segment["open_s"])
+            if index >= 2:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.shield(tasks[index - 2]["finished"]), QWEN_REUSE_WAIT_S
+                    )
+                except TimeoutError:
+                    rec.notes.append(f"task {index - 2} unfinished when its connection was reused")
+            task = {
+                "index": index,
+                "task_id": uuid.uuid4().hex,
+                "start_s": segment["start_s"],
+                "end_s": segment["end_s"],
+                "cut": segment["cut"],
+                "sentences": {},
+                "partial": "",
+                "started": loop.create_future(),
+                "finished": loop.create_future(),
+                "t_run": rec.now(),
+            }
+            payload_input: dict = {}
+            if use_context:
+                context = " ".join(task_text(t) for t in tasks).strip()[-QWEN_CONTEXT_CHARS:]
+                if context:
+                    payload_input = {
+                        "context": [
+                            {"role": "user", "content": [{"type": "input_text", "text": context}]}
+                        ]
+                    }
+                    task["context_chars"] = len(context)
+            tasks.append(task)
+            by_id[task["task_id"]] = task
+            await ws.send(
+                json.dumps(
+                    {
+                        "header": {
+                            "action": "run-task",
+                            "task_id": task["task_id"],
+                            "streaming": "duplex",
+                        },
+                        "payload": {
+                            "task_group": "audio",
+                            "task": "asr",
+                            "function": "recognition",
+                            "model": QWEN_MODEL,
+                            "parameters": parameters,
+                            "input": payload_input,
+                        },
+                    }
+                )
+            )
+            try:
+                ready = await asyncio.wait_for(
+                    asyncio.shield(task["started"]), QWEN_START_TIMEOUT_S
+                )
+            except TimeoutError:
+                ready = False
+                rec.notes.append(f"task {index} start timed out")
+            if not ready:
+                settle(task, False)
+                publish()
+                continue
+            position = int(segment["start_s"] * SAMPLE_RATE) * 2
+            end = min(len(pcm), int(segment["end_s"] * SAMPLE_RATE) * 2)
+            while position < end:
+                chunk_end = min(position + step, end)
+                await _sleep_until(rec, chunk_end / 2 / SAMPLE_RATE)
+                await ws.send(pcm[position:chunk_end])
+                position = chunk_end
+            await ws.send(
+                json.dumps(
+                    {
+                        "header": {
+                            "action": "finish-task",
+                            "task_id": task["task_id"],
+                            "streaming": "duplex",
+                        },
+                        "payload": {"input": {}},
+                    }
+                )
+            )
+            task["t_finish"] = rec.now()
+            rec.control("finalize", round(segment["end_s"], 3))
+        rec.control("audio_end", round(len(pcm) / 2 / SAMPLE_RATE, 3))
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*(asyncio.shield(t["finished"]) for t in tasks)), TAIL_WAIT_S
+            )
+        except TimeoutError:
+            rec.notes.append("tail wait timed out")
+        publish()
+        for receiver in receivers:
+            receiver.cancel()
+    keep = (
+        "index",
+        "start_s",
+        "end_s",
+        "cut",
+        "t_run",
+        "t_started",
+        "t_finish",
+        "t_finished",
+        "usage",
+        "error",
+        "context_chars",
+    )
+    return {
+        "endpoint": endpoint,
+        "model": QWEN_MODEL,
+        "config": parameters,
+        "cut_policy": QWEN_CUTS[variant],
+        "context": use_context,
+        "connections": 2,
+        "tasks": [
+            {k: (round(t[k], 4) if isinstance(t.get(k), float) else t[k]) for k in keep if k in t}
+            | {"sentences": len(t["sentences"])}
+            for t in tasks
+        ],
+    }
+
+
 async def run_qwen(rec, pcm, lang, variant, schedule, key, options) -> dict:
+    if variant in QWEN_CUTS:
+        return await run_qwen_cuts(rec, pcm, lang, variant, schedule, key, options)
     import websockets
 
     endpoint = options.get("qwen_endpoint") or QWEN_URL

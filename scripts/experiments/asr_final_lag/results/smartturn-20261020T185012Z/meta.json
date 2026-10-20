@@ -1,0 +1,23 @@
+{
+ "started_utc": "20261020T185012Z",
+ "label_sources": {
+  "ko_kr": "20261020T055613Z",
+  "ja_jp": "20261020T055613Z",
+  "en_us": "20261020T055613Z",
+  "ko_conv": "20261020T070225Z",
+  "ja_conv": "20261020T070225Z",
+  "en_conv": "20261020T070225Z"
+ },
+ "probe_s": 0.2,
+ "onset_reset_s": 0.5,
+ "window_s": 8.0,
+ "smart_turn_model": "smart-turn-v3.2-cpu.onnx",
+ "vad_threshold": 0.5,
+ "thresholds": [
+  0.0,
+  0.3,
+  0.5,
+  0.75,
+  0.9
+ ]
+}

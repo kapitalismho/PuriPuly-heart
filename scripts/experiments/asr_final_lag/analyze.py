@@ -265,7 +265,32 @@ def analyze_run(reference: dict, run: dict) -> dict:
         "word_final_lag": _stats([w["t"] - w["end_s"] for w in final_words]),
         "word_partial_first_lag": _stats(partial_lags),
         "finalize_ack_lag": _stats(ack_lags),
+        "finalize_count": len(finalize_times),
+        "tasks": _task_summary((run.get("provider_config") or {}).get("tasks") or []),
         "sentences": rows,
+    }
+
+
+def _task_summary(tasks: list[dict]) -> dict | None:
+    if not tasks:
+        return None
+    usage: dict[str, float] = {}
+    for task in tasks:
+        for key, value in (task.get("usage") or {}).items():
+            if isinstance(value, int | float):
+                usage[key] = usage.get(key, 0) + value
+    return {
+        "count": len(tasks),
+        "failed": sum(1 for t in tasks if t.get("error") or t.get("t_finished") is None),
+        "audio_s": round(sum(t["end_s"] - t["start_s"] for t in tasks), 2),
+        "finish_lag": _stats(
+            [
+                t["t_finished"] - t["t_finish"]
+                for t in tasks
+                if t.get("t_finished") is not None and t.get("t_finish") is not None
+            ]
+        ),
+        "usage": usage,
     }
 
 
@@ -382,6 +407,34 @@ def render_markdown(analyses: list[dict], decider_rtt_s: float) -> str:
                 f"({a['sentence_final_missing']}) | {_fmt(a['word_final_lag'])} "
                 f"| {_fmt(a['word_partial_first_lag'])} | {_fmt(a['finalize_ack_lag'])} "
                 f"| {a['connect_s'] if a['connect_s'] is not None else '-'} |"
+            )
+        lines.append("")
+
+    segmented = [a for a in analyses if a["variant"].startswith(("cut_", "end_"))]
+    if segmented:
+        lines += [
+            "## Cut and end variants",
+            "",
+            "- `deleted` / `inserted`: character edit operations against the reference text "
+            "(lost or duplicated words show up here).",
+            "- `cuts`: finalize requests (`finish-task` for Qwen Audio, `audio_stream_end` for "
+            "Gemini). `tasks`, `audio sent` and `task finish` (finish-task to task-finished, "
+            "p50 / p90) are Qwen Audio only.",
+            "",
+            "| data | provider | variant | CER | deleted | inserted | cuts | tasks | audio sent s "
+            "| task finish | usage |",
+            "|---|---|---|---|---|---|---|---|---|---|---|",
+        ]
+        rows = [a for a in analyses if a["provider"] in {s["provider"] for s in segmented}]
+        for a in sorted(rows, key=lambda a: (a["lang"], a["provider"], a["variant"])):
+            tasks = a.get("tasks") or {}
+            usage = ", ".join(f"{k} {v:g}" for k, v in (tasks.get("usage") or {}).items())
+            lines.append(
+                f"| {a['lang']} | {a['provider']} | {a['variant']} | {a['cer']:.3f} "
+                f"| {a['edit_counts']['delete']} | {a['edit_counts']['insert']} "
+                f"| {a.get('finalize_count', '-')} | {tasks.get('count', '-')} "
+                f"| {tasks.get('audio_s', '-')} "
+                f"| {_fmt(tasks['finish_lag']) if tasks else '-'} | {usage or '-'} |"
             )
         lines.append("")
 

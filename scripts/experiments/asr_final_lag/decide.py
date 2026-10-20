@@ -196,8 +196,8 @@ class Simulation:
     candidates: list[Candidate] = field(default_factory=list)
 
 
-def _load_run(results_dir: Path, provider: str, data: str) -> dict | None:
-    path = results_dir / "runs" / f"{provider}_natural_{data}.json.gz"
+def _load_run(results_dir: Path, provider: str, data: str, variant: str = "natural") -> dict | None:
+    path = results_dir / "runs" / f"{provider}_{variant}_{data}.json.gz"
     return analyze.load_run(path) if path.exists() else None
 
 
@@ -208,8 +208,10 @@ def _latest_results(data: str) -> Path | None:
     return None
 
 
-def build_stream(results_dir: Path, provider: str, data: str) -> Stream | None:
-    run = _load_run(results_dir, provider, data)
+def build_stream(
+    results_dir: Path, provider: str, data: str, variant: str = "natural"
+) -> Stream | None:
+    run = _load_run(results_dir, provider, data, variant)
     timing = _load_run(results_dir, "soniox", data)
     if run is None or timing is None or run.get("error"):
         return None

@@ -57,10 +57,15 @@ KEY_CANDIDATES = {
 }
 
 
-async def _run_one(provider, variant, lang, data_dir, key, options, runs_dir) -> None:
+async def _run_one(provider, variant, lang, data_dir, key, options, runs_dir, gate) -> None:
+    async with gate:
+        await _run_gated(provider, variant, lang, data_dir, key, options, runs_dir)
+
+
+async def _run_gated(provider, variant, lang, data_dir, key, options, runs_dir) -> None:
     reference, pcm = fleurs.load(lang, data_dir)
     rec = providers.Recorder()
-    schedule = providers.finalize_schedule(variant, reference)
+    schedule = providers.build_schedule(variant, lang, reference, pcm)
     started = dt.datetime.now(dt.UTC).isoformat(timespec="seconds")
     error = None
     config: dict = {}
@@ -157,18 +162,50 @@ async def _main(args: argparse.Namespace) -> Path:
         "chunk_ms": providers.CHUNK_MS,
         "gap_finalize_offset_s": providers.GAP_FINALIZE_OFFSET_S,
         "mid_finalize_every_s": providers.MID_FINALIZE_EVERY_S,
+        "parallel_per_provider": args.parallel,
     }
+    if any(v in providers.SEGMENTED for v in args.variants):
+        import segmenter
+
+        meta["segmentation"] = {
+            "vad_frame_s": segmenter.FRAME_S,
+            "smart_turn_probe_s": segmenter.PROBE_S,
+            "smart_threshold": segmenter.SMART_THRESHOLD,
+            "app_smart_threshold": segmenter.SMART_TURN_COMPLETE_THRESHOLD,
+            "turn_end_s": segmenter.TURN_END_S,
+            "pre_roll_s": segmenter.PRE_ROLL_S,
+            "app_replay_s": segmenter.APP_REPLAY_S,
+            "qwen_cuts": providers.QWEN_CUTS,
+            "gemini_ends": providers.GEMINI_ENDS,
+        }
     (results_dir / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
 
     for lang in args.data:
+        runs = [
+            (provider, variant)
+            for provider in selected
+            for variant in providers.VARIANTS[provider]
+            if variant in args.variants
+        ]
+        if any(variant in providers.SEGMENTED for _, variant in runs):
+            print(f"[lang] {lang}: computing VAD and Smart Turn cut schedules", flush=True)
+            providers.prepare_segmentation(lang, fleurs.load(lang, data_dir)[1])
         print(f"[lang] {lang}: streaming in real time", flush=True)
         started = time.monotonic()
+        gates = {p: asyncio.Semaphore(args.parallel or len(runs) or 1) for p in selected}
         await asyncio.gather(
             *(
-                _run_one(provider, variant, lang, data_dir, keys[provider][1], options, runs_dir)
-                for provider in selected
-                for variant in providers.VARIANTS[provider]
-                if variant in args.variants
+                _run_one(
+                    provider,
+                    variant,
+                    lang,
+                    data_dir,
+                    keys[provider][1],
+                    options,
+                    runs_dir,
+                    gates[provider],
+                )
+                for provider, variant in runs
             )
         )
         print(f"[lang] {lang}: done in {time.monotonic() - started:.0f} s", flush=True)
@@ -191,6 +228,9 @@ def main() -> None:
     parser.add_argument("--env-file", action="append", help="defaults to .env and .env.local")
     parser.add_argument("--key", action="append", default=[], metavar="PROVIDER=VARIABLE")
     parser.add_argument("--qwen-endpoint", default=None)
+    parser.add_argument(
+        "--parallel", type=int, default=0, help="concurrent runs per provider (0 = all at once)"
+    )
     parser.add_argument("--decider-rtt", type=float, default=analyze.DEFAULT_DECIDER_RTT_S)
     parser.add_argument("--out", default=None)
     args = parser.parse_args()

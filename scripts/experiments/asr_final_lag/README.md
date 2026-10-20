@@ -2,23 +2,9 @@
 
 Measures how soon each streaming ASR route turns continuous speech into partial and final text without forced finalization, and what finalize requests change. A second script replays the recorded partial transcripts through decision models to test when text could be released for translation. A third script tests decision-model splits of long utterances and judges the chunked translations. The results decide how Peer early release should find release points.
 
-## Next step: long-utterance split probe
+## Next step
 
-```powershell
-git pull
-uv run scripts/experiments/asr_final_lag/split.py
-git add scripts/experiments/asr_final_lag/results
-git commit -m "Record long-utterance split probe"
-git push
-```
-
-- It replays the recorded conversation runs (Soniox and Deepgram) and needs no new ASR run.
-- It uses `OPENROUTER_API_KEY` and takes about 10 minutes. It checks each model with one small request first.
-- Expected calls and cost at list prices:
-  - About 1,300 decision calls per model (two models, two questions): a few cents.
-  - About 330 translation calls with `google/gemma-4-26b-a4b-it`: a few cents.
-  - About 120 judge calls with `openai/gpt-6.1-sol`: about 1 USD.
-- `--no-judge` skips the judge, `--no-translate` skips translation and judging, `--judge MODEL` and `--translator MODEL` change the models.
+`HANDOFF.md` lists the commands for the local run: the Qwen Audio cut and Gemini end variants, the Gemini interim replay that includes them, and the long-utterance split probe. The Smart Turn pause evaluation and the interim replay of the earlier runs are already recorded (`results/smartturn-*`, `results/interim-*`).
 
 ## Run the ASR probe
 
@@ -38,6 +24,7 @@ uv run scripts/experiments/asr_final_lag/run.py
 - Other variable names: `--key gemini=MY_VARIABLE` (repeatable).
 - Data: `--data ko_kr ja_jp en_us` (FLEURS read speech, the default) and `ko_conv ja_conv en_conv` (YODAS2 conversation).
 - Subsets: `--providers soniox deepgram`, `--variants natural`.
+- `--parallel N` runs at most N variants of one provider at the same time (default: all at once).
 - Qwen uses `ALIBABA_API_KEY_BEIJING` first. The default endpoint is the Beijing host `wss://dashscope.aliyuncs.com/api-ws/v1/inference`.
 - International DashScope keys need `--qwen-endpoint wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference`.
 - A full FLEURS run takes about 8 minutes. Each data set streams about 2 minutes in real time with all of its runs in parallel. Billed audio is about 1 hour 10 minutes in total: Soniox 18 min, Deepgram 24 min, Qwen Audio 12 min, Gemini 18 min.
@@ -72,6 +59,13 @@ Results contain no API keys, host names or user names. The scripts refuse to wri
 | `finalize_gap` | Soniox, Deepgram, Gemini | Finalize 0.10 s after each sentence's speech end, inside the 0.2 s silence before the next sentence (best case for a pause-aligned finalize). |
 | `finalize_mid` | Soniox, Deepgram, Gemini | Finalize every 2.5 s regardless of speech (worst case for word damage). |
 | `semantic` | Qwen Audio | `semantic_punctuation_enabled=true`; the application uses `false`. |
+| `cut_app` | Qwen Audio | One task per local segment on two alternating connections, cut where the current Peer rules would cut (see `segmenter.py`): Smart Turn complete (0.75) then 512 ms, otherwise 800 ms; 4 s/192 ms; 5 s/128 ms; 6 s hard cut with 0.3 s replay. |
+| `cut_pause` | Qwen Audio | As `cut_app`, but cut at the first 200 ms pause after 2 s. |
+| `cut_smart` | Qwen Audio | As `cut_app`, but cut at a 200 ms pause when Smart Turn scores at least 0.5. |
+| `cut_fixed3` | Qwen Audio | As `cut_app`, but cut every 3 s even during speech. |
+| `cut_smart_ctx` | Qwen Audio | `cut_smart` plus the previous tasks' text (last 400 characters) as ASR context in `payload.input.context`. The context format follows the Fun-ASR client events and is not confirmed for Qwen Audio 3.1. |
+| `end_app` | Gemini | Continuous stream with `audio_stream_end` at every `cut_app` cut, as the application does now. |
+| `end_smart` | Gemini | Continuous stream with `audio_stream_end` only at Smart Turn cuts and 800 ms pauses, never during speech. |
 
 Provider settings mirror the application adapters: Soniox `stt-rt-v5` with endpoint detection off and diarization on, Deepgram `nova-3` with endpointing off, Qwen Audio `qwen-audio-3.1-asr-flash-streaming` with the Peer `max_sentence_silence=800`, and Gemini `gemini-3.5-transcribe-live` with automatic activity detection (500 ms prefix, 400 ms silence). Finalize is the Soniox `finalize` message, the Deepgram `Finalize` message and the Gemini `audio_stream_end` input, which the application sends when a Peer segment ends. For Gemini, `fin ack` is the first final transcript after `audio_stream_end`.
 
@@ -135,6 +129,24 @@ Defaults: models `typesafe/jev-1.14`, `inception/mercury-decide`, `perplexity/pp
 - `--fake` replaces decision models with a punctuation-label oracle and translation with an echo, and makes no API calls.
 
 Results go to `results/split-<UTC timestamp>/` with the same layout as the replay: `summary.md`, `summary.json`, `meta.json` and `calls/` (decision calls, translations and judgments).
+
+## Cut schedules and Smart Turn
+
+`segmenter.py` runs the bundled Silero VAD (32 ms frames, threshold 0.5, at least two voiced frames) and the bundled Smart Turn v3.2 model on the probe audio before streaming. Smart Turn scores each pause when it reaches 200 ms, with up to 8 s of audio that starts at the speech onset after the last pause of at least 0.5 s. The cut policies above are computed from these frames, so every variant of a data set cuts at the same audio times. Policies other than `app` end a turn at an 800 ms pause, cut at an 80 ms pause after 6 s and cut during speech after 10 s.
+
+`smartturn_eval.py` (no API calls) labels every 200 ms pause with the Soniox final token that ended there: sentence-final punctuation, a comma or neither. It reports how many sentence ends have a 200 ms pause, how well Smart Turn separates sentence ends from other pauses, and a preview of each cut policy.
+
+```powershell
+uv run scripts/experiments/asr_final_lag/smartturn_eval.py
+```
+
+## Gemini interim release replay
+
+`interim_release.py` (no API calls) replays recorded Gemini runs (`natural`, `end_smart`, `end_app`). It compares releasing each final as it arrives with releasing interim text up to its last sentence-final punctuation once that prefix has been unchanged for 0, 0.6 or 1.0 s. When a final arrives, only the rest is released, either from the final (located by text alignment) or from the last interim. It reports per-character latency from Soniox timestamps and CER, deletions and insertions against the reference. Each results folder needs a Soniox `natural` run of the same data for timing.
+
+```powershell
+uv run scripts/experiments/asr_final_lag/interim_release.py
+```
 
 ## Limits
 
