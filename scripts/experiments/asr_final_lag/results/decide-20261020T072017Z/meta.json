@@ -1,0 +1,77 @@
+{
+ "started_utc": "20261020T072017Z",
+ "models": [
+  "typesafe/jev-1.14",
+  "inception/mercury-decide",
+  "perplexity/pplx-decider-v1.2",
+  "perplexity/pplx-decider-flash-v1.2"
+ ],
+ "fake_decider": false,
+ "sources": {
+  "ko_kr": "20261020T055613Z",
+  "ja_jp": "20261020T055613Z",
+  "en_us": "20261020T055613Z",
+  "ko_conv": "20261020T070225Z",
+  "ja_conv": "20261020T070225Z",
+  "en_conv": "20261020T070225Z"
+ },
+ "streams": [
+  "ko_kr/soniox",
+  "ko_kr/deepgram",
+  "ko_kr/gemini",
+  "ko_kr/qwen",
+  "ja_jp/soniox",
+  "ja_jp/deepgram",
+  "ja_jp/gemini",
+  "ja_jp/qwen",
+  "en_us/soniox",
+  "en_us/deepgram",
+  "en_us/gemini",
+  "en_us/qwen",
+  "ko_conv/soniox",
+  "ko_conv/deepgram",
+  "ko_conv/gemini",
+  "ko_conv/qwen",
+  "ja_conv/soniox",
+  "ja_conv/deepgram",
+  "ja_conv/gemini",
+  "ja_conv/qwen",
+  "en_conv/soniox",
+  "en_conv/deepgram",
+  "en_conv/gemini",
+  "en_conv/qwen"
+ ],
+ "questions": {
+  "propose": {
+   "type": "choice",
+   "instructions": "The transcript is live speech recognition that stops at the latest recognized word. Numbered markers such as [1] sit between the newest words. Which marker is the last point where the speaker has finished a sentence or a self-contained clause, so that an interpreter could translate everything before it right now? The speaker may still be talking after the last marker.",
+   "criteria": {
+    "none": "No marker ends a sentence or self-contained clause; the speaker is still inside one.",
+    "1": "Everything before [1] ends a sentence or self-contained clause.",
+    "2": "Everything before [2] ends a sentence or self-contained clause."
+   }
+  },
+  "verify": {
+   "type": "noul",
+   "instructions": "`before` is live speech recognition and `after` is what the speaker said next. Does `before` end exactly where a sentence or a self-contained clause ends, so that `before` can be translated without the words in `after`?",
+   "criteria": {
+    "true": "`before` ends a complete sentence or clause; `after` starts a new one.",
+    "false": "`after` continues the sentence or clause that `before` ends with."
+   }
+  }
+ },
+ "max_markers": 12,
+ "window_chars": {
+  "Korean": 80,
+  "Japanese": 80,
+  "English": 240
+ },
+ "right_chars": {
+  "Korean": 2,
+  "Japanese": 3,
+  "English": 3
+ },
+ "candidate_min": 0.5,
+ "silence_s": 0.8,
+ "concurrency": 6
+}
