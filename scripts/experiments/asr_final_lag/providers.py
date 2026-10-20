@@ -33,7 +33,7 @@ VARIANTS = {
     "soniox": ("natural", "finalize_gap", "finalize_mid"),
     "deepgram": ("natural", "nointerim", "finalize_gap", "finalize_mid"),
     "qwen": ("natural", "semantic"),
-    "gemini": ("natural",),
+    "gemini": ("natural", "finalize_gap", "finalize_mid"),
 }
 
 
@@ -373,6 +373,7 @@ async def run_gemini(rec, pcm, lang, variant, schedule, key, options) -> dict:
     async with client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
         rec.connect_s = round(time.monotonic() - started, 4)
         done = asyncio.Event()
+        finalizing = asyncio.Event()
 
         async def receive() -> None:
             while not done.is_set():
@@ -380,6 +381,10 @@ async def run_gemini(rec, pcm, lang, variant, schedule, key, options) -> dict:
                 async for message in session.receive():
                     received = True
                     content = getattr(message, "server_content", None)
+                    interim = getattr(content, "interim_input_transcription", None)
+                    if interim is not None:
+                        rec.raw({"interim": interim.text or ""})
+                        rec.update(tail=interim.text or "")
                     transcription = getattr(content, "input_transcription", None)
                     if transcription is None:
                         continue
@@ -391,7 +396,10 @@ async def run_gemini(rec, pcm, lang, variant, schedule, key, options) -> dict:
                             _seconds(getattr(w, "end_offset", None)),
                             True,
                         )
-                    rec.update(final_append=text)
+                    if finalizing.is_set():
+                        finalizing.clear()
+                        rec.control("fin_ack")
+                    rec.update(final_append=text, tail="")
                 if not received:
                     await asyncio.sleep(0.05)
 
@@ -400,8 +408,12 @@ async def run_gemini(rec, pcm, lang, variant, schedule, key, options) -> dict:
                 audio=types.Blob(data=chunk, mime_type=f"audio/pcm;rate={SAMPLE_RATE}")
             )
 
+        async def finalize() -> None:
+            finalizing.set()
+            await session.send_realtime_input(audio_stream_end=True)
+
         receiver = asyncio.create_task(receive())
-        await _stream_audio(rec, pcm, send, None, schedule)
+        await _stream_audio(rec, pcm, send, finalize, schedule)
         await session.send_realtime_input(audio_stream_end=True)
         await asyncio.sleep(TAIL_WAIT_S)
         done.set()
@@ -415,6 +427,8 @@ async def run_gemini(rec, pcm, lang, variant, schedule, key, options) -> dict:
             "language_codes": [lang],
             "prefix_padding_ms": 500,
             "silence_duration_ms": 400,
+            "interim": "interim_input_transcription",
+            "finalize": "audio_stream_end",
         },
     }
 

@@ -16,6 +16,7 @@
 ## Columns that do not measure what their names say
 
 - `finalize_gap` sent finalize 0.10 s after the clip end, which was 0.0-3.0 s after the speech end. Its `final` timings and the `finalize at gap` column do not show a pause-aligned finalize.
+- Gemini `partial first` and `partial stable` are final timings. This probe version did not record `interim_input_transcription`, so Gemini partials are missing.
 
 ## Observations that do not depend on the pauses
 
