@@ -34,3 +34,17 @@ Text was released at each sentence-final punctuation mark in the partial text an
 - Soniox partial text at punctuation is effectively final.
 - Sampled Deepgram, Gemini and Qwen Audio differences mix real word revisions with boundary shifts. Real revisions include "修正" → "修練" (Deepgram), "살찐" → "살집" (Gemini) and "やった" → "言った" (Gemini).
 - Mid-speech finalize in the FLEURS run (`20261020T055613Z`, `finalize_mid`) raised CER by 0.2-2.3 points for Soniox, 3-7 points for Deepgram and 12-18 points for Gemini. Soniox also added terminal punctuation at almost every finalize point (42-45 extra ends per run).
+
+## Partial revision depth and age (added later)
+
+Each partial update was compared with the previous one. A revision is an update that changes already shown text. The age is the time since the changed text first appeared. Data: the three conversation runs; the Gemini interim figures also include the FLEURS run.
+
+| provider | updates that revise | revised text age p50 / p90 / max |
+| --- | --- | --- |
+| Soniox | 2% | 0.23 / 0.96 / 1.8 s |
+| Deepgram | 28% | 0.99 / 1.42 / 4.0 s |
+| Gemini interim (within an utterance) | 11% | 0.49 / 0.96 / 2.0 s |
+| Qwen Audio | 32% | 1.71 / 2.35 / 4.2 s |
+
+- Gemini interim text rarely changes after 1 s. Its finals are a separate result: compared with the last interim before them, they differ by CER 0.047-0.082 in Korean and English conversation and 0.264 in Japanese conversation.
+- Qwen Audio partial text keeps changing for about 2.5 s, and its punctuation appears late.
