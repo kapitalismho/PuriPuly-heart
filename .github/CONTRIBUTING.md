@@ -42,6 +42,8 @@ Pushing a `vMAJOR.MINOR.PATCH` tag, such as `v2.8.2`, runs the [native release w
 
 The native Windows shell disables optional CMake JNI discovery before configuring Flutter plugins. Android-only transitive dependencies must not introduce a Java runtime dependency based on the build machine's installed JDK. Native DLL dependency closure validation remains enforced.
 
+The native Flet build pins `shared_preferences_android` to `2.4.28`, the last version before its JNI dependency was introduced. Newer Android implementations require JNI 1.1 and are incompatible with the shell's pinned JNI bridge, even when compiling for Windows.
+
 The draft-release job installs the pinned `PYTHON_VERSION` before running release helpers. These helpers use the project's Python syntax and must not run with the Ubuntu image's default interpreter.
 
 SHA-256 and provenance verification remain inside the pipeline; provenance passes between jobs through job outputs rather than downloadable JSON files. Required third-party licenses and corresponding-source bundles remain embedded in the installer. Successful reruns remove non-installer attachments from the selected release.

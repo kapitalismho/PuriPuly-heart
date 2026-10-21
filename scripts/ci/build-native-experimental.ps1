@@ -236,6 +236,7 @@ company = "salee"
 
 [tool.flet.flutter.pubspec.dependency_overrides]
 jni_flutter = "1.0.3"
+shared_preferences_android = "2.4.28"
 "@ | Set-Content -LiteralPath (Join-Path $fixtureRoot "pyproject.toml") -Encoding utf8
 
     $env:FLET_CACHE_DIR = $fletCache
