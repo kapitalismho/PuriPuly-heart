@@ -12,6 +12,8 @@ from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import display_card as display_card_module
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.fonts import default_font_family
+from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
+from puripuly_heart.ui.views.dashboard import DashboardView
 from tests.helpers.flet_page import attach_dummy_page
 
 
@@ -770,3 +772,17 @@ def test_chosen_input_hint_survives_a_locale_change(monkeypatch: pytest.MonkeyPa
     card.apply_locale()
 
     assert card._input_field.hint_text == "Press Tab to switch the language pair"
+
+
+def test_launch_input_hint_reaches_the_dashboard_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    dashboard = DashboardView()
+    field = dashboard.display_card._input_field
+    adapter = FletUiPresentationAdapter(SimpleNamespace(view_dashboard=dashboard))
+    i18n_module.set_locale("ko")
+
+    adapter.set_dashboard_launch_input_hint(first_launch=True)
+    assert field.hint_text == "메시지를 입력하세요"
+
+    monkeypatch.setattr(display_card_module.random, "choice", lambda keys: keys[-1])
+    adapter.set_dashboard_launch_input_hint(first_launch=False)
+    assert field.hint_text == "듣기 번역이 잘 안될 땐 VRChat의 Earmuff 기능을 써보세요."

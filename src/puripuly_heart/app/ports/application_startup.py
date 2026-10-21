@@ -12,6 +12,7 @@ class ApplicationStartupState:
     settings: AppSettingsVNext
     fallback_channels: tuple[str, ...]
     installation_fallback: bool
+    main_input_first_launch: bool = False
 
 
 ApplicationStartupOutcome = Literal["entered", "completed", "cancelled", "failed"]

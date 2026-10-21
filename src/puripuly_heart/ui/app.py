@@ -54,7 +54,6 @@ from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.components.chatgpt_auth_dialog import ChatGptAuthDialog
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
 from puripuly_heart.ui.components.discord_managed_auth_dialog import DiscordManagedAuthDialog
-from puripuly_heart.ui.components.display_card import choose_input_hint_key
 from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDialog
 from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
     LocalQwenHallucinationDialog,
@@ -669,26 +668,9 @@ class TranslatorApp:
 
     async def _run_after_launch_tasks(self) -> None:
         await asyncio.gather(
-            self._apply_main_input_hint_after_launch(),
             self._run_launch_notification_flow(),
             self._run_after_launch_runtime_preparation(),
         )
-
-    async def _apply_main_input_hint_after_launch(self) -> None:
-        try:
-            first_launch = await self.application.claim_main_input_first_launch()
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self._log_diagnostic(
-                f"[Startup] Main input hint launch state failed: {exc!r}",
-                level=logging.WARNING,
-            )
-            return
-        dashboard = getattr(self, "view_dashboard", None)
-        set_hint_key = getattr(dashboard, "set_message_input_hint_key", None)
-        if callable(set_hint_key):
-            set_hint_key(choose_input_hint_key(first_launch=first_launch))
 
     async def _run_launch_notification_flow(self) -> None:
         exhausted, _ = await asyncio.gather(

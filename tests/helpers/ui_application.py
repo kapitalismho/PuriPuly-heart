@@ -264,10 +264,6 @@ class UiApplicationRuntimeStub:
         )
         return await record(active_date_utc) if callable(record) else None
 
-    async def claim_main_input_first_launch(self) -> bool:
-        claim = getattr(self._backend, "claim_main_input_first_launch", None)
-        return bool(await claim()) if callable(claim) else True
-
     def should_show_github_star_prompt(self) -> bool:
         should_show = getattr(self._backend, "should_show_github_star_prompt", None)
         return bool(should_show()) if callable(should_show) else False

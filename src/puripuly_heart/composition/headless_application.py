@@ -165,6 +165,9 @@ class HeadlessApplicationPresentation:
     def set_dashboard_peer_needs_key(self, needs_key: bool) -> None:
         self._remember("peer_needs_key", needs_key)
 
+    def set_dashboard_launch_input_hint(self, *, first_launch: bool) -> None:
+        self._remember("launch_input_hint_first_launch", first_launch)
+
     def dashboard_translation_enabled(self) -> bool:
         return bool(self.projections.get("translation_enabled", False))
 
