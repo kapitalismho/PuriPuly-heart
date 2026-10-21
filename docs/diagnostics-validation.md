@@ -420,6 +420,9 @@ A pre-publication Black check also reported all six affected Python files unchan
 ## SELF mini-turn captions and latest-scene protection — #265
 
 Authority: [issue #265](https://github.com/kapitalismho/PuriPuly-heart/issues/265).
+This is a historical verification record. The SELF publication policy below is
+superseded by [#279](#readable-self-translated-units--279); its native freshness
+and physical-observation limitations remain relevant.
 Implementation started from `639144cb27c3f5fa69a90375e49360c505dbc7b3`.
 The initial integrated product was `458b1faa39f5c728d7e4ca7d20d83899637020b7`;
 `eba9abb81404019e8912d37dc47240599a7bc0f3` changed only a superseded
@@ -700,3 +703,350 @@ and Flet controls on a test page; they do not claim a new native GUI or live
 authentication observation. These CI repairs change tests and fixtures only,
 not the accepted application or native implementation.
 
+
+## Readable SELF translated units — #279
+
+Authority: [issue #279](https://github.com/kapitalismho/PuriPuly-heart/issues/279).
+The implementation baseline and refreshed `origin/dev` were
+`a52fcc97a93d34e040545f388e77a55724cf3c91`. The historical presentation reference
+was `f1ab9a47d9caaf67bd7666b7d5f5e380da46b185`.
+
+The maintainer requested actual PC-overlay verification in place of agent-run
+HMD observation and retained physical headset checking personally. Physical
+HMD readability, consumption, historical stale-headset behavior and sustained
+headset-session exposure remain **NOT RUN / maintainer-owned**. Desktop pixels,
+offscreen graphics and controlled native submissions do not certify them.
+This is a task-specific disposition, not reuse of #265's closure amendment.
+
+### Implemented display unit and preserved boundaries
+
+SELF overlay publication selects closed source or an opportunistic complete
+sentence within an open cumulative source. An open sentence requires a valid
+matching translation before admission; source and translation advance together.
+Closed source can still publish its usable source-only fallback. A new
+speculative result or grace restart alone is no longer a display boundary.
+The obsolete source-boundary publication machinery was removed; shared source
+closure remains independent of translation completion.
+
+A pending source-only successor does not displace a visible translated SELF
+unit merely to fill the shared window. Available space still permits source
+display. Bounded staging admits the latest fallback when capacity becomes
+available, including predecessor expiry. Failed, disabled and unavailable
+translation retain source-only behavior. Ready successors can advance without
+waiting for an older translation. Retired or displaced identities cannot return
+as new captions through a late result.
+
+Blocked overlay admission retains the latest two translated units and a latest
+coherent source fallback, plus applicable admitted-caption patches, rather than
+playing back obsolete intermediate admissions. Queued first-admission authority
+survives its later retained-only patch. These are overlay decisions; progressive
+chatbox eligibility, corrections, ordering, pagination, compatible-final
+deduplication, UI, manual input and PEER policies remain independent.
+
+This is not a literal restoration of the old LLM-dependent source merge.
+Sentence publication is opportunistic: a newer incompatible source can cancel
+the earlier sentence's speculative request. Punctuation-free uninterrupted
+speech can wait for source closure. A continuing sentence milestone can replace
+the full cumulative translation, not a separately translated suffix. Finite
+shared slots do not guarantee a reading interval under arbitrary arrival rates,
+particularly with active PEER occupying a slot. No fixed dwell or caption
+playback queue was added.
+
+### Verification boundaries and corrected timing premise
+
+Actual production source, translation, output, paginator, presenter, bridge and
+Flet desktop-child paths consumed synthetic source and controlled translation
+responses. The chatbox destination was a recording local sender, not VRChat.
+The process used isolated manifests, loopback endpoints and owned synthetic
+backdrops. Only guarded owned-window regions were captured; no live audio,
+private settings, provider credentials or user conversations were required.
+Python 3.14.7, Flet/flet-desktop 1.0.0 and websockets 16.1.1 were recorded.
+Historical and baseline imports came from pinned source exports; candidate
+source identities were recorded around execution.
+
+An initial short-turn experiment injected `SpeechStart`, then full source and
+immediate `SpeechEnd` 40 ms later, with starts 650 ms apart. It bypassed acoustic
+hangover. It is evidence for already-separated callback turns, **not** evidence
+that a real 650 ms pause splits historically. The maintainer identified this
+distinction; the initial explanation was corrected rather than used for
+acceptance.
+
+For the ordinary local-VAD low-latency path, 500 ms hangover rounds to sixteen
+512-sample chunks at 16 kHz, approximately 512 ms. The existing 400 ms source
+grace follows `SpeechEnd`: about 912 ms from modeled speech stop when source is
+already available. Late source can restart grace; provider-owned independent
+recognition does not use this equation. Speculation runs concurrently, not as
+another delay added after those intervals. Historically, a still-running
+translation could additionally keep the source merge open.
+
+Corrective probes used real `VadGating`, controlled speech probabilities and
+synthetic 512-sample chunks, then the production audio-segment ledger and
+`OwnedVadEvent` identity matching the STT updates. These model stop-to-onset
+timing; they are not recorded speech or a real classifier-accuracy test.
+Three genuine resumed-speech chunks preceded resumed recognition.
+A no-GUI producer check first established ordinary source closure about 400 ms
+after the emitted end event and correct final idle state.
+
+All six final actual-desktop comparisons then completed with guarded pixels
+and clean child exits. At a modeled 650 ms stop-to-onset gap, historical,
+baseline and candidate each retained one canonical turn. At a 1.1 s gap with
+two-second translation latency, historical retained one joined A+B turn while
+baseline and candidate closed two turns. The candidate does not claim to
+restore that historical cross-turn translation grouping.
+
+An earlier six-run corrective attempt was invalid for grouping despite process
+exit success: plain VAD UUID ownership did not match scoped STT ownership and
+left continuation waiting for a watchdog. Those observations are excluded from
+grouping acceptance. The repaired ledger-based probes established closure and
+identity invariants before another GUI comparison. The final pixel observer
+ran in a separate process so screenshot work did not serialize producer events.
+Actual scheduling jitter and result cancellation remain distinct from intended
+input offsets.
+
+### Readable translated coverage and observed timing
+
+The corrected fast scenario used modeled speech onsets at 0, 0.970 and 1.940 s
+and stops at 0.320, 1.290 and 2.260 s. Full stable source was scheduled 100 ms
+before each stop. A was “The blue door is open.”, B “Please bring your ticket.”
+and C “We leave after sunset.” Their supplied Korean translations were
+“파란 문이 열려 있어요.”, “표를 가져오세요.” and “해가 진 뒤에 떠나요.”
+The candidate kept one caption identity and advanced A → cumulative AB →
+cumulative ABC, rather than exposing translated word-prefix revisions.
+Historical and baseline also merged these speech segments, but exposed
+intermediate prefixes in the controlled fast-result schedule.
+
+Times below are seconds from scenario start. Capture intervals bracket the
+actual screenshot operation that contained the matching text; they are not
+exact panel transition times. Readiness means the controlled provider completed
+the matching source response. The last column is a sample-supported unchanged
+display interval, not an enforced dwell or comfort guarantee.
+
+| Candidate coverage, 650 ms modeled pause | Translation ready | Matching pixel capture | Ready to capture, ms | Observed unchanged interval, s |
+| --- | --- | --- | --- | --- |
+| A | 0.255371 | 0.296919–0.328223 | 41.548–72.852 | 0.878480 |
+| AB | 1.220885 | 1.242300–1.277607 | 21.415–56.722 | 0.898791 |
+| ABC | 2.201549 | 2.225811–2.261050 | 24.262–59.501 | 1.747542 |
+
+Actual candidate speech-end events were 0.846647, 1.795769 and 2.794708 s;
+source closed at 3.199326 s, versus baseline 3.197153 s. A coherent translated
+sentence could therefore be read before the final acoustic/source boundary.
+These are translated-content observations; first-source appearance was not
+used as the completion metric. Cumulative sentence growth still changes layout
+and can wrap the final text.
+
+The slower scenario used modeled A onset/stop 0/0.320 s and B 1.420/1.740 s,
+with two-second translation requests. Candidate A source closed at 1.248485 s,
+before actual B onset at 1.450188 s; B source closed at 2.650470 s.
+
+| Slow scenario unit | Translation ready, s | Matching pixel capture, s |
+| --- | --- | --- |
+| Candidate A | 2.230398 | 2.264915–2.302039 |
+| Candidate B | 3.663085 | 3.696517–3.715466 |
+| Historical joint AB | 3.659080 | 3.683241–3.717328 |
+
+The candidate exposed A about 1.4 s before the historical joined translation,
+and retained A when B appeared. It did not recreate the historical joint
+translation. That difference preserves current canonical chatbox/source
+semantics while offering earlier complete translated content.
+
+Separate callback-boundary desktop cases observed source before/after end,
+resumed speech, slow/pending/failed/disabled translation, late results, expiry
+and mixed SELF/PEER. With two available slots, successive complete short units
+retained their predecessor for approximately 1.3 s in the observed schedule.
+With a held active PEER occupying one slot, complete SELF units could replace
+each other about 650 ms apart. The first Korean target had 13 characters.
+The Director retained this finite shared-capacity tradeoff rather than adding
+unsupported dwell or changing PEER selection; it is not a universal readability
+claim. The PEER fixture entered at the production presenter boundary.
+
+A blocked-release desktop burst reached the latest G+H scene without captured
+intermediate B–F playback. Producer-level admission checks separately establish
+coalescing; finite-rate screenshots alone cannot prove that no intermediate
+frame existed.
+
+### Baseline chatbox preservation
+
+A separate controlled-release matrix completed twelve cases: baseline and
+candidate, stable-append and final-only input, each with normal, blocked or
+disabled overlay delivery. Normal delivery used the real presenter and bridge
+without a desktop child. Every case made four translation requests and recorded
+four successful local-sender payloads. Normalized request, payload and canonical
+closure sequences matched baseline/candidate exactly; stable append yielded one
+canonical final, and final-only input yielded four. Source idle and completed
+chatbox progress were observed before blocked delivery was released. Compatible
+finalization did not add a duplicate payload.
+
+Blocked matrix teardown released and drained both versions before stopping.
+It is not a baseline immediate-stop pass; that earlier runner encountered the
+shutdown deadlock recorded below. The repaired candidate's independent
+immediate-stop smoke supplies the distinct cancellation-safety evidence.
+
+### Deterministic, native and process verification
+
+| Executed selection | Result and limits |
+| --- | --- |
+| Integrated domain, configuration, core and architecture suites at `766ae006` | 4,289 passed; four opt-in real-process skips; 210 existing websockets deprecation warnings |
+| Repaired streaming and producer-isolation suites | 94 passed; obsolete publication/wiring/empty diagnostic assertions removed, behavioral coverage retained |
+| Focused source, translation, chatbox, caption and retention neighbors | 463 passed; overlapping selection, not an additional suite total |
+| Output shutdown and caption-policy regressions after repair | 105 passed |
+| Native full serial suite, including Python cross-language scenarios | 304 passed; one existing opt-in renderer memory probe ignored |
+| Explicit D3D11 style/replay check | One passed; real offscreen GPU, no OpenVR hardware session |
+| README real-process overlay integration selection | Five passed; zero skips |
+| Repository Ruff, Black and offline test selection | Passed; Black checked 1,132 files, selection covered 516 offline files |
+
+The native release built successfully and the assembled executable's actual
+`--check-startup-contract` returned app 2.9.0, bridge 16, execution v1/r2,
+exclusive native retry v2 and immutable-first-readable speaker identity v2.
+Executable SHA-256:
+`eca11de223a283cb0588d9eb56557a742d366b49940cb10f33774278ee9e6d62`.
+Native product sources and protocol were unchanged.
+
+Actual Python presenter/mailbox JSON crossed loopback WebSocket parsing into
+the native presentation owner. This tier used a controlled renderer and
+submitter, separately from real D3D11 offscreen checks. Sparse 600 ms updates
+produced 28 renders/submissions; 30 ms bursts followed by silence produced 11.
+Measured owner-connection-through-joined-shutdown intervals were 4,317 ms and
+1,494 ms respectively; they are not HMD latency or GPU-utilization measurements.
+All 131 completed rows among 431 parsed retry rows carried fresh-render,
+producer-ready and successful-submit witnesses. Assertions correlated scene
+and episode identity, increasing execution IDs and existing per-episode limits.
+
+Coverage included latest scenes after exhaustion, retained patches, send-time
+expiry, SELF removal leaving primary-translated or secondary-only PEER,
+coalesced clear, fresh epochs without renewed caption age, empty handoff/Hide
+grace, OFF-side retirement and no-progress timeout despite scene churn.
+Metadata scheduling alone was not counted as execution.
+
+### Preserved failures and bounded shutdown repair
+
+The first broad integration run reported 13 failures, 4,274 passes and four
+skips. Tests expecting arbitrary speculative or grace-boundary display were
+replaced with coherent-coverage behavior checks. Provider language provenance,
+caption identity, pending-to-ready/failure transitions, progressive chatbox
+progress and producer isolation remain asserted. The final broad run above
+passed after those repairs.
+
+A blocked-output fixture exposed a real shutdown deadlock: the cancelling owner
+held the admission lock while awaiting a caption task whose cancellation cleanup
+tried to reacquire that lock. A two-file run timed out at 300.21 seconds; a
+single-case diagnostic timed out at 30.04 seconds. These are not test passes.
+Terminal-batch cleanup now avoids that reacquisition while preserving receipt
+identity; joined replacement-task markers are released after successful join.
+Seven regressions cover blocked and release-immediate close, applied-on-cancel
+receipts, live-waiter accounting and replacement-generation progress.
+
+A production-owner synthetic smoke then exercised both blocked-to-stop and
+release-to-immediate-stop without pre-stop delivery draining. Both exited
+successfully, closed providers, cleared reservations and left no live tasks or
+post-stop replay. This is cleanup evidence, not a performance guarantee.
+
+Earlier GUI harness attempts stopped on focus/occlusion guards, incompatible
+historical callbacks or an invalid mixed-source fixture; incomplete runs were
+not promoted to complete observations. Capture safety required the exact owned
+overlay and opaque backdrop with pre/post-capture region/z-order checks.
+Initial native shell quoting and log-decoding failures were corrected before
+interpreting successful checks. Initial Black failures were repaired using the
+repository formatter; final global checks passed.
+
+### Independent mixed-scene selection repair
+
+Whole-checkpoint review of `a52fcc97` → `766ae006` found one material mixed-window
+defect. A full scene containing an older finalized PEER and a newer translated
+SELF unnecessarily staged the next untranslated SELF, even though ordinary
+selection would replace only the older PEER. The independent production-owner
+probe observed the failed successor hidden until predecessor expiry. The
+Director accepted this P2 finding.
+
+Both staging and later promotion now forecast the actual next selection using
+the existing shared selector and current effective display preferences.
+Forecasts do not mutate stored entries, retirement, live pointers or appearance
+order. The translated SELF is protected only when it would actually lose its
+slot. Older finalized PEER can yield normally; newer finalized PEER and drawable
+active PEER still preserve their existing ordering/protection.
+
+Eight added cases cover both chronology orders, active/secondary-only/hidden
+PEER, translation-disabled drawability and promotion after preference or active
+protection changes. The affected caption/presenter/freshness suites passed 158
+tests. A fresh-process production-owner smoke observed immediate pending-source
+admission beside the retained translation at t=1.0, terminal failure without
+hiding it, and unchanged truthful fallback at t=7.9. Chatbox progression and
+appearance identity remained intact.
+
+The repaired integrated selection passed 705 caption, presenter, freshness,
+output, streaming, producer-isolation and architecture tests. Global Ruff and
+Black passed again. Earlier source/translation and native evidence is retained
+only where the bounded selection repair does not change its exercised path;
+these overlapping selections are not summed.
+
+Actual repaired PC pixels confirmed the reversed-order fix: after successor
+source arrived at 1.059477 s, the capture at 1.102059–1.138162 s showed the
+retained SELF translation beside successor source, without the older finalized
+PEER. The same content remained after both deliberately failed translation
+attempts. Inverse-order pixels retained the previous SELF until the new matching
+translation was ready. Active-PEER pixels retained the previous SELF during
+pending/failure and then progressed directly to a later ready successor.
+All three selected runs used identical repaired product hashes, ended with
+source idle and exited successfully.
+
+Two earlier control captures stopped on an owned-window identity/bounds/
+visibility guard: the inverse case saved no pixels; the active case saved only
+two initial safe frames. Their original exact causes remain unclassified,
+not product-selection failures or successful complete observations. Bounded
+continuations first established a populated owned window and guarded matching
+pixels before starting the scenario. Neither relaxed capture safety nor
+changed foreign windows. These completed both control observations.
+
+The repaired Python-to-native selection also passed all nine selected cases
+(296 other cases filtered, zero failures/skips). Its controlled sparse and
+burst/silence workloads again completed 28 and 11 fresh renders/submissions.
+All 120 completed rows among 292 retry rows carried matching fresh-render,
+producer-ready and submit-success witnesses. Native file hashes remained
+unchanged, so earlier release/startup and real offscreen GPU evidence remains
+applicable. This continuation does not add OpenVR or physical HMD evidence.
+
+### Automatic-review repair: pending open-sentence admission
+
+[PR #280's automatic review](https://github.com/kapitalismho/PuriPuly-heart/pull/280#discussion_r4332424604)
+found that the first open punctuated source could appear before its matching
+translation. Existing translated coverage was protected, so this was not a
+stale-target attachment defect. It did contradict the maintained open-sentence
+contract. The Director accepted a bounded correction: eligibility is now closed
+source, or sentence-complete source with a valid matching ready translation.
+Canonical closure and closed-source fallback remain independent of the LLM.
+
+The same ten behavioral cases failed before the correction and passed after it.
+They cover first admission in four languages, pending successor retention,
+matching-result progression, disabled/unavailable translation, failure before
+and after closure, and producer progress while translated overlay delivery is
+blocked. The complete affected selection passed 393 tests; six additional
+UI/bridge isolation cases passed with controlled boundaries and real production
+owners. Global Ruff, Black and offline test-selection checks passed.
+
+Two fresh production desktop-child sessions exercised the corrected projection
+hash `f56bc8d54ba7680469005f195f763402aa8ce48bbecf20af2608a7f9b010d1dd`.
+All ten guarded checkpoints passed and their captured images were viewed.
+The initial pending punctuated sentence showed no caption, only ordinary Lock
+chrome. Its matching result then admitted the complete source/translation pair.
+Newer pending cumulative coverage preserved that exact pair until its matching
+result was ready.
+
+| Enabled-session unit | Matching result ready | Capture showing coherent pair |
+| --- | --- | --- |
+| First sentence | 0.751380 s | 0.781276–0.816827 s |
+| Cumulative successor | 1.957235 s | 1.962104–2.002093 s |
+
+These are controlled observations, not a universal latency bound. Closing a
+later source admitted usable source-only fallback beside the retained
+translation; deliberate provider failure preserved that truthful fallback.
+The separate disabled session showed no open-source caption, then displayed
+closed source at 1.181447–1.217599 s with zero LLM calls. Both desktop children
+and independent observers exited successfully, without capture or cleanup
+failures.
+
+Earlier timing/comparison records describe the candidate before this bounded
+repair. Any earlier open-source-only admission observation is superseded, not
+relabelled as final-candidate evidence. Translated-unit grouping, canonical
+closure, destination isolation, mixed-scene selection and unchanged native
+protection evidence are retained only where their exercised behavior is
+unaffected. The new desktop observations cover the changed first-admission
+path; they add no physical HMD or sustained-session evidence.

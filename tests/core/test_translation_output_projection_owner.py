@@ -1295,7 +1295,7 @@ def test_source_owner_reuse_keeps_exact_and_soft_boundary_meanings_distinct() ->
         ("pending", 1, "ja", ""),
     ],
 )
-async def test_self_turn_boundary_uses_only_current_target_without_unowned_live_cache(
+async def test_closed_self_turn_uses_only_current_target_without_unowned_live_cache(
     primary_status, primary_source_revision, cached_language, expected_secondary
 ) -> None:
     presenter = OverlayPresenter(calibration=OverlayCalibration())
@@ -1320,7 +1320,7 @@ async def test_self_turn_boundary_uses_only_current_target_without_unowned_live_
         source_revision=1,
         source_text="current source",
         source_language="ko",
-        source_closed=False,
+        source_closed=True,
         status="active",
         targets=(
             SelfTurnTargetPresentation(
@@ -1332,7 +1332,6 @@ async def test_self_turn_boundary_uses_only_current_target_without_unowned_live_
             SelfTurnTargetPresentation("ja", 1, "ready", secondary),
         ),
         created_at=10.0,
-        boundary_source_revision=1,
     )
     try:
         if cached_language is not None:

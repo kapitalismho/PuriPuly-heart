@@ -49,6 +49,26 @@ _SELF_CAPTION_LIMIT = 64
 _SELF_CAPTION_BYTE_LIMIT = 1024 * 1024
 
 
+def _self_sentence_complete(text: str) -> bool:
+    text = text.rstrip().rstrip("\"'”’」』】)")
+    if not text:
+        return False
+    if text[-1] in "!?。！？":
+        return True
+    if text[-1] != "." or text.endswith("..."):
+        return False
+    word = text.rsplit(maxsplit=1)[-1].lower()
+    if word in {"mr.", "mrs.", "ms.", "dr.", "prof.", "sr.", "jr.", "vs.", "etc.", "e.g.", "i.e."}:
+        return False
+    stem = word[:-1]
+    return (
+        bool(stem)
+        and not stem[-1].isdigit()
+        and not (len(stem) == 1 and stem.isascii() and stem.isalpha())
+        and "." not in stem
+    )
+
+
 class TranslationUiMessagePort(Protocol):
     async def publish(
         self,
@@ -1410,8 +1430,7 @@ class TranslationOutputProjectionOwner:
         cancelled = snapshot.status in {"cancelled", "expired"}
         eligible = not cancelled and (
             snapshot.source_closed
-            or snapshot.boundary_source_revision == snapshot.source_revision
-            or ready is not None
+            or (ready is not None and _self_sentence_complete(snapshot.source_text))
         )
         if (
             len(snapshot.source_text.encode("utf-8"))
@@ -1434,29 +1453,25 @@ class TranslationOutputProjectionOwner:
             )
             self._self_captions[identity] = caption
             while len(self._self_captions) > _SELF_CAPTION_LIMIT:
-                self._self_captions.popitem(last=False)
-        if not translation_configs_match(caption.configuration.value, configuration.value):
+                self._retire_self_caption(next(iter(self._self_captions)))
+        compatible = translation_configs_match(caption.configuration.value, configuration.value)
+        if not compatible:
             caption.translation = None
         caption.configuration = configuration
         caption.presentation_revision = snapshot.revision
-        if eligible and not caption.source_closed:
+        terminal = snapshot.status != "active"
+        if eligible and (ready is not None or caption.translation is None or terminal):
             caption.source_revision = snapshot.source_revision
             caption.source_text = snapshot.source_text
             caption.source_closed = snapshot.source_closed
-        if ready is not None and snapshot.source_revision == caption.source_revision:
             caption.translation = ready
-        if snapshot.status != "active" and ready is None:
+        elif snapshot.source_revision == caption.source_revision:
+            caption.source_closed = snapshot.source_closed
+        if cancelled:
             caption.translation = None
         order = (snapshot.turn_generation, snapshot.turn_order)
-        authority = self._self_presentation_authority
-        retained_only = (
-            self._self_caption_order is not None and order < self._self_caption_order
-        ) or (
-            authority is not None
-            and authority.source_pending
-            and authority.parent_utterance_id != snapshot.utterance_id
-        )
-        if not retained_only and not cancelled:
+        retained_only = self._self_caption_order is not None and order < self._self_caption_order
+        if not retained_only and not cancelled and eligible:
             self._self_caption_order = order
         translation = caption.translation
         await self.publish_overlay_event(
@@ -1485,7 +1500,8 @@ class TranslationOutputProjectionOwner:
                 ),
                 created_at=snapshot.created_at,
                 caption_source_closed=caption.source_closed,
-                caption_complete=snapshot.status != "active",
+                caption_complete=terminal
+                and (cancelled or caption.source_revision == snapshot.source_revision),
                 caption_cancelled=cancelled,
                 caption_revision=snapshot.revision,
                 retained_only=retained_only,

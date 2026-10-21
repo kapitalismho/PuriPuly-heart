@@ -451,15 +451,23 @@ class OverlayPresenter(OverlaySink):
 
     def _apply_self_active_update(self, event: SelfActiveUpdate, *, now: float) -> bool:
         if event.caption_source_closed is not None:
-            return self._finish_reduction_result(
+            changed = self._finish_reduction_result(
                 self._presentation_state.apply_self_caption_update(
                     event,
                     now=now,
                     show_translation=self.show_translation,
+                    show_peer_original=self.show_peer_original,
+                    translation_enabled=self.translation_enabled,
+                    visible_window_target_blocks=self.visible_window_target_blocks,
                     next_appearance_seq=self._next_appearance_seq,
                     terminal_update_reason=self._terminal_update_reason,
                 )
             )
+            key = self._entry_key(event.channel, event.utterance_id)
+            entry = self._entries.get(key)
+            if entry is not None:
+                self._schedule_expiration(key, entry)
+            return changed
         result = self._presentation_state.apply_self_active_update(
             event,
             now=now,
@@ -654,6 +662,14 @@ class OverlayPresenter(OverlaySink):
     ) -> None:
         now = self.clock.now()
         self._expire_closed_entries(now=now)
+        self._presentation_state.promote_staged_self(
+            now=now,
+            show_translation=self.show_translation,
+            show_peer_original=self.show_peer_original,
+            translation_enabled=self.translation_enabled,
+            capacity=self.visible_window_target_blocks,
+        )
+        self._drain_presentation_state_removals()
         previous_snapshot = self.snapshot()
         previous_occupants = {block.id for block in previous_snapshot.blocks}
         selection = self._presentation_state.visible_block_selection(

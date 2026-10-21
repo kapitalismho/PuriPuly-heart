@@ -248,12 +248,15 @@ async def test_draft_drain_and_destructive_retirement_are_distinct(retirement) -
         await asyncio.wait_for(callback_complete.wait(), timeout=1.0)
         if retirement == "admission":
             assert [message.text for message in osc.messages] == ["pending (late translation)"]
-            assert any(
+            assert not any(
                 getattr(event, "secondary_text", "") == "late translation" for event in sink.events
             )
             await harness.self_owner.open_ingress()
             await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
             await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+            assert any(
+                getattr(event, "secondary_text", "") == "late translation" for event in sink.events
+            )
             assert [entry.text for entry in harness.self_runtime.translation_history] == ["pending"]
             assert len(llm.calls) == 1
         else:

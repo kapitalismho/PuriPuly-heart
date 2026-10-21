@@ -433,7 +433,9 @@ async def test_public_low_latency_final_uses_declared_provider_generation_port()
         current_generation=41,
     )
     try:
-        await _source_revision(harness, uuid4(), "port contract")
+        source_id = uuid4()
+        await _source_revision(harness, source_id, "port contract")
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
         await _eventually(
             lambda: any(
                 getattr(event, "secondary_text", "") == "translated" for event in sink.events
@@ -699,9 +701,7 @@ async def test_ready_spec_result_is_invalidated_by_provider_replacement_during_g
         await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
         await _source_revision(harness, source_id, "hello")
         await _eventually(
-            lambda: any(
-                getattr(event, "secondary_text", "") == "old translation" for event in sink.events
-            )
+            lambda: any("old translation" in message.text for message in osc.messages)
         )
         await harness.replace_llm_provider(new)
         await _eventually(lambda: harness.self_owner.merge_buffer is None)
@@ -810,6 +810,7 @@ class TestRuntimeLatencyLogging:
             await harness.dispatch_stt_event(
                 STTFinalEvent(utterance_id=transcript.utterance_id, transcript=transcript)
             )
+            await harness.self_owner.handle_vad_event(SpeechEnd(transcript.utterance_id))
 
             await _eventually(
                 lambda: any(
@@ -1201,11 +1202,7 @@ class TestLowLatencyDisjointSpeech:
         first_id, second_id = uuid4(), uuid4()
         try:
             await _source_revision(harness, first_id, text)
-            await _eventually(
-                lambda: any(
-                    getattr(event, "secondary_text", "") == "translated" for event in sink.events
-                )
-            )
+            await _eventually(lambda: any("translated" in message.text for message in osc.messages))
             if not same_turn:
                 await harness.self_owner.handle_vad_event(SpeechEnd(first_id))
                 await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
@@ -1459,7 +1456,7 @@ class TestResumeEndTimeout:
         )
         first_id, resumed_id = uuid4(), uuid4()
         try:
-            await _source_revision(harness, first_id, "첫 번째")
+            await _source_revision(harness, first_id, "첫 번째.")
             await _eventually(
                 lambda: any(
                     getattr(event, "secondary_text", "") == "translated live"
@@ -1475,7 +1472,7 @@ class TestResumeEndTimeout:
                 )
             metadata = sink.active_self_overlay_metadata()
             assert metadata is not None
-            assert metadata.text == "첫 번째"
+            assert metadata.text == "첫 번째."
             assert metadata.secondary_text == "translated live"
             assert harness.self_owner.merge_buffer is not None
         finally:
@@ -1511,9 +1508,7 @@ class TestSpecFinalReconciliation:
             assert sink.events == []
             if ready:
                 llm.release.set()
-                await _eventually(
-                    lambda: any(event.secondary_text == "reused" for event in sink.events)
-                )
+                await _eventually(lambda: any("reused" in message.text for message in osc.messages))
             await _source_revision(harness, source_id, revised)
             await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
             assert harness.self_owner.merge_buffer is None
@@ -1671,7 +1666,8 @@ class TestSpecCommitPaths:
                 lambda: any(message.text == "translated ja" for message in osc.messages)
             )
             assert not llm.releases["zh-CN"].is_set()
-            assert sink.active_self_overlay_metadata().secondary_text == ""
+            metadata = sink.active_self_overlay_metadata()
+            assert metadata is None or metadata.secondary_text == ""
             await _eventually(lambda: harness.self_owner.merge_buffer is None)
             assert [call["target_language"] for call in llm.calls] == ["zh-CN", "ja"]
             llm.releases["zh-CN"].set()
@@ -1694,7 +1690,9 @@ class TestSpecCommitPaths:
             await harness.stop()
 
     @pytest.mark.asyncio
-    async def test_resumed_source_restarts_both_targets_without_discarding_sticky_overlay(self):
+    async def test_resumed_source_restarts_both_targets_without_publishing_intermediate_translation(
+        self,
+    ):
         llm = PerTargetBlockingLLMProvider()
         sink = RecordingOverlaySink()
         osc = FakeOscQueue()
@@ -1717,10 +1715,7 @@ class TestSpecCommitPaths:
             await asyncio.wait_for(llm.all_started.wait(), timeout=1.0)
             llm.releases["zh-CN"].set()
             await _eventually(
-                lambda: any(
-                    getattr(event, "secondary_text", "") == "translated zh-CN"
-                    for event in sink.events
-                )
+                lambda: any("translated zh-CN" in message.text for message in osc.messages)
             )
             await harness.self_owner.handle_vad_event(
                 SpeechStart(resumed_id, pre_roll=samples(0.0), chunk=samples(1.0))
@@ -1729,7 +1724,7 @@ class TestSpecCommitPaths:
                 await harness.self_owner.handle_vad_event(
                     SpeechChunk(resumed_id, chunk=samples(0.5))
                 )
-            assert sink.active_self_overlay_metadata().secondary_text == "translated zh-CN"
+            assert sink.active_self_overlay_metadata() is None
             harness.replace_configuration(low_latency_finalize_wait_ms=0)
             await harness.self_owner.handle_vad_event(SpeechEnd(resumed_id))
             await _source_revision(harness, resumed_id, "continued")
@@ -1807,7 +1802,9 @@ class TestSpecCommitPaths:
                 await _eventually(
                     lambda: any(message.text == "translated ja" for message in osc.messages)
                 )
-                assert sink.active_self_overlay_metadata().secondary_text == ""
+                assert not any(
+                    getattr(event, "secondary_text", "") == "translated ja" for event in sink.events
+                )
             await harness.replace_llm_provider(new)
             for release in old.releases.values():
                 release.set()

@@ -915,7 +915,7 @@ async def test_handle_vad_event_speech_end_tracks_timing_and_forwards_to_stt() -
 
 
 @pytest.mark.asyncio
-async def test_blocked_source_overlay_does_not_block_stt_or_translation() -> None:
+async def test_blocked_translated_sentence_overlay_does_not_block_stt_or_translation() -> None:
     stt = StubSTT()
     llm = StubLLM()
     sink = BlockingOverlaySink()
@@ -926,29 +926,57 @@ async def test_blocked_source_overlay_does_not_block_stt_or_translation() -> Non
         overlay_sink=sink,
         clock=FakeClock(_now=10.0),
         low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
     )
     source_id = uuid4()
     source = asyncio.create_task(
         harness.self_owner.handle_stt_event(
             STTFinalEvent(
-                source_id, Transcript(utterance_id=source_id, text="hello live", is_final=True)
+                source_id, Transcript(utterance_id=source_id, text="hello live.", is_final=True)
             )
         )
     )
     try:
         await asyncio.wait_for(sink.started.wait(), timeout=1.0)
+        assert sink.events[0].text == "hello live."
+        assert sink.events[0].secondary_text == "T:hello live."
+        assert not sink.events[0].caption_source_closed
         chunk = SpeechChunk(uuid4(), chunk=np.zeros((1,), dtype=np.float32))
         await asyncio.wait_for(harness.self_owner.handle_vad_event(chunk), timeout=1.0)
         assert stt.handled == [chunk]
         await asyncio.wait_for(source, timeout=1.0)
+        await asyncio.wait_for(
+            harness.self_owner.handle_stt_event(
+                STTFinalEvent(
+                    source_id,
+                    Transcript(
+                        utterance_id=source_id,
+                        text="hello live. again",
+                        is_final=True,
+                    ),
+                )
+            ),
+            timeout=1.0,
+        )
         async with asyncio.timeout(1.0):
-            while not llm.calls:
+            while not any(
+                "T:hello live. again" in message.text for message in harness.osc.messages
+            ):
                 await asyncio.sleep(0)
-        assert [text for _, text, _ in llm.calls] == ["hello live"]
+        assert [text for _, text, _ in llm.calls] == ["hello live.", "hello live. again"]
+        await asyncio.wait_for(
+            harness.self_owner.handle_vad_event(SpeechEnd(source_id)), timeout=1.0
+        )
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=1.0)
+        assert harness.self_owner.merge_buffer is None
+        assert len(sink.events) == 1
         assert not sink.release.is_set()
     finally:
         sink.release.set()
         await source
+        async with asyncio.timeout(1.0):
+            while harness.output_runtime.has_active_overlay_deliveries:
+                await asyncio.sleep(0)
         await harness.stop()
 
 

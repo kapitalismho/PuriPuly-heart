@@ -615,7 +615,6 @@ class OutputRuntime:
             unchanged = configuration == state.configuration and snapshot == replace(
                 state.snapshot,
                 revision=snapshot.revision,
-                boundary_source_revision=snapshot.boundary_source_revision,
             )
             state.snapshot = snapshot
             state.configuration = configuration
@@ -1284,8 +1283,9 @@ class OutputRuntime:
             try:
                 await batch.ready.wait()
             except asyncio.CancelledError:
-                async with self._batch_admission.lock:
-                    self._batch_admission.cancel_waiting(batch)
+                if batch.disposition is None:
+                    async with self._batch_admission.lock:
+                        self._batch_admission.cancel_waiting(batch)
                 raise
             if batch.disposition is not None:
                 return self._overlay_rejection_result(
@@ -1371,23 +1371,24 @@ class OutputRuntime:
             publication_id=publication_id,
             scene_revision=None,
         )
-        async with self._batch_admission.lock:
-            self._remember_delivered_publication(
-                publication_key,
-                scope=publication_scope,
-                sequence=event.seq,
-            )
-            if resolved_receipt.outcome != "applied":
-                self._batch_admission.release(
-                    batch,
-                    resolved_receipt.cause or resolved_receipt.outcome,
-                )
-            elif not batch.managed_parent:
-                self._batch_admission.release(batch, "applied")
-            elif isinstance(event, UtteranceClosed):
-                batch.completed_targets.add(event.target_index)
-                if len(batch.completed_targets) >= batch.target_count:
+        self._remember_delivered_publication(
+            publication_key,
+            scope=publication_scope,
+            sequence=event.seq,
+        )
+        if batch.disposition is None:
+            async with self._batch_admission.lock:
+                if resolved_receipt.outcome != "applied":
+                    self._batch_admission.release(
+                        batch,
+                        resolved_receipt.cause or resolved_receipt.outcome,
+                    )
+                elif not batch.managed_parent:
                     self._batch_admission.release(batch, "applied")
+                elif isinstance(event, UtteranceClosed):
+                    batch.completed_targets.add(event.target_index)
+                    if len(batch.completed_targets) >= batch.target_count:
+                        self._batch_admission.release(batch, "applied")
 
         if resolved_receipt.outcome != "applied":
             return self._overlay_rejection_result(
@@ -2149,6 +2150,7 @@ class OutputRuntime:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._active_delivery_tasks.difference_update(tasks)
+        self._replacement_cancelled_delivery_tasks.difference_update(tasks)
         self._publications_in_flight.clear()
 
     @staticmethod
