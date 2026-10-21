@@ -10,39 +10,21 @@ import httpx
 
 from puripuly_heart.config.runtime_resolution import OPENAI_MODEL_GPT_6_LUNA
 from puripuly_heart.core import network_clients
-from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.llm.latency import current_attempt
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import LLMResponseError, record_probe_failure
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
 _OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
-class OpenAIResponseError(RuntimeError):
+class OpenAIResponseError(LLMResponseError):
     diagnostic_provider = "openai"
 
     def __init__(self, status_code: int) -> None:
-        self.status_code = status_code
-        super().__init__(f"OpenAI request failed (status={status_code})")
-
-
-def _log_basic_request_failure(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    error: OpenAIResponseError,
-) -> None:
-    report = provider_failure_report(error, provider="openai", operation=operation)
-    rendered = "[Basic][LLM] OpenAI request failed [%s]: %s" % (
-        operation,
-        format_error_report_for_log(report),
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(rendered, level=logging.ERROR)
-        return
-    logger.error(rendered)
+        super().__init__("OpenAI request failed", provider="openai", status_code=status_code)
 
 
 def _build_system_prompt(
@@ -64,7 +46,7 @@ def _extract_message_content(content: object) -> str:
         result = content.strip()
         if result:
             return result
-        raise RuntimeError("OpenAI response contained empty message content")
+        raise LLMResponseError("OpenAI response contained empty message content", provider="openai")
 
     if isinstance(content, list):
         parts: list[str] = []
@@ -76,7 +58,7 @@ def _extract_message_content(content: object) -> str:
         if parts:
             return "\n".join(parts)
 
-    raise RuntimeError("OpenAI response did not contain message content")
+    raise LLMResponseError("OpenAI response did not contain message content", provider="openai")
 
 
 def _has_length_finish_reason(data: object) -> bool:
@@ -197,8 +179,11 @@ class OpenAILLMProvider:
                         "max_completion_tokens": 1,
                     },
                 )
+                if response.status_code != 200:
+                    record_probe_failure(None, provider="openai", status_code=response.status_code)
                 return response.status_code == 200
-        except Exception:
+        except Exception as exc:
+            record_probe_failure(exc, provider="openai")
             return False
 
 
@@ -310,33 +295,37 @@ class HttpxOpenAIClient:
         )
         if response.status_code != 200:
             error = OpenAIResponseError(response.status_code)
-            _log_basic_request_failure(
-                runtime_logging=self.runtime_logging,
-                operation="translate",
-                error=error,
-            )
+
             raise error
 
         try:
             data = response.json()
-        except ValueError:
-            raise RuntimeError("OpenAI response was not valid JSON") from None
+        except ValueError as exc:
+            raise LLMResponseError("OpenAI response was not valid JSON", provider="openai") from exc
         if not isinstance(data, dict):
-            raise RuntimeError("OpenAI response did not contain a valid payload")
+            raise LLMResponseError(
+                "OpenAI response did not contain a valid payload", provider="openai"
+            )
         if observation is not None:
             observation.record_openai_response(data)
         self._last_reasoning_tokens = _reasoning_token_count(data)
         choices = data.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise RuntimeError("OpenAI response did not contain choices")
+            raise LLMResponseError("OpenAI response did not contain choices", provider="openai")
         if _has_length_finish_reason(data):
-            raise RuntimeError("OpenAI response was truncated by max_completion_tokens limit")
+            raise LLMResponseError(
+                "OpenAI response was truncated by max_completion_tokens limit", provider="openai"
+            )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise RuntimeError("OpenAI response did not contain a valid choice")
+            raise LLMResponseError(
+                "OpenAI response did not contain a valid choice", provider="openai"
+            )
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise RuntimeError("OpenAI response did not contain message content")
+            raise LLMResponseError(
+                "OpenAI response did not contain message content", provider="openai"
+            )
         return _extract_message_content(message.get("content"))
 
     async def close(self) -> None:

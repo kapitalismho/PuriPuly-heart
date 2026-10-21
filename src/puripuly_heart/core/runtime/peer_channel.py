@@ -5,7 +5,7 @@ import contextlib
 import inspect
 import logging
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Awaitable, Callable, Literal, Protocol, cast
 from uuid import UUID
 
@@ -36,6 +36,10 @@ from puripuly_heart.core.audio.smart_turn import (
     smart_turn_language_profile,
 )
 from puripuly_heart.core.clock import Clock
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureAdmissionPort,
     PeerCaptureAdmissionStatus,
@@ -101,6 +105,12 @@ class _PeerCaptureVadFailed(RuntimeError):
 
 class _PeerCaptureSourceOpenFailed(RuntimeError):
     pass
+
+
+class _PeerCaptureProviderHandoffFailed(RuntimeError):
+    def __init__(self, diagnostics: ErrorDiagnostics | None) -> None:
+        super().__init__("owned Peer STT handoff failed")
+        self.failure_diagnostics = diagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +185,13 @@ class _CaptureGeneration:
 
 
 @dataclass(frozen=True, slots=True)
+class _MutationObservation:
+    generation: int
+    enabled: bool
+    requires_setup_authority: bool
+
+
+@dataclass(frozen=True, slots=True)
 class _QueuedVadEvent:
     event: object
     pcm_samples: int
@@ -219,6 +236,7 @@ class _GenerationGuardedVadSink:
         self._queued_context_samples = 0
         self._queued_control_events = 0
         self._stream_drop_pending = False
+        self.failure_diagnostics: ErrorDiagnostics | None = None
         self._started_segment_ids: set[UUID] = set()
 
     async def handle_owned_vad_event(self, event: object) -> None:
@@ -230,8 +248,17 @@ class _GenerationGuardedVadSink:
         ledger = self.runtime.segment_ledger
         if ledger is None:
             return
+        qwen_discontinuity = (
+            ledger.settings.provider_id == "qwen_audio"
+            and event.boundary_reason == "source_discontinuity"
+        )
         if ledger.settings.provider_id not in {"gemini_transcribe", "rolling_free"}:
-            return
+            if not qwen_discontinuity:
+                return
+            event = replace(event, chunk=event.chunk[:0], capture=())
+            self._closing = True
+            if self._worker is not None and not self._worker.done():
+                self._worker.cancel()
         if event.capture:
             self.runtime._current_stream_capture_epoch = event.capture[-1].capture_epoch
         elif event.boundary_reason == "source_discontinuity":
@@ -255,6 +282,15 @@ class _GenerationGuardedVadSink:
                 )
             ),
         )
+        if qwen_discontinuity:
+            try:
+                await cast(_VadSink, self.sink).handle_stream_input(owned)
+            finally:
+                await self.abort()
+                self._worker = None
+                self._closing = False
+                self.runtime._cancel_segment_ledger(ledger)
+            return
         await self._submit(owned)
 
     async def observe_source_activity(
@@ -400,6 +436,7 @@ class _GenerationGuardedVadSink:
                 await self._wake.wait()
                 continue
             queued = self._queue.popleft()
+            ledger = None
             try:
                 if not self.runtime.is_current_generation(self.capture_generation.value):
                     continue
@@ -417,6 +454,19 @@ class _GenerationGuardedVadSink:
                     await cast(_VadSink, self.sink).handle_stream_input(queued.event)
                 else:
                     await cast(_VadSink, self.sink).handle_owned_vad_event(queued.event)
+            except Exception as exc:
+                if self.failure_diagnostics is None:
+                    self.failure_diagnostics = replace(
+                        stt_failure_report(
+                            exc,
+                            provider=ledger.settings.provider_id if ledger else "stt",
+                            channel="peer",
+                            operation="vad",
+                        ).diagnostics,
+                        generation=self.capture_generation.value,
+                        turn_id=str(queued.segment_id) if queued.segment_id is not None else None,
+                    )
+                raise
             finally:
                 self._release_event_accounting(queued)
                 if queued.closes_segment and queued.segment_id is not None:
@@ -708,6 +758,8 @@ class PeerCaptureSessionOwner:
         self._target_status: PeerCaptureTargetStatus | None = None
         self._state = PeerCaptureSessionState.STOPPED
         self._generation = 0
+        self._generation_operation: tuple[int, dict[str, str | None]] | None = None
+        self._mutation_observations: dict[asyncio.Task | None, _MutationObservation] = {}
         self._desired_active = False
         self._closed = False
         self._close_task: asyncio.Task[None] | None = None
@@ -738,6 +790,18 @@ class PeerCaptureSessionOwner:
     @property
     def state(self) -> PeerChannelRuntimeState:
         return self._state
+
+    def _provider_build_request(
+        self,
+        config: PeerCaptureSessionConfig,
+        warmup: bool,
+        *,
+        operation: dict[str, str | None],
+    ) -> object:
+        request = self._provider_request_factory(config, warmup)
+        if isinstance(request, ProviderRuntimeBuildRequest):
+            return replace(request, **operation)
+        return request
 
     @property
     def snapshot(self) -> PeerCaptureSessionSnapshot:
@@ -783,6 +847,9 @@ class PeerCaptureSessionOwner:
                 else None
             ),
             effective_language=self._effective_delivery_language(),
+            failure_diagnostics=(
+                self._last_failure.failure_diagnostics if self._last_failure else None
+            ),
         )
 
     @property
@@ -994,7 +1061,38 @@ class PeerCaptureSessionOwner:
             "local_asr_transition": self._transition_coordinator.lifecycle_snapshot(),
         }
 
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        observation = self._mutation_observations.get(task)
+        if observation is None:
+            return None
+        return observation.generation == self._generation and (
+            not observation.requires_setup_authority or self._provider_setup_task is task
+        )
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        return tuple(
+            observation.enabled
+            for task, observation in self._mutation_observations.items()
+            if self.mutation_authority(task)
+        )
+
     async def apply_intent(
+        self,
+        config: PeerCaptureSessionConfig,
+        *,
+        enabled: bool,
+        restart: bool = False,
+        stop_mode: Literal["retain", "release"] = "retain",
+    ) -> PeerCaptureSessionSnapshot:
+        try:
+            return await self._apply_intent(
+                config, enabled=enabled, restart=restart, stop_mode=stop_mode
+            )
+        finally:
+            self._mutation_observations.pop(asyncio.current_task(), None)
+            self._notify_state_changed()
+
+    async def _apply_intent(
         self,
         config: PeerCaptureSessionConfig,
         *,
@@ -1007,9 +1105,16 @@ class PeerCaptureSessionOwner:
         transition_only = False
         setup_to_cancel: asyncio.Task[object] | None = None
         current_task = asyncio.current_task()
+        provider_operation = current_diagnostic_operation()
         async with self._lock:
             if self._closed:
                 raise RuntimeError("PeerCaptureSessionOwner is closed")
+            invalidate_qwen = (
+                self._config is not None
+                and self._config.provider_id == "qwen_audio"
+                and self._config.runtime_signature != config.runtime_signature
+            )
+            restart = restart or invalidate_qwen
             self._requested_config = config
             requested_profile, _threshold = self._delivery_policy_for_config(config)
             if enabled and requested_profile == "on":
@@ -1042,6 +1147,7 @@ class PeerCaptureSessionOwner:
                 previous_generation = self._generation
                 self._generation += 1
                 generation = self._generation
+                self._generation_operation = (generation, provider_operation)
                 self._retire_publication_generation(previous_generation)
                 self._config = config
                 self._desired_active = enabled
@@ -1055,6 +1161,9 @@ class PeerCaptureSessionOwner:
                     self._provider_setup_task = current_task
                 else:
                     setup_to_cancel = self._provider_setup_task
+            self._mutation_observations[current_task] = _MutationObservation(
+                generation, enabled, requires_setup_authority=enabled
+            )
             self._notify_state_changed()
         if setup_to_cancel is not None and setup_to_cancel is not current_task:
             setup_to_cancel.cancel()
@@ -1063,7 +1172,9 @@ class PeerCaptureSessionOwner:
         try:
             async with self._activation_lock:
                 if transition_only:
-                    await self._transition_running_provider(config, generation=generation)
+                    await self._transition_running_provider(
+                        config, generation=generation, provider_operation=provider_operation
+                    )
                     return self.snapshot
                 if not enabled:
                     release_mode: Literal["dormant", "abort"] = (
@@ -1079,7 +1190,15 @@ class PeerCaptureSessionOwner:
                         release_mode=release_mode,
                     )
                     return self.snapshot
-                await self._start_generation(generation, config)
+                if invalidate_qwen:
+                    await self._teardown_resources(
+                        target_state=PeerCaptureSessionState.STOPPED,
+                        generation=generation,
+                        release_mode="abort",
+                    )
+                await self._start_generation(
+                    generation, config, provider_operation=provider_operation
+                )
                 return self.snapshot
         except asyncio.CancelledError:
             if self._is_superseded(generation):
@@ -1117,8 +1236,15 @@ class PeerCaptureSessionOwner:
                 or self._loop_task is not None
             ):
                 return self.snapshot
+            invalidate_qwen = (
+                self._config is not None
+                and self._config.provider_id == "qwen_audio"
+                and self._config.runtime_signature != config.runtime_signature
+            )
             self._generation += 1
             generation = self._generation
+            provider_operation = current_diagnostic_operation()
+            self._generation_operation = (generation, provider_operation)
             self._config = config
             self._state = PeerCaptureSessionState.PROVIDER_PENDING
             self._provider_status = PeerCaptureProviderStatus.PENDING
@@ -1128,10 +1254,15 @@ class PeerCaptureSessionOwner:
         async with self._activation_lock:
             if generation != self._generation or self._closed:
                 return self.snapshot
+            if invalidate_qwen:
+                await self._provider.release(mode="abort")
+                self._retire_provider_attachment()
+                self._provider_signature = None
             reusable = (
                 self._provider.is_ready(config) and self._provider_attachment_token is not None
             )
             attachment_token = self._provider_attachment_token
+            failure_diagnostics: Exception | ErrorDiagnostics | None = None
             if reusable:
                 result_status = PeerCaptureProviderMutationStatus.APPLIED
                 failure_reason = None
@@ -1141,7 +1272,9 @@ class PeerCaptureSessionOwner:
                 self._pending_provider_failures[attachment_token] = None
                 try:
                     result = await self._provider.replace(
-                        self._provider_request_factory(config, config.local_provider),
+                        self._provider_build_request(
+                            config, config.local_provider, operation=provider_operation
+                        ),
                         start=False,
                         on_terminal_failure=lambda exc: self._on_terminal_stt_failure(
                             exc,
@@ -1155,10 +1288,12 @@ class PeerCaptureSessionOwner:
                     self._pending_provider_failures.pop(attachment_token, None)
                     result_status = PeerCaptureProviderMutationStatus.FAILED
                     failure_reason = type(exc).__name__
+                    failure_diagnostics = exc
                     pending_failure = None
                 else:
                     result_status = result.status
                     failure_reason = result.reason
+                    failure_diagnostics = result.failure_diagnostics
                     pending_failure = self._pending_provider_failures.pop(
                         attachment_token,
                         None,
@@ -1172,6 +1307,7 @@ class PeerCaptureSessionOwner:
                     generation,
                     config=config,
                     reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                    exception=pending_failure,
                 )
                 return self.snapshot
             if result_status is PeerCaptureProviderMutationStatus.APPLIED:
@@ -1194,12 +1330,24 @@ class PeerCaptureSessionOwner:
                     generation,
                     config=config,
                     reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                    exception=failure_diagnostics,
                 )
                 return self.snapshot
             self._notify_state_changed()
             return self.snapshot
 
     async def retry_process_capture(
+        self,
+        *,
+        config: PeerCaptureSessionConfig | None = None,
+    ) -> bool:
+        try:
+            return await self._retry_process_capture(config=config)
+        finally:
+            self._mutation_observations.pop(asyncio.current_task(), None)
+            self._notify_state_changed()
+
+    async def _retry_process_capture(
         self,
         *,
         config: PeerCaptureSessionConfig | None = None,
@@ -1216,13 +1364,20 @@ class PeerCaptureSessionOwner:
                 return False
             self._generation += 1
             generation = self._generation
+            provider_operation = current_diagnostic_operation()
+            self._generation_operation = (generation, provider_operation)
             self._config = target_config
             self._desired_active = True
             self._retry_required_capture_target = None
+            self._mutation_observations[asyncio.current_task()] = _MutationObservation(
+                generation, True, requires_setup_authority=False
+            )
             self._state = PeerCaptureSessionState.STARTING
             self._notify_state_changed()
         async with self._activation_lock:
-            await self._start_generation(generation, target_config)
+            await self._start_generation(
+                generation, target_config, provider_operation=provider_operation
+            )
         return self._state is PeerCaptureSessionState.RUNNING
 
     async def warmup(self) -> None:
@@ -1368,6 +1523,7 @@ class PeerCaptureSessionOwner:
         config: PeerCaptureSessionConfig,
         *,
         generation: int,
+        provider_operation: dict[str, str | None],
     ) -> None:
         options = config.session_options or LocalASRSessionOptions(
             source_language=config.language.source_language,
@@ -1390,7 +1546,7 @@ class PeerCaptureSessionOwner:
         ) -> PreparedLocalASRTransition:
             return PreparedLocalASRTransition(
                 request=prepared_request,
-                provider=self._provider_request_factory(config, True),
+                provider=self._provider_build_request(config, True, operation=provider_operation),
                 generation=transition_generation,
             )
 
@@ -1418,7 +1574,35 @@ class PeerCaptureSessionOwner:
                 raise
             if result.status is not PeerCaptureProviderMutationStatus.APPLIED:
                 self._pending_provider_failures.pop(attachment_token, None)
-                raise RuntimeError("owned Peer STT handoff failed")
+                if result.status is PeerCaptureProviderMutationStatus.FAILED:
+                    native = result.failure_diagnostics
+                    if native is None:
+                        native = replace(
+                            stt_failure_report(
+                                None,
+                                provider=config.provider_id,
+                                channel="peer",
+                                operation="provider_handoff",
+                            ).diagnostics,
+                            generation=generation,
+                            **provider_operation,
+                        )
+                        emit_failure(logger, native, stage=native.operation)
+                    async with self._lock:
+                        if self._generation == generation and self._desired_active:
+                            self._emit_failure(
+                                PeerCaptureDiagnostic(
+                                    event=PeerCaptureDiagnosticEvent.FAILURE,
+                                    generation=generation,
+                                    state=self._state,
+                                    provider_id=config.provider_id,
+                                    reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                                    capture_kind=config.capture_target.kind,
+                                    failure_diagnostics=native,
+                                )
+                            )
+                    raise _PeerCaptureProviderHandoffFailed(native)
+                raise _PeerCaptureProviderHandoffFailed(result.failure_diagnostics)
             pending_failure = self._pending_provider_failures.pop(attachment_token, None)
             async with self._lock:
                 if self._generation == generation and self._desired_active:
@@ -1426,12 +1610,14 @@ class PeerCaptureSessionOwner:
                     self._provider_signature = config.provider_signature
                     self._signature = config.runtime_signature
                     self._commit_provider_attachment(attachment_token)
+                    self._last_failure = None
                     self._rebind_segment_ledger(generation, config)
             if pending_failure is not None:
                 await self._fault_current_generation_locked(
                     generation,
                     config=config,
                     reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                    exception=pending_failure,
                 )
 
         outcome = await self._transition_coordinator.request_transition(
@@ -1445,6 +1631,8 @@ class PeerCaptureSessionOwner:
         self,
         generation: int,
         config: PeerCaptureSessionConfig,
+        *,
+        provider_operation: dict[str, str | None],
     ) -> None:
         source = None
         provider_ready = False
@@ -1563,9 +1751,10 @@ class PeerCaptureSessionOwner:
                 self._pending_provider_failures[attachment_token] = None
                 self._provider_status = PeerCaptureProviderStatus.PENDING
                 self._notify_state_changed()
-                request = self._provider_request_factory(
+                request = self._provider_build_request(
                     config,
                     config.local_provider,
+                    operation=provider_operation,
                 )
                 try:
                     result = await self._provider.replace(
@@ -1591,7 +1780,19 @@ class PeerCaptureSessionOwner:
                     raise RuntimeError("owned Peer STT replacement was superseded")
                 if result.status is not PeerCaptureProviderMutationStatus.APPLIED:
                     self._pending_provider_failures.pop(attachment_token, None)
-                    raise RuntimeError("owned Peer STT replacement failed")
+                    await self._fault_current_generation_locked(
+                        generation,
+                        config=config,
+                        reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                        exception=result.failure_diagnostics,
+                    )
+                    self._emit_local_asr_diagnostic(
+                        config,
+                        outcome="failed",
+                        load_started_at=load_started_at,
+                        failure_type=result.reason,
+                    )
+                    return
             provider_ready = True
             pending_failure = (
                 self._pending_provider_failures.pop(attachment_token, None)
@@ -1605,6 +1806,7 @@ class PeerCaptureSessionOwner:
                     generation,
                     config=config,
                     reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                    exception=pending_failure,
                 )
                 self._emit_local_asr_diagnostic(
                     config,
@@ -1634,8 +1836,6 @@ class PeerCaptureSessionOwner:
             self._emit_event(PeerCaptureDiagnosticEvent.PROVIDER_CHANGED)
             self._notify_state_changed()
         except Exception as exc:
-            if source is not None and self._audio_source is not source:
-                await self._close_if_possible(source)
             if isinstance(
                 exc,
                 (
@@ -1654,6 +1854,8 @@ class PeerCaptureSessionOwner:
                 generation,
                 config=config,
                 reason=reason,
+                exception=exc,
+                detached_source=source if self._audio_source is not source else None,
             )
             self._emit_local_asr_diagnostic(
                 config,
@@ -1705,6 +1907,27 @@ class PeerCaptureSessionOwner:
                 )
             raise
         except Exception as exc:
+            primary = guarded_sink.failure_diagnostics or replace(
+                stt_failure_report(
+                    exc, provider="stt", channel="peer", operation="source_read"
+                ).diagnostics,
+                component="capture.peer",
+                generation=capture_generation.value,
+                code="capture.peer.peer_runtime_failed",
+            )
+            if (
+                self._generation_operation is not None
+                and self._generation_operation[0] == capture_generation.value
+            ):
+                primary = replace(primary, **self._generation_operation[1])
+            current = capture_generation.value == self._generation and not self._closed
+            emit_failure(
+                logger,
+                primary,
+                stage=primary.operation,
+                severity="error" if current else "info",
+                disposition="failed" if current else "superseded",
+            )
             cleanup_failures: list[Exception] = []
             try:
                 await guarded_sink.abort()
@@ -1712,18 +1935,25 @@ class PeerCaptureSessionOwner:
                 if cleanup_exc is not exc:
                     cleanup_failures.append(cleanup_exc)
                     self._log_loop_exception(
-                        "cleanup_failed", cleanup_exc, generation=capture_generation.value
+                        "cleanup_failed",
+                        cleanup_exc,
+                        generation=capture_generation.value,
+                        cause_diagnostics=primary,
                     )
             try:
                 await self._on_runtime_failure(
-                    exc,
+                    primary,
                     generation=capture_generation.value,
                     config=self._config,
+                    failure_observed=True,
                 )
             except Exception as cleanup_exc:
                 cleanup_failures.append(cleanup_exc)
                 self._log_loop_exception(
-                    "cleanup_failed", cleanup_exc, generation=capture_generation.value
+                    "cleanup_failed",
+                    cleanup_exc,
+                    generation=capture_generation.value,
+                    cause_diagnostics=primary,
                 )
             if cleanup_failures:
                 raise ExceptionGroup(
@@ -1736,6 +1966,7 @@ class PeerCaptureSessionOwner:
                 capture_generation.value,
                 config=self._config,
                 reason=self._failure_reason_from_terminal_source(terminal_reason),
+                exception=self._terminal_diagnostics_from_source(source),
             )
         else:
             await self._complete_current_generation(capture_generation.value)
@@ -1763,12 +1994,12 @@ class PeerCaptureSessionOwner:
 
     async def _on_runtime_failure(
         self,
-        exc: Exception,
+        exc: Exception | ErrorDiagnostics,
         *,
         generation: int,
         config: PeerCaptureSessionConfig | None,
+        failure_observed: bool = False,
     ) -> None:
-        self._log_loop_exception("runtime_failed", exc, generation=generation)
         await self._fault_current_generation(
             generation,
             config=config,
@@ -1777,6 +2008,8 @@ class PeerCaptureSessionOwner:
                 if config is not None and config.capture_target.kind == "process"
                 else PeerRuntimeFailureReason.PEER_RUNTIME_FAILED
             ),
+            exception=exc,
+            failure_observed=failure_observed,
         )
 
     async def _on_terminal_stt_failure(
@@ -1810,6 +2043,7 @@ class PeerCaptureSessionOwner:
                 target_generation,
                 config=config,
                 reason=PeerCaptureFailureReason.PROVIDER_FAILED,
+                exception=exc,
             )
 
     async def _fault_current_generation(
@@ -1818,12 +2052,18 @@ class PeerCaptureSessionOwner:
         *,
         config: PeerCaptureSessionConfig | None,
         reason: PeerRuntimeFailureReason,
+        exception: Exception | ErrorDiagnostics | None = None,
+        detached_source: object | None = None,
+        failure_observed: bool = False,
     ) -> None:
         async with self._activation_lock:
             await self._fault_current_generation_locked(
                 generation,
                 config=config,
                 reason=reason,
+                exception=exception,
+                detached_source=detached_source,
+                failure_observed=failure_observed,
             )
 
     async def _fault_current_generation_locked(
@@ -1832,6 +2072,9 @@ class PeerCaptureSessionOwner:
         *,
         config: PeerCaptureSessionConfig | None,
         reason: PeerRuntimeFailureReason,
+        exception: Exception | ErrorDiagnostics | None = None,
+        detached_source: object | None = None,
+        failure_observed: bool = False,
     ) -> None:
         current_task = asyncio.current_task()
         defer_diagnostic = current_task is not None and self._loop_task is current_task
@@ -1841,6 +2084,34 @@ class PeerCaptureSessionOwner:
             unavailable_reason = None
             if reason is PeerRuntimeFailureReason.PROCESS_TARGET_UNAVAILABLE:
                 unavailable_reason = self._last_failure_unavailable_reason
+            stage = {
+                PeerCaptureFailureReason.SOURCE_OPEN_FAILED: "source_open",
+                PeerCaptureFailureReason.VAD_FAILED: "vad",
+                PeerCaptureFailureReason.SOURCE_LOST: "source_read",
+                PeerCaptureFailureReason.PROVIDER_FAILED: "turn_terminal",
+                PeerCaptureFailureReason.CLEANUP_FAILED: "cleanup",
+            }.get(reason, "readiness")
+            native = (
+                exception
+                if isinstance(exception, ErrorDiagnostics)
+                else stt_failure_report(
+                    exception, provider=config.provider_id, channel="peer", operation=stage
+                ).diagnostics
+            )
+            if not isinstance(exception, ErrorDiagnostics):
+                native = replace(
+                    native,
+                    component="capture.peer",
+                    generation=generation,
+                    code=f"capture.peer.{reason.value}",
+                )
+            if (
+                not isinstance(exception, ErrorDiagnostics)
+                and self._generation_operation is not None
+                and self._generation_operation[0] == generation
+                and native.turn_id is None
+            ):
+                native = replace(native, generation=generation, **self._generation_operation[1])
             diagnostic = PeerCaptureDiagnostic(
                 event=PeerCaptureDiagnosticEvent.FAILURE,
                 generation=generation,
@@ -1849,6 +2120,7 @@ class PeerCaptureSessionOwner:
                 reason=reason,
                 capture_kind=config.capture_target.kind,
                 detail=unavailable_reason,
+                failure_diagnostics=native,
             )
         async with self._lock:
             if generation != self._generation or self._closed:
@@ -1856,6 +2128,16 @@ class PeerCaptureSessionOwner:
             if config is not None and config.capture_target.kind == "process":
                 self._retry_required_capture_target = config.capture_target
             self._last_failure = diagnostic
+            if (
+                not failure_observed
+                and diagnostic is not None
+                and diagnostic.failure_diagnostics is not None
+            ):
+                emit_failure(
+                    logger,
+                    diagnostic.failure_diagnostics,
+                    stage=diagnostic.failure_diagnostics.operation,
+                )
             self._generation += 1
             teardown_generation = self._generation
             self._desired_active = False
@@ -1864,6 +2146,12 @@ class PeerCaptureSessionOwner:
                 self._notify_state_changed()
             except Exception as exc:
                 failures.append(exc)
+        if detached_source is not None:
+            await self._attempt_cleanup(
+                failures,
+                lambda: self._close_if_possible(detached_source),
+                retain_on_failure=lambda: self._retain_retired_source(detached_source),
+            )
         try:
             await self._attempt_cleanup(
                 failures,
@@ -1871,6 +2159,9 @@ class PeerCaptureSessionOwner:
                     target_state=PeerCaptureSessionState.FAULTED,
                     generation=teardown_generation,
                     release_mode="abort",
+                    primary_failure=(
+                        diagnostic.failure_diagnostics if diagnostic is not None else None
+                    ),
                 ),
             )
         finally:
@@ -1879,6 +2170,14 @@ class PeerCaptureSessionOwner:
                     self._deferred_loop_diagnostics[current_task] = diagnostic
                 else:
                     self._emit_failure(diagnostic)
+        if diagnostic is not None:
+            for failure in failures:
+                self._log_loop_exception(
+                    "cleanup_failed",
+                    failure,
+                    generation=generation,
+                    cause_diagnostics=diagnostic.failure_diagnostics,
+                )
         self._raise_cleanup_failures("peer runtime fault cleanup failed", failures)
 
     async def _teardown_resources(
@@ -1889,6 +2188,7 @@ class PeerCaptureSessionOwner:
         release_mode: Literal["drain", "dormant", "abort"],
         release_provider: bool = True,
         cancel_segments: bool = True,
+        primary_failure: ErrorDiagnostics | None = None,
     ) -> None:
         async with self._lock:
             if self._generation != generation:
@@ -1954,6 +2254,13 @@ class PeerCaptureSessionOwner:
                 self._state = target_state
                 self._target_status = None
                 self._notify_state_changed()
+        for failure in failures:
+            self._log_loop_exception(
+                "cleanup_failed",
+                failure,
+                generation=generation,
+                cause_diagnostics=primary_failure,
+            )
         self._raise_cleanup_failures("peer owned runtime teardown failed", failures)
 
     def _commit_provider_attachment(
@@ -2039,23 +2346,38 @@ class PeerCaptureSessionOwner:
         exc: BaseException,
         *,
         generation: int,
+        cause_diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
-        exception_class = type(exc).__name__
-        if not (
-            0 < len(exception_class) <= 128
-            and all(
-                character.isascii() and (character.isalnum() or character == "_")
-                for character in exception_class
-            )
-        ):
-            exception_class = "UnknownError"
-        with contextlib.suppress(Exception):
-            logger.error(
-                "[PeerRuntime] %s channel=peer generation=%s exception_class=%s",
-                event,
-                generation,
-                exception_class,
-            )
+        if isinstance(exc, ExceptionGroup):
+            for member in exc.exceptions:
+                self._log_loop_exception(
+                    event, member, generation=generation, cause_diagnostics=cause_diagnostics
+                )
+            return
+        diagnostics = stt_failure_report(
+            exc,
+            provider="stt",
+            channel="peer",
+            operation="cleanup" if event == "cleanup_failed" else "source_read",
+        ).diagnostics
+        diagnostics = replace(
+            diagnostics,
+            component="capture.peer",
+            generation=generation,
+            code=(
+                "capture.peer.cleanup_failed"
+                if event == "cleanup_failed"
+                else "capture.peer.peer_runtime_failed"
+            ),
+            cause_id=cause_diagnostics.diagnostic_id if cause_diagnostics is not None else None,
+        )
+        emit_failure(
+            logger,
+            diagnostics,
+            severity="warning" if event == "cleanup_failed" else "error",
+            disposition="degraded" if event == "cleanup_failed" else "failed",
+            stage=diagnostics.operation,
+        )
 
     def _on_loop_task_done(self, task: asyncio.Task[None], *, generation: int) -> None:
         if not task.cancelled():
@@ -2063,7 +2385,7 @@ class PeerCaptureSessionOwner:
                 exc = task.exception()
             except asyncio.CancelledError:
                 exc = None
-            if exc is not None:
+            if exc is not None and task not in self._deferred_loop_diagnostics:
                 self._log_loop_exception("loop_failed", exc, generation=generation)
         diagnostic = self._deferred_loop_diagnostics.pop(task, None)
         if diagnostic is not None:
@@ -2241,6 +2563,18 @@ class PeerCaptureSessionOwner:
         if isinstance(exc, (ProcessAudioCaptureSetupError, ProcessAudioCaptureUnavailableError)):
             return PeerRuntimeFailureReason.PROCESS_SETUP_FAILED
         return PeerRuntimeFailureReason.PROCESS_SETUP_FAILED
+
+    @staticmethod
+    def _terminal_diagnostics_from_source(source: object) -> ErrorDiagnostics | None:
+        current = source
+        for _ in range(4):
+            diagnostics = getattr(current, "terminal_diagnostics", None)
+            if isinstance(diagnostics, ErrorDiagnostics):
+                return diagnostics
+            current = getattr(current, "source", None)
+            if current is None:
+                return None
+        return None
 
     @staticmethod
     def _terminal_reason_from_source(source: object) -> str | None:

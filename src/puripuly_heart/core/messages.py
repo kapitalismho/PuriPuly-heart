@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from types import MappingProxyType
 from typing import Final, Literal, TypeAlias
+from uuid import uuid4
 
 SafeMessageParam: TypeAlias = str | int | float | bool | None
 DiagnosticFieldValue: TypeAlias = str | int | float | bool | None
@@ -181,6 +183,18 @@ class ErrorDiagnostics:
     status_code: int | None
     retry_after_ms: int | None
     fields: Mapping[str, DiagnosticFieldValue]
+    diagnostic_id: str = field(default_factory=lambda: uuid4().hex)
+    occurred_at: str | None = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+    )
+    cause_id: str | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
+    channel: str | None = None
+    turn_id: str | None = None
+    generation: int | None = None
+    rejected_fields: int = 0
+    detail_truncated: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "fields", _freeze_safe_mapping(self.fields))
@@ -201,6 +215,16 @@ class RuntimeApplyResult:
     status: RuntimeApplyStatus
     message: UserMessageRef | None
     diagnostics: ErrorDiagnostics | None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+    def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +232,16 @@ class TransactionResult:
     status: TransactionStatus
     message: UserMessageRef | None
     diagnostics: ErrorDiagnostics | None
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+
+    def __post_init__(self) -> None:
+        excess = max(0, len(self.secondary_diagnostics) - 4)
+        if excess:
+            object.__setattr__(self, "secondary_diagnostics", self.secondary_diagnostics[:4])
+            object.__setattr__(
+                self, "secondary_omitted_count", self.secondary_omitted_count + excess
+            )
 
 
 __all__ = [

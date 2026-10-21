@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 import flet as ft
 
+from puripuly_heart.core.qq_auth_diagnostics import log_qq_auth
 from puripuly_heart.ui.components.warm_document_dialog import (
     WarmDocumentDialogAction,
     WarmDocumentDialogResult,
@@ -152,7 +153,10 @@ class QqManagedAuthDialog:
         if self._body_text is not None:
             self._body_text.value = join_body_paragraphs(split_body_paragraphs(t("qq_auth.body")))
         if self._dialog_result is not None:
-            buttons = self._dialog_result.set_actions(self._entry_actions())
+            resume = message_key.endswith((".recovery_pending", ".delivery_ack_pending"))
+            buttons = self._dialog_result.set_actions(
+                self._entry_actions("qq_auth.resume" if resume else "qq_auth.retry")
+            )
             self._chatgpt_button, self._continue_button = buttons[0:2]
             self._cancel_button = None
         self._set_error_key(message_key, **message_kwargs)
@@ -163,6 +167,7 @@ class QqManagedAuthDialog:
             return
         self._page.pop_dialog()
         self._is_open = False
+        self._is_waiting = False
 
     def _build_text_field(
         self,
@@ -186,7 +191,10 @@ class QqManagedAuthDialog:
         )
 
     def _submit(self) -> None:
+        if not self._is_open or self._is_waiting:
+            return
         if not self._validate_inputs():
+            log_qq_auth("preflight", "invalid_input")
             self._set_error_key("qq_auth.error.invalid_input")
             self._update_page_if_possible()
             return
@@ -204,7 +212,7 @@ class QqManagedAuthDialog:
             return False
         return True
 
-    def _entry_actions(self) -> list[WarmDocumentDialogAction]:
+    def _entry_actions(self, submit_key: str = "qq_auth.submit") -> list[WarmDocumentDialogAction]:
         return [
             WarmDocumentDialogAction(
                 label=t("openrouter.handoff.chatgpt"),
@@ -212,7 +220,7 @@ class QqManagedAuthDialog:
                 close_before_action=False,
             ),
             WarmDocumentDialogAction(
-                label=t("qq_auth.submit"),
+                label=t(submit_key),
                 on_select=self._submit,
                 close_before_action=False,
             ),

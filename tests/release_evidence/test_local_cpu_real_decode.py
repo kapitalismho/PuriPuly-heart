@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import wave
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -55,6 +56,7 @@ async def test_decode_case_uses_backend_final_and_measured_timing(
     audio_root = tmp_path
     _write_wav(audio_root / "parakeet-v3-en.wav", np.linspace(-0.2, 0.2, 16000, dtype=np.float32))
     sent: list[np.ndarray] = []
+    closed: list[str] = []
 
     class Session:
         async def send_audio_f32(self, samples: np.ndarray) -> None:
@@ -67,7 +69,7 @@ async def test_decode_case_uses_backend_final_and_measured_timing(
             yield STTBackendTranscriptEvent(text="hello", is_final=True)
 
         async def close(self) -> None:
-            return None
+            closed.append("session")
 
     class Backend:
         provider_id = "local_parakeet_v3"
@@ -76,7 +78,7 @@ async def test_decode_case_uses_backend_final_and_measured_timing(
             return Session()
 
         async def close(self) -> None:
-            return None
+            closed.append("backend")
 
     monkeypatch.setattr(evidence, "create_local_cpu_backend", lambda *_args, **_kwargs: Backend())
     result = await evidence._decode_case(
@@ -98,44 +100,76 @@ async def test_decode_case_uses_backend_final_and_measured_timing(
         result["attempt"]["decode_seconds"] / result["attempt"]["audio_seconds"]
     )
     assert sent and sent[0].size == 16000
+    assert closed == ["session", "backend"]
 
 
 @pytest.mark.asyncio
-async def test_decode_case_fails_when_backend_returns_empty_final(
+@pytest.mark.parametrize("failure_stage", ["open_session", "send_audio", "empty_final"])
+async def test_decode_failure_report_closes_every_acquired_resource(
     tmp_path: Path,
     monkeypatch,
+    failure_stage: str,
 ) -> None:
     _write_wav(tmp_path / "parakeet-v3-en.wav", np.ones(1600, dtype=np.float32))
+    reached: list[str] = []
+    closed: list[str] = []
 
     class Session:
         async def send_audio_f32(self, _samples: np.ndarray) -> None:
-            return None
+            reached.append("send_audio")
+            if failure_stage == "send_audio":
+                raise RuntimeError("synthetic audio send failed")
 
         async def on_speech_end(self, **_kwargs) -> None:
             return None
 
         async def events(self):
+            reached.append("empty_final")
             yield STTBackendTranscriptEvent(text="", is_final=True)
 
         async def close(self) -> None:
-            return None
+            closed.append("session")
 
     class Backend:
         provider_id = "local_parakeet_v3"
 
         async def open_session(self, **_kwargs) -> Session:
+            reached.append("open_session")
+            if failure_stage == "open_session":
+                raise RuntimeError("synthetic session open failed")
             return Session()
 
         async def close(self) -> None:
-            return None
+            closed.append("backend")
 
     monkeypatch.setattr(evidence, "create_local_cpu_backend", lambda *_args, **_kwargs: Backend())
-    with pytest.raises(RuntimeError):
-        await evidence._decode_case(
-            evidence.DECODE_CASES[0],
-            model_root=tmp_path / "models",
-            audio_root=tmp_path,
-        )
+    monkeypatch.setattr(
+        evidence,
+        "inspect_required_cpu_model_installs",
+        lambda *_args, **_kwargs: SimpleNamespace(cpu_auto_available=True, models=()),
+    )
+    monkeypatch.setattr(evidence, "DECODE_CASES", evidence.DECODE_CASES[:1])
+    report_path = tmp_path / "report.json"
+
+    exit_code = await evidence.run_evidence(
+        model_root=tmp_path / "models",
+        audio_root=tmp_path,
+        report_path=report_path,
+    )
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert reached[-1] == failure_stage
+    assert closed == (["backend"] if failure_stage == "open_session" else ["session", "backend"])
+    assert exit_code == 1
+    assert report["schema"] == evidence.REPORT_SCHEMA
+    assert report["status"] == "failed"
+    assert report["failure_type"] == "RuntimeError"
+    expected_failure = {
+        "open_session": "synthetic session open failed",
+        "send_audio": "synthetic audio send failed",
+        "empty_final": "real local CPU decode did not produce a nonempty final result",
+    }
+    assert report["failure"] == expected_failure[failure_stage]
 
 
 @pytest.mark.asyncio

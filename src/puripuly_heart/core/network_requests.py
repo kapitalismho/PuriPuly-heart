@@ -55,7 +55,9 @@ class ExternalRequestsSession(requests.Session):
         if route.url and not prepared_request.url.startswith("https:"):
             username, password = get_auth_from_url(route.url)
             if username and password:
-                prepared_request.headers["Proxy-Authorization"] = _basic_auth_str(username, password)
+                prepared_request.headers["Proxy-Authorization"] = _basic_auth_str(
+                    username, password
+                )
         return {"all": route.url} if route.url else {}
 
     def send(self, request, **kwargs: Any):

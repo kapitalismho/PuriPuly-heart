@@ -31,7 +31,7 @@
   #error MyAppDataDirName must be one safe LocalApplicationData child directory name without traversal, roots, or separators.
 #endif
 #define MyAppDataRoot "{localappdata}\" + MyAppDataDirName
-#define MyAppVersion "2.8.2"
+#define MyAppVersion "2.9.0"
 #define MyAppPublisher "salee"
 #define MyAppURL "https://github.com/kapitalismho/PuriPuly-heart"
 #ifndef MyAppExeName
@@ -71,7 +71,7 @@
 #define ParakeetJapaneseManifestRelativePath PackagedApplicationRoot + "puripuly_heart\data\models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa.manifest.json"
 
 #define InstallerPrivacyDir "installer\privacy"
-#define CanonicalSettingsVersion 51
+#define CanonicalSettingsVersion 53
 #ifdef InstallerSmokeAppDataRoot
   #if (Len(InstallerSmokeAppDataRoot) < 3) || (Copy(InstallerSmokeAppDataRoot, 2, 2) != ":/")
     #error InstallerSmokeAppDataRoot must be an absolute drive path using forward slashes
@@ -154,11 +154,11 @@ chinesesimplified.LocalSttDownloadTitle=正在下载 ASR 模型
 chinesesimplified.LocalSttDownloadDescription=
 chinesetraditional.LocalSttDownloadTitle=正在下載 ASR 模型
 chinesetraditional.LocalSttDownloadDescription=
-english.LocalSttDownloadFailed=ASR model download failed from both Hugging Face and ModelScope. Installation cannot complete.
-korean.LocalSttDownloadFailed=Hugging Face와 ModelScope 모두에서 ASR 모델 다운로드에 실패했습니다. 설치를 완료할 수 없습니다.
-japanese.LocalSttDownloadFailed=Hugging Face と ModelScope の両方でASRモデルのダウンロードに失敗しました。インストールを完了できません。
-chinesesimplified.LocalSttDownloadFailed=从 Hugging Face 和 ModelScope 下载 ASR 模型均失败。无法完成安装。
-chinesetraditional.LocalSttDownloadFailed=從 Hugging Face 和 ModelScope 下載 ASR 模型均失敗。無法完成安裝。
+english.LocalSttDownloadFailed=Required ASR model download or verification failed. Installation cannot complete.
+korean.LocalSttDownloadFailed=필수 ASR 모델 다운로드 또는 검증에 실패했습니다. 설치를 완료할 수 없습니다.
+japanese.LocalSttDownloadFailed=必須ASRモデルのダウンロードまたは検証に失敗しました。インストールを完了できません。
+chinesesimplified.LocalSttDownloadFailed=必需的 ASR 模型下载或验证失败。无法完成安装。
+chinesetraditional.LocalSttDownloadFailed=必要的 ASR 模型下載或驗證失敗。無法完成安裝。
 english.AsrModelsGroup=ASR Models
 english.RedownloadAsrTask=Re-download ASR models
 english.LocalSttRedownloadSize=Re-downloading ASR models.%nInstallation requires %1 of disk space.
@@ -263,9 +263,10 @@ var
   LocalSttDisplayedDownloadBytes: Int64;
   LocalSttCurrentFileExpectedBytes: Int64;
   LocalSttCurrentFileLabel: String;
+  LocalSttProgressFailed: Boolean;
 
 const
-  QwenDownloadSize = 987664355;
+  QwenDownloadSize = 987015347;
   ParakeetV3DownloadSize = 670478772;
   ParakeetJapaneseDownloadSize = 655571161;
   LocalSttDiskSpaceMargin = 67108864;
@@ -454,7 +455,7 @@ end;
 
 function HuggingFaceLocalSttUrl(RelativePath: String): String;
 begin
-  Result := 'https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/2cc50d1abfe4d4f2df8d71f536d108bb40f943d2/' + RelativePath;
+  Result := 'https://huggingface.co/csukuangfj2/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25/resolve/68818b2313fe77bd06f6a7c5068ff3ef59d02b8a/' + RelativePath;
 end;
 
 function ModelScopeLocalSttRemotePath(RelativePath: String): String;
@@ -471,7 +472,7 @@ end;
 
 function ModelScopeLocalSttUrl(RelativePath: String): String;
 begin
-  Result := 'https://www.modelscope.cn/api/v1/models/zengshuishui/Qwen3-ASR-onnx/repo?Revision=c69fb1666ccb59a82c09840c511a6c894e6a2482&FilePath=' + ModelScopeLocalSttRemotePath(RelativePath);
+  Result := 'https://www.modelscope.cn/api/v1/models/zengshuishui/Qwen3-ASR-onnx/repo?Revision=de9e449eb376dcb472c1ce8141fbae8d524fabbd&FilePath=' + ModelScopeLocalSttRemotePath(RelativePath);
 end;
 
 function LocalSttDownloadUrl(SourceName: String; RelativePath: String): String;
@@ -486,9 +487,19 @@ end;
 function LocalSttSourceRevision(SourceName: String): String;
 begin
   if SourceName = 'modelscope' then begin
-    Result := 'c69fb1666ccb59a82c09840c511a6c894e6a2482';
+    Result := 'de9e449eb376dcb472c1ce8141fbae8d524fabbd';
   end else begin
-    Result := '2cc50d1abfe4d4f2df8d71f536d108bb40f943d2';
+    Result := '68818b2313fe77bd06f6a7c5068ff3ef59d02b8a';
+  end;
+end;
+
+function PreferredLocalSttSource(ChineseSource: String): String;
+begin
+  if (ActiveLanguage = 'chinesesimplified') or
+     (ActiveLanguage = 'chinesetraditional') then begin
+    Result := ChineseSource;
+  end else begin
+    Result := 'huggingface';
   end;
 end;
 
@@ -558,7 +569,7 @@ function ValidateLocalSttAssets(BaseDir: String): Boolean;
 begin
   Result :=
     ValidateLocalSttAsset(BaseDir, 'conv_frontend.onnx', 'd22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e', 44148281) and
-    ValidateLocalSttAsset(BaseDir, 'decoder.int8.onnx', '61e5f8249f9e7c82d5e01e1938c79fb3f5b3135f91664928033029e42451bd18', 756563239) and
+    ValidateLocalSttAsset(BaseDir, 'decoder.int8.onnx', '4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771', 755914231) and
     ValidateLocalSttAsset(BaseDir, 'encoder.int8.onnx', '60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9', 182491662) and
     ValidateLocalSttAsset(BaseDir, 'tokenizer\merges.txt', '8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5', 1671853) and
     ValidateLocalSttAsset(BaseDir, 'tokenizer\tokenizer_config.json', '4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c', 12487) and
@@ -658,50 +669,63 @@ var
   OverallBytes: Int64;
   ProgressPosition: Integer;
 begin
-  CurrentBytes := Progress;
-  if CurrentBytes > LocalSttCurrentFileExpectedBytes then begin
-    CurrentBytes := LocalSttCurrentFileExpectedBytes;
-  end;
-  OverallBytes := LocalSttCompletedDownloadBytes + CurrentBytes;
-  if OverallBytes > LocalSttDisplayedDownloadBytes then begin
-    LocalSttDisplayedDownloadBytes := OverallBytes;
-  end;
-  if LocalSttRequiredDownloadBytes > 0 then begin
-    ProgressPosition := (LocalSttDisplayedDownloadBytes * 10000) div LocalSttRequiredDownloadBytes;
-    if ProgressPosition > 10000 then begin
-      ProgressPosition := 10000;
+  try
+    CurrentBytes := Progress;
+    if CurrentBytes > LocalSttCurrentFileExpectedBytes then begin
+      CurrentBytes := LocalSttCurrentFileExpectedBytes;
     end;
-    DownloadPage.SetProgress(ProgressPosition, 10000);
+    OverallBytes := LocalSttCompletedDownloadBytes + CurrentBytes;
+    if OverallBytes > LocalSttDisplayedDownloadBytes then begin
+      LocalSttDisplayedDownloadBytes := OverallBytes;
+    end;
+    if LocalSttRequiredDownloadBytes > 0 then begin
+      ProgressPosition := (LocalSttDisplayedDownloadBytes * 10000) div LocalSttRequiredDownloadBytes;
+      if ProgressPosition > 10000 then begin
+        ProgressPosition := 10000;
+      end;
+      DownloadPage.SetProgress(ProgressPosition, 10000);
+    end;
+    DownloadPage.SetText(
+      LocalSttCurrentFileLabel,
+      FormatByteSize(LocalSttDisplayedDownloadBytes) + ' / ' + FormatByteSize(LocalSttRequiredDownloadBytes)
+    );
+    Result := not DownloadPage.AbortedByUser;
+  except
+    LocalSttProgressFailed := True;
+    RaiseException(GetExceptionMessage);
   end;
-  DownloadPage.SetText(
-    LocalSttCurrentFileLabel,
-    FormatByteSize(LocalSttDisplayedDownloadBytes) + ' / ' + FormatByteSize(LocalSttRequiredDownloadBytes)
-  );
-  Result := not DownloadPage.AbortedByUser;
 end;
 
 function DownloadLocalSttFile(Url: String; BaseName: String; Sha256: String; ExpectedSize: Int64; DisplayName: String): Boolean;
 begin
   Result := False;
+  if DownloadPage.AbortedByUser then begin
+    exit;
+  end;
+  LocalSttProgressFailed := False;
   LocalSttCurrentFileExpectedBytes := ExpectedSize;
   LocalSttCurrentFileLabel := DisplayName;
   try
     DownloadTemporaryFile(Url, BaseName, Sha256, @DownloadLocalSttProgress);
-    LocalSttCompletedDownloadBytes := LocalSttCompletedDownloadBytes + ExpectedSize;
-    if LocalSttCompletedDownloadBytes > LocalSttDisplayedDownloadBytes then begin
-      LocalSttDisplayedDownloadBytes := LocalSttCompletedDownloadBytes;
-    end;
-    Result := True;
   except
+    if LocalSttProgressFailed then begin
+      RaiseException(GetExceptionMessage);
+    end;
     Log('Local STT asset download failed: ' + DisplayName + ': ' + GetExceptionMessage);
+    exit;
   end;
+  LocalSttCompletedDownloadBytes := LocalSttCompletedDownloadBytes + ExpectedSize;
+  if LocalSttCompletedDownloadBytes > LocalSttDisplayedDownloadBytes then begin
+    LocalSttDisplayedDownloadBytes := LocalSttCompletedDownloadBytes;
+  end;
+  Result := True;
 end;
 
 function DownloadLocalSttSourceFiles(SourceName: String): Boolean;
 begin
   Result :=
     DownloadLocalSttFile(LocalSttDownloadUrl(SourceName, 'conv_frontend.onnx'), 'qwen-conv_frontend.onnx', 'd22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e', 44148281, 'Qwen3 ASR - conv_frontend.onnx') and
-    DownloadLocalSttFile(LocalSttDownloadUrl(SourceName, 'decoder.int8.onnx'), 'qwen-decoder.int8.onnx', '61e5f8249f9e7c82d5e01e1938c79fb3f5b3135f91664928033029e42451bd18', 756563239, 'Qwen3 ASR - decoder.int8.onnx') and
+    DownloadLocalSttFile(LocalSttDownloadUrl(SourceName, 'decoder.int8.onnx'), 'qwen-decoder.int8.onnx', '4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771', 755914231, 'Qwen3 ASR - decoder.int8.onnx') and
     DownloadLocalSttFile(LocalSttDownloadUrl(SourceName, 'encoder.int8.onnx'), 'qwen-encoder.int8.onnx', '60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9', 182491662, 'Qwen3 ASR - encoder.int8.onnx') and
     DownloadLocalSttFile(LocalSttDownloadUrl(SourceName, 'tokenizer/merges.txt'), 'qwen-merges.txt', '8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5', 1671853, 'Qwen3 ASR - merges.txt') and
     DownloadLocalSttFile(LocalSttDownloadUrl(SourceName, 'tokenizer/tokenizer_config.json'), 'qwen-tokenizer_config.json', '4942d005604266809309cabc9f4e9cb89ce855d59b14681fdc0e1cc62ea26c4c', 12487, 'Qwen3 ASR - tokenizer_config.json') and
@@ -713,19 +737,24 @@ begin
   Result := AddBackslash(ResolveLocalSttAppDataRoot()) + 'models\parakeet-tdt-0.6b-v3-int8-sherpa';
 end;
 
-function ParakeetV3DownloadUrl(RelativePath: String): String;
+function ParakeetV3DownloadUrl(SourceName: String; RelativePath: String): String;
 begin
-  Result := 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/' + RelativePath;
+  if SourceName = 'hf_mirror' then begin
+    Result := 'https://hf-mirror.net/';
+  end else begin
+    Result := 'https://huggingface.co/';
+  end;
+  Result := Result + 'csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8/resolve/2bda32ec70b097a55adaa07d9a7173915b43cc78/' + RelativePath;
 end;
 
-function ExpectedParakeetV3InstalledManifest(): String;
+function ExpectedParakeetV3InstalledManifest(SourceName: String): String;
 begin
   Result := '{' + #13#10 +
     '  "manifest_version": 1,' + #13#10 +
     '  "model_id": "parakeet-tdt-0.6b-v3-int8-sherpa",' + #13#10 +
     '  "engine": "sherpa-onnx",' + #13#10 +
     '  "install_dirname": "parakeet-tdt-0.6b-v3-int8-sherpa",' + #13#10 +
-    '  "selected_source": "huggingface",' + #13#10 +
+    '  "selected_source": "' + SourceName + '",' + #13#10 +
     '  "selected_revision": "2bda32ec70b097a55adaa07d9a7173915b43cc78"' + #13#10 +
     '}';
 end;
@@ -735,7 +764,8 @@ var
   ManifestText: AnsiString;
 begin
   Result := LoadStringFromFile(AddBackslash(BaseDir) + 'installed-manifest.json', ManifestText) and
-    (ManifestText = ExpectedParakeetV3InstalledManifest());
+    ((ManifestText = ExpectedParakeetV3InstalledManifest('huggingface')) or
+     (ManifestText = ExpectedParakeetV3InstalledManifest('hf_mirror')));
 end;
 
 function ValidateParakeetV3Assets(BaseDir: String): Boolean;
@@ -752,36 +782,52 @@ begin
   Result := ValidateParakeetV3Assets(BaseDir) and ValidateParakeetV3InstalledManifest(BaseDir);
 end;
 
-function DownloadParakeetV3(): Boolean;
+function DownloadParakeetV3(SourceName: String; var SourceFailed: Boolean): Boolean;
 var
   StagingDir: String;
 begin
   Result := False;
-  StagingDir := GetParakeetV3InstallDir() + '.staging-huggingface';
+  SourceFailed := False;
+  StagingDir := GetParakeetV3InstallDir() + '.staging-' + SourceName;
   DelTree(StagingDir, True, True, True);
-  ForceDirectories(StagingDir);
   try
-    if DownloadLocalSttFile(ParakeetV3DownloadUrl('decoder.int8.onnx'), 'parakeet-v3-decoder.int8.onnx', '179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e', 11845275, 'Parakeet v3 - decoder.int8.onnx') and
-       DownloadLocalSttFile(ParakeetV3DownloadUrl('encoder.int8.onnx'), 'parakeet-v3-encoder.int8.onnx', 'acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247', 652184281, 'Parakeet v3 - encoder.int8.onnx') and
-       DownloadLocalSttFile(ParakeetV3DownloadUrl('joiner.int8.onnx'), 'parakeet-v3-joiner.int8.onnx', '3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3', 6355277, 'Parakeet v3 - joiner.int8.onnx') and
-       DownloadLocalSttFile(ParakeetV3DownloadUrl('tokens.txt'), 'parakeet-v3-tokens.txt', 'd58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d', 93939, 'Parakeet v3 - tokens.txt') and
-       CopyLocalSttAsset(StagingDir, 'parakeet-v3-decoder.int8.onnx', 'decoder.int8.onnx') and
-       CopyLocalSttAsset(StagingDir, 'parakeet-v3-encoder.int8.onnx', 'encoder.int8.onnx') and
-       CopyLocalSttAsset(StagingDir, 'parakeet-v3-joiner.int8.onnx', 'joiner.int8.onnx') and
-       CopyLocalSttAsset(StagingDir, 'parakeet-v3-tokens.txt', 'tokens.txt') and
-       SaveStringToFile(AddBackslash(StagingDir) + 'installed-manifest.json', ExpectedParakeetV3InstalledManifest(), False) and
-       ValidateParakeetV3Install(StagingDir) then begin
-      Result := PromoteLocalSttInstallTo(StagingDir, GetParakeetV3InstallDir());
+    if not ForceDirectories(StagingDir) then begin
+      exit;
     end;
-  except
-    Log('Parakeet v3 download failed: ' + GetExceptionMessage);
-  end;
-  if not Result then begin
-    DelTree(StagingDir, True, True, True);
+    SourceFailed := not (
+      DownloadLocalSttFile(ParakeetV3DownloadUrl(SourceName, 'decoder.int8.onnx'), 'parakeet-v3-decoder.int8.onnx', '179e50c43d1a9de79c8a24149a2f9bac6eb5981823f2a2ed88d655b24248db4e', 11845275, 'Parakeet v3 - decoder.int8.onnx') and
+      DownloadLocalSttFile(ParakeetV3DownloadUrl(SourceName, 'encoder.int8.onnx'), 'parakeet-v3-encoder.int8.onnx', 'acfc2b4456377e15d04f0243af540b7fe7c992f8d898d751cf134c3a55fd2247', 652184281, 'Parakeet v3 - encoder.int8.onnx') and
+      DownloadLocalSttFile(ParakeetV3DownloadUrl(SourceName, 'joiner.int8.onnx'), 'parakeet-v3-joiner.int8.onnx', '3164c13fc2821009440d20fcb5fdc78bff28b4db2f8d0f0b329101719c0948b3', 6355277, 'Parakeet v3 - joiner.int8.onnx') and
+      DownloadLocalSttFile(ParakeetV3DownloadUrl(SourceName, 'tokens.txt'), 'parakeet-v3-tokens.txt', 'd58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d', 93939, 'Parakeet v3 - tokens.txt'));
+    if SourceFailed then begin
+      exit;
+    end;
+    if not (
+      CopyLocalSttAsset(StagingDir, 'parakeet-v3-decoder.int8.onnx', 'decoder.int8.onnx') and
+      CopyLocalSttAsset(StagingDir, 'parakeet-v3-encoder.int8.onnx', 'encoder.int8.onnx') and
+      CopyLocalSttAsset(StagingDir, 'parakeet-v3-joiner.int8.onnx', 'joiner.int8.onnx') and
+      CopyLocalSttAsset(StagingDir, 'parakeet-v3-tokens.txt', 'tokens.txt') and
+      SaveStringToFile(AddBackslash(StagingDir) + 'installed-manifest.json', ExpectedParakeetV3InstalledManifest(SourceName), False)) then begin
+      exit;
+    end;
+    SourceFailed := not ValidateParakeetV3Install(StagingDir);
+    if SourceFailed or DownloadPage.AbortedByUser then begin
+      exit;
+    end;
+    Result := PromoteLocalSttInstallTo(StagingDir, GetParakeetV3InstallDir());
+  finally
+    if not Result then begin
+      DelTree(StagingDir, True, True, True);
+    end;
   end;
 end;
 
 function RunParakeetV3LocalSttModelInstall(): Boolean;
+var
+  SourceName: String;
+  AlternateSource: String;
+  SourceFailed: Boolean;
+  DownloadStartBytes: Int64;
 begin
 #ifdef SkipLocalSttProvisioning
   Result := True;
@@ -791,7 +837,20 @@ begin
     Result := True;
     exit;
   end;
-  Result := DownloadParakeetV3();
+  SourceName := PreferredLocalSttSource('hf_mirror');
+  if SourceName = 'huggingface' then begin
+    AlternateSource := 'hf_mirror';
+  end else begin
+    AlternateSource := 'huggingface';
+  end;
+  DownloadStartBytes := LocalSttCompletedDownloadBytes;
+  Result := DownloadParakeetV3(SourceName, SourceFailed);
+  if Result or not SourceFailed or DownloadPage.AbortedByUser then begin
+    exit;
+  end;
+  Log('Parakeet v3 provisioning failed for ' + SourceName + '; trying ' + AlternateSource + '.');
+  LocalSttCompletedDownloadBytes := DownloadStartBytes;
+  Result := DownloadParakeetV3(AlternateSource, SourceFailed);
 end;
 
 function GetParakeetJapaneseInstallDir(): String;
@@ -799,19 +858,24 @@ begin
   Result := AddBackslash(ResolveLocalSttAppDataRoot()) + 'models\parakeet-tdt-ctc-0.6b-ja-int8-sherpa';
 end;
 
-function ParakeetJapaneseDownloadUrl(RelativePath: String): String;
+function ParakeetJapaneseDownloadUrl(SourceName: String; RelativePath: String): String;
 begin
-  Result := 'https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/' + RelativePath;
+  if SourceName = 'hf_mirror' then begin
+    Result := 'https://hf-mirror.net/';
+  end else begin
+    Result := 'https://huggingface.co/';
+  end;
+  Result := Result + 'csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/' + RelativePath;
 end;
 
-function ExpectedParakeetJapaneseInstalledManifest(): String;
+function ExpectedParakeetJapaneseInstalledManifest(SourceName: String): String;
 begin
   Result := '{' + #13#10 +
     '  "manifest_version": 1,' + #13#10 +
     '  "model_id": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",' + #13#10 +
     '  "engine": "sherpa-onnx",' + #13#10 +
     '  "install_dirname": "parakeet-tdt-ctc-0.6b-ja-int8-sherpa",' + #13#10 +
-    '  "selected_source": "huggingface",' + #13#10 +
+    '  "selected_source": "' + SourceName + '",' + #13#10 +
     '  "selected_revision": "bef18eb066808c90bd0f5df5be685767b0732de8"' + #13#10 +
     '}';
 end;
@@ -821,7 +885,8 @@ var
   ManifestText: AnsiString;
 begin
   Result := LoadStringFromFile(AddBackslash(BaseDir) + 'installed-manifest.json', ManifestText) and
-    (ManifestText = ExpectedParakeetJapaneseInstalledManifest());
+    ((ManifestText = ExpectedParakeetJapaneseInstalledManifest('huggingface')) or
+     (ManifestText = ExpectedParakeetJapaneseInstalledManifest('hf_mirror')));
 end;
 
 function ValidateParakeetJapaneseAssets(BaseDir: String): Boolean;
@@ -836,32 +901,48 @@ begin
   Result := ValidateParakeetJapaneseAssets(BaseDir) and ValidateParakeetJapaneseInstalledManifest(BaseDir);
 end;
 
-function DownloadParakeetJapanese(): Boolean;
+function DownloadParakeetJapanese(SourceName: String; var SourceFailed: Boolean): Boolean;
 var
   StagingDir: String;
 begin
   Result := False;
-  StagingDir := GetParakeetJapaneseInstallDir() + '.staging-huggingface';
+  SourceFailed := False;
+  StagingDir := GetParakeetJapaneseInstallDir() + '.staging-' + SourceName;
   DelTree(StagingDir, True, True, True);
-  ForceDirectories(StagingDir);
   try
-    if DownloadLocalSttFile(ParakeetJapaneseDownloadUrl('model.int8.onnx'), 'parakeet-ja-model.int8.onnx', '3addd00ef5bd1742078389e540b77394e4a508bdf2f4c9ad1b4a76d93e76598e', 655542604, 'Parakeet Japanese - model.int8.onnx') and
-       DownloadLocalSttFile(ParakeetJapaneseDownloadUrl('tokens.txt'), 'parakeet-ja-tokens.txt', '732f64c53909f2620c713f4106b487d92e6f54a6915b3cd3d1dbd32f9f4f392a', 28557, 'Parakeet Japanese - tokens.txt') and
-       CopyLocalSttAsset(StagingDir, 'parakeet-ja-model.int8.onnx', 'model.int8.onnx') and
-       CopyLocalSttAsset(StagingDir, 'parakeet-ja-tokens.txt', 'tokens.txt') and
-       SaveStringToFile(AddBackslash(StagingDir) + 'installed-manifest.json', ExpectedParakeetJapaneseInstalledManifest(), False) and
-       ValidateParakeetJapaneseInstall(StagingDir) then begin
-      Result := PromoteLocalSttInstallTo(StagingDir, GetParakeetJapaneseInstallDir());
+    if not ForceDirectories(StagingDir) then begin
+      exit;
     end;
-  except
-    Log('Parakeet Japanese download failed: ' + GetExceptionMessage);
-  end;
-  if not Result then begin
-    DelTree(StagingDir, True, True, True);
+    SourceFailed := not (
+      DownloadLocalSttFile(ParakeetJapaneseDownloadUrl(SourceName, 'model.int8.onnx'), 'parakeet-ja-model.int8.onnx', '3addd00ef5bd1742078389e540b77394e4a508bdf2f4c9ad1b4a76d93e76598e', 655542604, 'Parakeet Japanese - model.int8.onnx') and
+      DownloadLocalSttFile(ParakeetJapaneseDownloadUrl(SourceName, 'tokens.txt'), 'parakeet-ja-tokens.txt', '732f64c53909f2620c713f4106b487d92e6f54a6915b3cd3d1dbd32f9f4f392a', 28557, 'Parakeet Japanese - tokens.txt'));
+    if SourceFailed then begin
+      exit;
+    end;
+    if not (
+      CopyLocalSttAsset(StagingDir, 'parakeet-ja-model.int8.onnx', 'model.int8.onnx') and
+      CopyLocalSttAsset(StagingDir, 'parakeet-ja-tokens.txt', 'tokens.txt') and
+      SaveStringToFile(AddBackslash(StagingDir) + 'installed-manifest.json', ExpectedParakeetJapaneseInstalledManifest(SourceName), False)) then begin
+      exit;
+    end;
+    SourceFailed := not ValidateParakeetJapaneseInstall(StagingDir);
+    if SourceFailed or DownloadPage.AbortedByUser then begin
+      exit;
+    end;
+    Result := PromoteLocalSttInstallTo(StagingDir, GetParakeetJapaneseInstallDir());
+  finally
+    if not Result then begin
+      DelTree(StagingDir, True, True, True);
+    end;
   end;
 end;
 
 function RunParakeetJapaneseLocalSttModelInstall(): Boolean;
+var
+  SourceName: String;
+  AlternateSource: String;
+  SourceFailed: Boolean;
+  DownloadStartBytes: Int64;
 begin
 #ifdef SkipLocalSttProvisioning
   Result := True;
@@ -871,34 +952,59 @@ begin
     Result := True;
     exit;
   end;
-  Result := DownloadParakeetJapanese();
+  SourceName := PreferredLocalSttSource('hf_mirror');
+  if SourceName = 'huggingface' then begin
+    AlternateSource := 'hf_mirror';
+  end else begin
+    AlternateSource := 'huggingface';
+  end;
+  DownloadStartBytes := LocalSttCompletedDownloadBytes;
+  Result := DownloadParakeetJapanese(SourceName, SourceFailed);
+  if Result or not SourceFailed or DownloadPage.AbortedByUser then begin
+    exit;
+  end;
+  Log('Parakeet Japanese provisioning failed for ' + SourceName + '; trying ' + AlternateSource + '.');
+  LocalSttCompletedDownloadBytes := DownloadStartBytes;
+  Result := DownloadParakeetJapanese(AlternateSource, SourceFailed);
 end;
 
-function DownloadAndInstallLocalSttSource(SourceName: String): Boolean;
+function DownloadAndInstallLocalSttSource(SourceName: String; var SourceFailed: Boolean): Boolean;
 var
   StagingDir: String;
 begin
   Result := False;
+  SourceFailed := False;
   StagingDir := GetLocalSttInstallDir() + '.staging-' + SourceName;
   DelTree(StagingDir, True, True, True);
-  ForceDirectories(StagingDir);
   try
-    if DownloadLocalSttSourceFiles(SourceName) and
-       StageLocalSttDownloads(StagingDir) and
-       WriteLocalSttInstalledManifest(StagingDir, SourceName) and
-       ValidateLocalSttInstall(StagingDir) then begin
-      Result := PromoteLocalSttInstall(StagingDir);
+    if not ForceDirectories(StagingDir) then begin
+      exit;
     end;
-  except
-    Log('Local STT download failed for ' + SourceName + ': ' + GetExceptionMessage);
-  end;
-  if not Result then begin
-    DelTree(StagingDir, True, True, True);
+    SourceFailed := not DownloadLocalSttSourceFiles(SourceName);
+    if SourceFailed then begin
+      exit;
+    end;
+    if not (StageLocalSttDownloads(StagingDir) and
+      WriteLocalSttInstalledManifest(StagingDir, SourceName)) then begin
+      exit;
+    end;
+    SourceFailed := not ValidateLocalSttInstall(StagingDir);
+    if SourceFailed or DownloadPage.AbortedByUser then begin
+      exit;
+    end;
+    Result := PromoteLocalSttInstall(StagingDir);
+  finally
+    if not Result then begin
+      DelTree(StagingDir, True, True, True);
+    end;
   end;
 end;
 
 function RunLocalSttModelInstall(): Boolean;
 var
+  SourceName: String;
+  AlternateSource: String;
+  SourceFailed: Boolean;
   DownloadStartBytes: Int64;
 begin
 #ifdef SkipLocalSttProvisioning
@@ -913,19 +1019,26 @@ begin
     exit;
   end;
 
+  SourceName := PreferredLocalSttSource('modelscope');
+  if SourceName = 'huggingface' then begin
+    AlternateSource := 'modelscope';
+  end else begin
+    AlternateSource := 'huggingface';
+  end;
   DownloadStartBytes := LocalSttCompletedDownloadBytes;
-  if DownloadAndInstallLocalSttSource('huggingface') then begin
-    Log('Local STT provisioning completed successfully from Hugging Face.');
-    Result := True;
+  Result := DownloadAndInstallLocalSttSource(SourceName, SourceFailed);
+  if Result then begin
+    Log('Local STT provisioning completed successfully from ' + SourceName + '.');
     exit;
   end;
-
-  Log('Hugging Face local STT provisioning failed; trying ModelScope.');
-  LocalSttCompletedDownloadBytes := DownloadStartBytes;
-  if DownloadAndInstallLocalSttSource('modelscope') then begin
-    Log('Local STT provisioning completed successfully from ModelScope.');
-    Result := True;
+  if not SourceFailed or DownloadPage.AbortedByUser then begin
     exit;
+  end;
+  Log('Local STT provisioning failed for ' + SourceName + '; trying ' + AlternateSource + '.');
+  LocalSttCompletedDownloadBytes := DownloadStartBytes;
+  Result := DownloadAndInstallLocalSttSource(AlternateSource, SourceFailed);
+  if Result then begin
+    Log('Local STT provisioning completed successfully from ' + AlternateSource + '.');
   end;
 end;
 
@@ -1074,14 +1187,21 @@ begin
   LocalSttDisplayedDownloadBytes := 0;
   DownloadPage.SetProgress(0, 10000);
   DownloadPage.Show;
+  Result := False;
   try
     SegmentStart := LocalSttCompletedDownloadBytes;
   ParakeetV3Installed := RunParakeetV3LocalSttModelInstall();
+    if DownloadPage.AbortedByUser then begin
+      exit;
+    end;
     if ParakeetV3NeedsDownload then begin
       CompleteLocalSttDownloadSegment(SegmentStart, ParakeetV3DownloadSize);
     end;
     SegmentStart := LocalSttCompletedDownloadBytes;
   ParakeetJapaneseInstalled := RunParakeetJapaneseLocalSttModelInstall();
+    if DownloadPage.AbortedByUser then begin
+      exit;
+    end;
     if ParakeetJapaneseNeedsDownload then begin
       CompleteLocalSttDownloadSegment(SegmentStart, ParakeetJapaneseDownloadSize);
     end;
@@ -1091,6 +1211,9 @@ begin
   end else begin
     QwenInstalled := True;
   end;
+    if DownloadPage.AbortedByUser then begin
+      exit;
+    end;
     if QwenNeedsDownload then begin
       CompleteLocalSttDownloadSegment(SegmentStart, QwenDownloadSize);
     end;
@@ -1365,6 +1488,7 @@ begin
     exit;
   end;
   if not RunRequiredCpuLocalSttModelInstalls() then begin
-    Log('Local STT provisioning did not complete; continuing app install without bundled ASR model. The app can retry the local STT model download at runtime.');
+    Log('Local STT provisioning failed; stopping setup before app installation.');
+    Result := ExpandConstant('{cm:LocalSttDownloadFailed}');
   end;
 end;

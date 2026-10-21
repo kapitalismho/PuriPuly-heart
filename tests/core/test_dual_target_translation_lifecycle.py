@@ -10,8 +10,10 @@ from puripuly_heart.config.overlay_calibration import OverlayCalibration
 from puripuly_heart.core.clock import FakeClock
 from puripuly_heart.core.overlay.bridge import OverlayBridge
 from puripuly_heart.core.overlay.presenter import OverlayPresenter
+from puripuly_heart.core.vad.gating import SpeechEnd
 from puripuly_heart.domain.events import STTFinalEvent, UIEventType
 from puripuly_heart.domain.models import FinalLanguageRun, Transcript, Translation
+from tests.helpers.self_stream import until
 from tests.helpers.translation_owners import compose_translation_test_harness
 
 
@@ -97,8 +99,9 @@ class RecordingOsc:
     def enqueue(self, message: object) -> None:
         self.messages.append(message)
 
-    def send_immediate(self, _text: str) -> bool:
-        return True
+    def send_immediate(self, _text: str) -> tuple[bool, None]:
+
+        return True, None
 
     def send_typing(self, _is_typing: bool) -> None:
         return None
@@ -172,12 +175,12 @@ async def test_dual_target_turns_admit_in_order_and_execute_without_provider_bar
     )
 
     try:
-        first_parent = await harness.self_owner.submit_text("first source")
+        first_parent = (await harness.self_owner.submit_text("first source")).turn_id
         first_calls = [
             await asyncio.wait_for(provider.started.get(), timeout=1),
             await asyncio.wait_for(provider.started.get(), timeout=1),
         ]
-        second_parent = await harness.self_owner.submit_text("second source")
+        second_parent = (await harness.self_owner.submit_text("second source")).turn_id
         second_calls = [
             await asyncio.wait_for(provider.started.get(), timeout=1),
             await asyncio.wait_for(provider.started.get(), timeout=1),
@@ -241,7 +244,7 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
     )
 
     try:
-        parent_id = await harness.self_owner.submit_text("source text")
+        parent_id = (await harness.self_owner.submit_text("source text")).turn_id
         started = {
             await asyncio.wait_for(provider.started.get(), timeout=1),
             await asyncio.wait_for(provider.started.get(), timeout=1),
@@ -298,6 +301,56 @@ async def test_end_to_end_secondary_first_publishes_progressive_parent_snapshots
         for release in provider.releases.values():
             release.set()
         await harness.translation_turns.close()
+
+
+@pytest.mark.asyncio
+async def test_low_latency_primary_failure_keeps_secondary_in_chatbox_not_overlay() -> None:
+    provider = TargetControlledProvider(failed_targets={"zh-CN"})
+    osc = RecordingOsc()
+    presenter = OverlayPresenter(calibration=OverlayCalibration())
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=presenter,
+        source_language="en",
+        target_language="zh-CN",
+        self_target_languages=("zh-CN", "ja"),
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        chatbox_include_source=False,
+    )
+    source_id = uuid4()
+    try:
+        await harness.start()
+        await harness.self_owner.handle_vad_event(SpeechEnd(source_id))
+        await harness.dispatch_stt_event(
+            STTFinalEvent(source_id, Transcript(source_id, "source text", True))
+        )
+        started = {
+            await asyncio.wait_for(provider.started.get(), timeout=1),
+            await asyncio.wait_for(provider.started.get(), timeout=1),
+        }
+        assert started == {("source text", "zh-CN"), ("source text", "ja")}
+        provider.releases[("source text", "ja")].set()
+        await until(lambda: bool(osc.messages))
+        assert osc.messages[-1].text == "translated-ja"
+        assert presenter.snapshot().blocks[0].secondary_text == ""
+        provider.releases[("source text", "zh-CN")].set()
+        await asyncio.wait_for(harness.translation_turns.wait_for_idle(), timeout=2)
+        await until(
+            lambda: any(block.block_variant == "finalized" for block in presenter.snapshot().blocks)
+        )
+        block = presenter.snapshot().blocks[0]
+        assert block.primary_text == "source text"
+        assert block.secondary_text == ""
+        assert block.secondary_language is None
+        assert osc.messages[-1].text == "translated-ja"
+    finally:
+        for release in provider.releases.values():
+            release.set()
+        await harness.stop()
+        await presenter.close()
 
 
 @pytest.mark.asyncio
@@ -491,7 +544,7 @@ async def test_two_dual_target_parents_complete_secondary_first_through_stalled_
     )
 
     try:
-        first_parent = await harness.self_owner.submit_text("first parent")
+        first_parent = (await harness.self_owner.submit_text("first parent")).turn_id
         first_started = {
             await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
         }
@@ -510,7 +563,7 @@ async def test_two_dual_target_parents_complete_secondary_first_through_stalled_
         provider.releases[("first parent", "zh-CN")].set()
         await harness.translation_turns.wait_for_parent(first_parent)
 
-        second_parent = await harness.self_owner.submit_text("second parent")
+        second_parent = (await harness.self_owner.submit_text("second parent")).turn_id
         second_started = {
             await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
         }
@@ -602,7 +655,7 @@ async def test_overlapping_dual_target_parent_projects_ready_surfaces_before_cha
             await asyncio.sleep(0)
 
     try:
-        first_parent = await harness.self_owner.submit_text("first overlap")
+        first_parent = (await harness.self_owner.submit_text("first overlap")).turn_id
         first_started = {
             await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
         }
@@ -610,7 +663,7 @@ async def test_overlapping_dual_target_parent_projects_ready_surfaces_before_cha
             ("first overlap", "zh-CN"),
             ("first overlap", "ja"),
         }
-        second_parent = await harness.self_owner.submit_text("second overlap")
+        second_parent = (await harness.self_owner.submit_text("second overlap")).turn_id
         second_started = {
             await asyncio.wait_for(provider.started.get(), timeout=1) for _ in range(2)
         }
@@ -666,10 +719,10 @@ async def test_newer_transcript_visibility_suppresses_older_primary_latest_surfa
     )
 
     try:
-        older_parent_id = await harness.self_owner.submit_text("older source")
+        older_parent_id = (await harness.self_owner.submit_text("older source")).turn_id
         await asyncio.wait_for(provider.started.get(), timeout=1)
         await asyncio.wait_for(provider.started.get(), timeout=1)
-        newer_parent_id = await harness.self_owner.submit_text("newer source")
+        newer_parent_id = (await harness.self_owner.submit_text("newer source")).turn_id
         await asyncio.wait_for(provider.started.get(), timeout=1)
         await asyncio.wait_for(provider.started.get(), timeout=1)
 

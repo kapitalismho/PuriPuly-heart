@@ -14,6 +14,7 @@ from puripuly_heart.app.ports import (
     settings_repository,
 )
 from puripuly_heart.core import messages
+from puripuly_heart.core.diagnostics import DiagnosticHistory
 
 SERVICE_MODULE = "puripuly_heart.app.services.openrouter_pkce_handoff"
 
@@ -26,6 +27,27 @@ FORBIDDEN_RAW_SECRET_VALUES = (
     RAW_PREVIOUS_SECRET,
     RAW_PROVIDER_PAYLOAD,
 )
+
+
+def _assert_retained_handoff(diagnostic: messages.ErrorDiagnostics, *, disposition: str) -> None:
+    history = DiagnosticHistory()
+    history.bind_instance("handoff-test-host")
+    record, fresh = history.retain(diagnostic, severity="error", disposition=disposition)
+    assert fresh
+    assert record["diagnostic_id"] == diagnostic.diagnostic_id
+    assert record["component"] == diagnostic.component
+    assert record["operation"] == diagnostic.operation
+    assert record["stage"] == diagnostic.operation
+    assert record["code"] == diagnostic.code
+    assert record["disposition"] == disposition
+    assert record["fields"]["phase"] == diagnostic.operation
+    assert record["detail"]["rejected_fields"] > 0
+    assert "secret_key" not in record["fields"]
+    assert "runtime_status" not in record["fields"]
+    _assert_no_raw_secret_values(record, label="retained handoff")
+    page = history.query({"diagnostic_id": diagnostic.diagnostic_id})
+    assert page["lookup"] == "found"
+    assert page["records"] == [record]
 
 
 class RecordingProviderVerifier:
@@ -749,6 +771,7 @@ async def test_verification_failures_short_circuit_secret_settings_and_runtime(
     assert result.diagnostics.component == "openrouter_pkce_handoff"
     assert result.diagnostics.operation == "verify_transient_key"
     assert result.diagnostics.code == expected_code
+    _assert_retained_handoff(result.diagnostics, disposition="failed")
     assert result.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
 
 
@@ -874,6 +897,7 @@ async def test_runtime_apply_non_applied_status_is_degraded_without_rollback(
     assert result.diagnostics.code == "runtime_apply_degraded"
     assert result.diagnostics.content_policy == messages.CONTENT_POLICY_METADATA_ONLY
     assert result.diagnostics.fields["runtime_status"] == runtime_status
+    _assert_retained_handoff(result.diagnostics, disposition="degraded")
 
 
 @pytest.mark.asyncio

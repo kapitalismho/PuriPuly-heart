@@ -12,6 +12,8 @@ import {
   markOperationActiveOnAck,
   findConflictingOperationDelivery,
   reconcileUnknownAttempt,
+  rejectUnboundQqOperation,
+  failManagedOperationTerminal,
   startManagedOperationAttempt,
   transitionManagedOperation,
   type ManagedOperationAttemptRecord,
@@ -110,6 +112,7 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
   if (!authenticated.ok) {
     return c.json({ ok: false, code: 'invalid_request', message: 'unknown operation' }, 404);
   }
+  authenticated.operation = await rejectUnboundQqOperation(db, authenticated.operation, now);
   if (authenticated.operation.state === 'FAILED') {
     return c.json(await resumeStateBody(db, authenticated.operation));
   }
@@ -166,13 +169,14 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
     }
     await transitionManagedOperation(db, operation.operation_id, 'CREATE_UNKNOWN', now, {
       from: ['DELIVERY_PENDING'],
+      attemptIndex: operation.current_attempt_index,
     });
     const afterStale = await getManagedOperation(db, operation.operation_id);
     if (afterStale) {
       operation = afterStale;
     }
     if (operation.state === 'CREATE_UNKNOWN') {
-      const reconciled = await reconcileUnknownAttempt(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, operation, now);
+      const reconciled = await reconcileUnknownAttempt(db, c.env.OPENROUTER_MANAGEMENT_API_KEY, { ...operation, current_attempt_index: auth.operation.current_attempt_index }, now);
       if (reconciled) {
         operation = reconciled;
       }
@@ -192,15 +196,12 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
       operation.hardware_hash_salt_version === null ||
       !operation.app_version)
   ) {
-    return c.json(
-      {
-        ...(await resumeStateBody(db, operation)),
-        ok: false,
-        code: 'resume_issuance_unavailable',
-        message: 'operation predates durable issuance context; start a fresh managed issue',
-      },
-      409,
-    );
+    const terminal = (await failManagedOperationTerminal(db, operation, now, 'terminal_provider_failure')) ?? operation;
+    return c.json({
+      ...(await resumeStateBody(db, terminal)),
+      code: 'resume_issuance_unavailable',
+      message: 'operation predates durable issuance context; start fresh authentication after cleanup',
+    });
   }
   const started = await startManagedOperationAttempt(db, operation, now);
   if (!started.ok) {
@@ -208,6 +209,7 @@ export async function handleManagedOperationResume(c: Context<BrokerEnv>): Promi
     return c.json(await resumeStateBody(db, current));
   }
   const attempt: ManagedOperationAttemptRecord = started.attempt;
+  operation = { ...operation, current_attempt_index: attempt.attempt_index, attempt_count: attempt.attempt_index };
   const nowIso = now.toISOString();
   if (!hasLiveDelivery) {
     const latest = await getLatestOperationDelivery(db, operation.operation_id);

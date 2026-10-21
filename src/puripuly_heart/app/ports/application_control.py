@@ -5,6 +5,8 @@ from typing import Protocol
 
 
 class ApplicationControl(Protocol):
+    instance_id: str | None
+
     def bind_instance(self, instance_id: str) -> None: ...
     def freeze_ingress(self) -> None: ...
 
@@ -37,4 +39,5 @@ class ApplicationControl(Protocol):
         include_transcripts: bool = False,
         include_translations: bool = False,
         after: int | None = None,
+        cursor_instance_id: str | None = None,
     ) -> AsyncIterator[dict]: ...

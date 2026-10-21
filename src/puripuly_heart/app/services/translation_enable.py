@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 
@@ -73,9 +74,13 @@ class TranslationEnableOwner:
     founder_letter_sink: TranslationEnableFounderLetterSink
     teardown: TranslationEnableTeardown | None = None
     starting_sink: TranslationEnableStartingSink | None = None
+    mutation_settled: Callable[[], None] | None = None
     intent_enabled: bool = False
     generation: int = 0
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
+    _active_requests: dict[asyncio.Task | None, int] = field(
+        init=False, default_factory=dict, repr=False
+    )
 
     def record_intent(self, enabled: bool) -> int:
         self.intent_enabled = bool(enabled)
@@ -91,6 +96,31 @@ class TranslationEnableOwner:
 
     async def set_enabled(self, enabled: bool, *, allow_authorization: bool = True) -> bool:
         request_generation = self.record_intent(enabled)
+        task = asyncio.current_task()
+        self._active_requests[task] = request_generation
+        try:
+            return await self._apply_enabled(
+                enabled, request_generation, allow_authorization=allow_authorization
+            )
+        finally:
+            self._active_requests.pop(task, None)
+            if self.mutation_settled is not None:
+                self.mutation_settled()
+
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        generation = self._active_requests.get(task)
+        return generation == self.generation if generation is not None else None
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        return tuple(
+            self.intent_enabled
+            for generation in self._active_requests.values()
+            if generation == self.generation
+        )
+
+    async def _apply_enabled(
+        self, enabled: bool, request_generation: int, *, allow_authorization: bool
+    ) -> bool:
         if not enabled:
             self.pending_sink(False)
             self._publish_starting(False)
@@ -123,13 +153,21 @@ class TranslationEnableOwner:
             self.clear_context()
             self.runtime_sink(enabled)
             if enabled:
-                await self.warmup()
+                try:
+                    await self.warmup()
+                except BaseException:
+                    if self.intent_matches(enabled=True, generation=request_generation):
+                        self.runtime_sink(False)
+                        self.dashboard_sink(False)
+                    raise
+                if not self.intent_matches(enabled=True, generation=request_generation):
+                    return False
             else:
                 await self._teardown()
             applied = self.state_provider().translation_enabled
             if applied != previous_enabled:
                 self.log_basic("[Translation] Enabled" if applied else "[Translation] Disabled")
-            return applied
+            return applied == bool(enabled)
         finally:
             if self.generation == request_generation:
                 self._publish_starting(False)
@@ -181,6 +219,10 @@ class TranslationEnableOwner:
         if self.teardown is None:
             return
         await self.teardown()
+
+    def disable_for_provider_transition(self) -> None:
+        self.runtime_sink(False)
+        self.dashboard_sink(False)
 
     def disable_for_managed_exhaustion(self, *, reopen_founder_letter: bool) -> None:
         self.record_intent(False)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from base64 import urlsafe_b64encode
 from collections.abc import Callable
@@ -7,8 +8,10 @@ from dataclasses import dataclass
 
 from puripuly_heart.app.ports.managed_identity_state import ManagedIdentityStatePort
 from puripuly_heart.app.ports.secret_store import SecretStorePort
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.openrouter import managed_operation_identity
 
-MANAGED_OPERATION_ID_PREFIX = "ph-mop-v1_"
 MANAGED_OPERATION_SOURCE_DISCORD = "discord"
 MANAGED_OPERATION_SOURCE_QQ = "qq"
 MANAGED_OPERATION_RESUME_TOKEN_SECRET = "openrouter_managed_operation_resume_token"
@@ -60,15 +63,27 @@ class ManagedOperationIdentity:
 
 
 class ManagedOperationTokenStoreError(Exception):
-    pass
+    def __init__(self, message: str, diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.diagnostics = diagnostics
+        super().__init__(message)
+
+
+class ManagedOperationTokenReadError(Exception):
+    def __init__(self, diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.diagnostics = diagnostics
+        super().__init__("managed operation token observation failed")
 
 
 class ManagedOperationTokenClearError(Exception):
-    pass
+    def __init__(self, message: str, diagnostics: ErrorDiagnostics | None = None) -> None:
+        self.diagnostics = diagnostics
+        super().__init__(message)
 
 
 def new_managed_operation_id() -> str:
-    return MANAGED_OPERATION_ID_PREFIX + _unpadded_b64url(secrets.token_bytes(24))
+    return managed_operation_identity.MANAGED_OPERATION_ID_PREFIX + _unpadded_b64url(
+        secrets.token_bytes(24)
+    )
 
 
 def new_managed_operation_resume_token() -> str:
@@ -77,15 +92,6 @@ def new_managed_operation_resume_token() -> str:
 
 def _unpadded_b64url(raw: bytes) -> str:
     return urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-
-
-def is_valid_operation_id(value: object) -> bool:
-    if not isinstance(value, str) or not value.startswith(MANAGED_OPERATION_ID_PREFIX):
-        return False
-    suffix = value[len(MANAGED_OPERATION_ID_PREFIX) :]
-    if len(suffix) != 32:
-        return False
-    return all(character.isalnum() or character in "-_" for character in suffix)
 
 
 def is_valid_resume_token(value: object) -> bool:
@@ -103,7 +109,7 @@ def read_pending_operation(
     pending_source = getattr(managed_state, "pending_managed_operation_source", None)
     installation_id = getattr(managed_state, "pending_managed_operation_installation_id", None)
     if (
-        not is_valid_operation_id(operation_id)
+        not managed_operation_identity.is_valid_operation_id(operation_id)
         or pending_source != source
         or not isinstance(installation_id, str)
         or not installation_id.strip()
@@ -129,7 +135,7 @@ def read_any_pending_operation(
     pending_source = getattr(managed_state, "pending_managed_operation_source", None)
     installation_id = getattr(managed_state, "pending_managed_operation_installation_id", None)
     if (
-        not is_valid_operation_id(operation_id)
+        not managed_operation_identity.is_valid_operation_id(operation_id)
         or pending_source not in (MANAGED_OPERATION_SOURCE_DISCORD, MANAGED_OPERATION_SOURCE_QQ)
         or not isinstance(installation_id, str)
         or not installation_id.strip()
@@ -204,14 +210,30 @@ async def store_resume_token(
     except Exception as exc:
         raise ManagedOperationTokenStoreError("managed operation token store failed") from exc
     if not result.succeeded:
-        raise ManagedOperationTokenStoreError("managed operation token store failed")
+        raise ManagedOperationTokenStoreError(
+            "managed operation token store failed", result.diagnostics
+        )
 
 
 async def read_resume_token(secret_store: SecretStorePort) -> str | None:
     try:
         result = await secret_store.get_secret(MANAGED_OPERATION_RESUME_TOKEN_SECRET)
-    except Exception:
-        return None
+    except Exception as exc:
+        raise ManagedOperationTokenReadError(
+            ErrorDiagnostics(
+                component="managed_connection_auth",
+                operation="read_resume_token",
+                code="managed_operation_token_read_failed",
+                category="transaction",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields=safe_exception_fields(exc),
+            )
+        ) from exc
+    if result.diagnostics is not None:
+        raise ManagedOperationTokenReadError(result.diagnostics)
     value = result.value
     return value if is_valid_resume_token(value) else None
 
@@ -222,7 +244,9 @@ async def clear_resume_token(secret_store: SecretStorePort) -> None:
     except Exception as exc:
         raise ManagedOperationTokenClearError("managed operation token clear failed") from exc
     if not result.succeeded:
-        raise ManagedOperationTokenClearError("managed operation token clear failed")
+        raise ManagedOperationTokenClearError(
+            "managed operation token clear failed", result.diagnostics
+        )
 
 
 def status_poll_delay_ms(poll_index: int, base_interval_ms: int, max_interval_ms: int) -> int:
@@ -259,15 +283,33 @@ def emit_progress(sink: ProgressSink | None, phase: str) -> None:
         return
     try:
         sink(phase)
-    except Exception:
-        pass
+    except Exception as exc:
+        _observe_operation_failure("auth_notification", exc)
+
+
+def _observe_operation_failure(phase: str, exception: BaseException) -> None:
+    diagnostics = getattr(exception, "diagnostics", None)
+    if not isinstance(diagnostics, ErrorDiagnostics):
+        diagnostics = ErrorDiagnostics(
+            component="managed_connection_auth",
+            operation=phase,
+            code="managed_application_failed",
+            category="transaction",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={"phase": phase, **safe_exception_fields(exception)},
+        )
+    emit_failure(
+        logging.getLogger(__name__), diagnostics, severity="warning", disposition="degraded"
+    )
 
 
 __all__ = [
     "DEFAULT_MAX_STATUS_POLLS",
     "DEFAULT_MAX_STATUS_POLL_INTERVAL_MS",
     "DEFAULT_STATUS_POLL_INTERVAL_MS",
-    "MANAGED_OPERATION_ID_PREFIX",
     "MANAGED_OPERATION_MAX_CONSECUTIVE_PROBE_FAILURES",
     "MANAGED_OPERATION_RESUME_TOKEN_SECRET",
     "MANAGED_OPERATION_SOURCE_DISCORD",
@@ -284,7 +326,6 @@ __all__ = [
     "clear_pending_operation_if_source",
     "clear_resume_token",
     "emit_progress",
-    "is_valid_operation_id",
     "is_valid_resume_token",
     "managed_operation_ui_phase",
     "new_managed_operation_id",

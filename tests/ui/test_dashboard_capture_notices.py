@@ -119,3 +119,30 @@ def test_every_managed_gemma_status_renders_text_and_tone(status: str) -> None:
         assert notice.text == ("i18n:dashboard.managed_gemma_notice.downloading:percent=42")
     else:
         assert notice.text == f"i18n:{MANAGED_GEMMA_NOTICE_KEYS[status]}"
+
+
+@pytest.mark.parametrize(
+    ("gpu_only", "phase", "key"),
+    [
+        (True, "runtime", "dashboard.managed_gemma_notice.gpu_only_failed"),
+        (False, "runtime", "dashboard.managed_gemma_notice.failed"),
+        (True, "download", "dashboard.managed_gemma_notice.failed"),
+        (False, "download", "dashboard.managed_gemma_notice.failed"),
+        (True, "runtime_files", "dashboard.managed_gemma_notice.runtime_files_failed"),
+        (False, "runtime_files", "dashboard.managed_gemma_notice.runtime_files_failed"),
+    ],
+)
+def test_managed_failure_notice_uses_application_presentation_hint(
+    gpu_only: bool, phase: str, key: str
+) -> None:
+    notice = managed_gemma_capture_notice(
+        ManagedGemmaDashboardNotice(
+            status="failed",
+            backend="gpu",
+            gpu_only=gpu_only,
+            failure_phase=phase,
+        )
+    )
+    assert notice is not None
+    assert notice.tone == "error"
+    assert notice.text == f"i18n:{key}"

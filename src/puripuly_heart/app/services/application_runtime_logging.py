@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from puripuly_heart.app.ports.application_startup import ApplicationStartupDiagnostic
@@ -13,6 +13,7 @@ from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownStallDiagnostic,
 )
 from puripuly_heart.core.lifecycle import LifecycleScope
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime.logging import emit_safe_fallback_log
 
 
@@ -23,6 +24,7 @@ class ApplicationRuntimeLoggingOwner:
     fallback_logger: logging.Logger
     _service: Any | None = field(init=False, default=None, repr=False)
     control_event_sink: Callable[[dict[str, object]], None] | None = None
+    _instance_id: str | None = field(init=False, default=None, repr=False)
     _task_scope: LifecycleScope = field(
         init=False,
         default_factory=lambda: LifecycleScope("ApplicationRuntimeLoggingOwner"),
@@ -30,12 +32,19 @@ class ApplicationRuntimeLoggingOwner:
     )
     _ingress_stopped: bool = field(init=False, default=False, repr=False)
 
-    @property
-    def service(self) -> Any:
+    def _metadata_service(self) -> Any:
         if self._service is None:
             self._service = self.service_factory()
-        self.presentation.attach_runtime_log_sink(self._service)
+        self._service.configure_diagnostics(
+            instance_id=self._instance_id, event_sink=self.control_event_sink
+        )
         return self._service
+
+    @property
+    def service(self) -> Any:
+        service = self._metadata_service()
+        self.presentation.attach_runtime_log_sink(service)
+        return service
 
     @property
     def installed_service(self) -> Any | None:
@@ -55,11 +64,34 @@ class ApplicationRuntimeLoggingOwner:
         self.stop_ingress()
         await self._task_scope.close()
 
+    def bind_instance(self, instance_id: str) -> None:
+        self._instance_id = instance_id
+        self._metadata_service().configure_diagnostics(instance_id=instance_id)
+
+    def diagnostic_history(self, arguments: dict) -> dict:
+        return self._metadata_service().diagnostic_history(arguments)
+
+    def diagnostic_health(self) -> dict:
+        return self._metadata_service().diagnostic_health()
+
+    def emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
+        exception: BaseException | None = None,
+    ) -> dict:
+        return self._metadata_service().emit_failure(
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
+        )
+
     def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
-        if self.control_event_sink is not None:
-            self.control_event_sink(
-                {"topic": "logs", "level": logging.getLevelName(level).lower(), "kind": "basic"}
-            )
         try:
             self.service.emit_basic(message, level=level)
         except Exception:
@@ -79,6 +111,39 @@ class ApplicationRuntimeLoggingOwner:
         except Exception:
             return False
 
+    def _emit_exception(self, exception: BaseException, *, level: int) -> bool:
+        diagnostics = ErrorDiagnostics(
+            component="application_runtime_logging",
+            operation="emit",
+            code="unclassified_failure",
+            category="unknown",
+            visibility="diagnostic_only",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={},
+        )
+        try:
+            self.emit_failure(
+                diagnostics,
+                severity=(
+                    "error"
+                    if level >= logging.ERROR
+                    else "warning" if level >= logging.WARNING else "info"
+                ),
+                disposition="unknown",
+                stage="diagnostic",
+                exception=exception,
+            )
+            return True
+        except Exception:
+            return emit_safe_fallback_log(
+                self.fallback_logger,
+                "[Logging] diagnostic_unavailable",
+                level=level,
+                live=False,
+            )
+
     def emit_diagnostic(
         self,
         message: str,
@@ -86,23 +151,14 @@ class ApplicationRuntimeLoggingOwner:
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
-        rendered_message = message
-        if self.control_event_sink is not None:
-            self.control_event_sink(
-                {
-                    "topic": "logs",
-                    "level": logging.getLevelName(level).lower(),
-                    "kind": "diagnostic",
-                }
-            )
         if exception is not None:
-            rendered_message = f"{message} exception_type={type(exception).__name__}"
+            return self._emit_exception(exception, level=level)
         try:
-            return bool(self.service.emit_diagnostic(rendered_message, level=level))
+            return bool(self.service.emit_diagnostic(message, level=level))
         except Exception:
             return emit_safe_fallback_log(
                 self.fallback_logger,
-                rendered_message,
+                message,
                 level=level,
                 live=False,
             )
@@ -114,16 +170,14 @@ class ApplicationRuntimeLoggingOwner:
         level: int = logging.INFO,
         exception: BaseException | None = None,
     ) -> bool:
+        if exception is not None:
+            return self._emit_exception(exception, level=level)
         rendered_message: str | None = None
 
         def render_message() -> str:
             nonlocal rendered_message
             if rendered_message is None:
                 rendered_message = build_message()
-                if exception is not None:
-                    rendered_message = (
-                        f"{rendered_message} exception_type={type(exception).__name__}"
-                    )
             return rendered_message
 
         try:
@@ -197,6 +251,22 @@ class ApplicationRuntimeLoggingOwner:
             )
 
     def emit_startup_diagnostic(self, diagnostic: ApplicationStartupDiagnostic) -> None:
+        if diagnostic.diagnostics is not None:
+            owning = replace(
+                diagnostic.diagnostics,
+                fields={
+                    **diagnostic.diagnostics.fields,
+                    "attempt_id": diagnostic.attempt_id,
+                    "process_id": diagnostic.process_id,
+                    "monotonic_ns": diagnostic.monotonic_ns,
+                },
+            )
+            self.emit_failure(
+                owning,
+                severity="info" if diagnostic.outcome == "cancelled" else "error",
+                disposition="cancelled" if diagnostic.outcome == "cancelled" else "failed",
+            )
+            return
         service = self.service
         emit_boundary = getattr(service, "emit_startup_boundary", None)
         if callable(emit_boundary):
@@ -303,6 +373,11 @@ class ApplicationRuntimeLoggingOwner:
         self,
         diagnostic: ApplicationShutdownDiagnostic,
     ) -> None:
+        if diagnostic.diagnostics is not None:
+            self.emit_failure(diagnostic.diagnostics, disposition="failed", stage="cleanup")
+            if diagnostic.stall_diagnostic is not None:
+                self.emit_shutdown_stall_diagnostic(diagnostic.stall_diagnostic)
+            return
         message = (
             "[Lifecycle][Shutdown] callback_failed "
             f"phase={diagnostic.phase} "

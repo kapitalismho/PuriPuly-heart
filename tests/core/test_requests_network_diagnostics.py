@@ -40,29 +40,42 @@ def test_real_requests_certificate_failures_preserve_distinct_codes(tmp_path: Pa
             )
         )
 
-    ca = builder(issuer, ca_key).add_extension(
-        x509.BasicConstraints(ca=True, path_length=None), critical=True
-    ).add_extension(
-        x509.KeyUsage(
-            digital_signature=True, content_commitment=False, key_encipherment=False,
-            data_encipherment=False, key_agreement=False, key_cert_sign=True,
-            crl_sign=True, encipher_only=False, decipher_only=False,
-        ), critical=True
-    ).sign(ca_key, hashes.SHA256())
-    server_cert = builder(
-        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "wrong.example")]), server_key
-    ).add_extension(
-        x509.SubjectAlternativeName([x509.DNSName("wrong.example")]), critical=False
-    ).sign(ca_key, hashes.SHA256())
+    ca = (
+        builder(issuer, ca_key)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=True,
+                crl_sign=True,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(ca_key, hashes.SHA256())
+    )
+    server_cert = (
+        builder(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "wrong.example")]), server_key)
+        .add_extension(x509.SubjectAlternativeName([x509.DNSName("wrong.example")]), critical=False)
+        .sign(ca_key, hashes.SHA256())
+    )
     ca_path = tmp_path / "private-ca.pem"
     cert_path = tmp_path / "server.pem"
     key_path = tmp_path / "server-key.pem"
     ca_path.write_bytes(ca.public_bytes(serialization.Encoding.PEM))
     cert_path.write_bytes(server_cert.public_bytes(serialization.Encoding.PEM))
-    key_path.write_bytes(server_key.private_bytes(
-        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-        serialization.NoEncryption(),
-    ))
+    key_path.write_bytes(
+        server_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
@@ -84,13 +97,19 @@ def test_real_requests_certificate_failures_preserve_distinct_codes(tmp_path: Pa
             session.trust_env = False
             for verify in (True, str(ca_path)):
                 with pytest.raises(requests.exceptions.SSLError) as caught:
-                    session.get(f"https://localhost:{server.server_port}/", verify=verify, timeout=3)
+                    session.get(
+                        f"https://localhost:{server.server_port}/", verify=verify, timeout=3
+                    )
                 failure = caught.value
                 failure.connection_diagnostics = {
-                    "transport": "https", "tls_source": "requests_bundle" if verify is True else "explicit_file",
-                    "proxy_source": "direct", "tls_backend": "openssl",
+                    "transport": "https",
+                    "tls_source": "requests_bundle" if verify is True else "explicit_file",
+                    "proxy_source": "direct",
+                    "tls_backend": "openssl",
                 }
-                report = provider_failure_report(failure, provider="dashscope", operation="recognize")
+                report = provider_failure_report(
+                    failure, provider="dashscope", operation="recognize"
+                )
                 assert report.diagnostics.category == "network"
                 assert report.diagnostics.fields["tls_backend"] == "openssl"
                 assert "os_errno" not in report.diagnostics.fields

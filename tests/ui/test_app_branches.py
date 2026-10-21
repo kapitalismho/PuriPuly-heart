@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable
+from concurrent.futures import Future
 from dataclasses import replace
 from datetime import datetime as real_datetime
 from pathlib import Path
@@ -14,7 +15,6 @@ import pytest
 pytest.importorskip("flet")
 
 import flet as ft
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 import puripuly_heart.ui.app as app_module
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
@@ -39,6 +39,11 @@ from puripuly_heart.app.services.canonical_settings_persistence import (
 )
 from puripuly_heart.app.services.http_extension_registry import HttpExtensionRegistryService
 from puripuly_heart.app.services.telemetry_reporting import APP_ACTIVE_DAY_RETRY_DELAY_S
+from puripuly_heart.app.services.translation_enable import (
+    ManagedTranslationPreparation,
+    TranslationEnableOwner,
+    TranslationEnableState,
+)
 from puripuly_heart.app.services.ui_application import UiApplicationBoundary
 from puripuly_heart.composition.ui_application import compose_ui_application
 from puripuly_heart.config.provider_values import (
@@ -53,6 +58,7 @@ from puripuly_heart.core.lifecycle import SHUTDOWN_PHASE_CLOSE_PROVIDERS_OUTPUT_
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.app import TranslatorApp, _check_and_notify_update
+from puripuly_heart.ui.i18n import set_locale, t, t_for_locale
 from puripuly_heart.ui.presentation_adapter import FletUiPresentationAdapter
 from tests.helpers.ui_application import compose_test_ui_application_boundary
 
@@ -230,8 +236,18 @@ class DummyPage:
         self.dialog = None
         return control
 
-    def run_task(self, coro_fn) -> None:
-        self.tasks.append(coro_fn)
+    def run_task(self, coro_fn) -> Future:
+        handle = Future()
+
+        async def run():
+            try:
+                return await coro_fn()
+            finally:
+                if not handle.done():
+                    handle.set_result(None)
+
+        self.tasks.append(run)
+        return handle
 
     def update(self) -> None:
         self.updated += 1
@@ -250,16 +266,15 @@ class DummyContent:
         self.update_calls += 1
 
 
-class InlineMicrophoneTestSettingsView:
+class InlineAudioTestSettingsView:
     def __init__(self) -> None:
-        self.levels: list[float] = []
-        self.active_states: list[bool] = []
+        self.applied: list[tuple[str, float]] = []
 
-    def set_microphone_test_level(self, value: float) -> None:
-        self.levels.append(value)
+    def vad_thresholds(self) -> dict[str, float]:
+        return {"self": 0.4, "peer": 0.55}
 
-    def set_microphone_test_active(self, active: bool) -> None:
-        self.active_states.append(active)
+    def apply_vad_threshold(self, channel: str, value: float) -> None:
+        self.applied.append((channel, value))
 
 
 class RuntimeLoggingController:
@@ -772,6 +787,7 @@ class ConstructionDummyDashboardView(ft.Container):
         self.on_toggle_overlay = capture.toggle_overlay
         self.on_retry_peer_process_capture = capture.retry_peer_process_capture
         self.on_gpu_notice_action = capture.run_gpu_notice_action
+        self.on_managed_gemma_notice_action = capture.run_managed_gemma_notice_action
 
     def set_overlay_peer_contract(self, contract) -> None:
         self.overlay_peer_contract = contract
@@ -786,14 +802,13 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_settings_changed = None
         self.on_prompt_apply_settings = None
         self.on_providers_changed = None
-        self.on_start_microphone_test = None
+        self.on_start_audio_test = None
         self.on_request_openrouter_pkce = None
         self.on_verify_api_key = None
         self.on_secret_cleared = None
         self.on_local_llm_secret_changed = None
         self.on_desktop_overlay_lock_change = None
         self.on_desktop_overlay_size_change = None
-        self.on_stop_microphone_test = None
         self.on_desktop_overlay_recovery_action = None
         self.on_desktop_overlay_position_reset = None
         self.show_snackbar = None
@@ -814,7 +829,7 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_secret_cleared = provider.secret_cleared
         self.on_local_llm_secret_changed = provider.local_llm_secret_changed
         self.on_gpu_discovery_requested = provider.gpu_discovery_requested
-        self.on_start_microphone_test = general.start_microphone_test
+        self.on_start_audio_test = general.start_audio_test
         self.on_telemetry_enabled_change = general.telemetry_enabled_change
         self.on_list_loopback_capture_options = general.list_loopback_capture_options
         self.on_list_loopback_process_options = general.list_loopback_process_options
@@ -832,6 +847,9 @@ class ConstructionDummySettingsView(ft.Container):
         self.on_overlay_calibration_change = overlay.calibration_change
         self.on_overlay_calibration_apply = overlay.calibration_apply
         self.on_overlay_calibration_cancel = overlay.calibration_cancel
+
+    def bind_recent_language_queue(self, dashboard) -> None:
+        self.recent_language_dashboard = dashboard
 
     def set_overlay_runtime_state(self, *_args, **_kwargs) -> None:
         return None
@@ -897,7 +915,7 @@ def _patch_app_construction(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         app_module,
         "TitleBar",
-        lambda _page, *, on_close: ft.Container(data=on_close),
+        lambda _page, *, on_close, **_tools: ft.Container(data=on_close),
     )
     monkeypatch.setattr(app_module, "BottomNavBar", lambda on_change: ft.Container(data=on_change))
     monkeypatch.setattr(app_module, "get_app_theme", lambda **_kwargs: "theme")
@@ -937,9 +955,13 @@ def test_translator_app_init_builds_layout_and_wires_callbacks(
     assert app.view_dashboard.on_message_input_activity == app._on_message_input_activity
     assert app.view_dashboard.on_toggle_overlay == app._on_overlay_toggle
     assert app.view_dashboard.on_toggle_peer_translation == app._on_peer_translation_toggle
+    assert (
+        app.view_dashboard.on_managed_gemma_notice_action
+        == app.application.handle_managed_gemma_notice_action
+    )
     assert app.view_settings.on_verify_api_key == app._on_verify_api_key
     assert app.view_settings.on_prompt_apply_settings == app._on_prompt_apply_settings
-    assert app.view_settings.on_start_microphone_test == app._on_start_microphone_test
+    assert app.view_settings.on_start_audio_test == app._on_start_audio_test
     assert app.view_settings.on_desktop_overlay_lock_change == (app._on_desktop_overlay_lock_change)
     assert app.view_settings.on_desktop_overlay_size_change == (app._on_desktop_overlay_size_change)
     assert app.view_settings.on_desktop_overlay_recovery_action == (
@@ -1391,7 +1413,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
         "on_founder_letter",
         "on_local_qwen_hallucination_modal",
         "on_github_star_snackbar",
-        "on_talk_together_pass_invite_progress",
         "on_foundation_primitives",
         "on_http_extension_form",
         "on_brake_notice",
@@ -1426,12 +1447,6 @@ def test_translator_app_mounts_debug_preview_when_enabled(
     assert (
         getattr(local_qwen_modal, "__func__", None)
         is TranslatorApp._preview_local_qwen_hallucination_modal
-    )
-    pass_progress = seen["callbacks"]["on_talk_together_pass_invite_progress"]
-    assert getattr(pass_progress, "__self__", None) is app
-    assert (
-        getattr(pass_progress, "__func__", None)
-        is TranslatorApp._preview_talk_together_pass_invite_progress
     )
     preview_calls: list[bool] = []
     monkeypatch.setattr(
@@ -1691,40 +1706,6 @@ def test_local_qwen_guidance_modal_open_guide_opens_github_api_key_guide_safely(
     assert app.bottom_nav.visual_updates == 0
     assert page.tasks == []
     assert forbidden_calls == []
-
-
-def test_debug_preview_talk_together_pass_invite_progress_sets_settings_state_only(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    managed_key_calls: list[dict[str, object]] = []
-    app.view_settings = SimpleNamespace(
-        set_managed_key_state=lambda **kwargs: managed_key_calls.append(kwargs)
-    )
-    forbidden_calls: list[str] = []
-    monkeypatch.setattr(
-        app_module.webbrowser,
-        "open",
-        lambda *args, **kwargs: forbidden_calls.append("webbrowser.open"),
-    )
-
-    app._preview_talk_together_pass_invite_progress()
-
-    assert forbidden_calls == []
-    assert managed_key_calls == [
-        {
-            "visible": True,
-            "remaining_percent": 100,
-            "referral_id": "7KQ9M2",
-            "remember_referral_id": False,
-            "pass_status": TalkTogetherPassStatus(
-                pass_id="7KQ9M2",
-                invite_count=1,
-                invite_limit=3,
-                bonus_translations_per_friend=200,
-            ),
-        }
-    ]
 
 
 def test_debug_preview_discord_callback_page_opens_local_preview_without_oauth(
@@ -2519,6 +2500,106 @@ async def test_qq_managed_auth_success_enables_translation_and_closes_dialog() -
     assert dashboard_translation_calls == [True]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raises", [False, True])
+async def test_qq_success_translation_failure_reports_activation_only(raises, caplog) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    closed, errors, notices = [], [], []
+    app._qq_managed_auth_dialog = SimpleNamespace(
+        qq_identity="mock-user",
+        credential="secret-must-not-leak",
+        set_waiting=lambda: None,
+        close=lambda: closed.append(True),
+        set_error=lambda *args: errors.append(args),
+    )
+    app._qq_managed_auth_generation = 0
+    app._qq_managed_auth_cancelled = False
+    app._show_snackbar = lambda message, *args: notices.append(message)
+    app.view_dashboard = SimpleNamespace(set_translation_enabled=lambda value: None)
+    enable_calls = []
+
+    async def authenticate(**kwargs):
+        return True
+
+    async def enable(*args, **kwargs):
+        enable_calls.append((args, kwargs))
+        if raises:
+            raise RuntimeError("secret-must-not-leak")
+        return False
+
+    app._ui_application = compose_test_ui_application_boundary(
+        SimpleNamespace(
+            start_qq_managed_auth_from_dialog=authenticate,
+            set_translation_enabled=enable,
+        )
+    )
+    with caplog.at_level(app_module.logging.INFO):
+        app._start_qq_managed_auth()
+        await app.page.tasks[0]()
+    assert closed == [True]
+    assert enable_calls == [((True,), {"allow_authorization": True})]
+    assert errors == []
+    assert notices == [app_module.t("qq_auth.error.translation_start_failed")]
+    assert "success stage=authentication code=authentication_succeeded" in caplog.text
+    assert "failure stage=translation_start code=translation_init_failed" in caplog.text
+    assert "failure stage=authentication" not in caplog.text
+    assert "secret-must-not-leak" not in caplog.text
+    assert app._qq_managed_auth_task_handle is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("locale", ["en", "ja", "ko", "ru", "zh-CN"])
+async def test_qq_missing_local_key_feedback_is_displayed_and_logs_known_outcome(locale, caplog):
+    previous_locale = i18n_module.get_locale()
+    i18n_module.set_locale(locale)
+    try:
+        app = TranslatorApp.__new__(TranslatorApp)
+        app.page = DummyPage()
+        dialog = app_module.QqManagedAuthDialog(
+            app.page,
+            on_continue=lambda: None,
+            on_close=lambda: None,
+        )
+        dialog.open()
+        dialog._qq_identity_field.value = "private-qq-identity"
+        dialog._credential_field.value = "a" * 64
+        app._qq_managed_auth_dialog = dialog
+        app._qq_managed_auth_generation = 0
+        app._qq_managed_auth_cancelled = False
+
+        async def authenticate(**_kwargs):
+            return "qq_auth.error.managed_secret_missing", {}
+
+        async def enable(*_args, **_kwargs):
+            pytest.fail("missing local key must not enable translation")
+
+        app._ui_application = compose_test_ui_application_boundary(
+            SimpleNamespace(
+                start_qq_managed_auth_from_dialog=authenticate,
+                set_translation_enabled=enable,
+            )
+        )
+        app._start_qq_managed_auth()
+        assert dialog.is_waiting is True
+        await app.page.tasks[0]()
+
+        assert dialog.is_open is True
+        assert dialog.is_waiting is False
+        assert dialog._qq_identity_field.disabled is False
+        assert dialog._credential_field.disabled is False
+        assert dialog._error_text.visible is True
+        assert dialog._error_text.value == app_module.t("qq_auth.error.managed_secret_missing")
+        assert dialog._error_text.value != app_module.t("qq_auth.error.delivery_ack_pending")
+        assert "failure stage=authentication code=managed_secret_missing" in caplog.text
+        assert "code=unknown_error" not in caplog.text
+        for sensitive in ("private-qq-identity", "a" * 64):
+            assert sensitive not in caplog.text
+        assert app._qq_managed_auth_task_handle is None
+    finally:
+        i18n_module.set_locale(previous_locale)
+
+
 def test_managed_china_dashboard_prompt_opens_qq_auth_not_discord() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
@@ -2665,7 +2746,7 @@ async def test_start_qq_managed_auth_exception_uses_safe_bounded_log() -> None:
 def test_start_discord_managed_auth_registers_page_task_with_oauth_runtime() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app._discord_managed_auth_dialog = SimpleNamespace(referral_id="", set_waiting=lambda: None)
+    app._discord_managed_auth_dialog = SimpleNamespace(set_waiting=lambda: None)
     app._show_snackbar = lambda *_args, **_kwargs: None
     app.view_dashboard = SimpleNamespace(set_translation_enabled=lambda _enabled: None)
     controller = SimpleNamespace(
@@ -2684,7 +2765,7 @@ def test_start_discord_managed_auth_registers_page_task_with_oauth_runtime() -> 
 async def test_start_discord_managed_auth_skips_controller_start_for_stale_generation() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app._discord_managed_auth_dialog = SimpleNamespace(referral_id="", set_waiting=lambda: None)
+    app._discord_managed_auth_dialog = SimpleNamespace(set_waiting=lambda: None)
     start_calls: list[str] = []
 
     async def fake_start_discord_managed_auth_from_dialog(**_kwargs) -> bool:
@@ -2707,7 +2788,7 @@ async def test_start_discord_managed_auth_skips_controller_start_for_stale_gener
 async def test_close_oauth_runtime_blocks_late_discord_auth_ui_mutation() -> None:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    dialog = SimpleNamespace(referral_id="", close_calls=0, set_waiting=lambda: None)
+    dialog = SimpleNamespace(close_calls=0, set_waiting=lambda: None)
     dialog.close = lambda: setattr(dialog, "close_calls", dialog.close_calls + 1)
     app._discord_managed_auth_dialog = dialog
     app._discord_managed_auth_generation = 0
@@ -2790,8 +2871,10 @@ async def test_start_discord_managed_auth_no_success_when_enable_fails() -> None
     await app.page.tasks[0]()
 
     assert enable_calls == [True]
-    assert snackbar_calls == []
-    assert dashboard_translation_calls == []
+    assert snackbar_calls == [
+        (app_module.t("discord_auth.error.translation_start_failed"), app_module.COLOR_WARNING)
+    ]
+    assert dashboard_translation_calls == [False]
 
 
 @pytest.mark.asyncio
@@ -2828,8 +2911,10 @@ async def test_start_discord_managed_auth_no_success_when_llm_unavailable_after_
     await app.page.tasks[0]()
 
     assert enable_calls == [True]
-    assert snackbar_calls == []
-    assert dashboard_translation_calls == []
+    assert snackbar_calls == [
+        (app_module.t("discord_auth.error.translation_start_failed"), app_module.COLOR_WARNING)
+    ]
+    assert dashboard_translation_calls == [False]
 
 
 @pytest.mark.asyncio
@@ -3073,150 +3158,261 @@ async def test_prompt_apply_keeps_dashboard_target_for_next_request() -> None:
     assert applied_targets == ["ja"]
 
 
-@pytest.mark.asyncio
-async def test_start_microphone_test_success_shows_measured_level() -> None:
+def _audio_test_app(controller: SimpleNamespace) -> TranslatorApp:
     app = TranslatorApp.__new__(TranslatorApp)
     app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-
-    async def fake_start_microphone_test(**kwargs) -> bool:
-        kwargs["meter_callback"](0.37)
-        return True
-
-    controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=lambda: None,
-        microphone_test_active=True,
-    )
+    app.view_settings = InlineAudioTestSettingsView()
+    app._run_page_task = lambda coroutine, *args: app.page.tasks.append(coroutine)
     app._ui_application = compose_test_ui_application_boundary(controller)
+    return app
 
-    app._on_start_microphone_test()
-    await app.page.tasks[0]()
 
-    assert len(app.page.opened) == 1
-    assert "37%" in _dialog_text_values(app.page.opened[0])
+def _audio_snapshot(state: str, **channels: dict[str, object]) -> dict[str, object]:
+    idle = {
+        "state": "off",
+        "failure_reason": None,
+        "failure_type": None,
+        "device": {},
+        "meter_level": 0.0,
+        "speech_probability": 0.0,
+        "speech_detected": False,
+        "speech_threshold": None,
+    }
+    return {
+        "state": state,
+        "desired_active": state in {"pending", "ready", "degraded"},
+        "effective_active": state in {"ready", "degraded"},
+        "channels": {
+            "self": {**idle, **channels.get("self_", {})},
+            "peer": {**idle, **channels.get("peer", {})},
+        },
+        "restore_capture": [],
+    }
 
 
 @pytest.mark.asyncio
-async def test_microphone_test_meter_callback_updates_modal_percentage() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
+async def test_audio_test_opens_two_column_modal_with_live_channels_and_saved_thresholds() -> None:
     callbacks: list[object] = []
+    snapshot = {"value": _audio_snapshot("pending")}
 
-    async def fake_start_microphone_test(**kwargs) -> bool:
-        callbacks.append(kwargs["meter_callback"])
+    async def fake_start_audio_test(**kwargs) -> bool:
+        callbacks.append(kwargs["observation_callback"])
         return True
 
     controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=lambda: None,
-        microphone_test_active=True,
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: snapshot["value"],
+        audio_test_active=True,
     )
-    app._ui_application = compose_test_ui_application_boundary(controller)
+    app = _audio_test_app(controller)
 
-    app._on_start_microphone_test()
-    await app.page.tasks[0]()
-    callbacks[0](0.82)
-
-    assert "82%" in _dialog_text_values(app.page.opened[0])
-
-
-@pytest.mark.asyncio
-async def test_microphone_test_backdrop_dismiss_stops_runtime() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-    stop_calls: list[str] = []
-
-    async def fake_start_microphone_test(**_kwargs) -> bool:
-        return True
-
-    async def fake_stop_microphone_test() -> None:
-        stop_calls.append("stop")
-
-    controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=fake_stop_microphone_test,
-        microphone_test_active=True,
-    )
-    app._ui_application = compose_test_ui_application_boundary(controller)
-
-    app._on_start_microphone_test()
+    app._on_start_audio_test()
     await app.page.tasks[0]()
 
     assert len(app.page.opened) == 1
-    app._microphone_test_dialog._handle_dismiss(None)
+    texts = _dialog_text_values(app.page.opened[0])
+    assert t("settings.audio_test") in texts
+    assert t("audio_test.channel.self") in texts
+    assert t("audio_test.channel.peer") in texts
+    dialog = app._audio_test_dialog
+    assert dialog.panel("self").slider.value == 0.4
+    assert dialog.panel("peer").slider.value == 0.55
 
-    assert len(app.page.tasks) == 2
-    await app.page.tasks[1]()
-    assert stop_calls == ["stop"]
+    callbacks[0]("peer", (SimpleNamespace(probability=0.8, level=0.3),))
+    snapshot["value"] = _audio_snapshot(
+        "degraded",
+        self_={
+            "state": "failed",
+            "failure_reason": "input_route_unavailable",
+            "device": {"name": "USB Mic", "host_api": "Windows WASAPI"},
+        },
+        peer={
+            "state": "ready",
+            "speech_detected": True,
+            "device": {"kind": "process", "name": "VRChat.exe"},
+        },
+    )
+    snapshot["value"]["restore_capture"] = ["peer"]
+    dialog.refresh()
+
+    texts = _dialog_text_values(app.page.opened[0])
+    assert t("audio_test.state.speech") not in texts
+    assert t("audio_test.state.listening") not in texts
+    assert dialog.panel("peer").status_row.visible is False
+    assert dialog.panel("self").status_row.visible is True
+    assert t("audio_test.error.input_route_unavailable") in texts
+    assert t("audio_test.device.process", name="VRChat.exe") in texts
+    assert dialog.panel("peer").history[-1] == (0.8, 0.3)
+    assert "USB Mic" in texts
+    assert all("·" not in text for text in texts)
 
 
 @pytest.mark.asyncio
-async def test_navigation_cleanup_closes_microphone_test_modal_and_stops_runtime() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
-    stop_calls: list[str] = []
-
-    async def fake_start_microphone_test(**_kwargs) -> bool:
+async def test_audio_test_modal_reopens_in_the_current_language() -> None:
+    async def fake_start_audio_test(**_kwargs) -> bool:
         return True
 
-    async def fake_stop_microphone_test() -> None:
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
+    )
+    app = _audio_test_app(controller)
+    set_locale("ko")
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+    app._audio_test_dialog.close()
+
+    set_locale("en")
+    app._on_start_audio_test()
+    await app.page.tasks[-1]()
+
+    texts = _dialog_text_values(app.page.opened[-1])
+    for key in ("audio_test.threshold", "audio_test.channel.self", "audio_test.channel.peer"):
+        assert t_for_locale("en", key) in texts
+        assert t_for_locale("ko", key) not in texts
+
+
+@pytest.mark.asyncio
+async def test_audio_test_modal_threshold_changes_use_the_settings_view_path() -> None:
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return True
+
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
+    )
+    app = _audio_test_app(controller)
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+
+    slider = app._audio_test_dialog.panel("peer").slider
+    slider.on_change_end(SimpleNamespace(control=SimpleNamespace(value=0.7)))
+
+    assert app.view_settings.applied == [("peer", 0.7)]
+
+
+@pytest.mark.asyncio
+async def test_audio_test_start_failure_marks_both_channels_failed() -> None:
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return False
+
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: _audio_snapshot("off"),
+        audio_test_active=False,
+    )
+    app = _audio_test_app(controller)
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+
+    texts = _dialog_text_values(app.page.opened[0])
+    assert texts.count(t("audio_test.error.generic")) == 2
+    app._audio_test_dialog.refresh()
+    app._audio_test_dialog.refresh()
+    assert _dialog_text_values(app.page.opened[0]).count(t("audio_test.error.generic")) == 2
+    controller.audio_test_snapshot = lambda: _audio_snapshot(
+        "ready", self_={"state": "ready"}, peer={"state": "ready"}
+    )
+    app._audio_test_dialog.refresh()
+    assert t("audio_test.error.generic") not in _dialog_text_values(app.page.opened[0])
+
+
+@pytest.mark.asyncio
+async def test_audio_test_backdrop_dismiss_stops_runtime() -> None:
+    stop_calls: list[str] = []
+
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return True
+
+    async def fake_stop_audio_test() -> None:
         stop_calls.append("stop")
 
     controller = SimpleNamespace(
-        start_microphone_test=fake_start_microphone_test,
-        stop_microphone_test=fake_stop_microphone_test,
-        microphone_test_active=True,
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=fake_stop_audio_test,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
     )
-    app._ui_application = compose_test_ui_application_boundary(controller)
+    app = _audio_test_app(controller)
 
-    app._on_start_microphone_test()
+    app._on_start_audio_test()
+    await app.page.tasks[0]()
+
+    assert len(app.page.opened) == 1
+    app._audio_test_dialog._handle_dismiss(None)
+
+    stop_task = app.page.tasks[-1]
+    await stop_task()
+    assert stop_calls == ["stop"]
+    assert app._audio_test_dialog.is_open is False
+
+
+@pytest.mark.asyncio
+async def test_navigation_cleanup_closes_audio_test_modal_and_stops_runtime() -> None:
+    stop_calls: list[str] = []
+
+    async def fake_start_audio_test(**_kwargs) -> bool:
+        return True
+
+    async def fake_stop_audio_test() -> None:
+        stop_calls.append("stop")
+
+    controller = SimpleNamespace(
+        start_audio_test=fake_start_audio_test,
+        stop_audio_test=fake_stop_audio_test,
+        audio_test_snapshot=lambda: _audio_snapshot("ready"),
+        audio_test_active=True,
+    )
+    app = _audio_test_app(controller)
+
+    app._on_start_audio_test()
     await app.page.tasks[0]()
     opened_dialog = app.page.opened[0]
 
     app._close_open_dialog_for_navigation()
 
     assert app.page.closed == [opened_dialog]
-    assert len(app.page.tasks) == 2
-    await app.page.tasks[1]()
+    await app.page.tasks[-1]()
     assert stop_calls == ["stop"]
 
 
 @pytest.mark.asyncio
-async def test_settings_apply_closes_microphone_test_modal_after_audio_cleanup() -> None:
-    app = TranslatorApp.__new__(TranslatorApp)
-    app.page = DummyPage()
-    app.view_settings = InlineMicrophoneTestSettingsView()
+async def test_settings_apply_closes_audio_test_modal_only_after_the_test_stopped() -> None:
     events: list[str] = []
-    controller = SimpleNamespace(microphone_test_active=True)
+    snapshot = {"value": _audio_snapshot("failed")}
+    controller = SimpleNamespace(audio_test_active=False)
 
-    async def fake_start_microphone_test(**_kwargs) -> bool:
+    async def fake_start_audio_test(**_kwargs) -> bool:
         events.append("start")
         return True
 
     async def fake_apply_settings(settings) -> None:
         events.append(f"apply:{settings}")
-        controller.microphone_test_active = False
 
-    async def fake_stop_microphone_test() -> None:
-        events.append("stop")
-
-    controller.start_microphone_test = fake_start_microphone_test
+    controller.start_audio_test = fake_start_audio_test
     controller.apply_settings = fake_apply_settings
-    controller.stop_microphone_test = fake_stop_microphone_test
-    app._ui_application = compose_test_ui_application_boundary(controller)
+    controller.stop_audio_test = lambda: events.append("stop")
+    controller.audio_test_snapshot = lambda: snapshot["value"]
+    app = _audio_test_app(controller)
 
-    app._on_start_microphone_test()
+    app._on_start_audio_test()
     await app.page.tasks[0]()
 
-    app._on_settings_changed("audio")
-    await app.page.tasks[1]()
+    app._on_settings_changed("threshold")
+    await app.page.tasks[-1]()
+    assert app.page.closed == []
 
-    assert events == ["start", "apply:audio"]
-    assert len(app.page.opened) == 1
+    snapshot["value"] = _audio_snapshot("off")
+    app._on_settings_changed("audio")
+    await app.page.tasks[-1]()
+
+    assert events == ["start", "apply:threshold", "apply:audio"]
     assert app.page.closed == [app.page.opened[0]]
 
 
@@ -3500,7 +3696,7 @@ def test_toggle_handlers_do_not_log_click_requests() -> None:
     assert controller.detailed_messages == []
 
 
-def test_on_overlay_state_changed_routes_runtime_logs() -> None:
+def test_on_overlay_state_changed_synchronizes_every_notification_without_duplicate_logs() -> None:
     controller = RuntimeLoggingController()
     app = TranslatorApp.__new__(TranslatorApp)
     app._ui_application = compose_test_ui_application_boundary(controller)
@@ -3518,12 +3714,16 @@ def test_on_overlay_state_changed_routes_runtime_logs() -> None:
     )
 
     app.on_overlay_state_changed(state="failed", failure_reason="runtime_crashed")
+    app.on_overlay_state_changed(state="failed", failure_reason="runtime_crashed")
 
-    assert controller.basic_messages == ["[Overlay] State changed: off -> failed"]
-    assert controller.detailed_messages == [
-        "[Overlay] State detail: overlay_state=failed failure_reason=runtime_crashed"
+    assert controller.basic_messages == []
+    assert controller.detailed_messages == []
+    assert app.overlay_state == "failed"
+    assert app.overlay_failure_reason == "runtime_crashed"
+    assert seen == [
+        ("failed", "runtime_crashed", None, False),
+        ("failed", "runtime_crashed", None, False),
     ]
-    assert seen == [("failed", "runtime_crashed", None, False)]
 
 
 @pytest.mark.asyncio
@@ -3958,3 +4158,463 @@ async def test_main_gui_registers_awaited_idempotent_page_lifecycle_handler(
 
     assert lifecycle_events == ["started", "stop_started", "stop_completed"]
     assert page.tasks == []
+
+
+def _managed_dialog_app(source, login, *, activation=True, failure_key=None, prompt=None):
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._mark_launch_high_priority_feedback_shown = lambda *_args: None
+    notifications = []
+    visuals = []
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+
+    async def enable(enabled, *, allow_authorization=True):
+        hub.translation_enabled = bool(enabled and activation)
+        return activation
+
+    backend = SimpleNamespace(
+        hub=hub,
+        start_qq_managed_auth_from_dialog=login,
+        start_discord_managed_auth_from_dialog=login,
+        set_translation_enabled=enable,
+        dashboard_managed_auth_prompt_kind=lambda: prompt[0] if prompt else source,
+        managed_auth_last_failure_kind=lambda: (
+            "idle_resumable"
+            if failure_key and failure_key.endswith("recovery_pending")
+            else "failed"
+        ),
+        managed_auth_last_message_key=lambda: failure_key,
+    )
+    app._ui_application = compose_test_ui_application_boundary(backend)
+    app._show_snackbar = lambda message, color: notifications.append((message, color))
+    app._set_dashboard_translation_visual_state = visuals.append
+    if source == "qq":
+        app.show_qq_managed_auth_dialog()
+        dialog = app._qq_managed_auth_dialog
+        dialog._qq_identity_field.value = "qq-user"
+        dialog._credential_field.value = "a" * 64
+    else:
+        app.show_discord_managed_auth_dialog()
+        dialog = app._discord_managed_auth_dialog
+    return app, dialog, notifications, visuals
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+@pytest.mark.parametrize("warmup_fails", [False, True])
+async def test_managed_auth_waits_for_owned_activation_before_reporting_result(
+    source, warmup_fails
+) -> None:
+    app = TranslatorApp.__new__(TranslatorApp)
+    app.page = DummyPage()
+    app._mark_launch_high_priority_feedback_shown = lambda *_args: None
+    hub = SimpleNamespace(llm=object(), translation_enabled=False)
+    notifications, visuals, runtime_values, starting_values = [], [], [], []
+    entered, release = asyncio.Event(), asyncio.Event()
+    state = TranslationEnableState(
+        runtime_available=True,
+        translation_enabled=False,
+        llm_available=True,
+        settings_available=True,
+        provider_name="openrouter",
+        qwen_region=None,
+        managed_selected=True,
+        managed_china=source == "qq",
+        managed_local_key_available=True,
+        managed_release_service_available=True,
+        ingress_frozen=False,
+    )
+
+    def set_runtime(enabled):
+        runtime_values.append(enabled)
+        hub.translation_enabled = enabled
+
+    async def warmup():
+        assert app.application.control().lock_owned_by_current_task()
+        entered.set()
+        await release.wait()
+        if warmup_fails:
+            raise RuntimeError("isolated provider warmup failure")
+
+    prepare = AsyncMock(return_value=ManagedTranslationPreparation(ready=True))
+    owner = TranslationEnableOwner(
+        state_provider=lambda: replace(state, translation_enabled=hub.translation_enabled),
+        managed_prepare=prepare,
+        founder_route=AsyncMock(return_value=False),
+        pending_sink=lambda _pending: None,
+        runtime_ensurer=AsyncMock(return_value=True),
+        usage_refresh_sink=lambda: None,
+        usage_refresh_now=AsyncMock(),
+        runtime_sink=set_runtime,
+        dashboard_sink=lambda _enabled: None,
+        clear_context=lambda: None,
+        warmup=warmup,
+        message_sink=lambda *_args: None,
+        qq_dialog_sink=lambda: None,
+        result_sink=lambda _result: None,
+        log_basic=lambda _message: None,
+        log_diagnostic=lambda _message: None,
+        log_error=lambda _message: None,
+        founder_letter_sink=lambda: None,
+        starting_sink=starting_values.append,
+    )
+    login = AsyncMock(return_value=True)
+    app._ui_application = compose_test_ui_application_boundary(
+        SimpleNamespace(
+            hub=hub,
+            start_qq_managed_auth_from_dialog=login,
+            start_discord_managed_auth_from_dialog=login,
+            set_translation_enabled=owner.set_enabled,
+            dashboard_managed_auth_prompt_kind=lambda: source,
+        )
+    )
+    app._show_snackbar = lambda message, color: notifications.append((message, color))
+    app._set_dashboard_translation_visual_state = visuals.append
+    getattr(app, f"show_{source}_managed_auth_dialog")()
+    dialog = getattr(app, f"_{source}_managed_auth_dialog")
+    if source == "qq":
+        dialog._qq_identity_field.value = "qq-user"
+        dialog._credential_field.value = "a" * 64
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    generation = getattr(app, f"_{source}_managed_auth_generation")
+    task = asyncio.create_task(app.page.tasks[0]())
+    try:
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        assert hub.translation_enabled is True
+        assert starting_values == [True]
+        assert dialog.is_waiting is True
+        assert app.application.dashboard_managed_auth_action() == "in_progress"
+        assert visuals == []
+        assert notifications == []
+        start()
+        assert getattr(app, f"_{source}_managed_auth_generation") == generation
+        assert len(app.page.tasks) == 1
+    finally:
+        release.set()
+        await task
+    ready = not warmup_fails
+    prepare.assert_awaited_once_with(True)
+    login.assert_awaited_once()
+    assert runtime_values == ([True, False] if warmup_fails else [True])
+    assert hub.translation_enabled is ready
+    assert starting_values == [True, False]
+    assert dialog.is_open is False
+    assert dialog.is_waiting is False
+    assert visuals == [ready]
+    message_key = (
+        f"{source}_auth.success" if ready else f"{source}_auth.error.translation_start_failed"
+    )
+    assert notifications == [
+        (
+            app_module.t(message_key),
+            app_module.COLOR_SUCCESS if ready else app_module.COLOR_WARNING,
+        )
+    ]
+    assert app.application.managed_auth_task_names() == ()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_repeated_submit_cannot_supersede_admitted_generation(source) -> None:
+    calls = []
+
+    async def login(**kwargs):
+        calls.append(kwargs)
+        return True
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login)
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    generation = getattr(app, f"_{source}_managed_auth_generation")
+    assert dialog.is_waiting is True
+    assert app.application.dashboard_managed_auth_action() == "in_progress"
+    start()
+    assert getattr(app, f"_{source}_managed_auth_generation") == generation
+    assert len(app.page.tasks) == 1
+    await app.page.tasks[0]()
+    assert len(calls) == 1
+    assert app.application.managed_auth_task_names() == ()
+    assert dialog.is_open is False
+    assert visuals == [True]
+    assert notifications == [(app_module.t(f"{source}_auth.success"), app_module.COLOR_SUCCESS)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+@pytest.mark.parametrize("outcome", ["exhausted", "terminal", "exception"])
+async def test_finished_auth_task_exposes_action_and_can_retry(source, outcome) -> None:
+    calls = []
+    failure_key = (
+        f"{source}_auth.error.recovery_pending"
+        if outcome == "exhausted"
+        else f"{source}_auth.error.authorization_expired"
+    )
+
+    async def login(**kwargs):
+        calls.append(kwargs)
+        if len(calls) > 1:
+            return True
+        if outcome == "exception":
+            raise RuntimeError("private response")
+        return (failure_key, {}) if source == "qq" else False
+
+    app, dialog, notifications, visuals = _managed_dialog_app(
+        source, login, failure_key=failure_key
+    )
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    await app.page.tasks[0]()
+    assert dialog.is_open is True
+    assert dialog.is_waiting is False
+    assert dialog._dialog.modal is False
+    assert app.application.managed_auth_task_names() == ()
+    assert app.application.dashboard_managed_auth_action() != "in_progress"
+    assert visuals == []
+    assert notifications == []
+    assert dialog._continue_button is not None
+    dialog._continue_button.on_click(None)
+    assert dialog.is_waiting is True
+    assert len(app.page.tasks) == 2
+    await app.page.tasks[1]()
+    assert len(calls) == 2
+    assert dialog.is_open is False
+    assert visuals == [True]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_auth_success_with_failed_activation_is_not_auth_failure_or_spinner(source) -> None:
+    async def login(**_kwargs):
+        return True
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login, activation=False)
+    getattr(app, f"_start_{source}_managed_auth")()
+    await app.page.tasks[0]()
+    assert dialog.is_open is False
+    assert dialog.is_waiting is False
+    assert visuals == [False]
+    assert notifications == [
+        (app_module.t(f"{source}_auth.error.translation_start_failed"), app_module.COLOR_WARNING)
+    ]
+    assert app.application.managed_auth_task_names() == ()
+
+
+@pytest.mark.asyncio
+async def test_source_switch_keeps_admitted_task_and_rejects_other_source_submission() -> None:
+    calls = []
+    prompt = ["qq"]
+
+    async def login(**kwargs):
+        calls.append(kwargs)
+        return True
+
+    app, qq_dialog, notifications, visuals = _managed_dialog_app("qq", login, prompt=prompt)
+    app._start_qq_managed_auth()
+    prompt[0] = "discord"
+    app.show_discord_managed_auth_dialog()
+    discord_dialog = app._discord_managed_auth_dialog
+    app._start_discord_managed_auth()
+    assert discord_dialog.is_waiting is False
+    assert not hasattr(app, "_discord_managed_auth_generation")
+    assert app.application.managed_auth_task_names() == ("qq-managed-auth-dialog",)
+    await app.page.tasks[0]()
+    assert len(calls) == 1
+    assert visuals == []
+    assert notifications == []
+    assert qq_dialog.is_waiting is False
+    assert app.application.managed_auth_task_names() == ()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["qq", "discord"])
+async def test_ui_cancel_keeps_settlement_owned_and_blocks_repeated_submit(source) -> None:
+    entered = asyncio.Event()
+    cancelling = asyncio.Event()
+    release = asyncio.Event()
+
+    async def login(**_kwargs):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelling.set()
+            await release.wait()
+            return True
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login)
+    start = getattr(app, f"_start_{source}_managed_auth")
+    start()
+    task = asyncio.create_task(app.page.tasks[0]())
+    await entered.wait()
+    getattr(app, f"_cancel_{source}_managed_auth")()
+    await cancelling.wait()
+    assert dialog.is_open is False
+    assert app.application.managed_auth_task_names() == (f"{source}-managed-auth-dialog",)
+    generation = getattr(app, f"_{source}_managed_auth_generation")
+    start()
+    assert getattr(app, f"_{source}_managed_auth_generation") == generation
+    assert len(app.page.tasks) == 1
+    assert not task.done()
+    release.set()
+    await task
+    assert app.application.managed_auth_task_names() == ()
+    assert notifications == []
+    assert visuals == []
+
+
+@pytest.mark.parametrize("source", ["qq", "discord"])
+def test_rejected_page_task_admission_restores_actionable_dialog(source) -> None:
+    async def login(**_kwargs):
+        pytest.fail("Unadmitted auth must never execute")
+
+    app, dialog, notifications, visuals = _managed_dialog_app(source, login)
+    app._run_page_task = lambda _factory: None
+    getattr(app, f"_start_{source}_managed_auth")()
+    assert getattr(app, f"_{source}_managed_auth_generation") == 0
+    assert dialog.is_open is True
+    assert dialog.is_waiting is False
+    assert dialog._continue_button is not None
+    assert app.application.managed_auth_task_names() == ()
+    assert notifications == []
+    assert visuals == []
+
+
+@pytest.mark.asyncio
+async def test_audio_test_dismiss_preempts_gated_settings_start_and_allows_later_start() -> None:
+    from tests.app.test_audio_test_session_owner import Harness
+
+    harness = Harness()
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    original = harness.control.set_enabled
+    opened = []
+
+    async def pause(channel, enabled):
+        await original(channel, enabled)
+        if channel == "peer" and not enabled:
+            entered.set()
+            await release.wait()
+
+    harness.control.set_enabled = pause
+    for channel, opener in harness.openers.items():
+        open_source = opener.open
+
+        async def open_owned(*, on_acquired, channel=channel, open_source=open_source):
+            opened.append(channel)
+            return await open_source(on_acquired=on_acquired)
+
+        opener.open = open_owned
+    controller = SimpleNamespace(
+        start_audio_test=harness.owner.start,
+        stop_audio_test=harness.owner.stop,
+        audio_test_snapshot=lambda: harness.owner.snapshot,
+        audio_test_active=False,
+    )
+    app = _audio_test_app(controller)
+    app._on_start_audio_test()
+    starting = asyncio.create_task(app.page.tasks[0]())
+    stopping = None
+    try:
+        await entered.wait()
+        assert app._settings_mutation_worker_active
+        app._audio_test_dialog._handle_dismiss(None)
+        stopping = asyncio.create_task(app.page.tasks[-1]())
+        await asyncio.sleep(0)
+        release.set()
+        await asyncio.wait_for(asyncio.gather(starting, stopping), timeout=2)
+        assert not app._settings_mutation_worker_active
+        assert not harness.owner.active
+        assert harness.owner.snapshot["state"] == "off"
+        assert opened == []
+        assert harness.control.enabled == {"self": True, "peer": True}
+        app._on_start_audio_test()
+        await app.page.tasks[-1]()
+        harness.sources["self"].feed(0.0)
+        assert await harness.owner.wait_ready()
+        assert set(opened) == {"self", "peer"}
+        app._audio_test_dialog._handle_dismiss(None)
+        await app.page.tasks[-1]()
+        assert harness.owner.snapshot["state"] == "off"
+        assert all(source.closed for source in harness.sources.values())
+    finally:
+        release.set()
+        await asyncio.gather(
+            *(task for task in (starting, stopping) if task is not None), return_exceptions=True
+        )
+        await harness.owner.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("locale", ("en", "ko", "ja", "ru", "zh-CN"))
+async def test_audio_open_failures_are_channel_specific_persistent_and_recover(locale) -> None:
+    previous_locale = i18n_module.get_locale()
+    i18n_module.set_locale(locale)
+    snapshot = {
+        "value": _audio_snapshot(
+            "failed",
+            self_={"state": "failed", "failure_reason": "source_open_failed"},
+            peer={"state": "ready"},
+        )
+    }
+
+    async def start(**_kwargs):
+        return True
+
+    controller = SimpleNamespace(
+        start_audio_test=start,
+        stop_audio_test=lambda: None,
+        audio_test_snapshot=lambda: snapshot["value"],
+        audio_test_active=False,
+    )
+    app = _audio_test_app(controller)
+    try:
+        app._on_start_audio_test()
+        await app.page.tasks[0]()
+        dialog = app._audio_test_dialog
+        dialog.refresh()
+        self_failure = dialog.panel("self").status_text.value
+        assert self_failure
+        assert not self_failure.startswith("audio_test.")
+        snapshot["value"]["channels"]["peer"] = {
+            "state": "failed",
+            "failure_reason": "source_open_failed",
+        }
+        dialog.refresh()
+        peer_failure = dialog.panel("peer").status_text.value
+        assert peer_failure
+        assert not peer_failure.startswith("audio_test.")
+        assert peer_failure != self_failure
+        dialog.refresh()
+        dialog.refresh()
+        assert dialog.panel("self").status_text.value == self_failure
+        assert dialog.panel("peer").status_text.value == peer_failure
+        snapshot["value"] = _audio_snapshot(
+            "degraded",
+            self_={"state": "ready"},
+            peer={"state": "failed", "failure_reason": "target_unavailable"},
+        )
+        dialog.refresh()
+        target_failure = dialog.panel("peer").status_text.value
+        assert target_failure
+        assert not target_failure.startswith("audio_test.")
+        assert target_failure not in {self_failure, peer_failure}
+        dialog.refresh()
+        assert dialog.panel("peer").status_text.value == target_failure
+        assert dialog.panel("self").status_text.value not in {self_failure, peer_failure}
+        snapshot["value"] = _audio_snapshot(
+            "failed",
+            self_={"state": "failed", "failure_reason": "vad_unavailable"},
+            peer={"state": "failed", "failure_reason": "vad_unavailable"},
+        )
+        dialog.refresh()
+        assert dialog.panel("self").status_text.value == dialog.panel("peer").status_text.value
+        snapshot["value"] = _audio_snapshot(
+            "ready", self_={"state": "ready"}, peer={"state": "ready"}
+        )
+        dialog.refresh()
+        assert dialog.panel("self").status_text.value not in {self_failure, peer_failure}
+        assert dialog.panel("peer").status_text.value not in {self_failure, peer_failure}
+    finally:
+        app._audio_test_dialog.close()
+        i18n_module.set_locale(previous_locale)

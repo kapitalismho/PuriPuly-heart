@@ -82,7 +82,7 @@ use super::types::{
 };
 use super::types::{
     BlockBounds, CaptionDebugOverlay, CaptionLayoutResult, CaptionPresentation, CaptionRenderError,
-    DamageBand, RenderDiagnostics, ResolvedFrameLayout, StyleBucketSourceCount,
+    CaptionFitScales, DamageBand, RenderDiagnostics, ResolvedFrameLayout, StyleBucketSourceCount,
     TextStyleDescriptor,
 };
 use crate::openvr::OpenVrOutputAdapter;
@@ -182,6 +182,7 @@ enum TextFormatCollectionRoute {
 pub struct CaptionRenderer {
     policy: CaptionLayoutPolicy,
     presentation: RefCell<CaptionPresentation>,
+    fitting_history: RefCell<Vec<CaptionFittingMemory>>,
     backend: RefCell<RenderBackend>,
     openvr_adapter_identity: AdapterIdentity,
     test_readiness_pending_yields: Cell<usize>,
@@ -192,6 +193,12 @@ pub struct CaptionRenderer {
     test_readiness_pending_on_call: Cell<Option<(usize, usize)>>,
     test_readiness_terminal_on_call: Cell<Option<(usize, ReadinessOutcome)>>,
     test_readiness_started_on_call: RefCell<Option<(usize, Arc<Notify>)>>,
+}
+
+struct CaptionFittingMemory {
+    occupant_key: String,
+    generation: u64,
+    scales: CaptionFitScales,
 }
 
 impl CaptionRenderer {
@@ -257,11 +264,36 @@ impl CaptionRenderer {
 
     pub fn render_blocks_with_debug_overlay(
         &self,
-        blocks: Vec<super::types::CaptionBlock>,
+        mut blocks: Vec<super::types::CaptionBlock>,
         debug_overlay: Option<CaptionDebugOverlay>,
     ) -> Result<RenderedFrame, CaptionRenderError> {
-        let (width, height) = self.policy.default_surface_size();
         let presentation = self.presentation.borrow().clone();
+        let (width, height) = self.policy.surface_size_for_presentation(&presentation);
+        let mut fitting_history = self.fitting_history.borrow_mut();
+        fitting_history.retain(|entry| {
+            blocks.iter().any(|block| {
+                block.occupant_key == entry.occupant_key
+                    && block.occupant_generation == entry.generation
+            })
+        });
+        for block in &mut blocks {
+            let mut scales = self.policy.fit_scales_for_block(block, width, &presentation);
+            if let Some(entry) = fitting_history.iter_mut().find(|entry| {
+                entry.occupant_key == block.occupant_key
+                    && entry.generation == block.occupant_generation
+            }) {
+                scales.primary = scales.primary.min(entry.scales.primary);
+                scales.secondary = scales.secondary.min(entry.scales.secondary);
+                entry.scales = scales;
+            } else {
+                fitting_history.push(CaptionFittingMemory {
+                    occupant_key: block.occupant_key.clone(),
+                    generation: block.occupant_generation,
+                    scales,
+                });
+            }
+            block.fit_scales = Some(scales);
+        }
         self.backend.borrow_mut().render(
             &self.policy,
             &presentation,
@@ -287,6 +319,7 @@ impl CaptionRenderer {
         Ok(Self {
             policy,
             presentation: RefCell::new(CaptionPresentation::default()),
+            fitting_history: RefCell::new(Vec::with_capacity(2)),
             openvr_adapter_identity: output_adapter
                 .map(OpenVrOutputAdapter::requested_identity)
                 .unwrap_or(match backend_mode {
@@ -695,6 +728,8 @@ struct WindowsCaptionRenderer {
     speaker_divider_fill_brush: ID2D1SolidColorBrush,
     target_bitmap: ID2D1Bitmap1,
     texture: ID3D11Texture2D,
+    surface_width_px: u32,
+    surface_height_px: u32,
     caches: WindowsRendererCaches,
     previous_layout: Option<ResolvedFrameLayout>,
     previous_debug_overlay_visible: bool,
@@ -739,26 +774,13 @@ impl WindowsCaptionRenderer {
             font_resolver.clone(),
             bundled_font_collection.clone(),
         );
-        let texture = create_target_texture(&device)?;
+        let texture = create_target_texture(
+            &device,
+            DEFAULT_SURFACE_WIDTH_PX,
+            DEFAULT_SURFACE_HEIGHT_PX,
+        )?;
         let d2d_context = create_d2d_context(&device, &d2d_factory)?;
-        let dxgi_surface: IDXGISurface = texture
-            .cast()
-            .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
-        let bitmap_properties = D2D1_BITMAP_PROPERTIES1 {
-            pixelFormat: D2D1_PIXEL_FORMAT {
-                format: DXGI_FORMAT_B8G8R8A8_UNORM,
-                alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
-            },
-            dpiX: 96.0,
-            dpiY: 96.0,
-            bitmapOptions: D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
-            colorContext: ManuallyDrop::new(None),
-        };
-        let target_bitmap = unsafe {
-            d2d_context
-                .CreateBitmapFromDxgiSurface(&dxgi_surface, Some(&bitmap_properties))
-                .map_err(|error| CaptionRenderError::Init(error.to_string()))?
-        };
+        let target_bitmap = create_target_bitmap(&d2d_context, &texture)?;
         unsafe {
             d2d_context.SetTarget(&target_bitmap);
             d2d_context.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
@@ -808,6 +830,8 @@ impl WindowsCaptionRenderer {
             speaker_divider_fill_brush,
             target_bitmap,
             texture,
+            surface_width_px: DEFAULT_SURFACE_WIDTH_PX,
+            surface_height_px: DEFAULT_SURFACE_HEIGHT_PX,
             caches: WindowsRendererCaches::default(),
             previous_layout: None,
             previous_debug_overlay_visible: false,
@@ -1030,8 +1054,8 @@ impl WindowsCaptionRenderer {
                         contentBounds: D2D_RECT_F {
                             left: 0.0,
                             top: 0.0,
-                            right: DEFAULT_SURFACE_WIDTH_PX as f32,
-                            bottom: DEFAULT_SURFACE_HEIGHT_PX as f32,
+                            right: self.surface_width_px as f32,
+                            bottom: self.surface_height_px as f32,
                         },
                         geometricMask: ManuallyDrop::new(None),
                         maskAntialiasMode: D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
@@ -1419,6 +1443,23 @@ impl WindowsCaptionRenderer {
         diagnostics.font_warmup_failures = self.font_warmup_failures;
     }
 
+    fn ensure_surface_size(&mut self, width: u32, height: u32) -> Result<(), CaptionRenderError> {
+        if self.surface_width_px == width && self.surface_height_px == height {
+            return Ok(());
+        }
+        let texture = create_target_texture(&self._d3d_device, width, height)?;
+        let target_bitmap = create_target_bitmap(&self.d2d_context, &texture)?;
+        unsafe {
+            self.d2d_context.SetTarget(&target_bitmap);
+        }
+        self.target_bitmap = target_bitmap;
+        self.texture = texture;
+        self.surface_width_px = width;
+        self.surface_height_px = height;
+        self.previous_layout = None;
+        Ok(())
+    }
+
     fn render(
         &mut self,
         policy: &CaptionLayoutPolicy,
@@ -1428,6 +1469,7 @@ impl WindowsCaptionRenderer {
         height: u32,
         debug_overlay: Option<CaptionDebugOverlay>,
     ) -> Result<RenderedFrame, CaptionRenderError> {
+        self.ensure_surface_size(width, height)?;
         self.frame_text_format_cache_hits = 0;
         self.frame_text_format_cache_misses = 0;
         let mut diagnostics = RenderDiagnostics::default();
@@ -2180,11 +2222,15 @@ fn renderer_adapter_identity(device: &ID3D11Device) -> Result<AdapterIdentity, C
 }
 
 #[cfg(windows)]
-fn create_target_texture(device: &ID3D11Device) -> Result<ID3D11Texture2D, CaptionRenderError> {
+fn create_target_texture(
+    device: &ID3D11Device,
+    width: u32,
+    height: u32,
+) -> Result<ID3D11Texture2D, CaptionRenderError> {
     let mut texture = None;
     let description = D3D11_TEXTURE2D_DESC {
-        Width: DEFAULT_SURFACE_WIDTH_PX,
-        Height: DEFAULT_SURFACE_HEIGHT_PX,
+        Width: width,
+        Height: height,
         MipLevels: 1,
         ArraySize: 1,
         Format: DXGI_FORMAT_B8G8R8A8_UNORM,
@@ -2205,6 +2251,31 @@ fn create_target_texture(device: &ID3D11Device) -> Result<ID3D11Texture2D, Capti
     }
 
     texture.ok_or_else(|| CaptionRenderError::Init("renderer texture missing".into()))
+}
+
+#[cfg(windows)]
+fn create_target_bitmap(
+    context: &ID2D1DeviceContext,
+    texture: &ID3D11Texture2D,
+) -> Result<ID2D1Bitmap1, CaptionRenderError> {
+    let dxgi_surface: IDXGISurface = texture
+        .cast()
+        .map_err(|error| CaptionRenderError::Init(error.to_string()))?;
+    let bitmap_properties = D2D1_BITMAP_PROPERTIES1 {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        dpiX: 96.0,
+        dpiY: 96.0,
+        bitmapOptions: D2D1_BITMAP_OPTIONS_TARGET | D2D1_BITMAP_OPTIONS_CANNOT_DRAW,
+        colorContext: ManuallyDrop::new(None),
+    };
+    unsafe {
+        context
+            .CreateBitmapFromDxgiSurface(&dxgi_surface, Some(&bitmap_properties))
+            .map_err(|error| CaptionRenderError::Init(error.to_string()))
+    }
 }
 
 #[cfg(windows)]
@@ -2497,6 +2568,63 @@ mod tests {
             }
             renderer.d3d_context.Unmap(&staging, 0);
             pixels
+        }
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_graphics_resized_surfaces_render_lower_text_and_clear_empty_frames() {
+        let policy = CaptionLayoutPolicy::default();
+        let mut renderer = super::WindowsCaptionRenderer::new(None).unwrap();
+        for (scale, has_text) in [
+            (1.0, true),
+            (1.2, true),
+            (1.0, false),
+            (1.2, false),
+            (1.2, false),
+            (1.0, true),
+            (1.0, false),
+        ] {
+            let presentation = CaptionPresentation {
+                text_scale: scale,
+                ..Default::default()
+            };
+            let (width, height) = policy.surface_size_for_presentation(&presentation);
+            let blocks = if has_text {
+                (0..2)
+                    .map(|slot| {
+                        CaptionBlock::new(format!("slot-{slot}"), "FIRST\nSECOND")
+                            .with_secondary_text("THIRD", true)
+                            .with_slot(slot, 40.0 + slot as f32 * (468.0 * scale + 36.0))
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let frame = renderer
+                .render(&policy, &presentation, blocks, width, height, None)
+                .unwrap();
+            assert_eq!(
+                renderer
+                    .prepare_frame_for_submission(&ReadinessCancellation::default())
+                    .await,
+                ReadinessOutcome::Ready,
+            );
+            let pixels = texture_pixels(&renderer);
+            assert_eq!(pixels.len(), width as usize * height as usize * 4);
+            if has_text {
+                for block in &frame.layout().visible_blocks {
+                    for line in block.primary_lines.iter().chain(block.secondary_line.iter()) {
+                        let start = line.origin_y as usize;
+                        let end = (line.origin_y + line.font_size_px * 1.5) as usize;
+                        assert!(end < height as usize);
+                        let region = &pixels[start * width as usize * 4..end * width as usize * 4];
+                        assert!(region.chunks_exact(4).any(|pixel| pixel[3] != 0));
+                    }
+                }
+            } else {
+                assert!(pixels.iter().all(|byte| *byte == 0));
+            }
         }
     }
 

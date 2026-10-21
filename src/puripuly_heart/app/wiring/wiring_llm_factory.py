@@ -40,10 +40,13 @@ from puripuly_heart.config.runtime_resolution import (
     CREDENTIAL_REF_OPENROUTER_MANAGED_QQ,
     CREDENTIAL_REF_QWEN_BEIJING,
     CREDENTIAL_REF_QWEN_SINGAPORE,
+    MANAGED_GEMMA_26B_MODEL,
+    MANAGED_GEMMA_MODEL,
     OPENAI_MODEL_GPT_6_LUNA,
     PROVIDER_CHATGPT,
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
+    PROVIDER_INDEX_TRANSLATE,
     PROVIDER_LOCAL_LLM,
     PROVIDER_MANAGED_GEMMA,
     PROVIDER_OPENAI,
@@ -63,6 +66,11 @@ from puripuly_heart.core.chatgpt.session import (
 from puripuly_heart.core.llm import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.fallback_racing import LLMProviderAttempt
 from puripuly_heart.core.llm.provider import LLMProvider, SemaphoreLLMProvider
+from puripuly_heart.core.local_translation.assets import (
+    GEMMA_26B_MODEL_ID,
+    GEMMA_MODEL_ID,
+    resolve_gemma_spec,
+)
 from puripuly_heart.core.local_translation.devices import resolve_llama_vulkan_device
 from puripuly_heart.core.local_translation.runtime import ManagedGemmaRuntimeOwner
 from puripuly_heart.core.managed_openrouter_release import OpenRouterReleaseRuntimeConfig
@@ -70,10 +78,9 @@ from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
-    OPENROUTER_MANAGED_API_KEY_SECRET,
-    OPENROUTER_MANAGED_QQ_API_KEY_SECRET,
     OpenRouterCredentialRuntimeConfig,
     load_managed_openrouter_user_identifier,
+    resolve_openrouter_credentials,
 )
 from puripuly_heart.core.openrouter_routing import (
     OpenRouterProviderRouting,
@@ -85,6 +92,7 @@ from puripuly_heart.domain.models import Translation
 from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanLLMProvider
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
 from puripuly_heart.providers.llm.gemini import GeminiLLMProvider
+from puripuly_heart.providers.llm.index_translate import IndexTranslateProvider
 from puripuly_heart.providers.llm.local_openai import LocalOpenAICompatibleLLMProvider
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
 from puripuly_heart.providers.llm.openai import OpenAILLMProvider
@@ -108,6 +116,9 @@ class LlmFactoryManagedIdentity:
     active_managed_credential_ref: str | None = None
     active_managed_expires_at: str | None = None
     local_managed_claim_sources: tuple[str, ...] = ()
+    pending_managed_operation_id: str | None = None
+    pending_managed_operation_source: str | None = None
+    pending_delivery_ack_source: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +136,9 @@ def llm_factory_extras_from_vnext(settings: AppSettingsVNext) -> LlmFactoryResol
             active_managed_credential_ref=identity.active_managed_credential_ref,
             active_managed_expires_at=identity.active_managed_expires_at,
             local_managed_claim_sources=tuple(identity.local_managed_claim_sources),
+            pending_managed_operation_id=identity.pending_managed_operation_id,
+            pending_managed_operation_source=identity.pending_managed_operation_source,
+            pending_delivery_ack_source=identity.pending_delivery_ack_source,
         ),
         gpu_device_id=settings.intent.translation.gpu_device_id,
     )
@@ -309,27 +323,6 @@ def _require_openrouter_byok_api_key(secrets: SecretStore) -> str:
     )
 
 
-def _openrouter_managed_api_key(
-    secrets: SecretStore,
-    credential: ResolvedCredentialRequirement,
-) -> str | None:
-    requested_secret_key = _openrouter_managed_api_key_secret_for_resolved_credential(credential)
-    opposite_secret_key = _opposite_openrouter_managed_api_key_secret(requested_secret_key)
-    requested_value = _normalize_secret_value(secrets.get(requested_secret_key))
-    opposite_value = _normalize_secret_value(secrets.get(opposite_secret_key))
-    if opposite_value is not None:
-        raise ValueError("OpenRouter managed local claim conflict")
-    return requested_value
-
-
-def _openrouter_managed_api_key_secret_for_resolved_credential(
-    credential: ResolvedCredentialRequirement,
-) -> str:
-    if credential.reference == CREDENTIAL_REF_OPENROUTER_MANAGED_QQ:
-        return OPENROUTER_MANAGED_QQ_API_KEY_SECRET
-    return OPENROUTER_MANAGED_API_KEY_SECRET
-
-
 def _managed_claim_source_for_resolved_credential(
     credential: ResolvedCredentialRequirement,
 ) -> str:
@@ -351,12 +344,6 @@ def _extras_have_opposite_managed_claim_source(
         )
         is not None
     )
-
-
-def _opposite_openrouter_managed_api_key_secret(secret_key: str) -> str:
-    if secret_key == OPENROUTER_MANAGED_QQ_API_KEY_SECRET:
-        return OPENROUTER_MANAGED_API_KEY_SECRET
-    return OPENROUTER_MANAGED_QQ_API_KEY_SECRET
 
 
 def _guarded_managed_release_service_for_claim(
@@ -489,6 +476,15 @@ def _openrouter_credential_config_from_resolved_fields(
         ),
         active_managed_expires_at=(
             None if identity is None else identity.active_managed_expires_at
+        ),
+        pending_managed_operation_id=(
+            None if identity is None else identity.pending_managed_operation_id
+        ),
+        pending_managed_operation_source=(
+            None if identity is None else identity.pending_managed_operation_source
+        ),
+        pending_delivery_ack_source=(
+            None if identity is None else identity.pending_delivery_ack_source
         ),
     )
 
@@ -629,7 +625,7 @@ def _openrouter_provider_from_resolved_fields(
             secrets=secrets,
             credential=credential,
         )
-        managed_api_key = _openrouter_managed_api_key(secrets, credential)
+        managed_api_key = resolve_openrouter_credentials(credential_config, secrets=secrets).api_key
         if force_managed_wrapper or managed_api_key is None:
             from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
@@ -688,6 +684,9 @@ def _provider_from_resolved_target(
     include_selection_alias: bool = True,
     chatgpt_session: ChatGptAccessTokenPort | None = None,
 ) -> LLMProvider:
+    if target.provider == PROVIDER_INDEX_TRANSLATE:
+        return IndexTranslateProvider(model=target.model, runtime_logging=runtime_logging)
+
     if target.provider == PROVIDER_CHATGPT:
         if target.credential.reference != CREDENTIAL_REF_CHATGPT_OAUTH:
             raise ValueError("ChatGPT plan requires its OAuth credential")
@@ -713,6 +712,12 @@ def _provider_from_resolved_target(
         return ManagedGemmaLLMProvider(
             runtime=managed_gemma_runtime,
             backend=backend,
+            spec=resolve_gemma_spec(
+                {
+                    MANAGED_GEMMA_MODEL: GEMMA_MODEL_ID,
+                    MANAGED_GEMMA_26B_MODEL: GEMMA_26B_MODEL_ID,
+                }[target.model]
+            ),
             vulkan_device=vulkan_device,
             release_runtime=managed_gemma_release,
             runtime_logging=runtime_logging,
@@ -938,6 +943,8 @@ def create_llm_provider_from_resolved_config(
             runtime_logging=runtime_logging,
             request_admission=base if isinstance(base, ChatGptPlanLLMProvider) else None,
         )
+    if config.primary.provider == PROVIDER_MANAGED_GEMMA:
+        return base
     return SemaphoreLLMProvider(
         inner=base,
         semaphore=asyncio.Semaphore(config.concurrency_limit),

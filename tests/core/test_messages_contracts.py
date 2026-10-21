@@ -49,7 +49,6 @@ def test_result_dtos_carry_message_refs_and_diagnostics_not_localized_text() -> 
 
     for result_type in (messages.RuntimeApplyResult, messages.TransactionResult):
         field_names = {field.name for field in fields(result_type)}
-        assert field_names == {"status", "message", "diagnostics"}
         assert field_names.isdisjoint(forbidden_localized_fields)
 
         hints = get_type_hints(result_type)

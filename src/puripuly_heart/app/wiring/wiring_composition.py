@@ -2,15 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 
+from puripuly_heart.app.ports.audio_test import AudioTestCapturePort
 from puripuly_heart.app.ports.desktop_overlay import (
     DesktopOverlayPolicy,
     DesktopWorkAreaPort,
 )
 from puripuly_heart.app.ports.manual_typing import SelfChatboxTypingPort
-from puripuly_heart.app.ports.microphone_test import (
-    MicrophoneTestCapturePort,
-    MicrophoneTestMeterCallback,
-)
 from puripuly_heart.app.ports.provider_verifier import ProviderVerifierPort
 from puripuly_heart.app.ports.self_capture_admission import (
     SelfCaptureAdmissionEffectSink,
@@ -24,7 +21,6 @@ from puripuly_heart.app.services.gpu_provider_recovery import (
 )
 from puripuly_heart.app.services.gpu_provider_recovery_application import (
     GpuProviderRecoveryApplicationOwner,
-    GpuProviderRecoveryAsyncEffect,
     GpuProviderRecoveryFailureSink,
     GpuProviderRecoveryPeerOwnerProvider,
     GpuProviderRecoveryPendingClear,
@@ -79,7 +75,6 @@ from puripuly_heart.app.services.local_asr_readiness import (
 from puripuly_heart.app.services.manual_typing import ManualTypingOwner
 from puripuly_heart.app.services.provider_credential_verification import (
     ProviderCredentialSelectedModelProvider,
-    ProviderCredentialVerificationDiagnosticsSink,
     ProviderCredentialVerificationErrorSink,
     ProviderCredentialVerificationInteractionOwner,
     ProviderCredentialVerificationOwner,
@@ -107,30 +102,20 @@ from puripuly_heart.core.runtime.vrchat_osc_presence import (
 from puripuly_heart.core.self_capture import SelfCaptureAdmissionPort
 
 
-def create_microphone_test_capture_adapter(
+def create_audio_test_capture_adapter(
     *,
-    clock: object,
     log_sink: Callable[[str], None],
-    meter_sink: Callable[
-        [float, MicrophoneTestMeterCallback | None, int | None],
-        Awaitable[None],
-    ],
-    route_observer: Callable[..., object],
-    channel_decision: Callable[..., object],
-    source_factory: Callable[..., object],
-) -> MicrophoneTestCapturePort:
-    from puripuly_heart.app.adapters.microphone_test_capture import (
-        MicrophoneTestCaptureAdapter,
-    )
+) -> AudioTestCapturePort:
+    from puripuly_heart.app.adapters.audio_test_capture import AudioTestCaptureAdapter
 
-    return MicrophoneTestCaptureAdapter(
-        clock=clock,
-        log_sink=log_sink,
-        meter_sink=meter_sink,
-        route_observer=route_observer,
-        channel_decision=channel_decision,
-        source_factory=source_factory,
-    )
+    return AudioTestCaptureAdapter(log_sink=log_sink)
+
+
+def create_audio_test_vad_engine() -> object:
+    from puripuly_heart.core.vad.bundled import bundled_silero_vad_onnx_path
+    from puripuly_heart.core.vad.silero import SileroVadOnnx
+
+    return SileroVadOnnx(model_path=bundled_silero_vad_onnx_path())
 
 
 def create_manual_typing_owner(
@@ -138,7 +123,6 @@ def create_manual_typing_owner(
     output_provider: Callable[[], SelfChatboxTypingPort | None],
     completion_provider: Callable[[object], object | None],
     log_diagnostic: Callable[[str], object],
-    log_error: Callable[[str], object],
     idle_timeout_seconds: float,
     submit_timeout_seconds: float,
 ) -> ManualTypingOwner:
@@ -146,7 +130,6 @@ def create_manual_typing_owner(
         output_provider=output_provider,
         completion_provider=completion_provider,
         log_diagnostic=log_diagnostic,
-        log_error=log_error,
         idle_timeout_seconds=idle_timeout_seconds,
         submit_timeout_seconds=submit_timeout_seconds,
     )
@@ -158,13 +141,11 @@ def create_provider_credential_verification_interaction_owner(
     selected_model_provider: ProviderCredentialSelectedModelProvider,
     connection_provider: Callable[[str], AlibabaConnection] | None = None,
     low_latency: bool,
-    diagnostics_sink: ProviderCredentialVerificationDiagnosticsSink | None = None,
     error_sink: ProviderCredentialVerificationErrorSink | None = None,
 ) -> ProviderCredentialVerificationInteractionOwner:
     return ProviderCredentialVerificationInteractionOwner(
         verification_owner=ProviderCredentialVerificationOwner(
             verifier=verifier,
-            diagnostics_sink=diagnostics_sink,
         ),
         selected_model_provider=selected_model_provider,
         connection_provider=connection_provider,
@@ -205,9 +186,6 @@ def create_gpu_provider_recovery_application_owner(
     self_owner_factory: GpuProviderRecoverySelfOwnerFactory,
     peer_owner_provider: GpuProviderRecoveryPeerOwnerProvider,
     self_state_sink: GpuProviderRecoverySelfStateSink,
-    ensure_self_switch: GpuProviderRecoveryAsyncEffect,
-    refresh_self: GpuProviderRecoveryAsyncEffect,
-    refresh_peer: GpuProviderRecoveryAsyncEffect,
     diagnostic_sink: GpuProviderRecoveryDiagnosticSink,
 ) -> GpuProviderRecoveryApplicationOwner:
     return GpuProviderRecoveryApplicationOwner(
@@ -223,9 +201,6 @@ def create_gpu_provider_recovery_application_owner(
         self_owner_factory=self_owner_factory,
         peer_owner_provider=peer_owner_provider,
         self_state_sink=self_state_sink,
-        ensure_self_switch=ensure_self_switch,
-        refresh_self=refresh_self,
-        refresh_peer=refresh_peer,
     )
 
 

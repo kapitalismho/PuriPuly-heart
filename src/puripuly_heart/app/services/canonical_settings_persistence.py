@@ -3,8 +3,10 @@ from __future__ import annotations
 import asyncio
 import copy
 import threading
+from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from functools import partial
 from pathlib import Path
 
 from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
@@ -12,6 +14,7 @@ from puripuly_heart.app.adapters.settings_vnext_canonical_persistence import (
 )
 from puripuly_heart.app.ports.application_runtime_logging import ApplicationRuntimeLoggingPort
 from puripuly_heart.app.ports.canonical_settings_persistence import (
+    CanonicalSettingsPersistenceError,
     CanonicalSettingsPersistencePort,
     ProviderVerificationBinding,
 )
@@ -40,6 +43,8 @@ from puripuly_heart.config.settings_vnext.schema import (
     with_telemetry_enabled,
     with_translation_runtime_policy,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.translation_policy import (
     FIXED_TRANSLATION_POLICY,
     TranslationRuntimePolicy,
@@ -63,15 +68,25 @@ def _managed_connection_delta(baseline: object, current: object) -> dict[str, ob
 
 
 @dataclass(slots=True)
+class _SettingsCommit:
+    settings: AppSettingsVNext
+    diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    ready: bool = False
+
+
+@dataclass(slots=True)
 class CanonicalSettingsPatchRepository:
     owner: SettingsOwner
     committed_settings: AppSettingsVNext
     base_settings: AppSettingsVNext | None = None
     surface: str = "translation_provider"
     provider_verification_binding: ProviderVerificationBinding | None = None
-    save_failure_sink: Callable[[str], None] | None = None
     commit_sink: Callable[[], None] | None = None
+    commit_guard: Callable[[], bool] | None = None
     commit_succeeded: bool = False
+    secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    secondary_omitted_count: int = 0
+    _publication: _SettingsCommit | None = None
 
     async def load(self) -> SettingsSnapshot:
         settings = self.owner.canonical or self.committed_settings
@@ -82,65 +97,108 @@ class CanonicalSettingsPatchRepository:
 
     async def save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
         self.commit_succeeded = False
-        base_settings = self.base_settings
-        source = base_settings or self.committed_settings
-        if (
-            base_settings is None
-            and "state" not in request.values
-            and "intent" not in request.values
-        ):
-            next_settings = copy.deepcopy(self.committed_settings)
-        elif request.values and all(
-            isinstance(path, str) and "." in path for path in request.values
-        ):
-            next_settings = apply_settings_path_patch(source, request.values)
-        elif "state" in request.values or "intent" in request.values:
-            next_settings = merge_canonical_payload(source, request.values)
-        else:
-            next_settings = copy.deepcopy(self.committed_settings)
-        if not isinstance(next_settings, AppSettingsVNext):
-            raise TypeError("canonical patch repository requires AppSettingsVNext")
-        self.owner.begin()
+        self._publication = None
+        self.secondary_diagnostics = ()
+        self.secondary_omitted_count = 0
         try:
-            self.owner.apply_canonical_delta(
-                self.owner.projection_snapshot or base_settings or next_settings,
-                next_settings,
-            )
-            if self.provider_verification_binding is not None:
-                self.owner.bind_provider_verification(self.provider_verification_binding)
-            await self.owner.persist_async()
-            self.commit_succeeded = True
-            if self.commit_sink is not None:
-                self.commit_sink()
+            result = await run_owned_thread_call(partial(self._save, request))
         except asyncio.CancelledError:
-            self.owner.rollback()
+            if self.commit_succeeded:
+                self._notify_commit()
             raise
-        except Exception:
-            self.owner.rollback()
-            if self.save_failure_sink is not None:
-                self.save_failure_sink("Failed to save settings mutation")
-            return SettingsCommitResult(
-                succeeded=False,
-                snapshot=None,
-                message=None,
-                diagnostics=_settings_mutation_diagnostics(
-                    component="settings_repository",
-                    operation="save",
-                    code="settings_save_failed",
-                    surface=self.surface,
-                ),
-            )
-        self.committed_settings = next_settings
-        self.owner.remember_projection(next_settings)
-        return SettingsCommitResult(
-            succeeded=True,
-            snapshot=SettingsSnapshot(
-                values=canonical_snapshot_values(self.committed_settings),
-                revision=None,
-            ),
-            message=None,
-            diagnostics=None,
-        )
+        if self.commit_succeeded:
+            self._notify_commit()
+        return result
+
+    def _notify_commit(self) -> None:
+        if self._publication is not None:
+            self.secondary_diagnostics += self._publication.diagnostics
+        if self.commit_sink is not None:
+            try:
+                self.commit_sink()
+            except Exception as exc:
+                self.secondary_diagnostics += (
+                    _settings_mutation_diagnostics(
+                        component="settings_repository",
+                        operation="commit_notification",
+                        code="settings_commit_notification_failed",
+                        surface=self.surface,
+                        exception=exc,
+                    ),
+                )
+
+    def _save(self, request: SettingsCommitRequest) -> SettingsCommitResult:
+        publication = None
+        try:
+            with self.owner._commit_lock:
+                if self.commit_guard is not None and not self.commit_guard():
+                    return SettingsCommitResult(
+                        succeeded=False,
+                        snapshot=None,
+                        message=None,
+                        diagnostics=ErrorDiagnostics(
+                            component="settings_repository",
+                            operation="save",
+                            code="settings_selection_superseded",
+                            category="lifecycle",
+                            visibility="basic",
+                            content_policy="metadata_only",
+                            status_code=None,
+                            retry_after_ms=None,
+                            fields={"surface": self.surface},
+                        ),
+                    )
+                try:
+                    source = self.base_settings or self.committed_settings
+                    if request.values and all(
+                        isinstance(path, str) and "." in path for path in request.values
+                    ):
+                        source = self.owner.canonical or source
+                        next_settings = apply_settings_path_patch(source, request.values)
+                    elif "state" in request.values or "intent" in request.values:
+                        next_settings = merge_canonical_payload(source, request.values)
+                    else:
+                        next_settings = copy.deepcopy(self.committed_settings)
+                    if not isinstance(next_settings, AppSettingsVNext):
+                        raise TypeError("canonical patch repository requires AppSettingsVNext")
+                    publication = self.owner._commit_delta_locked(
+                        source,
+                        next_settings,
+                        provider_verification_binding=self.provider_verification_binding,
+                    )
+                except Exception as exc:
+                    diagnostics = self.owner.last_failure or _settings_mutation_diagnostics(
+                        component="settings_repository",
+                        operation="save",
+                        code="settings_save_failed",
+                        surface=self.surface,
+                        exception=exc,
+                    )
+                    diagnostics = replace(
+                        diagnostics, fields={**diagnostics.fields, "surface": self.surface}
+                    )
+                    self.secondary_diagnostics = self.owner.persistence_secondary_diagnostics
+                    self.secondary_omitted_count = self.owner.persistence_secondary_omitted_count
+                    return SettingsCommitResult(
+                        succeeded=False,
+                        snapshot=None,
+                        message=None,
+                        diagnostics=diagnostics,
+                    )
+                self._publication = publication
+                self.committed_settings = publication.settings
+                self.commit_succeeded = True
+                return SettingsCommitResult(
+                    succeeded=True,
+                    snapshot=SettingsSnapshot(
+                        values=canonical_snapshot_values(self.committed_settings),
+                        revision=None,
+                    ),
+                    message=None,
+                    diagnostics=None,
+                )
+        finally:
+            self.owner._release_publication(publication)
 
 
 def compose_canonical_settings_persistence(
@@ -181,11 +239,24 @@ class SettingsOwner:
     commit_listener: Callable[[AppSettingsVNext], None] | None = None
     _commit_loop: asyncio.AbstractEventLoop | None = None
     _commit_thread: int | None = None
+    last_failure: ErrorDiagnostics | None = None
+    notification_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    persistence_secondary_diagnostics: tuple[ErrorDiagnostics, ...] = ()
+    persistence_secondary_omitted_count: int = 0
+    _commit_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _publication_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _publications: deque[_SettingsCommit] = field(default_factory=deque, repr=False)
+    _publishing: bool = False
 
     def require_canonical(self) -> AppSettingsVNext:
         if self.canonical is None:
             raise RuntimeError("settings owner has no canonical settings")
         return self.canonical
+
+    def require_committed(self) -> AppSettingsVNext:
+        if self.committed_settings is None:
+            raise RuntimeError("settings owner has no committed settings")
+        return self.committed_settings
 
     def observe_commits(self, listener: Callable[[AppSettingsVNext], None]) -> None:
         try:
@@ -249,39 +320,171 @@ class SettingsOwner:
         )
 
     def _publish_commit(self, snapshot: AppSettingsVNext) -> None:
-        self.committed_settings = snapshot
-        if self.commit_listener is not None:
-            self.commit_listener(snapshot)
+        with self._commit_lock:
+            publication = self._enqueue_commit_locked(snapshot)
+        self._release_publication(publication)
 
-    def persist(self) -> None:
+    def _enqueue_commit_locked(self, snapshot: AppSettingsVNext) -> _SettingsCommit:
+        publication = _SettingsCommit(snapshot)
+        self.committed_settings = snapshot
+        with self._publication_lock:
+            self._publications.append(publication)
+        return publication
+
+    def _release_publication(self, publication: _SettingsCommit | None) -> None:
+        if publication is not None:
+            with self._publication_lock:
+                publication.ready = True
+            self._dispatch_publications()
+
+    def _dispatch_publications(self) -> None:
+        with self._publication_lock:
+            if self._publishing or not self._publications:
+                return
+            self._publishing = True
         loop = self._commit_loop
-        different_thread = (
-            self.commit_listener is not None and threading.get_ident() != self._commit_thread
+        if loop is not None and threading.get_ident() != self._commit_thread:
+            try:
+                loop.call_soon_threadsafe(self._drain_publications)
+            except RuntimeError as exc:
+                self._fail_publications(exc)
+        else:
+            self._drain_publications()
+
+    def _fail_publications(self, exc: Exception) -> None:
+        diagnostics = (
+            _settings_mutation_diagnostics(
+                component="settings_repository",
+                operation="commit_notification",
+                code="settings_commit_notification_failed",
+                exception=exc,
+            ),
         )
-        if different_thread and (loop is None or not loop.is_running()):
+        with self._publication_lock:
+            while self._publications:
+                self._publications.popleft().diagnostics = diagnostics
+            self._publishing = False
+        self.notification_diagnostics = diagnostics
+
+    def _drain_publications(self) -> None:
+        while True:
+            with self._publication_lock:
+                if not self._publications or not self._publications[0].ready:
+                    self._publishing = False
+                    return
+                publication = self._publications.popleft()
+            if self.commit_listener is not None:
+                try:
+                    self.commit_listener(publication.settings)
+                except Exception as exc:
+                    publication.diagnostics = (
+                        _settings_mutation_diagnostics(
+                            component="settings_repository",
+                            operation="commit_notification",
+                            code="settings_commit_notification_failed",
+                            exception=exc,
+                        ),
+                    )
+                    self.notification_diagnostics = publication.diagnostics
+
+    def _persist_locked(self) -> _SettingsCommit:
+        self.last_failure = None
+        self.notification_diagnostics = ()
+        self.persistence_secondary_diagnostics = ()
+        self.persistence_secondary_omitted_count = 0
+        if (
+            self.commit_listener is not None
+            and threading.get_ident() != self._commit_thread
+            and (self._commit_loop is None or not self._commit_loop.is_running())
+        ):
             raise RuntimeError("settings commit observer loop is unavailable")
         snapshot = copy.deepcopy(self.require_canonical())
-        self.persistence.persist(self.path, snapshot)
-        if different_thread:
-            completed = threading.Event()
-
-            def publish() -> None:
-                try:
-                    self._publish_commit(snapshot)
-                finally:
-                    completed.set()
-
-            loop.call_soon_threadsafe(publish)
-            completed.wait()
-        else:
-            self._publish_commit(snapshot)
-
-    async def persist_async(self) -> None:
-        task = asyncio.create_task(asyncio.to_thread(self.persist))
         try:
-            await asyncio.shield(task)
-        except asyncio.CancelledError:
-            await asyncio.shield(task)
+            self.persistence.persist(self.path, snapshot)
+        except Exception as exc:
+            self.last_failure = (
+                exc.diagnostics if isinstance(exc, CanonicalSettingsPersistenceError) else None
+            ) or _settings_mutation_diagnostics(
+                component="settings_repository",
+                operation="save",
+                code="settings_save_failed",
+                exception=exc,
+            )
+            self.persistence_secondary_diagnostics = (
+                exc.secondary_diagnostics
+                if isinstance(exc, CanonicalSettingsPersistenceError)
+                else ()
+            )
+            self.persistence_secondary_omitted_count = (
+                exc.secondary_omitted_count
+                if isinstance(exc, CanonicalSettingsPersistenceError)
+                else 0
+            )
+            raise
+        return self._enqueue_commit_locked(snapshot)
+
+    def _commit_delta_locked(
+        self,
+        base_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+        *,
+        provider_verification_binding: ProviderVerificationBinding | None = None,
+        rollback_snapshot: AppSettingsVNext | None = None,
+    ) -> _SettingsCommit:
+        self.begin(snapshot=rollback_snapshot)
+        try:
+            self.apply_canonical_delta(base_settings, next_settings)
+            if provider_verification_binding is not None:
+                self.bind_provider_verification(provider_verification_binding)
+            publication = self._persist_locked()
+        except BaseException:
+            try:
+                self.rollback()
+            except Exception as exc:
+                self.persistence_secondary_diagnostics += (
+                    replace(
+                        _settings_mutation_diagnostics(
+                            component="settings_repository",
+                            operation="rollback",
+                            code="settings_rollback_failed",
+                            exception=exc,
+                        ),
+                        cause_id=self.last_failure.diagnostic_id if self.last_failure else None,
+                    ),
+                )
+            raise
+        self.canonical = publication.settings
+        self.remember_projection(publication.settings)
+        self.complete()
+        return publication
+
+    def commit_delta(
+        self,
+        base_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+    ) -> AppSettingsVNext:
+        publication = None
+        try:
+            with self._commit_lock:
+                publication = self._commit_delta_locked(base_settings, next_settings)
+                return publication.settings
+        finally:
+            self._release_publication(publication)
+
+    async def commit_delta_async(
+        self,
+        base_settings: AppSettingsVNext | None,
+        next_settings: AppSettingsVNext,
+    ) -> AppSettingsVNext:
+        return await run_owned_thread_call(partial(self.commit_delta, base_settings, next_settings))
+
+    def persist(self) -> None:
+        publication = None
+        try:
+            with self._commit_lock:
+                publication = self._persist_locked()
+        finally:
+            self._release_publication(publication)
 
     def save_current(
         self,
@@ -292,25 +495,33 @@ class SettingsOwner:
             self.persist_current()
         except Exception as exc:
             if failure_sink is not None:
-                failure_sink(exc)
+                try:
+                    failure_sink(exc)
+                except Exception as notification_exc:
+                    self.notification_diagnostics = (
+                        _settings_mutation_diagnostics(
+                            component="settings_repository",
+                            operation="failure_notification",
+                            code="settings_failure_notification_failed",
+                            exception=notification_exc,
+                        ),
+                    )
             return False
         return True
 
     def persist_current(self) -> None:
-        live = self.require_canonical()
-        owns_mutation = self.mutation_depth == 0
-        baseline = self.projection_snapshot or live
-        if owns_mutation:
-            self.begin(snapshot=baseline)
-        self.apply_canonical_delta(baseline, live)
+        publication = None
         try:
-            self.persist()
-        except Exception:
-            self.rollback()
-            raise
-        self.remember_projection(live)
-        if owns_mutation:
-            self.complete()
+            with self._commit_lock:
+                live = self.require_canonical()
+                baseline = self.projection_snapshot or live
+                publication = self._commit_delta_locked(
+                    baseline,
+                    live,
+                    rollback_snapshot=baseline if self.mutation_depth == 0 else None,
+                )
+        finally:
+            self._release_publication(publication)
 
     def with_telemetry_enabled(
         self,
@@ -320,26 +531,25 @@ class SettingsOwner:
         return with_telemetry_enabled(settings, enabled)
 
     def persist_telemetry_preference(self, enabled: bool) -> AppSettingsVNext:
-        if self.path.exists():
-            settings = self.persistence.load_active(self.path).canonical_settings
-        else:
-            settings = new_settings_for_first_run()
-        expected = self.with_telemetry_enabled(settings, enabled)
-        self.canonical = settings
-        self.begin(snapshot=settings)
-        self.canonical = expected
+        publication = None
         try:
-            self.persist()
-            verified = self.persistence.load_active(self.path).canonical_settings
-            if verified != expected:
-                raise RuntimeError("persisted telemetry preference did not verify")
-        except Exception:
-            self.rollback()
-            raise
-        self.canonical = verified
-        self.remember_projection(verified)
-        self.complete()
-        return verified
+            with self._commit_lock:
+                settings = self.canonical
+                if settings is None:
+                    settings = (
+                        self.persistence.load_active(self.path).canonical_settings
+                        if self.path.exists()
+                        else new_settings_for_first_run()
+                    )
+                publication = self._commit_delta_locked(
+                    settings, self.with_telemetry_enabled(settings, enabled)
+                )
+                verified = self.persistence.load_active(self.path).canonical_settings
+                if verified != publication.settings:
+                    raise RuntimeError("persisted telemetry preference did not verify")
+                return verified
+        finally:
+            self._release_publication(publication)
 
     def build_managed_openrouter_byok_target(
         self,
@@ -410,35 +620,32 @@ class SettingsOwner:
         *,
         bound_managed_snapshot: object | None = None,
     ) -> None:
-        active_settings = self.canonical or settings
-        baseline = self.projection_snapshot or active_settings
-        managed_baseline = (
-            bound_managed_snapshot
-            if bound_managed_snapshot is not None
-            else baseline.state.managed_connection
-        )
-        managed_delta = _managed_connection_delta(
-            managed_baseline,
-            settings.state.managed_connection,
-        )
-        next_state = replace(
-            active_settings.state,
-            managed_connection=replace(
-                active_settings.state.managed_connection,
-                **managed_delta,
-            ),
-        )
-        next_settings = replace(active_settings, state=next_state)
-        self.begin()
-        self.apply_canonical_delta(baseline, next_settings)
+        publication = None
         try:
-            self.persist()
-        except Exception:
-            self.rollback()
-            raise
-        self.canonical = next_settings
-        self.remember_projection(next_settings)
-        self.complete()
+            with self._commit_lock:
+                active_settings = self.canonical or settings
+                managed_baseline = (
+                    bound_managed_snapshot
+                    if bound_managed_snapshot is not None
+                    else (self.projection_snapshot or active_settings).state.managed_connection
+                )
+                managed_delta = _managed_connection_delta(
+                    managed_baseline,
+                    settings.state.managed_connection,
+                )
+                next_settings = replace(
+                    active_settings,
+                    state=replace(
+                        active_settings.state,
+                        managed_connection=replace(
+                            active_settings.state.managed_connection,
+                            **managed_delta,
+                        ),
+                    ),
+                )
+                publication = self._commit_delta_locked(active_settings, next_settings)
+        finally:
+            self._release_publication(publication)
 
     def managed_identity_persistence_callback(
         self,
@@ -485,39 +692,34 @@ class SettingsOwner:
         binding: ProviderVerificationBinding | None,
         active_secret: str | None,
     ) -> None:
-        live = self.require_canonical()
-        baseline = copy.deepcopy(self.projection_snapshot or live)
-        self.begin()
-        verification = live.state.provider_verification
         if success:
-            next_entry = ProviderVerificationEntry(status="unknown")
-        else:
-            next_entry = ProviderVerificationEntry(status="unknown")
-        next_settings = replace(
-            live,
-            state=replace(
-                live.state,
-                provider_verification=replace(verification, **{provider: next_entry}),
-            ),
-        )
+            if binding is None:
+                raise RuntimeError("verified provider requires evidence binding")
+            if active_secret != key:
+                raise RuntimeError(
+                    "verified credential does not match the active SecretStore value"
+                )
+        publication = None
         try:
-            self.apply_canonical_delta(baseline, next_settings)
-            if success:
-                if binding is None:
-                    raise RuntimeError("verified provider requires evidence binding")
-                if active_secret != key:
-                    raise RuntimeError(
-                        "verified credential does not match the active SecretStore value"
-                    )
-                self.bind_provider_verification(binding)
-            else:
-                self.canonical = next_settings
-            self.persist()
-        except Exception:
-            self.rollback()
-            raise
-        self.remember_projection(self.require_canonical())
-        self.complete()
+            with self._commit_lock:
+                live = self.require_canonical()
+                next_settings = replace(
+                    live,
+                    state=replace(
+                        live.state,
+                        provider_verification=replace(
+                            live.state.provider_verification,
+                            **{provider: ProviderVerificationEntry(status="unknown")},
+                        ),
+                    ),
+                )
+                publication = self._commit_delta_locked(
+                    live,
+                    next_settings,
+                    provider_verification_binding=binding if success else None,
+                )
+        finally:
+            self._release_publication(publication)
 
     @staticmethod
     def snapshot_values(settings: AppSettingsVNext) -> dict[str, object]:
@@ -530,8 +732,8 @@ class SettingsOwner:
         base_settings: AppSettingsVNext | None = None,
         surface: str = "translation_provider",
         provider_verification_binding: ProviderVerificationBinding | None = None,
-        save_failure_sink: Callable[[str], None] | None = None,
         commit_sink: Callable[[], None] | None = None,
+        commit_guard: Callable[[], bool] | None = None,
     ) -> CanonicalSettingsPatchRepository:
         return CanonicalSettingsPatchRepository(
             owner=self,
@@ -539,52 +741,50 @@ class SettingsOwner:
             base_settings=base_settings,
             surface=surface,
             provider_verification_binding=provider_verification_binding,
-            save_failure_sink=save_failure_sink,
             commit_sink=commit_sink,
+            commit_guard=commit_guard,
         )
 
     def apply_capture_target(self, capture_target: CaptureTargetIntent) -> AppSettingsVNext:
-        if self.canonical is None:
-            self.canonical = new_settings_for_first_run()
-        snapshot = self.persistence.snapshot(self.canonical)
-        self.canonical = with_capture_target(self.canonical, capture_target)
+        publication = None
         try:
-            self.persist()
-        except Exception:
-            self.canonical = self.persistence.rollback(snapshot)
-            raise
-        return self.require_canonical()
+            with self._commit_lock:
+                live = self.canonical or new_settings_for_first_run()
+                publication = self._commit_delta_locked(
+                    live, with_capture_target(live, capture_target)
+                )
+                return publication.settings
+        finally:
+            self._release_publication(publication)
 
     def update_capture_target(
         self,
         settings: AppSettingsVNext,
         capture_target: CaptureTargetIntent,
     ) -> AppSettingsVNext:
-        if self.canonical is None:
-            self.canonical = settings
-        snapshot = self.persistence.snapshot(self.canonical)
-        desktop_audio = self.canonical.intent.desktop_audio
-        self.canonical = with_capture_target(
-            replace(
-                self.canonical,
-                intent=replace(
-                    self.canonical.intent,
-                    desktop_audio=replace(
-                        desktop_audio,
-                        vad_speech_threshold=settings.intent.desktop_audio.vad_speech_threshold,
-                        vad_hangover_ms=settings.intent.desktop_audio.vad_hangover_ms,
-                        vad_pre_roll_ms=settings.intent.desktop_audio.vad_pre_roll_ms,
-                    ),
-                ),
-            ),
-            capture_target,
-        )
+        publication = None
         try:
-            self.persist()
-        except Exception:
-            self.canonical = self.persistence.rollback(snapshot)
-            raise
-        return self.require_canonical()
+            with self._commit_lock:
+                live = self.canonical or settings
+                next_settings = with_capture_target(
+                    replace(
+                        live,
+                        intent=replace(
+                            live.intent,
+                            desktop_audio=replace(
+                                live.intent.desktop_audio,
+                                vad_speech_threshold=settings.intent.desktop_audio.vad_speech_threshold,
+                                vad_hangover_ms=settings.intent.desktop_audio.vad_hangover_ms,
+                                vad_pre_roll_ms=settings.intent.desktop_audio.vad_pre_roll_ms,
+                            ),
+                        ),
+                    ),
+                    capture_target,
+                )
+                publication = self._commit_delta_locked(live, next_settings)
+                return publication.settings
+        finally:
+            self._release_publication(publication)
 
     def materialize_translation(self, settings: AppSettingsVNext) -> AppSettingsVNext:
         return materialize_canonical_translation_settings(settings)
@@ -677,6 +877,20 @@ def materialize_canonical_translation_settings(settings: AppSettingsVNext) -> Ap
     )
 
     translation = settings.intent.translation
+    if translation.model == "index_translate_35b":
+        return replace(
+            settings,
+            intent=replace(
+                settings.intent,
+                translation=replace(
+                    translation,
+                    connection="public_api",
+                    openrouter_selected_source="none",
+                    openrouter_selection_alias=None,
+                    openrouter_provider_routing="default",
+                ),
+            ),
+        )
     model = "gemma4_26b_31b" if translation.model in {"gemma4", "gemma4_31b"} else translation.model
     if model != translation.model:
         translation = replace(translation, model=model)

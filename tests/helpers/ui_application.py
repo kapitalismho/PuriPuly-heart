@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -26,11 +27,11 @@ from puripuly_heart.app.ports.settings_view import (
     ProviderApplyIntent,
 )
 from puripuly_heart.app.ports.ui_application_intents import (
+    UiAudioTestRuntimePort,
     UiDiagnosticsRuntimePort,
     UiEngagementRuntimePort,
     UiInputRuntimePort,
     UiManagedRuntimePort,
-    UiMicrophoneRuntimePort,
     UiOverlayRuntimePort,
     UiPeerCaptureRuntimePort,
     UiProviderRuntimePort,
@@ -39,6 +40,8 @@ from puripuly_heart.app.ports.ui_application_intents import (
 from puripuly_heart.app.ports.ui_application_state import (
     UiApplicationStateRuntimePort,
 )
+from puripuly_heart.app.services.application_control import ApplicationControlOwner
+from puripuly_heart.app.services.application_control_events import ControlEvents
 from puripuly_heart.app.services.application_shutdown import (
     ApplicationShutdownContext,
     ApplicationShutdownDiagnostic,
@@ -207,13 +210,18 @@ class UiApplicationRuntimeStub:
         )
         return bool(refresh()) if callable(refresh) else False
 
-    async def stop_microphone_test(self) -> None:
-        stop = getattr(self._backend, "stop_microphone_test", None)
+    async def stop_audio_test(self) -> None:
+        stop = getattr(self._backend, "stop_audio_test", None)
         if not callable(stop):
             return
         result = stop()
         if hasattr(result, "__await__"):
             await result
+
+    def release_audio_test_capture_restore(self, channel: str) -> None:
+        release = getattr(self._backend, "release_audio_test_capture_restore", None)
+        if callable(release):
+            release(channel)
 
     def overlay_peer_presentation_state(self) -> object | None:
         state = getattr(self._backend, "overlay_peer_presentation_state", None)
@@ -226,6 +234,10 @@ class UiApplicationRuntimeStub:
     def dashboard_managed_auth_prompt_kind(self) -> str:
         prompt = getattr(self._backend, "dashboard_managed_auth_prompt_kind", None)
         return str(prompt()) if callable(prompt) else "discord"
+
+    def managed_auth_last_message_key(self) -> str | None:
+        accessor = getattr(self._backend, "managed_auth_last_message_key", None)
+        return accessor() if callable(accessor) else None
 
     async def apply_telemetry_enabled(self, enabled: bool) -> object | None:
         apply = getattr(self._backend, "apply_telemetry_enabled", None)
@@ -326,8 +338,8 @@ class UiApplicationStateRuntimeStub:
         return bool(getattr(peer, "eula_accepted", False))
 
     @property
-    def microphone_test_active(self) -> bool:
-        return bool(getattr(self._backend, "microphone_test_active", False))
+    def audio_test_active(self) -> bool:
+        return bool(getattr(self._backend, "audio_test_active", False))
 
     @property
     def provider_name(self) -> str | None:
@@ -353,17 +365,6 @@ class UiApplicationStateRuntimeStub:
     @property
     def desktop_overlay_captions_locked(self) -> bool:
         return bool(getattr(self._backend, "desktop_overlay_captions_locked", False))
-
-    @property
-    def managed_auth_referral_bonus_applied(self) -> bool:
-        return (
-            getattr(
-                self._backend,
-                "last_discord_managed_auth_referral_bonus_applied",
-                False,
-            )
-            is True
-        )
 
     @property
     def overlay_calibration(self) -> object:
@@ -414,7 +415,7 @@ class ApplicationRuntimeShutdownStub:
     async def close_local_asr_provisioning(self) -> None:
         return None
 
-    async def close_microphone_test_runtime(self) -> None:
+    async def close_audio_test_runtime(self) -> None:
         return None
 
     async def close_self_capture_owner(self) -> None:
@@ -498,6 +499,8 @@ def compose_test_ui_application_boundary(
     runtime_shutdown: ApplicationRuntimeShutdownPort | None = None,
     runtime_logging: ApplicationRuntimeLoggingPort | None = None,
     osc_state_publisher: Callable[[], object] | None = None,
+    runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
+    runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
 ) -> UiApplicationBoundary:
     logging_port = runtime_logging or ApplicationRuntimeLoggingStub(backend)
     state_runtime = cast(
@@ -505,13 +508,13 @@ def compose_test_ui_application_boundary(
         UiApplicationStateRuntimeStub(backend),
     )
     runtime = UiApplicationRuntimeStub(backend)
-    return UiApplicationBoundary(
+    boundary = UiApplicationBoundary(
         startup=cast(ApplicationStartupOwner, runtime),
         input_runtime=cast(UiInputRuntimePort, runtime),
         peer_capture=cast(UiPeerCaptureRuntimePort, runtime),
         settings=cast(UiSettingsRuntimePort, runtime),
         provider=cast(UiProviderRuntimePort, runtime),
-        microphone=cast(UiMicrophoneRuntimePort, runtime),
+        audio_test=cast(UiAudioTestRuntimePort, runtime),
         overlay=cast(UiOverlayRuntimePort, runtime),
         managed=cast(UiManagedRuntimePort, runtime),
         engagement=cast(UiEngagementRuntimePort, runtime),
@@ -523,4 +526,26 @@ def compose_test_ui_application_boundary(
             secret_store_factory=EmptySettingsSecretStore,
         ),
         osc_state_publisher=osc_state_publisher,
+        runtime_control_authority=runtime_control_authority,
+        runtime_control_activity=runtime_control_activity,
     )
+    boundary.attach_control(
+        ApplicationControlOwner(
+            application=boundary,
+            settings=None,
+            pipeline=None,
+            results=None,
+            events=ControlEvents(),
+            provisioning=lambda: None,
+            gpu=lambda: None,
+            peer=lambda: None,
+            calibration=lambda: None,
+            gemma=lambda: None,
+            sync_ui=lambda: None,
+            locale_choices=("en",),
+            localize=lambda key: key,
+            gemma_selection=lambda _settings: None,
+            instance_id="00000000-0000-0000-0000-000000000231",
+        ),
+    )
+    return boundary

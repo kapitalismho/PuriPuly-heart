@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
 import pytest
 
 from puripuly_heart.release_evidence import release_identity as identity
+from tests.helpers.native_pe import write_pe
 
 VERSION = "2.6.1"
 TAG = "v2.6.1"
@@ -120,41 +124,187 @@ def test_release_surface_rejects_tag_version_disagreement() -> None:
         )
 
 
-def test_native_release_surface_and_provenance_round_trip(tmp_path) -> None:
-    version = "2.8.0"
-    tag = f"v{version}"
-    installer = tmp_path / identity.installer_filename(version)
-    installer.write_bytes(b"native-installer")
-    provenance = identity.build_provenance(
-        version=version,
-        tag=tag,
-        source_sha=SOURCE_SHA,
-        build_origin="github-hosted",
-        repository="owner/repo",
-        server_url="https://github.com",
-        run_id="123",
-        run_attempt="1",
-        artifacts=_artifact_entries([installer]),
-    )
-    provenance_path = tmp_path / "provenance.json"
-    identity.write_provenance_file(provenance_path, provenance)
-    reloaded = json.loads(provenance_path.read_text(encoding="utf-8"))
-
-    assert reloaded["tag"] == tag
-    assert reloaded["version"] == version
-    assert identity.check_tag_matches_version(tag, version) == tag
-    assert (
-        identity.verify_release_surface(
-            version=version,
-            tag=reloaded["tag"],
-            title=tag,
-            installer_exe=installer.name,
-            body_text=f"Download `{installer.name}` below.",
-            asset_names=[installer.name],
+@pytest.fixture
+def native_release_inputs(tmp_path: Path) -> tuple[dict[str, Path], Path]:
+    names = {
+        "main-executable": "PuriPulyHeart.exe",
+        "gpu-worker-executable": "PuriPulyHeartGpuWorker.exe",
+        "overlay-executable": "PuriPulyHeartOverlay.exe",
+        "installer": INSTALLER_EXE,
+    }
+    paths = {
+        role: write_pe(
+            tmp_path / name,
+            version=f"{VERSION}.0",
+            metadata={
+                "ProductName": identity.PRODUCT_NAME,
+                "ProductVersion": VERSION,
+                "FileDescription": role,
+            },
         )
-        == installer.name
+        for role, name in names.items()
+    }
+    return paths, tmp_path / "provenance.json"
+
+
+def _identity_cli(tmp_path: Path, arguments: list[str]) -> subprocess.CompletedProcess[str]:
+    environment = dict(os.environ)
+    environment["LOCALAPPDATA"] = str(tmp_path / "profile")
+    return subprocess.run(
+        [sys.executable, "-I", "-B", "-m", identity.__name__, *arguments],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+        timeout=30,
     )
-    identity.verify_assets_against_provenance(reloaded, [installer])
+
+
+def _build_arguments(paths: dict[str, Path], provenance_path: Path) -> list[str]:
+    return [
+        "verify-build",
+        "--version",
+        VERSION,
+        "--tag",
+        TAG,
+        "--source-sha",
+        SOURCE_SHA,
+        "--build-origin",
+        "local",
+        "--main-exe",
+        str(paths["main-executable"]),
+        "--gpu-worker-exe",
+        str(paths["gpu-worker-executable"]),
+        "--overlay-exe",
+        str(paths["overlay-executable"]),
+        "--installer",
+        str(paths["installer"]),
+        "--provenance-out",
+        str(provenance_path),
+    ]
+
+
+def _publish_arguments(installer: Path, body: Path, provenance_path: Path) -> list[str]:
+    return [
+        "verify-publish",
+        "--version",
+        VERSION,
+        "--tag",
+        TAG,
+        "--title",
+        TAG,
+        "--installer-exe",
+        installer.name,
+        "--body",
+        str(body),
+        "--asset",
+        str(installer),
+        "--provenance-json",
+        provenance_path.read_text(encoding="utf-8"),
+    ]
+
+
+def test_native_release_cli_verifies_build_provenance_and_publication(
+    tmp_path: Path, native_release_inputs: tuple[dict[str, Path], Path]
+) -> None:
+    paths, provenance_path = native_release_inputs
+    built = _identity_cli(tmp_path, _build_arguments(paths, provenance_path))
+    assert built.returncode == 0, built.stderr
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    assert json.loads(built.stdout) == provenance
+    assert provenance["version"] == VERSION
+    assert provenance["tag"] == TAG
+    assert provenance["source_sha"] == SOURCE_SHA
+    assert provenance["build_origin"] == "local"
+    assert "workflow" not in provenance
+    assert {entry["role"] for entry in provenance["artifacts"]} == paths.keys()
+    for entry in provenance["artifacts"]:
+        path = paths[entry["role"]]
+        assert entry["filename"] == path.name
+        assert entry["size"] == path.stat().st_size
+        assert entry["sha256"] == hashlib.sha256(path.read_bytes()).hexdigest()
+        assert entry["product_name"] == identity.PRODUCT_NAME
+        assert entry["product_version"] == VERSION
+        assert entry["file_description"] == entry["role"]
+
+    template = tmp_path / "template.md"
+    template.write_text("Download `{{INSTALLER_EXE}}` below.", encoding="utf-8")
+    body = tmp_path / "body.md"
+    rendered = _identity_cli(
+        tmp_path,
+        [
+            "render-body",
+            "--template",
+            str(template),
+            "--installer-exe",
+            INSTALLER_EXE,
+            "--output",
+            str(body),
+        ],
+    )
+    assert rendered.returncode == 0, rendered.stderr
+    published = _identity_cli(
+        tmp_path, _publish_arguments(paths["installer"], body, provenance_path)
+    )
+    assert published.returncode == 0, published.stderr
+    assert json.loads(published.stdout) == {
+        "version": VERSION,
+        "tag": TAG,
+        "installer_exe": INSTALLER_EXE,
+        "assets": [INSTALLER_EXE],
+        "source_sha": SOURCE_SHA,
+        "build_origin": "local",
+    }
+
+
+@pytest.mark.parametrize(
+    "version,product,error",
+    [
+        (f"{VERSION}.0", "Unrelated Product", "ProductName mismatch"),
+        ("9.9.9.0", identity.PRODUCT_NAME, "binary ProductVersion mismatch"),
+    ],
+)
+def test_verify_build_cli_rejects_wrong_pe_metadata_without_emitting_provenance(
+    tmp_path: Path,
+    native_release_inputs: tuple[dict[str, Path], Path],
+    version: str,
+    product: str,
+    error: str,
+) -> None:
+    paths, provenance_path = native_release_inputs
+    write_pe(
+        paths["gpu-worker-executable"],
+        version=version,
+        metadata={"ProductName": product, "ProductVersion": VERSION},
+    )
+
+    rejected = _identity_cli(tmp_path, _build_arguments(paths, provenance_path))
+
+    assert rejected.returncode != 0
+    assert error in rejected.stderr
+    assert paths["gpu-worker-executable"].name in rejected.stderr
+    assert not provenance_path.exists()
+
+
+def test_publish_cli_rejects_other_role_bytes_with_valid_product_metadata(
+    tmp_path: Path, native_release_inputs: tuple[dict[str, Path], Path]
+) -> None:
+    paths, provenance_path = native_release_inputs
+    built = _identity_cli(tmp_path, _build_arguments(paths, provenance_path))
+    assert built.returncode == 0, built.stderr
+    installer = paths["installer"]
+    installer.write_bytes(paths["main-executable"].read_bytes())
+    identity.verify_pe_product_metadata(installer, expected_version=VERSION)
+    body = tmp_path / "body.md"
+    body.write_text(f"Download `{INSTALLER_EXE}` below.", encoding="utf-8")
+
+    rejected = _identity_cli(tmp_path, _publish_arguments(installer, body, provenance_path))
+
+    assert rejected.returncode != 0
+    assert "disagrees" in rejected.stderr
+    assert installer.name in rejected.stderr
 
 
 @pytest.mark.parametrize("mutation", ["bytes", "version", "tag", "unrecorded"])

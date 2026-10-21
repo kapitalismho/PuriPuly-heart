@@ -11,6 +11,7 @@ from puripuly_heart.core.stt.backend import (
     STTTextContribution,
 )
 from puripuly_heart.domain.models import FinalLanguageRun, FinalSpeakerRun
+from puripuly_heart.domain.recognition import RecognitionTextOrigin
 
 
 class STTNormalizationError(RuntimeError):
@@ -35,9 +36,12 @@ class STTScopedTurnNormalizer:
         identity: STTProviderTurnIdentity,
         *,
         diagnostic_sink: Callable[[STTNormalizationDiagnostic], object] | None = None,
+        preserve_text: bool = False,
     ) -> None:
         self.identity = identity
         self._diagnostic_sink = diagnostic_sink
+        self._preserve_text = preserve_text
+        self._recognition_origins: tuple[RecognitionTextOrigin, ...] = ()
         self._stable_text = ""
         self._stable_raw_text = ""
         self._stable_raw_runs: tuple[FinalLanguageRun, ...] = ()
@@ -78,6 +82,8 @@ class STTScopedTurnNormalizer:
         if native_event_id is not None:
             self._native_event_ids.add(native_event_id)
         self._remember_provenance(update.provenance)
+        if update.recognition_origins:
+            self._recognition_origins = update.recognition_origins
         contribution: STTTextContribution | None = None
         if update.stability == "stable":
             previous_length = len(self._stable_text)
@@ -144,6 +150,7 @@ class STTScopedTurnNormalizer:
             final_speaker_runs=speaker_runs,
             provenance=update.provenance,
             contribution=contribution,
+            recognition_origins=self._recognition_origins,
         )
 
     def apply_terminal(self, terminal: STTProviderTurnTerminal) -> STTProviderTurnTerminal:
@@ -154,6 +161,8 @@ class STTScopedTurnNormalizer:
             if item.native_event_id is not None:
                 self._native_event_ids.add(item.native_event_id)
             self._remember_provenance(item)
+        if terminal.recognition_origins:
+            self._recognition_origins = terminal.recognition_origins
         raw_text = terminal.text if terminal.text else self._stable_text
         runs = terminal.final_language_runs if terminal.text else self._stable_runs
         speaker_runs = terminal.final_speaker_runs if terminal.text else self._stable_speaker_runs
@@ -183,6 +192,8 @@ class STTScopedTurnNormalizer:
             text = ""
             runs = ()
             speaker_runs = ()
+            self._recognition_origins = ()
+            self._contributions.clear()
             authority = "none"
         elif outcome == "final":
             authority = "authoritative"
@@ -212,6 +223,8 @@ class STTScopedTurnNormalizer:
             recovery_pending=terminal.recovery_pending,
             provenance=tuple(self._provenance),
             included_contributions=tuple(self._contributions),
+            failure_diagnostics=terminal.failure_diagnostics,
+            recognition_origins=self._recognition_origins,
         )
         return self._terminal
 
@@ -295,7 +308,7 @@ class STTScopedTurnNormalizer:
         text: str,
         runs: tuple[FinalLanguageRun, ...],
     ) -> tuple[str, tuple[FinalLanguageRun, ...]]:
-        normalized = text.strip()
+        normalized = text if self._preserve_text else text.strip()
         if not normalized:
             return "", ()
         if not runs:
@@ -305,8 +318,8 @@ class STTScopedTurnNormalizer:
                 normalized, "language_run_conservation_fallback"
             )
         trimmed = list(runs)
-        left = len(text) - len(text.lstrip())
-        right = len(text) - len(text.rstrip())
+        left = 0 if self._preserve_text else len(text) - len(text.lstrip())
+        right = 0 if self._preserve_text else len(text) - len(text.rstrip())
         while left and trimmed:
             item = trimmed[0]
             amount = min(left, len(item.text))
@@ -354,6 +367,8 @@ class STTScopedTurnNormalizer:
     ) -> tuple[FinalSpeakerRun, ...]:
         if not runs:
             return ()
+        if self._preserve_text and "".join(item.text for item in runs) == text:
+            return runs
         if "".join(item.text for item in runs) != text:
             self._diagnose("speaker_run_conservation_fallback")
             return (FinalSpeakerRun(text.strip(), None, "", attribution_state="malformed"),)
@@ -469,6 +484,12 @@ class STTScopedTurnNormalizer:
                 )
                 if value is not None
             )
+            if provenance.transcription is not None:
+                size += provenance.transcription.retained_bytes
+        size += sum(
+            128 + (origin.native.retained_bytes if origin.native is not None else 0)
+            for origin in self._recognition_origins
+        )
         if size > self.MAX_ASSEMBLY_BYTES:
             raise STTNormalizationError("provider_result_too_large")
 

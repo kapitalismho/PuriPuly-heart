@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from puripuly_heart.app.ports.provider_verifier import (
     PROVIDER_VERIFICATION_STATUS_FAILED,
@@ -16,17 +16,12 @@ from puripuly_heart.config.alibaba_connection import (
     validated_native_url,
     validated_websocket_url,
 )
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import (
-    format_error_report_for_log,
     openrouter_auth_failure_report,
+    provider_failure_report,
+    stt_failure_report,
 )
-from puripuly_heart.core.messages import (
-    CONTENT_POLICY_METADATA_ONLY,
-    DIAGNOSTIC_CATEGORY_AUTH,
-    DIAGNOSTIC_VISIBILITY_BASIC,
-    ErrorDiagnostics,
-)
-from puripuly_heart.core.openrouter.authentication import OpenRouterAuthenticationError
 from puripuly_heart.core.openrouter_metadata import OpenRouterKeyMetadata
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 from puripuly_heart.providers.llm.deepseek import DeepSeekLLMProvider
@@ -63,28 +58,6 @@ def _optional_context_str(request: ProviderVerificationRequest, key: str) -> str
 def _optional_context_bool(request: ProviderVerificationRequest, key: str) -> bool:
     value = request.context.get(key)
     return bool(value) if isinstance(value, bool) else False
-
-
-def _verification_diagnostics(
-    *,
-    provider: str,
-    code: str,
-    error_type: str | None = None,
-) -> ErrorDiagnostics:
-    fields: dict[str, str] = {"provider": provider}
-    if error_type:
-        fields["error_type"] = error_type
-    return ErrorDiagnostics(
-        component="provider_verifier",
-        operation="verify_api_key",
-        code=code,
-        category=DIAGNOSTIC_CATEGORY_AUTH,
-        visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-        content_policy=CONTENT_POLICY_METADATA_ONLY,
-        status_code=None,
-        retry_after_ms=None,
-        fields=fields,
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,33 +174,44 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
         except Exception as exc:
             if request.provider == "openrouter":
                 report = openrouter_auth_failure_report(exc, stage="key_verification")
-                logger.error("[OpenRouterAuth] failed " + format_error_report_for_log(report))
-                return ProviderVerificationResult(
-                    status=PROVIDER_VERIFICATION_STATUS_FAILED,
-                    provider=request.provider,
-                    secret_key=request.secret_key,
-                    secret_revision=request.secret_revision,
-                    evidence={"verifier": "provider_adapter", "provider": request.provider},
-                    message=report.message,
-                    diagnostics=report.diagnostics,
+            elif request.provider in {
+                "deepgram",
+                "gemini_transcribe",
+                "elevenlabs_scribe",
+                "soniox",
+            }:
+                report = stt_failure_report(
+                    exc, provider=request.provider, operation="key_verification", channel=""
                 )
+            else:
+                report = provider_failure_report(
+                    exc, provider=request.provider, operation="key_verification"
+                )
+            diagnostics = replace(
+                report.diagnostics,
+                channel=None,
+                fields={
+                    **{
+                        key: value
+                        for key, value in report.diagnostics.fields.items()
+                        if key != "channel"
+                    },
+                    "verification_scope": "key_probe",
+                    "recognition_readiness": "unobserved",
+                },
+            )
+            emit_failure(logger, diagnostics, stage="key_verification")
             return ProviderVerificationResult(
                 status=PROVIDER_VERIFICATION_STATUS_FAILED,
                 provider=request.provider,
                 secret_key=request.secret_key,
                 secret_revision=request.secret_revision,
                 evidence={
-                    "verifier": "provider_adapter",
-                    "provider": request.provider,
-                    "context_count": len(request.context),
-                    "error_type": type(exc).__name__,
+                    "verification_scope": "key_probe",
+                    "recognition_readiness": "unobserved",
                 },
-                message=None,
-                diagnostics=_verification_diagnostics(
-                    provider=request.provider,
-                    code="provider_verifier_exception",
-                    error_type=type(exc).__name__,
-                ),
+                message=report.message,
+                diagnostics=diagnostics,
             )
 
         if verified:
@@ -240,26 +224,13 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
                     "verifier": "provider_adapter",
                     "provider": request.provider,
                     "context_count": len(request.context),
+                    "verification_scope": "key_probe",
+                    "recognition_readiness": "unobserved",
                 },
                 message=None,
                 diagnostics=None,
             )
 
-        if request.provider == "openrouter":
-            report = openrouter_auth_failure_report(
-                OpenRouterAuthenticationError.from_status(401, stage="key_verification"),
-                stage="key_verification",
-            )
-            logger.error("[OpenRouterAuth] failed " + format_error_report_for_log(report))
-            return ProviderVerificationResult(
-                status=PROVIDER_VERIFICATION_STATUS_FAILED,
-                provider=request.provider,
-                secret_key=request.secret_key,
-                secret_revision=request.secret_revision,
-                evidence={"verifier": "provider_adapter", "provider": request.provider},
-                message=report.message,
-                diagnostics=report.diagnostics,
-            )
         return ProviderVerificationResult(
             status=PROVIDER_VERIFICATION_STATUS_FAILED,
             provider=request.provider,
@@ -268,13 +239,12 @@ class ProviderVerifierAdapter(ProviderVerifierPort):
             evidence={
                 "verifier": "provider_adapter",
                 "provider": request.provider,
+                "verification_scope": "key_probe",
+                "recognition_readiness": "unobserved",
                 "context_count": len(request.context),
             },
             message=None,
-            diagnostics=_verification_diagnostics(
-                provider=request.provider,
-                code="provider_verification_failed",
-            ),
+            diagnostics=None,
         )
 
 

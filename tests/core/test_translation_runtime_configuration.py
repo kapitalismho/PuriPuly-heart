@@ -33,8 +33,9 @@ class FakeOsc:
     def enqueue(self, message) -> None:
         self.messages.append(message)
 
-    def send_immediate(self, _text: str) -> bool:
-        return True
+    def send_immediate(self, _text: str) -> tuple[bool, None]:
+
+        return True, None
 
     def send_typing(self, _is_typing: bool) -> None:
         return None

@@ -65,8 +65,8 @@ class TranslationRuntimeConfig:
     peer_hangover_s: float = 0.6
     context_time_window_s: float = 30.0
     context_max_entries: int = 3
-    integrated_context_time_window_s: float = 40.0
-    integrated_context_max_entries: int = 4
+    integrated_context_time_window_s: float = 60.0
+    integrated_context_max_entries: int = 5
     low_latency_mode: bool = False
     low_latency_merge_gap_ms: int = 600
     low_latency_spec_retry_max: int = 1
@@ -96,6 +96,43 @@ class TranslationRuntimeConfig:
         normalized_targets = (target_language, *secondary_targets[:1])
         object.__setattr__(self, "target_language", target_language)
         object.__setattr__(self, "self_target_languages", normalized_targets)
+
+
+def translation_configs_match(
+    left: TranslationRuntimeConfig,
+    right: TranslationRuntimeConfig,
+) -> bool:
+    return (
+        left.source_language,
+        left.target_language,
+        left.self_target_languages,
+        left.peer_source_language,
+        left.peer_target_language,
+        left.peer_source_mode,
+        left.system_prompt,
+        left.translation_enabled,
+        left.peer_translation_enabled,
+        left.integrated_context_enabled,
+        left.context_time_window_s,
+        left.context_max_entries,
+        left.integrated_context_time_window_s,
+        left.integrated_context_max_entries,
+    ) == (
+        right.source_language,
+        right.target_language,
+        right.self_target_languages,
+        right.peer_source_language,
+        right.peer_target_language,
+        right.peer_source_mode,
+        right.system_prompt,
+        right.translation_enabled,
+        right.peer_translation_enabled,
+        right.integrated_context_enabled,
+        right.context_time_window_s,
+        right.context_max_entries,
+        right.integrated_context_time_window_s,
+        right.integrated_context_max_entries,
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -37,6 +37,7 @@ _PROMPT_OVERRIDE_MIGRATION_VERSION = 45
 _DEEPSEEK_41_SAVED_CONNECTION_MIGRATION_VERSION = 41
 _MANAGED_GEMMA_12B_RETIREMENT_MIGRATION_VERSION = 43
 _TRANSLATION_FALLBACK_RETIREMENT_MIGRATION_VERSION = 44
+_PROMPT_OVERRIDE_RESET_VERSION = 52
 _RELEASED_DEFAULT_PROMPT_SHA256 = frozenset(
     {
         "9badb2a6aa2dca63f57eef67bdd46d8ecbe171b0eff951d1fced92377df8ba6e",
@@ -96,6 +97,9 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         data.get("settings_version")
     )
     migrate_prompt_reset = _requires_prompt_override_migration(data.get("settings_version"))
+    migrate_prompt_override_reset = _requires_prompt_override_reset_migration(
+        data.get("settings_version")
+    )
     migrate_deepgram_rolling = _requires_deepgram_rolling_migration(data.get("settings_version"))
     migrate_deepseek_saved_connections = _requires_deepseek_41_saved_connection_migration(
         data.get("settings_version")
@@ -177,7 +181,7 @@ def _prepare_vnext_migration_dict(data: Mapping[str, Any]) -> dict[str, Any]:
         intent["desktop_audio"] = desktop_audio
         prompts = intent.get("prompts") if isinstance(intent.get("prompts"), Mapping) else {}
         if isinstance(prompts, dict):
-            if migrate_prompt_reset:
+            if migrate_prompt_override_reset:
                 prompts.pop("system_prompt", None)
                 prompts["system_prompt_override"] = None
             intent["prompts"] = prompts
@@ -380,7 +384,9 @@ def _shared_default_prompt() -> str:
 def _stored_system_prompt(data: Mapping[str, Any]) -> str:
     intent = data.get("intent")
     prompts = intent.get("prompts") if isinstance(intent, Mapping) else None
-    value = prompts.get("system_prompt") if isinstance(prompts, Mapping) else None
+    value = prompts.get("system_prompt_override") if isinstance(prompts, Mapping) else None
+    if not isinstance(value, str):
+        value = prompts.get("system_prompt") if isinstance(prompts, Mapping) else None
     if not isinstance(value, str):
         value = data.get("system_prompt")
     return value if isinstance(value, str) else ""
@@ -394,7 +400,7 @@ def _is_released_default_prompt(value: str) -> bool:
 
 
 def system_prompt_backup_text(data: Mapping[str, Any]) -> str | None:
-    if is_vnext_shape_dict(data) and not _requires_prompt_override_migration(
+    if is_vnext_shape_dict(data) and not _requires_prompt_override_reset_migration(
         data.get("settings_version")
     ):
         return None
@@ -441,6 +447,16 @@ def _requires_prompt_override_migration(settings_version: object) -> bool:
         return settings_version < _PROMPT_OVERRIDE_MIGRATION_VERSION
     if isinstance(settings_version, str) and settings_version.strip().isdigit():
         return int(settings_version.strip()) < _PROMPT_OVERRIDE_MIGRATION_VERSION
+    return True
+
+
+def _requires_prompt_override_reset_migration(settings_version: object) -> bool:
+    if isinstance(settings_version, bool):
+        return True
+    if isinstance(settings_version, int):
+        return settings_version < _PROMPT_OVERRIDE_RESET_VERSION
+    if isinstance(settings_version, str) and settings_version.strip().isdigit():
+        return int(settings_version.strip()) < _PROMPT_OVERRIDE_RESET_VERSION
     return True
 
 

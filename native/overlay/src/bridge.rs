@@ -70,7 +70,7 @@ impl BridgeClient {
             "runtime_generation": 1,
             "capabilities": {
                 "execution_contract": {"version": 1, "revision": "r2"},
-                "native_presentation_retry": {"version": 1, "ownership": "exclusive"},
+                "native_presentation_retry": {"version": 2, "ownership": "exclusive"},
                 "speaker_identity_presentation": {"version": 2, "policy": "immutable_first_readable_style"}
             }
         });

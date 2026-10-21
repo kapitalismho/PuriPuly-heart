@@ -535,15 +535,37 @@ async def test_all_llm_outer_providers_forward_scene_to_inner_client() -> None:
     assert [inner.calls for inner in inners] == [[2]] * len(inners)
 
 
-def test_gemma_prefix_identity_ignores_scene_people() -> None:
+@pytest.mark.parametrize("effective_backend", ["cpu", "vulkan"])
+def test_gemma_prefix_identity_ignores_scene_people(effective_backend) -> None:
     from puripuly_heart.core.local_translation.assets import e4b_gemma_spec
     from puripuly_heart.core.local_translation.runtime import _prefix_identity
 
     spec = e4b_gemma_spec()
+    scene = SequenceSceneProvider(
+        [
+            VrchatSceneSnapshot(status="ready", participant_count=2),
+            VrchatSceneSnapshot(status="ready", participant_count=5),
+        ]
+    )
+    fixture = build_scene_owner(scene)
+    first_request = fixture.owner.prepare("hello", channel="self")
+    second_request = fixture.owner.prepare("hello", channel="self")
+    assert first_request.scene_snapshot.participant_count == 2
+    assert second_request.scene_snapshot.participant_count == 5
     first = _prefix_identity(
-        spec=spec, system_prompt="system", source_language="en", target_language="ko"
+        spec=spec,
+        system_prompt=first_request.system_prompt,
+        source_language="ko",
+        target_language="en",
+        effective_backend=effective_backend,
+        profile_identity="scene-independent-profile",
     )
     second = _prefix_identity(
-        spec=spec, system_prompt="system", source_language="en", target_language="ko"
+        spec=spec,
+        system_prompt=second_request.system_prompt,
+        source_language="ko",
+        target_language="en",
+        effective_backend=effective_backend,
+        profile_identity="scene-independent-profile",
     )
     assert first == second

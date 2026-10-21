@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.stt.backend import (
     STTBackendTranscriptEvent,
     STTProviderEpochEnded,
@@ -39,6 +40,7 @@ class STTSessionEventProjection:
         else:
             self._scoped_events = STTProviderEventBuffer()
         self._active_identity: STTProviderTurnIdentity | None = None
+        self.channel: str | None = None
         self._payload_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._update_sequences: dict[STTProviderTurnIdentity, int] = {}
         self._sealed_identities: set[STTProviderTurnIdentity] = set()
@@ -106,6 +108,7 @@ class STTSessionEventProjection:
         self._active_identity = request.identity
         self._payload_sequences[request.identity] = 0
         self._update_sequences[request.identity] = 0
+        self.channel = request.channel
 
     def require_open(self, identity: STTProviderTurnIdentity) -> None:
         self._require_scoped_projection()
@@ -225,6 +228,7 @@ class STTSessionEventProjection:
         reason: str,
         provider_turn_id: str | None = None,
         failure_retryable: bool = False,
+        failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> bool:
         if not self.is_scoped or self._epoch_ended or self._closed:
             return False
@@ -240,6 +244,7 @@ class STTSessionEventProjection:
             reason=reason,
             provider_turn_id=provider_turn_id,
             failure_retryable=failure_retryable,
+            failure_diagnostics=failure_diagnostics,
         )
         try:
             return self._scoped_buffer().put(event)

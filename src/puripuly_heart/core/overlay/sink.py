@@ -34,6 +34,8 @@ class OverlayPublicationScope:
     target_index: int = 0
     target_count: int = 1
     retained_payload_bytes: int = 0
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -58,6 +60,8 @@ class OverlayEvent:
     target_index: int = 0
     target_count: int = 1
     retained_payload_bytes: int = 0
+    operation_id: str | None = None
+    request_id: str | None = None
 
     EVENT_TYPE: ClassVar[str] = "overlay_event"
 
@@ -99,6 +103,11 @@ class SelfActiveUpdate(OverlayEvent):
     secondary_text: str = ""
     source_language: str = ""
     target_language: str = ""
+    caption_source_closed: bool | None = None
+    caption_complete: bool = False
+    caption_cancelled: bool = False
+    retained_only: bool = False
+    caption_revision: int = 0
 
     EVENT_TYPE: ClassVar[str] = "self_active_update"
 
@@ -303,6 +312,13 @@ class OverlayEventAdapter:
         source_text_hash: str | None = None,
         source_text_len: int | None = None,
         logical_turn_key: str | None = None,
+        caption_source_closed: bool | None = None,
+        caption_complete: bool = False,
+        caption_cancelled: bool = False,
+        retained_only: bool = False,
+        caption_revision: int = 0,
+        turn_generation: int | None = None,
+        turn_order: int | None = None,
     ) -> SelfActiveUpdate:
         return SelfActiveUpdate(
             **self._common_event_fields(
@@ -315,12 +331,19 @@ class OverlayEventAdapter:
                 source_text_hash=source_text_hash,
                 source_text_len=source_text_len,
                 logical_turn_key=logical_turn_key,
+                turn_generation=turn_generation,
+                turn_order=turn_order,
             ),
             text=text,
             secondary_text=secondary_text,
             occupant_key=occupant_key,
             source_language=source_language,
             target_language=target_language,
+            caption_source_closed=caption_source_closed,
+            caption_complete=caption_complete,
+            caption_cancelled=caption_cancelled,
+            retained_only=retained_only,
+            caption_revision=caption_revision,
         )
 
     def peer_active_update(
@@ -479,6 +502,8 @@ class OverlayEventAdapter:
             "target_index": target_index,
             "target_count": target_count,
             "retained_payload_bytes": retained_payload_bytes,
+            "operation_id": output_scope.operation_id if output_scope is not None else None,
+            "request_id": output_scope.request_id if output_scope is not None else None,
         }
 
 

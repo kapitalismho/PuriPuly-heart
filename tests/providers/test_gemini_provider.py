@@ -358,7 +358,7 @@ async def test_google_genai_client_raises_on_empty_response(
 
     client = GoogleGenaiGeminiClient(api_key="k", model="m")
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.gemini"):
-        with pytest.raises(RuntimeError, match="Gemini response did not contain text"):
+        with pytest.raises(RuntimeError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="PROMPT",
@@ -366,7 +366,8 @@ async def test_google_genai_client_raises_on_empty_response(
                 target_language="ko",
             )
 
-    assert any(record.levelno == logging.ERROR for record in caplog.records)
+    assert caplog.records == []
+    assert exc_info.value.failure_diagnostics.category == "invalid_response"
 
 
 @pytest.mark.asyncio
@@ -378,7 +379,7 @@ async def test_google_genai_client_uses_runtime_logging_for_missing_text_warning
 
     client = GoogleGenaiGeminiClient(api_key="k", model="m", runtime_logging=runtime_logging)
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.gemini"):
-        with pytest.raises(RuntimeError, match="Gemini response did not contain text"):
+        with pytest.raises(RuntimeError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="PROMPT",
@@ -387,7 +388,6 @@ async def test_google_genai_client_uses_runtime_logging_for_missing_text_warning
             )
 
     assert runtime_logging.detailed_messages == []
-    assert runtime_logging.basic_messages == [
-        ("[Basic][LLM] Gemini response missing text [translate]", logging.ERROR),
-    ]
+    assert runtime_logging.basic_messages == []
+    assert exc_info.value.failure_diagnostics.category == "invalid_response"
     assert caplog.messages == []

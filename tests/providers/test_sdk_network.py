@@ -25,19 +25,28 @@ async def test_scribe_sdk_verified_proxy_audio_event_flow(certificates, monkeypa
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     requests = []
+
     async def handler(ws):
         requests.append((ws.request.path, ws.request.headers, json.loads(await ws.recv())))
         await ws.send(json.dumps({"message_type": "partial_transcript", "text": "recognized"}))
         await ws.wait_closed()
+
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
         async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
-            scribe = ExternalScribeRealtime(api_key="test-key", base_url=f"wss://localhost:{server.sockets[0].getsockname()[1]}")
-            connection = await scribe.connect({
-                "model_id": "scribe_v2_realtime", "audio_format": AudioFormat.PCM_16000,
-                "sample_rate": 16000, "commit_strategy": CommitStrategy.MANUAL,
-                "language_code": "en", "keyterms": ["PuriPuly"],
-            })
+            scribe = ExternalScribeRealtime(
+                api_key="test-key", base_url=f"wss://localhost:{server.sockets[0].getsockname()[1]}"
+            )
+            connection = await scribe.connect(
+                {
+                    "model_id": "scribe_v2_realtime",
+                    "audio_format": AudioFormat.PCM_16000,
+                    "sample_rate": 16000,
+                    "commit_strategy": CommitStrategy.MANUAL,
+                    "language_code": "en",
+                    "keyterms": ["PuriPuly"],
+                }
+            )
             result = asyncio.get_running_loop().create_future()
             connection.on(RealtimeEvents.PARTIAL_TRANSCRIPT, lambda event: result.set_result(event))
             try:
@@ -64,32 +73,61 @@ async def test_deepgram_sdk_verified_proxy_message_flow(certificates, monkeypatc
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     requests = []
+
     async def handler(ws):
         requests.append((ws.request.path, ws.request.headers, await ws.recv()))
-        await ws.send(json.dumps({
-            "type": "Results", "channel_index": [0, 1], "duration": 1.0, "start": 0.0,
-            "is_final": True, "speech_final": True,
-            "channel": {"alternatives": [{"transcript": "recognized", "confidence": 1.0, "words": []}]},
-            "metadata": {"request_id": "00000000-0000-0000-0000-000000000001", "model_info": {}, "model_uuid": "00000000-0000-0000-0000-000000000001"},
-        }))
+        await ws.send(
+            json.dumps(
+                {
+                    "type": "Results",
+                    "channel_index": [0, 1],
+                    "duration": 1.0,
+                    "start": 0.0,
+                    "is_final": True,
+                    "speech_final": True,
+                    "channel": {
+                        "alternatives": [
+                            {"transcript": "recognized", "confidence": 1.0, "words": []}
+                        ]
+                    },
+                    "metadata": {
+                        "request_id": "00000000-0000-0000-0000-000000000001",
+                        "model_info": {},
+                        "model_uuid": "00000000-0000-0000-0000-000000000001",
+                    },
+                }
+            )
+        )
         await ws.wait_closed()
+
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
         async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
             url = f"wss://localhost:{server.sockets[0].getsockname()[1]}"
+
             async def operation():
                 async with network_clients.external_async_client() as http_client:
                     client = AsyncDeepgramClient(
-                        api_key="test-key", httpx_client=http_client,
+                        api_key="test-key",
+                        httpx_client=http_client,
                         environment=DeepgramClientEnvironment(base=url, production=url, agent=url),
                     )
                     async with deepgram_listen_connect(
-                        client, model="nova-3", language="en", encoding="linear16", sample_rate=16000,
-                        channels=1, interim_results=False, punctuate=True, vad_events=False,
-                        endpointing=False, keyterm=["first", "second"],
+                        client,
+                        model="nova-3",
+                        language="en",
+                        encoding="linear16",
+                        sample_rate=16000,
+                        channels=1,
+                        interim_results=False,
+                        punctuate=True,
+                        vad_events=False,
+                        endpointing=False,
+                        keyterm=["first", "second"],
                     ) as connection:
                         await connection.send_media(b"\0\0")
                         return (await connection.recv()).channel["alternatives"][0]["transcript"]
+
             assert await asyncio.wait_for(operation(), 10) == "recognized"
     path, headers, audio = requests[0]
     query = parse_qs(urlsplit(path).query)
@@ -111,12 +149,23 @@ async def test_genai_live_verified_proxy_setup_audio_flow(certificates, monkeypa
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     messages = []
+
     async def handler(ws):
         messages.append(json.loads(await ws.recv()))
         await ws.send(json.dumps({"setupComplete": {}}))
         messages.append(json.loads(await ws.recv()))
-        await ws.send(json.dumps({"serverContent": {"inputTranscription": {"text": "recognized"}, "turnComplete": True}}))
+        await ws.send(
+            json.dumps(
+                {
+                    "serverContent": {
+                        "inputTranscription": {"text": "recognized"},
+                        "turnComplete": True,
+                    }
+                }
+            )
+        )
         await ws.wait_closed()
+
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("ALL_PROXY", proxy)
         async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"]) as server:
@@ -125,8 +174,12 @@ async def test_genai_live_verified_proxy_setup_audio_flow(certificates, monkeypa
             client = genai.Client(api_key="test-key", http_options=options)
             configure_live_network(client, options)
             try:
-                async with client.aio.live.connect(model="gemini-test", config={"response_modalities": ["TEXT"]}) as session:
-                    await session.send_realtime_input(audio=types.Blob(data=b"\0\0", mime_type="audio/pcm;rate=16000"))
+                async with client.aio.live.connect(
+                    model="gemini-test", config={"response_modalities": ["TEXT"]}
+                ) as session:
+                    await session.send_realtime_input(
+                        audio=types.Blob(data=b"\0\0", mime_type="audio/pcm;rate=16000")
+                    )
                     async for event in session.receive():
                         if event.server_content and event.server_content.input_transcription:
                             assert event.server_content.input_transcription.text == "recognized"
@@ -142,31 +195,42 @@ async def test_genai_live_verified_proxy_setup_audio_flow(certificates, monkeypa
 
 
 @pytest.mark.parametrize("initial_direct", [True, False])
-async def test_genai_live_cross_route_redirect_rejects_before_contact(certificates, monkeypatch, initial_direct):
+async def test_genai_live_cross_route_redirect_rejects_before_contact(
+    certificates, monkeypatch, initial_direct
+):
     from google import genai
     from google.genai import types
 
     root, _, contexts = certificates
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     contacts = []
+
     async def accept(reader, writer):
         contacts.append(True)
         writer.close()
         await writer.wait_closed()
+
     destination = await asyncio.start_server(accept, "127.0.0.1", 0)
     try:
         target_port = destination.sockets[0].getsockname()[1]
+
         def redirect(connection, request):
             response = connection.respond(307, "redirect")
             response.headers["Location"] = f"wss://localhost:{target_port}/destination"
             return response
+
         async def unused(ws):
             pytest.fail("GenAI redirect source must not complete its handshake")
+
         async with recording_proxy() as (proxy, recorded):
-            async with serve(unused, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect) as source:
+            async with serve(
+                unused, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect
+            ) as source:
                 source_port = source.sockets[0].getsockname()[1]
                 monkeypatch.setenv("HTTPS_PROXY", proxy)
-                monkeypatch.setenv("NO_PROXY", f"localhost:{source_port if initial_direct else target_port}")
+                monkeypatch.setenv(
+                    "NO_PROXY", f"localhost:{source_port if initial_direct else target_port}"
+                )
                 options = types.HttpOptions(
                     **network_clients.genai_http_options(),
                     base_url=f"https://localhost:{source_port}",
@@ -178,7 +242,9 @@ async def test_genai_live_cross_route_redirect_rejects_before_contact(certificat
                     with pytest.raises(SecurityError) as caught:
                         async with client.aio.live.connect(model="gemini-test"):
                             pytest.fail("A changed routing policy must not be followed")
-                    assert str(caught.value) == "WebSocket redirect changes the selected proxy route"
+                    assert (
+                        str(caught.value) == "WebSocket redirect changes the selected proxy route"
+                    )
                 finally:
                     await client.aio.aclose()
                     client.close()
@@ -192,7 +258,9 @@ async def test_genai_live_cross_route_redirect_rejects_before_contact(certificat
 
 
 @pytest.mark.parametrize("https_proxy", [False, True])
-async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(certificates, monkeypatch, https_proxy):
+async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(
+    certificates, monkeypatch, https_proxy
+):
     from google import genai
     from google.genai import types
 
@@ -200,6 +268,7 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(certific
     monkeypatch.setenv("SSL_CERT_FILE", str(root))
     messages = []
     requests = []
+
     def redirect(connection, request):
         requests.append(request)
         if request.path != "/destination":
@@ -207,15 +276,28 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(certific
             response.headers["Location"] = "/destination"
             return response
         return None
+
     async def handler(ws):
         messages.append(json.loads(await ws.recv()))
         await ws.send(json.dumps({"setupComplete": {}}))
         messages.append(json.loads(await ws.recv()))
-        await ws.send(json.dumps({"serverContent": {"inputTranscription": {"text": "redirect-recognized"}, "turnComplete": True}}))
+        await ws.send(
+            json.dumps(
+                {
+                    "serverContent": {
+                        "inputTranscription": {"text": "redirect-recognized"},
+                        "turnComplete": True,
+                    }
+                }
+            )
+        )
         await ws.wait_closed()
+
     async with recording_proxy(contexts["valid"] if https_proxy else None) as (proxy, recorded):
         monkeypatch.setenv("HTTPS_PROXY", proxy)
-        async with serve(handler, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect) as server:
+        async with serve(
+            handler, "127.0.0.1", 0, ssl=contexts["valid"], process_request=redirect
+        ) as server:
             options = types.HttpOptions(
                 **network_clients.genai_http_options(),
                 base_url=f"https://localhost:{server.sockets[0].getsockname()[1]}",
@@ -223,11 +305,18 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(certific
             client = genai.Client(api_key="test-key", http_options=options)
             configure_live_network(client, options)
             try:
-                async with client.aio.live.connect(model="gemini-test", config={"response_modalities": ["TEXT"]}) as session:
-                    await session.send_realtime_input(audio=types.Blob(data=b"\0\0", mime_type="audio/pcm;rate=16000"))
+                async with client.aio.live.connect(
+                    model="gemini-test", config={"response_modalities": ["TEXT"]}
+                ) as session:
+                    await session.send_realtime_input(
+                        audio=types.Blob(data=b"\0\0", mime_type="audio/pcm;rate=16000")
+                    )
                     async for event in session.receive():
                         if event.server_content and event.server_content.input_transcription:
-                            assert event.server_content.input_transcription.text == "redirect-recognized"
+                            assert (
+                                event.server_content.input_transcription.text
+                                == "redirect-recognized"
+                            )
                             break
             finally:
                 await client.aio.aclose()
@@ -243,7 +332,9 @@ async def test_genai_live_same_route_relative_redirect_retains_sdk_flow(certific
 
 
 @pytest.mark.parametrize("owner_case", ["client", "verification"])
-async def test_genai_actual_operations_close_owned_keepalive_socket(certificates, monkeypatch, owner_case):
+async def test_genai_actual_operations_close_owned_keepalive_socket(
+    certificates, monkeypatch, owner_case
+):
     from puripuly_heart.providers.llm.gemini import GeminiLLMProvider, GoogleGenaiGeminiClient
 
     root, _, contexts = certificates
@@ -251,20 +342,26 @@ async def test_genai_actual_operations_close_owned_keepalive_socket(certificates
     active = set()
     closed = asyncio.Queue()
     tasks = set()
+
     async def serve_models(reader, writer):
         active.add(writer)
         try:
             request = await reader.readuntil(b"\r\n\r\n")
             assert b"/models" in request.split(b"\r\n", 1)[0]
             if request.startswith(b"POST "):
-                headers = dict(line.split(b":", 1) for line in request.split(b"\r\n")[1:] if b":" in line)
-                length = next(int(value) for key, value in headers.items() if key.lower() == b"content-length")
+                headers = dict(
+                    line.split(b":", 1) for line in request.split(b"\r\n")[1:] if b":" in line
+                )
+                length = next(
+                    int(value) for key, value in headers.items() if key.lower() == b"content-length"
+                )
                 await reader.readexactly(length)
                 body = b'{"candidates":[{"content":{"role":"model","parts":[{"text":"translated"}]},"finishReason":"STOP"}]}'
             else:
                 body = b'{"models":[{"name":"models/gemini-3.8-flash"}]}'
             writer.write(
-                f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n".encode() + body
+                f"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n".encode()
+                + body
             )
             await writer.drain()
             assert await reader.read() == b""
@@ -273,16 +370,20 @@ async def test_genai_actual_operations_close_owned_keepalive_socket(certificates
             writer.close()
             await writer.wait_closed()
             await closed.put(True)
+
     def accept(reader, writer):
         task = asyncio.create_task(serve_models(reader, writer))
         tasks.add(task)
         task.add_done_callback(tasks.discard)
+
     server = await asyncio.start_server(accept, "127.0.0.1", 0, ssl=contexts["valid"])
     original_options = network_clients.genai_http_options
+
     def options():
         configured = original_options()
         configured["base_url"] = f"https://localhost:{server.sockets[0].getsockname()[1]}"
         return configured
+
     monkeypatch.setattr(network_clients, "genai_http_options", options)
     try:
         for _ in range(2):
@@ -291,9 +392,15 @@ async def test_genai_actual_operations_close_owned_keepalive_socket(certificates
             else:
                 owner = GoogleGenaiGeminiClient(api_key="test-key", model="gemini-test")
                 try:
-                    assert await owner.translate(
-                        text="hello", system_prompt="translate", source_language="en", target_language="ko"
-                    ) == "translated"
+                    assert (
+                        await owner.translate(
+                            text="hello",
+                            system_prompt="translate",
+                            source_language="en",
+                            target_language="ko",
+                        )
+                        == "translated"
+                    )
                     assert len(active) == 1
                 finally:
                     await owner.close()

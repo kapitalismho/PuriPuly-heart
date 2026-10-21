@@ -7,6 +7,8 @@ from pathlib import Path
 from puripuly_heart.config.paths import STABLE_APP_DIR_NAME
 from puripuly_heart.config.provider_values import SecretsBackend
 from puripuly_heart.config.settings_vnext.schema import SecretsIntent
+from puripuly_heart.core.diagnostics import safe_exception_fields
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.storage.secrets import (
     EncryptedFileSecretStore,
     KeyringSecretStore,
@@ -15,6 +17,25 @@ from puripuly_heart.core.storage.secrets import (
 
 SECRETS_PASSPHRASE_ENV = "PURIPULY_HEART_SECRETS_PASSPHRASE"
 STABLE_KEYRING_SERVICE_NAME = STABLE_APP_DIR_NAME
+
+
+class SecretStoreCreationError(ValueError):
+    def __init__(self, code: str, exception: BaseException | None = None) -> None:
+        self.diagnostics = ErrorDiagnostics(
+            component="settings_secrets",
+            operation="create_store",
+            code=code,
+            category="transaction",
+            visibility="basic",
+            content_policy="metadata_only",
+            status_code=None,
+            retry_after_ms=None,
+            fields={
+                "phase": "create_store",
+                **(safe_exception_fields(exception) if exception is not None else {}),
+            },
+        )
+        super().__init__(code)
 
 
 def create_secret_store(
@@ -28,20 +49,23 @@ def create_secret_store(
 
     backend = _secrets_backend_value(settings.backend)
     if backend == SecretsBackend.KEYRING.value:
-        return KeyringSecretStore(service_name=keyring_service_name)
+        try:
+            return KeyringSecretStore(service_name=keyring_service_name)
+        except Exception as exc:
+            raise SecretStoreCreationError("settings_secret_failed", exc) from exc
 
     if backend == SecretsBackend.ENCRYPTED_FILE.value:
         if not passphrase:
-            raise ValueError(
-                "encrypted_file secrets backend requires a passphrase; "
-                f"set {SECRETS_PASSPHRASE_ENV} or pass passphrase explicitly"
-            )
+            raise SecretStoreCreationError("secret_store_passphrase_missing")
         path = Path(settings.encrypted_file_path)
         if not path.is_absolute():
             path = config_path.parent / path
-        return EncryptedFileSecretStore(path=path, passphrase=passphrase)
+        try:
+            return EncryptedFileSecretStore(path=path, passphrase=passphrase)
+        except Exception as exc:
+            raise SecretStoreCreationError("settings_secret_failed", exc) from exc
 
-    raise ValueError(f"Unsupported secrets backend: {settings.backend}")
+    raise SecretStoreCreationError("secret_store_backend_unsupported")
 
 
 def _secrets_backend_value(value: object) -> str:

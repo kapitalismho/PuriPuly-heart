@@ -200,7 +200,9 @@ async def test_qwen_client_normalizes_legacy_plus_to_qwen38(monkeypatch):
         {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
     )
     monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs))
+    monkeypatch.setattr(
+        "httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs)
+    )
 
     client = DashScopeQwenClient(
         api_key="k", model="qwen3.5-plus", base_url="https://example/api/v1"
@@ -343,14 +345,16 @@ async def test_qwen_client_logs_basic_request_failure_for_qwen38(
         {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
     )
     monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs))
+    monkeypatch.setattr(
+        "httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs)
+    )
 
     client = DashScopeQwenClient(
         api_key="k", model="qwen3.8-flash", base_url="https://example/api/v1"
     )
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen"):
-        with pytest.raises(RuntimeError, match="quota exceeded"):
+        with pytest.raises(RuntimeError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="PROMPT",
@@ -358,7 +362,9 @@ async def test_qwen_client_logs_basic_request_failure_for_qwen38(
                 target_language="en",
             )
 
-    assert caplog.records[-1].levelno == logging.ERROR
+    assert caplog.records == []
+    assert exc_info.value.failure_diagnostics.status_code == 429
+    assert exc_info.value.failure_diagnostics.category == "rate_limit"
     assert "quota exceeded" not in "\n".join(caplog.messages)
 
 
@@ -388,7 +394,9 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
         {"api_key": "", "base_http_api_url": "", "Generation": DummyGeneration},
     )
     monkeypatch.setitem(sys.modules, "dashscope", dummy)
-    monkeypatch.setattr("httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs))
+    monkeypatch.setattr(
+        "httpx.Client.post", lambda self, url, **kwargs: fake_httpx_post(url, **kwargs)
+    )
     runtime_logging = SpyRuntimeLogging(detailed_return=False)
 
     client = DashScopeQwenClient(
@@ -399,7 +407,7 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
     )
 
     with caplog.at_level(logging.INFO, logger="puripuly_heart.providers.llm.qwen"):
-        with pytest.raises(RuntimeError, match="quota exceeded"):
+        with pytest.raises(RuntimeError) as exc_info:
             await client.translate(
                 text="hello",
                 system_prompt="PROMPT",
@@ -408,11 +416,8 @@ async def test_qwen_client_uses_runtime_logging_for_failure_breadcrumbs_for_qwen
             )
 
     assert runtime_logging.detailed_messages == []
-    assert len(runtime_logging.basic_messages) == 1
-    failure, level = runtime_logging.basic_messages[0]
-    assert level == logging.ERROR
-    assert "category=quota code=provider.quota" in failure
-    assert "operation=translate status=429 provider=qwen" in failure
-    assert "exception_type=RuntimeError" in failure
-    assert "quota exceeded" not in failure
+    assert runtime_logging.basic_messages == []
+    assert exc_info.value.failure_diagnostics.status_code == 429
+    assert exc_info.value.failure_diagnostics.category == "rate_limit"
+    assert "quota exceeded" not in str(exc_info.value.failure_diagnostics)
     assert caplog.messages == []

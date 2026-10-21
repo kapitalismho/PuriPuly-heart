@@ -19,9 +19,10 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_text_for_sink,
     redact_user_message_ref_for_sink,
 )
+from puripuly_heart.core.diagnostics import emit_failure
 from puripuly_heart.core.error_messages import sanitize_legacy_raw_user_visible_error_text
-from puripuly_heart.core.messages import UserErrorReport, UserMessageRef
-from puripuly_heart.domain.events import STTSessionState, UIEvent
+from puripuly_heart.core.messages import ErrorDiagnostics, UserErrorReport, UserMessageRef
+from puripuly_heart.domain.events import SelfTurnPresentation, STTSessionState, UIEvent
 from puripuly_heart.domain.models import OSCMessage, Translation
 from puripuly_heart.ui.event_mapping import map_ui_event
 from puripuly_heart.ui.event_projection import (
@@ -57,6 +58,8 @@ class DashboardEventDestination(Protocol):
         debug_prefix: str | None = None,
     ) -> bool | None: ...
 
+    def publish_self_turn(self, snapshot: SelfTurnPresentation) -> bool | None: ...
+
     def publish_error(self, text: str) -> None: ...
 
 
@@ -69,6 +72,8 @@ class HistoryEventDestination(Protocol):
         translated: bool = False,
         language_code: str | None = None,
     ) -> None: ...
+
+    def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None: ...
 
 
 class ErrorEventDestination(Protocol):
@@ -131,6 +136,12 @@ class AppDashboardEventDestination:
         )
         return True
 
+    def publish_self_turn(self, snapshot: SelfTurnPresentation) -> bool:
+        if self._dashboard is None:
+            return False
+        self._dashboard.set_self_turn(snapshot)
+        return True
+
     def publish_error(self, text: str) -> None:
         dashboard = self._dashboard
         if dashboard is not None:
@@ -138,8 +149,13 @@ class AppDashboardEventDestination:
 
 
 class AppHistoryEventDestination:
-    def __init__(self, append_history_entry: object | None) -> None:
+    def __init__(
+        self,
+        append_history_entry: object | None,
+        conversation_view: object | None = None,
+    ) -> None:
         self._append_history_entry = append_history_entry
+        self._conversation_view = conversation_view
 
     def append_entry(
         self,
@@ -153,6 +169,10 @@ class AppHistoryEventDestination:
             self._append_history_entry(
                 source, text, translated=translated, language_code=language_code
             )
+
+    def publish_self_turn(self, snapshot: SelfTurnPresentation, *, source: str) -> None:
+        if self._conversation_view is not None:
+            self._conversation_view.update_self_turn(snapshot, source=source)
 
 
 class AppErrorEventDestination:
@@ -371,14 +391,7 @@ class UIEventBridge:
                 try:
                     await self._handle_event(event)
                 except Exception as exc:
-                    message = (
-                        "A user interface event failed · "
-                        f"Event {event.type.value} · Cause {type(exc).__name__}"
-                    )
-                    if self.runtime_logging is not None:
-                        self.runtime_logging.emit_basic(message, level=logging.ERROR)
-                    else:
-                        logger.error(message)
+                    self._record_output_failure(event, "dashboard", exc)
                 finally:
                     self.event_queue.task_done()
         except asyncio.CancelledError:
@@ -386,6 +399,33 @@ class UIEventBridge:
             raise
         finally:
             self._running = False
+
+    @staticmethod
+    def _record_output_failure(event: UIEvent, destination: str, exception: Exception) -> None:
+        fields = {"destination": destination}
+        if event.utterance_id is not None:
+            fields["publication_id"] = str(event.utterance_id)
+        emit_failure(
+            logger,
+            ErrorDiagnostics(
+                component="output_runtime",
+                operation="publish",
+                code="destination_publish_failed",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields=fields,
+                channel=event.channel,
+                turn_id=str(event.utterance_id) if event.utterance_id else None,
+                operation_id=event.operation_id,
+                request_id=event.request_id,
+            ),
+            disposition="degraded",
+            stage="ui_event_delivery",
+            exception=exception,
+        )
 
     async def wait_started(self) -> None:
         await self._started.wait()
@@ -408,24 +448,48 @@ class UIEventBridge:
             self.dashboard_destination.publish_status(mapped.status)
             return
 
+        if mapped.kind == "self_turn":
+            projection = self.projection_service.project(mapped, self._projection_context())
+            snapshot = projection.self_turn
+            if snapshot is None:
+                return
+            try:
+                self.history_destination.publish_self_turn(snapshot, source=mapped.source or "Mic")
+            except Exception as exc:
+                self._record_output_failure(event, "conversation_feed", exc)
+            if (
+                authority is None or authority.claim_presentation()
+            ) and self.projection_service.claim_current_turn(snapshot):
+                try:
+                    self.dashboard_destination.publish_self_turn(snapshot)
+                except Exception as exc:
+                    self._record_output_failure(event, "dashboard", exc)
+            return
+
         if mapped.kind == "transcript":
             projection = self.projection_service.project(mapped, self._projection_context())
             if projection.transcript is None:
                 return
             transcript_projection = projection.transcript
             if authority is None or authority.claim_presentation():
-                self.dashboard_destination.publish_transcript(
-                    transcript_projection.text,
-                    language_code=transcript_projection.language_code,
-                    debug_prefix=transcript_projection.debug_prefix,
-                )
+                try:
+                    self.dashboard_destination.publish_transcript(
+                        transcript_projection.text,
+                        language_code=transcript_projection.language_code,
+                        debug_prefix=transcript_projection.debug_prefix,
+                    )
+                except Exception as exc:
+                    self._record_output_failure(event, "dashboard", exc)
             for history in projection.history:
-                self.history_destination.append_entry(
-                    history.source,
-                    history.text,
-                    translated=history.translated,
-                    language_code=history.language_code,
-                )
+                try:
+                    self.history_destination.append_entry(
+                        history.source,
+                        history.text,
+                        translated=history.translated,
+                        language_code=history.language_code,
+                    )
+                except Exception as exc:
+                    self._record_output_failure(event, "conversation_feed", exc)
             return
 
         if mapped.kind == "translation":
@@ -435,22 +499,29 @@ class UIEventBridge:
             translation_projection = projection.translation
             dashboard_published = False
             if authority is None or authority.claim_presentation():
-                dashboard_published = self.dashboard_destination.publish_translation(
-                    translation_projection.text,
-                    language_code=translation_projection.language_code,
-                    debug_prefix=translation_projection.debug_prefix,
-                )
+                try:
+                    dashboard_published = self.dashboard_destination.publish_translation(
+                        translation_projection.text,
+                        language_code=translation_projection.language_code,
+                        debug_prefix=translation_projection.debug_prefix,
+                    )
+                except Exception as exc:
+                    dashboard_published = False
+                    self._record_output_failure(event, "dashboard", exc)
             if dashboard_published is not False and projection.translation_diagnostic is not None:
                 self._emit_dashboard_translation_applied_diagnostic(
                     diagnostic=projection.translation_diagnostic,
                 )
             for history in projection.history:
-                self.history_destination.append_entry(
-                    history.source,
-                    history.text,
-                    translated=history.translated,
-                    language_code=history.language_code,
-                )
+                try:
+                    self.history_destination.append_entry(
+                        history.source,
+                        history.text,
+                        translated=history.translated,
+                        language_code=history.language_code,
+                    )
+                except Exception as exc:
+                    self._record_output_failure(event, "conversation_feed", exc)
             if isinstance(mapped.payload, Translation):
                 self._schedule_github_star_prompt_translation_success(mapped.payload)
             return

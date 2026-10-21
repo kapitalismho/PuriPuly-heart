@@ -58,6 +58,8 @@ pub enum CaptionRenderError {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CaptionBlock {
     pub id: String,
+    pub occupant_key: String,
+    pub occupant_generation: u64,
     pub primary_text: String,
     pub secondary_text: String,
     pub secondary_enabled: bool,
@@ -72,6 +74,13 @@ pub struct CaptionBlock {
     pub slot_index: usize,
     pub slot_top_px: f32,
     pub slot_assigned: bool,
+    pub(crate) fit_scales: Option<CaptionFitScales>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct CaptionFitScales {
+    pub primary: f32,
+    pub secondary: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -122,8 +131,11 @@ impl SpeakerStyle {
 
 impl CaptionBlock {
     pub fn new(id: impl Into<String>, primary_text: impl Into<String>) -> Self {
+        let id = id.into();
         Self {
-            id: id.into(),
+            occupant_key: id.clone(),
+            occupant_generation: 0,
+            id,
             primary_text: primary_text.into(),
             secondary_text: String::new(),
             secondary_enabled: true,
@@ -138,7 +150,14 @@ impl CaptionBlock {
             slot_index: 0,
             slot_top_px: 0.0,
             slot_assigned: false,
+            fit_scales: None,
         }
+    }
+
+    pub fn with_occupant(mut self, occupant_key: impl Into<String>, generation: u64) -> Self {
+        self.occupant_key = occupant_key.into();
+        self.occupant_generation = generation;
+        self
     }
 
     pub fn with_secondary_text(

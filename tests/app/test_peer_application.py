@@ -14,6 +14,7 @@ from puripuly_heart.app.services.provider.provider_runtime_apply import (
 from puripuly_heart.app.wiring import build_peer_capture_session_config
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.peer_capture import (
     PeerCaptureProviderStatus,
     PeerCaptureSessionState,
@@ -62,6 +63,7 @@ class RuntimeSnapshot:
     runtime_signature: tuple[object, ...] | None = None
     provider_status: PeerCaptureProviderStatus = PeerCaptureProviderStatus.READY
     failure_reason: object | None = None
+    failure_diagnostics: ErrorDiagnostics | None = None
 
 
 @dataclass
@@ -420,9 +422,16 @@ async def test_peer_owner_rejects_post_readiness_completion_after_newer_intent()
 
     enabling = asyncio.create_task(owner.set_enabled(True))
     await harness.readiness_entered.wait()
+    assert owner.mutation_authority(enabling) is True
+    assert owner.pending_mutations() == (True,)
     await owner.set_enabled(False)
+    assert not enabling.done()
+    assert owner.mutation_authority(enabling) is False
+    assert owner.pending_mutations() == ()
     harness.readiness_release.set()
     await enabling
+    assert owner.mutation_authority(enabling) is None
+    assert owner.pending_mutations() == ()
 
     assert harness.settings.ui.peer_translation_enabled is False
     assert "overlay_start" not in harness.events

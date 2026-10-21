@@ -16,27 +16,19 @@ type HasSuccessfulCleanupOutcome = Extract<
 type RejectSuccessfulCleanupOutcome = AssertFalse<HasSuccessfulCleanupOutcome>;
 
 describe('Managed issuance source policy', () => {
-  it('keeps QQ on the base Managed trial policy and excludes Discord referral surfaces', () => {
+  it('keeps QQ on the base Managed trial policy', () => {
     expect(getManagedIssuanceSourcePolicy('qq')).toEqual({
       issue_source: 'qq',
       budget_usd: 0.07,
       uses_managed_trial_guardrail: true,
-      discord_referral_reservation: false,
-      owned_referral_id: false,
-      talk_together_pass: false,
-      referral_bonus_budget: false,
     });
   });
 
-  it('keeps Discord marked as the only source that can use referral and Talk Together surfaces', () => {
+  it('keeps Discord on the base Managed trial policy', () => {
     expect(getManagedIssuanceSourcePolicy('discord')).toEqual({
       issue_source: 'discord',
       budget_usd: 0.07,
       uses_managed_trial_guardrail: true,
-      discord_referral_reservation: true,
-      owned_referral_id: true,
-      talk_together_pass: true,
-      referral_bonus_budget: true,
     });
   });
 });

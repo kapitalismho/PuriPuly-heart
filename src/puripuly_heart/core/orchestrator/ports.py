@@ -3,12 +3,23 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol
 
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.output.models import OutputRoutingDecision
 
 
 class TranslationRuntimeLoggingPort(Protocol):
 
     def emit_basic(self, message: str, *, level: int = ...) -> None: ...
+
+    def emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
+        exception: BaseException | None = None,
+    ) -> dict: ...
 
     def emit_diagnostic(self, message: str, *, level: int = ...) -> bool: ...
 

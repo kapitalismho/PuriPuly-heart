@@ -28,6 +28,9 @@ from typing import AsyncIterator
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.core.audio.format import AudioCaptureSpan
 from puripuly_heart.core.clock import Clock, SystemClock
+from puripuly_heart.core.diagnostics import emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.runtime_logging import emit_basic_log
 from puripuly_heart.core.speech_boundary import SpeechBoundaryReason
 from puripuly_heart.core.stt.backend import (
@@ -36,14 +39,17 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTBackendTranscriptEvent,
     STTIndependentRecognitionSession,
+    STTProviderInputTerminal,
     STTProviderTurnEvent,
     STTProviderTurnIdentity,
     STTProviderTurnRequest,
+    STTProviderTurnTerminal,
     STTRecognitionUnit,
     STTRecognitionUnitTerminal,
     STTScopedTurnSession,
     STTSessionProjection,
 )
+from puripuly_heart.core.stt.diagnostics import recognition_failure_diagnostics
 from puripuly_heart.domain.recognition import (
     RecognitionStreamIdentity,
     RecognitionUnitIdentity,
@@ -90,6 +96,7 @@ class RollingProviderStatus:
     observability: RollingQuotaObservability
     estimate_remaining: int | None = None
     estimate_total: int | None = None
+    last_failure_diagnostics: ErrorDiagnostics | None = None
 
 
 def _error_text(exc: BaseException) -> str:
@@ -183,10 +190,15 @@ class RollingSTTBackend(STTBackend):
 
     providers: tuple[RollingProviderDefinition, ...]
     clock: Clock = field(default_factory=SystemClock)
+    channel: str | None = None
 
     _states: dict[STTProviderName, RollingProviderState | None] = field(
         init=False, default_factory=dict, repr=False
     )
+    _last_failures: dict[STTProviderName, ErrorDiagnostics] = field(
+        init=False, default_factory=dict, repr=False
+    )
+    _fallback_cause: ErrorDiagnostics | None = field(init=False, default=None, repr=False)
 
     def __post_init__(self) -> None:
         if not self.providers:
@@ -217,6 +229,7 @@ class RollingSTTBackend(STTBackend):
             name=name,
             state=state,
             observability=RollingQuotaObservability.UNKNOWN,
+            last_failure_diagnostics=self._last_failures.get(name),
         )
 
     def statuses(self) -> tuple[RollingProviderStatus, ...]:
@@ -263,6 +276,7 @@ class RollingSTTBackend(STTBackend):
             return False
         definition.rebind(api_key)
         self._states[name] = None
+        self._last_failures.pop(name, None)
         return True
 
     async def open_session(
@@ -279,13 +293,15 @@ class RollingSTTBackend(STTBackend):
                 session = await backend.open_session(projection=projection)
             except Exception as exc:
                 kind = definition.classifier()(exc)
-                self._handle_open_error(definition, exc, kind)
+                self._handle_open_error(definition, exc, kind, projection.provider_epoch_id)
                 last_error = exc
                 continue
             return _RollingSession(
                 definition=definition,
                 inner=session,
                 on_session_error=self._handle_session_error,
+                on_terminal_observed=self._observe_terminal,
+                _channel=self.channel,
             )
         if last_error is not None:
             raise last_error
@@ -309,35 +325,88 @@ class RollingSTTBackend(STTBackend):
         definition: RollingProviderDefinition,
         exc: Exception,
         kind: str,
+        provider_epoch_id: str | None = None,
     ) -> None:
+        diagnostics = stt_failure_report(
+            exc, provider=definition.name.value, channel=self.channel, operation="readiness"
+        ).diagnostics
+        diagnostics = replace(
+            diagnostics,
+            fields={
+                **diagnostics.fields,
+                "policy_disposition": "excluded" if kind != _ERROR_KIND_TRANSIENT else "transient",
+                **({"provider_epoch_id": provider_epoch_id} if provider_epoch_id else {}),
+            },
+        )
+        exc.failure_diagnostics = diagnostics
+        self._last_failures[definition.name] = diagnostics
+        self._fallback_cause = self._fallback_cause or diagnostics
+        emit_failure(
+            logger, diagnostics, severity="warning", disposition="degraded", stage="readiness"
+        )
         if kind == _ERROR_KIND_AUTH:
             self._mark(definition.name, RollingProviderState.AUTH_FAILED)
-            emit_basic_log(
-                logger,
-                "[Recognition] A speech recognition service rejected its credentials.",
-                level=logging.WARNING,
-            )
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
-            emit_basic_log(
-                logger,
-                "[Recognition] A speech recognition service has no free quota remaining.",
-                level=logging.WARNING,
-            )
             return
 
     def _handle_session_error(
         self,
         definition: RollingProviderDefinition,
         exc: BaseException,
+        diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         kind = definition.classifier()(exc)
+        diagnostics = (
+            diagnostics
+            or stt_failure_report(
+                exc, provider=definition.name.value, channel=None, operation="receive"
+            ).diagnostics
+        )
+        diagnostics = replace(
+            diagnostics,
+            fields={
+                **diagnostics.fields,
+                "policy_disposition": "excluded" if kind != _ERROR_KIND_TRANSIENT else "transient",
+            },
+        )
+        exc.failure_diagnostics = diagnostics
+        self._last_failures[definition.name] = diagnostics
+        self._fallback_cause = self._fallback_cause or diagnostics
         if kind == _ERROR_KIND_AUTH:
             self._mark(definition.name, RollingProviderState.AUTH_FAILED)
             return
         if kind in _PERSISTENT_EXHAUSTION_STATES:
             self._mark(definition.name, RollingProviderState.FREE_QUOTA_EXHAUSTED)
+
+    def _observe_terminal(
+        self,
+        definition: RollingProviderDefinition,
+        event: STTProviderTurnTerminal | STTProviderInputTerminal,
+        channel: str | None,
+    ) -> None:
+        if event.outcome in {"failed", "degraded"} and event.failure_diagnostics is not None:
+            self._last_failures[definition.name] = event.failure_diagnostics
+        elif event.outcome in {"final", "empty"} and self._fallback_cause is not None:
+            recovered = recognition_failure_diagnostics(
+                None,
+                provider=definition.name.value,
+                channel=channel,
+                operation="recovery",
+                reason="recovered",
+                identity=event.identity,
+            )
+            emit_failure(
+                logger,
+                replace(
+                    recovered, code="stt.recovered", cause_id=self._fallback_cause.diagnostic_id
+                ),
+                severity="info",
+                disposition="recovered",
+                stage="recovery",
+            )
+            self._fallback_cause = None
 
 
 @dataclass(slots=True)
@@ -346,12 +415,40 @@ class _RollingSession(STTBackendSession):
 
     definition: RollingProviderDefinition
     inner: STTBackendSession
-    on_session_error: Callable[[RollingProviderDefinition, BaseException], None]
+    on_session_error: Callable[[RollingProviderDefinition, BaseException, ErrorDiagnostics], None]
+    on_terminal_observed: Callable[
+        [RollingProviderDefinition, STTProviderTurnTerminal | STTProviderInputTerminal, str | None],
+        None,
+    ]
+    _channel: str | None = None
     _outer_stream: RecognitionStreamIdentity | None = field(default=None, init=False)
     _last_receipt_sequence: int = field(default=0, init=False)
     _unit_identities: OrderedDict[RecognitionUnitIdentity, RecognitionUnitIdentity] = field(
         default_factory=OrderedDict, init=False
     )
+
+    def _record_session_error(
+        self,
+        exception: BaseException,
+        identity: STTProviderTurnIdentity | None = None,
+        stream: RecognitionStreamIdentity | None = None,
+    ) -> None:
+        diagnostics = recognition_failure_diagnostics(
+            exception,
+            provider=self.definition.name.value,
+            channel=self._channel,
+            operation="receive",
+            reason="provider_event_stream_failed",
+            identity=identity,
+        )
+        stream = stream or self._outer_stream
+        if stream is not None:
+            diagnostics = replace(
+                diagnostics,
+                generation=stream.activation_generation,
+                fields={**diagnostics.fields, "provider_epoch_id": stream.provider_epoch_id},
+            )
+        self.on_session_error(self.definition, exception, diagnostics)
 
     @property
     def max_session_age_s(self) -> float | None:
@@ -395,14 +492,16 @@ class _RollingSession(STTBackendSession):
         if self._outer_stream is not None and self._outer_stream != stream:
             raise RuntimeError("rolling member cannot bind unrelated recognition streams")
         try:
+            self._channel = stream.channel
             await self.inner.begin_stream(stream)
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc, stream=stream)
             raise
         self._outer_stream = stream
 
     async def begin_turn(self, request: STTProviderTurnRequest) -> None:
+        self._channel = request.channel
         if self.independent_recognition_units:
             identity = request.identity
             stream = RecognitionStreamIdentity(
@@ -420,7 +519,7 @@ class _RollingSession(STTBackendSession):
             await self._scoped_inner().begin_turn(request)
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc, request.identity)
             raise
 
     async def send_turn_audio(
@@ -442,7 +541,7 @@ class _RollingSession(STTBackendSession):
             )
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc, identity)
             raise
 
     async def seal_turn(
@@ -462,7 +561,7 @@ class _RollingSession(STTBackendSession):
             )
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc, identity)
             raise
 
     async def abort_turn(self, identity: STTProviderTurnIdentity, *, reason: str) -> None:
@@ -470,7 +569,7 @@ class _RollingSession(STTBackendSession):
             await self._scoped_inner().abort_turn(identity, reason=reason)
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc, identity)
             raise
 
     async def send_stream_audio(
@@ -482,7 +581,7 @@ class _RollingSession(STTBackendSession):
             await self.inner.send_stream_audio(pcm16le, source_ranges=source_ranges)
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc)
             raise
 
     async def end_stream(self, *, reason: str) -> None:
@@ -492,7 +591,7 @@ class _RollingSession(STTBackendSession):
             await self.inner.end_stream(reason=reason)
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc)
             raise
 
     def recognition_source_covers(self, ranges: tuple[AudioCaptureSpan, ...]) -> bool:
@@ -503,6 +602,23 @@ class _RollingSession(STTBackendSession):
     async def turn_events(self) -> AsyncIterator[STTProviderTurnEvent]:
         try:
             async for event in self._scoped_inner().turn_events():
+                if isinstance(event, STTProviderTurnTerminal | STTProviderInputTerminal):
+                    if (
+                        event.outcome in {"failed", "degraded"}
+                        and event.failure_diagnostics is None
+                    ):
+                        event = replace(
+                            event,
+                            failure_diagnostics=recognition_failure_diagnostics(
+                                None,
+                                provider=self.definition.name.value,
+                                channel=self._channel or "unknown",
+                                operation="turn_terminal",
+                                reason=event.failure_reason or event.outcome,
+                                identity=event.identity,
+                            ),
+                        )
+                    self.on_terminal_observed(self.definition, event, self._channel)
                 if isinstance(event, (STTRecognitionUnit, STTRecognitionUnitTerminal)):
                     unit = event if isinstance(event, STTRecognitionUnit) else event.unit
                     identity = self._remap_recognition_identity(unit.identity)
@@ -515,7 +631,7 @@ class _RollingSession(STTBackendSession):
                 yield event
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc)
             raise
 
     def _remap_recognition_identity(
@@ -571,7 +687,7 @@ class _RollingSession(STTBackendSession):
                 yield event
         except BaseException as exc:
             if not isinstance(exc, asyncio.CancelledError):
-                self.on_session_error(self.definition, exc)
+                self._record_session_error(exc)
             raise
 
 

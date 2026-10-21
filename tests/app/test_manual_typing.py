@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import uuid4
 
 import pytest
 
 from puripuly_heart.app.ports.manual_typing import SelfChatboxTypingPort
-from puripuly_heart.app.services.manual_typing import ManualTypingOwner
+from puripuly_heart.app.services.manual_typing import ManualTextSubmissionFailed, ManualTypingOwner
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 
 
 class RecordingSelfTypingOutput:
@@ -36,7 +38,6 @@ def _owner(
         output_provider=lambda: output,
         completion_provider=completion_provider,
         log_diagnostic=lambda message: detailed.append(message),
-        log_error=lambda message: errors.append(message),
         idle_timeout_seconds=0.01,
         submit_timeout_seconds=0.1,
     )
@@ -80,8 +81,8 @@ async def test_owner_keeps_overlapping_submit_generations_independent() -> None:
         completion_provider=lambda _utterance_id: completion,
     )
 
-    async def submit() -> str:
-        return "utterance"
+    async def submit() -> TextSubmissionAdmission:
+        return TextSubmissionAdmission("admitted", uuid4(), ())
 
     first = asyncio.create_task(owner.submit(submit))
     await asyncio.sleep(0)
@@ -103,13 +104,12 @@ async def test_owner_clears_submit_reason_after_submission_failure() -> None:
     async def fail() -> object:
         raise RuntimeError("boom")
 
-    await owner.submit(fail)
+    with pytest.raises(ManualTextSubmissionFailed) as caught:
+        await owner.submit(fail)
 
     assert output.reasons == set()
-    assert errors == [
-        "[ManualTyping] operation_failed "
-        "operation=submit cause=unclassified exception_type=RuntimeError"
-    ]
+    assert caught.value.diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "boom" not in repr(caught.value.diagnostics)
 
 
 def test_typing_output_port_exposes_only_self_channel_operations() -> None:

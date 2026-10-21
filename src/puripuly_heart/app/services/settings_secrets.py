@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import contextlib
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
@@ -13,6 +13,27 @@ from puripuly_heart.app.ports.settings_secrets import (
     SettingsSecretStorePort,
     SettingsSecretValuesSnapshot,
 )
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.messages import ErrorDiagnostics
+
+logger = logging.getLogger(__name__)
+
+
+def _secret_diagnostics(phase: str, exception: BaseException) -> ErrorDiagnostics:
+    diagnostics = ErrorDiagnostics(
+        component="settings_secrets",
+        operation=phase,
+        code="settings_secret_failed",
+        category="transaction",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={"phase": phase, **safe_exception_fields(exception)},
+    )
+    emit_failure(logger, diagnostics, disposition="degraded", severity="warning", stage=phase)
+    return diagnostics
+
 
 SettingsSecretStoreFactory = Callable[[], SettingsSecretStorePort]
 
@@ -29,8 +50,10 @@ def _load_value(
     for legacy_key in legacy_keys:
         legacy_value = store.get(legacy_key) or ""
         if legacy_value:
-            with contextlib.suppress(Exception):
+            try:
                 store.set(key, legacy_value)
+            except Exception as exc:
+                _secret_diagnostics("legacy_secret_migration", exc)
             return legacy_value
     return ""
 
@@ -45,7 +68,8 @@ class SettingsSecretsOwner:
         except Exception as exc:
             return SettingsSecretLoadResult(
                 snapshot=None,
-                error_message=f"Failed to load secrets: {exc}",
+                error_message="Secret storage is unavailable.",
+                diagnostics=_secret_diagnostics("store_creation", exc),
             )
 
         snapshot = SettingsSecretSnapshot()
@@ -107,7 +131,9 @@ class SettingsSecretsOwner:
                 ),
             )
         except Exception as exc:
-            return SettingsSecretLoadResult(snapshot=snapshot, read_error=exc)
+            return SettingsSecretLoadResult(
+                snapshot=snapshot, diagnostics=_secret_diagnostics("secret_read", exc)
+            )
         return SettingsSecretLoadResult(snapshot=snapshot)
 
     def load_values(
@@ -119,7 +145,8 @@ class SettingsSecretsOwner:
         except Exception as exc:
             return SettingsSecretLoadResult(
                 snapshot=None,
-                error_message=f"Failed to load secrets: {exc}",
+                error_message="Secret storage is unavailable.",
+                diagnostics=_secret_diagnostics("store_creation", exc),
             )
 
         values: list[tuple[str, str]] = []
@@ -129,7 +156,9 @@ class SettingsSecretsOwner:
                 values.append((key, store.get(key) or ""))
                 snapshot = SettingsSecretValuesSnapshot(tuple(values))
         except Exception as exc:
-            return SettingsSecretLoadResult(snapshot=snapshot, read_error=exc)
+            return SettingsSecretLoadResult(
+                snapshot=snapshot, diagnostics=_secret_diagnostics("secret_read", exc)
+            )
         return SettingsSecretLoadResult(snapshot=snapshot)
 
     def load_openrouter_pkce(
@@ -140,7 +169,8 @@ class SettingsSecretsOwner:
         except Exception as exc:
             return SettingsSecretLoadResult(
                 snapshot=None,
-                error_message=f"Failed to load secrets: {exc}",
+                error_message="Secret storage is unavailable.",
+                diagnostics=_secret_diagnostics("store_creation", exc),
             )
 
         snapshot = OpenRouterPkceSecretSnapshot()
@@ -154,7 +184,9 @@ class SettingsSecretsOwner:
                 deepseek_api_key=store.get("deepseek_api_key") or "",
             )
         except Exception as exc:
-            return SettingsSecretLoadResult(snapshot=snapshot, read_error=exc)
+            return SettingsSecretLoadResult(
+                snapshot=snapshot, diagnostics=_secret_diagnostics("secret_read", exc)
+            )
         return SettingsSecretLoadResult(snapshot=snapshot)
 
     def mutate(self, mutation: SettingsSecretMutation) -> SettingsSecretMutationResult:
@@ -168,6 +200,7 @@ class SettingsSecretsOwner:
             return SettingsSecretMutationResult(
                 succeeded=False,
                 error_type=type(exc).__name__,
+                diagnostics=_secret_diagnostics("secret_mutation", exc),
             )
         return SettingsSecretMutationResult(succeeded=True)
 

@@ -12,6 +12,8 @@ from puripuly_heart.ui.flet_runtime import (
     is_hover_active,
     update_control_if_mounted,
 )
+from puripuly_heart.ui.fonts import TypeFace, locale_body_letter_spacing
+from puripuly_heart.ui.i18n import get_locale
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_DIVIDER,
@@ -21,6 +23,7 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY_CONTAINER,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    text_style,
 )
 
 
@@ -251,10 +254,10 @@ class TextSubtabShell(ft.Column):
                 ft.ControlState.DEFAULT: background,
                 ft.ControlState.HOVERED: background,
             },
-            text_style=ft.TextStyle(
+            text_style=text_style(
+                TypeFace(self._font_family, locale_body_letter_spacing(get_locale())),
                 size=16,
                 weight=ft.FontWeight.W_600,
-                font_family=self._font_family,
             ),
             overlay_color=ft.Colors.TRANSPARENT,
             padding=padding,

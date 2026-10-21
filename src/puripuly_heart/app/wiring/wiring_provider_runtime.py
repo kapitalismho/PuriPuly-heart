@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from puripuly_heart.app.ports.translation_runtime_configuration import (
     TranslationRuntimeSettingsValues,
 )
 from puripuly_heart.app.services.canonical_settings_persistence import SettingsOwner
 from puripuly_heart.app.services.managed_gemma_translation import ManagedGemmaTranslationOwner
-from puripuly_heart.app.services.peer_application import PeerApplicationOwner
+from puripuly_heart.app.services.peer_application import PeerApplicationOwner, PeerApplicationState
 from puripuly_heart.app.services.provider_runtime_apply import (
     LlmProviderRebuildContext,
     LlmProviderRebuildOwner,
@@ -21,6 +23,7 @@ from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.prompts import resolve_system_prompt
 from puripuly_heart.config.runtime_resolution import resolve_llm_config
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS
 from puripuly_heart.config.vad_defaults import DEFAULT_STABLE_VAD_HANGOVER_MS
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
 from puripuly_heart.core.http_extensions import HttpExtensionRegistry
@@ -29,9 +32,11 @@ from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfigurationPort,
 )
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.runtime.self_capture import SelfCaptureSessionOwner
 from puripuly_heart.core.self_capture import SelfCaptureSessionSnapshot
+from puripuly_heart.core.translation_backend import TranslationBackend
 from puripuly_heart.core.translation_policy import FIXED_TRANSLATION_POLICY
 
 from .wiring_llm_factory import (
@@ -125,7 +130,13 @@ class ProviderRuntimeSignatures:
     last_llm_provider: tuple[object, ...] | None = None
     superseded_settings_ids: set[int] = field(default_factory=set)
 
-    def sync(
+    def sync_llm(self, canonical: AppSettingsVNext) -> None:
+        self.last_llm_provider = build_llm_provider_signature(
+            canonical,
+            http_extensions=self.http_extensions,
+        )
+
+    def sync_stt(
         self,
         settings: AppSettingsVNext,
         *,
@@ -135,10 +146,6 @@ class ProviderRuntimeSignatures:
     ) -> None:
         self.last_self_runtime = build_self_stt_runtime_signature_from_vnext(canonical)
         self.last_self_provider = build_self_stt_provider_signature_from_vnext(canonical)
-        self.last_llm_provider = build_llm_provider_signature(
-            canonical,
-            http_extensions=self.http_extensions,
-        )
         peer.last_runtime_signature = build_peer_stt_runtime_signature_from_vnext(canonical)
         peer.last_provider_signature = build_peer_stt_provider_signature_from_vnext(canonical)
         peer.last_intent_enabled = bool(peer_translation_enabled)
@@ -195,7 +202,7 @@ class ProviderRuntimeEffects:
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None]
     self_capture_owner: Callable[[], SelfCaptureSessionOwner]
     peer: Callable[[], PeerApplicationOwner]
-    peer_desired: Callable[[AppSettingsVNext], bool]
+    peer_state: Callable[[AppSettingsVNext], PeerApplicationState]
     canonical_settings: Callable[[AppSettingsVNext], AppSettingsVNext]
     clear_local_pending: Callable[[], None]
     sync_local_notice: Callable[[], None]
@@ -204,8 +211,8 @@ class ProviderRuntimeEffects:
     dashboard_managed_pending_sink: Callable[[bool], None]
     sync_effective_flags: Callable[[], None]
     refresh_overlay: Callable[[], None]
-    refresh_peer_runtime: Callable[[], Awaitable[None]]
-    replace_self_stt: Callable[[bool], Awaitable[None]]
+    refresh_peer_runtime: Callable[[AppSettingsVNext], Awaitable[None]]
+    replace_self_stt: Callable[[AppSettingsVNext, bool], Awaitable[None]]
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None]
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool]
     gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]]
@@ -216,6 +223,7 @@ class ProviderRuntimeEffects:
         llm_runtime = self.llm_runtime_provider()
         local_asr_runtime = self.local_asr_runtime_provider()
         self_owner = self.self_capture_provider()
+        peer_owner = self.peer().runtime
         return ProviderRuntimeState(
             runtime_available=llm_runtime is not None and local_asr_runtime is not None,
             llm_available=llm_runtime is not None and llm_runtime.provider is not None,
@@ -228,7 +236,13 @@ class ProviderRuntimeEffects:
                 and local_asr_runtime.snapshot.channel_for("peer").provider_id is not None
             ),
             self_stt_desired=bool(self_owner is not None and self_owner.snapshot.desired_active),
-            peer_stt_desired=self.peer_desired(settings),
+            peer_stt_desired=self.peer().desired_active(self.peer_state(settings)),
+            self_failure_diagnostics=(
+                self_owner.snapshot.failure_diagnostics if self_owner is not None else None
+            ),
+            peer_failure_diagnostics=(
+                peer_owner.snapshot.failure_diagnostics if peer_owner is not None else None
+            ),
         )
 
     def self_runtime_convergence(self, settings: object) -> bool | None:
@@ -272,7 +286,7 @@ class ProviderRuntimeEffects:
         config = build_peer_capture_session_config_from_vnext(
             self.canonical_settings(settings),
         )
-        capture_convergence = owner.capture_runtime_convergence(config)
+        capture_convergence = owner.capture_runtime_convergence(config, self.peer_state(settings))
         if capture_convergence is not True:
             return capture_convergence
         runtime = self.local_asr_runtime_provider()
@@ -291,7 +305,6 @@ class ProviderRuntimeEffects:
         canonical = self.canonical_settings(settings)
         translation = canonical.intent.translation
         provider_llm = provider_llm_for_translation(translation.model, translation.connection)
-        self.settings.canonical = settings
         self.clear_local_pending()
         self.sync_local_notice()
         if (
@@ -327,26 +340,23 @@ class ProviderRuntimeEffects:
                 api_key=api_key,
             )
 
-    async def refresh_peer(self) -> None:
-        await self.refresh_peer_runtime()
-        current = self.settings.canonical
-        if current is not None:
-            self.sync_effective_flags()
+    async def refresh_peer(self, settings: AppSettingsVNext) -> None:
+        await self.refresh_peer_runtime(settings)
+        self.sync_effective_flags()
         self.refresh_overlay()
 
-    async def refresh_self_stt(self) -> None:
+    async def refresh_self_stt(self, settings: AppSettingsVNext) -> None:
         owner = self.self_capture_provider()
         if owner is not None and owner.snapshot.desired_active:
-            await self.replace_self_stt(True)
+            await self.replace_self_stt(settings, True)
             return
-        await self.rebuild_self_stt()
+        await self.rebuild_self_stt(settings)
 
-    async def rebuild_self_stt(self) -> None:
-        current = self.settings.canonical
-        if current is None or self.local_asr_runtime_provider() is None:
+    async def rebuild_self_stt(self, settings: AppSettingsVNext) -> None:
+        if self.local_asr_runtime_provider() is None:
             return
         owner = self.self_capture_owner()
-        config = build_self_capture_session_config_from_vnext(self.canonical_settings(current))
+        config = build_self_capture_session_config_from_vnext(self.canonical_settings(settings))
         if owner.snapshot.desired_active:
             snapshot = await owner.apply_intent(config, enabled=True)
         else:
@@ -364,7 +374,7 @@ class ProviderRuntimeComponents:
     llm_rebuild: LlmProviderRebuildOwner
     effects: ProviderRuntimeEffects
     signatures: ProviderRuntimeSignatures
-    sync_signatures: Callable[[AppSettingsVNext], None]
+    sync_stt_signatures: Callable[[AppSettingsVNext], None]
     capture_signatures_before_canonical_mutation: Callable[[], None]
 
 
@@ -382,7 +392,7 @@ def compose_provider_runtime(
     self_capture_provider: Callable[[], SelfCaptureSessionOwner | None],
     self_capture_owner: Callable[[], SelfCaptureSessionOwner],
     peer: Callable[[], PeerApplicationOwner],
-    peer_desired: Callable[[AppSettingsVNext], bool],
+    peer_state: Callable[[AppSettingsVNext], PeerApplicationState],
     canonical_settings: Callable[[AppSettingsVNext], AppSettingsVNext],
     clear_local_pending: Callable[[], None],
     sync_local_notice: Callable[[], None],
@@ -391,8 +401,8 @@ def compose_provider_runtime(
     dashboard_managed_pending_sink: Callable[[bool], None],
     sync_effective_flags: Callable[[], None],
     refresh_overlay: Callable[[], None],
-    refresh_peer_runtime: Callable[[], Awaitable[None]],
-    replace_self_stt: Callable[[bool], Awaitable[None]],
+    refresh_peer_runtime: Callable[[AppSettingsVNext], Awaitable[None]],
+    replace_self_stt: Callable[[AppSettingsVNext, bool], Awaitable[None]],
     self_state_sink: Callable[[SelfCaptureSessionSnapshot], None],
     self_availability: Callable[[SelfCaptureSessionSnapshot], bool],
     gpu_recovery: Callable[[AppSettingsVNext, ProviderRuntimeApplyPlan], Awaitable[None]],
@@ -423,7 +433,7 @@ def compose_provider_runtime(
         self_capture_provider=self_capture_provider,
         self_capture_owner=self_capture_owner,
         peer=peer,
-        peer_desired=peer_desired,
+        peer_state=peer_state,
         canonical_settings=canonical_settings,
         clear_local_pending=clear_local_pending,
         sync_local_notice=sync_local_notice,
@@ -441,8 +451,7 @@ def compose_provider_runtime(
         success_sink=success_sink,
     )
 
-    def llm_context() -> LlmProviderRebuildContext | None:
-        current = settings.canonical
+    def llm_context(current: object | None) -> LlmProviderRebuildContext | None:
         runtime = llm_runtime_provider()
         if current is None or runtime is None:
             return None
@@ -487,8 +496,14 @@ def compose_provider_runtime(
     async def create_llm(settings_value: object) -> object | None:
         canonical = canonical_settings(settings_value)
         translation = canonical.intent.translation
-        secrets = create_secret_store(canonical.intent.secrets, config_path=config_path)
-        if translation.model == "managed_gemma":
+        if translation.model == "gemma4_26b_31b":
+            selection_at_admission = settings.canonical
+            secrets = await run_owned_thread_call(
+                lambda: create_secret_store(canonical.intent.secrets, config_path=config_path)
+            )
+        else:
+            secrets = create_secret_store(canonical.intent.secrets, config_path=config_path)
+        if translation.model in MANAGED_GEMMA_MODELS:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             config = translation_runtime_configuration_provider()
@@ -523,6 +538,27 @@ def compose_provider_runtime(
             )
         release = managed_release()
         await release.rebuild(secrets=secrets)
+        if translation.model == "gemma4_26b_31b":
+            backend = await run_owned_thread_call(
+                lambda: _translation_backend_from_canonical(
+                    settings_value,
+                    secrets=secrets,
+                    managed_release_service=release.service,
+                    managed_delegate_ready=managed_delegate_ready,
+                    runtime_logging=runtime_logging,
+                    chatgpt_session=chatgpt_session,
+                )
+            )
+            current = settings.canonical
+            if (
+                current is None
+                or selection_at_admission is None
+                or current.intent.translation != selection_at_admission.intent.translation
+            ):
+                if backend is not None:
+                    await cast(TranslationBackend, backend).close()
+                raise asyncio.CancelledError
+            return backend
         return _translation_backend_from_canonical(
             settings_value,
             secrets=secrets,
@@ -532,17 +568,22 @@ def compose_provider_runtime(
             chatgpt_session=chatgpt_session,
         )
 
+    def sync_llm_signature(current: object) -> None:
+        signature_state.sync_llm(canonical_settings(current))
+
     llm_rebuild = LlmProviderRebuildOwner(
-        context_provider=llm_context,
+        context_provider=lambda: llm_context(settings.committed_settings),
         provider_factory=create_llm,
         availability_sink=translation_needs_key_sink,
         usage_refresh=usage_refresh,
         failure_sink=failure_sink,
         success_sink=success_sink,
+        signature_sink=sync_llm_signature,
+        retry_sink=signature_state.mark_llm_retry,
     )
 
-    def sync_signatures(current: object) -> None:
-        signature_state.sync(
+    def sync_stt_signatures(current: object) -> None:
+        signature_state.sync_stt(
             current,
             canonical=canonical_settings(current),
             peer=peer(),
@@ -551,7 +592,7 @@ def compose_provider_runtime(
         additional_signature_sink(current)
 
     def capture_signatures_before_canonical_mutation() -> None:
-        current = settings.canonical
+        current = settings.committed_settings
         if current is None:
             return
         signature_state.capture_peer_before_canonical_mutation(
@@ -563,13 +604,14 @@ def compose_provider_runtime(
     runtime = ProviderRuntimeOwner(
         state_provider=effects.state,
         common_effect=effects.apply_common,
-        rebuild_llm=llm_rebuild.rebuild,
+        rebuild_llm=lambda current: llm_rebuild.rebuild_with_context(
+            llm_context(current), propagate_failure=True
+        ),
         recover_gpu=effects.gpu_recovery,
         refresh_peer=effects.refresh_peer,
         refresh_self_stt=effects.refresh_self_stt,
-        signature_sink=sync_signatures,
-        llm_retry_sink=signature_state.mark_llm_retry,
-        current_settings_provider=lambda: settings.canonical,
+        signature_sink=sync_stt_signatures,
+        current_settings_provider=lambda: settings.committed_settings,
         signature_cache_provider=lambda: signature_state.cache(peer()),
         self_signature_builder=lambda current: build_self_stt_provider_signature_from_vnext(
             canonical_settings(current)
@@ -595,7 +637,7 @@ def compose_provider_runtime(
         llm_rebuild=llm_rebuild,
         effects=effects,
         signatures=signature_state,
-        sync_signatures=sync_signatures,
+        sync_stt_signatures=sync_stt_signatures,
         capture_signatures_before_canonical_mutation=(capture_signatures_before_canonical_mutation),
     )
 

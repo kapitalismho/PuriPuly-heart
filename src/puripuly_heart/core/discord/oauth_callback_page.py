@@ -9,7 +9,7 @@ OAUTH_CALLBACK_COMPLETION_LINE_KEYS = (
     "auth.callback.line3",
 )
 OAUTH_CALLBACK_COMPLETION_FALLBACK_LINES = (
-    "We received your authentication",
+    "Authentication received",
     "PuriPuly is finishing the connection in the app.",
     "You can close this tab.",
 )

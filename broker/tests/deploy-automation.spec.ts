@@ -271,7 +271,7 @@ describe('broker direct deploy automation', () => {
       db.close();
     }
   });
-  it.skipIf(!bashAvailable)('keeps migration 0025 out of both ordinary deploy phases while preserving deferred 0021 and 0024', () => {
+  it.skipIf(!bashAvailable)('keeps telemetry deletion and referral retirement out of both ordinary deploy phases while preserving deferred privacy migrations', () => {
     const workflow = readFileSync(deployWorkflow, 'utf8');
     const stageScript = extractWorkflowRunBlock(
       workflow,
@@ -287,6 +287,8 @@ describe('broker direct deploy automation', () => {
       '0023_backfill_operation_route_rate_limits.sql',
       '0024_allow_unattributed_request_events.sql',
       '0025_drop_legacy_translation_telemetry.sql',
+      '0026_managed_attempt_cleanup_ownership.sql',
+      '0027_remove_managed_referrals.sql',
     ];
     for (const migrationName of migrationNames) {
       writeFileSync(join(migrationsDir, migrationName), `SELECT '${migrationName}';\n`);
@@ -300,6 +302,7 @@ describe('broker direct deploy automation', () => {
       '0020_network_identity_hmac.sql',
       '0022_managed_operation_issuance_context.sql',
       '0023_backfill_operation_route_rate_limits.sql',
+      '0026_managed_attempt_cleanup_ownership.sql',
     ]);
     expect(
       readdirSync(join(tempDir, '.deploy-direct', 'staged-migrations-post-backfill')).sort(),
@@ -309,6 +312,7 @@ describe('broker direct deploy automation', () => {
       '0022_managed_operation_issuance_context.sql',
       '0023_backfill_operation_route_rate_limits.sql',
       '0024_allow_unattributed_request_events.sql',
+      '0026_managed_attempt_cleanup_ownership.sql',
     ]);
   });
 
@@ -352,6 +356,35 @@ describe('broker direct deploy automation', () => {
 
       expect(result.status, scenario.migrations.join(',')).toBe(scenario.status);
     }
+  });
+  it.skipIf(!bashAvailable)('admits a fresh schema or completed privacy history and rejects incomplete existing databases before deployment', () => {
+    const workflow = readFileSync(deployWorkflow, 'utf8');
+    const script = extractWorkflowRunBlock(workflow, 'Require completed privacy migration before referral-free deployment')
+      .replaceAll('${{ steps.render.outputs.config_path }}', 'wrangler.production.jsonc');
+    const scenarios = [
+      { tables: [], migrations: [], status: 0, firstInstall: true },
+      { tables: ['installations', 'broker_config'], migrations: ['0021_network_identity_purge.sql', '0024_allow_unattributed_request_events.sql'], status: 0, firstInstall: false },
+      { tables: ['installations', 'broker_config'], migrations: ['0021_network_identity_purge.sql'], status: 1, firstInstall: false },
+      { tables: ['installations', 'broker_config'], migrations: [], status: 1, firstInstall: false },
+      { tables: ['broker_config'], migrations: [], status: 1, firstInstall: false },
+    ];
+    for (const scenario of scenarios) {
+      const tempDir = createRepoTempDir();
+      writeFileSync(join(tempDir, 'bash-env.sh'), `pnpm() { case \"$*\" in *sqlite_master*) printf '%s' \"$SCHEMA_JSON\" ;; *) printf '%s' \"$JOURNAL_JSON\" ;; esac; }\n`);
+      const outputPath = join(tempDir, 'github-output');
+      const result = runBashScript(script, tempDir, {
+        BASH_ENV: './bash-env.sh',
+        GITHUB_OUTPUT: outputPath,
+        SCHEMA_JSON: JSON.stringify([{ results: scenario.tables.map((name) => ({ name })) }]),
+        JOURNAL_JSON: JSON.stringify([{ results: scenario.migrations.map((name) => ({ name })) }]),
+      });
+      expect(result.status, JSON.stringify(scenario)).toBe(scenario.status);
+      if (scenario.status === 0) expect(readFileSync(outputPath, 'utf8')).toContain(`first_install=${scenario.firstInstall}`);
+    }
+    const prerequisite = workflow.indexOf('Require completed privacy migration before referral-free deployment');
+    expect(prerequisite).toBeLessThan(workflow.indexOf('Export pre-migration production D1 backup'));
+    expect(prerequisite).toBeLessThan(workflow.indexOf('pnpm exec wrangler deploy'));
+    expect(workflow).toContain("if: steps.privacy_prerequisite.outputs.first_install == 'true'");
   });
 
   it.skipIf(!bashAvailable)('requires the dedicated deletion inputs and a usable backup before staging and applying only migration 0025', () => {
@@ -615,7 +648,7 @@ describe('broker direct deploy automation', () => {
     );
     const networkIdentityPurgeApplyIndex = workflow.indexOf(
       'wrangler d1 migrations apply',
-      remoteD1MigrationIndex + 1,
+      networkIdentityBackfillAwaitIndex + 1,
     );
     const networkIdentityPurgeVerifyIndex = workflow.indexOf(
       'Verify legacy network identity columns are gone',
@@ -892,7 +925,6 @@ describe('broker direct deploy automation', () => {
     expect(readme).toContain('not the shared worker secret');
     expect(readme).toContain('BROKER_DEPLOY_SMOKE_DISALLOWED_MODEL_PRODUCTION');
     expect(readme).toContain('OPENROUTER_MANAGED_API_KEY_PRODUCTION` remains transitional');
-    expect(readme).toContain('reconciles the production OpenRouter guardrail');
     expect(readme).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET_PRODUCTION');
     expect(readme).toContain('OPENROUTER_MANAGED_USER_HMAC_SECRET');
     expect(readme).toContain('QQ_AUTH_HMAC_PSK_PRODUCTION');

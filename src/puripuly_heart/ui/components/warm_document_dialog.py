@@ -10,6 +10,7 @@ from puripuly_heart.ui.theme import (
     COLOR_ON_BACKGROUND,
     COLOR_PRIMARY,
     COLOR_SURFACE,
+    text_style,
 )
 
 DIALOG_WIDTH = 720
@@ -38,7 +39,7 @@ def _action_button_style() -> ft.ButtonStyle:
         ),
         shape=ft.RoundedRectangleBorder(radius=BUTTON_RADIUS),
         overlay_color=ft.Colors.TRANSPARENT,
-        text_style=ft.TextStyle(size=BUTTON_TEXT_SIZE, weight=ft.FontWeight.BOLD),
+        text_style=text_style(size=BUTTON_TEXT_SIZE, weight=ft.FontWeight.BOLD),
         animation_duration=0,
     )
 

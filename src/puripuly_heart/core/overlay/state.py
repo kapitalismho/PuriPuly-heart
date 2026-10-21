@@ -81,6 +81,9 @@ class OverlayLogicalTurnEntry:
     retained_hidden: bool = False
     window_evicted_at: float | None = None
     expiration_revision: int = 0
+    caption_revision: int = 0
+    source_closed: bool = False
+    caption_staged: bool = False
 
     @property
     def block_id(self) -> str:
@@ -150,6 +153,7 @@ class OverlayPresentationEntry(Protocol):
     appearance_seq: int | None
     publishable_seq: int | None
     retained_hidden: bool
+    caption_staged: bool
     ever_visible: bool
     last_updated_seq: int
 
@@ -292,6 +296,232 @@ class OverlayPresentationState:
         )
         self._pending_removals.append(record)
         return record
+
+    def apply_self_caption_update(
+        self,
+        event: SelfActiveUpdate,
+        *,
+        now: float,
+        show_translation: bool,
+        show_peer_original: bool,
+        translation_enabled: bool,
+        next_appearance_seq: NextAppearanceSeq,
+        visible_window_target_blocks: int,
+        terminal_update_reason: OverlayTerminalUpdateReason,
+    ) -> OverlayReductionResult:
+        key = self.entry_key(event.channel, event.utterance_id)
+        if terminal_update_reason(event.channel, event.utterance_id) is not None:
+            return OverlayReductionResult(False)
+        entry = self.entries.get(key)
+        if event.retained_only and (entry is None or entry.retained_hidden):
+            return OverlayReductionResult(False)
+        if entry is not None and (
+            event.caption_revision <= entry.caption_revision or event.seq < entry.last_updated_seq
+        ):
+            return OverlayReductionResult(False)
+        if event.caption_cancelled:
+            self.remove_entry(key, reason="caption_cancelled", now=now, tombstone_seq=event.seq)
+            return OverlayReductionResult(entry is not None)
+        if entry is None:
+            entry = self.entry_for(event.channel, event.utterance_id)
+        previous_translation = self._rendered_self_translation_text(entry)
+        previous_payload = (
+            entry.original_text,
+            entry.translation_text,
+            entry.original_language,
+            entry.translation_language,
+            entry.source_closed,
+            self.live_self_turn_key == key,
+            entry.caption_staged,
+        )
+        if event.secondary_text.strip():
+            for old_key, old_entry in tuple(self.entries.items()):
+                if (
+                    old_key != key
+                    and old_entry.caption_staged
+                    and (old_entry.first_input_seq or 0) < (entry.first_input_seq or event.seq)
+                ):
+                    self.remove_entry(
+                        old_key,
+                        reason="evicted_by_newer_turn",
+                        now=now,
+                        tombstone_seq=old_entry.last_updated_seq,
+                    )
+        self._remember_entry_input_seq(entry, event_seq=event.seq)
+        if not entry.occupant_key:
+            entry.occupant_key = event.occupant_key
+        if not entry.source_closed:
+            entry.original_text = event.text
+            entry.original_language = _line_language(event.source_language, event.text)
+            entry.original_seq = event.seq
+        entry.source_closed = bool(event.caption_source_closed)
+        self._refresh_entry_visibility_and_expiration(
+            key,
+            entry,
+            now=now,
+            publishable_seq=event.seq,
+            next_appearance_seq=next_appearance_seq,
+        )
+        entry.translation_text = event.secondary_text
+        entry.translation_language = _line_language(event.target_language, event.secondary_text)
+        entry.translation_update_id = event.update_id
+        entry.translation_origin_wall_clock_ms = event.origin_wall_clock_ms
+        entry.translation_session_scope = event.session_scope
+        entry.translation_source_text_hash = event.source_text_hash
+        entry.translation_source_text_len = event.source_text_len
+        entry.translation_logical_turn_key = event.logical_turn_key
+        entry.translation_seq = event.seq if event.secondary_text.strip() else None
+        staged = not event.secondary_text.strip() and self._self_caption_would_displace_translation(
+            key,
+            entry,
+            activate=not event.caption_complete,
+            show_translation=show_translation,
+            show_peer_original=show_peer_original,
+            translation_enabled=translation_enabled,
+            capacity=visible_window_target_blocks,
+        )
+        if entry.caption_staged and event.retained_only and not event.secondary_text.strip():
+            staged = True
+        entry.caption_staged = staged
+        if not event.retained_only and not staged and self.live_self_turn_key != key:
+            self._clear_live_self_pointer(
+                reason="live_self_replaced", now=now, show_translation=show_translation
+            )
+        if not event.retained_only and not staged:
+            self.live_self_turn_key = key
+        if self.live_self_turn_key == key or staged:
+            if event.caption_complete:
+                self._clear_self_live_payload(entry)
+                if self.live_self_turn_key == key:
+                    self.live_self_turn_key = None
+            else:
+                entry.live_text = entry.original_text
+                entry.live_primary_language = entry.original_language
+                entry.live_secondary_text = entry.translation_text
+                entry.live_secondary_language = entry.translation_language
+                entry.live_update_id = event.update_id
+                entry.live_origin_wall_clock_ms = event.origin_wall_clock_ms
+                entry.live_session_scope = event.session_scope
+                entry.live_source_text_hash = event.source_text_hash
+                entry.live_source_text_len = event.source_text_len
+                entry.live_logical_turn_key = event.logical_turn_key
+                entry.live_seq = event.seq
+        if event.caption_complete and entry.closed_at is None:
+            entry.closed_at = now
+            entry.closed_seq = event.seq
+        entry.caption_revision = event.caption_revision
+        entry.last_updated_seq = event.seq
+        self._update_self_translation_visibility(
+            entry,
+            previous_rendered_text=previous_translation,
+            next_rendered_text=self._rendered_self_translation_text(entry),
+            now=now,
+            show_translation=show_translation,
+        )
+        return OverlayReductionResult(
+            previous_payload
+            != (
+                entry.original_text,
+                entry.translation_text,
+                entry.original_language,
+                entry.translation_language,
+                entry.source_closed,
+                self.live_self_turn_key == key,
+                entry.caption_staged,
+            )
+        )
+
+    def promote_staged_self(
+        self,
+        *,
+        now: float,
+        show_translation: bool,
+        show_peer_original: bool,
+        translation_enabled: bool,
+        capacity: int,
+    ) -> None:
+        staged = [(key, entry) for key, entry in self.entries.items() if entry.caption_staged]
+        if not staged:
+            return
+        key, entry = max(staged, key=lambda item: item[1].first_input_seq or 0)
+        if self._self_caption_would_displace_translation(
+            key,
+            entry,
+            activate=entry.closed_seq is None,
+            show_translation=show_translation,
+            show_peer_original=show_peer_original,
+            translation_enabled=translation_enabled,
+            capacity=capacity,
+        ):
+            return
+        for old_key, old_entry in staged:
+            if old_key != key:
+                self.remove_entry(
+                    old_key,
+                    reason="evicted_by_newer_turn",
+                    now=now,
+                    tombstone_seq=old_entry.last_updated_seq,
+                )
+        entry.caption_staged = False
+        if entry.closed_seq is None:
+            self._clear_live_self_pointer(
+                reason="live_self_replaced", now=now, show_translation=show_translation
+            )
+            self.live_self_turn_key = key
+
+    def _self_caption_would_displace_translation(
+        self,
+        key: OverlayEntryKey,
+        entry: OverlayLogicalTurnEntry,
+        *,
+        activate: bool,
+        show_translation: bool,
+        show_peer_original: bool,
+        translation_enabled: bool,
+        capacity: int,
+    ) -> bool:
+        if not show_translation or any(
+            block.id == entry.block_id for block in self._snapshot.blocks
+        ):
+            return False
+        drawable_ids = {
+            value.block_id
+            for value in self.entries.values()
+            if not value.caption_staged and not value.retained_hidden
+        }
+        translated_ids = {
+            block.id
+            for block in self._snapshot.blocks
+            if block.channel == "self"
+            and block.secondary_enabled
+            and block.secondary_text.strip()
+            and block.id in drawable_ids
+        }
+        if not translated_ids:
+            return False
+        candidate = replace(
+            entry,
+            caption_staged=False,
+            live_text=entry.original_text if activate else "",
+        )
+        entries = {**self.entries, key: candidate}
+        live_self_entry = (key, candidate) if activate else None
+        live_peer_entry = (
+            (self.live_peer_turn_key, entries[self.live_peer_turn_key])
+            if self.live_peer_turn_key in entries
+            else None
+        )
+        selection = self.visible_block_selection(
+            entries=entries,
+            live_self_entry=live_self_entry,
+            live_peer_entry=live_peer_entry,
+            visible_window_target_blocks=capacity,
+            show_translation=show_translation,
+            show_peer_original=show_peer_original,
+            translation_enabled=translation_enabled,
+            next_appearance_seq=None,
+        )
+        return not translated_ids.issubset(block.id for _, block in selection.rendered_entries)
 
     def apply_self_active_update(
         self,
@@ -908,7 +1138,7 @@ class OverlayPresentationState:
         visible_window_target_blocks: int,
         show_translation: bool,
         show_peer_original: bool,
-        next_appearance_seq: NextAppearanceSeq,
+        next_appearance_seq: NextAppearanceSeq | None,
         translation_enabled: bool = True,
     ) -> OverlayVisibleBlockSelection:
         active_self_key = (
@@ -1011,6 +1241,7 @@ class OverlayPresentationState:
                 translation_enabled=translation_enabled,
             )
             and not entry.retained_hidden
+            and not entry.caption_staged
         )
 
     def rendered_block_signature(
@@ -1097,6 +1328,8 @@ class OverlayPresentationState:
             visible_deadline = visible_anchor + visible_ttl_seconds
         elif entry.closed_at is not None:
             visible_deadline = entry.closed_at + late_arrival_window_seconds
+        if entry.caption_staged and visible_deadline is not None:
+            visible_deadline += late_arrival_window_seconds
 
         translation_deadline: float | None = None
         if (
@@ -1348,7 +1581,7 @@ class OverlayPresentationState:
         finalized_limit: int,
         excluded_keys: set[OverlayEntryKey],
         show_peer_original: bool,
-        next_appearance_seq: NextAppearanceSeq,
+        next_appearance_seq: NextAppearanceSeq | None,
         translation_enabled: bool = True,
     ) -> tuple[list[OverlayEntryKey], list[OverlayEntryKey]]:
         if finalized_limit == 0:
@@ -1364,18 +1597,28 @@ class OverlayPresentationState:
                 translation_enabled=translation_enabled,
             ):
                 continue
-            self._ensure_entry_visibility_metadata(
-                entry,
-                occupant_key=self._finalized_occupant_key(entry.channel, entry.utterance_id),
-                next_appearance_seq=next_appearance_seq,
+            if next_appearance_seq is not None:
+                self._ensure_entry_visibility_metadata(
+                    entry,
+                    occupant_key=self._finalized_occupant_key(entry.channel, entry.utterance_id),
+                    next_appearance_seq=next_appearance_seq,
+                )
+            publishable_seq = (
+                entry.publishable_seq
+                if entry.publishable_seq is not None
+                else entry.last_updated_seq if entry.last_updated_seq > 0 else None
             )
-            if entry.publishable_seq is None or entry.appearance_seq is None:
+            appearance_seq = (
+                entry.appearance_seq if entry.appearance_seq is not None else entry.first_input_seq
+            )
+            if publishable_seq is None or appearance_seq is None:
                 continue
             publishable.append(
                 (
-                    entry.publishable_seq,
-                    entry.appearance_seq,
-                    entry.occupant_key,
+                    publishable_seq,
+                    appearance_seq,
+                    entry.occupant_key
+                    or self._finalized_occupant_key(entry.channel, entry.utterance_id),
                     self._format_entry_key(key),
                     key,
                 )

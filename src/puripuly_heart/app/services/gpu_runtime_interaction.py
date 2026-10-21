@@ -241,6 +241,16 @@ class GpuRuntimeInteractionOwner:
                 publish_notice=True,
                 origin=activity.origin,
             )
+        elif self._ui_state == "installing":
+            model = snapshot.state_for(LOCAL_QWEN_GPU_MODEL_ID)
+            if model.status == "download_failed":
+                self.set_ui_state("install_failed", publish_notice=True)
+            else:
+                self.set_ui_state(
+                    "installed"
+                    if model.available
+                    else "invalid" if model.integrity == "invalid" else "not_installed"
+                )
 
     def apply_provisioning_effect(self, effect: LocalASRGpuProvisioningEffect) -> None:
         self.set_ui_state(

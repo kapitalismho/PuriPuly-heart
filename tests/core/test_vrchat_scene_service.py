@@ -1004,9 +1004,11 @@ async def test_deleted_log_warns_with_safe_reason_without_file_name(
 
     warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
     assert len(warnings) == 1
-    assert warnings[0].getMessage() == (
-        "[VRChat Scene] Scene context became unavailable · Cause FileNotFoundError"
-    )
+    diagnostics = warnings[0]._puripuly_heart_failure[0]
+    assert diagnostics.code == "vrchat_scene_log_read_failed"
+    assert diagnostics.fields["exception_class"] == "FileNotFoundError"
+    assert diagnostics.fields["errno"] == 2
+    assert file_name not in repr(diagnostics)
     assert file_name not in warnings[0].getMessage()
     assert _USER_A not in caplog.text
     assert _USER_B not in caplog.text

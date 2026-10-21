@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
+from puripuly_heart.core.messages import ErrorDiagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,7 @@ class ApplicationStartupDiagnostic:
     process_id: int
     monotonic_ns: int
     exception_class: str | None = None
+    diagnostics: ErrorDiagnostics | None = None
 
 
 class ApplicationStartupSettingsPort(Protocol):

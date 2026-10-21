@@ -106,11 +106,15 @@ def build_parser() -> argparse.ArgumentParser:
     follow_parser.add_argument(
         "--after", type=int, help="Resume after a received nonnegative sequence number"
     )
+    follow_parser.add_argument("--instance-id", help="Originating host identity for replay cursor")
     logs = sub.add_parser("logs", help="Follow bounded, content-redacted application logs")
     logs_sub = logs.add_subparsers(dest="action", required=True)
-    logs_sub.add_parser("follow").add_argument(
+    log_follow = logs_sub.add_parser("follow")
+    log_follow.add_argument(
         "--level", choices=("debug", "info", "warning", "error"), default="warning"
     )
+    log_follow.add_argument("--after", type=int, help="Replay after an event sequence")
+    log_follow.add_argument("--instance-id", help="Originating host identity for replay cursor")
     secret = sub.add_parser("secrets", help="Set a secret without exposing it in process arguments")
     secret_sub = secret.add_subparsers(dest="action", required=True)
     secret_set = secret_sub.add_parser("set")
@@ -157,7 +161,9 @@ def build_parser() -> argparse.ArgumentParser:
     asr_set.add_argument("--provider", required=True)
     asr_set.add_argument("--no-wait", action="store_true")
     cap_sub.add_parser("status")
-    audio = sub.add_parser("audio", help="Discover audio devices and processes")
+    audio = sub.add_parser(
+        "audio", help="Discover audio devices, set the loopback target, and test audio"
+    )
     audio_sub = audio.add_subparsers(dest="action", required=True)
     audio_sub.add_parser("devices").add_subparsers(dest="verb", required=True).add_parser("list")
     audio_sub.add_parser("processes").add_subparsers(dest="verb", required=True).add_parser("list")
@@ -167,6 +173,9 @@ def build_parser() -> argparse.ArgumentParser:
     audio_target_set.add_argument("value")
     audio_target_set.add_argument("--no-wait", action="store_true")
     audio_sub.add_parser("retry").add_argument("--no-wait", action="store_true")
+    audio_test = audio_sub.add_parser("test")
+    audio_test.add_argument("state", choices=("on", "off"))
+    audio_test.add_argument("--no-wait", action="store_true")
     settings = sub.add_parser("settings", help="Inspect choices and apply typed settings changes")
     settings_sub = settings.add_subparsers(dest="action", required=True)
     for name in ("current", "choices"):
@@ -181,12 +190,9 @@ def build_parser() -> argparse.ArgumentParser:
     submit.add_argument("--stdin", action="store_true", help="Read content from standard input")
     submit.add_argument("--file", type=Path, help="Read UTF-8 content from a file")
     submit.add_argument("--no-wait", action="store_true")
-    microphone = sub.add_parser("microphone", help="Control the microphone test")
-    microphone_set = microphone.add_subparsers(dest="action", required=True).add_parser("test")
-    microphone_set.add_argument("state", choices=("on", "off"))
-    microphone_set.add_argument("--no-wait", action="store_true")
     models = sub.add_parser(
-        "models", help="Inspect, prepare, install, retry or cancel local models"
+        "models",
+        help="Inspect, download, import, delete, install, retry or cancel local models",
     )
     models_sub = models.add_subparsers(dest="action", required=True)
     models_sub.add_parser("status")
@@ -200,8 +206,22 @@ def build_parser() -> argparse.ArgumentParser:
         model_action.add_argument("--no-wait", action="store_true")
         if action == "install":
             model_action.add_argument("--model-id", action="append", default=[])
+        if action == "cancel":
+            model_action.add_argument("--model-id")
         if action == "prepare":
             model_action.add_argument("--verify-checksums", action="store_true")
+    for action in ("download", "import", "delete"):
+        asset_action = models_sub.add_parser(action)
+        asset_action.add_argument("--model-id", required=True)
+        asset_action.add_argument("--no-wait", action="store_true")
+        if action == "download":
+            asset_action.add_argument(
+                "--source",
+                choices=("auto", "huggingface", "modelscope", "hf-mirror"),
+                default="auto",
+            )
+        if action == "import":
+            asset_action.add_argument("--dir", type=Path, required=True)
     gemma = sub.add_parser("gemma", help="Prepare or cancel managed Gemma assets")
     gemma_sub = gemma.add_subparsers(dest="action", required=True)
     for action in ("prepare", "cancel"):
@@ -306,7 +326,6 @@ def _auth_input(args: argparse.Namespace) -> dict[str, Any]:
         if not isinstance(fields, dict) or fields.keys() - {
             "qq_identity",
             "credential",
-            "referral_id",
         }:
             raise ValueError(
                 "Authorization stdin must be a JSON object of supported protected fields"
@@ -326,12 +345,8 @@ def _auth_input(args: argparse.Namespace) -> dict[str, Any]:
             for key in ("qq_identity", "credential")
         ):
             raise ValueError("QQ login requires nonempty qq_identity and credential")
-    elif fields.keys() - {"referral_id"}:
-        raise ValueError("Only QQ login accepts an identity or credential")
-    if "referral_id" in fields and (
-        not isinstance(fields["referral_id"], str) or not fields["referral_id"]
-    ):
-        raise ValueError("Referral ID must be a nonempty string")
+    elif fields:
+        raise ValueError("Only QQ login accepts protected account input")
     return fields
 
 
@@ -596,6 +611,7 @@ async def _stop(record: Any, args: argparse.Namespace) -> int:
                     "terminal": True,
                     "instance_id": record.instance_id,
                     "operation_id": result["operation_id"],
+                    "cleanup_outcome": "unobserved",
                 }
             )
             return 0
@@ -712,7 +728,6 @@ async def _run(args: argparse.Namespace) -> int:
         "asr",
         "secrets",
         "text",
-        "microphone",
         "audio",
         "models",
         "gemma",
@@ -757,18 +772,25 @@ async def _run(args: argparse.Namespace) -> int:
             values = {
                 "text": sys.stdin.read() if args.stdin else args.file.read_text(encoding="utf-8")
             }
-        elif args.domain == "microphone":
-            name, values = "microphone.test", {"enabled": args.state == "on"}
         elif args.domain == "audio":
-            name, values = (
-                ("audio.target.set", {"value": args.value})
-                if args.action == "target"
-                else ("audio.retry", {})
-            )
+            if args.action == "target":
+                name, values = "audio.target.set", {"value": args.value}
+            elif args.action == "test":
+                name, values = "audio.test", {"enabled": args.state == "on"}
+            else:
+                name, values = "audio.retry", {}
+        elif args.domain == "models" and args.action in ("download", "import", "delete"):
+            name, values = f"models.{args.action}", {"model_id": args.model_id}
+            if args.action == "download":
+                values["source"] = args.source
+            if args.action == "import":
+                values["directory"] = str(args.dir.resolve())
         elif args.domain == "models":
             name, values = f"models.{args.action}", {"backend": args.backend}
             if args.action == "install" and args.model_id:
                 values["model_ids"] = args.model_id
+            if args.action == "cancel" and args.model_id:
+                values["model_id"] = args.model_id
             if args.action == "prepare":
                 values["verify_checksums"] = args.verify_checksums
         elif args.domain == "gemma":
@@ -815,9 +837,10 @@ async def _run(args: argparse.Namespace) -> int:
                 "include_transcripts": args.include_transcripts,
                 "include_translations": args.include_translations,
                 "after": args.after,
+                "cursor_instance_id": args.instance_id,
             }
             if args.domain == "events"
-            else {"topics": ["logs"]}
+            else {"topics": ["logs"], "after": args.after, "cursor_instance_id": args.instance_id}
         )
         levels = {"debug": 10, "info": 20, "warning": 30, "error": 40}
         async for event in follow(record, values):
@@ -869,9 +892,18 @@ def main(argv: list[str] | None = None) -> int:
         return 130
     except (ControlTransportError, ValueError, OSError, json.JSONDecodeError) as exc:
         code = exc.code if isinstance(exc, ControlTransportError) else "invalid_input"
+        message = (
+            str(exc)
+            if isinstance(exc, ControlTransportError)
+            else (
+                "Local input or control resource could not be accessed"
+                if isinstance(exc, OSError)
+                else "Invalid local input or arguments"
+            )
+        )
         print(
             json.dumps(
-                {"output_version": 1, "error": {"code": code, "message": str(exc)}},
+                {"output_version": 1, "error": {"code": code, "message": message}},
                 ensure_ascii=False,
             ),
             file=sys.stderr,

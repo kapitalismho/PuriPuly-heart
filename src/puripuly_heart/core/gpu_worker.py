@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Protocol
 
+from puripuly_heart.core.messages import ErrorDiagnostics
+
 GpuWorkerMode = Literal["discovery", "persistent"]
 
 
@@ -68,10 +70,16 @@ class GpuWorkerClosedError(GpuWorkerError):
         code: str = "worker_closed",
         exit_code: int | None = None,
         failure_type: str | None = None,
+        cleanup_failures: tuple[Mapping[str, object], ...] = (),
+        cleanup_complete: bool | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
     ) -> None:
         self.code = code
         self.exit_code = exit_code
         self.failure_type = failure_type
+        self.cleanup_failures = cleanup_failures
+        self.cleanup_complete = cleanup_complete
+        self.failure_diagnostics = failure_diagnostics
         super().__init__(message)
 
 
@@ -106,7 +114,16 @@ class GpuWorkerClientPort(Protocol):
 
 
 class GpuWorkerProcessFactoryPort(Protocol):
-    async def start(self, *, mode: GpuWorkerMode) -> GpuWorkerClientPort: ...
+    async def start(
+        self,
+        *,
+        mode: GpuWorkerMode,
+        operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> GpuWorkerClientPort: ...
+    async def close_pending_startups(self) -> None: ...
+
+    def startup_cleanup_snapshot(self) -> Mapping[str, object]: ...
 
 
 __all__ = [

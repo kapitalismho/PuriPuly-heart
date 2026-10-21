@@ -70,9 +70,9 @@ class RecordingChatbox:
     def process_due(self) -> None:
         return
 
-    def send_immediate(self, text: str) -> bool:
+    def send_immediate(self, text: str) -> tuple[bool, None]:
         _ = text
-        return True
+        return True, None
 
 
 class CaptureOwner:
@@ -537,10 +537,12 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
 
     ui_drain = asyncio.create_task(drain_ui_events())
 
-    self_id = await pipeline.self_translation_channel.submit_text(
-        "manual self text",
-        source="You",
-    )
+    self_id = (
+        await pipeline.self_translation_channel.submit_text(
+            "manual self text",
+            source="You",
+        )
+    ).turn_id
     parent_id = uuid4()
     existing_peer_ids = set(peer_owner.runtime.utterances)
     await peer_owner.handle_stt_event(

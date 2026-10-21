@@ -17,7 +17,7 @@ _install_moved_module_aliases(
         ),
         "wiring_managed_account": "puripuly_heart.app.wiring.wiring_managed_account",
         "wiring_managed_auth_factory": "puripuly_heart.app.wiring.wiring_managed_auth_factory",
-        "wiring_microphone_test": "puripuly_heart.app.wiring.wiring_microphone_test",
+        "wiring_audio_test": "puripuly_heart.app.wiring.wiring_audio_test",
         "wiring_overlay_factory": "puripuly_heart.app.wiring.wiring_overlay_factory",
         "wiring_peer_application": "puripuly_heart.app.wiring.wiring_peer_application",
         "wiring_provider_runtime": "puripuly_heart.app.wiring.wiring_provider_runtime",

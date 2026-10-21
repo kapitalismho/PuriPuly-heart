@@ -29,6 +29,17 @@ class RecordingRuntimeLogging:
         self.detailed: list[tuple[int, str]] = []
         self.persisted: list[tuple[int, str]] = []
         self.close_failures: tuple[BaseException, ...] | None = None
+        self.failures: list[dict] = []
+
+    def configure_diagnostics(self, **_kwargs) -> None:
+        return None
+
+    def emit_failure(self, diagnostics, **kwargs) -> dict:
+        from puripuly_heart.core.diagnostics import normalize_diagnostic
+
+        record = normalize_diagnostic(diagnostics, instance_id=None, **kwargs)
+        self.failures.append(record)
+        return record
 
     def emit_basic(self, message: str, *, level: int) -> None:
         self.basic.append((level, message))
@@ -77,7 +88,7 @@ def test_owner_exposes_provider_observation_capability() -> None:
     assert service.basic == [(logging.WARNING, "provider observation")]
 
 
-def test_owner_formats_exception_detail_and_preserves_lazy_evaluation() -> None:
+def test_owner_preserves_exception_cause_without_rendering_private_message() -> None:
     owner, _ = _owner()
     service = RecordingRuntimeLogging()
     owner.install_service(service)
@@ -88,11 +99,11 @@ def test_owner_formats_exception_detail_and_preserves_lazy_evaluation() -> None:
         assert owner.emit_diagnostic("failed", level=logging.WARNING, exception=error) is True
     assert owner.emit_diagnostic_lazy(lambda: "lazy", level=logging.INFO) is True
 
-    assert service.detailed[0] == (
-        logging.WARNING,
-        "failed exception_type=RuntimeError",
-    )
-    assert service.detailed[1] == (logging.INFO, "lazy")
+    assert service.failures[0]["code"] == "unclassified_failure"
+    assert service.failures[0]["fields"]["exception_class"] == "RuntimeError"
+    assert service.failures[0]["disposition"] == "unknown"
+    assert "sensitive detail" not in str(service.failures)
+    assert service.detailed == [(logging.INFO, "lazy")]
 
 
 def test_owner_fallback_preserves_audience_and_never_forwards_raw_diagnostics() -> None:
@@ -360,7 +371,12 @@ def test_conversation_failure_reports_type_without_private_payload(caplog) -> No
     def reject(**kwargs) -> None:
         raise ValueError("private source and provider secret")
 
-    owner.install_service(SimpleNamespace(record_conversation_observation=reject))
+    owner.install_service(
+        SimpleNamespace(
+            configure_diagnostics=lambda **_kwargs: None,
+            record_conversation_observation=reject,
+        )
+    )
     owner.record_conversation_observation(
         utterance_id="failed-turn",
         speaker_channel="self",

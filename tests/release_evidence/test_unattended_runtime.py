@@ -274,10 +274,12 @@ async def test_peer_generation_probe_uses_runtime_sink_and_suppresses_publicatio
     assert facts["loop_task_released"] is True
 
 
-def test_process_success_maps_actual_native_facts() -> None:
+def test_supplied_native_pass_maps_facts_but_needs_approved_baseline_for_qualification() -> None:
     report = map_process_report(_native_pass(), 0, _probe())
 
     assert report["status"] == "blocked"
+    assert all(stage["status"] == "passed" for stage in report["stages"].values())
+    assert report["baseline"]["status"] != "passed"
     assert report["stages"]["cold_enumeration"]["facts"]["milliseconds"] == 3.0
     assert report["stages"]["activation"]["facts"]["milliseconds"] == 250.0
     assert report["stages"]["queue"]["facts"]["dropped"] == 1

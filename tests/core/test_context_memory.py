@@ -504,7 +504,7 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert context == '- [self] "safe local line"'
 
-    def test_integrated_context_uses_40_second_window_before_entry_budget(self):
+    def test_integrated_context_uses_60_second_window_before_entry_budget(self):
         harness = compose_translation_test_harness(
             stt=None,
             llm=None,
@@ -514,7 +514,7 @@ class TestContextInternalPaths:
             peer_translation_enabled=True,
         )
         harness.self_runtime.remember_context(
-            "41 seconds old", timestamp=59.0, source_language="en", target_language="ko"
+            "61 seconds old", timestamp=39.0, source_language="en", target_language="ko"
         )
         harness.self_runtime.remember_context(
             "self recent", timestamp=70.0, source_language="en", target_language="ko"
@@ -536,12 +536,12 @@ class TestContextInternalPaths:
         )
 
         assert mode == "integrated"
-        assert "41 seconds old" not in context
+        assert "61 seconds old" not in context
         assert context == (
             '- [self] "self recent"\n' '- [peer] "peer recent"\n' '- [self] "self newest"'
         )
 
-    def test_integrated_context_uses_latest_4_combined_entries_after_timestamp_merge(self):
+    def test_integrated_context_uses_latest_5_combined_entries_after_timestamp_merge(self):
         harness = compose_translation_test_harness(
             stt=None,
             llm=None,
@@ -565,6 +565,9 @@ class TestContextInternalPaths:
         harness.self_runtime.remember_context(
             "self 3", timestamp=74.0, source_language="en", target_language="ko"
         )
+        harness.peer_runtime.remember_context(
+            "peer 3", timestamp=75.0, source_language="en", target_language="ko"
+        )
 
         context, mode = harness.translation_requests.context_resolver.resolve_for_request(
             runtime=harness.self_runtime,
@@ -578,31 +581,38 @@ class TestContextInternalPaths:
         assert mode == "integrated"
         assert "self 1" not in context
         assert context == (
-            '- [peer] "peer 1"\n' '- [self] "self 2"\n' '- [peer] "peer 2"\n' '- [self] "self 3"'
+            '- [peer] "peer 1"\n'
+            '- [self] "self 2"\n'
+            '- [peer] "peer 2"\n'
+            '- [self] "self 3"\n'
+            '- [peer] "peer 3"'
         )
 
-    def test_context_resolver_default_integrated_context_uses_40_second_window_and_latest_4_entries(
+    def test_context_resolver_default_integrated_context_uses_60_second_window_and_latest_5_entries(
         self,
     ):
         self_runtime = ChannelRuntime(channel="self")
         peer_runtime = ChannelRuntime(channel="peer")
         self_runtime.remember_context(
-            "41 seconds old", timestamp=59.0, source_language="en", target_language="ko"
+            "61 seconds old", timestamp=39.0, source_language="en", target_language="ko"
         )
         self_runtime.remember_context(
-            "recent 1", timestamp=61.0, source_language="en", target_language="ko"
+            "recent 1", timestamp=41.0, source_language="en", target_language="ko"
         )
         peer_runtime.remember_context(
-            "recent 2", timestamp=62.0, source_language="en", target_language="ko"
+            "recent 2", timestamp=42.0, source_language="en", target_language="ko"
         )
         self_runtime.remember_context(
-            "recent 3", timestamp=63.0, source_language="en", target_language="ko"
+            "recent 3", timestamp=43.0, source_language="en", target_language="ko"
         )
         peer_runtime.remember_context(
-            "recent 4", timestamp=64.0, source_language="en", target_language="ko"
+            "recent 4", timestamp=44.0, source_language="en", target_language="ko"
         )
         self_runtime.remember_context(
-            "recent 5", timestamp=65.0, source_language="en", target_language="ko"
+            "recent 5", timestamp=45.0, source_language="en", target_language="ko"
+        )
+        peer_runtime.remember_context(
+            "recent 6", timestamp=46.0, source_language="en", target_language="ko"
         )
         resolver = ContextResolver(clock=FakeClock(initial_time=100.0))
 
@@ -616,13 +626,14 @@ class TestContextInternalPaths:
         )
 
         assert mode == "integrated"
-        assert "41 seconds old" not in context
+        assert "61 seconds old" not in context
         assert "recent 1" not in context
         assert context == (
             '- [peer] "recent 2"\n'
             '- [self] "recent 3"\n'
             '- [peer] "recent 4"\n'
-            '- [self] "recent 5"'
+            '- [self] "recent 5"\n'
+            '- [peer] "recent 6"'
         )
 
     def test_prepare_llm_request_formats_prompt_and_context(self):
@@ -746,7 +757,9 @@ class TestContextLogging:
             clock=FakeClock(),
         )
 
-        utterance_id = await harness.self_owner.submit_text("hello")
+        admission = await harness.self_owner.submit_text("hello")
+        assert admission.status == "admitted"
+        utterance_id = admission.turn_id
         bundle = harness.bundle_for(utterance_id)
         assert bundle.translation is None
 
@@ -907,7 +920,9 @@ class TestContextLogging:
             osc=FakeOscQueue(),
             clock=FakeClock(initial_time=1.0),
         )
-        utterance_id = await harness.self_owner.submit_text("hello")
+        admission = await harness.self_owner.submit_text("hello")
+        assert admission.status == "admitted"
+        utterance_id = admission.turn_id
         await asyncio.gather(
             *harness.self_runtime.translation_tasks.values(), return_exceptions=True
         )

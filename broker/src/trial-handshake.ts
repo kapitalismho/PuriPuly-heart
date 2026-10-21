@@ -3,7 +3,6 @@ import type { Context } from 'hono';
 import type {
   InstallationRecord,
   OpenRouterEntitlementRecord,
-  ReferralCodeRecord,
 } from './persistence';
 import type { BrokerEnv } from './contract';
 import { getFingerprintSaltConfig } from './fingerprint-salt';
@@ -24,18 +23,12 @@ import { errorResponse as publicErrorResponse } from './broker-error';
 import {
   normalizeManagedState,
   normalizeTrialStatusResponse,
-  type ManagedStateResponse,
-  type TalkTogetherPassStatusResponse,
-  type TrialStatusResponse,
 } from './managed-state';
 import {
   MANAGED_TRIAL_BUDGET_POLICY,
   TRIAL_PROVIDER_POLICY,
 } from './trial-policy';
-import {
-  ensureOwnedReferralIdForActiveDiscordManagedUser,
-  resolveTalkTogetherPassStatusForOwnedReferralCode,
-} from './referral';
+
 
 export const TRIAL_CHALLENGE_TTL_SECONDS = 300;
 export const TRIAL_RELEASE_TOKEN_TTL_SECONDS = 900;
@@ -935,91 +928,7 @@ export async function handleTrialStatus(c: Context<BrokerEnv>): Promise<Response
     });
   }
 
-  const ownedReferralStatus = await bestEffortResolveOwnedReferralStatusForStatus(
-    c.env.BROKER_DB,
-    {
-      installationId,
-      nowIso: now.toISOString(),
-    },
-  );
-
-  return c.json(
-    normalizeTrialStatusResponse(
-      entitlement,
-      ownedReferralStatus?.referralCode.referral_id ?? null,
-      ownedReferralStatus?.talkTogetherPass ?? null,
-    ),
-  );
-}
-
-type OwnedReferralStatusLookup = {
-  referralCode: ReferralCodeRecord;
-  talkTogetherPass: TalkTogetherPassStatusResponse | null;
-};
-
-async function bestEffortResolveOwnedReferralStatusForStatus(
-  db: D1Database,
-  input: {
-    installationId: string;
-    nowIso: string;
-  },
-): Promise<OwnedReferralStatusLookup | null> {
-  try {
-    const result = await ensureOwnedReferralIdForActiveDiscordManagedUser(db, input);
-    if (!result.ok) {
-      logTrialStatusOwnedReferralFailure({
-        installationId: input.installationId,
-        reason: result.reason,
-      });
-      return null;
-    }
-
-    try {
-      return {
-        referralCode: result.referralCode,
-        talkTogetherPass: await resolveTalkTogetherPassStatusForOwnedReferralCode(
-          db,
-          result.referralCode,
-        ),
-      };
-    } catch {
-      logTrialStatusOwnedReferralFailure({
-        installationId: input.installationId,
-        reason: 'talk_together_pass_status_failed',
-      });
-      return {
-        referralCode: result.referralCode,
-        talkTogetherPass: null,
-      };
-    }
-  } catch {
-    logTrialStatusOwnedReferralFailure({
-      installationId: input.installationId,
-      reason: 'owned_referral_ensure_exception',
-    });
-    return null;
-  }
-}
-
-function logTrialStatusOwnedReferralFailure(input: {
-  installationId: string;
-  reason: string;
-}): void {
-  if (input.reason === 'not_eligible') {
-    return;
-  }
-
-  console.warn('owned_referral_status_failed', {
-    endpoint: 'trial_status',
-    installation_id: input.installationId,
-    reason: normalizeTrialStatusOwnedReferralFailureReason(input.reason),
-  });
-}
-
-function normalizeTrialStatusOwnedReferralFailureReason(reason: string): string {
-  return /^[a-z0-9_:-]{1,64}$/u.test(reason)
-    ? reason
-    : 'owned_referral_ensure_exception';
+  return c.json(normalizeTrialStatusResponse(entitlement));
 }
 
 async function readJsonBody<T>(

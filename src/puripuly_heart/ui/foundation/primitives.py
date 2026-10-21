@@ -6,6 +6,7 @@ import flet as ft
 
 from puripuly_heart.ui.components.shared_card_wrapper import SharedCardWrapper
 from puripuly_heart.ui.foundation.tokens import FOUNDATION_DESIGN_TOKENS
+from puripuly_heart.ui.theme import text_style
 
 
 class FoundationCard(SharedCardWrapper):
@@ -48,7 +49,7 @@ class FoundationActionButton(ft.TextButton):
                     ft.ControlState.DISABLED: FOUNDATION_DESIGN_TOKENS.palette.neutral,
                 },
                 bgcolor=ft.Colors.TRANSPARENT,
-                text_style=ft.TextStyle(
+                text_style=text_style(
                     size=FOUNDATION_DESIGN_TOKENS.typography.label,
                     weight=ft.FontWeight.W_600,
                 ),

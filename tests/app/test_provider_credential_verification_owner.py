@@ -153,9 +153,6 @@ async def test_owner_contains_verifier_failure_and_emits_safe_diagnostics() -> N
     diagnostics: list[tuple[str, dict[str, object], BaseException | None]] = []
     owner = ProviderCredentialVerificationOwner(
         verifier=verifier,
-        diagnostics_sink=lambda event, metadata, exception: diagnostics.append(
-            (event, dict(metadata), exception)
-        ),
     )
 
     outcome = await owner.verify(
@@ -167,14 +164,14 @@ async def test_owner_contains_verifier_failure_and_emits_safe_diagnostics() -> N
     )
 
     assert outcome.status == PROVIDER_CREDENTIAL_ERROR
-    assert outcome.error_text == "private provider detail"
-    assert diagnostics[0][0] == "provider_credential_verification_failed"
-    assert diagnostics[0][1] == {
-        "provider": "google",
-        "error_type": "RuntimeError",
-    }
-    assert isinstance(diagnostics[0][2], RuntimeError)
-    assert "private provider detail" not in str(diagnostics[0][1])
+    assert outcome.error_text == "provider.failure"
+    assert outcome.diagnostics is not None
+    assert outcome.diagnostics.category == "unknown"
+    assert outcome.diagnostics.fields["exception_class"] == "RuntimeError"
+    assert outcome.verification_scope == "key_probe"
+    assert outcome.recognition_readiness == "unobserved"
+    assert "private provider detail" not in repr(outcome)
+    assert diagnostics == []
 
 
 @pytest.mark.asyncio
@@ -197,8 +194,8 @@ async def test_interaction_owner_maps_empty_unknown_failed_and_error_results() -
         "Verification failed (check logs/console for details)",
     )
     verifier.failure = RuntimeError("provider failure")
-    assert await owner.verify("deepseek", "secret") == (False, "provider failure")
-    assert error_calls == [("deepseek", "provider failure")]
+    assert await owner.verify("deepseek", "secret") == (False, "provider.failure")
+    assert error_calls == [("deepseek", "provider.failure")]
 
 
 def test_interaction_owner_factory_composes_verifier_and_callbacks() -> None:

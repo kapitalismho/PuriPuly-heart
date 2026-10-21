@@ -7,6 +7,8 @@ import logging
 import os
 import time
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
@@ -35,13 +37,16 @@ from puripuly_heart.app.ports.settings_view import (
     PromptApplyIntent,
     ProviderApplyIntent,
 )
-from puripuly_heart.app.ports.ui_application import UiApplicationState
+from puripuly_heart.app.ports.ui_application import (
+    TranslationEnablePreparation,
+    UiApplicationState,
+)
 from puripuly_heart.app.ports.ui_application_intents import (
+    UiAudioTestRuntimePort,
     UiDiagnosticsRuntimePort,
     UiEngagementRuntimePort,
     UiInputRuntimePort,
     UiManagedRuntimePort,
-    UiMicrophoneRuntimePort,
     UiOverlayRuntimePort,
     UiPeerCaptureRuntimePort,
     UiProviderRuntimePort,
@@ -64,13 +69,17 @@ from puripuly_heart.app.services.application_shutdown import (
     application_shutdown_callback,
 )
 from puripuly_heart.app.services.application_startup import ApplicationStartupOwner
+from puripuly_heart.app.services.index_selection import IndexSelectionOwner
 from puripuly_heart.config.alibaba_connection import AlibabaEndpointMode, AlibabaRegion
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import provider_llm_for_translation
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
 from puripuly_heart.core.runtime.github_star_prompt import GithubStarPromptRuntime
 from puripuly_heart.core.runtime.oauth import OAuthRuntime
 from puripuly_heart.core.updater import check_for_update
@@ -104,6 +113,11 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "handle_gpu_notice_action",
         "handle_managed_gemma_notice_action",
         "install_selected_gpu_model_if_needed",
+        "download_model_asset",
+        "import_model_asset",
+        "cancel_model_asset",
+        "delete_model_asset",
+        "refresh_model_assets",
         "edit_alibaba_connection_draft",
         "on_dashboard_language_change",
         "persist_api_key_verification",
@@ -131,9 +145,9 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "start_discord_managed_auth_from_dialog",
         "start_github_star_prompt",
         "start_managed_auth_task",
-        "start_microphone_test",
+        "start_audio_test",
         "start_qq_managed_auth_from_dialog",
-        "stop_microphone_test",
+        "stop_audio_test",
         "submit_text",
         "verify_alibaba_connection_draft",
         "verify_api_key",
@@ -158,33 +172,125 @@ _ORDERED_INTENTS = frozenset(
         "set_translation_enabled",
         "set_overlay_enabled",
         "persist_provider_secret_change",
+        "start_audio_test",
     }
 )
+
+_RUNTIME_OSC_PARAMETERS = {
+    "set_stt_enabled": "PuriPuly_Talk",
+    "set_peer_translation_enabled": "PuriPuly_Listen",
+    "set_translation_enabled": "PuriPuly_Trans",
+    "set_overlay_enabled": "PuriPuly_Captions",
+}
+
+
+@dataclass(slots=True)
+class _RuntimeControlActivity:
+    parameter: str
+    value: bool
+    has_authority: Callable[[], bool]
 
 
 def _guard_application_intent(method: Callable[..., Any]) -> Callable[..., Any]:
     if inspect.iscoroutinefunction(method):
 
-        @functools.wraps(method)
-        async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
+        async def invoke_ordered(self, *args: Any, **kwargs: Any) -> Any:
             self._admit_application_intent(method.__name__)
+            if method.__name__ == "start_audio_test" and kwargs.get("admission_revision") is None:
+                kwargs["admission_revision"] = self.audio_test_start_revision()
             control = self._control
+            toggle_resource = {
+                "set_translation_enabled": "translation",
+                "set_stt_enabled": "self",
+                "set_peer_translation_enabled": "peer",
+            }.get(method.__name__)
+            toggle_intent = (
+                control.runtime_toggle_intent(
+                    toggle_resource, args[0] if args else kwargs.get("enabled")
+                )
+                if control is not None and toggle_resource is not None
+                else None
+            )
+            activity = self._osc_runtime_activity.get(asyncio.current_task())
+            if activity is not None and toggle_intent is not None:
+                activity.has_authority = lambda: control.runtime_toggle_is_current(toggle_intent)
+
+            async def apply() -> Any:
+                if activity is not None:
+                    activity.has_authority = lambda: True
+                return await method(self, *args, **kwargs)
+
+            if method.__name__ == "set_translation_enabled":
+                preparation = kwargs.get("preparation")
+                if preparation is not None:
+                    if (
+                        preparation.intent_revision != self._translation_selection_intent
+                        or not preparation.ready
+                        or self.translation_preparation_needs_refresh(preparation)
+                    ):
+                        return False
+                self._translation_selection_intent += 1
+                intent = self._translation_selection_intent
+                if activity is not None:
+                    activity.has_authority = lambda: (
+                        intent == self._translation_selection_intent
+                        and (
+                            toggle_intent is None
+                            or control.runtime_toggle_is_current(toggle_intent)
+                        )
+                    )
+                enabled = args[0] if args else kwargs.get("enabled")
+                if (
+                    enabled
+                    and preparation is None
+                    and self.translation_preparation_needs_refresh(None)
+                ):
+                    if control is not None and control.lock_owned_by_current_task():
+                        return False
+                    while True:
+                        preparation = await self.prepare_translation_enable(intent)
+                        if (
+                            preparation is None
+                            or not preparation.ready
+                            or intent != self._translation_selection_intent
+                        ):
+                            return False
+                        self._admit_application_intent(method.__name__)
+                        if control is None:
+                            return await apply()
+                        async with control.runtime_toggle_lock(toggle_intent):
+                            if intent != self._translation_selection_intent:
+                                return False
+                            if not self.translation_preparation_needs_refresh(preparation):
+                                return await control.run_runtime_toggle(toggle_intent, apply)
+            if toggle_intent is not None:
+                return await control.run_runtime_toggle(toggle_intent, apply)
             if (
                 method.__name__ not in _ORDERED_INTENTS
                 or control is None
                 or control.lock_owned_by_current_task()
             ):
-                return await method(self, *args, **kwargs)
-            capture_off = (
-                method.__name__ in {"set_stt_enabled", "set_peer_translation_enabled"}
-                and (args[0] if args else kwargs.get("enabled")) is False
+                return await apply()
+            async with control._resource_lock:
+                async with control._lock:
+                    return await apply()
+
+        @functools.wraps(method)
+        async def invoke_async(self, *args: Any, **kwargs: Any) -> Any:
+            parameter = _RUNTIME_OSC_PARAMETERS.get(method.__name__)
+            if parameter is None:
+                return await invoke_ordered(self, *args, **kwargs)
+            task = asyncio.current_task()
+            self._osc_runtime_activity[task] = _RuntimeControlActivity(
+                parameter,
+                bool(args[0] if args else kwargs.get("enabled")),
+                lambda: True,
             )
-            if not capture_off:
-                async with control._resource_lock:
-                    async with control._lock:
-                        return await method(self, *args, **kwargs)
-            async with control._lock:
-                return await method(self, *args, **kwargs)
+            try:
+                return await invoke_ordered(self, *args, **kwargs)
+            finally:
+                self._osc_runtime_activity.pop(task, None)
+                await self._publish_osc_state()
 
         return invoke_async
 
@@ -205,7 +311,7 @@ class UiApplicationBoundary:
         peer_capture: UiPeerCaptureRuntimePort,
         settings: UiSettingsRuntimePort,
         provider: UiProviderRuntimePort,
-        microphone: UiMicrophoneRuntimePort,
+        audio_test: UiAudioTestRuntimePort,
         overlay: UiOverlayRuntimePort,
         managed: UiManagedRuntimePort,
         engagement: UiEngagementRuntimePort,
@@ -217,13 +323,17 @@ class UiApplicationBoundary:
         osc_state_publisher: Callable[[], object] | None = None,
         output_status_provider: Callable[[], dict[str, dict[str, object]]] | None = None,
         http_extension_registry: object | None = None,
+        scene_observation_provider: Callable[[], dict[str, object] | None] | None = None,
+        index_selection: IndexSelectionOwner | None = None,
+        runtime_control_authority: Callable[[str, asyncio.Task | None], bool | None] | None = None,
+        runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
     ) -> None:
         self._startup = startup
         self._input_runtime = input_runtime
         self._peer_capture = peer_capture
         self._settings = settings
         self._provider = provider
-        self._microphone = microphone
+        self._audio_test = audio_test
         self._overlay = overlay
         self._managed = managed
         self._engagement = engagement
@@ -235,6 +345,13 @@ class UiApplicationBoundary:
         self._state_owner = state
         self._osc_state_publisher = osc_state_publisher
         self._output_status_provider = output_status_provider
+        self._scene_observation_provider = scene_observation_provider
+        self._runtime_control_authority = runtime_control_authority
+        self._runtime_control_activity = runtime_control_activity
+        self._index_selection = index_selection
+        self._translation_selection_intent = 0
+        self._audio_test_start_revision = 0
+        self._osc_runtime_activity: dict[asyncio.Task | None, _RuntimeControlActivity] = {}
         self._github_star_prompt_runtime = GithubStarPromptRuntime(
             diagnostics_sink=self._github_star_prompt_runtime_diagnostics_sink,
         )
@@ -272,6 +389,10 @@ class UiApplicationBoundary:
             ),
         )
 
+    @property
+    def diagnostic_instance_id(self) -> str | None:
+        return self.control().instance_id
+
     def control(self) -> ApplicationControl:
         if self._control is None:
             raise RuntimeError("application control is not composed")
@@ -279,6 +400,20 @@ class UiApplicationBoundary:
 
     def attach_control(self, control: ApplicationControl) -> None:
         self._control = control
+
+    def osc_pending_controls(self) -> tuple[tuple[str, bool], ...]:
+        pending = []
+        for task, activity in self._osc_runtime_activity.items():
+            authority = (
+                self._runtime_control_authority(activity.parameter, task)
+                if self._runtime_control_authority is not None
+                else None
+            )
+            if authority if authority is not None else activity.has_authority():
+                pending.append((activity.parameter, activity.value))
+        if self._runtime_control_activity is not None:
+            pending.extend(self._runtime_control_activity())
+        return tuple(pending)
 
     def bind_presentation_close(self, callback: Callable[[], Awaitable[None]]) -> None:
         if self._presentation_close is not None:
@@ -308,6 +443,22 @@ class UiApplicationBoundary:
             raise RuntimeError("application output owners are not composed")
         return self._output_status_provider()
 
+    def scene_observation(self) -> dict[str, object]:
+        snapshot = (
+            self._scene_observation_provider()
+            if self._scene_observation_provider is not None
+            else None
+        )
+        return {
+            "observation_succeeded": (
+                snapshot.get("process_observation_succeeded") if snapshot else None
+            ),
+            "process_present": snapshot.get("process_present") if snapshot else None,
+            "observation_diagnostic_id": (
+                snapshot.get("observation_diagnostic_id") if snapshot else None
+            ),
+        }
+
     async def wait_overlay_transition(self) -> dict[str, object]:
         return await self._overlay.wait_overlay_transition()
 
@@ -332,11 +483,21 @@ class UiApplicationBoundary:
         try:
             await self._startup.start()
         except BaseException as exc:
-            try:
-                await self.stop()
-            except BaseException:
-                pass
             cancelled = isinstance(exc, asyncio.CancelledError)
+            primary = getattr(exc, "diagnostics", None)
+            if not isinstance(primary, ErrorDiagnostics):
+                phase = getattr(self._startup, "phase", "startup_prepare")
+                primary = ErrorDiagnostics(
+                    component="application_startup",
+                    operation=phase,
+                    code="startup_prepare_failed",
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"phase": phase, **safe_exception_fields(exc)},
+                )
             self._emit_startup_diagnostic(
                 ApplicationStartupDiagnostic(
                     outcome="cancelled" if cancelled else "failed",
@@ -344,8 +505,14 @@ class UiApplicationBoundary:
                     process_id=process_id,
                     monotonic_ns=time.monotonic_ns(),
                     exception_class=None if cancelled else type(exc).__name__,
+                    diagnostics=primary,
                 )
             )
+            self.application_lifecycle().set_primary_failure(primary.diagnostic_id)
+            try:
+                await self.stop()
+            except BaseException:
+                pass
             raise
         self._emit_startup_diagnostic(
             ApplicationStartupDiagnostic(
@@ -404,9 +571,27 @@ class UiApplicationBoundary:
         callback = self._osc_state_publisher
         if callback is None:
             return
-        result = callback()
-        if inspect.isawaitable(result):
-            await result
+        try:
+            result = callback()
+            if inspect.isawaitable(result):
+                await result
+        except Exception as exc:
+            emit_failure(
+                logging.getLogger(__name__),
+                ErrorDiagnostics(
+                    component="application_notification",
+                    operation="osc_state_notification",
+                    code="application_state_notification_failed",
+                    category="lifecycle",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields={"phase": "osc_state_notification", **safe_exception_fields(exc)},
+                ),
+                severity="warning",
+                disposition="degraded",
+            )
 
     def emit_application_shutdown_diagnostic(
         self,
@@ -420,14 +605,60 @@ class UiApplicationBoundary:
     def log_diagnostic(self, message: str, *, level: int = logging.INFO) -> None:
         self._runtime_logging.emit_diagnostic(message, level=level)
 
-    async def submit_text(self, text: str) -> None:
-        await self._input_runtime.submit_text(text)
+    async def submit_text(self, text: str) -> TextSubmissionAdmission | None:
+        return await self._input_runtime.submit_text(text)
 
     def set_manual_input_activity(self, has_text: bool) -> None:
         self._input_runtime.set_manual_input_activity(has_text)
 
+    def _translation_preparation_required(self) -> bool:
+        selection = self._index_selection
+        if selection is None:
+            return False
+        current = self.compatibility_settings()
+        return bool(
+            (current is not None and current.intent.translation.model == "index_translate_35b")
+            or not selection.ready_for_enable
+        )
+
+    async def prepare_translation_enable(
+        self, intent_revision: int | None = None
+    ) -> TranslationEnablePreparation | None:
+        required = self._translation_preparation_required()
+        if intent_revision is None:
+            if not required:
+                return None
+            intent_revision = self._translation_selection_intent
+        selection = self._index_selection
+        ready = intent_revision == self._translation_selection_intent
+        if ready and required and selection is not None:
+            ready = await selection.prepare_enable()
+        return TranslationEnablePreparation(
+            intent_revision=intent_revision,
+            selection_generation=selection.generation if selection is not None else None,
+            ready=ready,
+        )
+
+    def translation_preparation_needs_refresh(
+        self, preparation: TranslationEnablePreparation | None
+    ) -> bool:
+        if preparation is None:
+            return self._translation_preparation_required()
+        if preparation.intent_revision != self._translation_selection_intent:
+            return False
+        selection = self._index_selection
+        generation = selection.generation if selection is not None else None
+        return bool(
+            preparation.selection_generation != generation
+            or (preparation.ready and selection is not None and not selection.ready_for_enable)
+        )
+
     async def set_translation_enabled(
-        self, enabled: bool, *, allow_authorization: bool = True
+        self,
+        enabled: bool,
+        *,
+        allow_authorization: bool = True,
+        preparation: TranslationEnablePreparation | None = None,
     ) -> object:
         result = await self._input_runtime.set_translation_enabled(
             enabled,
@@ -437,11 +668,13 @@ class UiApplicationBoundary:
         return result
 
     async def set_stt_enabled(self, enabled: bool) -> object:
+        await self._yield_audio_test_capture("self", enabled)
         result = await self._input_runtime.set_stt_enabled(enabled)
         await self._publish_osc_state()
         return result
 
     async def set_peer_translation_enabled(self, enabled: bool) -> object:
+        await self._yield_audio_test_capture("peer", enabled)
         result = await self._peer_capture.set_peer_translation_enabled(enabled)
         await self._publish_osc_state()
         return result
@@ -500,8 +733,15 @@ class UiApplicationBoundary:
     ) -> AppSettingsVNext:
         return self._settings.merge_settings_tab_apply_with_current_languages(settings)
 
-    async def apply_settings(self, settings: AppSettingsVNext) -> object:
-        result = await self._settings.apply_settings(settings)
+    async def apply_settings(
+        self,
+        settings: AppSettingsVNext,
+        *,
+        provider_requested: bool = False,
+    ) -> object:
+        result = await self._settings.apply_settings(
+            settings, provider_requested=provider_requested
+        )
         await self._publish_osc_state()
         return result
 
@@ -563,28 +803,39 @@ class UiApplicationBoundary:
     async def ensure_gpu_device_discovery(self) -> None:
         await self._provider.ensure_gpu_device_discovery()
 
-    async def start_microphone_test(
+    def audio_test_start_revision(self) -> int:
+        return self._audio_test_start_revision
+
+    async def start_audio_test(
         self,
         *,
-        meter_callback: Callable[[float], None] | None = None,
+        observation_callback: Callable[[str, tuple[object, ...]], object] | None = None,
+        admission_revision: int | None = None,
     ) -> bool:
-        start = self._microphone.start_microphone_test
-        if meter_callback is not None and _accepts_keyword(start, "meter_callback"):
-            result = start(meter_callback=meter_callback)
-        else:
-            result = start()
-        return bool(await result if inspect.isawaitable(result) else result)
+        if admission_revision != self._audio_test_start_revision:
+            return False
+        return bool(
+            await self._audio_test.start_audio_test(observation_callback=observation_callback)
+        )
 
-    def microphone_test_snapshot(self) -> dict[str, object]:
-        return self._microphone.microphone_test_snapshot()
+    def audio_test_snapshot(self) -> dict[str, object]:
+        return self._audio_test.audio_test_snapshot()
 
-    async def wait_microphone_test_ready(self) -> bool:
-        return await self._microphone.wait_microphone_test_ready()
+    async def wait_audio_test_ready(self) -> bool:
+        return await self._audio_test.wait_audio_test_ready()
 
-    async def stop_microphone_test(self) -> None:
-        result = self._microphone.stop_microphone_test()
-        if inspect.isawaitable(result):
-            await result
+    async def stop_audio_test(self) -> None:
+        self._audio_test_start_revision += 1
+        await self._audio_test.stop_audio_test()
+
+    async def _yield_audio_test_capture(self, channel: str, enabled: bool) -> None:
+        self._audio_test.release_audio_test_capture_restore(channel)
+        if enabled:
+            self._audio_test_start_revision += 1
+        if enabled and self.state().audio_test_active:
+            await self._audio_test.stop_audio_test()
+            if self.state().audio_test_active:
+                raise RuntimeError("Audio test resources are still being released")
 
     async def set_desktop_overlay_captions_locked(self, locked: bool) -> dict[str, str]:
         return await self._overlay.set_desktop_overlay_captions_locked(locked)
@@ -611,6 +862,8 @@ class UiApplicationBoundary:
         return self._peer_capture.overlay_peer_presentation_state()
 
     def dashboard_managed_auth_action(self) -> str:
+        if self._managed_auth_runtime.external_task_names:
+            return "in_progress"
         return str(self._managed.dashboard_managed_auth_action())
 
     def dashboard_managed_auth_prompt_kind(self) -> str:
@@ -622,6 +875,9 @@ class UiApplicationBoundary:
             return "failed"
         kind = accessor()
         return kind if isinstance(kind, str) else "failed"
+
+    def managed_auth_last_message_key(self) -> str | None:
+        return self._managed.managed_auth_last_message_key()
 
     async def apply_telemetry_enabled(self, enabled: bool) -> Any | None:
         return await self._settings.apply_telemetry_enabled(enabled)
@@ -902,6 +1158,8 @@ class UiApplicationBoundary:
         task_name: str,
         generation: int,
     ) -> object:
+        if self.dashboard_managed_auth_action() == "in_progress":
+            raise RuntimeError("Managed authentication is already in progress")
         return self._managed_auth_runtime.start_external_task(
             task_runner=task_runner,
             task_factory=task_factory,
@@ -972,22 +1230,30 @@ class UiApplicationBoundary:
     ) -> object:
         return await self._provider.handle_managed_gemma_notice_action(action)
 
+    def model_asset_entries(self) -> tuple[object, ...]:
+        return self._provider.model_asset_entries()
+
+    async def refresh_model_assets(self) -> tuple[object, ...]:
+        return await self._provider.refresh_model_assets()
+
+    async def download_model_asset(self, model_id: str, *, source: str | None = None) -> object:
+        return await self._provider.download_model_asset(model_id, source=source)
+
+    async def import_model_asset(self, model_id: str, directory: Path) -> object:
+        return await self._provider.import_model_asset(model_id, directory)
+
+    async def cancel_model_asset(self, model_id: str) -> bool:
+        return await self._provider.cancel_model_asset(model_id)
+
+    async def delete_model_asset(self, model_id: str) -> object:
+        return await self._provider.delete_model_asset(model_id)
+
 
 for _intent_method_name in UI_APPLICATION_USER_INTENT_METHODS:
     setattr(
         UiApplicationBoundary,
         _intent_method_name,
         _guard_application_intent(getattr(UiApplicationBoundary, _intent_method_name)),
-    )
-
-
-def _accepts_keyword(callable_obj: object, keyword: str) -> bool:
-    try:
-        parameters = inspect.signature(callable_obj).parameters
-    except TypeError, ValueError:
-        return True
-    return keyword in parameters or any(
-        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
     )
 
 

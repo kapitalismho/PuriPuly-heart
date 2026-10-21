@@ -681,9 +681,26 @@ async def test_rolling_session_preserves_scoped_member_protocol() -> None:
     session = await _make(definition).open_session(
         projection=STTSessionProjection(mode="scoped", provider_epoch_id="epoch-1")
     )
-    identity = object()
+    identity = STTProviderTurnIdentity(
+        segment=AudioSegmentIdentity(3, 1, uuid4(), 7),
+        provider_epoch_id="epoch-1",
+        provider_turn_id=str(uuid4()),
+        settings_scope=("rolling", ("rolling",), ("capture",)),
+    )
     assert session.provider_name is STTProviderName.DEEPGRAM
-    request = object()
+    settings = AudioSegmentSettingsSnapshot(
+        provider_id="rolling",
+        provider_signature=("rolling",),
+        runtime_signature=("capture",),
+        source_mode="microphone",
+        source_language="en",
+        expected_languages=("en",),
+        target_sample_rate_hz=16000,
+        vad_speech_threshold=0.5,
+        vad_hangover_ms=200,
+        vad_pre_roll_ms=320,
+    )
+    request = STTProviderTurnRequest(identity, settings, channel="self")
 
     await session.begin_turn(request)
     await session.send_turn_audio(

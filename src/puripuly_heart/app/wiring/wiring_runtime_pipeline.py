@@ -25,7 +25,7 @@ from puripuly_heart.config.paths import default_http_extensions_dir
 from puripuly_heart.config.provider_values import STTProviderName
 from puripuly_heart.config.runtime_resolution import RuntimeResolutionInput
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.config.translation_values import TranslationModel
+from puripuly_heart.config.translation_values import MANAGED_GEMMA_MODELS, TranslationModel
 from puripuly_heart.core.audio.gate import VrcMicAudioGate
 from puripuly_heart.core.chatgpt.session import ChatGptAccessTokenPort
 from puripuly_heart.core.clock import Clock
@@ -841,14 +841,11 @@ async def _compose_runtime_pipeline(
     if http_extensions is None and inputs.translation_model == TranslationModel.CUSTOM_HTTP.value:
         http_extensions = HttpExtensionRegistry(default_http_extensions_dir())
         http_extensions.reload()
-    if (
-        inputs.translation_model != TranslationModel.MANAGED_GEMMA.value
-        and managed_gemma is not None
-    ):
+    if inputs.translation_model not in MANAGED_GEMMA_MODELS and managed_gemma is not None:
         await managed_gemma.deactivate()
     if inputs.translation_model not in {
         TranslationModel.CUSTOM_HTTP.value,
-        TranslationModel.MANAGED_GEMMA.value,
+        *MANAGED_GEMMA_MODELS,
     }:
         await managed_release.rebuild(secrets=secrets)
 
@@ -856,7 +853,7 @@ async def _compose_runtime_pipeline(
     with contextlib.suppress(Exception):
         gemma_runtime = None
         gemma_release = None
-        if inputs.translation_model == TranslationModel.MANAGED_GEMMA.value:
+        if inputs.translation_model in MANAGED_GEMMA_MODELS:
             if managed_gemma is None:
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             gemma_runtime = managed_gemma.runtime

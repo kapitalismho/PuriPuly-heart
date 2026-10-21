@@ -36,6 +36,7 @@ class HuggingFaceDownloadRequest:
     remote_path: str
     local_dir: Path
     expected_size_bytes: int | None
+    endpoint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import threading
 from dataclasses import replace
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 from puripuly_heart.app.services.managed_auth import ManagedAuthOwner
@@ -196,16 +199,7 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
 ) -> None:
     owner = compose_settings_owner(tmp_path / "settings.json")
     managed = _managed_settings()
-    owner.canonical = replace(
-        managed,
-        state=replace(
-            managed.state,
-            managed_connection=replace(
-                managed.state.managed_connection,
-                referral_id=" 7kq9m2 ",
-            ),
-        ),
-    )
+    owner.canonical = managed
     store = SecretStore()
 
     secret_store_calls: list[tuple[object, object]] = []
@@ -258,7 +252,6 @@ async def test_managed_account_composition_wires_all_owners_and_secret_store(
     assert isinstance(components.pkce, OpenRouterPkceApplicationOwner)
     assert components.pkce.results is results
     assert components.auth.dashboard_action() == "prompt"
-    assert components.usage.current_referral_id == "7KQ9M2"
     translation_state = components.translation.state_provider()
     assert translation_state.managed_selected is True
     assert translation_state.runtime_available is False
@@ -351,7 +344,6 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
 ) -> None:
-    diagnostics: list[tuple[str, BaseException]] = []
 
     class Service:
         def __init__(self, *, fail_first_close: bool) -> None:
@@ -369,7 +361,6 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
         settings=compose_settings_owner(tmp_path / "settings.json"),
         config_path=tmp_path / "settings.json",
         callback_received=lambda: None,
-        diagnostic_sink=lambda message, exception: diagnostics.append((message, exception)),
         service=cast(ManagedOpenRouterReleaseService, previous),
     )
 
@@ -387,12 +378,13 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
         create_replacement,
     )
 
-    with pytest.raises(RuntimeError, match="retired close failed"):
+    with pytest.raises(RuntimeError) as captured:
         await runtime.rebuild(secrets=SecretStore())
 
     assert runtime.service is replacement
     assert previous.close_calls == 1
-    assert diagnostics[0][0].endswith("close failed")
+    assert captured.value.diagnostics.code == "managed_release_cleanup_failed"
+    assert captured.value.diagnostics.fields["exception_class"] == "RuntimeError"
 
     await runtime.retry_retired()
     await runtime.close()
@@ -400,3 +392,91 @@ async def test_release_runtime_retains_failed_replacement_cleanup_for_retry(
     assert previous.close_calls == 2
     assert replacement.close_calls == 1
     assert runtime.service is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["ready", "missing", "cancel", "freeze", "replace", "failure"])
+async def test_usage_credentials_keep_loop_responsive_and_reject_stale_observations(
+    monkeypatch, tmp_path, outcome
+):
+    owner = compose_settings_owner(tmp_path / "settings.json")
+    owner.canonical = _managed_settings()
+    loop = asyncio.get_running_loop()
+    loop_thread = threading.get_ident()
+    entered = asyncio.Event()
+    release = threading.Event()
+    observation_threads = []
+    verifier_threads = []
+    frozen = False
+    metadata = object()
+    store = SecretStore()
+    if outcome != "missing":
+        store.set("openrouter_managed_api_key", "synthetic-managed-key")
+
+    def create_store(_settings, *, config_path):
+        assert config_path == owner.path
+        observation_threads.append(threading.get_ident())
+        loop.call_soon_threadsafe(entered.set)
+        assert release.wait(3)
+        if outcome == "failure":
+            raise OSError("synthetic secret observation failure")
+        return store
+
+    async def fetch_metadata(key):
+        assert key == "synthetic-managed-key"
+        verifier_threads.append(threading.get_ident())
+        return metadata
+
+    verifier = AsyncMock(spec=ProviderVerifierPort)
+    verifier.fetch_openrouter_key_metadata.side_effect = fetch_metadata
+    adapter = managed_account_module.ManagedUsageRuntimeAdapter(
+        settings=owner,
+        release=ManagedOpenRouterReleaseRuntime(
+            settings=owner, config_path=owner.path, callback_received=lambda: None
+        ),
+        config_path=owner.path,
+        verifier=verifier,
+        ingress_provider=lambda: frozen,
+    )
+    monkeypatch.setattr(managed_account_module, "create_secret_store", create_store)
+    task = asyncio.create_task(adapter.fetch_metadata())
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        await asyncio.sleep(0)
+        assert not task.done()
+        assert observation_threads != [loop_thread]
+        if outcome == "cancel":
+            task.cancel()
+            await asyncio.sleep(0)
+            task.cancel()
+            await asyncio.sleep(0)
+            assert not task.done()
+        elif outcome == "freeze":
+            frozen = True
+        elif outcome == "replace":
+            owner.canonical = replace(
+                owner.canonical,
+                state=replace(
+                    owner.canonical.state,
+                    managed_connection=replace(
+                        owner.canonical.state.managed_connection,
+                        active_managed_credential_ref="replacement-entitlement",
+                    ),
+                ),
+            )
+        release.set()
+        if outcome == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        else:
+            result = await task
+            assert result.key_available is (outcome == "ready")
+            assert result.metadata is (metadata if outcome == "ready" else None)
+        if outcome == "ready":
+            assert verifier_threads == [loop_thread]
+            verifier.fetch_openrouter_key_metadata.assert_awaited_once()
+        else:
+            verifier.fetch_openrouter_key_metadata.assert_not_awaited()
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)

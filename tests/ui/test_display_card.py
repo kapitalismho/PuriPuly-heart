@@ -9,6 +9,7 @@ pytest.importorskip("flet")
 
 from puripuly_heart.ui.components import display_card as display_card_module
 from puripuly_heart.ui.components.display_card import DisplayCard
+from puripuly_heart.ui.fonts import default_font_family
 from tests.helpers.flet_page import attach_dummy_page
 
 
@@ -26,12 +27,6 @@ def _visible_size(card: DisplayCard) -> int:
 
 def _mute_display_updates(monkeypatch: pytest.MonkeyPatch, card: DisplayCard) -> None:
     monkeypatch.setattr(type(card._display_text), "update", lambda self: None)
-
-
-def _input_row(card: DisplayCard):
-    main_content = card.content.content
-    _display_region, input_footer = main_content.controls
-    return input_footer.controls[1]
 
 
 def test_weighted_length_counts_cjk_as_two() -> None:
@@ -276,42 +271,6 @@ def test_only_the_source_colour_is_dimmed_relative_to_messages() -> None:
     assert display_card_module.DISPLAY_MESSAGE_WEIGHT == display_card_module.ft.FontWeight.BOLD
 
 
-def test_display_region_anchors_the_first_line_to_the_top() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    display_region = card.content.content.controls[0]
-
-    assert display_region.alignment == display_card_module.ft.Alignment.TOP_LEFT
-    assert (
-        display_region.content.vertical_alignment == display_card_module.ft.CrossAxisAlignment.START
-    )
-
-
-def test_the_first_line_anchor_is_independent_of_text_length_and_size(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    _mute_display_updates(monkeypatch, card)
-    display_region = card.content.content.controls[0]
-
-    def anchor() -> tuple[object, object, object]:
-        return (
-            display_region.alignment,
-            display_region.content.vertical_alignment,
-            display_region.padding,
-        )
-
-    card.set_display("hi")
-    short_anchor = anchor()
-    assert _visible_size(card) == 48
-
-    card.set_display("x" * 200)
-    assert _visible_size(card) == 24
-    assert anchor() == short_anchor
-
-    card.set_display_translation("y" * 200)
-    assert anchor() == short_anchor
-
-
 def test_translation_never_grows_the_text_beyond_its_source_size(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -523,14 +482,6 @@ def test_debug_prefix_applies_to_the_visible_text_only(monkeypatch: pytest.Monke
     assert "[P 41c6" not in _visible_text(card)
 
 
-def test_input_row_holds_only_the_input_field() -> None:
-    card = DisplayCard(on_submit=lambda _text: None)
-    controls = _input_row(card).controls
-
-    assert controls == [card._input_field]
-    assert all(getattr(control, "value", None) != "•" for control in controls)
-
-
 def test_clear_input_empties_the_field(monkeypatch: pytest.MonkeyPatch) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
     monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
@@ -680,17 +631,91 @@ def test_input_font_and_locale_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _visible_text(card) == display_card_module.t("display.stopping")
 
 
-def test_input_footer_stays_outside_the_expanding_display_region() -> None:
+def test_input_line_metrics_do_not_follow_the_source_language_font(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
 
-    padded_content_layer = card.content
-    main_content = padded_content_layer.content
-    display_region, input_footer = main_content.controls
-    divider_container = input_footer.controls[0]
+    strut_styles = []
+    for font_family in ("NanumSquareRound", "MPLUSRounded1c", "ResourceHanRoundedCN", None):
+        card.set_input_font(font_family)
+        strut_styles.append(card._input_field.strut_style)
 
-    assert main_content.alignment == display_card_module.ft.MainAxisAlignment.START
-    assert display_region.expand is True
-    assert display_region.clip_behavior == display_card_module.ft.ClipBehavior.HARD_EDGE
-    assert divider_container.padding.bottom == 4
-    assert input_footer.expand is None
-    assert input_footer.tight is True
+    strut = strut_styles[0]
+    assert all(style == strut for style in strut_styles)
+    assert strut.force_strut_height is True
+    assert strut.size == card._input_field.text_size
+    assert strut.font_family == default_font_family()
+
+
+def test_display_text_uses_content_language_tracking(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    _mute_display_updates(monkeypatch, card)
+
+    card.set_display("안녕", font_family="NanumSquareRound")
+    assert card._display_text.font_family == "NanumSquareRound"
+    assert card._display_text.style.letter_spacing == 0
+
+    card.set_display("こんにちは", font_family="MPLUSRounded1c", letter_spacing=0.5)
+    assert card._display_text.font_family == "MPLUSRounded1c"
+    assert card._display_text.style.letter_spacing == 0.5
+
+    card.set_display_translation("你好", font_family="ResourceHanRoundedCN", letter_spacing=0.4)
+    assert card._display_text.font_family == "ResourceHanRoundedCN"
+    assert card._display_text.style.letter_spacing == 0.4
+
+
+def test_input_and_hint_keep_each_language_typeface(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
+    _mute_display_updates(monkeypatch, card)
+    card.set_input_font("MPLUSRounded1c", letter_spacing=0.5)
+
+    card.set_input_font(None)
+    assert card._input_field.text_style.font_family == ""
+    assert card._input_field.text_style.letter_spacing == 0
+
+    card.apply_locale(
+        display_font_family="MPLUSRounded1c",
+        input_font_family="NanumSquareRound",
+        display_letter_spacing=0.5,
+        input_letter_spacing=None,
+    )
+    assert card._input_field.hint_style.font_family == "MPLUSRounded1c"
+    assert card._input_field.hint_style.letter_spacing == 0.5
+    assert card._input_field.hint_style.italic is True
+    assert card._input_field.text_style.font_family == "NanumSquareRound"
+    assert card._input_field.text_style.letter_spacing == 0
+
+    card.set_input_font("MPLUSRounded1c", letter_spacing=0.5)
+    assert card._input_field.text_style.font_family == "MPLUSRounded1c"
+    assert card._input_field.text_style.letter_spacing == 0.5
+    assert card._input_field.strut_style.font_family == default_font_family()
+
+    card.set_input_font("ResourceHanRoundedCN", letter_spacing=0.4)
+    assert card._input_field.text_style.font_family == "ResourceHanRoundedCN"
+    assert card._input_field.text_style.letter_spacing == 0.4
+
+
+def test_display_updates_preserve_unsubmitted_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    submitted: list[str] = []
+    card = DisplayCard(on_submit=submitted.append)
+    _mute_display_updates(monkeypatch, card)
+    card._input_field.value = "still editing"
+
+    for source, translated in (("short", "brief"), ("long source " * 30, "long result " * 30)):
+        card.set_display(source)
+        assert _visible_text(card) == source
+        assert card._input_field.value == "still editing"
+        card.set_display_translation(translated)
+        assert _visible_text(card) == translated
+        assert card._input_field.value == "still editing"
+
+    card.set_status("disconnected")
+    assert card._input_field.value == "still editing"
+    assert submitted == []

@@ -54,9 +54,9 @@ def _auth_state(
     )
 
 
-def _owner(settings: AppSettingsVNext) -> SettingsOwner:
+def _owner(settings: AppSettingsVNext, path: Path) -> SettingsOwner:
     return SettingsOwner(
-        path=Path("settings.json"),
+        path=path,
         persistence=SettingsVNextCanonicalPersistenceAdapter(),
         canonical=settings,
         authoritative=True,
@@ -104,6 +104,7 @@ def _adapter(
     settings: AppSettingsVNext,
     auth: AuthAdapter,
     *,
+    config_path: Path,
     service=None,
     runtime_snapshot=(True, False, None),
     founder_dialog=lambda: False,
@@ -111,7 +112,7 @@ def _adapter(
 ) -> ManagedTranslationRuntimeAdapter:
     return ManagedTranslationRuntimeAdapter(
         auth=auth,
-        settings=_owner(settings),
+        settings=_owner(settings, config_path),
         release_service_provider=lambda: service,
         runtime_snapshot_provider=lambda: runtime_snapshot,
         ingress_provider=lambda: False,
@@ -120,7 +121,7 @@ def _adapter(
     )
 
 
-def test_state_projects_runtime_provider_region_and_managed_auth_snapshot() -> None:
+def test_state_projects_runtime_provider_region_and_managed_auth_snapshot(tmp_path: Path) -> None:
     settings = _qwen_settings()
     adapter = _adapter(
         settings,
@@ -130,6 +131,7 @@ def test_state_projects_runtime_provider_region_and_managed_auth_snapshot() -> N
                 local_key_available=True,
             )
         ),
+        config_path=tmp_path / "settings.json",
         runtime_snapshot=(True, True, object()),
     )
 
@@ -145,11 +147,12 @@ def test_state_projects_runtime_provider_region_and_managed_auth_snapshot() -> N
     assert state.managed_local_key_available is True
 
 
-def test_state_labels_custom_http_without_reusing_inactive_llm_metadata() -> None:
+def test_state_labels_custom_http_without_reusing_inactive_llm_metadata(tmp_path: Path) -> None:
     settings = _custom_http_settings()
     adapter = _adapter(
         settings,
         AuthAdapter(_auth_state()),
+        config_path=tmp_path / "settings.json",
         runtime_snapshot=(True, True, object()),
     )
 
@@ -162,7 +165,7 @@ def test_state_labels_custom_http_without_reusing_inactive_llm_metadata() -> Non
 
 
 @pytest.mark.asyncio
-async def test_custom_http_prepare_skips_managed_release_service() -> None:
+async def test_custom_http_prepare_skips_managed_release_service(tmp_path: Path) -> None:
     settings = _custom_http_settings()
 
     async def unexpected_prepare() -> object:
@@ -171,6 +174,7 @@ async def test_custom_http_prepare_skips_managed_release_service() -> None:
     adapter = _adapter(
         settings,
         AuthAdapter(_auth_state()),
+        config_path=tmp_path / "settings.json",
         service=SimpleNamespace(prepare_for_translation=unexpected_prepare),
     )
 
@@ -180,7 +184,7 @@ async def test_custom_http_prepare_skips_managed_release_service() -> None:
 
 
 @pytest.mark.asyncio
-async def test_prepare_ready_records_discord_claim_and_persists_identity() -> None:
+async def test_prepare_ready_records_discord_claim_and_persists_identity(tmp_path: Path) -> None:
     settings = _managed_settings()
     events: list[str] = []
 
@@ -208,6 +212,7 @@ async def test_prepare_ready_records_discord_claim_and_persists_identity() -> No
     adapter = _adapter(
         settings,
         AuthAdapter(_auth_state(), ClaimGuard()),
+        config_path=tmp_path / "settings.json",
         service=SimpleNamespace(prepare_for_translation=prepare_for_translation),
     )
 
@@ -223,7 +228,9 @@ async def test_prepare_ready_records_discord_claim_and_persists_identity() -> No
 
 
 @pytest.mark.asyncio
-async def test_china_prepare_maps_required_result_to_qq_dialog_and_safe_diagnostics() -> None:
+async def test_china_prepare_maps_required_result_to_qq_dialog_and_safe_diagnostics(
+    tmp_path: Path,
+) -> None:
     settings = _managed_settings(china=True)
 
     async def prepare_for_translation(
@@ -244,6 +251,7 @@ async def test_china_prepare_maps_required_result_to_qq_dialog_and_safe_diagnost
     adapter = _adapter(
         settings,
         AuthAdapter(_auth_state(managed_china=True)),
+        config_path=tmp_path / "settings.json",
         service=SimpleNamespace(prepare_for_translation=prepare_for_translation),
     )
 
@@ -256,7 +264,7 @@ async def test_china_prepare_maps_required_result_to_qq_dialog_and_safe_diagnost
     assert result.show_qq_dialog is True
 
 
-def test_founder_letter_marks_active_identity_and_persists_after_dialog() -> None:
+def test_founder_letter_marks_active_identity_and_persists_after_dialog(tmp_path: Path) -> None:
     settings = AppSettingsVNext()
     settings = replace(
         settings,
@@ -269,11 +277,26 @@ def test_founder_letter_marks_active_identity_and_persists_after_dialog() -> Non
         ),
     )
     persisted: list[str] = []
+    config_path = tmp_path / "settings.json"
+
+    def show_founder_dialog() -> bool:
+        assert not config_path.exists()
+        return True
+
+    def observe_persisted_settings() -> None:
+        fresh = (
+            SettingsVNextCanonicalPersistenceAdapter().load_active(config_path).canonical_settings
+        )
+        assert fresh.state.managed_connection.active_managed_credential_ref == "managed-ref"
+        assert fresh.state.managed_connection.founder_letter_seen_credential_ref == "managed-ref"
+        persisted.append("persist")
+
     adapter = _adapter(
         settings,
         AuthAdapter(_auth_state()),
-        founder_dialog=lambda: True,
-        persist_settings=lambda: persisted.append("persist"),
+        config_path=config_path,
+        founder_dialog=show_founder_dialog,
+        persist_settings=observe_persisted_settings,
     )
 
     adapter.show_founder_letter()
@@ -282,3 +305,10 @@ def test_founder_letter_marks_active_identity_and_persists_after_dialog() -> Non
     assert canonical is not None
     assert canonical.state.managed_connection.founder_letter_seen_credential_ref == "managed-ref"
     assert persisted == ["persist"]
+    fresh_owner = SettingsOwner(
+        path=config_path,
+        persistence=SettingsVNextCanonicalPersistenceAdapter(),
+    )
+    assert (
+        fresh_owner.start().settings.state.managed_connection == canonical.state.managed_connection
+    )

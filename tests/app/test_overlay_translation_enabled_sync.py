@@ -525,7 +525,7 @@ async def test_paused_start_applies_latest_translation_request(
     start_task = runtime.start_task
     try:
         await runner.entered.wait()
-        assert await enable_owner.set_enabled(False) is False
+        assert await enable_owner.set_enabled(False) is True
         runner.gate.set()
         await start_task
         await _drain()
@@ -622,7 +622,7 @@ async def test_composed_app_translation_disable_rebuilds_overlay_source_primary(
         )
         assert presenter.snapshot().blocks[0].primary_text == "peer translation toggle"
         snapshots_before = len(bridge.snapshots)
-        assert await app._input_runtime.translation.set_enabled(False) is False
+        assert await app._input_runtime.translation.set_enabled(False) is True
         await _drain()
         assert config_owner.snapshot().value.translation_enabled is False
         off_block = presenter.snapshot().blocks[0]
@@ -674,7 +674,7 @@ async def test_accepted_toggle_round_trip_rebuilds_without_new_speech() -> None:
     )
     enable_owner, _dashboard = make_enable_owner(config_owner, owner, llm_available=True)
     snapshots_before = len(bridge.snapshots)
-    assert await enable_owner.set_enabled(False) is False
+    assert await enable_owner.set_enabled(False) is True
     await _drain()
     off_block = presenter.snapshot().blocks[0]
     assert off_block.primary_text == "peer source toggle"
@@ -721,6 +721,80 @@ async def test_rejected_enable_keeps_source_primary_without_republish() -> None:
     assert block.secondary_text == ""
     assert block.secondary_enabled is False
     assert len(bridge.snapshots) == snapshots_before
+
+
+async def test_failed_warmup_rebuilds_existing_row_as_source_primary() -> None:
+    config_owner = TranslationRuntimeConfigurationOwner(
+        TranslationRuntimeConfig(translation_enabled=False)
+    )
+    owner = make_owner(config_owner)
+    runtime, presenter, bridge = attach_live_presenter(owner, config_owner)
+    adapter = OverlayEventAdapter(clock=FakeClock(_now=10.0))
+    peer_turn_id = uuid4()
+    await presenter.emit(
+        adapter.transcript_final(
+            Transcript(
+                utterance_id=peer_turn_id,
+                channel="peer",
+                text="retained peer source",
+                is_final=True,
+                created_at=10.0,
+            ),
+            source_language="en",
+            target_language="ko",
+        )
+    )
+    await presenter.emit(
+        adapter.translation_final(
+            utterance_id=peer_turn_id,
+            channel="peer",
+            text="retained peer translation",
+            source_language="en",
+            target_language="ko",
+            applied_context_mode=None,
+            created_at=10.1,
+        )
+    )
+    enable_owner, dashboard = make_enable_owner(config_owner, owner, llm_available=True)
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    failure = OSError("controlled warmup failure")
+
+    async def warmup() -> None:
+        entered.set()
+        await release.wait()
+        raise failure
+
+    enable_owner.warmup = warmup
+    enabling = asyncio.create_task(enable_owner.set_enabled(True))
+    try:
+        await entered.wait()
+        await _drain()
+        assert presenter.snapshot().blocks[0].primary_text == "retained peer translation"
+        snapshots_before_failure = len(bridge.snapshots)
+        release.set()
+        with pytest.raises(OSError) as caught:
+            await enabling
+        assert caught.value is failure
+        await _drain()
+        assert config_owner.snapshot().value.translation_enabled is False
+        assert dashboard == [False]
+        assert presenter.translation_enabled is False
+        block = presenter.snapshot().blocks[0]
+        assert block.primary_text == "retained peer source"
+        assert block.secondary_text == ""
+        assert block.secondary_enabled is False
+        assert len(bridge.snapshots) == snapshots_before_failure + 1
+    finally:
+        release.set()
+        await asyncio.gather(enabling, return_exceptions=True)
+        await runtime.close(
+            preserve_presenter_state=False,
+            overlay_sink_detach=None,
+            preview_reset=None,
+            diagnostics_detach=None,
+            emit_shutdown=False,
+        )
 
 
 async def test_managed_exhaustion_rebuilds_visible_row_as_source_primary() -> None:

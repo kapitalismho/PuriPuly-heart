@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
+import copy
 import json
 import subprocess
 import sys
+import wave
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -13,9 +14,8 @@ import numpy as np
 import pytest
 from puripuly_heart.core.local_asr_provider_runtime import ProviderRuntimeDiagnostic
 
-from puripuly_heart.composition.local_asr_production_evidence import (
-    compose_local_asr_production_evidence,
-)
+import puripuly_heart.composition.local_asr_production_evidence as composition
+from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.audio.ownership import AudioSegmentIdentity
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
 from puripuly_heart.core.stt.backend import (
@@ -148,17 +148,28 @@ def test_console_safe_preserves_report_and_escapes_unencodable_text() -> None:
 async def test_run_stage_reports_and_cancels_a_blocked_production_operation() -> None:
     report: dict[str, object] = {}
     never = asyncio.Event()
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+
+    async def blocked_operation() -> None:
+        started.set()
+        try:
+            await never.wait()
+        finally:
+            cancelled.set()
 
     with pytest.raises(RuntimeError, match="blocked_operation.*exceeded"):
         await evidence._run_stage(
             report,
             "blocked_operation",
-            never.wait(),
+            blocked_operation(),
             timeout=0.01,
         )
 
     assert report["active_stage"] == "blocked_operation"
     assert report["stage_timeout"]["stack"]
+    assert started.is_set()
+    assert cancelled.is_set()
 
 
 def test_recovered_activation_requires_new_resolved_physical_device() -> None:
@@ -284,10 +295,84 @@ def test_runner_accepts_native_runtime_layout_before_validating_assets(
     assert report["failure_type"] == "FileNotFoundError"
 
 
-def test_execute_defaults_to_the_package_evidence_composition_factory() -> None:
-    parameter = inspect.signature(evidence._execute).parameters["composition_factory"]
+def test_runner_initializes_and_closes_through_the_real_composition_adapter(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    config_path = tmp_path / "settings.json"
+    model_path = tmp_path / "model.bin"
+    model_path.write_bytes(b"synthetic-model-identity")
+    audio_path = tmp_path / "speech.wav"
+    with wave.open(str(audio_path), "wb") as sink:
+        sink.setnchannels(1)
+        sink.setsampwidth(2)
+        sink.setframerate(16000)
+        sink.writeframes(np.zeros(160, dtype="<i2").tobytes())
+    calls: list[str] = []
+    initialized: list[AppSettingsVNext] = []
+    original_settings = AppSettingsVNext()
+    settings_before_run = copy.deepcopy(original_settings)
 
-    assert parameter.default is compose_local_asr_production_evidence
+    def load_settings() -> AppSettingsVNext:
+        calls.append("load_settings")
+        return original_settings
+
+    async def initialize(settings: AppSettingsVNext) -> None:
+        calls.append("initialize")
+        initialized.append(settings)
+
+    async def stop() -> None:
+        calls.append("stop")
+
+    def compose_runtime(**kwargs):
+        assert kwargs["config_path"] == config_path
+        calls.append("compose_runtime")
+        kwargs["local_asr_evidence_sink"](
+            SimpleNamespace(
+                config_path=config_path,
+                load_compatibility_settings=load_settings,
+                initialize=initialize,
+                owner=object(),
+            )
+        )
+        return SimpleNamespace(stop=stop)
+
+    monkeypatch.setattr(composition, "compose_application_runtime", compose_runtime)
+    monkeypatch.setattr(evidence, "os", SimpleNamespace(name="nt", environ={}))
+    monkeypatch.setattr(
+        evidence,
+        "current_runtime_layout",
+        lambda: SimpleNamespace(
+            host_kind="native",
+            host_executable=tmp_path / "PuriPulyHeart.exe",
+        ),
+    )
+    monkeypatch.setattr(evidence, "local_gpu_model_path", lambda: model_path)
+    monkeypatch.setattr(evidence, "default_settings_path", lambda: config_path)
+    report_path = tmp_path / "report.json"
+
+    exit_code = evidence.run_local_asr_production_composition(
+        audio_path=audio_path,
+        report_path=report_path,
+        candidate="candidate-sha",
+        expected_gpu_name="synthetic-device",
+    )
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert calls == ["compose_runtime", "load_settings", "initialize", "stop"]
+    assert len(initialized) == 1
+    settings = initialized[0]
+    assert settings.intent.stt.provider == settings.intent.peer_stt.provider == "local_qwen_gpu"
+    assert settings.intent.secrets.backend == "encrypted_file"
+    assert settings.intent.osc.chatbox_send is False
+    assert original_settings == settings_before_run
+    assert exit_code == 1
+    assert report["status"] == "failed"
+    assert report["failure_type"] == "RuntimeError"
+    assert report["failure"] == "production application did not compose the canonical owner"
+    assert report["candidate"] == "candidate-sha"
+    assert report["audio_samples"] == 160
+    assert "shutdown_failure" not in report
 
 
 class _ScopedSession:
@@ -352,12 +437,17 @@ def _scoped_request() -> SimpleNamespace:
 
 
 @pytest.mark.asyncio
-async def test_peer_production_probe_uses_owned_scoped_recognition_path() -> None:
+@pytest.mark.parametrize(("channel", "generation"), [("self", 3), ("peer", 7)])
+async def test_production_probe_uses_each_owned_scoped_recognition_path(
+    channel: str,
+    generation: int,
+) -> None:
     events: list[object] = []
+    dispatched: list[str] = []
     request = _scoped_request()
     session = _ScopedSession()
     engine = ScopedRecognitionEngine(
-        channel="peer",
+        channel=channel,
         session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
         event_sink=events.append,
         accepted_settings_scope=(
@@ -367,67 +457,34 @@ async def test_peer_production_probe_uses_owned_scoped_recognition_path() -> Non
         ),
     )
 
-    class PeerRuntime:
-        async def handle_peer_owned_vad_event(self, owned: object) -> None:
-            await engine.handle_owned_vad_event(owned)
-
-    samples = np.linspace(-0.5, 0.5, 160, dtype=np.float32)
-    try:
-        final = await evidence._send_utterance(
-            application=SimpleNamespace(peer_vad=PeerRuntime()),
-            channel="peer",
-            samples=samples,
-            events=events,
-            request=request,
-            activation_generation=7,
-        )
-    finally:
-        await engine.close()
-
-    assert isinstance(final, STTProviderTurnTerminal)
-    assert final.outcome == "final"
-    assert final.text == "scoped transcript"
-    assert final.identity.segment.activation_generation == 7
-    assert len(session.audio) == samples.size * 2
-
-
-@pytest.mark.asyncio
-async def test_self_production_probe_uses_owned_scoped_recognition_path() -> None:
-    events: list[object] = []
-    request = _scoped_request()
-    session = _ScopedSession()
-    engine = ScopedRecognitionEngine(
-        channel="self",
-        session_factory=lambda _settings, _epoch: asyncio.sleep(0, result=session),
-        event_sink=events.append,
-        accepted_settings_scope=(
-            request.provider_id,
-            request.provider_signature,
-            request.runtime_signature,
-        ),
-    )
-
-    class SelfRuntime:
+    class Runtime:
         async def handle_vad_event(self, owned: object) -> None:
+            dispatched.append("self")
+            await engine.handle_owned_vad_event(owned)
+
+        async def handle_peer_owned_vad_event(self, owned: object) -> None:
+            dispatched.append("peer")
             await engine.handle_owned_vad_event(owned)
 
     samples = np.linspace(-0.5, 0.5, 160, dtype=np.float32)
+    runtime = Runtime()
     try:
         final = await evidence._send_utterance(
-            application=SimpleNamespace(self_vad=SelfRuntime()),
-            channel="self",
+            application=SimpleNamespace(self_vad=runtime, peer_vad=runtime),
+            channel=channel,
             samples=samples,
             events=events,
             request=request,
-            activation_generation=3,
+            activation_generation=generation,
         )
     finally:
         await engine.close()
 
+    assert dispatched == [channel, channel]
     assert isinstance(final, STTProviderTurnTerminal)
     assert final.outcome == "final"
     assert final.text == "scoped transcript"
-    assert final.identity.segment.activation_generation == 3
+    assert final.identity.segment.activation_generation == generation
     assert len(session.audio) == samples.size * 2
 
 

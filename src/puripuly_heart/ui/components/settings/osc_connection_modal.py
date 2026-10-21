@@ -9,8 +9,7 @@ from puripuly_heart.ui.flet_runtime import (
     is_hover_active,
     update_control_if_mounted,
 )
-from puripuly_heart.ui.fonts import font_for_language
-from puripuly_heart.ui.i18n import get_locale, t
+from puripuly_heart.ui.i18n import t
 from puripuly_heart.ui.theme import (
     COLOR_BACKGROUND,
     COLOR_NEUTRAL_DARK,
@@ -18,6 +17,7 @@ from puripuly_heart.ui.theme import (
     COLOR_PRIMARY,
     COLOR_SECONDARY,
     COLOR_SURFACE,
+    text_style,
 )
 
 _OPTION_CARD_RADIUS = 16
@@ -189,10 +189,7 @@ class OscConnectionModal:
             bgcolor=ft.Colors.TRANSPARENT,
             color=COLOR_PRIMARY,
             text_size=_PORT_TEXT_SIZE,
-            text_style=ft.TextStyle(
-                weight=ft.FontWeight.BOLD,
-                font_family=font_for_language(get_locale()),
-            ),
+            text_style=text_style(weight=ft.FontWeight.BOLD),
             text_align=ft.TextAlign.CENTER,
             content_padding=ft.Padding.symmetric(horizontal=8, vertical=4),
             on_change=self._on_port_change,

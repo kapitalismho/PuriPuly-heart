@@ -10,7 +10,7 @@
 
 <p align="center">
 
-  <img src="https://img.shields.io/badge/version-2.8.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.9.0-blue" alt="Version" />
 
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
 
@@ -112,7 +112,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 | LLM \ ASR                 | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 | ------------------------- | --------- | ------------------- | ------ | ---------- |
-| **Gemma 4 E4B (Local)**   | 무제한       | 무제한                 | 5,000회 | 7,260회     |
+| **Index-Translate 35B A3B**   | 무제한       | 무제한                 | 5,000회 | 7,260회     |
 | **Gemma 4 26B A4B + 31B** | 13,940회 | 13,940회 | 3,680회 | 4,770회 |
 | **DeepSeek V4.1 Flash**   | 16,800회   | 16,800회             | 3,860회 | 5,070회     |
 | **GPT 6 Luna** | 8,680회 | 8,680회 | 3,170회 | 3,950회 |
@@ -123,6 +123,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 | LLM \ ASR                    | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 | ---------------------------- | --------- | ------------------- | ------ | ---------- |
+| **Gemma 4 E4B & 26B (Local)** | 무제한       | 무제한                 | 5,000회 | 7,260회     |
 | **DeepSeek V4 Flash (OpenRouter)** | 17,020회   | 17,020회             | 3,860회 | 5,090회     |
 | **Gemini 3.8 Flash**         | 1,160회    | 1,160회              | 940회   | 1,000회     |
 | **Qwen 3.8 Flash**           | 7,460회    | 7,460회              | 2,990회 | 3,680회     |
@@ -135,7 +136,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 | LLM \ ASR                 | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 | ------------------------- | --------- | ------------------- | ------ | ---------- |
-| **Gemma 4 E4B (Local)**   | 0원        | 0원                  | ~0.3원  | ~0.2원      |
+| **Index-Translate 35B A3B**   | 0원        | 0원                  | ~0.3원  | ~0.2원      |
 | **Gemma 4 26B A4B + 31B** | ~0.1원 | ~0.1원 | ~0.4원 | ~0.3원 |
 | **DeepSeek V4.1 Flash**   | ~0.08원    | ~0.08원              | ~0.4원  | ~0.3원      |
 | **GPT 6 Luna** | ~0.16원 | ~0.16원 | ~0.4원 | ~0.4원 |
@@ -146,6 +147,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 
 | LLM \ ASR                    | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 | ---------------------------- | --------- | ------------------- | ------ | ---------- |
+| **Gemma 4 E4B & 26B (Local)** | 0원        | 0원                  | ~0.3원  | ~0.2원      |
 | **DeepSeek V4 Flash (OpenRouter)** | ~0.08원    | ~0.08원              | ~0.4원  | ~0.3원      |
 | **Gemini 3.8 Flash**         | ~1.2원     | ~1.2원               | ~1.5원  | ~1.4원      |
 | **Qwen 3.8 Flash**            | ~0.2원     | ~0.2원               | ~0.5원  | ~0.4원      |
@@ -157,7 +159,7 @@ VRChat, Discord를 포함하여 여러 환경에서 사용 가능해요.
 - *DeepSeek V4.1 Flash는 캐시 히트율 70%, V4 Flash는 60% 가정 / 피크 타임은 고려하지 않음*
 - *GPT 6 Luna는 OpenAI API 요금 기준, 캐시 할인 미적용 가정 / ChatGPT로 연결하면 API 요금 대신 Codex 한도를 사용해요*
 - *Qwen API 비용은 베이징 리전 기준*
-- *요금표 기준: 2026년 9월 25일*
+- *요금표 기준: 2026년 10월 17일*
 - *1 달러 = 1400원*
 
 ### 무료 크레딧
@@ -197,7 +199,10 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 | 모델                 | 실행 환경     | 양자화        |
 | ------------------ | --------- | ---------- |
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | GPU 전용 (Vulkan) | UD Q4_K_XL |
 | OpenAI 호환 API      | —         | —          |
+
+모델 파일은 설치 프로그램에 포함되지 않으며, 선택한 모델이 필요할 때 다운로드합니다. 26B 다운로드 크기는 약 14.25 GB입니다. 모델 선택은 재시작 후에도 유지됩니다. 26B는 Vulkan GPU 전용이며 초기화 실패 시 CPU나 E4B로 자동 전환하지 않습니다. GPU 번역은 하나의 런타임에서 Self/Peer 요청을 최대 2개까지 동시에 처리하고, CPU 번역은 순차 처리합니다. [고정 프로필 및 관리형 로컬 번역 계약](../cli.md#managed-local-translation)을 참고하세요.
 
 
 ---
@@ -209,7 +214,7 @@ GPU 추론은 Vulkan을 사용했어요. Radeon이든 Arc든 제조사와 상관
 1. [다운로드 페이지](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)에서 최신 버전 다운로드
 2. PuriPuly 설치
 3. **TALK** 버튼 클릭
-4. **TRANS** 버튼 클릭 후 디스코드 인증
+4. **TRANS** 버튼 클릭. 신규 설치는 API 키 없이 Index를 사용해요. 인증·설정 안내가 나오면 완료해주세요.
 5. **CAPTIONS** 버튼을 눌러 자막 켜기
 6. (선택) **LISTEN** 버튼을 눌러 상대 음성 번역 켜기
   > 상대 음성 번역 기능이 제대로 작동하기 위해서는 시끄럽지 않은 공간이 필요해요. VRChat에서 사용할 경우 Earmuff 기능을 사용해서 환경을 통제해주세요.

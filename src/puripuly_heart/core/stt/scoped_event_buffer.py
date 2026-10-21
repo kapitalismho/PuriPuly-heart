@@ -107,6 +107,7 @@ class STTProviderEventBuffer:
             for event in self._events
             if not (_is_provisional_snapshot(event) and event.identity == incoming.identity)
         )
+        self._recognition_bytes = sum(_recognition_bytes(event) for event in self._events)
 
     def _discard_provisional_snapshots_until_room(self) -> None:
         retained: deque[STTProviderTurnEvent] = deque()
@@ -118,6 +119,7 @@ class STTProviderEventBuffer:
                 continue
             retained.append(event)
         self._events = retained
+        self._recognition_bytes = sum(_recognition_bytes(event) for event in self._events)
 
     def _fail_scoped_turn(
         self,
@@ -131,6 +133,7 @@ class STTProviderEventBuffer:
                 text_authority="none",
                 failure_reason="provider_event_buffer_overflow",
                 epoch_disposition="retire",
+                is_current=event.is_current,
             ),
             identity.provider_epoch_id,
         )
@@ -154,6 +157,7 @@ class STTProviderEventBuffer:
         self._events = retained
         self._events.append(event)
         self._retire_epoch(epoch_id)
+        self._recognition_bytes = sum(_recognition_bytes(queued) for queued in self._events)
         self._wake.set()
         return True
 
@@ -189,6 +193,14 @@ def _recognition_bytes(event: STTProviderTurnEvent) -> int:
         return event.unit.retained_bytes
     if isinstance(event, STTRecognitionUnit):
         return event.retained_bytes
+    if (
+        isinstance(event, (STTProviderTurnUpdate, STTProviderTurnTerminal))
+        and event.recognition_origins
+    ):
+        return len(event.text.encode("utf-8")) + sum(
+            128 + (origin.native.retained_bytes if origin.native is not None else 0)
+            for origin in event.recognition_origins
+        )
     return 0
 
 

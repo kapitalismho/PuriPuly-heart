@@ -14,6 +14,10 @@ with open(config_path, encoding="utf-8") as config_file:
 if os.environ.get("FAKE_GPU_WORKER_EXIT_BEFORE_AUTH") == "1":
     raise SystemExit(23)
 
+if os.environ.get("FAKE_GPU_WORKER_SKIP_AUTH") == "1":
+    while True:
+        time.sleep(60)
+
 connection = socket.create_connection((config["connect_host"], config["connect_port"]))
 writer_lock = threading.Lock()
 stopping = threading.Event()
@@ -83,6 +87,28 @@ for raw in reader:
             }
         )
     elif request_type == "activate":
+        if os.environ.get("FAKE_GPU_WORKER_BLOCK_ACTIVATION") == "1":
+            send(
+                {
+                    "type": "event",
+                    "event": "activation_progress",
+                    "request_id": request_id,
+                    "fields": {"phase": "loading"},
+                }
+            )
+            while True:
+                time.sleep(60)
+        if os.environ.get("FAKE_GPU_WORKER_ACTIVATION_FAILURE") == "1":
+            send(
+                {
+                    "type": "response",
+                    "request_id": request_id,
+                    "status": "failed",
+                    "error_code": "out_of_memory",
+                    "payload": {},
+                }
+            )
+            continue
         send(
             {
                 "type": "response",

@@ -176,7 +176,10 @@ async def test_provider_verifier_adapter_returns_safe_failed_result_when_provide
     assert result.provider == "deepseek"
     assert result.secret_key == "providers.deepseek.api_key"
     assert result.diagnostics is not None
-    assert result.diagnostics.fields["error_type"] == "RuntimeError"
+    assert result.diagnostics.fields["exception_class"] == "RuntimeError"
+    assert result.diagnostics.category == "unknown"
+    assert result.diagnostics.fields["verification_scope"] == "key_probe"
+    assert result.diagnostics.fields["recognition_readiness"] == "unobserved"
     assert secret_value not in repr(result)
     assert secret_value not in repr(result.diagnostics)
 

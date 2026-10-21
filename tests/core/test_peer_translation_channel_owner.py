@@ -130,6 +130,7 @@ async def test_peer_native_input_terminals_release_local_timing_without_binding_
                     ),
                     "failed" if order == 1 else "submitted",
                     "peer",
+                    independent_recognition=True,
                 )
             )
             if order == 1:

@@ -10,6 +10,10 @@ Download `{{INSTALLER_EXE}}` from the Assets section below, then run it.
 
 
 ## Change logs
+- Luna on the ChatGPT connection preconnects one standby socket while translation is off and reuses it when translation is enabled.
+
+- Soniox speech recognition and API-key verification now authenticate when opening the WebSocket connection. Update before **January 15, 2027**, when Soniox will reject older builds that authenticate only in the first configuration message. Existing API keys continue to work; no key reissuance or settings change is required.
+- Soniox's concurrent-connection limit now uses the existing bounded recovery policy.
 
 ---
 **If PuriPuly has made your world a bit wider,

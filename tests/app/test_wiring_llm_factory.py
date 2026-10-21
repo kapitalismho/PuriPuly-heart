@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict, replace
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from puripuly_heart.app.wiring_managed_auth_factory import (
@@ -20,6 +22,7 @@ from puripuly_heart.core.openrouter_credentials import (
 )
 
 from puripuly_heart.app import wiring_llm_factory
+from puripuly_heart.app.services.managed.managed_operation import new_managed_operation_id
 from puripuly_heart.app.wiring import create_llm_provider_from_resolved_config
 from puripuly_heart.app.wiring.wiring_llm_factory import llm_factory_extras_from_vnext
 from puripuly_heart.config.provider_values import OpenRouterCredentialSource
@@ -38,6 +41,11 @@ from puripuly_heart.config.runtime_resolution import (
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.core.llm.fallback_racing import FallbackRacingLLMProvider
 from puripuly_heart.core.llm.provider import SemaphoreLLMProvider
+from puripuly_heart.core.managed_credential import (
+    ManagedCredentialBinding,
+    credential_binding_secret,
+    managed_key_secret,
+)
 from puripuly_heart.core.openrouter_routing import OpenRouterProviderRouting
 from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.providers.llm.managed_gemma import ManagedGemmaLLMProvider
@@ -172,10 +180,10 @@ async def test_managed_gemma_target_uses_injected_runtime_and_activation_release
         managed_gemma_release=release,
     )
 
-    assert isinstance(provider, SemaphoreLLMProvider)
-    assert isinstance(provider.inner, ManagedGemmaLLMProvider)
-    assert provider.inner.runtime is runtime
-    assert provider.inner.backend == "gpu"
+    assert isinstance(provider, ManagedGemmaLLMProvider)
+    assert provider.runtime is runtime
+    assert provider.backend == "gpu"
+    assert provider.spec.model_id == "gemma-4-e4b-it-qat-ud-q4-k-xl"
 
     await provider.close()
     await provider.close()
@@ -403,3 +411,119 @@ def test_combined_gemma_byok_without_key_does_not_fall_back_to_managed(
             secrets=secrets,
             managed_release_service=object(),
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("model", "model_id"),
+    [
+        ("managed_gemma", "gemma-4-e4b-it-qat-ud-q4-k-xl"),
+        ("managed_gemma_26b", "gemma-4-26b-a4b-it-qat-ud-q4-k-xl"),
+    ],
+)
+async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_limit_one(
+    model: str, model_id: str
+) -> None:
+    both_entered = asyncio.Event()
+    finish = asyncio.Event()
+    calls = []
+
+    class Runtime:
+        async def translate(self, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 2:
+                both_entered.set()
+            await finish.wait()
+            return SimpleNamespace(text=kwargs["user_message"])
+
+    provider = create_llm_provider_from_resolved_config(
+        resolve_llm_config(
+            RuntimeResolutionInput(
+                translation=TranslationRuntimeIntent(
+                    model=model, connection="gpu", concurrency_limit=1
+                )
+            )
+        ),
+        secrets=InMemorySecretStore(),
+        managed_gemma_runtime=Runtime(),
+    )
+    identities = [uuid4(), uuid4()]
+    tasks = [
+        asyncio.create_task(
+            provider.translate(
+                utterance_id=identity,
+                text=f"synthetic {index}",
+                system_prompt="translate",
+                source_language="en",
+                target_language="ko",
+            )
+        )
+        for index, identity in enumerate(identities)
+    ]
+    try:
+        await asyncio.wait_for(both_entered.wait(), timeout=2)
+        assert all(call["spec"].model_id == model_id for call in calls)
+        finish.set()
+        results = await asyncio.gather(*tasks)
+        assert [result.utterance_id for result in results] == identities
+        assert results[0].text != results[1].text
+    finally:
+        finish.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", ["discord", "qq"])
+@pytest.mark.parametrize(
+    "authority", ["missing_view", "unacknowledged", "pending", "acknowledged", "legacy"]
+)
+async def test_real_managed_factory_obeys_canonical_credential_proof(source, authority):
+    from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
+
+    settings = _managed_china_settings() if source == "qq" else _managed_settings()
+    operation = new_managed_operation_id()
+    managed = replace(
+        settings.state.managed_connection,
+        installation_id="synthetic-installation",
+        active_managed_credential_ref=(
+            None if authority in {"unacknowledged", "legacy"} else "synthetic-ref"
+        ),
+    )
+    if authority == "pending":
+        managed = replace(
+            managed,
+            pending_managed_operation_id=operation,
+            pending_managed_operation_source=source,
+            pending_managed_operation_installation_id=managed.installation_id,
+            pending_managed_operation_state="DELIVERY_PENDING",
+        )
+    settings = replace(settings, state=replace(settings.state, managed_connection=managed))
+    secrets = InMemorySecretStore()
+    secrets.set(managed_key_secret(source), "synthetic-key")
+    if authority != "legacy":
+        secrets.set(
+            credential_binding_secret(source),
+            ManagedCredentialBinding.create(
+                source=source,
+                installation_id=managed.installation_id,
+                operation_id=operation,
+                delivery_id="synthetic-delivery",
+                managed_credential_ref="synthetic-ref",
+                credential="synthetic-key",
+            ).encode(),
+        )
+    provider = create_llm_provider_from_resolved_config(
+        _managed_china_resolved_config() if source == "qq" else _standard_managed_resolved_config(),
+        secrets=secrets,
+        managed_release_service=object(),
+        extras=None if authority == "missing_view" else llm_factory_extras_from_vnext(settings),
+    )
+    try:
+        assert isinstance(provider, SemaphoreLLMProvider)
+        if authority in {"acknowledged", "legacy"}:
+            assert isinstance(provider.inner, OpenRouterLLMProvider)
+            assert provider.inner.api_key == "synthetic-key"
+        else:
+            assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
+    finally:
+        await provider.close()

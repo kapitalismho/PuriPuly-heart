@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import flet as ft
 
@@ -11,14 +11,14 @@ from puripuly_heart.ui.flet_runtime import (
     is_hover_active,
     update_control_if_mounted,
 )
-from puripuly_heart.ui.fonts import font_for_language
-from puripuly_heart.ui.i18n import get_locale, language_name, t
+from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
     COLOR_DIVIDER,
     COLOR_ON_PRIMARY_CONTAINER,
     COLOR_PRIMARY,
     COLOR_PRIMARY_CONTAINER,
     COLOR_SECONDARY,
+    text_style,
 )
 
 _CHIP_RADIUS = 999
@@ -47,7 +47,8 @@ class LanguageHintEditor(ft.Column):
         self._on_add = on_add
         self._on_remove = on_remove
         self._terms: list[str] = []
-        self._recent: list[str] = []
+        self._recent_codes: Callable[[], Sequence[str]] | None = None
+        self._remember_recent: Callable[[str], None] | None = None
 
         self._chips_wrap = ft.Row(
             controls=[],
@@ -66,10 +67,7 @@ class LanguageHintEditor(ft.Column):
                     ft.ControlState.HOVERED: COLOR_PRIMARY,
                     ft.ControlState.DEFAULT: COLOR_SECONDARY,
                 },
-                text_style=ft.TextStyle(
-                    size=20,
-                    font_family=font_for_language(get_locale()),
-                ),
+                text_style=text_style(size=20),
                 overlay_color=ft.Colors.TRANSPARENT,
                 animation_duration=0,
             ),
@@ -93,21 +91,29 @@ class LanguageHintEditor(ft.Column):
                 ft.ControlState.HOVERED: COLOR_PRIMARY,
                 ft.ControlState.DEFAULT: COLOR_SECONDARY,
             },
-            text_style=ft.TextStyle(
-                size=20,
-                font_family=font_for_language(get_locale()),
-            ),
+            text_style=text_style(size=20),
             overlay_color=ft.Colors.TRANSPARENT,
             animation_duration=0,
         )
         self.set_terms(list(self._terms))
 
+    def bind_recent_languages(
+        self,
+        *,
+        codes: Callable[[], Sequence[str]],
+        remember: Callable[[str], None],
+    ) -> None:
+        """Use the same recent-language queue as the dashboard language modals."""
+        self._recent_codes = codes
+        self._remember_recent = remember
+
+    def recent_language_codes(self) -> tuple[str, ...] | None:
+        if self._recent_codes is None:
+            return None
+        return tuple(self._recent_codes())
+
     def set_terms(self, terms: list[str]) -> None:
         self._terms = list(terms)
-        for code in self._terms:
-            if code not in self._recent:
-                self._recent.insert(0, code)
-        self._recent = self._recent[:6]
         chip_controls = [self._build_chip(code) for code in self._terms]
         self._chips_wrap.controls = chip_controls
         self._chips_wrap.visible = bool(chip_controls)
@@ -156,20 +162,22 @@ class LanguageHintEditor(ft.Column):
         if page is None:
             return
         languages = get_all_language_options()
-        lang_codes = dict(languages)
-        recent = [code for code in self._recent if code in lang_codes]
         modal = LanguageModal(
             page=page,
             languages=languages,
             on_select=self._handle_select,
         )
-        modal.open(current="", recent=recent)
+        modal.open(current="", recent=self._recent_for_modal())
+
+    def _recent_for_modal(self) -> list[str]:
+        if self._recent_codes is None:
+            return []
+        known = {code for code, _name in get_all_language_options()}
+        return [code for code in self._recent_codes() if code in known]
 
     def _handle_select(self, code: str) -> None:
-        if code in self._recent:
-            self._recent.remove(code)
-        self._recent.insert(0, code)
-        self._recent = self._recent[:6]
+        if self._remember_recent is not None:
+            self._remember_recent(code)
         if self._on_add is not None:
             self._on_add(code)
 

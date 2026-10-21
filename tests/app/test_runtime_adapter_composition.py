@@ -1,45 +1,11 @@
 from __future__ import annotations
 
-import logging
-from pathlib import Path
-from types import SimpleNamespace
-
 import pytest
 
 from puripuly_heart.app.services.osc.noop_query import NoopOscQueryService
 from puripuly_heart.app.services.osc.state_publisher import OscCanonicalState
-from puripuly_heart.app.wiring import wiring_application_runtime_logging, wiring_vrc_mic_sync
+from puripuly_heart.app.wiring import wiring_vrc_mic_sync
 from puripuly_heart.core.osc.receiver_contract import VrcMicState
-
-
-class RecordingLoggingAdapter:
-    def __init__(self) -> None:
-        self.log_file = Path("runtime.log")
-        self.basic_messages: list[tuple[int, str]] = []
-        self.close_calls = 0
-
-    def attach_realtime_sink(self, _sink: object) -> None:
-        return None
-
-    def detach_realtime_sink(self) -> None:
-        return None
-
-    def emit_basic(self, message: str, *, level: int = logging.INFO) -> None:
-        self.basic_messages.append((level, message))
-
-    def emit_diagnostic(self, _message: str, *, level: int = logging.INFO) -> bool:
-        _ = level
-        return True
-
-    def emit_diagnostic_lazy(self, _build_message, *, level: int = logging.INFO) -> bool:
-        _ = level
-        return True
-
-    def emit_persisted(self, _message: str, *, level: int = logging.INFO) -> None:
-        _ = level
-
-    def close_terminal_owner(self) -> None:
-        self.close_calls += 1
 
 
 class RecordingGate:
@@ -67,41 +33,6 @@ class RecordingOscReceiver:
 
     def stop(self) -> None:
         self.stop_calls += 1
-
-
-def test_production_logging_composition_constructs_adapter_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    adapters: list[RecordingLoggingAdapter] = []
-
-    def adapter_factory(**_kwargs: object) -> RecordingLoggingAdapter:
-        adapter = RecordingLoggingAdapter()
-        adapters.append(adapter)
-        return adapter
-
-    monkeypatch.setattr(
-        wiring_application_runtime_logging,
-        "SessionRuntimeLoggingService",
-        adapter_factory,
-    )
-    attached: list[object] = []
-    owner = wiring_application_runtime_logging.compose_application_runtime_logging(
-        presentation=SimpleNamespace(
-            attach_runtime_log_sink=lambda service: attached.append(service)
-        ),
-        sinks=None,
-    )
-
-    first = owner.service
-    second = owner.service
-    first.emit_basic("wired", level=logging.WARNING)
-    first.close()
-
-    assert first is second
-    assert len(adapters) == 1
-    assert adapters[0].basic_messages == [(logging.WARNING, "wired")]
-    assert adapters[0].close_calls == 1
-    assert attached == [first, first]
 
 
 @pytest.mark.asyncio

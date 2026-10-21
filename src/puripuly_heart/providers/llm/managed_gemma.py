@@ -8,41 +8,30 @@ from uuid import UUID
 
 import httpx
 
-from puripuly_heart.core.error_messages import format_error_report_for_log, provider_failure_report
 from puripuly_heart.core.http_client_logging import suppress_http_client_logs
-from puripuly_heart.core.llm.latency import AttemptLatency, current_attempt
+from puripuly_heart.core.llm.latency import (
+    AttemptLatency,
+    current_attempt,
+    current_request,
+    observe_attempt,
+)
+from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID, GemmaModelSpec
 from puripuly_heart.core.local_translation.runtime import (
     ManagedGemmaMetrics,
     ManagedGemmaResponse,
     ManagedGemmaRuntimeOwner,
 )
-from puripuly_heart.core.local_translation.runtime_profile import GemmaBackend
+from puripuly_heart.core.local_translation.runtime_profile import (
+    MANAGED_GEMMA_26B_MODEL_ALIAS,
+    MANAGED_GEMMA_MODEL_ALIAS,
+    GemmaBackend,
+)
 from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.domain.models import Translation
+from puripuly_heart.providers.llm.error_details import LLMResponseError
 from puripuly_heart.providers.llm.messages import build_translation_user_message
 
 logger = logging.getLogger(__name__)
-
-
-def _log_basic_request_failure(
-    *,
-    runtime_logging: ProviderObservationPort | None,
-    operation: str,
-    exc: BaseException,
-) -> None:
-    report = provider_failure_report(
-        exc,
-        provider="managed_gemma",
-        operation=operation,
-    )
-    rendered = "[Basic][LLM] Gemma request failed [%s]: %s" % (
-        operation,
-        format_error_report_for_log(report),
-    )
-    if runtime_logging is not None:
-        runtime_logging.emit_basic(rendered, level=logging.ERROR)
-        return
-    logger.error(rendered)
 
 
 def _number(value: object) -> float:
@@ -59,16 +48,18 @@ def _optional_integer(value: object) -> int | None:
 
 def _response_text(payload: object) -> str:
     if not isinstance(payload, dict):
-        raise RuntimeError("managed Gemma response was not an object")
+        raise LLMResponseError("managed Gemma response was not an object", provider="managed_gemma")
     content = payload.get("content")
     if not isinstance(content, str) or not content.strip():
-        raise RuntimeError("managed Gemma response contained empty content")
+        raise LLMResponseError(
+            "managed Gemma response contained empty content", provider="managed_gemma"
+        )
     return content.strip()
 
 
 def _response_metrics(payload: object) -> ManagedGemmaMetrics:
     if not isinstance(payload, dict):
-        raise RuntimeError("managed Gemma response was not an object")
+        raise LLMResponseError("managed Gemma response was not an object", provider="managed_gemma")
     timings = payload.get("timings") if isinstance(payload.get("timings"), dict) else {}
     prompt_tokens = _integer(timings.get("prompt_n"))
     completion_tokens = _integer(timings.get("predicted_n"))
@@ -133,6 +124,30 @@ class HttpxManagedGemmaTransport:
             slot_id=slot_id,
         )
 
+    async def wait_slot_idle(self, *, slot_id: int) -> None:
+        timeout = self.timeout.read if isinstance(self.timeout, httpx.Timeout) else self.timeout
+        async with asyncio.timeout(timeout or 120.0):
+            while True:
+                response = await self._require_client().get("/slots")
+                response.raise_for_status()
+                slots = response.json()
+                if isinstance(slots, list):
+                    for slot in slots:
+                        if isinstance(slot, dict) and slot.get("id") == slot_id:
+                            if slot.get("is_processing") is False:
+                                return
+                            break
+                    else:
+                        raise LLMResponseError(
+                            "managed Gemma slot was missing during settlement",
+                            provider="managed_gemma",
+                        )
+                else:
+                    raise LLMResponseError(
+                        "managed Gemma slot state was invalid", provider="managed_gemma"
+                    )
+                await asyncio.sleep(min(self.poll_interval_s, 0.1))
+
     async def restore_prefix(self, *, filename: str, slot_id: int) -> bool:
         try:
             response = await self._require_client().post(
@@ -140,15 +155,20 @@ class HttpxManagedGemmaTransport:
                 json={"filename": filename},
             )
         except httpx.HTTPError:
+            await self.wait_slot_idle(slot_id=slot_id)
             return False
         return response.status_code == 200
 
     async def save_prefix(self, *, filename: str, slot_id: int) -> None:
-        response = await self._require_client().post(
-            f"/slots/{slot_id}?action=save",
-            json={"filename": filename},
-        )
-        response.raise_for_status()
+        try:
+            response = await self._require_client().post(
+                f"/slots/{slot_id}?action=save",
+                json={"filename": filename},
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            await self.wait_slot_idle(slot_id=slot_id)
+            raise
 
     async def translate(
         self,
@@ -188,12 +208,21 @@ class HttpxManagedGemmaTransport:
             },
         )
         template_response.raise_for_status()
-        template_payload = template_response.json()
+        try:
+            template_payload = template_response.json()
+        except ValueError as exc:
+            raise LLMResponseError(
+                "managed Gemma template response was not valid JSON", provider="managed_gemma"
+            ) from exc
         if not isinstance(template_payload, dict):
-            raise RuntimeError("managed Gemma template response was not an object")
+            raise LLMResponseError(
+                "managed Gemma template response was not an object", provider="managed_gemma"
+            )
         prompt = template_payload.get("prompt")
         if not isinstance(prompt, str) or not prompt:
-            raise RuntimeError("managed Gemma template response did not contain a prompt")
+            raise LLMResponseError(
+                "managed Gemma template response did not contain a prompt", provider="managed_gemma"
+            )
         body: dict[str, object] = {
             "prompt": prompt,
             "stream": False,
@@ -209,7 +238,12 @@ class HttpxManagedGemmaTransport:
             observation.mark_sent()
         response = await client.post("/completion", json=body)
         response.raise_for_status()
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise LLMResponseError(
+                "managed Gemma response was not valid JSON", provider="managed_gemma"
+            ) from exc
         if observation is not None and isinstance(payload, dict):
             timings = payload.get("timings")
             if isinstance(timings, dict):
@@ -244,6 +278,7 @@ class ManagedGemmaLLMProvider:
     vulkan_device: str = "Vulkan0"
     release_runtime: Callable[[], Awaitable[None]] | None = None
     runtime_logging: ProviderObservationPort | None = None
+    spec: GemmaModelSpec | None = None
     _closed: bool = field(init=False, default=False, repr=False)
     _released: bool = field(init=False, default=False, repr=False)
 
@@ -260,7 +295,11 @@ class ManagedGemmaLLMProvider:
         max_output_tokens: int | None = None,
     ) -> Translation:
         if self._closed:
-            raise RuntimeError("managed Gemma provider is closed")
+            raise LLMResponseError(
+                "managed Gemma provider is closed",
+                provider="managed_gemma",
+                diagnostic_category="lifecycle",
+            )
         runtime_kwargs = {
             "backend": self.backend,
             "source_language": source_language,
@@ -275,15 +314,18 @@ class ManagedGemmaLLMProvider:
         }
         if max_output_tokens is not None:
             runtime_kwargs["max_output_tokens"] = max_output_tokens
-        try:
+        if self.spec is not None:
+            runtime_kwargs["spec"] = self.spec
+        model = (
+            MANAGED_GEMMA_26B_MODEL_ALIAS
+            if self.spec is not None and self.spec.model_id == GEMMA_26B_MODEL_ID
+            else MANAGED_GEMMA_MODEL_ALIAS
+        )
+        with observe_attempt(provider="managed_gemma", model=model):
             response = await self.runtime.translate(**runtime_kwargs)  # type: ignore[arg-type]
-        except Exception as exc:
-            _log_basic_request_failure(
-                runtime_logging=self.runtime_logging,
-                operation="translate",
-                exc=exc,
-            )
-            raise
+            request = current_request()
+            if request is not None:
+                request.winner_attempt = 0
 
         return Translation(
             utterance_id=utterance_id,

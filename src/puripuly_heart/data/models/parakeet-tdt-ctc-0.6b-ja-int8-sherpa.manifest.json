@@ -13,6 +13,12 @@
       "repo_id": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8",
       "revision": "bef18eb066808c90bd0f5df5be685767b0732de8",
       "download_url_template": "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/{path}"
+    },
+    "hf_mirror": {
+      "name": "hf_mirror",
+      "repo_id": "csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8",
+      "revision": "bef18eb066808c90bd0f5df5be685767b0732de8",
+      "download_url_template": "https://hf-mirror.net/csukuangfj/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8/resolve/bef18eb066808c90bd0f5df5be685767b0732de8/{path}"
     }
   },
   "files": [

@@ -63,7 +63,7 @@ class SettingsRuntimeEffectsPort(Protocol[SettingsT]):
 
     def apply_activation_notice(self, settings: SettingsT) -> None: ...
 
-    def sync_signatures(self, settings: SettingsT) -> None: ...
+    def sync_stt_signatures(self, settings: SettingsT) -> None: ...
 
     def state(self, settings: SettingsT) -> SettingsRuntimeState: ...
 
@@ -73,6 +73,7 @@ class SettingsRuntimeEffectsPort(Protocol[SettingsT]):
         *,
         strict_runtime_errors: bool,
         reload_settings_view: bool,
+        rebuild_managed_gemma: bool = True,
     ) -> None: ...
 
 

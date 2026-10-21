@@ -2,21 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections import deque
-from collections.abc import AsyncIterator
+from collections import OrderedDict, deque
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field, replace
 from typing import Protocol, cast
 from uuid import UUID
 
 from puripuly_heart.core.clock import Clock
-from puripuly_heart.core.orchestrator.configuration import TranslationRuntimeConfig
+from puripuly_heart.core.orchestrator.configuration import (
+    TranslationRuntimeConfig,
+    TranslationRuntimeConfigSnapshot,
+    translation_configs_match,
+)
 from puripuly_heart.core.orchestrator.context import ContextMode
 from puripuly_heart.core.orchestrator.translation_diagnostics import (
     LatencyStageDiagnostic,
     OverlayEmitDiagnostic,
     RuntimeDiagnostic,
-    SelfOverlayDecisionDiagnostic,
     TranslationLatencyDiagnosticsOwner,
     TranslationReadyDiagnostic,
 )
@@ -38,10 +41,32 @@ from puripuly_heart.core.overlay.sink import (
 )
 from puripuly_heart.core.overlay.state import ActiveSelfOverlayMetadata
 from puripuly_heart.core.runtime.output import OutputPublicationResult, OutputRuntime
-from puripuly_heart.domain.events import UIEvent, UIEventType
+from puripuly_heart.domain.events import SelfTurnPresentation, UIEvent, UIEventType
 from puripuly_heart.domain.models import ChannelId, SpeakerAssignment, Transcript, Translation
 
 _SOFT_REUSE_PUNCT = {".", ",", "…", "。", "，", "、"}
+_SELF_CAPTION_LIMIT = 64
+_SELF_CAPTION_BYTE_LIMIT = 1024 * 1024
+
+
+def _self_sentence_complete(text: str) -> bool:
+    text = text.rstrip().rstrip("\"'”’」』】)")
+    if not text:
+        return False
+    if text[-1] in "!?。！？":
+        return True
+    if text[-1] != "." or text.endswith("..."):
+        return False
+    word = text.rsplit(maxsplit=1)[-1].lower()
+    if word in {"mr.", "mrs.", "ms.", "dr.", "prof.", "sr.", "jr.", "vs.", "etc.", "e.g.", "i.e."}:
+        return False
+    stem = word[:-1]
+    return (
+        bool(stem)
+        and not stem[-1].isdigit()
+        and not (len(stem) == 1 and stem.isascii() and stem.isalpha())
+        and "." not in stem
+    )
 
 
 class TranslationUiMessagePort(Protocol):
@@ -52,6 +77,7 @@ class TranslationUiMessagePort(Protocol):
         parent_utterance_id: UUID | None = None,
         publication_generation: int | None = None,
         source_order: int | None = None,
+        presentation_is_current: Callable[[], bool] | None = None,
     ) -> OutputPublicationResult | None: ...
 
 
@@ -66,6 +92,11 @@ class TranslationUiMessage:
     publication_generation: int | None = None
     source_order: int | None = None
     parent_utterance_id: UUID | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
+    presentation_is_current: Callable[[], bool] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self) -> None:
         if (
@@ -116,27 +147,8 @@ class ChatboxProjection:
     turn_order: int | None = None
     target_indexes: tuple[int, ...] = ()
     target_languages: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class ActiveSelfProjection:
-    merge_id: UUID
-    active_text: str
-    spec_text: str | None
-    spec_translation: Translation | None
-    source_language: str
-    target_language: str
-    resume_pending: bool
-    resume_confirmed: bool
-    created_at: float | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ActiveSelfProjectionReceipt:
-    secondary_text: str
-    source: str
-    reuse_mode: str | None
-    emitted: bool
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +172,8 @@ class SelfTranslationTurnSnapshot:
     admitted_at: float = 0.0
     first_success_at: float | None = None
     all_targets_terminal_at: float | None = None
+    operation_id: str | None = None
+    request_id: str | None = None
 
     @property
     def text(self) -> str:
@@ -184,6 +198,8 @@ class _SelfTranslationTurnAggregate:
     revision: int = 0
     visible_signature: tuple[tuple[str, str], ...] = ()
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    operation_id: str | None = None
+    request_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -210,6 +226,7 @@ class _UiDeliveryAuthority:
     speech_generation: int | None
     peer_generation: int | None
     peer_source_order: int | None
+    presentation_is_current: Callable[[], bool] | None = None
     claimed: bool = False
 
     def is_current(self) -> bool:
@@ -240,7 +257,11 @@ class _UiDeliveryAuthority:
         return True
 
     def claim_presentation(self) -> bool:
-        if not self.is_current() or self.sequence < self.owner._presented_sequence:
+        if (
+            not self.is_current()
+            or (self.presentation_is_current is not None and not self.presentation_is_current())
+            or self.sequence < self.owner._presented_sequence
+        ):
             return False
         self.owner._presented_sequence = self.sequence
         return True
@@ -304,6 +325,7 @@ class TranslationUiMessageQueue:
         parent_utterance_id: UUID | None = None,
         publication_generation: int | None = None,
         source_order: int | None = None,
+        presentation_is_current: Callable[[], bool] | None = None,
     ) -> OutputPublicationResult | None:
         self._sequence += 1
         event = replace(
@@ -320,6 +342,7 @@ class TranslationUiMessageQueue:
                 ),
                 publication_generation if event.channel == "peer" else None,
                 source_order,
+                presentation_is_current,
             ),
         )
         if self._replacing:
@@ -547,6 +570,14 @@ class TranslationUiMessageQueue:
     def _submit_self_event(self, event: UIEvent) -> OutputPublicationResult:
         if self._closed or self.output_runtime.state != "open":
             return self._record_self(event, "output_runtime_closing")
+        if event.type is UIEventType.SELF_TURN_UPDATED:
+            retained = deque()
+            for pending in self._self_events:
+                if pending.type is event.type and pending.utterance_id == event.utterance_id:
+                    self._record_self(pending, "output_superseded")
+                else:
+                    retained.append(pending)
+            self._self_events = retained
         if not self._self_events and self._self_worker is None:
             try:
                 self.queue.put_nowait(event)
@@ -625,6 +656,8 @@ class TranslationUiMessageQueue:
             event_type=event.type.value,
             accepted_handoff=accepted,
             ui_queue_submitted=reason == "ui_queue_submitted",
+            operation_id=event.operation_id,
+            request_id=event.request_id,
         )
 
     def _ensure_peer_writer(self) -> None:
@@ -859,6 +892,8 @@ class TranslationUiMessageQueue:
             event_type=event.type.value,
             accepted_handoff=accepted_handoff,
             ui_queue_submitted=ui_queue_submitted,
+            operation_id=event.operation_id,
+            request_id=event.request_id,
         )
 
     @staticmethod
@@ -868,6 +903,23 @@ class TranslationUiMessageQueue:
     ) -> str:
         identity = event.utterance_id or parent_utterance_id or "control"
         return f"{event.type.value}:{identity}"
+
+
+@dataclass(frozen=True, slots=True)
+class _SelfPresentationAuthority:
+    order_watermark: tuple[int, int] | None
+    parent_utterance_id: UUID
+    source_pending: bool = False
+
+
+@dataclass(slots=True)
+class _SelfCaptionAssembly:
+    source_revision: int
+    source_text: str
+    source_closed: bool
+    translation: Translation | None
+    configuration: TranslationRuntimeConfigSnapshot
+    presentation_revision: int
 
 
 @dataclass(slots=True)
@@ -890,17 +942,22 @@ class TranslationOutputProjectionOwner:
     _latest_visible_self_parent_utterance_id: UUID | None = None
     _self_publish_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
     _self_surface_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
+    _self_presentation_authority: _SelfPresentationAuthority | None = None
+    _self_captions: OrderedDict[tuple[int, UUID], _SelfCaptionAssembly] = field(
+        default_factory=OrderedDict
+    )
+    _self_caption_order: tuple[int, int] | None = None
+    _self_caption_retired: OrderedDict[tuple[int, UUID], None] = field(default_factory=OrderedDict)
 
     def __post_init__(self) -> None:
         if self.self_turn_tombstone_capacity < 1:
             raise ValueError("self_turn_tombstone_capacity must be positive")
         self.output_runtime.bind_peer_overlay_delivery_observer(self._observe_peer_overlay_delivery)
+        self.output_runtime.bind_self_stream_delivery_observer(self._observe_self_stream_delivery)
 
     def _observe_peer_overlay_delivery(self, decision: OutputRoutingDecision) -> None:
         if decision.reason == "destination_publish_failed":
-            self.diagnostics.record_overlay_sink_failure(
-                decision.metadata.get("error_type", "Exception")
-            )
+            self.diagnostics.record_overlay_sink_failure()
         if decision.metadata.get("event_type") not in {
             "peer_transcript_final",
             "translation_final",
@@ -943,6 +1000,9 @@ class TranslationOutputProjectionOwner:
         if channel != "self" or turn_generation <= self._active_self_turn_generation:
             return
         self._active_self_turn_generation = turn_generation
+        self._self_captions.clear()
+        self._self_caption_order = None
+        self._self_caption_retired.clear()
         for parent_utterance_id, aggregate in tuple(self._self_turns.items()):
             key = (aggregate.turn_generation, parent_utterance_id)
             self._retired_self_turns[key] = aggregate
@@ -962,12 +1022,42 @@ class TranslationOutputProjectionOwner:
             return 0
         return aggregate.revision
 
+    def _self_presentation_is_current(
+        self,
+        key: tuple[int | None, int | None],
+        parent_utterance_id: UUID,
+    ) -> bool:
+        current = self._self_presentation_authority
+        return (
+            current is not None
+            and not current.source_pending
+            and current.order_watermark == key
+            and current.parent_utterance_id == parent_utterance_id
+        )
+
     def admit_self_turn(self, children: tuple[TranslationTurnChild, ...]) -> bool:
         if not children:
             return False
         first = children[0]
         if first.channel != "self" or any(child.channel != "self" for child in children):
             raise ValueError("self projection admission requires Self children")
+        key = (first.turn_generation, first.turn_order)
+        current = self._self_presentation_authority
+        if current is None or current.order_watermark is None or key > current.order_watermark:
+            self._self_presentation_authority = (
+                replace(current, order_watermark=key)
+                if current is not None
+                and current.source_pending
+                and current.parent_utterance_id != first.parent_utterance_id
+                else _SelfPresentationAuthority(key, first.parent_utterance_id)
+            )
+        elif (
+            key == current.order_watermark
+            and current.parent_utterance_id == first.parent_utterance_id
+        ):
+            self._self_presentation_authority = _SelfPresentationAuthority(
+                key, first.parent_utterance_id
+            )
         if any(
             (child.parent_utterance_id, child.turn_generation, child.turn_order)
             != (first.parent_utterance_id, first.turn_generation, first.turn_order)
@@ -1017,6 +1107,8 @@ class TranslationOutputProjectionOwner:
             child_target_indexes={child.utterance_id: child.target_index for child in children},
             child_sequences={child.utterance_id: child.sequence for child in children},
             admitted_at=self.clock.now(),
+            operation_id=first.operation_id,
+            request_id=first.request_id,
         )
         self._self_turns[first.parent_utterance_id] = aggregate
         self.diagnostics.emit(
@@ -1246,6 +1338,191 @@ class TranslationOutputProjectionOwner:
     def chatbox_is_denied(channel: ChannelId) -> bool:
         return OutputRuntime.chatbox_is_denied(channel)
 
+    def _observe_self_stream_delivery(self, decision: OutputRoutingDecision) -> None:
+        self.diagnostics.emit(
+            RuntimeDiagnostic(
+                message=(
+                    "[Diagnostic][Translation] self_stream_delivery parent_utterance_id=%s "
+                    "stage=%s disposition=%s presentation_revision=%s preview_revision=%s "
+                    "source_revision=%s reused_preview_send=%s queued_payload=%s"
+                ),
+                args=(
+                    decision.publication_id,
+                    decision.metadata.get("stage"),
+                    decision.reason,
+                    decision.metadata.get("presentation_revision"),
+                    decision.metadata.get("preview_revision"),
+                    decision.metadata.get("source_revision"),
+                    decision.metadata.get("reused_preview_send"),
+                    decision.metadata.get("queued_payload"),
+                ),
+                diagnostic_only=True,
+            )
+        )
+        if decision.reason == "status_promoted":
+            retire = decision.metadata.get("reused_preview_send") is True
+        else:
+            retire = decision.reason not in {"first_page_sent", "output_send_failed"}
+        if retire:
+            self.diagnostics.abandon_pending_latency_output("self", UUID(decision.publication_id))
+
+    async def project_self_turn(
+        self,
+        snapshot: SelfTurnPresentation,
+        config_snapshot: TranslationRuntimeConfigSnapshot,
+        *,
+        source: str,
+    ) -> None:
+        key = (snapshot.turn_generation, snapshot.turn_order)
+        parent_utterance_id = snapshot.utterance_id
+        await self._project_self_caption(snapshot, config_snapshot)
+        current = self._self_presentation_authority
+        if current is None or current.order_watermark is None or key > current.order_watermark:
+            self._self_presentation_authority = _SelfPresentationAuthority(key, parent_utterance_id)
+        await self.publish_ui(
+            TranslationUiMessage(
+                event_type=UIEventType.SELF_TURN_UPDATED,
+                utterance_id=snapshot.utterance_id,
+                payload=snapshot,
+                source=source,
+                channel="self",
+                runtime_log_handled=True,
+                presentation_is_current=lambda: self._self_presentation_is_current(
+                    key, parent_utterance_id
+                ),
+            )
+        )
+        self.diagnostics.retain_latency_until_output("self", snapshot.utterance_id)
+        await self.output_runtime.publish_self_turn(snapshot, config_snapshot.value)
+
+    async def _project_self_caption(
+        self,
+        snapshot: SelfTurnPresentation,
+        configuration: TranslationRuntimeConfigSnapshot,
+    ) -> None:
+        if (
+            not self.has_overlay_destination
+            or snapshot.turn_generation < self._active_self_turn_generation
+        ):
+            return
+        identity = (snapshot.turn_generation, snapshot.utterance_id)
+        if identity in self._self_caption_retired:
+            return
+        caption = self._self_captions.get(identity)
+        if caption is not None and (
+            snapshot.revision <= caption.presentation_revision
+            or configuration.revision < caption.configuration.revision
+        ):
+            return
+        target_language = configuration.value.target_language
+        ready = next(
+            (
+                target.translation
+                for target in snapshot.targets
+                if target.target_language == target_language
+                and target.status == "ready"
+                and target.source_revision == snapshot.source_revision
+                and target.translation is not None
+                and target.translation.text.strip()
+            ),
+            None,
+        )
+        cancelled = snapshot.status in {"cancelled", "expired"}
+        eligible = not cancelled and (
+            snapshot.source_closed
+            or (ready is not None and _self_sentence_complete(snapshot.source_text))
+        )
+        if (
+            len(snapshot.source_text.encode("utf-8"))
+            + (len(ready.text.encode("utf-8")) if ready is not None else 0)
+            > _SELF_CAPTION_BYTE_LIMIT
+        ):
+            return
+        if caption is None:
+            if not eligible:
+                if cancelled:
+                    self._retire_self_caption(identity)
+                return
+            caption = _SelfCaptionAssembly(
+                snapshot.source_revision,
+                snapshot.source_text,
+                snapshot.source_closed,
+                None,
+                configuration,
+                snapshot.revision,
+            )
+            self._self_captions[identity] = caption
+            while len(self._self_captions) > _SELF_CAPTION_LIMIT:
+                self._retire_self_caption(next(iter(self._self_captions)))
+        compatible = translation_configs_match(caption.configuration.value, configuration.value)
+        if not compatible:
+            caption.translation = None
+        caption.configuration = configuration
+        caption.presentation_revision = snapshot.revision
+        terminal = snapshot.status != "active"
+        if eligible and (ready is not None or caption.translation is None or terminal):
+            caption.source_revision = snapshot.source_revision
+            caption.source_text = snapshot.source_text
+            caption.source_closed = snapshot.source_closed
+            caption.translation = ready
+        elif snapshot.source_revision == caption.source_revision:
+            caption.source_closed = snapshot.source_closed
+        if cancelled:
+            caption.translation = None
+        order = (snapshot.turn_generation, snapshot.turn_order)
+        retained_only = self._self_caption_order is not None and order < self._self_caption_order
+        if not retained_only and not cancelled and eligible:
+            self._self_caption_order = order
+        translation = caption.translation
+        await self.publish_overlay_event(
+            self.overlay_event_adapter.self_active_update(
+                text=caption.source_text,
+                utterance_id=snapshot.utterance_id,
+                occupant_key=f"self:{snapshot.utterance_id}",
+                secondary_text=translation.text if translation is not None else "",
+                source_language=(
+                    translation.source_language
+                    if translation is not None
+                    else next(
+                        (
+                            target.translation.source_language
+                            for target in snapshot.targets
+                            if target.target_language == target_language
+                            and target.status == "ready"
+                            and target.source_revision == snapshot.source_revision
+                            and target.translation is not None
+                        ),
+                        snapshot.source_language,
+                    )
+                ),
+                target_language=(
+                    translation.target_language if translation is not None else target_language
+                ),
+                created_at=snapshot.created_at,
+                caption_source_closed=caption.source_closed,
+                caption_complete=terminal
+                and (cancelled or caption.source_revision == snapshot.source_revision),
+                caption_cancelled=cancelled,
+                caption_revision=snapshot.revision,
+                retained_only=retained_only,
+                turn_generation=snapshot.turn_generation,
+                turn_order=snapshot.turn_order,
+                **(self._translation_metadata(translation) if translation is not None else {}),
+            ),
+            handoff=True,
+        )
+        if cancelled:
+            self._retire_self_caption(identity)
+
+    def _retire_self_caption(self, identity: tuple[int, UUID]) -> None:
+        self._self_captions.pop(identity, None)
+        self._self_caption_retired[identity] = None
+        while len(self._self_caption_retired) > self.self_turn_tombstone_capacity:
+            self._self_caption_retired.popitem(last=False)
+
+    def record_final_self_submission(self, submission: TranslationOutputSubmission) -> None:
+        self._record_conversation_submission(submission)
+
     async def publish_ui(
         self,
         message: TranslationUiMessage,
@@ -1270,6 +1547,30 @@ class TranslationOutputProjectionOwner:
             if source_order is None:
                 source_order = getattr(message.payload, "source_order", None)
         parent_utterance_id = message.parent_utterance_id or message.utterance_id
+        presentation_is_current = message.presentation_is_current
+        if (
+            presentation_is_current is None
+            and channel == "self"
+            and parent_utterance_id is not None
+            and message.event_type in {UIEventType.TRANSCRIPT_PARTIAL, UIEventType.TRANSCRIPT_FINAL}
+        ):
+            current = self._self_presentation_authority
+            if message.parent_utterance_id is None and (
+                current is None or current.parent_utterance_id != parent_utterance_id
+            ):
+                self._self_presentation_authority = _SelfPresentationAuthority(
+                    current.order_watermark if current is not None else None,
+                    parent_utterance_id,
+                    source_pending=True,
+                )
+
+            def source_presentation_is_current() -> bool:
+                authority = self._self_presentation_authority
+                return (
+                    authority is not None and authority.parent_utterance_id == parent_utterance_id
+                )
+
+            presentation_is_current = source_presentation_is_current
         event = UIEvent(
             type=message.event_type,
             utterance_id=message.utterance_id,
@@ -1277,6 +1578,8 @@ class TranslationOutputProjectionOwner:
             source=message.source,
             channel=message.channel,
             runtime_log_handled=message.runtime_log_handled,
+            operation_id=message.operation_id,
+            request_id=message.request_id,
         )
         if (
             scoped_peer_event
@@ -1299,12 +1602,15 @@ class TranslationOutputProjectionOwner:
                 event_type=message.event_type.value,
                 accepted_handoff=False,
                 ui_queue_submitted=False,
+                operation_id=message.operation_id,
+                request_id=message.request_id,
             )
         return await self.ui_messages.publish(
             event,
             parent_utterance_id=parent_utterance_id,
             publication_generation=publication_generation,
             source_order=source_order,
+            presentation_is_current=presentation_is_current,
         )
 
     def retire_self_ui_speech(self) -> None:
@@ -1329,11 +1635,11 @@ class TranslationOutputProjectionOwner:
         self,
         reason: str,
         active: bool,
-    ) -> OutputPublicationResult:
-        return self.output_runtime.set_self_chatbox_typing_reason(reason, active)
+    ) -> None:
+        self.output_runtime.set_self_chatbox_typing_reason(reason, active)
 
-    def clear_self_chatbox_typing_reasons(self) -> OutputPublicationResult:
-        return self.output_runtime.clear_self_chatbox_typing_reasons()
+    def clear_self_chatbox_typing_reasons(self) -> None:
+        self.output_runtime.clear_self_chatbox_typing_reasons()
 
     async def replace_overlay_sink(
         self,
@@ -1357,6 +1663,8 @@ class TranslationOutputProjectionOwner:
     async def emit_final_transcript(
         self,
         projection: TranscriptOverlayProjection,
+        *,
+        handoff: bool = False,
     ) -> None:
         if not self.has_overlay_destination:
             return
@@ -1377,6 +1685,7 @@ class TranslationOutputProjectionOwner:
             ),
             publication_generation=projection.transcript.publication_generation,
             source_order=projection.transcript.source_order,
+            handoff=handoff,
         )
 
     async def project_self_final_transcript(
@@ -1496,6 +1805,7 @@ class TranslationOutputProjectionOwner:
         source_order: int | None = None,
         finalize_latency: bool | None = None,
         output_scope: OverlayPublicationScope | None = None,
+        handoff: bool = False,
     ) -> bool:
         should_finalize = finalize_latency is True or (
             finalize_latency is None and channel == "peer"
@@ -1510,6 +1820,7 @@ class TranslationOutputProjectionOwner:
                 ),
                 publication_generation=publication_generation,
                 source_order=source_order,
+                handoff=handoff,
             )
         if should_finalize:
             self.diagnostics.clear_latency_timeline(channel, utterance_id)
@@ -1521,8 +1832,14 @@ class TranslationOutputProjectionOwner:
         *,
         publication_generation: int | None = None,
         source_order: int | None = None,
+        handoff: bool = False,
     ) -> None:
         if not self.has_overlay_destination:
+            return
+        if handoff:
+            await self.output_runtime.submit_self_overlay_event(
+                event, on_failure=self.diagnostics.record_overlay_sink_failure
+            )
             return
         result = await self.output_runtime.publish_overlay_event(
             event,
@@ -1537,103 +1854,8 @@ class TranslationOutputProjectionOwner:
         ):
             self.diagnostics.abandon_pending_latency_output("peer", event.utterance_id)
         if result.decision.reason == "destination_publish_failed":
-            self.diagnostics.record_overlay_sink_failure(
-                result.decision.metadata.get("error_type", "Exception")
-            )
+            self.diagnostics.record_overlay_sink_failure()
             return
-
-    async def sync_active_self(
-        self,
-        projection: ActiveSelfProjection,
-    ) -> ActiveSelfProjectionReceipt:
-        if not self.has_overlay_destination or not projection.active_text:
-            return ActiveSelfProjectionReceipt("", "blank", None, False)
-        metadata = self.active_self_overlay_metadata()
-        reuse_mode = (
-            self.soft_reuse_mode(projection.spec_text, projection.active_text)
-            if projection.spec_translation is not None
-            else None
-        )
-        secondary_text, source = self._active_secondary_decision(
-            projection,
-            metadata,
-            reuse_mode=reuse_mode,
-        )
-        self.diagnostics.record_self_overlay_decision(
-            SelfOverlayDecisionDiagnostic.create(
-                merge_id=projection.merge_id,
-                source=source,
-                active_text=projection.active_text,
-                secondary_text=secondary_text,
-                spec_text_len=len((projection.spec_text or "").strip()),
-                spec_translation_len=(
-                    len(projection.spec_translation.text.strip())
-                    if projection.spec_translation is not None
-                    else 0
-                ),
-                cached_secondary_len=(
-                    len(metadata.secondary_text.strip()) if metadata is not None else 0
-                ),
-                reuse_mode=reuse_mode,
-                resume_pending=projection.resume_pending,
-                resume_confirmed=projection.resume_confirmed,
-            )
-        )
-        occupant_key = f"self:{projection.merge_id}"
-        translation_metadata = self._secondary_translation_metadata(
-            projection,
-            source=source,
-            secondary_text=secondary_text,
-            metadata=metadata,
-        )
-        source_language, target_language = self._active_languages(
-            projection,
-            source=source,
-            secondary_text=secondary_text,
-            metadata=metadata,
-        )
-        primary_language = source_language.strip() or None
-        secondary_language = (target_language.strip() or None) if secondary_text.strip() else None
-        if (
-            metadata is not None
-            and projection.merge_id == metadata.utterance_id
-            and occupant_key == metadata.occupant_key
-            and projection.active_text == metadata.text
-            and secondary_text == metadata.secondary_text
-            and primary_language == metadata.primary_language
-            and secondary_language == metadata.secondary_language
-            and translation_metadata == self._active_translation_metadata(metadata)
-        ):
-            return ActiveSelfProjectionReceipt(
-                secondary_text,
-                source,
-                reuse_mode,
-                False,
-            )
-        self._record_overlay_emit(
-            event_kind="active_self",
-            utterance_id=projection.merge_id,
-            channel="self",
-            secondary_len=len(secondary_text),
-        )
-        await self.publish_overlay_event(
-            self.overlay_event_adapter.self_active_update(
-                text=projection.active_text,
-                utterance_id=projection.merge_id,
-                secondary_text=secondary_text,
-                occupant_key=occupant_key,
-                source_language=source_language,
-                target_language=target_language,
-                created_at=projection.created_at,
-                **translation_metadata,
-            )
-        )
-        return ActiveSelfProjectionReceipt(
-            secondary_text,
-            source,
-            reuse_mode,
-            True,
-        )
 
     def soft_reuse_mode(self, spec_text: str | None, final_text: str) -> str | None:
         if spec_text is None:
@@ -1652,48 +1874,6 @@ class TranslationOutputProjectionOwner:
         if self.active_self_overlay_metadata() is None or not self.has_overlay_destination:
             return
         await self.publish_overlay_event(self.overlay_event_adapter.self_active_clear())
-
-    async def blank_active_self(
-        self,
-        *,
-        utterance_id: UUID,
-        text: str,
-        source_language: str,
-        target_language: str,
-        created_at: float,
-    ) -> None:
-        self._record_overlay_emit(
-            event_kind="active_self",
-            utterance_id=utterance_id,
-            channel="self",
-            secondary_len=0,
-        )
-        await self.publish_overlay_event(
-            self.overlay_event_adapter.self_active_update(
-                text=text,
-                utterance_id=utterance_id,
-                secondary_text="",
-                occupant_key=f"self:{utterance_id}",
-                source_language=source_language,
-                target_language=target_language,
-                created_at=created_at,
-            )
-        )
-
-    def should_blank_stale_active_secondary(
-        self,
-        *,
-        final_text: str,
-        reuse_mode: str | None,
-    ) -> bool:
-        metadata = self.active_self_overlay_metadata()
-        return (
-            reuse_mode is None
-            and self.has_overlay_destination
-            and metadata is not None
-            and metadata.text == final_text
-            and bool(metadata.secondary_text.strip())
-        )
 
     def self_overlay_languages_for_utterance(
         self,
@@ -1863,6 +2043,8 @@ class TranslationOutputProjectionOwner:
             admitted_at=aggregate.admitted_at,
             first_success_at=aggregate.first_success_at,
             all_targets_terminal_at=aggregate.all_targets_terminal_at,
+            operation_id=aggregate.operation_id,
+            request_id=aggregate.request_id,
         )
 
     async def _publish_self_snapshot(
@@ -1920,6 +2102,8 @@ class TranslationOutputProjectionOwner:
                     turn_order=snapshot.turn_order,
                     target_indexes=target_indexes,
                     target_languages=target_languages,
+                    operation_id=snapshot.operation_id,
+                    request_id=snapshot.request_id,
                 )
             )
             if result.decision.decision != "published":
@@ -2219,6 +2403,8 @@ class TranslationOutputProjectionOwner:
             target_index=eligible_target_index,
             target_count=eligible_target_count,
             retained_payload_bytes=retained_payload_bytes,
+            operation_id=submission.operation_id,
+            request_id=submission.request_id,
         )
 
     async def project_translation_result(
@@ -2265,6 +2451,7 @@ class TranslationOutputProjectionOwner:
                     close_is_final=True,
                     finalize_latency=True,
                     speaker_assignment=submission.speaker_assignment,
+                    output_scope=output_scope,
                 )
                 await self.publish_peer_chatbox_denial(utterance_id)
             elif dual_target_self:
@@ -2287,6 +2474,8 @@ class TranslationOutputProjectionOwner:
                             source=submission.source,
                             turn_generation=submission.turn_generation,
                             turn_order=submission.turn_order,
+                            operation_id=submission.operation_id,
+                            request_id=submission.request_id,
                         )
                     )
                 else:
@@ -2304,6 +2493,8 @@ class TranslationOutputProjectionOwner:
                         translation_text=None,
                         include_source=configuration.chatbox_include_source,
                         source=submission.source,
+                        operation_id=submission.operation_id,
+                        request_id=submission.request_id,
                     )
                 )
             else:
@@ -2384,6 +2575,7 @@ class TranslationOutputProjectionOwner:
                     close_is_final=False,
                     finalize_latency=not denied_fallback_to_chatbox,
                     speaker_assignment=submission.speaker_assignment,
+                    output_scope=output_scope,
                 )
             if fallback_to_chatbox and await self._await_translation_destination(
                 submission,
@@ -2398,6 +2590,8 @@ class TranslationOutputProjectionOwner:
                         translation_text=None,
                         include_source=configuration.chatbox_include_source,
                         source=submission.source,
+                        operation_id=submission.operation_id,
+                        request_id=submission.request_id,
                     )
                 )
             elif deny_peer_chatbox_attempt:
@@ -2445,6 +2639,8 @@ class TranslationOutputProjectionOwner:
                 finalize_latency=not (publish_to_chatbox or deny_peer_chatbox_attempt),
                 output_scope=output_scope,
             )
+        self_turn_key = (submission.turn_generation, submission.turn_order)
+        parent_utterance_id = submission.parent_utterance_id
         if channel != "self":
             ui_publication_result = await self.publish_ui(
                 TranslationUiMessage(
@@ -2456,6 +2652,8 @@ class TranslationOutputProjectionOwner:
                     publication_generation=submission.publication_generation,
                     source_order=submission.source_order,
                     parent_utterance_id=submission.parent_utterance_id,
+                    operation_id=submission.operation_id,
+                    request_id=submission.request_id,
                 )
             )
         elif dual_target_self:
@@ -2473,6 +2671,11 @@ class TranslationOutputProjectionOwner:
                             utterance_id=utterance_id,
                             payload=translation,
                             source=submission.source,
+                            operation_id=submission.operation_id,
+                            request_id=submission.request_id,
+                            presentation_is_current=lambda: self._self_presentation_is_current(
+                                self_turn_key, parent_utterance_id
+                            ),
                         )
                     )
                     await self.emit_translation(
@@ -2505,6 +2708,11 @@ class TranslationOutputProjectionOwner:
                     utterance_id=utterance_id,
                     payload=translation,
                     source=submission.source,
+                    operation_id=submission.operation_id,
+                    request_id=submission.request_id,
+                    presentation_is_current=lambda: self._self_presentation_is_current(
+                        self_turn_key, parent_utterance_id
+                    ),
                 )
             )
             await self.emit_translation(
@@ -2575,6 +2783,8 @@ class TranslationOutputProjectionOwner:
                         if submission.turn_generation is not None
                         else ()
                     ),
+                    operation_id=submission.operation_id,
+                    request_id=submission.request_id,
                 )
             )
         elif deny_peer_chatbox_attempt:
@@ -2806,6 +3016,8 @@ class TranslationOutputProjectionOwner:
             target_indexes=projection.target_indexes,
             target_languages=projection.target_languages,
             self_speech=projection.channel == "self" and projection.source == "Mic",
+            operation_id=projection.operation_id,
+            request_id=projection.request_id,
         )
         if result.decision.decision != "published":
             self.diagnostics.emit(
@@ -2854,6 +3066,8 @@ class TranslationOutputProjectionOwner:
                 payload=message,
                 source=projection.source,
                 channel=projection.channel,
+                operation_id=projection.operation_id,
+                request_id=projection.request_id,
             )
         )
         self.diagnostics.clear_latency_timeline(
@@ -2897,107 +3111,6 @@ class TranslationOutputProjectionOwner:
         if translation.channel == "peer":
             metadata["speaker_assignment"] = translation.speaker_assignment
         return metadata
-
-    @staticmethod
-    def _active_translation_metadata(
-        metadata: ActiveSelfOverlayMetadata | None,
-    ) -> dict[str, object]:
-        if metadata is None:
-            return {
-                "update_id": None,
-                "origin_wall_clock_ms": None,
-                "session_scope": None,
-                "source_text_hash": None,
-                "source_text_len": None,
-                "logical_turn_key": None,
-            }
-        return {
-            "update_id": metadata.update_id,
-            "origin_wall_clock_ms": metadata.origin_wall_clock_ms,
-            "session_scope": metadata.session_scope,
-            "source_text_hash": metadata.source_text_hash,
-            "source_text_len": metadata.source_text_len,
-            "logical_turn_key": metadata.logical_turn_key,
-        }
-
-    def _active_secondary_decision(
-        self,
-        projection: ActiveSelfProjection,
-        metadata: ActiveSelfOverlayMetadata | None,
-        *,
-        reuse_mode: str | None,
-    ) -> tuple[str, str]:
-        translation = projection.spec_translation
-        if translation is not None and reuse_mode is not None:
-            return translation.text.strip(), "spec"
-        if metadata is not None and metadata.secondary_text.strip():
-            return metadata.secondary_text.strip(), "sticky_cache"
-        return "", "blank"
-
-    def _secondary_translation_metadata(
-        self,
-        projection: ActiveSelfProjection,
-        *,
-        source: str,
-        secondary_text: str,
-        metadata: ActiveSelfOverlayMetadata | None,
-    ) -> dict[str, object]:
-        if not secondary_text:
-            return self._active_translation_metadata(None)
-        if source == "spec" and projection.spec_translation is not None:
-            return self._translation_metadata(projection.spec_translation)
-        if (
-            source == "sticky_cache"
-            and metadata is not None
-            and metadata.utterance_id == projection.merge_id
-        ):
-            return self._active_translation_metadata(metadata)
-        return self._active_translation_metadata(None)
-
-    def _active_languages(
-        self,
-        projection: ActiveSelfProjection,
-        *,
-        source: str,
-        secondary_text: str,
-        metadata: ActiveSelfOverlayMetadata | None,
-    ) -> tuple[str, str]:
-        if source == "spec" and projection.spec_translation is not None:
-            return (
-                self._language_or_fallback(
-                    projection.spec_translation.source_language,
-                    projection.source_language,
-                ),
-                self._language_or_fallback(
-                    projection.spec_translation.target_language,
-                    projection.target_language,
-                ),
-            )
-        metadata_matches = (
-            metadata is not None
-            and metadata.utterance_id == projection.merge_id
-            and metadata.occupant_key == f"self:{projection.merge_id}"
-        )
-        if secondary_text and source == "sticky_cache" and metadata_matches:
-            return (
-                self._language_or_fallback(
-                    metadata.primary_language,
-                    projection.source_language,
-                ),
-                self._language_or_fallback(
-                    metadata.secondary_language,
-                    projection.target_language,
-                ),
-            )
-        if not secondary_text and metadata_matches:
-            return (
-                self._language_or_fallback(
-                    metadata.primary_language,
-                    projection.source_language,
-                ),
-                projection.target_language,
-            )
-        return projection.source_language, projection.target_language
 
     @staticmethod
     def _language_or_fallback(language: str | None, fallback: str) -> str:
@@ -3078,8 +3191,6 @@ class TranslationOutputProjectionOwner:
 
 
 __all__ = [
-    "ActiveSelfProjection",
-    "ActiveSelfProjectionReceipt",
     "ChatboxProjection",
     "SelfTranslationTurnSnapshot",
     "TranscriptOverlayProjection",

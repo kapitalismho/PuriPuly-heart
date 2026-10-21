@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import hashlib
 import json
@@ -12,10 +13,12 @@ from collections.abc import Awaitable, Mapping, Sequence
 from dataclasses import dataclass
 from logging.handlers import QueueHandler, QueueListener, RotatingFileHandler
 from pathlib import Path
+from threading import RLock
 from typing import Callable
 from uuid import uuid4
 
 from puripuly_heart.config.paths import user_config_dir
+from puripuly_heart.core.diagnostic_codes import is_supported_diagnostic_code
 from puripuly_heart.core.diagnostic_validation import (
     DIAGNOSTIC_REDACTION_MARKER,
     DIAGNOSTIC_SINK_BASIC_LOGS,
@@ -25,7 +28,17 @@ from puripuly_heart.core.diagnostic_validation import (
     redact_conversation_text_for_sink,
     redact_diagnostics_for_sink,
     redact_text_for_sink,
+    stt_startup_failure_code,
+    stt_startup_failure_stage,
+    stt_startup_failure_type,
     validate_diagnostics_for_sink,
+)
+from puripuly_heart.core.diagnostics import (
+    DIAGNOSTIC_PROJECTION_ATTRIBUTE,
+    DIAGNOSTIC_RECORD_ATTRIBUTE,
+    DiagnosticHistory,
+    safe_exception_fields,
+    sanitize_diagnostic_fields,
 )
 from puripuly_heart.core.language import get_language_info
 from puripuly_heart.core.llm.latency import is_translation_latency_summary
@@ -49,16 +62,10 @@ from puripuly_heart.core.observability import (
     ConversationRecord,
     ConversationRecordChannel,
     ConversationRecordSink,
-    DiagnosticEvent,
-    DiagnosticsSink,
-    PersistedDiagnosticRecord,
-    PersistedDiagnosticStore,
     ProviderObservationEvent,
     ProviderObservationOutcome,
     ProviderObservationSink,
     RealtimeLogSink,
-    RuntimeLogEvent,
-    RuntimeLogSink,
 )
 from puripuly_heart.core.output.models import OutputRoutingDecision
 from puripuly_heart.core.runtime.logging import (
@@ -191,6 +198,7 @@ class RealtimeLogHandler(logging.Handler):
     def __init__(self, sink: RealtimeLogSink):
         super().__init__()
         self._sink = sink
+        self.delivery_failures = 0
         self.setFormatter(
             logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
         )
@@ -204,24 +212,225 @@ class RealtimeLogHandler(logging.Handler):
             else:
                 self._sink.append_log(message)
         except Exception:
+            self.delivery_failures += 1
             return
 
 
 ObservabilityRunner = Callable[[Awaitable[None]], None]
+_OUTPUT_STAGE_TOKENS = {
+    "decision": frozenset({"accepted", "waiting"}),
+    "route": frozenset({"subtitle_overlay"}),
+    "reason": frozenset({"accepted_handoff", "logical_pacing_wait"}),
+    "stage": frozenset({"admission_accepted", "logical_pacing"}),
+    "outcome": frozenset({"pending", "waiting"}),
+    "physical_ack": frozenset({"false"}),
+    "wait_reason": frozenset({"replacement_gate", "protected_rows"}),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _ValidatedDiagnosticProjection:
+    text: str
+
+
+class _DiagnosticIngressHandler(logging.Handler):
+    def __init__(self, owner: SessionRuntimeLoggingService) -> None:
+        super().__init__(logging.NOTSET)
+        self.owner = owner
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if getattr(record, "_puripuly_heart_failure_consumed", False):
+            return
+        failure = getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE, None)
+        if failure is not None:
+            setattr(record, "_puripuly_heart_failure_consumed", True)
+            try:
+                diagnostics, severity, disposition, stage, exception = failure
+                if not isinstance(diagnostics, ErrorDiagnostics):
+                    raise TypeError
+                self.owner.emit_failure(
+                    diagnostics,
+                    severity=severity,
+                    disposition=disposition,
+                    stage=stage,
+                    exception=exception,
+                )
+            except Exception:
+                self.owner._diagnostic_history.rejected_records += 1
 
 
 def _is_metadata_only_text(message: str) -> bool:
-    if "\n" in message or "\r" in message:
+    if len(message) > 4096 or "\n" in message or "\r" in message:
         return False
     if is_translation_latency_summary(message):
         return True
     prefix = _METADATA_PREFIX_RE.match(message)
     if prefix is None:
         return False
-    tokens = message[prefix.end() :].split()
-    if not tokens or _METADATA_TOKEN_RE.fullmatch(tokens[0]) is None:
+    tags = re.findall(r"\[([A-Za-z][A-Za-z0-9_-]*)\]", message[: prefix.end()])
+    if any(
+        tag
+        not in {
+            "Lifecycle",
+            "Startup",
+            "Shutdown",
+            "Logging",
+            "STT",
+            "LLM",
+            "Provider",
+            "Translation",
+            "Output",
+            "OSC",
+            "ASR",
+            "Capture",
+            "GPU",
+            "Overlay",
+            "Native",
+            "DesktopOverlay",
+            "Settings",
+            "QQAuth",
+            "Auth",
+            "UI",
+            "Context",
+            "Conversation",
+            "SelfCapture",
+            "PeerCapture",
+            "LocalASR",
+            "Soniox",
+        }
+        for tag in tags
+    ):
         return False
-    return all(_METADATA_FIELD_RE.fullmatch(token) is not None for token in tokens[1:])
+    tokens = message[prefix.end() :].split()
+    if not tokens or len(tokens) > 33:
+        return False
+    event = tokens[0]
+    known_stage, _ = sanitize_diagnostic_fields({"phase": event})
+    if (
+        event
+        not in {
+            "boundary",
+            "untrusted_record_redacted",
+            "diagnostic_delivery_failed",
+            "oversized_record_rejected",
+            "logging_close",
+            "logging_delivery_terminal",
+            "coordinator_terminal",
+            "callback_failed",
+            "stall",
+            "runtime_state",
+            "await_graph",
+            "failed",
+            "turn_end",
+            "session_fault",
+        }
+        and not known_stage
+        and not is_supported_diagnostic_code(event, frozenset())
+        and not (tags == ["Output"] and event == "destination_stage")
+    ):
+        return False
+    for token in tokens[1:]:
+        if _METADATA_FIELD_RE.fullmatch(token) is None:
+            return False
+        key, value = token.split("=", 1)
+        validator = {
+            "failure_stage": stt_startup_failure_stage,
+            "failure_code": stt_startup_failure_code,
+            "failure_type": stt_startup_failure_type,
+        }.get(key)
+        if validator is not None and (
+            value in {"none", "unclassified"} or validator(value) == value
+        ):
+            continue
+        if tags == ["Output"] and event == "destination_stage":
+            if key in _OUTPUT_STAGE_TOKENS:
+                if value not in _OUTPUT_STAGE_TOKENS[key]:
+                    return False
+                continue
+            if key == "publication_id" and re.fullmatch(r"evt-[0-9]{1,20}", value):
+                continue
+            if (
+                key in {"handoff_wait_ms", "pending_batches"}
+                and value.isdecimal()
+                and len(value) <= 20
+            ):
+                continue
+        if tags == ["Soniox"] and event in {"turn_end", "session_fault"}:
+            if key in {"epoch", "turn", "utterance_id"} and (
+                value == "none" or re.fullmatch(r"[0-9a-fA-F-]{32,36}", value)
+            ):
+                continue
+            if key in {"server_error_code", "ws_close_code"} and (
+                value in {"none", "unclassified"} or (value.isdecimal() and len(value) <= 10)
+            ):
+                continue
+            if key in {
+                "session_age_ms",
+                "finalize_queue_ms",
+                "since_finalize_requested_ms",
+                "since_finalize_written_ms",
+                "last_rx_age_ms",
+            } and (value == "none" or re.fullmatch(r"[0-9]{1,20}(?:\.[0-9]{1,3})?", value)):
+                continue
+            if key in {
+                "diarization",
+                "finalize_requested",
+                "finalize_written",
+                "fin_received",
+                "fin_accepted",
+            } and value in {"true", "false"}:
+                continue
+            if key == "exception_type" and (
+                value in {"none", "unclassified"} or stt_startup_failure_type(value) == value
+            ):
+                continue
+            if key == "protocol_detail" and value == "none":
+                continue
+            if key == "reason" and value in {
+                "none",
+                "soniox_request_failed",
+                "soniox_transport_failed",
+                "soniox_protocol_failed",
+                "soniox_task_failed",
+                "final",
+                "empty",
+                "cancelled",
+            }:
+                continue
+            if key == "trigger" and value in {
+                "provider_error",
+                "receive_failed",
+                "protocol_failed",
+                "seal",
+                "abort",
+                "finished",
+                "task_cancelled",
+                "local_stop",
+                "local_close",
+            }:
+                continue
+        if key in {"logger_sha256", "message_sha256"} and re.fullmatch(r"[0-9a-f]{16}", value):
+            continue
+        if key == "level" and value in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            continue
+        if (
+            key in {"message_len", "character_count", "file_cap_bytes"}
+            and value.isdecimal()
+            and len(value) <= 20
+        ):
+            continue
+        fields, rejected = sanitize_diagnostic_fields({key: value})
+        if not rejected:
+            continue
+        parsed = {"true": True, "false": False, "none": None}.get(value, value)
+        if re.fullmatch(r"-?[0-9]{1,20}", value):
+            parsed = int(value)
+        if key == "exception_class" and value == "none":
+            continue
+        _, rejected = sanitize_diagnostic_fields({key: parsed})
+        if rejected:
+            return False
+    return True
 
 
 def _metadata_only_log_envelope(record: logging.LogRecord, message: str) -> str:
@@ -241,11 +450,21 @@ class _DiagnosticRedactionFilter(logging.Filter):
         self.sink = sink
 
     def filter(self, record: logging.LogRecord) -> bool:
+        if getattr(record, "_puripuly_heart_failure_consumed", False):
+            return False
         if record.name == "httpx" or record.name.startswith("httpcore"):
             return False
-        with contextlib.suppress(Exception):
+        try:
             message = record.getMessage()
             category = getattr(record, _CONTENT_CATEGORY_ATTR, None)
+            projection = getattr(record, DIAGNOSTIC_PROJECTION_ATTRIBUTE, None)
+            if isinstance(projection, _ValidatedDiagnosticProjection):
+                record.msg = "[Failure] " + projection.text
+                record.args = ()
+                record.exc_info = None
+                record.exc_text = None
+                record.stack_info = None
+                return True
             if category in {_CONVERSATION_CATEGORY, _CONTEXT_CATEGORY}:
                 safe_message = message
             elif (
@@ -269,6 +488,8 @@ class _DiagnosticRedactionFilter(logging.Filter):
             elif safe_message != message:
                 record.msg = safe_message
                 record.args = ()
+        except Exception:
+            return False
         return True
 
 
@@ -317,6 +538,11 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
         super().__init__(*args, **kwargs)
         self.oversized_records = 0
         self.delivery_failures = 0
+        self.written_records = 0
+        self.last_progress_at = time.monotonic()
+        self.failure_diagnostics: ErrorDiagnostics | None = None
+        self.failure_sink: Callable[[ErrorDiagnostics], None] | None = None
+        self.failure_notification_failures = 0
 
     def emit_batch(self, records: list[logging.LogRecord]) -> None:
         if not records:
@@ -351,8 +577,25 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
                 self._write_pending(pending)
                 if pending:
                     self.flush()
-        except Exception:
+        except Exception as exc:
             self.delivery_failures += len(records)
+            if self.failure_diagnostics is None:
+                self.failure_diagnostics = ErrorDiagnostics(
+                    component="runtime_logging",
+                    operation="write",
+                    code="log_file_delivery_failed",
+                    category="transaction",
+                    visibility="basic",
+                    content_policy="metadata_only",
+                    status_code=None,
+                    retry_after_ms=None,
+                    fields=safe_exception_fields(exc),
+                )
+                if self.failure_sink is not None:
+                    try:
+                        self.failure_sink(self.failure_diagnostics)
+                    except Exception:
+                        self.failure_notification_failures += 1
 
     def emit(self, record: logging.LogRecord) -> None:
         self.emit_batch([record])
@@ -366,6 +609,8 @@ class _BatchingRotatingFileHandler(RotatingFileHandler):
     def _write_pending(self, pending: list[str]) -> None:
         if pending and self.stream is not None:
             self.stream.write("".join(pending))
+            self.written_records += len(pending)
+            self.last_progress_at = time.monotonic()
 
 
 def _estimated_record_bytes(record: logging.LogRecord) -> int:
@@ -391,6 +636,16 @@ def _is_priority_file_record(record: logging.LogRecord) -> bool:
 
 
 class _BoundedFileQueue(queue.Queue[logging.LogRecord]):
+    def __init__(self, maxsize: int) -> None:
+        super().__init__(maxsize=maxsize)
+        self.pending_since: float | None = None
+
+    def task_done(self) -> None:
+        super().task_done()
+        with self.mutex:
+            if self.unfinished_tasks == 0:
+                self.pending_since = None
+
     def admit(self, record: logging.LogRecord, *, force: bool = False) -> tuple[bool, int]:
         priority = _is_priority_file_record(record)
         with self.not_full:
@@ -415,6 +670,8 @@ class _BoundedFileQueue(queue.Queue[logging.LogRecord]):
                 self.not_full.notify()
             if self._qsize() >= limit:
                 return False, evicted
+            if self.unfinished_tasks == 0:
+                self.pending_since = time.monotonic()
             self._put(record)
             self.unfinished_tasks += 1
             self.not_empty.notify()
@@ -426,6 +683,10 @@ class _BoundedQueueHandler(QueueHandler):
         super().__init__(file_queue)
         self.dropped_records = 0
         self.oversized_records = 0
+        self.enqueued_records = 0
+        self.failure_diagnostics: ErrorDiagnostics | None = None
+        self.failure_sink: Callable[[ErrorDiagnostics], None] | None = None
+        self.failure_notification_failures = 0
 
     def handle(self, record: logging.LogRecord) -> bool:
         if getattr(self, _QUEUE_HANDLER_CLOSING_ATTR, False):
@@ -444,6 +705,25 @@ class _BoundedQueueHandler(QueueHandler):
         self.dropped_records += evicted
         if not accepted:
             self.dropped_records += 1
+        if accepted:
+            self.enqueued_records += 1
+        if (not accepted or evicted) and self.failure_diagnostics is None:
+            self.failure_diagnostics = ErrorDiagnostics(
+                component="runtime_logging",
+                operation="enqueue",
+                code="log_queue_overflow",
+                category="lifecycle",
+                visibility="basic",
+                content_policy="metadata_only",
+                status_code=None,
+                retry_after_ms=None,
+                fields={"queue_capacity": self.queue.maxsize},
+            )
+            if self.failure_sink is not None:
+                try:
+                    self.failure_sink(self.failure_diagnostics)
+                except Exception:
+                    self.failure_notification_failures += 1
 
 
 class _SafeQueueListener(QueueListener):
@@ -590,7 +870,8 @@ class RuntimeLoggingSinks:
 
 def default_main_log_file(*, log_dir: Path | None = None) -> Path:
     resolved_log_dir = log_dir or user_config_dir()
-    resolved_log_dir.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        resolved_log_dir.mkdir(parents=True, exist_ok=True)
     return resolved_log_dir / MAIN_LOG_FILENAME
 
 
@@ -632,6 +913,7 @@ def configure_main_logging(
             maxBytes=_MAIN_LOG_MAX_BYTES,
             backupCount=1,
             encoding="utf-8",
+            delay=True,
         )
         file_handler.namer = _main_log_backup_namer
         file_handler.set_name(_MAIN_FILE_HANDLER_NAME)
@@ -684,11 +966,8 @@ class SessionRuntimeLoggingService:
         session_logger: logging.Logger | None = None,
         sinks: RuntimeLoggingSinks | None = None,
         ui_handler_factory: Callable[[RealtimeLogSink], logging.Handler] | None = None,
-        runtime_log_sink: RuntimeLogSink | None = None,
-        diagnostics_sink: DiagnosticsSink | None = None,
         provider_observation_sink: ProviderObservationSink | None = None,
         conversation_record_sink: ConversationRecordSink | None = None,
-        persisted_diagnostic_store: PersistedDiagnosticStore | None = None,
         observability_runner: ObservabilityRunner | None = None,
     ) -> None:
         self._root_logger = root_logger or logging.getLogger()
@@ -699,11 +978,8 @@ class SessionRuntimeLoggingService:
         self._session_logger.setLevel(logging.INFO)
         self._session_logger.propagate = False
         self._ui_handler_factory = ui_handler_factory
-        self._runtime_log_sink = runtime_log_sink
-        self._diagnostics_sink = diagnostics_sink
         self._provider_observation_sink = provider_observation_sink
         self._conversation_record_sink = conversation_record_sink
-        self._persisted_diagnostic_store = persisted_diagnostic_store
         self._observability_runner = observability_runner
         self._realtime_sink: RealtimeLogSink | None = None
         self._ui_handler: logging.Handler | None = None
@@ -715,6 +991,20 @@ class SessionRuntimeLoggingService:
         )
         self._request_context_keys: set[tuple[str, int | None]] = set()
         self._request_context_order: deque[tuple[str, int | None]] = deque()
+        self._diagnostic_history = DiagnosticHistory()
+        self._diagnostic_sink: Callable[[dict], None] | None = None
+        self._diagnostic_loop: asyncio.AbstractEventLoop | None = None
+        self._pending_diagnostic_events: deque[dict] = deque(maxlen=256)
+        self._diagnostic_event_lock = RLock()
+        self._diagnostic_delivery_scheduled = False
+        self._diagnostic_ingress = _DiagnosticIngressHandler(self)
+        self._root_logger.handlers.insert(0, self._diagnostic_ingress)
+        self._session_logger.handlers.insert(0, self._diagnostic_ingress)
+        for handler in (self._sinks.file_handler, self._sinks.file_queue_handler):
+            if isinstance(handler, (_BatchingRotatingFileHandler, _BoundedQueueHandler)):
+                handler.failure_sink = self._record_delivery_failure
+                if handler.failure_diagnostics is not None:
+                    self._record_delivery_failure(handler.failure_diagnostics)
 
         file_output_handler = (
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
@@ -735,26 +1025,275 @@ class SessionRuntimeLoggingService:
     def log_file(self) -> Path:
         return self._sinks.log_file
 
+    def configure_diagnostics(
+        self,
+        *,
+        instance_id: str | None = None,
+        event_sink: Callable[[dict], None] | None = None,
+    ) -> None:
+        if instance_id is not None:
+            self._diagnostic_history.bind_instance(instance_id)
+        if event_sink is not None:
+            self._diagnostic_sink = event_sink
+            with contextlib.suppress(RuntimeError):
+                self._diagnostic_loop = asyncio.get_running_loop()
+
+    def diagnostic_history(self, arguments: dict) -> dict:
+        return self._diagnostic_history.query(arguments)
+
+    def _publish_diagnostic(self, event: dict) -> None:
+        loop = self._diagnostic_loop
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+        if loop is None or loop is current_loop:
+            self._deliver_diagnostic(event)
+            return
+        with self._diagnostic_event_lock:
+            if len(self._pending_diagnostic_events) == self._pending_diagnostic_events.maxlen:
+                self._diagnostic_history.subscriber_delivery_failures += 1
+            self._pending_diagnostic_events.append(event)
+            if self._diagnostic_delivery_scheduled:
+                return
+            self._diagnostic_delivery_scheduled = True
+        try:
+            loop.call_soon_threadsafe(self._drain_diagnostic_events)
+        except RuntimeError:
+            with self._diagnostic_event_lock:
+                self._diagnostic_history.subscriber_delivery_failures += len(
+                    self._pending_diagnostic_events
+                )
+                self._pending_diagnostic_events.clear()
+                self._diagnostic_delivery_scheduled = False
+
+    def _drain_diagnostic_events(self) -> None:
+        with self._diagnostic_event_lock:
+            pending = tuple(self._pending_diagnostic_events)
+            self._pending_diagnostic_events.clear()
+            self._diagnostic_delivery_scheduled = False
+        for event in pending:
+            self._deliver_diagnostic(event)
+
+    def _deliver_diagnostic(self, event: dict) -> None:
+        if self._diagnostic_sink is not None:
+            try:
+                self._diagnostic_sink(event)
+            except Exception:
+                self._diagnostic_history.subscriber_delivery_failures += 1
+
+    def diagnostic_health(self) -> dict:
+        health = self._diagnostic_history.health()
+        queue_handler = self._sinks.file_queue_handler
+        file_handler = self._sinks.file_handler
+        listener = self._sinks.file_queue_listener
+        file_queue = self._sinks.file_queue
+        failures = int(getattr(file_handler, "delivery_failures", 0)) + int(
+            getattr(listener, "delivery_failures", 0)
+        )
+        dropped = (
+            int(getattr(queue_handler, "dropped_records", 0))
+            + int(getattr(listener, "shutdown_drops", 0))
+            + self._sinks.abandoned_records
+        )
+        thread = getattr(listener, "_thread", None)
+        pending = int(file_queue.unfinished_tasks) if file_queue is not None else 0
+        last_progress = getattr(file_handler, "last_progress_at", None)
+        age_ms = (
+            max(0, int((time.monotonic() - last_progress) * 1000))
+            if last_progress is not None
+            else None
+        )
+        pending_since = getattr(file_queue, "pending_since", None)
+        pending_age_ms = (
+            max(0, int((time.monotonic() - pending_since) * 1000))
+            if pending_since is not None
+            else None
+        )
+        written = getattr(file_handler, "written_records", None)
+        cleanup_failures = len(getattr(listener, "cleanup_failures", ()))
+        health["basic"] = {
+            "ui_attached": self._ui_handler is not None,
+            "delivery_failures": getattr(self._ui_handler, "delivery_failures", None),
+        }
+        health["history"]["subscriber_dispatch_pending"] = len(self._pending_diagnostic_events)
+        health["history"]["subscriber_dispatch_capacity"] = self._pending_diagnostic_events.maxlen
+        health["file"] = {
+            "availability": (
+                "closed"
+                if self._closed
+                else (
+                    "closing"
+                    if self._sinks._closed
+                    else (
+                        "failed"
+                        if failures
+                        else (
+                            "stalled"
+                            if pending
+                            and age_ms is not None
+                            and pending_age_ms is not None
+                            and min(age_ms, pending_age_ms) >= 2000
+                            else (
+                                "pending"
+                                if pending
+                                else "active" if written is not None else "unknown"
+                            )
+                        )
+                    )
+                )
+            ),
+            "queue_capacity": getattr(file_queue, "maxsize", None),
+            "queue_pending": pending,
+            "enqueued_records": getattr(queue_handler, "enqueued_records", None),
+            "written_records": written,
+            "delivery_failures": failures,
+            "dropped_records": dropped,
+            "oversized_rejected": int(getattr(queue_handler, "oversized_records", 0))
+            + int(getattr(file_handler, "oversized_records", 0)),
+            "writer_alive": thread.is_alive() if thread is not None else None,
+            "shutdown_complete": (
+                bool(listener.cleanup_complete and not cleanup_failures)
+                if listener is not None
+                else None
+            ),
+            "shutdown_attempt_complete": getattr(listener, "cleanup_complete", None),
+            "cleanup_failures": cleanup_failures,
+            "last_progress_age_ms": age_ms,
+            "pending_episode_age_ms": pending_age_ms,
+            "delivery_diagnostic_id": getattr(
+                getattr(file_handler, "failure_diagnostics", None), "diagnostic_id", None
+            ),
+            "loss_diagnostic_id": getattr(
+                getattr(queue_handler, "failure_diagnostics", None), "diagnostic_id", None
+            ),
+            "failure_notification_failures": int(
+                getattr(file_handler, "failure_notification_failures", 0)
+            )
+            + int(getattr(queue_handler, "failure_notification_failures", 0)),
+            "persistence": (
+                "incomplete"
+                if failures or dropped or cleanup_failures
+                else (
+                    "pending"
+                    if pending
+                    else "unknown" if written is None else "written_not_durable"
+                )
+            ),
+            "durable": False,
+        }
+        return health
+
+    def emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str = "error",
+        disposition: str = "failed",
+        stage: str | None = None,
+        exception: BaseException | None = None,
+    ) -> dict:
+        return self._emit_failure(
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
+        )
+
+    def _record_delivery_failure(self, diagnostics: ErrorDiagnostics) -> None:
+        self._emit_failure(
+            diagnostics,
+            severity="warning",
+            disposition="degraded",
+            stage=(
+                "file_delivery"
+                if diagnostics.code == "log_file_delivery_failed"
+                else "queue_overflow"
+            ),
+            project_file=False,
+        )
+
+    def _emit_failure(
+        self,
+        diagnostics: ErrorDiagnostics,
+        *,
+        severity: str,
+        disposition: str,
+        stage: str | None = None,
+        exception: BaseException | None = None,
+        project_file: bool = True,
+    ) -> dict:
+        record, fresh = self._diagnostic_history.retain(
+            diagnostics,
+            severity=severity,
+            disposition=disposition,
+            stage=stage,
+            exception=exception,
+            file_evidence="unknown" if project_file else "unavailable",
+        )
+        if not fresh:
+            return record
+        encoded = json.dumps(record, separators=(",", ":"))
+        self._publish_diagnostic(
+            {
+                "topic": "logs",
+                "level": record["severity"],
+                "kind": "failure",
+                "diagnostic": json.loads(encoded),
+            }
+        )
+        level = {"info": logging.INFO, "warning": logging.WARNING}.get(
+            record["severity"], logging.ERROR
+        )
+        if project_file:
+            file_record = self._session_logger.makeRecord(
+                self._session_logger.name,
+                level,
+                "",
+                0,
+                "[Failure] structured_failure",
+                (),
+                None,
+                extra={DIAGNOSTIC_PROJECTION_ATTRIBUTE: _ValidatedDiagnosticProjection(encoded)},
+            )
+            try:
+                handler = self._sinks.file_queue_handler or self._sinks.file_handler
+                if self._closed or handler.handle(file_record) is False:
+                    self._diagnostic_history.file_projection_failures += 1
+            except Exception:
+                self._diagnostic_history.file_projection_failures += 1
+        if diagnostics.visibility == DIAGNOSTIC_VISIBILITY_BASIC:
+            summary = (
+                f"[Failure] {record['component']}: {record['code']} ({record['disposition']})."
+            )
+            basic_record = self._session_logger.makeRecord(
+                self._session_logger.name,
+                level,
+                "",
+                0,
+                summary,
+                (),
+                None,
+                extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
+            )
+            for handler in (self._sinks.stream_handler, self._ui_handler):
+                if handler is not None:
+                    with contextlib.suppress(Exception):
+                        handler.handle(basic_record)
+        return record
+
     def configure_structured_observability(
         self,
         *,
-        runtime_log_sink: RuntimeLogSink | None = None,
-        diagnostics_sink: DiagnosticsSink | None = None,
         provider_observation_sink: ProviderObservationSink | None = None,
         conversation_record_sink: ConversationRecordSink | None = None,
-        persisted_diagnostic_store: PersistedDiagnosticStore | None = None,
         observability_runner: ObservabilityRunner | None = None,
     ) -> None:
-        if runtime_log_sink is not None:
-            self._runtime_log_sink = runtime_log_sink
-        if diagnostics_sink is not None:
-            self._diagnostics_sink = diagnostics_sink
         if provider_observation_sink is not None:
             self._provider_observation_sink = provider_observation_sink
         if conversation_record_sink is not None:
             self._conversation_record_sink = conversation_record_sink
-        if persisted_diagnostic_store is not None:
-            self._persisted_diagnostic_store = persisted_diagnostic_store
         if observability_runner is not None:
             self._observability_runner = observability_runner
 
@@ -818,11 +1357,6 @@ class SessionRuntimeLoggingService:
             safe_message,
             extra={_LIVE_AUDIENCE_ATTR: _LIVE_AUDIENCE_BASIC},
         )
-        self._emit_structured_runtime_log(
-            safe_message,
-            level=level,
-            visibility=DIAGNOSTIC_VISIBILITY_BASIC,
-        )
 
     def emit_translation_latency(self, message: str) -> bool:
         if self._closed or not is_translation_latency_summary(message):
@@ -852,8 +1386,6 @@ class SessionRuntimeLoggingService:
             getattr(self._sinks, "file_queue_handler", None) or self._sinks.file_handler
         )
         file_output_handler.handle(record)
-        if structured:
-            self._persist_structured_diagnostic(safe_message, level=level)
         return True
 
     def emit_diagnostic_lazy(
@@ -868,6 +1400,40 @@ class SessionRuntimeLoggingService:
 
     def record_output_routing_decision(self, decision: OutputRoutingDecision) -> None:
         if self._closed:
+            return
+        if decision.diagnostics is not None:
+            self.emit_failure(
+                decision.diagnostics,
+                disposition="degraded" if decision.decision != "failed" else "failed",
+                stage="destination_delivery",
+            )
+            return
+        if (
+            decision.decision == "denied"
+            and decision.route == "self_chatbox"
+            and decision.reason == "peer_chatbox_denied"
+        ):
+            return
+        if decision.decision == "skipped" and decision.reason in {
+            "activation_notice_disabled",
+            "destination_unconfigured",
+            "duplicate_publication",
+            "publication_generation_retired",
+            "stale_source_order",
+            "stale_retired",
+            "stale",
+            "preview_superseded",
+            "destination_replaced",
+            "cancelled_local",
+            "output_runtime_closing",
+        }:
+            return
+        if (
+            decision.decision == "published"
+            and decision.route == "subtitle_overlay"
+            and decision.reason in {"accepted_handoff", "logical_pacing_wait"}
+        ):
+            self.emit_diagnostic(_format_output_routing_decision(decision))
             return
         self.emit_basic(_format_output_routing_decision(decision))
 
@@ -894,7 +1460,6 @@ class SessionRuntimeLoggingService:
             exc_info=None,
         )
         _enqueue_terminal_file_record(self._sinks, record)
-        self._persist_structured_diagnostic(safe_message, level=level)
 
     def observe_provider_operation(
         self,
@@ -912,6 +1477,13 @@ class SessionRuntimeLoggingService:
     ) -> None:
         if self._closed:
             return
+        if diagnostics is not None:
+            self.emit_failure(
+                diagnostics,
+                severity=severity,
+                disposition="failed" if outcome == "failure" else "degraded",
+                stage=operation,
+            )
         event_visibility = visibility or (
             diagnostics.visibility
             if diagnostics is not None
@@ -1093,6 +1665,7 @@ class SessionRuntimeLoggingService:
                 ),
                 channel=record.speaker_channel,
                 utterance_id=record.utterance_id,
+                parent_utterance_id=metadata.get("parent_utterance_id"),
                 source_text=record.transcript_text,
                 translated_text=record.translation_text,
                 source_language=record.source_language,
@@ -1108,78 +1681,6 @@ class SessionRuntimeLoggingService:
                 f"cause=unclassified exception_type={type(exc).__name__}",
                 level=logging.ERROR,
             )
-
-    def _emit_structured_runtime_log(
-        self,
-        message: str,
-        *,
-        level: int,
-        visibility: DiagnosticVisibility,
-    ) -> None:
-        if self._observability_runner is None:
-            return
-        if self._runtime_log_sink is None and self._diagnostics_sink is None:
-            return
-
-        correlation_id = _new_correlation_id("runtime-log")
-        fields = _legacy_text_observability_fields(
-            message,
-            level=level,
-            visibility=visibility,
-        )
-        runtime_event = RuntimeLogEvent(
-            category=DIAGNOSTIC_CATEGORY_UNKNOWN,
-            severity=_severity_for_level(level),
-            visibility=visibility,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            correlation_id=correlation_id,
-            message=None,
-            diagnostics=None,
-            fields=fields,
-        )
-        diagnostic_event = DiagnosticEvent(
-            category=runtime_event.category,
-            severity=runtime_event.severity,
-            visibility=runtime_event.visibility,
-            content_policy=runtime_event.content_policy,
-            correlation_id=runtime_event.correlation_id,
-            diagnostics=None,
-            fields=runtime_event.fields,
-        )
-        self._dispatch_observability(
-            self._runtime_log_sink,
-            lambda sink: sink.emit_runtime_log(runtime_event),
-        )
-        self._dispatch_observability(
-            self._diagnostics_sink,
-            lambda sink: sink.emit_diagnostic(diagnostic_event),
-        )
-
-    def _persist_structured_diagnostic(self, message: str, *, level: int) -> None:
-        if self._persisted_diagnostic_store is None or self._observability_runner is None:
-            return
-        diagnostic = DiagnosticEvent(
-            category=DIAGNOSTIC_CATEGORY_UNKNOWN,
-            severity=_severity_for_level(level),
-            visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
-            content_policy=CONTENT_POLICY_METADATA_ONLY,
-            correlation_id=_new_correlation_id("persisted-log"),
-            diagnostics=None,
-            fields=_legacy_text_observability_fields(
-                message,
-                level=level,
-                visibility=DIAGNOSTIC_VISIBILITY_DIAGNOSTIC_ONLY,
-            ),
-        )
-        persisted = PersistedDiagnosticRecord(
-            diagnostic=diagnostic,
-            storage_key=_persisted_storage_key(self._sinks.log_file),
-            metadata={"renderer": "legacy_text"},
-        )
-        self._dispatch_observability(
-            self._persisted_diagnostic_store,
-            lambda store: store.persist_diagnostic(persisted),
-        )
 
     def _dispatch_observability(
         self,
@@ -1227,6 +1728,9 @@ class SessionRuntimeLoggingService:
         if self._closed:
             return
         self._closed = True
+        self._drain_diagnostic_events()
+        self._root_logger.removeHandler(self._diagnostic_ingress)
+        self._session_logger.removeHandler(self._diagnostic_ingress)
         failures: list[Exception] = []
         try:
             self._detach_realtime_sink(suppress_errors=False)
@@ -1243,6 +1747,10 @@ class SessionRuntimeLoggingService:
                 self._sinks.close(force=force_owned_sinks)
             except Exception as exc:
                 failures.append(exc)
+        for handler in (self._sinks.file_handler, self._sinks.file_queue_handler):
+            if isinstance(handler, (_BatchingRotatingFileHandler, _BoundedQueueHandler)):
+                handler.failure_sink = None
+        self._drain_diagnostic_events()
         _raise_close_failures("Runtime logging session close failed", failures)
 
 
@@ -1433,36 +1941,17 @@ def _redact_observability_fields_for_sink(
     return result.diagnostics.fields
 
 
-def _legacy_text_observability_fields(
-    message: str,
-    *,
-    level: int,
-    visibility: DiagnosticVisibility,
-) -> Mapping[str, DiagnosticFieldValue]:
-    level_name = logging.getLevelName(level)
-    if not isinstance(level_name, str):
-        level_name = str(level_name)
-    return {
-        "renderer": "legacy_text",
-        "visibility": visibility,
-        "levelno": int(level),
-        "level_name": level_name,
-        "text_len": len(message),
-    }
-
-
-def _persisted_storage_key(log_file: object) -> str | None:
-    try:
-        storage_path = Path(log_file)
-    except TypeError:
-        return None
-    return storage_path.name or None
-
-
 def _format_output_routing_decision(decision: OutputRoutingDecision) -> str:
+    intermediate = decision.decision == "published" and decision.reason in {
+        "accepted_handoff",
+        "logical_pacing_wait",
+    }
+    status: str = decision.decision
+    if intermediate:
+        status = "waiting" if decision.reason == "logical_pacing_wait" else "accepted"
     parts = [
-        "[Output] destination_result",
-        f"decision={decision.decision}",
+        "[Output] destination_stage" if intermediate else "[Output] destination_result",
+        f"decision={status}",
         f"route={decision.route}",
         f"publication_id={decision.publication_id}",
         f"publication_kind={decision.publication_kind}",
@@ -1585,9 +2074,14 @@ def _enqueue_terminal_file_record(
     if handler is None or file_queue is None:
         sinks.file_handler.handle(record)
         return
+    if not handler.filter(record):
+        sinks.abandoned_records += 1
+        return
     setattr(record, _TERMINAL_RECORD_ATTR, True)
     if isinstance(file_queue, _BoundedFileQueue):
         accepted, evicted = file_queue.admit(record, force=True)
+        if accepted and isinstance(handler, _BoundedQueueHandler):
+            handler.enqueued_records += 1
         sinks.abandoned_records = int(getattr(sinks, "abandoned_records", 0)) + evicted
         if not accepted:
             sinks.abandoned_records += 1

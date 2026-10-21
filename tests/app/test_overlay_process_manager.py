@@ -44,7 +44,7 @@ def _ready_script_line() -> str:
         "print(__import__('json').dumps({'type':'overlay_ready',"
         "'overlay_instance_id':m['overlay_instance_id'],'runtime_generation':1,"
         "'capabilities':{'execution_contract':{'version':1,'revision':'r2'},"
-        "'native_presentation_retry':{'version':1,'ownership':'exclusive'},"
+        "'native_presentation_retry':{'version':2,'ownership':'exclusive'},"
         "'speaker_identity_presentation':{'version':2,"
         "'policy':'immutable_first_readable_style'}}}), flush=True)"
     )
@@ -453,7 +453,7 @@ async def test_owned_process_stop_finishes_with_full_reverse_control_queue() -> 
         "reverse_control_rejected",
         {
             "type": "overlay_event",
-            "payload_event": "event-8",
+            "payload_event": "unclassified",
             "reason": "control_capacity",
         },
     ) in lifecycle
@@ -569,7 +569,7 @@ async def test_real_subprocess_pressure_preserves_lifecycle_and_bounded_cleanup(
                 "manifest = json.load(open(sys.argv[2], encoding='utf-8'))",
                 "for index in range(2048):",
                 "    print(json.dumps({'type':'overlay_trace','component':'probe','event':'pressure','index':index}), flush=True)",
-                "print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':1,'ownership':'exclusive'},'speaker_identity_presentation':{'version':2,'policy':'immutable_first_readable_style'}}}), flush=True)",
+                "print(json.dumps({'type':'overlay_ready','overlay_instance_id':manifest['overlay_instance_id'],'runtime_generation':1,'capabilities':{'execution_contract':{'version':1,'revision':'r2'},'native_presentation_retry':{'version':2,'ownership':'exclusive'},'speaker_identity_presentation':{'version':2,'policy':'immutable_first_readable_style'}}}), flush=True)",
                 "time.sleep(0.1)",
                 "print(json.dumps({'type':'shutdown_complete','overlay_instance_id':manifest['overlay_instance_id']}), flush=True)",
                 "time.sleep(0.05)",
@@ -678,7 +678,7 @@ async def test_actual_manager_fails_process_on_noncoalescible_reverse_control_ov
         if event["event"] == "reverse_control_rejected"
     )
     assert rejection["type"] == "overlay_event"
-    assert rejection["payload_event"] == "event-8"
+    assert rejection["payload_event"] == "unclassified"
     assert rejection["reason"] == "control_capacity"
 
 
@@ -860,7 +860,9 @@ def _patch_vendored_openvr_bundle(
 
 
 @pytest.mark.asyncio
-async def test_overlay_process_manager_stop_preserves_process_when_terminate_fails() -> None:
+async def test_overlay_process_manager_stop_preserves_process_when_terminate_fails(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     class FailingOnceTerminateProcess:
         def __init__(self) -> None:
             self.terminate_calls = 0
@@ -877,7 +879,7 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
         async def terminate(self) -> None:
             self.terminate_calls += 1
             if self.terminate_calls == 1:
-                raise RuntimeError("terminate failed")
+                raise RuntimeError("terminate failed SYNTHETIC_PRIVATE_CREDENTIAL_PATH")
 
     manager = OverlayProcessManager()
     process = FailingOnceTerminateProcess()
@@ -887,6 +889,10 @@ async def test_overlay_process_manager_stop_preserves_process_when_terminate_fai
         await manager.stop()
 
     assert manager._process is process
+    assert manager._primary_diagnostics is not None
+    assert manager._primary_diagnostics.fields["cleanup_stage"] == "process_terminate"
+    assert manager._primary_diagnostics.fields["exception_class"] == "RuntimeError"
+    assert "SYNTHETIC_PRIVATE" not in caplog.text
 
     await manager.stop()
 
@@ -1325,8 +1331,9 @@ async def test_shutdown_drain_preserves_first_runtime_error_with_safe_bounded_ev
     assert len(receipt["stdout_events"]) <= process_module._SHUTDOWN_EVIDENCE_LIMIT
     assert [event["failure_reason"] for event in receipt["stdout_events"][:2]] == [
         "gpu_query_failed",
-        "later_cleanup_error",
+        "unknown",
     ]
+    assert "later_cleanup_error" not in repr(receipt)
 
 
 def test_overlay_process_manager_cleanup_manifest_preserves_path_when_unlink_fails() -> None:
@@ -1355,10 +1362,12 @@ def test_overlay_process_manager_cleanup_manifest_preserves_path_when_unlink_fai
 
 
 @pytest.mark.asyncio
-async def test_overlay_stop_reports_cleanup_failure_and_retains_manifest_reference() -> None:
+async def test_overlay_stop_reports_cleanup_failure_and_retains_manifest_reference(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     class LockedManifest:
         def unlink(self) -> None:
-            raise PermissionError("manifest locked")
+            raise PermissionError(5, "manifest locked SYNTHETIC_PRIVATE_CREDENTIAL_PATH")
 
     manager = OverlayProcessManager()
     manifest = LockedManifest()
@@ -1372,6 +1381,11 @@ async def test_overlay_stop_reports_cleanup_failure_and_retains_manifest_referen
     assert manager._manifest_path is manifest
     assert receipt["terminal_cause"] == "shutdown_cleanup_failed"
     assert receipt["cleanup_succeeded"] is False
+    assert manager._primary_diagnostics is not None
+    assert manager._primary_diagnostics.fields["cleanup_stage"] == "cleanup"
+    assert manager._primary_diagnostics.fields["exception_class"] == "PermissionError"
+    assert manager._primary_diagnostics.fields["errno"] == 5
+    assert "SYNTHETIC_PRIVATE" not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -2230,10 +2244,13 @@ async def test_authenticated_bridge_shutdown_ack_requires_process_exit_for_compl
     receipt = manager.shutdown_receipt()
     assert receipt["acknowledged"] is True
     assert receipt["exit_confirmed"] is True
-    assert receipt["graceful_completed"] is True
+    assert receipt["terminal_status_received"] is False
+    assert receipt["graceful_completed"] is False
+    assert receipt["native_evidence_state"] == "incomplete"
     assert receipt["forced"] is False
-    assert receipt["cleanup_succeeded"] is True
-    assert manager.state == "off"
+    assert receipt["cleanup_succeeded"] is False
+    assert receipt["terminal_cause"] == "shutdown_terminal_unavailable"
+    assert manager.state == "failed"
 
 
 @pytest.mark.asyncio
@@ -2336,6 +2353,7 @@ async def test_overlay_process_manager_maps_bridge_runtime_error_after_ready() -
     manager = OverlayProcessManager(
         process_runner=FakeProcessRunner(ready_event_delay_ms=0),
         bridge_messages=bridge_messages,
+        bridge_messages_authenticated=True,
     )
 
     await manager.start()
@@ -2852,9 +2870,12 @@ async def test_overlay_ready_rejects_stale_instance_and_duplicate_generation() -
 @pytest.mark.parametrize(
     "native_retry_capability",
     [
-        {"version": 2, "ownership": "exclusive"},
-        {"version": 1, "ownership": "shared"},
-        {"version": 1, "ownership": "exclusive", "extension": True},
+        {"version": 1, "ownership": "exclusive"},
+        {"version": 3, "ownership": "exclusive"},
+        {"version": True, "ownership": "exclusive"},
+        {"version": 2.0, "ownership": "exclusive"},
+        {"version": 2, "ownership": "shared"},
+        {"version": 2, "ownership": "exclusive", "extension": True},
     ],
 )
 async def test_overlay_ready_rejects_non_exact_native_retry_contract(
@@ -2874,6 +2895,7 @@ async def test_overlay_ready_rejects_non_exact_native_retry_contract(
             "capabilities": {
                 "execution_contract": OVERLAY_EXECUTION_CONTRACT,
                 "native_presentation_retry": native_retry_capability,
+                "speaker_identity_presentation": OVERLAY_SPEAKER_IDENTITY_CONTRACT,
             },
         },
         allow_ready=True,
@@ -3175,3 +3197,201 @@ async def test_failed_desktop_start_still_waits_for_authenticated_ack_after_exit
         if not task.done():
             task.cancel()
         await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_real_pipe_and_loopback_bridge_preserve_primary_cleanup_and_reject_stale_private_detail(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+
+    script = tmp_path / "native_fault_fixture.py"
+    script.write_text(
+        "\n".join(
+            [
+                "import asyncio, json, sys, websockets",
+                "m=json.load(open(sys.argv[2], encoding='utf-8'))",
+                "async def run():",
+                "    global m",
+                "    ws=await websockets.connect(m['bridge_url'], ping_interval=None, proxy=None)",
+                "    await ws.send(json.dumps({'type':'auth','session_token':m['session_token']}))",
+                "    await ws.recv()",
+                "    for index in range(2048):",
+                "        print(json.dumps({'type':'overlay_trace','component':'probe','event':'pressure','index':index}), flush=True)",
+                "    " + _ready_script_line(),
+                "    await asyncio.sleep(0.1)",
+                "    record={'schema_version':1,'record_type':'renderer_event','event_type':'SYNTHETIC_PRIVATE_CHILD_JSON','renderer_revision':1,'actual_disposition':'SYNTHETIC_PRIVATE_CHILD_JSON','render_commit_acknowledged':False,'slot_count':1,'line_count':2,'surface_visible':True,'interaction_mode':'locked','window_width':1344,'window_height':336}",
+                "    print(json.dumps({'type':'desktop_renderer_diagnostic','overlay_instance_id':m['overlay_instance_id'],'runtime_generation':1,'record':record}), flush=True)",
+                "    await asyncio.sleep(0.05)",
+                "    fault={'type':'runtime_error','overlay_instance_id':m['overlay_instance_id'],'runtime_generation':1,'failure_reason':'render_failed','primary_failure_reason':'render_failed','cleanup_failure_reason':'openvr_failed','exception_class':'OSError','errno':5,'diagnostic_dropped':7,'reliable_delivery_failures':1,'detail':'SYNTHETIC_PRIVATE_CREDENTIAL_BODY_PERSONAL_PATH','evidence_state':'incomplete'}",
+                "    await ws.send(json.dumps(fault))",
+                "    print(json.dumps(fault), flush=True)",
+                "    stale={**fault,'runtime_generation':2,'failure_reason':'gpu_query_failed','primary_failure_reason':'gpu_query_failed'}",
+                "    print(json.dumps(stale), flush=True)",
+                "    await asyncio.sleep(0.1)",
+                "    await ws.close()",
+                "asyncio.run(run())",
+                "raise SystemExit(7)",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    bridge = OverlayBridge(session_token="isolated-native-fault-fixture")
+    await bridge.start()
+    manager = OverlayProcessManager(
+        process_runner=DefaultOverlayProcessRunner(executable_path=script),
+        bridge_url=bridge.url,
+        bridge_messages=bridge.messages,
+        bridge_messages_authenticated=True,
+        session_token=bridge.session_token,
+        diagnostics_dir=tmp_path,
+        startup_timeout_ms=2000,
+    )
+    try:
+        await manager.start()
+        assert manager._monitor_task is not None
+        await asyncio.wait_for(asyncio.shield(manager._monitor_task), timeout=3)
+        assert manager.state == "failed"
+        await manager.stop()
+        receipt = manager.shutdown_receipt()
+        assert receipt["native_primary_failure_reason"] == "render_failed"
+        assert receipt["native_cleanup_failure_reason"] == "openvr_failed"
+        assert receipt["native_diagnostic_dropped"] == 7
+        assert receipt["native_reliable_delivery_failures"] == 1
+        assert receipt["native_evidence_state"] == "incomplete"
+        assert receipt["exit_confirmed"] is True
+        assert receipt["reader_cleanup"] == "complete"
+        assert "SYNTHETIC_PRIVATE" not in json.dumps(receipt)
+        assert "SYNTHETIC_PRIVATE" not in caplog.text
+        diagnostics = [
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+        ]
+        primary = next(item for item in diagnostics if item.code == "render_failed")
+        cleanup = next(item for item in diagnostics if item.code == "openvr_failed")
+        assert cleanup.cause_id == primary.diagnostic_id
+        assert receipt["primary_diagnostic_id"] == primary.diagnostic_id
+        assert receipt["native_cleanup_diagnostic_id"] == cleanup.diagnostic_id
+        assert len([item for item in diagnostics if item.code == "render_failed"]) == 1
+        assert manager.diagnostics is not None
+        assert (
+            manager.diagnostics.evidence_summary()["input_rejected"]["desktop_diagnostic_invalid"]
+            == 1
+        )
+        artifact_receipt = manager.diagnostics.last_dump_receipt
+        assert artifact_receipt is not None
+        assert artifact_receipt["outcome"] == "written"
+        artifacts = list(tmp_path.glob("overlay-diagnostics-failure-*.jsonl"))
+        assert artifacts == [tmp_path / artifact_receipt["file_name"]]
+        for artifact in artifacts:
+            content = artifact.read_bytes()
+            assert b"SYNTHETIC_PRIVATE_CHILD_JSON" not in content
+            assert len(content) == artifact_receipt["bytes"]
+            assert hashlib.sha256(content).hexdigest() == artifact_receipt["sha256"]
+    finally:
+        await manager.stop()
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["event_type", "actual_disposition"])
+async def test_desktop_child_diagnostic_rejects_arbitrary_values_before_artifact(
+    tmp_path: Path,
+    field: str,
+) -> None:
+    marker = "PRIVATE_CHILD_JSON_SENTINEL"
+    manager = OverlayProcessManager(
+        overlay_instance_id="desktop-enum-fixture",
+        diagnostics_dir=tmp_path,
+    )
+    record = {
+        "schema_version": 1,
+        "record_type": "renderer_event",
+        "event_type": "render_commit",
+        "renderer_revision": 1,
+        "actual_disposition": "committed",
+        "render_commit_acknowledged": False,
+        "slot_count": 1,
+        "line_count": 2,
+        "surface_visible": True,
+        "interaction_mode": "locked",
+        "window_width": 1344,
+        "window_height": 336,
+    }
+    event = {
+        "type": "desktop_renderer_diagnostic",
+        "overlay_instance_id": manager.overlay_instance_id,
+        "runtime_generation": 1,
+        "record": {**record, field: marker},
+    }
+    manager._handle_desktop_renderer_diagnostic(event, trusted_process_event=True)
+    diagnostics = manager.diagnostics
+    assert diagnostics is not None
+    assert not diagnostics.process_events
+    assert diagnostics.evidence_summary()["input_rejected"]["desktop_diagnostic_invalid"] == 1
+
+    manager._handle_desktop_renderer_diagnostic(
+        {**event, "record": record},
+        trusted_process_event=True,
+    )
+    assert len(diagnostics.process_events) == 1
+    assert diagnostics.process_events[0]["event_type"] == "render_commit"
+    receipt = await diagnostics.dump_evidence(outcome="failure", failure_reason="render_failed")
+    assert receipt["outcome"] == "written"
+    persisted = (tmp_path / receipt["file_name"]).read_text(encoding="utf-8")
+    assert marker not in persisted
+    assert receipt["input_rejected"]["desktop_diagnostic_invalid"] == 1
+
+
+@pytest.mark.parametrize(
+    "event_type, disposition, acknowledged",
+    [
+        ("receipt", "committed", False),
+        ("receipt", "superseded", False),
+        ("receipt", "stale", False),
+        ("receipt", "failed", False),
+        ("supersession", "superseded", False),
+        ("stale", "stale", False),
+        ("failed", "failed", False),
+        ("render_start", "committed", False),
+        ("render_commit", "committed", False),
+        ("render_commit_acknowledgement", "committed", True),
+    ],
+)
+def test_desktop_child_diagnostic_retains_legitimate_renderer_outcomes(
+    tmp_path: Path,
+    event_type: str,
+    disposition: str,
+    acknowledged: bool,
+) -> None:
+    manager = OverlayProcessManager(
+        overlay_instance_id="desktop-enum-fixture",
+        diagnostics_dir=tmp_path,
+    )
+    manager._handle_desktop_renderer_diagnostic(
+        {
+            "type": "desktop_renderer_diagnostic",
+            "overlay_instance_id": manager.overlay_instance_id,
+            "runtime_generation": 1,
+            "record": {
+                "schema_version": 1,
+                "record_type": "renderer_event",
+                "event_type": event_type,
+                "renderer_revision": 1,
+                "actual_disposition": disposition,
+                "render_commit_acknowledged": acknowledged,
+                "slot_count": 1,
+                "line_count": 2,
+                "surface_visible": True,
+                "interaction_mode": "locked",
+                "window_width": 1344,
+                "window_height": 336,
+            },
+        },
+        trusted_process_event=True,
+    )
+    assert manager.diagnostics is not None
+    assert manager.diagnostics.process_events[0]["event_type"] == event_type
+    assert manager.diagnostics.process_events[0]["actual_disposition"] == disposition

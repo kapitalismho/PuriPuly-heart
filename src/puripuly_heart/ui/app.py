@@ -5,14 +5,15 @@ import json
 import logging
 import tempfile
 import webbrowser
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import flet as ft
 from puripuly_heart.core.discord_oauth_loopback import (
     render_discord_oauth_callback_completion_page,
 )
-from puripuly_heart.core.managed_openrouter_release import TalkTogetherPassStatus
 
 from puripuly_heart.app.language_selection import LanguageSelectionChange
 from puripuly_heart.app.ports.chatgpt_account import (
@@ -23,6 +24,7 @@ from puripuly_heart.app.ports.settings_view import (
     ImmediateSettingsIntent,
     OpenRouterPkceTarget,
     PromptApplyIntent,
+    TranslationSelectionEdit,
 )
 from puripuly_heart.app.ports.ui_application import (
     UiApplicationFactoryPort,
@@ -35,11 +37,19 @@ from puripuly_heart.app.services.application_shutdown import (
 )
 from puripuly_heart.app.services.telemetry_reporting import TelemetryReportingOwner
 from puripuly_heart.config.provider_values import QwenRegion
+from puripuly_heart.core.diagnostics import (
+    diagnostic_operation,
+    emit_failure,
+    safe_exception_fields,
+)
 from puripuly_heart.core.language import get_stt_compatibility_warning
 from puripuly_heart.core.lifecycle import (
     SHUTDOWN_PHASE_FREEZE_INGRESS,
     SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
 )
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.qq_auth_diagnostics import exception_fields, log_qq_auth
+from puripuly_heart.ui.components.audio_test_dialog import AudioTestDialog
 from puripuly_heart.ui.components.bottom_nav import BottomNavBar
 from puripuly_heart.ui.components.chatgpt_auth_dialog import ChatGptAuthDialog
 from puripuly_heart.ui.components.debug_preview_panel import DebugPreviewPanel
@@ -48,7 +58,7 @@ from puripuly_heart.ui.components.founder_letter_dialog import FounderLetterDial
 from puripuly_heart.ui.components.local_qwen_hallucination_dialog import (
     LocalQwenHallucinationDialog,
 )
-from puripuly_heart.ui.components.microphone_test_dialog import MicrophoneTestDialog
+from puripuly_heart.ui.components.model_assets_dialog import ModelAssetsDialog
 from puripuly_heart.ui.components.peer_translation_eula_dialog import PeerTranslationEulaDialog
 from puripuly_heart.ui.components.qq_managed_auth_dialog import QqManagedAuthDialog
 from puripuly_heart.ui.components.title_bar import TitleBar
@@ -58,8 +68,8 @@ from puripuly_heart.ui.dashboard.contract import (
 )
 from puripuly_heart.ui.fonts import (
     font_for_language,
-    locale_body_letter_spacing,
     register_ui_fonts,
+    typeface_for_language,
 )
 from puripuly_heart.ui.foundation.adapter import FletFoundationAdapter
 from puripuly_heart.ui.foundation.preview import FoundationPreviewSurface
@@ -90,6 +100,7 @@ from puripuly_heart.ui.theme import (
     COLOR_SUCCESS,
     COLOR_WARNING,
     get_app_theme,
+    text_style,
 )
 from puripuly_heart.ui.views.about import AboutView
 from puripuly_heart.ui.views.dashboard import DashboardView
@@ -117,7 +128,6 @@ FOUNDER_README_API_KEYS_ANCHOR_BY_LOCALE = {
     "ru": "свои-api-ключи",
 }
 FOUNDER_README_DEFAULT_API_KEYS_ANCHOR = "using-your-own-api-keys"
-DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID = "7KQ9M2"
 GITHUB_STAR_REPOSITORY_URL = "https://github.com/kapitalismho/PuriPuly-heart"
 GITHUB_STAR_PROMPT_DELAY_S = 2.5
 GITHUB_STAR_PROMPT_DURATION_MS = 8000
@@ -216,7 +226,7 @@ class TranslatorApp:
         self._launch_high_priority_feedback_reason: str | None = None
         self._launch_high_priority_snackbar = None
         self._github_star_prompt_shown_this_launch = False
-        self._microphone_test_dialog: MicrophoneTestDialog | None = None
+        self._audio_test_dialog: AudioTestDialog | None = None
         self._foundation_preview_dialog: ft.AlertDialog | None = None
         self._foundation_adapter = FletFoundationAdapter(
             self.application,
@@ -244,6 +254,7 @@ class TranslatorApp:
                 toggle_overlay=self._on_overlay_toggle,
                 retry_peer_process_capture=self._on_retry_peer_process_capture,
                 run_gpu_notice_action=self.application.handle_gpu_notice_action,
+                run_managed_gemma_notice_action=self.application.handle_managed_gemma_notice_action,
             ),
         )
 
@@ -268,6 +279,7 @@ class TranslatorApp:
                 local_llm_secret_changed=self._on_local_llm_secret_changed,
                 custom_stt_secret_changed=self._on_custom_stt_secret_changed,
                 gpu_discovery_requested=self._on_gpu_discovery_requested,
+                open_model_assets=self._open_model_assets,
                 settings_secrets=self.application.settings_secrets(),
                 chatgpt=SettingsChatGptIntents(
                     account_snapshot=self.application.chatgpt_account_snapshot,
@@ -277,7 +289,7 @@ class TranslatorApp:
                 ),
             ),
             general=SettingsGeneralIntents(
-                start_microphone_test=self._on_start_microphone_test,
+                start_audio_test=self._on_start_audio_test,
                 telemetry_enabled_change=self._on_telemetry_enabled_change,
                 list_loopback_capture_options=(
                     lambda: self.application.list_loopback_capture_options()
@@ -462,10 +474,7 @@ class TranslatorApp:
         self.page.title = t("app.title")
         self.page.theme_mode = ft.ThemeMode.LIGHT
         register_ui_fonts(self.page)
-        self.page.theme = get_app_theme(
-            font_family=font_for_language(get_locale()),
-            body_letter_spacing=locale_body_letter_spacing(get_locale()),
-        )
+        self.page.theme = get_app_theme(face=typeface_for_language(get_locale()))
         self.page.bgcolor = COLOR_BACKGROUND
         self.page.padding = 0
         self.page.window.frameless = FOUNDATION_DESIGN_TOKENS.window.frameless
@@ -489,6 +498,7 @@ class TranslatorApp:
         self.view_settings = SettingsView(
             http_extension_registry=self.application.http_extension_registry()
         )
+        self.view_settings.bind_recent_language_queue(self.view_dashboard)
         self.view_logs = LogsView()
         self.view_about = AboutView()
         self.view_settings.set_overlay_runtime_state(self.overlay_state)
@@ -515,6 +525,13 @@ class TranslatorApp:
         self.layout = shell.layout
         self.page.add(shell.root)
 
+    def _open_model_assets(self) -> None:
+        if getattr(self, "_model_assets_dialog", None) is None:
+            self._model_assets_dialog = ModelAssetsDialog(
+                self.page, self.application, self._run_page_task
+            )
+        self._model_assets_dialog.open()
+
     def _build_debug_preview_panel(self) -> DebugPreviewPanel:
         return DebugPreviewPanel(
             on_display_turn_cycle=self._cycle_debug_preview_display_turn,
@@ -527,9 +544,6 @@ class TranslatorApp:
             on_founder_letter=self._preview_founder_letter,
             on_local_qwen_hallucination_modal=self._preview_local_qwen_hallucination_modal,
             on_github_star_snackbar=self._preview_github_star_snackbar,
-            on_talk_together_pass_invite_progress=(
-                self._preview_talk_together_pass_invite_progress
-            ),
             on_foundation_primitives=self._preview_foundation_primitives,
             on_http_extension_form=self._preview_http_extension_form,
             on_brake_notice=self._preview_brake_notice,
@@ -797,10 +811,7 @@ class TranslatorApp:
                         on_click=on_click,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
-                            text_style=ft.TextStyle(
-                                size=18,
-                                font_family=font_for_language(get_locale()),
-                            ),
+                            text_style=text_style(size=18),
                             overlay_color=COLOR_PRIMARY,
                         ),
                     ),
@@ -892,23 +903,6 @@ class TranslatorApp:
 
     def _preview_local_qwen_hallucination_modal(self) -> None:
         self.show_local_qwen_hallucination_dialog()
-
-    def _preview_talk_together_pass_invite_progress(self) -> None:
-        set_managed_key_state = getattr(self.view_settings, "set_managed_key_state", None)
-        if not callable(set_managed_key_state):
-            return
-        set_managed_key_state(
-            visible=True,
-            remaining_percent=100,
-            referral_id=DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID,
-            remember_referral_id=False,
-            pass_status=TalkTogetherPassStatus(
-                pass_id=DEBUG_PREVIEW_TALK_TOGETHER_PASS_ID,
-                invite_count=1,
-                invite_limit=3,
-                bonus_translations_per_friend=200,
-            ),
-        )
 
     def _preview_capture_fault_cycle(self) -> None:
         profile = self.application.cycle_debug_capture_fault_profile()
@@ -1013,13 +1007,13 @@ class TranslatorApp:
         self._run_page_task(_task)
 
     def _close_open_dialog_for_navigation(self) -> None:
-        microphone_test_dialog = getattr(self, "_microphone_test_dialog", None)
-        if microphone_test_dialog is not None and getattr(
-            microphone_test_dialog,
+        audio_test_dialog = getattr(self, "_audio_test_dialog", None)
+        if audio_test_dialog is not None and getattr(
+            audio_test_dialog,
             "is_open",
             False,
         ):
-            microphone_test_dialog.close(notify=True)
+            audio_test_dialog.close(notify=True)
             return
 
         try:
@@ -1041,10 +1035,40 @@ class TranslatorApp:
             try:
                 while self._settings_mutation_queue:
                     next_task = self._settings_mutation_queue.pop(0)
+                    operation_id = uuid4().hex
                     try:
-                        await next_task()
-                    except Exception:
-                        logger.exception("Settings mutation task failed")
+                        with diagnostic_operation(
+                            self.application.diagnostic_instance_id, operation_id, operation_id
+                        ):
+                            result = await next_task()
+                        if result is False:
+                            self._show_snackbar(
+                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                            )
+                    except Exception as exc:
+                        emit_failure(
+                            logger,
+                            ErrorDiagnostics(
+                                component="gui_settings_queue",
+                                operation="queued_mutation",
+                                code="settings_background_task_failed",
+                                category="transaction",
+                                visibility="basic",
+                                content_policy="metadata_only",
+                                status_code=None,
+                                retry_after_ms=None,
+                                fields={"phase": "queued_mutation", **safe_exception_fields(exc)},
+                                operation_id=operation_id,
+                                request_id=operation_id,
+                            ),
+                            stage="queued_mutation",
+                        )
+                        try:
+                            self._show_snackbar(
+                                t("settings.mutation.failed_pending"), COLOR_WARNING
+                            )
+                        except Exception:
+                            pass
             finally:
                 self._settings_mutation_worker_active = False
 
@@ -1075,6 +1099,7 @@ class TranslatorApp:
                         if result:
                             self.view_settings.acknowledge_provider_apply_settings(pending_settings)
                             self.application.refresh_settings_projection()
+                        return bool(result)
 
                     self._queue_settings_mutation_task(_task)
             elif getattr(self.view_settings, "has_pending_prompt_changes", False):
@@ -1085,6 +1110,7 @@ class TranslatorApp:
                     if result:
                         self.view_settings.acknowledge_prompt_apply_settings(pending)
                         self.application.refresh_settings_projection()
+                    return bool(result)
 
                 self._queue_settings_mutation_task(_task)
 
@@ -1130,10 +1156,7 @@ class TranslatorApp:
 
     def apply_locale(self) -> None:
         self.page.title = t("app.title")
-        self.page.theme = get_app_theme(
-            font_family=font_for_language(get_locale()),
-            body_letter_spacing=locale_body_letter_spacing(get_locale()),
-        )
+        self.page.theme = get_app_theme(face=typeface_for_language(get_locale()))
         self.view_dashboard.apply_locale()
         self.view_settings.apply_locale()
         self.refresh_overlay_peer_contract()
@@ -1439,53 +1462,76 @@ class TranslatorApp:
     def _on_settings_changed(self, intent: ImmediateSettingsIntent) -> None:
         async def _task():
             await self.application.apply_settings_intent(intent)
-            self._sync_microphone_test_dialog_if_inactive()
+            self._sync_audio_test_dialog_if_stopped()
 
         self._queue_settings_mutation_task(_task)
 
-    def _on_start_microphone_test(self) -> None:
+    def _on_start_audio_test(self) -> None:
+        admission_revision = self.application.audio_test_start_revision()
+
         async def _task():
-            dialog = self._get_microphone_test_dialog()
-            dialog.reset()
-            dialog.open()
-            started = await self.application.start_microphone_test(meter_callback=dialog.set_level)
+            if admission_revision != self.application.audio_test_start_revision():
+                return
+            dialog = self._get_audio_test_dialog()
+            if dialog.is_open:
+                return
+            thresholds = None
+            view_settings = getattr(self, "view_settings", None)
+            read_thresholds = getattr(view_settings, "vad_thresholds", None)
+            if callable(read_thresholds):
+                thresholds = read_thresholds()
+            dialog.open(thresholds)
+            started = await self.application.start_audio_test(
+                observation_callback=dialog.add_samples,
+                admission_revision=admission_revision,
+            )
             if not started:
                 dialog.show_failure()
-                return
 
         self._queue_settings_mutation_task(_task)
 
-    def _on_stop_microphone_test(self) -> None:
+    def _on_stop_audio_test(self) -> None:
         async def _task() -> None:
-            await self.application.stop_microphone_test()
-            self._close_microphone_test_dialog()
+            await self.application.stop_audio_test()
+            self._close_audio_test_dialog()
 
-        self._queue_settings_mutation_task(_task)
+        self._run_page_task(_task)
 
-    def _get_microphone_test_dialog(self) -> MicrophoneTestDialog:
-        dialog = getattr(self, "_microphone_test_dialog", None)
+    def _get_audio_test_dialog(self) -> AudioTestDialog:
+        dialog = getattr(self, "_audio_test_dialog", None)
         if dialog is None:
-            dialog = MicrophoneTestDialog(
+            dialog = AudioTestDialog(
                 self.page,
-                on_close=self._on_microphone_test_dialog_dismiss,
+                on_close=self._on_audio_test_dialog_dismiss,
+                on_threshold_change=self._on_audio_test_threshold_change,
+                snapshot_provider=self.application.audio_test_snapshot,
+                run_task=self._run_page_task,
             )
-            self._microphone_test_dialog = dialog
+            self._audio_test_dialog = dialog
         return dialog
 
-    def _close_microphone_test_dialog(self) -> None:
-        dialog = getattr(self, "_microphone_test_dialog", None)
+    def _on_audio_test_threshold_change(self, channel: str, value: float) -> None:
+        view_settings = getattr(self, "view_settings", None)
+        apply_threshold = getattr(view_settings, "apply_vad_threshold", None)
+        if callable(apply_threshold):
+            apply_threshold(channel, value)
+
+    def _close_audio_test_dialog(self) -> None:
+        dialog = getattr(self, "_audio_test_dialog", None)
         if dialog is None:
             return
         dialog.close(notify=False)
-        dialog.reset()
 
-    def _on_microphone_test_dialog_dismiss(self) -> None:
-        self._on_stop_microphone_test()
+    def _on_audio_test_dialog_dismiss(self) -> None:
+        self._on_stop_audio_test()
 
-    def _sync_microphone_test_dialog_if_inactive(self) -> None:
-        if self.application.state().microphone_test_active:
+    def _sync_audio_test_dialog_if_stopped(self) -> None:
+        dialog = getattr(self, "_audio_test_dialog", None)
+        if dialog is None or not dialog.is_open:
             return
-        self._close_microphone_test_dialog()
+        if self.application.audio_test_snapshot().get("state") != "off":
+            return
+        self._close_audio_test_dialog()
 
     def _on_prompt_apply_settings(self, intent: PromptApplyIntent) -> None:
         async def _task():
@@ -1493,19 +1539,28 @@ class TranslatorApp:
             if result:
                 self.view_settings.acknowledge_prompt_apply_settings(intent)
                 self.application.refresh_settings_projection()
+            return bool(result)
 
         self._queue_settings_mutation_task(_task)
 
     def _on_providers_changed(self) -> None:
         view_settings = getattr(self, "view_settings", None)
+        consume_immediate = getattr(
+            view_settings, "consume_immediate_provider_apply_settings", None
+        )
+        pending_intent = consume_immediate() if callable(consume_immediate) else None
+        focused_intent = pending_intent
         consume_http_extension_runtime_reload = getattr(
             view_settings,
             "consume_http_extension_runtime_reload",
             None,
         )
-        if callable(consume_http_extension_runtime_reload) and (
+        runtime_reload = (
             consume_http_extension_runtime_reload()
-        ):
+            if callable(consume_http_extension_runtime_reload)
+            else False
+        )
+        if pending_intent is None and runtime_reload:
 
             async def _runtime_only_task():
                 await self.application.apply_providers(
@@ -1516,12 +1571,13 @@ class TranslatorApp:
             self._queue_settings_mutation_task(_runtime_only_task)
             return
 
-        pending_intent = None
         build_provider_apply_settings = getattr(
             view_settings, "build_provider_apply_settings", None
         )
-        if callable(build_provider_apply_settings) and getattr(
-            view_settings, "has_provider_changes", False
+        if (
+            pending_intent is None
+            and callable(build_provider_apply_settings)
+            and getattr(view_settings, "has_provider_changes", False)
         ):
             pending_intent = build_provider_apply_settings()
         if pending_intent is not None:
@@ -1532,6 +1588,25 @@ class TranslatorApp:
                 await self.application.apply_providers()
                 return
             result = await self.application.apply_provider_intent(pending_intent)
+            if not result and focused_intent is not None:
+                committed = self.application.compatibility_settings()
+                selection_edit = next(
+                    (
+                        edit
+                        for edit in focused_intent.edits
+                        if isinstance(edit, TranslationSelectionEdit)
+                    ),
+                    None,
+                )
+                if (
+                    committed is not None
+                    and selection_edit is not None
+                    and committed.intent.translation.model == selection_edit.selection.model.value
+                    and committed.intent.translation.connection
+                    == selection_edit.selection.connection.value
+                ):
+                    view_settings.acknowledge_provider_apply_settings(focused_intent)
+                    self.application.refresh_settings_projection()
             if result:
                 view_settings.acknowledge_provider_apply_settings(pending_intent)
                 self.application.refresh_settings_projection()
@@ -1545,6 +1620,7 @@ class TranslatorApp:
                 )
                 if verification is not None:
                     self._run_page_task(verification)
+            return bool(result)
 
         self._queue_settings_mutation_task(_task)
 
@@ -1632,8 +1708,21 @@ class TranslatorApp:
             self._refresh_chatgpt_account_card()
             try:
                 result = await self.application.connect_chatgpt()
-            except Exception:
-                self._log_basic("[ChatGPT] sign-in task failed", level=logging.ERROR)
+            except Exception as exc:
+                emit_failure(
+                    logger,
+                    ErrorDiagnostics(
+                        component="chatgpt_account",
+                        operation="sign_in",
+                        code="chatgpt_sign_in_failed",
+                        category="auth",
+                        visibility="basic",
+                        content_policy="metadata_only",
+                        status_code=None,
+                        retry_after_ms=None,
+                        fields={"phase": "sign_in", **safe_exception_fields(exc)},
+                    ),
+                )
                 result = ChatGptConnectResult(succeeded=False, failure_code="failed")
             dialog = getattr(self, "_chatgpt_auth_dialog", None)
             if dialog is not None:
@@ -1699,6 +1788,9 @@ class TranslatorApp:
             close()
 
     def show_discord_managed_auth_dialog(self, preview: bool = False) -> None:
+        existing = getattr(self, "_discord_managed_auth_dialog", None)
+        if getattr(existing, "is_open", False):
+            return
         if not preview:
             self._mark_launch_high_priority_feedback_shown("auth_required")
         if preview:
@@ -1726,6 +1818,9 @@ class TranslatorApp:
         dialog.open()
 
     def show_qq_managed_auth_dialog(self) -> None:
+        existing = getattr(self, "_qq_managed_auth_dialog", None)
+        if getattr(existing, "is_open", False):
+            return
         self._mark_launch_high_priority_feedback_shown("auth_required")
         dialog = QqManagedAuthDialog(
             self.page,
@@ -1744,82 +1839,139 @@ class TranslatorApp:
             if callable(close):
                 close()
 
-    def _next_qq_managed_auth_generation(self) -> int:
-        generation = int(getattr(self, "_qq_managed_auth_generation", 0)) + 1
-        self._qq_managed_auth_generation = generation
-        self._qq_managed_auth_cancelled = False
-        return generation
+    def _admit_managed_auth_ui_task(
+        self,
+        source: str,
+        dialog: object,
+        generation: int,
+        task_factory: Callable[[], Awaitable[None]],
+    ) -> None:
+        if self.application.managed_auth_task_names() or (
+            self.application.dashboard_managed_auth_action() == "in_progress"
+        ):
+            if not getattr(dialog, "is_waiting", False):
+                set_error = getattr(dialog, "set_error", None)
+                if callable(set_error):
+                    set_error(f"{source}_auth.error.other_source_pending")
+            return
+        previous_generation = getattr(self, f"_{source}_managed_auth_generation", 0)
+        previous_cancelled = getattr(self, f"_{source}_managed_auth_cancelled", False)
+
+        def run_admitted(factory: Callable[[], Awaitable[None]]) -> object:
+            setattr(self, f"_{source}_managed_auth_generation", generation)
+            setattr(self, f"_{source}_managed_auth_cancelled", False)
+            set_waiting = getattr(dialog, "set_waiting", None)
+            if callable(set_waiting):
+                set_waiting()
+            return self._run_page_task(factory)
+
+        try:
+            handle = self.application.start_managed_auth_task(
+                task_runner=run_admitted,
+                task_factory=task_factory,
+                task_name=f"{source}-managed-auth-dialog",
+                generation=generation,
+            )
+        except Exception:
+            setattr(self, f"_{source}_managed_auth_generation", previous_generation)
+            setattr(self, f"_{source}_managed_auth_cancelled", previous_cancelled)
+            set_error = getattr(dialog, "set_error", None)
+            if callable(set_error):
+                set_error(f"{source}_auth.error.retry")
+            return
+        setattr(self, f"_{source}_managed_auth_task_handle", handle)
 
     def _is_current_qq_managed_auth_generation(self, generation: int) -> bool:
         return bool(
             generation == getattr(self, "_qq_managed_auth_generation", None)
             and not getattr(self, "_qq_managed_auth_cancelled", False)
+            and self.application.managed_auth_tasks_open()
         )
 
     def _start_qq_managed_auth(self) -> None:
         dialog = getattr(self, "_qq_managed_auth_dialog", None)
         qq_identity = getattr(dialog, "qq_identity", "")
         credential = getattr(dialog, "credential", "")
-        set_waiting = getattr(dialog, "set_waiting", None)
-        if callable(set_waiting):
-            set_waiting()
-        generation = self._next_qq_managed_auth_generation()
+        generation = int(getattr(self, "_qq_managed_auth_generation", 0)) + 1
+        prompt_kind = self.application.dashboard_managed_auth_prompt_kind()
 
         async def _task() -> None:
             application = self.application
-            if not self._is_current_qq_managed_auth_generation(generation):
-                return
             try:
-                result = await application.start_qq_managed_auth_from_dialog(
-                    qq_identity=qq_identity,
-                    credential=credential,
-                )
-            except asyncio.CancelledError:
-                return
-            except Exception:
-                self._log_basic("[ManagedAuth] QQ auth task failed", level=logging.ERROR)
-                result = None
-            if not self._is_current_qq_managed_auth_generation(generation):
-                return
-            if result is True:
-                enable_result = await application.set_translation_enabled(True)
                 if not self._is_current_qq_managed_auth_generation(generation):
                     return
-                if not application.translation_enable_succeeded(enable_result):
+                try:
+                    result = await application.start_qq_managed_auth_from_dialog(
+                        qq_identity=qq_identity,
+                        credential=credential,
+                    )
+                except Exception as exc:
+                    log_qq_auth("authentication", "unknown_error", fields=exception_fields(exc))
+                    result = None
+                if (
+                    not self._is_current_qq_managed_auth_generation(generation)
+                    or dialog is not getattr(self, "_qq_managed_auth_dialog", None)
+                    or prompt_kind != application.dashboard_managed_auth_prompt_kind()
+                ):
+                    return
+                if result is True:
+                    log_qq_auth("authentication", "authentication_succeeded", level=logging.INFO)
+                    try:
+                        enable_result = await application.set_translation_enabled(True)
+                        translation_ready = application.translation_enable_succeeded(enable_result)
+                    except Exception as exc:
+                        log_qq_auth(
+                            "translation_start",
+                            "translation_init_failed",
+                            fields=exception_fields(exc),
+                        )
+                        translation_ready = False
+                    if not self._is_current_qq_managed_auth_generation(generation):
+                        return
+                    self._close_qq_managed_auth_dialog()
+                    self._set_dashboard_translation_visual_state(translation_ready)
+                    if not translation_ready:
+                        log_qq_auth("translation_start", "translation_init_failed")
+                    self._show_snackbar(
+                        t(
+                            "qq_auth.success"
+                            if translation_ready
+                            else "qq_auth.error.translation_start_failed"
+                        ),
+                        COLOR_SUCCESS if translation_ready else COLOR_WARNING,
+                    )
+                    return
+                message_key = "qq_auth.error.retry"
+                message_kwargs: dict[str, object] = {}
+                if isinstance(result, tuple) and result:
+                    message_key = str(result[0])
+                    if len(result) > 1 and isinstance(result[1], dict):
+                        message_kwargs = dict(result[1])
+                set_error = getattr(dialog, "set_error", None)
+                if callable(set_error):
+                    log_qq_auth(
+                        "authentication",
+                        (
+                            "unknown_error"
+                            if message_key == "qq_auth.error.retry"
+                            else message_key.rsplit(".", 1)[-1]
+                        ),
+                    )
+                    set_error(message_key, **message_kwargs)
+            except asyncio.CancelledError:
+                if self._is_current_qq_managed_auth_generation(generation):
                     set_error = getattr(dialog, "set_error", None)
                     if callable(set_error):
                         set_error("qq_auth.error.retry")
+            finally:
+                if generation == getattr(self, "_qq_managed_auth_generation", None):
                     self._qq_managed_auth_task_handle = None
-                    return
-                self._close_qq_managed_auth_dialog()
-                self._show_snackbar(t("qq_auth.success"), COLOR_SUCCESS)
-                self._set_dashboard_translation_visual_state(True)
-                self._qq_managed_auth_task_handle = None
-                self.application.clear_managed_auth_task(
-                    "qq-managed-auth-dialog",
-                )
-                return
-            message_key = "qq_auth.error.retry"
-            message_kwargs: dict[str, object] = {}
-            if isinstance(result, tuple) and result:
-                message_key = str(result[0])
-                if len(result) > 1 and isinstance(result[1], dict):
-                    message_kwargs = dict(result[1])
-            set_error = getattr(dialog, "set_error", None)
-            if callable(set_error):
-                set_error(message_key, **message_kwargs)
-            if self._is_current_qq_managed_auth_generation(generation):
-                self._qq_managed_auth_task_handle = None
-                self.application.clear_managed_auth_task(
-                    "qq-managed-auth-dialog",
-                )
+                    if self._is_current_qq_managed_auth_generation(generation) and getattr(
+                        dialog, "is_waiting", False
+                    ):
+                        dialog.set_error("qq_auth.error.retry")
 
-        self._qq_managed_auth_task_handle = self.application.start_managed_auth_task(
-            task_runner=self._run_page_task,
-            task_factory=_task,
-            task_name="qq-managed-auth-dialog",
-            generation=generation,
-        )
+        self._admit_managed_auth_ui_task("qq", dialog, generation, _task)
 
     def _cancel_qq_managed_auth(self) -> None:
         self._qq_managed_auth_cancelled = True
@@ -1828,18 +1980,8 @@ class TranslatorApp:
             task_handle,
             task_name="qq-managed-auth-dialog",
         )
-        cancel = getattr(task_handle, "cancel", None)
-        if callable(cancel):
-            with contextlib.suppress(Exception):
-                cancel()
         self._qq_managed_auth_task_handle = None
         self._close_qq_managed_auth_dialog()
-
-    def _next_discord_managed_auth_generation(self) -> int:
-        generation = int(getattr(self, "_discord_managed_auth_generation", 0)) + 1
-        self._discord_managed_auth_generation = generation
-        self._discord_managed_auth_cancelled = False
-        return generation
 
     def _is_current_discord_managed_auth_generation(self, generation: int) -> bool:
         return bool(
@@ -1850,10 +1992,8 @@ class TranslatorApp:
 
     def _start_discord_managed_auth(self) -> None:
         dialog = getattr(self, "_discord_managed_auth_dialog", None)
-        set_waiting = getattr(dialog, "set_waiting", None)
-        if callable(set_waiting):
-            set_waiting()
-        generation = self._next_discord_managed_auth_generation()
+        generation = int(getattr(self, "_discord_managed_auth_generation", 0)) + 1
+        prompt_kind = self.application.dashboard_managed_auth_prompt_kind()
 
         async def _task() -> None:
             application = self.application
@@ -1874,35 +2014,43 @@ class TranslatorApp:
                 if not ok:
                     self.mark_discord_managed_auth_failed(generation)
                     return
+                if (
+                    not self._is_current_discord_managed_auth_generation(generation)
+                    or dialog is not getattr(self, "_discord_managed_auth_dialog", None)
+                    or prompt_kind != application.dashboard_managed_auth_prompt_kind()
+                ):
+                    return
+                try:
+                    enable_result = await application.set_translation_enabled(True)
+                    translation_ready = application.translation_enable_succeeded(enable_result)
+                except Exception:
+                    translation_ready = False
                 if not self._is_current_discord_managed_auth_generation(generation):
                     return
-                enable_result = await application.set_translation_enabled(True)
-                if not self._is_current_discord_managed_auth_generation(generation):
-                    return
-                if not application.translation_enable_succeeded(enable_result):
-                    return
-            except asyncio.CancelledError:
-                return
-            except Exception:
-                logger.exception("Discord managed auth task failed")
-                return
-            self._close_discord_managed_auth_dialog()
-            self._show_snackbar(t("discord_auth.success"), COLOR_SUCCESS)
-            if application.state().managed_auth_referral_bonus_applied:
-                self._show_snackbar(t("discord_auth.referral_reward_applied"), COLOR_SUCCESS)
-            self._set_dashboard_translation_visual_state(True)
-            if self._is_current_discord_managed_auth_generation(generation):
-                self._discord_managed_auth_task_handle = None
-                self.application.clear_managed_auth_task(
-                    "discord-managed-auth-dialog",
+                self._close_discord_managed_auth_dialog()
+                self._show_snackbar(
+                    t(
+                        "discord_auth.success"
+                        if translation_ready
+                        else "discord_auth.error.translation_start_failed"
+                    ),
+                    COLOR_SUCCESS if translation_ready else COLOR_WARNING,
                 )
+                self._set_dashboard_translation_visual_state(translation_ready)
+            except asyncio.CancelledError:
+                if self._is_current_discord_managed_auth_generation(generation):
+                    self.mark_discord_managed_auth_failed(generation)
+            except Exception:
+                self.mark_discord_managed_auth_failed(generation)
+            finally:
+                if generation == getattr(self, "_discord_managed_auth_generation", None):
+                    self._discord_managed_auth_task_handle = None
+                    if self._is_current_discord_managed_auth_generation(generation) and getattr(
+                        dialog, "is_waiting", False
+                    ):
+                        self.mark_discord_managed_auth_failed(generation)
 
-        self._discord_managed_auth_task_handle = self.application.start_managed_auth_task(
-            task_runner=self._run_page_task,
-            task_factory=_task,
-            task_name="discord-managed-auth-dialog",
-            generation=generation,
-        )
+        self._admit_managed_auth_ui_task("discord", dialog, generation, _task)
 
     async def _close_managed_auth_ui_tasks(self) -> None:
         self._discord_managed_auth_cancelled = True
@@ -1973,14 +2121,23 @@ class TranslatorApp:
             observed = None
         if isinstance(observed, str) and observed:
             failure_kind = observed
-        if failure_kind == "recovering":
-            set_recovering = getattr(dialog, "set_recovering", None)
-            if callable(set_recovering):
-                set_recovering()
-            return
-        set_action_required = getattr(dialog, "set_action_required", None)
-        if callable(set_action_required):
-            set_action_required()
+        set_error = getattr(dialog, "set_error", None)
+        if callable(set_error):
+            resumable = failure_kind == "idle_resumable"
+            message_key = self.application.managed_auth_last_message_key()
+            set_error(
+                message_key
+                or (
+                    "discord_auth.error.recovery_pending"
+                    if resumable
+                    else "discord_auth.error.retry"
+                ),
+                resume=resumable,
+            )
+        else:
+            set_action_required = getattr(dialog, "set_action_required", None)
+            if callable(set_action_required):
+                set_action_required()
 
     def _cancel_discord_managed_auth(self) -> None:
         self._discord_managed_auth_cancelled = True
@@ -1989,10 +2146,6 @@ class TranslatorApp:
             task_handle,
             task_name="discord-managed-auth-dialog",
         )
-        cancel = getattr(task_handle, "cancel", None)
-        if callable(cancel):
-            with contextlib.suppress(Exception):
-                cancel()
         self._discord_managed_auth_task_handle = None
         self._close_discord_managed_auth_dialog()
 
@@ -2375,13 +2528,8 @@ class TranslatorApp:
         state: str,
         failure_reason: str | None = None,
     ) -> None:
-        previous_state = getattr(self, "overlay_state", "unknown")
-        self._log_basic(f"[Overlay] State changed: {previous_state} -> {state}")
         self.overlay_state = state
         self.overlay_failure_reason = failure_reason
-        self._log_diagnostic(
-            f"[Overlay] State detail: overlay_state={state} failure_reason={failure_reason}"
-        )
         self._sync_settings_overlay_runtime_state()
         self.refresh_overlay_peer_contract()
 
@@ -2454,10 +2602,7 @@ async def _check_and_notify_update(
                         on_click=_open_download,
                         style=ft.ButtonStyle(
                             color=ft.Colors.WHITE,
-                            text_style=ft.TextStyle(
-                                size=18,
-                                font_family=font_for_language(get_locale()),
-                            ),
+                            text_style=text_style(size=18),
                             overlay_color=COLOR_PRIMARY,
                         ),
                     ),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Callable, Mapping
+from typing import Literal
 from uuid import uuid4
 
 import pytest
@@ -133,6 +134,368 @@ async def _wait_for_requests(server: _FakeServer, count: int) -> None:
     async with asyncio.timeout(1):
         while len(server.requests) < count:
             await asyncio.sleep(0)
+
+
+async def _wait_for_idle(provider: ChatGptPlanLLMProvider, count: int) -> None:
+    async with asyncio.timeout(1):
+        while len(provider._idle) != count or provider._openings:
+            await asyncio.sleep(0)
+
+
+async def _activate(provider: ChatGptPlanLLMProvider) -> None:
+    await provider.set_connection_mode("active")
+    await _wait_for_idle(provider, min(provider.prepared_connections, provider.max_connections))
+
+
+async def _wait_for_closed(server: _FakeServer, count: int) -> None:
+    async with asyncio.timeout(1):
+        while server.closed < count:
+            await asyncio.sleep(0)
+
+
+async def _settle(provider: ChatGptPlanLLMProvider) -> None:
+    async with asyncio.timeout(1):
+        while provider._openings or provider._maintenance or provider._dispatch_handle is not None:
+            await asyncio.sleep(0)
+
+
+async def test_standby_opens_exactly_one_idle_socket_without_sending_requests() -> None:
+    server = _FakeServer(_completed("ready"))
+    provider = _provider(server, _FakeSession())
+    try:
+        await provider.set_connection_mode("standby")
+        await _settle(provider)
+        await provider.set_connection_mode("standby")
+        await _settle(provider)
+        assert len(server.sockets) == 1
+        assert server.requests == []
+        execution = await asyncio.wait_for(_admit(provider), timeout=1)
+        try:
+            assert execution.attempt_count == 1
+            assert len(server.sockets) == 1
+            assert server.requests == []
+            assert (await execution.translate_attempt(0)).text == "ready"
+        finally:
+            await execution.close()
+        assert len(server.sockets[0].sent) == 1
+    finally:
+        await provider.close()
+
+
+async def test_standby_admits_immediately_while_active_expansion_is_blocked() -> None:
+    server = _FakeServer(_completed("immediate"))
+    expanded = asyncio.Event()
+    gate = asyncio.Event()
+    calls = 0
+
+    async def connect(url: str, headers: Mapping[str, str]) -> _FakeSocket:
+        nonlocal calls
+        calls += 1
+        if calls > 1:
+            if calls == 6:
+                expanded.set()
+            await gate.wait()
+        return await server.connect(url, headers)
+
+    provider = ChatGptPlanLLMProvider(session=_FakeSession(), connector=connect)
+    execution = None
+    try:
+        await provider.set_connection_mode("standby")
+        await _wait_for_idle(provider, 1)
+        original = server.sockets[0]
+        await asyncio.wait_for(provider.set_connection_mode("active"), timeout=1)
+        await asyncio.wait_for(expanded.wait(), timeout=1)
+        execution = await asyncio.wait_for(_admit(provider), timeout=1)
+        assert execution.attempt_count == 1
+        assert len(server.sockets) == 1
+        assert server.requests == []
+        assert (
+            await asyncio.wait_for(execution.translate_attempt(0), timeout=1)
+        ).text == "immediate"
+        await execution.close()
+        gate.set()
+        await _wait_for_idle(provider, 6)
+        assert len(server.sockets) == 6
+        assert len(original.sent) == 1
+        await provider.set_connection_mode("standby")
+        await _settle(provider)
+        assert original.close_code is None
+        assert all(socket.close_code == 1000 for socket in server.sockets[1:])
+        assert await _translate(provider, "next") == "immediate"
+        assert len(original.sent) == 2
+        assert len(server.sockets) == 6
+    finally:
+        gate.set()
+        if execution is not None:
+            await execution.close()
+        await provider.close()
+
+
+async def test_rapid_mode_changes_retire_late_cancelled_sockets_without_overflow() -> None:
+    server = _FakeServer(_completed("latest"))
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    gate = asyncio.Event()
+    calls = 0
+    cancelled_count = 0
+
+    async def connect(url: str, headers: Mapping[str, str]) -> _FakeSocket:
+        nonlocal calls, cancelled_count
+        calls += 1
+        if 2 <= calls <= 3:
+            if calls == 3:
+                entered.set()
+            try:
+                await gate.wait()
+            except asyncio.CancelledError:
+                cancelled_count += 1
+                if cancelled_count == 2:
+                    cancelled.set()
+                await gate.wait()
+        assert sum(socket.close_code is None for socket in server.sockets) < 3
+        return await server.connect(url, headers)
+
+    provider = ChatGptPlanLLMProvider(
+        session=_FakeSession(), connector=connect, max_connections=3, prepared_connections=3
+    )
+    try:
+        await provider.set_connection_mode("standby")
+        await _wait_for_idle(provider, 1)
+        original = server.sockets[0]
+        await provider.set_connection_mode("active")
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        await provider.set_connection_mode("standby")
+        await asyncio.wait_for(cancelled.wait(), timeout=1)
+        await provider.set_connection_mode("active")
+        assert calls == 3
+        assert original.close_code is None
+        gate.set()
+        await _wait_for_idle(provider, 3)
+        await _settle(provider)
+        assert calls == 5
+        assert server.sockets[0] is original
+        assert original.close_code is None
+        assert all(socket.close_code == 1000 for socket in server.sockets[1:3])
+        assert sum(socket.close_code is None for socket in server.sockets) == 3
+        assert server.requests == []
+        await provider.set_connection_mode("standby")
+        await _settle(provider)
+        assert sum(socket.close_code is None for socket in server.sockets) == 1
+        assert original.close_code is None
+    finally:
+        gate.set()
+        await provider.close()
+
+
+@pytest.mark.parametrize("mode", ["standby", "active"])
+async def test_proactive_connection_failure_does_not_retry_automatically(
+    mode: Literal["standby", "active"],
+) -> None:
+    calls = 0
+
+    async def connect(_url: str, _headers: Mapping[str, str]) -> _FakeSocket:
+        nonlocal calls
+        calls += 1
+        raise OSError("connection unavailable")
+
+    provider = ChatGptPlanLLMProvider(
+        session=_FakeSession(), connector=connect, max_connections=3, prepared_connections=3
+    )
+    try:
+        await provider.set_connection_mode(mode)
+        await _settle(provider)
+        expected = 1 if mode == "standby" else 3
+        assert calls == expected
+        await provider.set_connection_mode(mode)
+        await _settle(provider)
+        assert calls == expected
+        assert provider._open_count == 0
+        await provider.set_connection_mode("inactive")
+        await provider.set_connection_mode("standby")
+        await _settle(provider)
+        assert calls == expected + 1
+    finally:
+        await provider.close()
+
+
+@pytest.mark.parametrize("shutdown", ["inactive", "close"])
+async def test_shutdown_cancels_proactive_opening_and_retires_its_late_socket(
+    shutdown: str,
+) -> None:
+    server = _FakeServer(_completed("unused"))
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    gate = asyncio.Event()
+
+    async def connect(url: str, headers: Mapping[str, str]) -> _FakeSocket:
+        entered.set()
+        try:
+            await gate.wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            await gate.wait()
+        return await server.connect(url, headers)
+
+    provider = ChatGptPlanLLMProvider(session=_FakeSession(), connector=connect)
+    close_task: asyncio.Task[None] | None = None
+    try:
+        await provider.set_connection_mode("standby")
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        if shutdown == "inactive":
+            await asyncio.wait_for(provider.set_connection_mode("inactive"), timeout=1)
+        else:
+            close_task = asyncio.create_task(provider.close())
+        await asyncio.wait_for(cancelled.wait(), timeout=1)
+        if close_task is not None:
+            assert not close_task.done()
+        assert server.requests == []
+        assert server.sockets == []
+        gate.set()
+        if close_task is not None:
+            await asyncio.wait_for(close_task, timeout=1)
+        await _settle(provider)
+        assert len(server.sockets) == 1
+        assert server.closed == 1
+        assert provider._open_count == 0
+        await provider.set_connection_mode("inactive")
+        await _settle(provider)
+        assert len(server.sockets) == 1
+    finally:
+        gate.set()
+        await provider.close()
+        if close_task is not None:
+            await asyncio.gather(close_task, return_exceptions=True)
+
+
+async def test_inactive_to_active_ignores_failed_completion_from_the_old_epoch() -> None:
+    server = _FakeServer(_completed("latest"))
+    entered = asyncio.Event()
+    cancelled = asyncio.Event()
+    gate = asyncio.Event()
+    calls = 0
+
+    async def connect(url: str, headers: Mapping[str, str]) -> _FakeSocket:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            entered.set()
+            try:
+                await gate.wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                await gate.wait()
+            raise OSError("obsolete opening")
+        return await server.connect(url, headers)
+
+    provider = ChatGptPlanLLMProvider(
+        session=_FakeSession(), connector=connect, max_connections=1, prepared_connections=1
+    )
+    try:
+        await provider.set_connection_mode("standby")
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        await provider.set_connection_mode("inactive")
+        await asyncio.wait_for(cancelled.wait(), timeout=1)
+        await provider.set_connection_mode("active")
+        assert calls == 1
+        gate.set()
+        await _wait_for_idle(provider, 1)
+        await _settle(provider)
+        assert calls == 2
+        assert server.requests == []
+        assert await _translate(provider) == "latest"
+        assert len(server.sockets) == 1
+    finally:
+        gate.set()
+        await provider.close()
+
+
+async def test_standby_reuses_valid_return_when_the_retained_idle_socket_closes() -> None:
+    server = _FakeServer(_completed("reused"))
+    server.gate = asyncio.Event()
+    provider = _provider(server, _FakeSession(), max_connections=2, prepared_connections=2)
+    translation: asyncio.Task[str] | None = None
+    try:
+        await _activate(provider)
+        original, busy = server.sockets
+        translation = asyncio.create_task(_translate(provider))
+        await _wait_for_requests(server, 1)
+        await provider.set_connection_mode("standby")
+        original.close_code = 1006
+        server.gate.set()
+        assert await translation == "reused"
+        await _settle(provider)
+        assert len(server.sockets) == 2
+        assert busy.close_code is None
+        assert await _translate(provider, "next") == "reused"
+        assert len(busy.sent) == 2
+        assert len(server.sockets) == 2
+    finally:
+        server.gate.set()
+        if translation is not None:
+            await asyncio.gather(translation, return_exceptions=True)
+        await provider.close()
+
+
+async def test_standby_replaces_token_invalidated_during_proactive_opening() -> None:
+    server = _FakeServer(_completed("fresh"))
+    session = _FakeSession()
+    entered = asyncio.Event()
+    gate = asyncio.Event()
+    calls = 0
+
+    async def connect(url: str, headers: Mapping[str, str]) -> _FakeSocket:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            entered.set()
+            await gate.wait()
+        return await server.connect(url, headers)
+
+    provider = ChatGptPlanLLMProvider(session=session, connector=connect, max_connections=1)
+    try:
+        await provider.set_connection_mode("standby")
+        await asyncio.wait_for(entered.wait(), timeout=1)
+        session.rotate()
+        gate.set()
+        await _wait_for_idle(provider, 1)
+        assert [socket.token for socket in server.sockets] == ["token-1", "token-2"]
+        assert server.sockets[0].close_code == 1000
+        assert server.requests == []
+        assert await _translate(provider) == "fresh"
+        assert [len(socket.sent) for socket in server.sockets] == [0, 1]
+    finally:
+        gate.set()
+        await provider.close()
+
+
+async def test_standby_shrink_keeps_idle_socket_while_other_exchanges_drain() -> None:
+    server = _FakeServer(_completed("drained"))
+    server.gate = asyncio.Event()
+    provider = _provider(server, _FakeSession(), max_connections=3, prepared_connections=3)
+    attempts: list[asyncio.Task[str]] = []
+    try:
+        await provider.set_connection_mode("standby")
+        await _wait_for_idle(provider, 1)
+        original = server.sockets[0]
+        await _activate(provider)
+        attempts = [asyncio.create_task(_translate(provider, str(index))) for index in range(2)]
+        await _wait_for_requests(server, 2)
+        assert original.sent == []
+        await provider.set_connection_mode("standby")
+        assert original.close_code is None
+        assert server.closed == 0
+        server.gate.set()
+        assert await asyncio.gather(*attempts) == ["drained", "drained"]
+        await _settle(provider)
+        assert original.close_code is None
+        assert server.closed == 2
+        assert await _translate(provider, "retained") == "drained"
+        assert len(original.sent) == 1
+        assert len(server.sockets) == 3
+    finally:
+        server.gate.set()
+        await asyncio.gather(*attempts, return_exceptions=True)
+        await provider.close()
 
 
 async def test_translate_sends_plan_compatible_request_and_reuses_connection() -> None:
@@ -290,11 +653,11 @@ async def test_runaway_output_is_rejected_and_connection_discarded() -> None:
     assert server.closed == 1
 
 
-async def test_prepare_connections_opens_idle_connections_for_first_utterances() -> None:
+async def test_active_opens_idle_connections_without_translation_requests() -> None:
     server = _FakeServer(_completed("ok"))
     provider = _provider(server, _FakeSession(), prepared_connections=2)
 
-    await provider.prepare_connections()
+    await _activate(provider)
     assert len(server.sockets) == 2
     assert server.requests == []
 
@@ -304,21 +667,24 @@ async def test_prepare_connections_opens_idle_connections_for_first_utterances()
     assert server.closed == 2
 
 
-async def test_release_closes_idle_connections_and_drains_in_flight_ones() -> None:
+async def test_inactive_closes_idle_connections_and_drains_in_flight_ones() -> None:
     server = _FakeServer(_completed("ok"))
     provider = _provider(server, _FakeSession(), prepared_connections=2)
-    await provider.prepare_connections()
+    await _activate(provider)
 
     server.gate = asyncio.Event()
     in_flight = asyncio.create_task(_translate(provider))
-    await asyncio.sleep(0.01)
-    await provider.release_connections()
+    await _wait_for_requests(server, 1)
+    await provider.set_connection_mode("inactive")
+    await _wait_for_closed(server, 1)
     assert server.closed == 1
 
     server.gate.set()
     assert await in_flight == "ok"
     assert server.closed == 2
 
+    await provider.set_connection_mode("standby")
+    await _wait_for_idle(provider, 1)
     assert await _translate(provider) == "ok"
     assert await _translate(provider) == "ok"
     assert len(server.sockets) == 3
@@ -326,9 +692,10 @@ async def test_release_closes_idle_connections_and_drains_in_flight_ones() -> No
     await provider.close()
 
 
-async def test_cancelled_preparation_closes_partial_connections_and_unblocks_next_request() -> None:
+async def test_standby_cancels_excess_openings_and_preserves_the_original_socket() -> None:
     server = _FakeServer(_completed("ready"))
     pending = asyncio.Event()
+    cancelled = asyncio.Event()
     gate = asyncio.Event()
     calls = 0
 
@@ -337,31 +704,47 @@ async def test_cancelled_preparation_closes_partial_connections_and_unblocks_nex
         calls += 1
         if calls == 3:
             pending.set()
-            await gate.wait()
+            try:
+                await gate.wait()
+            except asyncio.CancelledError:
+                cancelled.set()
         return await server.connect(url, headers)
 
     provider = ChatGptPlanLLMProvider(
         session=_FakeSession(), connector=connect, prepared_connections=3, max_connections=3
     )
     try:
-        preparation = asyncio.create_task(provider.prepare_connections())
+        await provider.set_connection_mode("standby")
+        await _wait_for_idle(provider, 1)
+        original = server.sockets[0]
+        await provider.set_connection_mode("active")
         await pending.wait()
-        preparation.cancel()
-        with pytest.raises(asyncio.CancelledError):
-            await preparation
-        assert server.closed == 2
+        await provider.set_connection_mode("standby")
+        await asyncio.wait_for(cancelled.wait(), timeout=1)
+        await _settle(provider)
+        assert calls == 3
+        assert original.close_code is None
+        assert [socket.close_code for socket in server.sockets[1:]] == [1000, 1000]
+        assert server.requests == []
         assert await asyncio.wait_for(_translate(provider), timeout=1) == "ready"
+        assert len(original.sent) == 1
+        assert len(server.sockets) == 3
     finally:
+        gate.set()
         await provider.close()
     assert server.closed == 3
 
 
-async def test_cancelled_release_finishes_closing_every_detached_connection() -> None:
+@pytest.mark.parametrize("cancel_close", [False, True])
+async def test_inactive_returns_promptly_and_close_owns_blocked_retirements(
+    cancel_close: bool,
+) -> None:
     server = _FakeServer(_completed("ready"))
     provider = _provider(server, _FakeSession(), prepared_connections=3)
-    await provider.prepare_connections()
+    await _activate(provider)
     started = asyncio.Event()
     gate = asyncio.Event()
+    close_task: asyncio.Task[None] | None = None
     for socket in server.sockets:
         original = socket.close
 
@@ -372,16 +755,34 @@ async def test_cancelled_release_finishes_closing_every_detached_connection() ->
 
         socket.close = slow_close
     try:
-        release = asyncio.create_task(provider.release_connections())
+        await asyncio.wait_for(provider.set_connection_mode("inactive"), timeout=1)
         await started.wait()
-        release.cancel()
+        close_task = asyncio.create_task(provider.close())
+        await asyncio.sleep(0)
+        assert not close_task.done()
+        await provider.set_connection_mode("active")
+        await provider.set_connection_mode("standby")
+        assert len(server.sockets) == 3
+        assert server.requests == []
+        if cancel_close:
+            close_task.cancel()
+            await asyncio.sleep(0)
+            assert not close_task.done()
         gate.set()
-        with pytest.raises(asyncio.CancelledError):
-            await release
+        if cancel_close:
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(close_task, timeout=1)
+        else:
+            await asyncio.wait_for(close_task, timeout=1)
         assert [socket.close_code for socket in server.sockets] == [1000, 1000, 1000]
+        assert not provider._openings
+        assert not provider._maintenance
+        assert provider._open_count == 0
     finally:
         gate.set()
         await provider.close()
+        if close_task is not None:
+            await asyncio.gather(close_task, return_exceptions=True)
 
 
 async def test_cancelled_response_drains_before_connection_reuse_without_mixing_text() -> None:
@@ -438,7 +839,7 @@ async def test_cancelled_response_failure_frees_pool_slot(failure: str) -> None:
         await provider.close()
 
 
-@pytest.mark.parametrize("shutdown", ["release", "close"])
+@pytest.mark.parametrize("shutdown", ["inactive", "close"])
 async def test_shutdown_retires_draining_connection(shutdown: str) -> None:
     server = _FakeServer(lambda _request: [])
     provider = _provider(server, _FakeSession(), max_connections=1)
@@ -454,7 +855,7 @@ async def test_shutdown_retires_draining_connection(shutdown: str) -> None:
             with pytest.raises(RuntimeError, match="closed"):
                 await _translate(provider)
         else:
-            await provider.release_connections()
+            await provider.set_connection_mode("inactive")
             server.sockets[0]._queue.put_nowait(
                 json.dumps({"type": "response.output_text.delta", "delta": "old"})
             )
@@ -498,7 +899,7 @@ async def test_six_ready_connections_admit_three_immediate_pairs() -> None:
     provider = _provider(server, _FakeSession())
     executions: list[LLMRequestExecution] = []
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         executions = await asyncio.gather(*(_admit(provider, str(index)) for index in range(3)))
         assert [execution.attempt_count for execution in executions] == [2, 2, 2]
         attempts = [
@@ -522,7 +923,7 @@ async def test_ready_capacity_goes_to_every_first_attempt_before_duplicates() ->
     provider = _provider(server, _FakeSession())
     executions: list[LLMRequestExecution] = []
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         executions = await asyncio.gather(*(_admit(provider, str(index)) for index in range(4)))
         assert [execution.attempt_count for execution in executions] == [2, 2, 1, 1]
         results = await asyncio.gather(
@@ -541,7 +942,7 @@ async def test_released_slots_cover_queued_primaries_before_optional_duplicates(
     provider = _provider(server, _FakeSession(), max_connections=3, prepared_connections=3)
     executions: list[LLMRequestExecution] = []
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         pair = await _admit(provider)
         single = await _admit(provider, max_attempts=1)
         executions.extend([pair, single])
@@ -566,7 +967,7 @@ async def test_single_ready_connection_starts_without_waiting_and_never_upgrades
     provider = _provider(server, _FakeSession(), max_connections=2, prepared_connections=2)
     executions: list[LLMRequestExecution] = []
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         held = await _admit(provider, max_attempts=1)
         execution = await asyncio.wait_for(_admit(provider), timeout=1)
         executions.extend([held, execution])
@@ -593,7 +994,7 @@ async def test_queued_requests_are_fifo_and_do_not_reuse_an_occupied_socket() ->
     provider = _provider(server, _FakeSession(), max_connections=1)
     executions: list[LLMRequestExecution] = []
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         held = await _admit(provider)
         executions.append(held)
         oldest = asyncio.create_task(_admit(provider, "oldest"))
@@ -638,7 +1039,7 @@ async def test_cancellation_after_grant_returns_unclaimed_reservations(slots: in
     )
     execution = None
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         admission = asyncio.create_task(_admit(provider))
         with pytest.raises(asyncio.CancelledError):
             await asyncio.wait_for(admission, timeout=1)
@@ -696,7 +1097,7 @@ async def test_cancellation_before_send_returns_an_admitted_lease() -> None:
 async def test_closed_execution_returns_only_unused_slots_while_sent_attempt_drains() -> None:
     server = _FakeServer(lambda _request: [])
     provider = _provider(server, _FakeSession(), max_connections=2, prepared_connections=2)
-    await provider.prepare_connections()
+    await _activate(provider)
     execution = await _admit(provider)
     try:
         loser = asyncio.create_task(execution.translate_attempt(0))
@@ -722,12 +1123,12 @@ async def test_closed_execution_returns_only_unused_slots_while_sent_attempt_dra
     assert server.closed == 2
 
 
-@pytest.mark.parametrize("invalidate", ["token", "release", "close"])
+@pytest.mark.parametrize("invalidate", ["token", "inactive", "close"])
 async def test_late_reservation_invalidation_never_sends_stale_work(invalidate: str) -> None:
     server = _FakeServer(_completed("fresh"))
     session = _FakeSession()
     provider = _provider(server, session, max_connections=2, prepared_connections=2)
-    await provider.prepare_connections()
+    await _activate(provider)
     execution = await _admit(provider)
     try:
         if invalidate == "token":
@@ -735,13 +1136,14 @@ async def test_late_reservation_invalidation_never_sends_stale_work(invalidate: 
             with pytest.raises(RuntimeError, match="reservation"):
                 await execution.translate_attempt(0)
         else:
-            if invalidate == "release":
-                await provider.release_connections()
+            if invalidate == "inactive":
+                await provider.set_connection_mode("inactive")
             else:
                 await provider.close()
             with pytest.raises(asyncio.CancelledError):
                 await execution.translate_attempt(0)
         await execution.close()
+        await _settle(provider)
         assert server.requests == []
         assert server.closed == 2
         if invalidate != "close":
@@ -782,7 +1184,7 @@ async def test_opening_failure_fails_waiter_and_restores_physical_capacity() -> 
         await provider.close()
 
 
-@pytest.mark.parametrize("shutdown", ["release", "close"])
+@pytest.mark.parametrize("shutdown", ["inactive", "close"])
 async def test_shutdown_retires_late_opening_and_cancels_admission(shutdown: str) -> None:
     server = _FakeServer(_completed("fresh"))
     entered = asyncio.Event()
@@ -802,16 +1204,17 @@ async def test_shutdown_retires_late_opening_and_cancels_admission(shutdown: str
     try:
         admission = asyncio.create_task(_admit(provider))
         await entered.wait()
-        if shutdown == "release":
-            await asyncio.wait_for(provider.release_connections(), timeout=1)
+        if shutdown == "inactive":
+            await asyncio.wait_for(provider.set_connection_mode("inactive"), timeout=1)
         else:
             await asyncio.wait_for(provider.close(), timeout=1)
         with pytest.raises(asyncio.CancelledError):
             await admission
+        await _wait_for_closed(server, 1)
         assert server.requests == []
         assert server.closed == 1
         assert server.sockets[0].close_code == 1000
-        if shutdown == "release":
+        if shutdown == "inactive":
             blocked = False
             assert await asyncio.wait_for(_translate(provider), timeout=1) == "fresh"
             assert len(server.sockets) == 2
@@ -837,7 +1240,7 @@ async def test_close_owns_reservations_opening_and_draining_exchange() -> None:
     provider = ChatGptPlanLLMProvider(
         session=_FakeSession(), connector=connect, max_connections=4, prepared_connections=3
     )
-    await provider.prepare_connections()
+    await _activate(provider)
     execution = await _admit(provider)
     held = await _admit(provider, max_attempts=1)
     try:
@@ -909,7 +1312,7 @@ async def test_released_in_flight_failure_does_not_reopen_pool(status: int) -> N
     try:
         translation = asyncio.create_task(_translate(provider))
         await _wait_for_requests(server, 1)
-        await provider.release_connections()
+        await provider.set_connection_mode("inactive")
         server.sockets[0]._queue.put_nowait(
             json.dumps({"type": "error", "status": status, "error": {"code": "failed"}})
         )
@@ -1024,7 +1427,8 @@ async def test_cancelled_opening_before_start_does_not_keep_a_physical_slot() ->
         session=_FakeSession(), connector=server.connect, max_connections=1
     )
     try:
-        await asyncio.wait_for(provider.prepare_connections(), timeout=1)
+        await provider.set_connection_mode("active")
+        await _settle(provider)
         assert server.sockets == []
         assert await asyncio.wait_for(_translate(provider), timeout=1) == "next"
         assert len(server.sockets) == 1
@@ -1034,7 +1438,7 @@ async def test_cancelled_opening_before_start_does_not_keep_a_physical_slot() ->
 
 
 @pytest.mark.parametrize("phase", ["admission", "lease"])
-@pytest.mark.parametrize("shutdown", ["release", "close"])
+@pytest.mark.parametrize("shutdown", ["inactive", "close"])
 async def test_shutdown_cancels_authentication_before_sending(phase: str, shutdown: str) -> None:
     entered = asyncio.Event()
     gate = asyncio.Event()
@@ -1060,17 +1464,18 @@ async def test_shutdown_cancels_authentication_before_sending(phase: str, shutdo
             _admit(provider) if execution is None else execution.translate_attempt(0)
         )
         await entered.wait()
-        if shutdown == "release":
-            await asyncio.wait_for(provider.release_connections(), timeout=1)
+        if shutdown == "inactive":
+            await asyncio.wait_for(provider.set_connection_mode("inactive"), timeout=1)
         else:
             await asyncio.wait_for(provider.close(), timeout=1)
         with pytest.raises(asyncio.CancelledError):
             await asyncio.wait_for(operation, timeout=1)
         if execution is not None:
             await execution.close()
+        await _settle(provider)
         assert server.requests == []
         assert all(socket.close_code == 1000 for socket in server.sockets)
-        if shutdown == "release":
+        if shutdown == "inactive":
             session.blocked = False
             assert await asyncio.wait_for(_translate(provider), timeout=1) == "fresh"
     finally:
@@ -1106,7 +1511,7 @@ async def test_executions_with_the_same_utterance_id_keep_distinct_payloads_and_
     executions: list[LLMRequestExecution] = []
     utterance_id = uuid4()
     try:
-        await provider.prepare_connections()
+        await _activate(provider)
         executions = await asyncio.gather(
             *(
                 provider.admit_request(
@@ -1136,7 +1541,7 @@ async def test_executions_with_the_same_utterance_id_keep_distinct_payloads_and_
         await provider.close()
 
 
-@pytest.mark.parametrize("shutdown", ["release", "close"])
+@pytest.mark.parametrize("shutdown", ["inactive", "close"])
 async def test_shutdown_during_opening_authentication_never_starts_a_socket(
     shutdown: str,
 ) -> None:
@@ -1161,15 +1566,16 @@ async def test_shutdown_during_opening_authentication_never_starts_a_socket(
     try:
         admission = asyncio.create_task(_admit(provider))
         await entered.wait()
-        if shutdown == "release":
-            await asyncio.wait_for(provider.release_connections(), timeout=1)
+        if shutdown == "inactive":
+            await asyncio.wait_for(provider.set_connection_mode("inactive"), timeout=1)
         else:
             await asyncio.wait_for(provider.close(), timeout=1)
         with pytest.raises(asyncio.CancelledError):
             await admission
+        await _settle(provider)
         assert server.requests == []
         assert server.sockets == []
-        if shutdown == "release":
+        if shutdown == "inactive":
             assert await asyncio.wait_for(_translate(provider), timeout=1) == "fresh"
     finally:
         gate.set()

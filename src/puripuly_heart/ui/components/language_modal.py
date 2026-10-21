@@ -9,6 +9,7 @@ from typing import Callable, Sequence
 
 import flet as ft
 
+from puripuly_heart.app.language_selection import RECENT_LANGUAGE_QUEUE_LIMIT
 from puripuly_heart.ui.flet_runtime import is_hover_active
 from puripuly_heart.ui.i18n import language_name, t
 from puripuly_heart.ui.theme import (
@@ -21,12 +22,68 @@ from puripuly_heart.ui.theme import (
 
 logger = logging.getLogger(__name__)
 
+RECENT_CHIP_WIDTH = 170
+RECENT_CHIP_SPACING = 10
+RECENT_CHIP_RADIUS = 16
+RECENT_CHIP_TEXT_SIZE = 22
+_FORMER_RECENT_ROWS = 2
+_FORMER_RECENT_TEXT_SIZE = 16
+_FORMER_RECENT_VERTICAL_PADDING = 16
+_FORMER_RECENT_RUN_SPACING = 10
+_FORMER_RECENT_CHIP_HEIGHT = _FORMER_RECENT_TEXT_SIZE + (2 * _FORMER_RECENT_VERTICAL_PADDING)
+RECENT_CHIP_HEIGHT = (
+    _FORMER_RECENT_ROWS * _FORMER_RECENT_CHIP_HEIGHT
+    + (_FORMER_RECENT_ROWS - 1) * _FORMER_RECENT_RUN_SPACING
+)
+
+
+def build_recent_language_chip(
+    label: str,
+    *,
+    on_click: Callable,
+    on_hover: Callable | None = None,
+    selected: bool = False,
+    data: str | None = None,
+) -> ft.Container:
+    """One recent-language chip. Three of these fill the old six-chip block."""
+    return ft.Container(
+        data=data,
+        content=ft.Text(
+            label,
+            size=RECENT_CHIP_TEXT_SIZE,
+            weight=ft.FontWeight.BOLD,
+            color=ft.Colors.WHITE if selected else COLOR_NEUTRAL_DARK,
+            text_align=ft.TextAlign.CENTER,
+            max_lines=1,
+            overflow=ft.TextOverflow.ELLIPSIS,
+        ),
+        bgcolor=COLOR_PRIMARY if selected else COLOR_BACKGROUND,
+        border_radius=RECENT_CHIP_RADIUS,
+        padding=ft.Padding.symmetric(horizontal=8, vertical=16),
+        alignment=ft.Alignment.CENTER,
+        on_click=on_click,
+        on_hover=on_hover,
+        animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
+        width=RECENT_CHIP_WIDTH,
+        height=RECENT_CHIP_HEIGHT,
+    )
+
+
+def apply_recent_language_chip_hover(event: ft.ControlEvent) -> None:
+    """Match the language-modal hover: primary text, leaving a selected chip alone."""
+    container = event.control
+    text_control = container.content
+    if getattr(text_control, "color", None) == ft.Colors.WHITE:
+        return
+    text_control.color = COLOR_PRIMARY if is_hover_active(event) else COLOR_NEUTRAL_DARK
+    container.update()
+
 
 class LanguageModal:
     """Modal dialog for language selection.
 
     Features:
-    - Recent languages as chips (up to 6)
+    - Recent languages as chips, newest first, up to three
     - Full language list with current selection highlighted
     - Closes on selection or outside click
     """
@@ -70,9 +127,9 @@ class LanguageModal:
 
         Args:
             current: Currently selected language code.
-            recent: List of recently selected language codes (up to 3).
+            recent: Recently selected language codes, newest first. The queue
+                holds three codes, and the dialog shows them in that order.
         """
-        # Build recent grid (up to 6 items)
         recent_grid = self._build_recent_grid(recent, current)
 
         # Build language list (1-column grid style)
@@ -115,7 +172,7 @@ class LanguageModal:
                 horizontal_alignment=ft.CrossAxisAlignment.STRETCH,  # Stretch width
             ),
             width=600,  # Larger width
-            height=700,  # Larger height
+            height=700,
             padding=ft.Padding.symmetric(horizontal=32, vertical=32),
             bgcolor=COLOR_SURFACE,
             border_radius=28,
@@ -132,44 +189,28 @@ class LanguageModal:
         self._page.show_dialog(self._dialog)
 
     def _build_recent_grid(self, recent: list[str], current: str) -> ft.Control | None:
-        """Build grid controls for recent languages (up to 6)."""
-        if not recent:
+        """Build the recent chips in stored order, up to the queue limit.
+
+        Three chips fill the block previously used by six chips in two rows.
+        """
+        visible = recent[:RECENT_LANGUAGE_QUEUE_LIMIT]
+        if not visible:
             return None
 
         items = []
-        for lang_code in recent[:6]:
-            is_current = lang_code == current
-            # Bento Card Style
-            bg_color = COLOR_PRIMARY if is_current else COLOR_BACKGROUND
-            text_color = ft.Colors.WHITE if is_current else COLOR_NEUTRAL_DARK
-            font_weight = ft.FontWeight.BOLD
-
-            chip = ft.Container(
-                content=ft.Text(
-                    self._label_for_code(lang_code),
-                    size=16,  # Larger text for VR
-                    weight=font_weight,
-                    color=text_color,
-                    text_align=ft.TextAlign.CENTER,
-                    max_lines=1,
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                ),
-                bgcolor=bg_color,
-                border_radius=16,
-                padding=ft.Padding.symmetric(horizontal=8, vertical=16),  # Taller padding
-                alignment=ft.Alignment.CENTER,
+        for lang_code in visible:
+            chip = build_recent_language_chip(
+                self._label_for_code(lang_code),
                 on_click=lambda e, code=lang_code: self._select(code),
                 on_hover=self._on_chip_hover,
-                animate=ft.Animation(200, ft.AnimationCurve.EASE_OUT),
-                width=170,  # Fixed width for 3-column layout (536px available / 3 ~= 178px)
+                selected=lang_code == current,
             )
             items.append(chip)
 
         return ft.Row(
             controls=items,
-            wrap=True,
-            spacing=10,
-            run_spacing=10,
+            wrap=False,
+            spacing=RECENT_CHIP_SPACING,
             alignment=ft.MainAxisAlignment.START,
         )
 
@@ -251,24 +292,9 @@ class LanguageModal:
             padding=ft.Padding.only(right=8, bottom=12),
         )
 
-    def _on_chip_hover(self, e: ft.ControlEvent) -> None:
+    def _on_chip_hover(self, event: ft.ControlEvent) -> None:
         """Handle hover effect on chips."""
-        container = e.control
-        text_control = container.content
-
-        # If selected (primary bg), usually we don't need hover effect on text
-        # But we must ensure specific check.
-        # Here we assume selected items provide WHITE text initially.
-        # So if text is WHITE, it is selected.
-        if text_control.color == ft.Colors.WHITE:
-            return
-
-        if is_hover_active(e):
-            text_control.color = COLOR_PRIMARY
-        else:
-            text_control.color = COLOR_NEUTRAL_DARK
-
-        container.update()
+        apply_recent_language_chip_hover(event)
 
     def _on_item_hover(self, e: ft.ControlEvent) -> None:
         """Handle hover effect on list cards."""

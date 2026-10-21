@@ -102,9 +102,9 @@ class RecordingOscQueue:
     def set_typing_reason(self, reason: str, active: bool) -> None:
         self.typing.append(active)
 
-    def send_immediate(self, text: str) -> bool:
+    def send_immediate(self, text: str) -> tuple[bool, None]:
         self.immediate_messages.append(text)
-        return self.immediate_result
+        return self.immediate_result, None
 
     def process_due(self) -> None:
         self.process_due_calls += 1

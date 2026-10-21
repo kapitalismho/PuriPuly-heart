@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
@@ -15,11 +16,16 @@ from puripuly_heart.core.audio.ownership import (
     AudioRetentionBinding,
     AudioRetentionBudget,
     AudioSegmentSettingsSnapshot,
+    AudioSegmentTerminalReceipt,
     CaptureStreamInput,
     OwnedStreamInput,
     OwnedVadEvent,
     PeerAudioSegmentLedger,
 )
+from puripuly_heart.core.diagnostics import current_diagnostic_operation, emit_failure
+from puripuly_heart.core.error_messages import stt_failure_report
+from puripuly_heart.core.local_asr.local_asr_provider_runtime import ProviderRuntimeBuildRequest
+from puripuly_heart.core.messages import ErrorDiagnostics
 from puripuly_heart.core.self_capture import (
     SelfCaptureAdmissionPort,
     SelfCaptureAdmissionStatus,
@@ -41,6 +47,8 @@ from puripuly_heart.core.stt.diagnostics import recognition_cause
 from puripuly_heart.core.vad.gating import SpeechEnd, SpeechStart
 from puripuly_heart.domain.recognition import RecognitionStreamIdentity
 
+logger = logging.getLogger(__name__)
+
 SelfCaptureProviderRequestFactory = Callable[[SelfCaptureSessionConfig, bool], object]
 SelfCaptureSourceFactory = Callable[[SelfCaptureSessionConfig], Awaitable[object] | object]
 SelfCaptureVadFactory = Callable[[SelfCaptureSessionConfig], object]
@@ -52,6 +60,7 @@ SelfCaptureDiagnosticSink = Callable[[SelfCaptureDiagnostic], object]
 class _VadSink(Protocol):
     async def handle_vad_event(self, event: object) -> None: ...
     async def handle_stream_input(self, event: OwnedStreamInput) -> None: ...
+    async def handle_source_segment_retired(self, receipt: AudioSegmentTerminalReceipt) -> None: ...
     async def observe_source_activity(
         self,
         *,
@@ -150,13 +159,23 @@ class _GenerationGuardedVadSink:
     async def handle_stream_input(self, event: CaptureStreamInput) -> None:
         if not self.owner.is_current_generation(self.capture_generation.value):
             return
+        qwen_discontinuity = (
+            self.ledger.settings.provider_id == "qwen_audio"
+            and event.boundary_reason == "source_discontinuity"
+        )
         if self.ledger.settings.provider_id not in {"gemini_transcribe", "rolling_free"}:
-            return
-        if self._worker is None:
-            self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
-        elif self._worker.done():
-            await self._worker
-            raise RuntimeError("self VAD dispatch worker stopped")
+            if not qwen_discontinuity:
+                return
+            event = replace(event, chunk=event.chunk[:0], capture=())
+            self._closing = True
+            if self._worker is not None and not self._worker.done():
+                self._worker.cancel()
+        if not qwen_discontinuity:
+            if self._worker is None:
+                self._worker = asyncio.create_task(self._run(), name="self-vad-dispatch")
+            elif self._worker.done():
+                await self._worker
+                raise RuntimeError("self VAD dispatch worker stopped")
         if event.capture:
             self.owner._current_stream_capture_epoch = event.capture[-1].capture_epoch
         elif event.boundary_reason == "source_discontinuity":
@@ -179,6 +198,17 @@ class _GenerationGuardedVadSink:
                 )
             ),
         )
+        if qwen_discontinuity:
+            try:
+                await cast(_VadSink, self.sink).handle_stream_input(owned)
+            finally:
+                retired = await self.abort()
+                self._worker = None
+                self._closing = False
+                if self.owner.is_current_generation(self.capture_generation.value):
+                    for receipt in retired:
+                        await cast(_VadSink, self.sink).handle_source_segment_retired(receipt)
+            return
         samples = int(event.chunk.size)
         if samples and self._stream_drop_pending:
             return
@@ -284,7 +314,7 @@ class _GenerationGuardedVadSink:
         if worker is not None:
             await worker
 
-    async def abort(self) -> None:
+    async def abort(self) -> tuple[AudioSegmentTerminalReceipt, ...]:
         worker = self._worker
         if worker is not None and not worker.done():
             worker.cancel()
@@ -299,7 +329,7 @@ class _GenerationGuardedVadSink:
         self._retained_samples = 0
         self._rejected_segment_ids.clear()
         self._control_events = 0
-        self.ledger.cancel_unfinished(now_monotonic_s=asyncio.get_running_loop().time())
+        return self.ledger.cancel_unfinished(now_monotonic_s=asyncio.get_running_loop().time())
 
     async def _admit_unsent_segment(self, owned: OwnedVadEvent) -> None:
         while len(self._unsent_segments) >= self.max_wholly_unsent_segments:
@@ -537,6 +567,8 @@ class SelfCaptureSessionOwner:
         self._provider_status = SelfCaptureProviderStatus.DETACHED
         self._desired_active = False
         self._generation = 0
+        self._generation_operation: tuple[int, dict[str, str | None]] | None = None
+        self._intent_generations: dict[asyncio.Task | None, int] = {}
         self._config: SelfCaptureSessionConfig | None = None
         self._provider_signature: tuple[object, ...] | None = None
         self._provider_attachment_token: object | None = None
@@ -559,6 +591,7 @@ class SelfCaptureSessionOwner:
         self._fault_tasks: set[asyncio.Task[None]] = set()
         self._retired_sources: list[object] = []
         self._failure_reason: SelfCaptureFailureReason | None = None
+        self._primary_failure: tuple[int, ErrorDiagnostics] | None = None
         self._admission_reason: str | None = None
         self._last_cleanup_exception: Exception | None = None
         self._closed = False
@@ -588,6 +621,11 @@ class SelfCaptureSessionOwner:
             has_loop_task=self._loop_task is not None,
             cleanup_debt=len(self._retired_sources),
             closed=self._closed,
+            failure_diagnostics=(
+                self._primary_failure[1]
+                if self._failure_reason is not None and self._primary_failure is not None
+                else None
+            ),
         )
 
     @property
@@ -765,7 +803,7 @@ class SelfCaptureSessionOwner:
             self._fault_generation(
                 generation,
                 failure_reason,
-                RuntimeError(reason),
+                terminal.failure_diagnostics if terminal is not None else None,
                 terminal=terminal,
                 recognition_reason=recognition_cause(reason),
             ),
@@ -774,7 +812,39 @@ class SelfCaptureSessionOwner:
         self._fault_tasks.add(task)
         task.add_done_callback(self._fault_tasks.discard)
 
+    def mutation_authority(self, task: asyncio.Task | None) -> bool | None:
+        generation = self._intent_generations.get(task)
+        return generation == self._generation if generation is not None else None
+
+    def pending_mutations(self) -> tuple[bool, ...]:
+        return tuple(
+            self._desired_active
+            for generation in self._intent_generations.values()
+            if generation == self._generation
+        )
+
     async def apply_intent(
+        self,
+        config: SelfCaptureSessionConfig,
+        *,
+        enabled: bool,
+        restart: bool = False,
+        force_immediate: bool = False,
+        explicit_toggle_off: bool = True,
+    ) -> SelfCaptureSessionSnapshot:
+        try:
+            return await self._apply_intent(
+                config,
+                enabled=enabled,
+                restart=restart,
+                force_immediate=force_immediate,
+                explicit_toggle_off=explicit_toggle_off,
+            )
+        finally:
+            self._intent_generations.pop(asyncio.current_task(), None)
+            self._notify_state_changed()
+
+    async def _apply_intent(
         self,
         config: SelfCaptureSessionConfig,
         *,
@@ -786,6 +856,13 @@ class SelfCaptureSessionOwner:
         async with self._state_lock:
             if self._closed:
                 raise RuntimeError("SelfCaptureSessionOwner is closed")
+            if (
+                self._config is not None
+                and self._config.provider_id == "qwen_audio"
+                and self._config.runtime_signature != config.runtime_signature
+            ):
+                restart = True
+                force_immediate = True
             if (
                 enabled
                 and not restart
@@ -803,6 +880,9 @@ class SelfCaptureSessionOwner:
                 return self.snapshot
             self._generation += 1
             generation = self._generation
+            self._intent_generations[asyncio.current_task()] = generation
+            self._generation_operation = (generation, current_diagnostic_operation())
+            self._primary_failure = None
             self._desired_active = enabled
             if (
                 enabled
@@ -845,6 +925,21 @@ class SelfCaptureSessionOwner:
                     self._transition_task = None
         return self.snapshot
 
+    def _provider_build_request(
+        self,
+        config: SelfCaptureSessionConfig,
+        warmup: bool,
+        generation: int,
+    ) -> object:
+        request = self._provider_request_factory(config, warmup)
+        operation = self._generation_operation
+        if isinstance(request, ProviderRuntimeBuildRequest):
+            return replace(
+                request,
+                **(operation[1] if operation is not None and operation[0] == generation else {}),
+            )
+        return request
+
     async def prepare_provider(
         self,
         config: SelfCaptureSessionConfig,
@@ -854,8 +949,15 @@ class SelfCaptureSessionOwner:
         async with self._state_lock:
             if self._closed:
                 raise RuntimeError("SelfCaptureSessionOwner is closed")
+            invalidate_qwen = (
+                self._config is not None
+                and self._config.provider_id == "qwen_audio"
+                and self._config.runtime_signature != config.runtime_signature
+            )
             self._generation += 1
             generation = self._generation
+            self._generation_operation = (generation, current_diagnostic_operation())
+            self._primary_failure = None
             self._config = config
             self._state = SelfCaptureSessionState.STARTING
             self._provider_status = SelfCaptureProviderStatus.PENDING
@@ -864,8 +966,11 @@ class SelfCaptureSessionOwner:
         async with self._activation_lock:
             if self._is_superseded(generation):
                 return self.snapshot
+            if invalidate_qwen:
+                await self._release_provider(mode="abort")
             attachment_token = self._provider_attachment_token
             result: SelfCaptureProviderMutation | None = None
+            failure_exception: Exception | None = None
             if self._attached_provider_matches(config):
                 result_status = SelfCaptureProviderMutationStatus.APPLIED
                 failure_reason = None
@@ -873,7 +978,7 @@ class SelfCaptureSessionOwner:
                 attachment_token = object()
                 try:
                     result = await self._provider.replace(
-                        self._provider_request_factory(config, False),
+                        self._provider_build_request(config, False, generation),
                         start=False,
                         on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                             exc,
@@ -885,6 +990,7 @@ class SelfCaptureSessionOwner:
                 except Exception as exc:
                     result_status = SelfCaptureProviderMutationStatus.FAILED
                     failure_reason = type(exc).__name__
+                    failure_exception = exc
                 else:
                     result_status = result.status
                     failure_reason = result.reason
@@ -915,6 +1021,8 @@ class SelfCaptureSessionOwner:
                     failure_code=result.failure_code if result is not None else None,
                     failure_type=result.failure_type if result is not None else failure_reason,
                     failure_stage=result.failure_stage if result is not None else "provider_build",
+                    exception=failure_exception,
+                    failure_diagnostics=result.failure_diagnostics if result is not None else None,
                 )
             self._notify_state_changed()
             return self.snapshot
@@ -1036,6 +1144,7 @@ class SelfCaptureSessionOwner:
                         generation=self._generation,
                         reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                         detail=type(pending_failure).__name__,
+                        exception=pending_failure,
                     )
                     self._notify_state_changed()
         return self.snapshot
@@ -1106,7 +1215,16 @@ class SelfCaptureSessionOwner:
                 if self._config.capture_signature == config.capture_signature:
                     await self._transition_provider(generation, config)
                     return
-            if self._source is not None or self._loop_task is not None or self._vad is not None:
+            if (
+                self._source is not None
+                or self._loop_task is not None
+                or self._vad is not None
+                or (
+                    self._config is not None
+                    and self._config.provider_id == "qwen_audio"
+                    and self._config.runtime_signature != config.runtime_signature
+                )
+            ):
                 mode, release_backend_after = self._release_plan(
                     self._config or config,
                     force_immediate=force_immediate,
@@ -1171,7 +1289,9 @@ class SelfCaptureSessionOwner:
             self._notify_state_changed()
             try:
                 result = await self._provider.replace(
-                    self._provider_request_factory(config, config.local_cpu or config.local_gpu),
+                    self._provider_build_request(
+                        config, config.local_cpu or config.local_gpu, generation
+                    ),
                     start=False,
                     on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                         exc,
@@ -1283,7 +1403,10 @@ class SelfCaptureSessionOwner:
         self._notify_state_changed()
         if config.warmup:
             try:
-                await self._provider.warmup()
+                operation = self._generation_operation
+                await self._provider.warmup(
+                    **(operation[1] if operation is not None and operation[0] == generation else {})
+                )
             except Exception as exc:
                 self._emit(
                     SelfCaptureDiagnosticEvent.FAILURE,
@@ -1292,6 +1415,8 @@ class SelfCaptureSessionOwner:
                     detail=type(exc).__name__,
                     failure_stage="provider_warmup",
                     failure_type=type(exc).__name__,
+                    exception=exc,
+                    disposition="degraded",
                 )
 
     async def _transition_provider(
@@ -1305,7 +1430,7 @@ class SelfCaptureSessionOwner:
         self._notify_state_changed()
         try:
             result = await self._provider.handoff(
-                self._provider_request_factory(config, True),
+                self._provider_build_request(config, True, generation),
                 start=True,
                 on_terminal_failure=lambda exc: self._on_terminal_provider_failure(
                     exc,
@@ -1328,6 +1453,8 @@ class SelfCaptureSessionOwner:
                 detail=type(exc).__name__,
                 failure_stage="provider_handoff",
                 failure_type=type(exc).__name__,
+                exception=exc,
+                disposition="degraded",
             )
             self._notify_state_changed()
             return
@@ -1368,6 +1495,8 @@ class SelfCaptureSessionOwner:
                 failure_code=result.failure_code,
                 failure_type=result.failure_type,
                 failure_stage=result.failure_stage,
+                failure_diagnostics=result.failure_diagnostics,
+                disposition="degraded",
             )
         self._notify_state_changed()
 
@@ -1453,7 +1582,7 @@ class SelfCaptureSessionOwner:
 
     async def _on_terminal_provider_failure(
         self,
-        exc: Exception,
+        exc: Exception | ErrorDiagnostics,
         *,
         attachment_token: object,
     ) -> None:
@@ -1492,6 +1621,7 @@ class SelfCaptureSessionOwner:
                 generation=generation,
                 reason=SelfCaptureFailureReason.PROVIDER_FAILED,
                 detail=type(exc).__name__,
+                exception=exc,
             )
             self._notify_state_changed()
 
@@ -1499,7 +1629,7 @@ class SelfCaptureSessionOwner:
         self,
         generation: int,
         reason: SelfCaptureFailureReason,
-        exc: Exception | None = None,
+        exc: Exception | ErrorDiagnostics | None = None,
         *,
         completed_task: asyncio.Task[None] | None = None,
         terminal: STTProviderTurnTerminal | None = None,
@@ -1519,7 +1649,7 @@ class SelfCaptureSessionOwner:
         self,
         generation: int,
         reason: SelfCaptureFailureReason,
-        exc: Exception | None = None,
+        exc: Exception | ErrorDiagnostics | None = None,
         *,
         completed_task: asyncio.Task[None] | None = None,
         terminal: STTProviderTurnTerminal | None = None,
@@ -1545,6 +1675,7 @@ class SelfCaptureSessionOwner:
                 type(exc).__name__ if exc is not None and failure_stage is not None else None
             ),
             failure_stage=failure_stage,
+            exception=exc,
             terminal=terminal,
             recognition_reason=recognition_reason,
             desired_active_before=desired_active_before,
@@ -1577,8 +1708,6 @@ class SelfCaptureSessionOwner:
         self._state = SelfCaptureSessionState.FAULTED
         if reason is not SelfCaptureFailureReason.ADMISSION_REJECTED:
             self._desired_active = False
-        if release_provider:
-            await self._release_provider(mode="abort")
         self._provider_status = (
             SelfCaptureProviderStatus.FAILED
             if reason is SelfCaptureFailureReason.PROVIDER_FAILED
@@ -1600,11 +1729,25 @@ class SelfCaptureSessionOwner:
                 else (type(exc).__name__ if exc is not None else None)
             ),
             failure_stage=mutation.failure_stage if mutation is not None else failure_stage,
+            exception=exc,
+            failure_diagnostics=mutation.failure_diagnostics if mutation is not None else None,
             desired_active_before=desired_active_before,
             desired_active_after=self._desired_active,
             action=("deactivate" if desired_active_before and not self._desired_active else None),
             target_state=SelfCaptureSessionState.FAULTED,
         )
+        if release_provider:
+            try:
+                await self._release_provider(mode="abort")
+            except Exception as cleanup_exc:
+                self._emit(
+                    SelfCaptureDiagnosticEvent.FAILURE,
+                    generation=generation,
+                    reason=SelfCaptureFailureReason.CLEANUP_FAILED,
+                    exception=cleanup_exc,
+                    disposition="degraded",
+                )
+                raise
         self._notify_state_changed()
 
     async def _teardown(
@@ -1620,6 +1763,9 @@ class SelfCaptureSessionOwner:
     ) -> None:
         if generation != self._generation:
             return
+        primary_reason = (
+            self._failure_reason if target_state is SelfCaptureSessionState.FAULTED else None
+        )
         loop_task = self._loop_task
         source = self._source
         self._loop_task = None
@@ -1669,14 +1815,16 @@ class SelfCaptureSessionOwner:
             self._desired_active = False
         if failures:
             self._last_cleanup_exception = failures[0]
-            self._failure_reason = SelfCaptureFailureReason.CLEANUP_FAILED
+            self._failure_reason = primary_reason or SelfCaptureFailureReason.CLEANUP_FAILED
             self._state = SelfCaptureSessionState.FAULTED
-            self._emit(
-                SelfCaptureDiagnosticEvent.FAILURE,
-                generation=generation,
-                reason=SelfCaptureFailureReason.CLEANUP_FAILED,
-                detail=type(failures[0]).__name__,
-            )
+            for failure in failures:
+                self._emit(
+                    SelfCaptureDiagnosticEvent.FAILURE,
+                    generation=generation,
+                    reason=SelfCaptureFailureReason.CLEANUP_FAILED,
+                    exception=failure,
+                    disposition="degraded" if primary_reason is not None else "failed",
+                )
             self._notify_state_changed()
             raise failures[0]
         self._last_cleanup_exception = None
@@ -1805,7 +1953,62 @@ class SelfCaptureSessionOwner:
         desired_active_after: bool | None = None,
         action: str | None = None,
         target_state: SelfCaptureSessionState | None = None,
+        exception: BaseException | ErrorDiagnostics | None = None,
+        failure_diagnostics: ErrorDiagnostics | None = None,
+        disposition: str = "failed",
     ) -> None:
+        if event is SelfCaptureDiagnosticEvent.FAILURE:
+            stage = failure_stage or {
+                SelfCaptureFailureReason.SOURCE_OPEN_FAILED: "source_open",
+                SelfCaptureFailureReason.VAD_FAILED: "vad",
+                SelfCaptureFailureReason.PROVIDER_FAILED: "turn_terminal",
+                SelfCaptureFailureReason.CLEANUP_FAILED: "cleanup",
+                SelfCaptureFailureReason.SESSION_FAILED: "source_read",
+            }.get(reason, "readiness")
+            native = failure_diagnostics or (
+                terminal.failure_diagnostics if terminal is not None else None
+            )
+            if native is None and isinstance(exception, ErrorDiagnostics):
+                native = exception
+            if native is None:
+                native = stt_failure_report(
+                    exception,
+                    provider=self._config.provider_id if self._config else "stt",
+                    operation=stage,
+                    channel="self",
+                ).diagnostics
+                native = replace(
+                    native,
+                    component="capture.self",
+                    operation=stage,
+                    code=f"capture.self.{reason.value if reason is not None else 'unknown'}",
+                    generation=generation,
+                    fields={
+                        **native.fields,
+                        "observed_state": self._state.value,
+                        **({"warmup_usable": True} if stage == "provider_warmup" else {}),
+                    },
+                )
+            if (
+                self._generation_operation is not None
+                and self._generation_operation[0] == generation
+                and native.turn_id is None
+            ):
+                native = replace(native, **self._generation_operation[1])
+            primary = self._primary_failure
+            if reason is SelfCaptureFailureReason.CLEANUP_FAILED and primary is not None:
+                if primary[0] == generation and primary[1].diagnostic_id != native.diagnostic_id:
+                    native = replace(native, cause_id=primary[1].diagnostic_id)
+            elif disposition in {"failed", "degraded"}:
+                self._primary_failure = (generation, native)
+            failure_diagnostics = native
+            emit_failure(
+                logger,
+                native,
+                stage=stage,
+                severity="warning" if disposition == "degraded" else "error",
+                disposition=disposition,
+            )
         if self._diagnostic_sink is None:
             return
         self._diagnostic_sink(
@@ -1819,6 +2022,7 @@ class SelfCaptureSessionOwner:
                 failure_code=failure_code,
                 failure_type=failure_type,
                 failure_stage=failure_stage,
+                failure_diagnostics=failure_diagnostics,
                 recognition_reason=recognition_reason,
                 utterance_id=(
                     terminal.identity.segment.segment_id if terminal is not None else None

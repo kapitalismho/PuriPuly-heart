@@ -4,11 +4,13 @@ import asyncio
 import json
 import logging
 import sys
+import traceback
 from dataclasses import replace
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from websockets.asyncio.client import ClientConnection
 from websockets.asyncio.server import serve
 from websockets.exceptions import InvalidStatus, ProtocolError
 
@@ -192,7 +194,9 @@ async def test_soniox_rejected_open_only_retries_known_server_statuses(
     async def rejected_connect(*_args, **_kwargs):
         raise InvalidStatus(SimpleNamespace(status_code=status))
 
-    monkeypatch.setattr("puripuly_heart.core.network_clients.external_websocket_connect", rejected_connect)
+    monkeypatch.setattr(
+        "puripuly_heart.core.network_clients.external_websocket_connect", rejected_connect
+    )
     backend = SonioxRealtimeSTTBackend(api_key="k", language_hints=["en"])
     error_type = PermanentSTTScopedSessionError if permanent else InvalidStatus
     with pytest.raises(error_type):
@@ -224,6 +228,47 @@ async def test_soniox_open_config_send_distinguishes_protocol_from_transport(
     error_type = PermanentSTTScopedSessionError if permanent else ConnectionResetError
     with pytest.raises(error_type):
         await backend.open_session()
+
+
+@pytest.mark.asyncio
+async def test_soniox_startup_send_cancellation_closes_post_upgrade_rejected_transport(
+    monkeypatch,
+) -> None:
+    sending = asyncio.Event()
+    server_closed = asyncio.Event()
+    clients = []
+    original_send = ClientConnection.send
+
+    async def blocked_send(connection, payload, **kwargs):
+        clients.append(connection)
+        sending.set()
+        await connection.wait_closed()
+        return await original_send(connection, payload, **kwargs)
+
+    monkeypatch.setattr(ClientConnection, "send", blocked_send)
+
+    async def handler(connection):
+        await connection.send(json.dumps({"error_code": 401, "error_type": "unauthenticated"}))
+        await connection.wait_closed()
+        server_closed.set()
+
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key="local-cancel-key", language_hints=["en"], endpoint=f"ws://{host}:{port}"
+        )
+        opening = asyncio.create_task(backend.open_session())
+        try:
+            await asyncio.wait_for(sending.wait(), timeout=1)
+            opening.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(opening, timeout=1)
+            await asyncio.wait_for(server_closed.wait(), timeout=1)
+            assert len(clients) == 1
+            assert clients[0].close_code == 1000
+        finally:
+            opening.cancel()
+            await asyncio.gather(opening, return_exceptions=True)
 
 
 def test_soniox_backend_defaults_to_realtime_v5_model() -> None:
@@ -1118,9 +1163,7 @@ async def test_soniox_session_start_send_recv_and_close(
         exceptions=SimpleNamespace(ConnectionClosedOK=type("ConnectionClosedOK", (Exception,), {})),
     )
     monkeypatch.setitem(sys.modules, "websockets", fake_websockets)
-    monkeypatch.setattr(
-        "puripuly_heart.core.network_clients.external_websocket_connect", connect
-    )
+    monkeypatch.setattr("puripuly_heart.core.network_clients.external_websocket_connect", connect)
 
     session = _SonioxSession(
         api_key="k",
@@ -1174,76 +1217,151 @@ async def test_soniox_session_start_send_recv_and_close(
 @pytest.mark.asyncio
 async def test_soniox_session_local_server_preserves_finalize_and_remote_close() -> None:
     wire_events: list[object] = []
+    authenticated: list[bool] = []
+    sessions = []
     keepalive_seen = asyncio.Event()
-    finalize_seen = asyncio.Event()
-    server_closed = asyncio.Event()
 
     async def handler(connection) -> None:
+        authenticated.append(
+            connection.request.headers.get("Authorization") == "Bearer local-wire-key"
+            and "Sec-WebSocket-Protocol" not in connection.request.headers
+        )
         wire_events.append(json.loads(await connection.recv()))
-        try:
-            while True:
-                message = await connection.recv()
-                if isinstance(message, bytes):
-                    wire_events.append(("audio", len(message)))
-                    continue
-                payload = json.loads(message)
-                wire_events.append(payload)
-                if payload.get("type") == "keepalive":
-                    keepalive_seen.set()
-                if payload.get("type") == "finalize":
-                    finalize_seen.set()
-                    await connection.send(
-                        json.dumps(
-                            {
-                                "tokens": [
-                                    {"text": "hello", "is_final": True, "end_ms": 100},
-                                    {"text": "<fin>", "is_final": True},
-                                ]
-                            }
-                        )
+        while True:
+            message = await connection.recv()
+            if isinstance(message, bytes):
+                wire_events.append(("audio", len(message)))
+                continue
+            payload = json.loads(message)
+            wire_events.append(payload)
+            if payload.get("type") == "keepalive":
+                keepalive_seen.set()
+            if payload.get("type") == "finalize":
+                await connection.send(
+                    json.dumps(
+                        {
+                            "tokens": [
+                                {"text": "hello", "is_final": True, "end_ms": 100},
+                                {"text": "<fin>", "is_final": True},
+                            ]
+                        }
                     )
-                    await connection.close(code=1000, reason="fake-complete")
-                    return
-        finally:
-            server_closed.set()
+                )
+                await connection.close(code=1000, reason="fake-complete")
+                return
 
-    server = await serve(handler, "127.0.0.1", 0, ping_interval=None)
-    host, port = server.sockets[0].getsockname()[:2]
-    session = _SonioxSession(
-        api_key="fake-key",
-        model="fake-model",
-        endpoint=f"ws://{host}:{port}",
-        sample_rate_hz=16000,
-        language_hints=["en"],
-        context_terms=[],
-        keepalive_interval_s=0.01,
-        trailing_silence_ms=0,
-        connect_timeout_s=2,
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        backend = SonioxRealtimeSTTBackend(
+            api_key="local-wire-key",
+            endpoint=f"ws://{host}:{port}",
+            language_hints=["en"],
+            context_terms=["PuriPuly"],
+            keepalive_interval_s=0.01,
+            trailing_silence_ms=0,
+            connect_timeout_s=2,
+        )
+        for _ in range(2):
+            keepalive_seen.clear()
+            session = await backend.open_session()
+            sessions.append(session)
+            try:
+                await asyncio.wait_for(keepalive_seen.wait(), timeout=1)
+                await session.send_audio(b"abc")
+                await session.on_speech_end(trailing_silence_ms=0)
+                event = await asyncio.wait_for(anext(session.events()), timeout=1)
+                assert event.text == "hello"
+                await asyncio.wait_for(session._recv_task, timeout=1)
+                assert session._stopped is True
+            finally:
+                await session.close()
+
+    assert authenticated == [True, True]
+    configs = [event for event in wire_events if isinstance(event, dict) and "model" in event]
+    assert len(configs) == 2
+    for config in configs:
+        assert "api_key" not in config
+        assert config["model"] == "stt-rt-v5"
+        assert config["audio_format"] == "pcm_s16le"
+        assert config["sample_rate"] == 16000
+        assert config["num_channels"] == 1
+        assert config["enable_endpoint_detection"] is False
+        assert config["language_hints"] == ["en"]
+        assert config["context"] == {"terms": ["PuriPuly"]}
+    assert wire_events.count(("audio", 3)) == 2
+    assert (
+        sum(isinstance(event, dict) and event.get("type") == "finalize" for event in wire_events)
+        == 2
     )
+    assert sessions[0].speaker_session_scope != sessions[1].speaker_session_scope
 
-    try:
-        await session.start()
-        await asyncio.wait_for(keepalive_seen.wait(), timeout=1)
-        await session.send_audio(b"abc")
-        await session.on_speech_end(trailing_silence_ms=0)
-        event = await asyncio.wait_for(session._event_projection._legacy_events.get(), timeout=1)
-        assert event.text == "hello"
-        await asyncio.wait_for(finalize_seen.wait(), timeout=1)
-        assert session._recv_task is not None
-        await asyncio.wait_for(session._recv_task, timeout=1)
-        assert session._stopped is True
-    finally:
-        await session.close()
-        server.close()
-        await server.wait_closed()
 
-    await asyncio.wait_for(server_closed.wait(), timeout=1)
-    assert wire_events[0]["model"] == "fake-model"
-    assert ("audio", 3) in wire_events
-    assert any(
-        isinstance(event, dict) and event.get("type") == "keepalive" for event in wire_events
-    )
-    assert any(isinstance(event, dict) and event.get("type") == "finalize" for event in wire_events)
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        {},
+        None,
+        "cancel",
+        {"error_code": 401, "error_type": "unauthenticated"},
+        {"error_type": "unauthenticated"},
+        {"error": "legacy"},
+    ],
+    ids=["response", "timeout-heuristic", "cancellation", "401", "error-type-only", "legacy-error"],
+)
+async def test_soniox_probe_local_server_authenticates_and_closes(response, caplog) -> None:
+    authenticated = []
+    configurations = []
+    closed = asyncio.Event()
+    configured = asyncio.Event()
+    marker = "local-probe-private-key"
+
+    async def handler(connection) -> None:
+        authenticated.append(
+            connection.request.headers.get("Authorization") == f"Bearer {marker}"
+            and "Sec-WebSocket-Protocol" not in connection.request.headers
+        )
+        configurations.append(json.loads(await connection.recv()))
+        configured.set()
+        if isinstance(response, dict):
+            payload = {**response, "error_message": marker} if response else response
+            if "error" in payload:
+                payload["error"] = marker
+            await connection.send(json.dumps(payload))
+        await connection.wait_closed()
+        closed.set()
+
+    async with serve(handler, "127.0.0.1", 0, ping_interval=None) as server:
+        host, port = server.sockets[0].getsockname()[:2]
+        with caplog.at_level(logging.INFO):
+            if response == "cancel":
+                probe = asyncio.create_task(
+                    SonioxRealtimeSTTBackend.verify_api_key(marker, endpoint=f"ws://{host}:{port}")
+                )
+                await asyncio.wait_for(configured.wait(), timeout=1)
+                probe.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await probe
+            elif response:
+                with pytest.raises(Exception) as failure:
+                    await SonioxRealtimeSTTBackend.verify_api_key(
+                        marker, endpoint=f"ws://{host}:{port}"
+                    )
+                assert marker not in "".join(traceback.format_exception(failure.value))
+                assert failure.value.failure_diagnostics is not None
+                assert failure.value.failure_diagnostics.status_code == (
+                    401 if response.get("error_code") == 401 else None
+                )
+            else:
+                assert await SonioxRealtimeSTTBackend.verify_api_key(
+                    marker, endpoint=f"ws://{host}:{port}"
+                )
+            await asyncio.wait_for(closed.wait(), timeout=1)
+    assert authenticated == [True]
+    assert len(configurations) == 1
+    assert "api_key" not in configurations[0]
+    assert configurations[0]["model"] == "stt-rt-v5"
+    assert marker not in caplog.text
 
 
 @pytest.mark.asyncio
@@ -1272,9 +1390,7 @@ async def test_soniox_session_start_omits_context_when_no_terms(monkeypatch) -> 
         exceptions=SimpleNamespace(ConnectionClosedOK=type("ConnectionClosedOK", (Exception,), {})),
     )
     monkeypatch.setitem(sys.modules, "websockets", fake_websockets)
-    monkeypatch.setattr(
-        "puripuly_heart.core.network_clients.external_websocket_connect", connect
-    )
+    monkeypatch.setattr("puripuly_heart.core.network_clients.external_websocket_connect", connect)
 
     session = _make_session()
     await session.start()

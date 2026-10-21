@@ -18,12 +18,9 @@ from puripuly_heart.core.audio.ownership import (
 from puripuly_heart.core.clock import Clock, SystemClock
 from puripuly_heart.core.orchestrator.channel_runtime import (
     ChannelRuntime,
-    _SpeculativeAttempt,
-    _SpeculativeAttemptStatus,
 )
 from puripuly_heart.core.orchestrator.configuration import (
     TranslationRuntimeConfig,
-    TranslationRuntimeConfigSnapshot,
     TranslationRuntimeConfigurationOwner,
 )
 from puripuly_heart.core.orchestrator.context import ContextResolver
@@ -100,43 +97,6 @@ def owned_peer_speech_end(
             reason=reason,
         ),
         now_monotonic_s=speech_end_at,
-    )
-
-
-def make_speculative_attempt(
-    *,
-    source_text: str = "",
-    config_snapshot: TranslationRuntimeConfigSnapshot | None = None,
-    provider_generation: int = 0,
-    sequence: int = 1,
-    task: asyncio.Task[None] | None = None,
-    result: object | None = None,
-    started_at: float | None = None,
-    completed_at: float | None = None,
-    latency_stage_times: dict[str, float] | None = None,
-    status: _SpeculativeAttemptStatus | None = None,
-) -> _SpeculativeAttempt:
-    snapshot = config_snapshot or TranslationRuntimeConfigSnapshot(
-        revision=0,
-        value=TranslationRuntimeConfig(),
-    )
-    return _SpeculativeAttempt(
-        source_text=source_text,
-        normalized_text=source_text.strip(),
-        config_snapshot=snapshot,
-        provider_generation=provider_generation,
-        sequence=sequence,
-        status=status
-        or (
-            _SpeculativeAttemptStatus.READY
-            if result is not None
-            else _SpeculativeAttemptStatus.RUNNING
-        ),
-        task=task,
-        result=result,
-        started_at=started_at,
-        completed_at=completed_at,
-        latency_stage_times=dict(latency_stage_times or {}),
     )
 
 
@@ -371,15 +331,6 @@ class TranslationOwnersTestHarness:
     async def commit_self_merge(self, buffer: object, *, reason: str) -> None:
         """Commit the current self merge buffer through the owner's commit path."""
         await self._self_owner._commit_merge(buffer, reason=reason)
-
-    async def run_self_spec_translation(
-        self,
-        merge_id: object,
-        text: str,
-        sequence: int,
-    ) -> None:
-        """Run the owner's speculative translation path for the merge buffer."""
-        await self._self_owner._run_spec_translation(merge_id, text, sequence)
 
     async def process_translation(
         self,

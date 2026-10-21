@@ -79,6 +79,7 @@ class FakeGpuWorkerClient:
         self.transcribe_calls: list[tuple[str, str, str | None]] = []
         self.cancel_calls: list[str] = []
         self.close_calls = 0
+        self.force_close_calls = 0
         self.started = asyncio.Event()
         self.transcribe_returning = asyncio.Event()
         self.activation_started = asyncio.Event()
@@ -171,6 +172,7 @@ class FakeGpuWorkerClient:
         await self._events.put(None)
 
     async def force_close(self) -> None:
+        self.force_close_calls += 1
         await self.close()
 
 
@@ -179,9 +181,21 @@ class FakeGpuWorkerFactory:
         self.clients = clients
         self.modes: list[GpuWorkerMode] = []
 
-    async def start(self, *, mode: GpuWorkerMode) -> FakeGpuWorkerClient:
+    async def start(
+        self,
+        *,
+        mode: GpuWorkerMode,
+        operation_id: str | None = None,
+        request_id: str | None = None,
+    ) -> FakeGpuWorkerClient:
         self.modes.append(mode)
         return self.clients.pop(0)
+
+    async def close_pending_startups(self) -> None:
+        return None
+
+    def startup_cleanup_snapshot(self) -> dict[str, object]:
+        return {"pending_startups": 0, "close_complete": True, "cleanup_failures": []}
 
 
 async def _activate(
@@ -290,6 +304,96 @@ async def test_close_cancels_and_awaits_in_progress_activation() -> None:
     with pytest.raises(asyncio.CancelledError):
         await activation
     assert client.close_calls == 1
+
+
+async def test_last_channel_disable_aborts_loading_without_releasing_readiness_and_can_retry() -> (
+    None
+):
+    gate = asyncio.Event()
+
+    class LoadingClient(FakeGpuWorkerClient):
+        async def close(self) -> None:
+            await gate.wait()
+            await super().close()
+
+        async def force_close(self) -> None:
+            self.force_close_calls += 1
+            await FakeGpuWorkerClient.close(self)
+
+    client = LoadingClient(activation_gate=gate)
+    replacement = FakeGpuWorkerClient()
+    factory = FakeGpuWorkerFactory([client, replacement])
+    diagnostics = []
+    runtime = SharedGpuASRRuntime(
+        process_factory=factory,
+        diagnostic_sink=diagnostics.append,
+        force_close_seconds=10,
+    )
+    activation = asyncio.create_task(_activate(runtime))
+    await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+    try:
+        await asyncio.wait_for(
+            runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]), timeout=1
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await activation
+        assert not gate.is_set()
+        assert client.is_closed
+        assert client.force_close_calls == 1
+        assert runtime.worker_pid is None
+        assert runtime.active_channels == frozenset()
+        assert runtime.state == GpuASRRuntimeState.STOPPED
+        assert not any(event.kind == "activation_ready" for event in diagnostics)
+
+        assert await _activate(runtime) == ACTIVATION
+        assert factory.modes == ["persistent", "persistent"]
+        assert runtime.state == GpuASRRuntimeState.READY
+    finally:
+        gate.set()
+        await runtime.close()
+        await asyncio.gather(activation, return_exceptions=True)
+
+
+@pytest.mark.parametrize("remaining_channel", ["self", "peer"])
+async def test_revoked_pending_owner_cannot_receive_shared_activation_readiness(
+    remaining_channel: GpuASRChannel,
+) -> None:
+    gate = asyncio.Event()
+    client = FakeGpuWorkerClient(activation_gate=gate)
+    factory = FakeGpuWorkerFactory([client])
+    runtime = SharedGpuASRRuntime(process_factory=factory)
+    remaining_owner = object()
+    activation = asyncio.create_task(_activate(runtime))
+    await asyncio.wait_for(client.activation_started.wait(), timeout=1)
+    remaining = asyncio.create_task(
+        runtime.activate_channel(
+            remaining_channel,
+            owner=remaining_owner,
+            model_path=Path("model.gguf"),
+            model_id="qwen-gpu",
+            device_id="vulkan:0",
+        )
+    )
+    await asyncio.sleep(0)
+    try:
+        await asyncio.wait_for(
+            runtime.deactivate_channel("self", owner=_GPU_OWNERS["self"]), timeout=1
+        )
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(activation, timeout=1)
+        assert runtime.active_channels == frozenset({remaining_channel})
+        assert runtime.state == GpuASRRuntimeState.STARTING
+        assert not client.is_closed
+        assert not remaining.done()
+
+        gate.set()
+        assert await asyncio.wait_for(remaining, timeout=1) == ACTIVATION
+        assert client.force_close_calls == 0
+        assert factory.modes == ["persistent"]
+    finally:
+        gate.set()
+        await runtime.close()
+        await asyncio.gather(activation, remaining, return_exceptions=True)
 
 
 async def test_activation_progress_is_observed_before_activation_completes() -> None:
@@ -1481,4 +1585,94 @@ async def test_membership_owner_is_idempotent_and_only_last_owner_cancels_work()
         client.transcribe_gate.set()
         if work is not None:
             await asyncio.gather(work, return_exceptions=True)
+        await runtime.close()
+
+
+@pytest.mark.parametrize("recovery", ["retry", "close"])
+async def test_activation_primary_survives_temporary_cleanup_debt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    recovery: str,
+) -> None:
+    denied = True
+    directories: list[object] = []
+
+    class OwnedDirectory:
+        def __init__(self, **_kwargs: object) -> None:
+            self.name = str(tmp_path / f"owned-audio-{len(directories)}")
+            self.cleanup_complete = False
+            directories.append(self)
+
+        def cleanup(self) -> None:
+            if denied:
+                raise PermissionError(13, "private temporary cleanup credential body")
+            self.cleanup_complete = True
+
+    monkeypatch.setattr(gpu_asr_module.tempfile, "TemporaryDirectory", OwnedDirectory)
+    primary = GpuWorkerRequestError("out_of_memory")
+    failed_client = FakeGpuWorkerClient(activation_error=primary)
+    factory = FakeGpuWorkerFactory([failed_client, FakeGpuWorkerClient()])
+    diagnostics = []
+    runtime = SharedGpuASRRuntime(process_factory=factory, diagnostic_sink=diagnostics.append)
+    from puripuly_heart.core.diagnostics import DIAGNOSTIC_RECORD_ATTRIBUTE
+
+    operation_id, request_id = uuid4().hex, uuid4().hex
+    try:
+        with pytest.raises(GpuASRManualRetryRequired) as caught:
+            await runtime.activate_channel(
+                "self",
+                owner=_GPU_OWNERS["self"],
+                model_path=tmp_path / "model.gguf",
+                model_id="qwen-gpu",
+                device_id=DEVICE.device_id,
+                operation_id=operation_id,
+                request_id=request_id,
+            )
+        assert caught.value.code == "out_of_memory"
+        assert caught.value.__cause__ is primary
+        assert caught.value.failure_diagnostics is not None
+        first_cause = caught.value.failure_diagnostics
+        assert first_cause.fields["native_classification"] == "out_of_memory"
+        assert first_cause.operation_id == operation_id
+        assert first_cause.request_id == request_id
+        assert runtime.state == GpuASRRuntimeState.FAILED
+        assert runtime.last_failure_code == "out_of_memory"
+        assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 1
+        assert runtime.startup_cleanup_snapshot["temporary_cleanup_diagnostic_id"] is not None
+        assert [
+            event.fields["failure"] for event in diagnostics if event.kind == "activation_failed"
+        ] == ["out_of_memory"]
+        assert failed_client.is_closed
+        secondary = next(
+            getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0]
+            for record in caplog.records
+            if hasattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)
+            and getattr(record, DIAGNOSTIC_RECORD_ATTRIBUTE)[0].diagnostic_id
+            == runtime.startup_cleanup_snapshot["temporary_cleanup_diagnostic_id"]
+        )
+        assert secondary.cause_id == first_cause.diagnostic_id
+        assert secondary.fields["exception_class"] == "PermissionError"
+        assert secondary.fields["errno"] == 13
+        assert "private temporary cleanup credential body" not in caplog.text
+
+        with pytest.raises(PermissionError):
+            if recovery == "retry":
+                await runtime.retry()
+            else:
+                await runtime.close()
+        assert factory.modes == ["persistent"]
+        assert runtime.state == GpuASRRuntimeState.FAILED
+        assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 1
+        denied = False
+        if recovery == "retry":
+            await runtime.retry()
+            assert runtime.state == GpuASRRuntimeState.READY
+        else:
+            await runtime.close()
+            assert runtime.state == GpuASRRuntimeState.CLOSED
+        assert runtime.startup_cleanup_snapshot["pending_temporary_directories"] == 0
+        assert directories[0].cleanup_complete
+    finally:
+        denied = False
         await runtime.close()

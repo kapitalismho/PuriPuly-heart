@@ -19,6 +19,7 @@ TRANSLATION_PROMPT_NAME = "translation_prompt"
 LUNA_TRANSLATION_PROMPT_NAME = "translation_prompt_luna"
 UNSPECIFIED_SOURCE_TEXT_REF = "<input>"
 _LLM_PROVIDER_PROMPT_KEYS = {
+    "index_translate",
     "gemini",
     "qwen",
     "deepseek",

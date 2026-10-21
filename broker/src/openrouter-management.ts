@@ -9,7 +9,6 @@ type FetchImpl = typeof fetch;
 export type OpenRouterManagementOperation =
   | 'create_key'
   | 'read_key'
-  | 'update_key_limit'
   | 'assign_guardrail'
   | 'disable_key'
   | 'delete_key';
@@ -254,60 +253,6 @@ export async function assignManagedGuardrail(input: {
   }
 }
 
-export async function readManagedChildKeyEffectiveLimit(input: {
-  managementApiKey: string;
-  keyHash: string;
-  fetchImpl?: FetchImpl;
-}): Promise<number> {
-  const response = await requestOpenRouter({
-    operation: 'read_key',
-    path: `/keys/${input.keyHash}`,
-    managementApiKey: input.managementApiKey,
-    fetchImpl: input.fetchImpl,
-    method: 'GET',
-  });
-  const payload = await readSuccessJson(response, 'read_key');
-  return readEffectiveLimitFromKeyPayload(payload, response.status, 'read_key');
-}
-
-export async function updateManagedChildKeyLimit(input: {
-  managementApiKey: string;
-  keyHash: string;
-  limitUsd: number;
-  fetchImpl?: FetchImpl;
-}): Promise<number> {
-  const response = await requestOpenRouter({
-    operation: 'update_key_limit',
-    path: `/keys/${input.keyHash}`,
-    managementApiKey: input.managementApiKey,
-    fetchImpl: input.fetchImpl,
-    method: 'PATCH',
-    body: {
-      limit: input.limitUsd,
-    },
-  });
-  const payload = await readSuccessJson(response, 'update_key_limit');
-  const effectiveLimitUsd = readEffectiveLimitFromKeyPayload(
-    payload,
-    response.status,
-    'update_key_limit',
-  );
-  const effectiveLimitCents = currencyCentsFromUsd(effectiveLimitUsd);
-  const requestedLimitCents = currencyCentsFromUsd(input.limitUsd);
-  if (
-    effectiveLimitCents === null ||
-    requestedLimitCents === null ||
-    effectiveLimitCents < requestedLimitCents
-  ) {
-    throw malformedUpstreamError(
-      'update_key_limit',
-      response.status,
-      'OpenRouter update-key response effective limit is below the requested limit',
-    );
-  }
-
-  return effectiveLimitUsd;
-}
 
 export async function cleanupManagedChildKey(input: {
   managementApiKey: string;
@@ -413,38 +358,6 @@ async function requestOpenRouter(input: {
   return response;
 }
 
-function readEffectiveLimitFromKeyPayload(
-  payload: unknown,
-  status: number,
-  operation: OpenRouterManagementOperation,
-): number {
-  if (!isRecord(payload) || !isRecord(payload.data)) {
-    throw malformedUpstreamError(
-      operation,
-      status,
-      `OpenRouter ${operation} response must include data`,
-    );
-  }
-
-  if (typeof payload.data.limit !== 'number') {
-    throw malformedUpstreamError(
-      operation,
-      status,
-      `OpenRouter ${operation} response must include numeric data.limit`,
-    );
-  }
-
-  const effectiveLimitCents = currencyCentsFromUsd(payload.data.limit);
-  if (effectiveLimitCents === null) {
-    throw malformedUpstreamError(
-      operation,
-      status,
-      `OpenRouter ${operation} response data.limit must be a non-negative USD value`,
-    );
-  }
-
-  return payload.data.limit;
-}
 
 async function validateCleanupStepSuccess(input: {
   operation: Extract<OpenRouterManagementOperation, 'disable_key' | 'delete_key'>;
@@ -608,40 +521,71 @@ function describeUnknownError(error: unknown): string {
 }
 export type ManagedChildKeyLookupResult =
   | { found: true; keyHash: string; keyName: string; limitUsd: number | null }
-  | { found: false };
+  | { found: false; complete: true }
+  | { found: false; complete: false; nextOffset: number };
 
 export async function findManagedChildKeyByName(input: {
   managementApiKey: string;
   keyName: string;
+  offset?: number;
   fetchImpl?: FetchImpl;
 }): Promise<ManagedChildKeyLookupResult> {
-  const fetchImpl = input.fetchImpl ?? fetch;
-  let offset = 0;
-  for (let page = 0; page < 20; page += 1) {
-    const response = await requestOpenRouter({
+  let offset = input.offset ?? 0;
+  try {
+    for (let page = 0; page < 20; page += 1) {
+      const response = await requestOpenRouter({
+        operation: 'read_key',
+        path: `/keys?limit=100&offset=${offset}&include_disabled=true&include_expired=true`,
+        managementApiKey: input.managementApiKey,
+        fetchImpl: input.fetchImpl,
+        method: 'GET',
+      });
+      const payload = await readSuccessJson(response, 'read_key');
+      if (!isRecord(payload) || !Array.isArray(payload.data) || payload.data.length > 100) {
+        return { found: false, complete: false, nextOffset: offset };
+      }
+      const entries = payload.data;
+      if (entries.some((entry) =>
+        !isRecord(entry) || typeof entry.name !== 'string' ||
+        typeof entry.hash !== 'string' || entry.hash.length === 0)) {
+        return { found: false, complete: false, nextOffset: offset };
+      }
+      for (const entry of entries as Array<Record<string, unknown>>) {
+        if (entry.name === input.keyName) {
+          const limitUsd = typeof entry.limit === 'number' && Number.isFinite(entry.limit) ? entry.limit : null;
+          return { found: true, keyHash: entry.hash as string, keyName: input.keyName, limitUsd };
+        }
+      }
+      if (entries.length < 100) {
+        return offset === 0
+          ? { found: false, complete: true }
+          : { found: false, complete: false, nextOffset: 0 };
+      }
+      offset += entries.length;
+    }
+  } catch {
+    return { found: false, complete: false, nextOffset: offset };
+  }
+  return { found: false, complete: false, nextOffset: offset };
+}
+
+export async function verifyManagedChildKeyAbsent(input: {
+  managementApiKey: string;
+  keyHash: string;
+  fetchImpl?: FetchImpl;
+}): Promise<boolean> {
+  try {
+    await requestOpenRouter({
       operation: 'read_key',
-      path: `/keys?limit=100&offset=${offset}`,
+      path: `/keys/${input.keyHash}`,
       managementApiKey: input.managementApiKey,
-      fetchImpl,
+      fetchImpl: input.fetchImpl,
       method: 'GET',
     });
-    const payload = await readSuccessJson(response, 'read_key');
-    const entries = Array.isArray((payload as Record<string, unknown>).data)
-      ? ((payload as Record<string, unknown>).data as unknown[])
-      : [];
-    for (const entry of entries) {
-      if (!isRecord(entry) || entry.name !== input.keyName || typeof entry.hash !== 'string') {
-        continue;
-      }
-      const limitUsd = typeof entry.limit === 'number' && Number.isFinite(entry.limit) ? entry.limit : null;
-      return { found: true, keyHash: entry.hash, keyName: input.keyName, limitUsd };
-    }
-    if (entries.length < 100) {
-      return { found: false };
-    }
-    offset += entries.length;
+    return false;
+  } catch (error) {
+    return error instanceof OpenRouterManagementError && error.status === 404;
   }
-  return { found: false };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

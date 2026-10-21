@@ -30,6 +30,11 @@ class _UnavailableGpuRuntime:
     worker_pid = None
     last_failure_code = None
     configured_device_id = None
+    startup_cleanup_snapshot = {
+        "pending_startups": 0,
+        "close_complete": True,
+        "cleanup_failures": [],
+    }
 
     async def discover_devices(self):
         return ()

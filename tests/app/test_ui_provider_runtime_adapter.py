@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -7,10 +8,13 @@ from unittest.mock import AsyncMock
 import pytest
 
 from puripuly_heart.app.adapters.ui_runtime import UiProviderRuntimeAdapter
+from puripuly_heart.app.ports.chatgpt_account import ChatGptSignOutResult
 from puripuly_heart.app.ports.ui_models import GpuDeviceOption
+from puripuly_heart.app.services.llm_connection_readiness import LlmConnectionReadinessOwner
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
 from puripuly_heart.config.translation_values import TranslationConnection, TranslationModel
 from puripuly_heart.core.local_translation.devices import LlamaVulkanDevice
+from puripuly_heart.providers.llm.chatgpt_plan import ChatGptPlanLLMProvider
 
 
 def _custom_http_settings() -> AppSettingsVNext:
@@ -169,3 +173,100 @@ async def test_gpu_discovery_publishes_llama_devices(
         origin="settings",
     )
     assert published == [(GpuDeviceOption("Vulkan1", "AMD Radeon Graphics", "Vulkan1"),)]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sign_out_fails", [False, True])
+async def test_chatgpt_logout_suspends_standby_during_revocation(
+    sign_out_fails: bool,
+) -> None:
+    class Session:
+        token_generation = 1
+
+        async def access_token(self) -> str:
+            return "test-token"
+
+    class Socket:
+        def __init__(self) -> None:
+            self.close_code: int | None = None
+            self.closed = asyncio.Event()
+
+        async def close(self) -> None:
+            self.close_code = 1000
+            self.closed.set()
+
+    sockets: list[Socket] = []
+    connected: asyncio.Queue[Socket] = asyncio.Queue()
+
+    async def connect(_url: str, _headers: object) -> Socket:
+        socket = Socket()
+        sockets.append(socket)
+        connected.put_nowait(socket)
+        return socket
+
+    provider = ChatGptPlanLLMProvider(session=Session(), connector=connect)
+    current: list[object | None] = [provider]
+    readiness = LlmConnectionReadinessOwner(
+        llm_provider=lambda: current[0],
+        translation_enabled=lambda: False,
+    )
+    settings = AppSettingsVNext()
+    settings = replace(
+        settings,
+        intent=replace(
+            settings.intent,
+            translation=replace(
+                settings.intent.translation,
+                model=TranslationModel.GPT_6_LUNA.value,
+                connection=TranslationConnection.CHATGPT.value,
+            ),
+        ),
+    )
+    revoking = asyncio.Event()
+    revoke_gate = asyncio.Event()
+
+    async def sign_out() -> ChatGptSignOutResult:
+        revoking.set()
+        await revoke_gate.wait()
+        if sign_out_fails:
+            raise RuntimeError("controlled credential-store failure")
+        return ChatGptSignOutResult(remote_revoked=False)
+
+    async def apply(*_args: object, **_kwargs: object) -> bool:
+        current[0] = None
+        await provider.close()
+        return True
+
+    adapter = _adapter(settings, change_secret=AsyncMock(), apply=apply)
+    adapter.chatgpt = SimpleNamespace(sign_out=sign_out)
+    adapter.connection_readiness = readiness
+    logout: asyncio.Task[ChatGptSignOutResult] | None = None
+    try:
+        readiness.sync()
+        first = await asyncio.wait_for(connected.get(), timeout=1)
+        logout = asyncio.create_task(adapter.sign_out_chatgpt())
+        await asyncio.wait_for(revoking.wait(), timeout=1)
+        await asyncio.wait_for(first.closed.wait(), timeout=1)
+        readiness.sync()
+        if readiness._task is not None:
+            await asyncio.wait_for(readiness._task, timeout=1)
+        assert connected.empty()
+        assert len(sockets) == 1
+
+        revoke_gate.set()
+        if sign_out_fails:
+            with pytest.raises(RuntimeError, match="credential-store failure"):
+                await logout
+            replacement = await asyncio.wait_for(connected.get(), timeout=1)
+            assert replacement is not first
+            assert replacement.close_code is None
+        else:
+            assert (await logout).remote_revoked is False
+            assert connected.empty()
+            assert all(socket.close_code == 1000 for socket in sockets)
+    finally:
+        revoke_gate.set()
+        if logout is not None:
+            await asyncio.gather(logout, return_exceptions=True)
+        await readiness.close()
+        await provider.close()

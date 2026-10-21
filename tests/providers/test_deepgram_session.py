@@ -202,7 +202,9 @@ async def test_deepgram_writer_ack_waits_for_write_and_close_drains_fifo(control
     assert connection.written == [b"first", b"second", "Finalize"]
     assert connection.closed.is_set()
     assert all(client.is_closed for client in clients)
-    assert all(task.done() for task in (session._send_task, session._recv_task, session._keepalive_task))
+    assert all(
+        task.done() for task in (session._send_task, session._recv_task, session._keepalive_task)
+    )
 
 
 @pytest.mark.asyncio
@@ -226,7 +228,9 @@ async def test_deepgram_writer_failure_fails_inflight_and_pending_writes(control
     await asyncio.wait_for(session.close(), 1)
     assert connection.closed.is_set()
     assert all(client.is_closed for client in clients)
-    assert all(task.done() for task in (session._send_task, session._recv_task, session._keepalive_task))
+    assert all(
+        task.done() for task in (session._send_task, session._recv_task, session._keepalive_task)
+    )
 
 
 @pytest.mark.asyncio
@@ -262,4 +266,6 @@ async def test_deepgram_cancelled_close_fails_blocked_writes_and_joins_owned_tas
     assert all(isinstance(result, RuntimeError) for result in results)
     assert connection.closed.is_set()
     assert all(client.is_closed for client in clients)
-    assert all(task.done() for task in (session._send_task, session._recv_task, session._keepalive_task))
+    assert all(
+        task.done() for task in (session._send_task, session._recv_task, session._keepalive_task)
+    )

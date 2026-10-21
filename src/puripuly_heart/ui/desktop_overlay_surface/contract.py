@@ -52,6 +52,10 @@ _DESKTOP_CAPTION_SECONDARY_MAX_LINES = 1
 
 _DESKTOP_CAPTION_LINE_HEIGHT = 1.24
 
+_DESKTOP_CAPTION_FONT_SCALES = (1.0, 0.9, 0.8)
+
+_DESKTOP_CAPTION_FIT_OVERFLOW_TOLERANCE = 1.10
+
 _DESKTOP_CAPTION_PRIMARY_REGION_ALIGNMENT_Y = -0.5
 
 _DESKTOP_CAPTION_TEXT_STACK_ALIGNMENT_Y = -0.08
@@ -306,12 +310,13 @@ class DesktopCaptionLine:
     block_variant: str
     appearance_seq: int
     max_lines: int
-    font_size: int
+    font_size: float
     font_family: str | None
     line_height: float = _DESKTOP_CAPTION_LINE_HEIGHT
     weight: str = "semibold"
     promoted: bool = False
     active: bool = False
+    font_scale: float = 1.0
 
 
 @dataclass(frozen=True, slots=True)

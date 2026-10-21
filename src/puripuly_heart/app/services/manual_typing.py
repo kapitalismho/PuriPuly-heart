@@ -2,12 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from puripuly_heart.app.ports.manual_typing import SelfChatboxTypingPort
+from puripuly_heart.core.diagnostics import emit_failure, safe_exception_fields
+from puripuly_heart.core.messages import ErrorDiagnostics
+from puripuly_heart.core.orchestrator.self_translation_channel import TextSubmissionAdmission
+
+logger = logging.getLogger(__name__)
 
 MANUAL_INPUT_TYPING_REASON = "manual_input"
+
+
+class ManualTextSubmissionFailed(RuntimeError):
+    def __init__(self, diagnostics: ErrorDiagnostics) -> None:
+        self.diagnostics = diagnostics
+        super().__init__("Manual text submission failed")
 
 
 @dataclass(slots=True)
@@ -15,7 +27,6 @@ class ManualTypingOwner:
     output_provider: Callable[[], SelfChatboxTypingPort | None]
     completion_provider: Callable[[object], object | None]
     log_diagnostic: Callable[[str], object]
-    log_error: Callable[[str], object]
     idle_timeout_seconds: float
     submit_timeout_seconds: float
     _idle_task: asyncio.Task[None] | None = field(init=False, default=None, repr=False)
@@ -29,16 +40,21 @@ class ManualTypingOwner:
     def submit_generation(self) -> int:
         return self._submit_generation
 
-    async def submit(self, submit: Callable[[], Awaitable[object]] | None) -> None:
+    async def submit(
+        self, submit: Callable[[], Awaitable[TextSubmissionAdmission]] | None
+    ) -> TextSubmissionAdmission | None:
         self.clear_input()
         if submit is None:
-            return
+            return None
         reason = self.begin_submit()
         try:
-            utterance_id = await submit()
-            await self._wait_for_completion(utterance_id)
+            admission = await submit()
+            if admission.status == "admitted":
+                await self._wait_for_completion(admission.turn_id)
+            return admission
         except Exception as exc:
-            self.log_error(_format_manual_typing_error("submit", exc))
+            diagnostics = _record_manual_typing_failure("manual_submit", exc)
+            raise ManualTextSubmissionFailed(diagnostics) from exc
         finally:
             self.clear_submit(reason)
 
@@ -86,10 +102,10 @@ class ManualTypingOwner:
                 asyncio.shield(awaitable),
                 timeout=self.submit_timeout_seconds,
             )
-        except asyncio.TimeoutError:
-            self.log_diagnostic("[ManualTyping] submit output wait timed out")
+        except asyncio.TimeoutError as exc:
+            _record_manual_typing_failure("manual_completion_wait", exc, disposition="unknown")
         except Exception as exc:
-            self.log_error(_format_manual_typing_error("wait_for_completion", exc))
+            _record_manual_typing_failure("manual_completion_wait", exc, disposition="degraded")
 
     def _set_reason(self, reason: str, active: bool) -> None:
         output = self.output_provider()
@@ -98,14 +114,16 @@ class ManualTypingOwner:
         try:
             output.set_self_chatbox_typing_reason(reason, active)
         except Exception as exc:
-            self.log_error(_format_manual_typing_error("output_update", exc))
+            _record_manual_typing_failure("manual_typing_output", exc, disposition="degraded")
 
     def _reschedule_idle_timeout(self) -> None:
         self._cancel_idle_task()
         try:
             loop = asyncio.get_running_loop()
-        except RuntimeError:
-            self.log_error("Manual typing idle timeout scheduling failed: no running loop")
+        except RuntimeError as exc:
+            _record_manual_typing_failure(
+                "manual_typing_idle_schedule", exc, disposition="degraded"
+            )
             return
         self._idle_task = loop.create_task(self._idle_timeout())
 
@@ -123,14 +141,33 @@ class ManualTypingOwner:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            self.log_error(_format_manual_typing_error("idle_timeout", exc))
+            _record_manual_typing_failure("manual_typing_idle_timeout", exc, disposition="degraded")
         finally:
             if self._idle_task is asyncio.current_task():
                 self._idle_task = None
 
 
-def _format_manual_typing_error(operation: str, exc: Exception) -> str:
-    return (
-        "[ManualTyping] operation_failed "
-        f"operation={operation} cause=unclassified exception_type={type(exc).__name__}"
+def _record_manual_typing_failure(
+    operation: str, exception: BaseException, *, disposition: str = "failed"
+) -> ErrorDiagnostics:
+    diagnostics = ErrorDiagnostics(
+        component="manual_typing",
+        operation=operation,
+        code=(
+            "manual_submission_failed" if operation == "manual_submit" else "manual_typing_degraded"
+        ),
+        category="lifecycle",
+        visibility="basic",
+        content_policy="metadata_only",
+        status_code=None,
+        retry_after_ms=None,
+        fields={"phase": operation, **safe_exception_fields(exception)},
     )
+    emit_failure(
+        logger,
+        diagnostics,
+        severity="error" if disposition == "failed" else "warning",
+        disposition=disposition,
+        stage=operation,
+    )
+    return diagnostics

@@ -7,7 +7,7 @@
 </h1>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.8.2-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.9.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--or--later-blue" alt="License: AGPL-3.0-or-later" />
   <img src="https://img.shields.io/badge/python-3.14-yellow" alt="Python" />
   <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platform" />
@@ -103,7 +103,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | 無制限 | 無制限 | 5,000回 | 7,260回 |
+| **Index-Translate 35B A3B** | 無制限 | 無制限 | 5,000回 | 7,260回 |
 | **Gemma 4 26B A4B + 31B** | 13,940回 | 13,940回 | 3,680回 | 4,770回 |
 | **DeepSeek V4.1 Flash** | 16,800回 | 16,800回 | 3,860回 | 5,070回 |
 | **GPT 6 Luna** | 8,680回 | 8,680回 | 3,170回 | 3,950回 |
@@ -112,6 +112,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | 無制限 | 無制限 | 5,000回 | 7,260回 |
 | **DeepSeek V4 Flash (OpenRouter)** | 17,020回 | 17,020回 | 3,860回 | 5,090回 |
 | **Gemini 3.8 Flash** | 1,160回 | 1,160回 | 940回 | 1,000回 |
 | **Qwen 3.8 Flash** | 7,460回 | 7,460回 | 2,990回 | 3,680回 |
@@ -122,7 +123,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
-| **Gemma 4 E4B (Local)** | 0円 | 0円 | ~0.03円 | ~0.02円 |
+| **Index-Translate 35B A3B** | 0円 | 0円 | ~0.03円 | ~0.02円 |
 | **Gemma 4 26B A4B + 31B** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **DeepSeek V4.1 Flash** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **GPT 6 Luna** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
@@ -131,6 +132,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 
 | LLM \ ASR | Local ASR | Cloud Free Tier ASR | Soniox | Qwen Audio |
 |---|---|---|---|---|
+| **Gemma 4 E4B & 26B (Local)** | 0円 | 0円 | ~0.03円 | ~0.02円 |
 | **DeepSeek V4 Flash (OpenRouter)** | ~0.01円 | ~0.01円 | ~0.04円 | ~0.03円 |
 | **Gemini 3.8 Flash** | ~0.13円 | ~0.13円 | ~0.16円 | ~0.15円 |
 | **Qwen 3.8 Flash** | ~0.02円 | ~0.02円 | ~0.05円 | ~0.04円 |
@@ -141,7 +143,7 @@ VRChatやDiscordを含む、さまざまな環境で使えます。
 *   *DeepSeek V4.1 Flashはキャッシュヒット率70%、V4 Flash（OpenRouter）は60%を仮定しています*
 *   *GPT 6 LunaはOpenAI APIの料金を基準とし、キャッシュ割引なしを仮定しています。ChatGPTで接続した場合はAPI料金の代わりにCodexの利用上限を使います*
 *   *Qwen APIコストは北京リージョン基準*
-*   *料金表基準: 2026年9月25日*
+*   *料金表基準: 2026年10月17日*
 *   *1ドル = 150円*
 
 ### 無料クレジット
@@ -176,7 +178,10 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 | モデル | 実行環境 | 量子化 |
 |---|---|---|
 | Gemma 4 E4B IT QAT | CPU / GPU | UD Q4_K_XL |
+| Gemma 4 26B A4B IT QAT | GPU専用 (Vulkan) | UD Q4_K_XL |
 | OpenAI互換API | — | — |
+
+モデルはインストーラーに含まれず、選択したモデルが必要になったときにダウンロードされます。26Bのダウンロードは約14.25 GBです。モデル選択は再起動後も保持されます。26BはVulkan GPU専用で、初期化に失敗してもCPUやE4Bへ自動切り替えしません。GPUでは1つのランタイムでSelf/Peerの最大2リクエストを同時処理し、CPUでは順番に処理します。[固定プロファイルと管理対象ローカル翻訳の契約](../cli.md#managed-local-translation)を参照してください。
 
 ---
 
@@ -187,7 +192,7 @@ GPU推論はVulkanを使用しています。RadeonでもArcでも、ベンダ�
 1. [ダウンロードページ](https://github.com/kapitalismho/PuriPuly-heart/releases/latest)から最新バージョンをダウンロード
 2. PuriPulyをインストール
 3. **TALK** ボタンをクリック
-4. **TRANS** ボタンをクリックしてDiscord認証
+4. **TRANS** をクリック。新規インストールではAPIキー不要のIndexを使います。認証・設定を求められた場合は完了してください。
 5. **CAPTIONS** ボタンを押してVR字幕をオン
 6. （任意）**LISTEN** ボタンを押して相手の音声翻訳をオン
 

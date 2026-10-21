@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import socket
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import NoReturn
 from urllib.parse import parse_qs, urlsplit
@@ -34,6 +34,10 @@ class DiscordOAuthLoopbackClosedError(RuntimeError):
     pass
 
 
+class DiscordOAuthLoopbackUnavailableError(OSError):
+    pass
+
+
 class _DiscordOAuthHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = False
     daemon_threads = True
@@ -56,6 +60,7 @@ class DiscordOAuthLoopbackListener:
     _result: DiscordOAuthCallbackResult | None = None
     _error: DiscordOAuthCallbackError | None = None
     _closed: bool = False
+    _expected_state: str | None = field(default=None, repr=False)
 
     @classmethod
     def bind(cls, port: int, *, locale: str | None = None) -> DiscordOAuthLoopbackListener:
@@ -67,6 +72,7 @@ class DiscordOAuthLoopbackListener:
         listener._result = None
         listener._error = None
         listener._closed = False
+        listener._expected_state = None
         listener._server = _DiscordOAuthHTTPServer(
             (DISCORD_OAUTH_LOOPBACK_HOST, port),
             _handler_for(listener),
@@ -78,6 +84,20 @@ class DiscordOAuthLoopbackListener:
         )
         listener._thread.start()
         return listener
+
+    def expect_state(self, state: str) -> None:
+        if not isinstance(state, str) or not state:
+            raise ValueError("Discord OAuth requires an expected state")
+        with self._lock:
+            if self._closed:
+                raise DiscordOAuthLoopbackClosedError("Discord OAuth loopback listener was closed")
+            if self._expected_state is not None and self._expected_state != state:
+                raise ValueError("Discord OAuth expected state is already registered")
+            self._expected_state = state
+
+    def _accepts_state(self, state: str) -> bool:
+        with self._lock:
+            return not self._event.is_set() and self._expected_state == state
 
     @property
     def redirect_uri(self) -> str:
@@ -139,7 +159,9 @@ def bind_first_available(*, locale: str | None = None) -> DiscordOAuthLoopbackLi
             return DiscordOAuthLoopbackListener.bind(port, locale=locale)
         except OSError as exc:
             last_error = exc
-    raise OSError("no Discord OAuth loopback port is available") from last_error
+    raise DiscordOAuthLoopbackUnavailableError(
+        "no Discord OAuth loopback port is available"
+    ) from last_error
 
 
 def _resolve_callback_locale(locale: str | None) -> str:
@@ -181,11 +203,20 @@ def _handler_for(listener: DiscordOAuthLoopbackListener) -> type[BaseHTTPRequest
             code = _single_non_empty(params, "code")
             oauth_error = _single_non_empty(params, "error")
 
+            if state is not None and not listener._accepts_state(state):
+                self.send_error(400)
+                return
+            if code is not None and oauth_error is not None:
+                self.send_error(400)
+                return
+
             if state is not None and oauth_error is not None:
-                self.send_response(204)
-                self.end_headers()
                 listener._complete(error=DiscordOAuthCallbackError(oauth_error, state))
-                listener._close_async()
+                try:
+                    self.send_response(204)
+                    self.end_headers()
+                finally:
+                    listener._close_async()
                 return
 
             if state is not None and code is not None:

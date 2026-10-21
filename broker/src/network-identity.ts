@@ -315,30 +315,3 @@ export async function resolveNetworkIdentityWriteMode(
   return state.phase === 'keyed_only' ? 'keyed' : 'dual';
 }
 
-export interface ReferralAttemptIdentity {
-  digest: { digest: string; keyVersion: number; epoch: string } | null;
-  legacyHash: string | null;
-}
-
-export async function resolveReferralAttemptIdentity(
-  ip: string | null,
-  secrets: NetworkIdentitySecrets | null,
-  now: Date,
-): Promise<ReferralAttemptIdentity> {
-  const normalized = ip ? normalizeNetworkIdentityIp(ip) : null;
-  if (!normalized) {
-    return { digest: null, legacyHash: null };
-  }
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(`puripuly-heart:referral-attempt-ip:v1\n${normalized}`),
-  );
-  const legacyHash = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, '0'),
-  ).join('');
-  const keyed = await resolveRequestNetworkIdentity(ip, secrets, now);
-  return {
-    digest: keyed ? { digest: keyed.digest, keyVersion: keyed.keyVersion, epoch: keyed.epoch } : null,
-    legacyHash,
-  };
-}
