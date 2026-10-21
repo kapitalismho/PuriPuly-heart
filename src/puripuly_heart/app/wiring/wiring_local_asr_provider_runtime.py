@@ -5,10 +5,12 @@ import inspect
 import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import cast
 
 from puripuly_heart.app.adapters.gpu_worker_process import DefaultGpuWorkerProcessFactory
+from puripuly_heart.app.services.local_asr_selection import LOCAL_CPU_PROVIDERS
 from puripuly_heart.config.provider_values import (
     STTProviderName,
     custom_stt_selection_for_provider,
@@ -29,6 +31,8 @@ from puripuly_heart.core.local_asr_provider_runtime import (
     ProviderRuntimeTerminalFailureSink,
 )
 from puripuly_heart.core.local_asr_provisioning import LocalASRProvisioningPort
+from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.gpu_asr import SharedGpuASRRuntime
 from puripuly_heart.core.runtime.local_asr_provider_runtime import (
     LocalASRProviderRuntimeOwner,
@@ -57,7 +61,10 @@ from puripuly_heart.providers.stt.local_gpu import LocalGpuSTTBackend
 from puripuly_heart.providers.stt.qwen_audio import QwenAudioStreamingSTTBackend
 from puripuly_heart.providers.stt.soniox import SONIOX_MAX_SESSION_AGE_S
 
-from .wiring_stt_factory import create_stt_backend_from_resolved_config
+from .wiring_stt_factory import (
+    create_stt_backend_from_resolved_config,
+    prepare_local_stt_backend_dependencies,
+)
 
 FinalTranscriptSuppressedSink = Callable[[FinalTranscriptSuppressedNotification], object]
 FaultProfileProvider = Callable[[], object]
@@ -117,7 +124,7 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
     secrets: SecretStore
     clock: Clock
     reset_deadline_s: float
-    gpu_model_path: Path
+    gpu_model_path: Path | None
     on_final_transcript_suppressed: FinalTranscriptSuppressedSink | None = None
     runtime_logging: SessionRuntimeLoggingService | None = None
     fault_profile_provider: FaultProfileProvider | None = None
@@ -142,11 +149,16 @@ class SharedSTTProviderFactory(ProviderRuntimeProviderFactoryPort):
                 mode=provider_mode,
                 extra=config.provider_options.get("extra"),
             )
+        if config.provider in LOCAL_CPU_PROVIDERS:
+            await run_owned_thread_call(partial(prepare_local_stt_backend_dependencies, config))
+        gpu_model_path = self.gpu_model_path
+        if provider_name == STTProviderName.LOCAL_QWEN_GPU and gpu_model_path is None:
+            gpu_model_path = await run_owned_thread_call(local_gpu_model_path)
         backend = create_stt_backend_from_resolved_config(
             config,
             secrets=self.secrets,
             gpu_runtime=cast(SharedGpuASRRuntime, gpu_runtime),
-            gpu_model_path=self.gpu_model_path,
+            gpu_model_path=gpu_model_path,
             gpu_device_id=request.gpu_device_id,
             basic_log_sink=(
                 None

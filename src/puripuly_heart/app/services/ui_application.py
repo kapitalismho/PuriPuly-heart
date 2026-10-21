@@ -329,6 +329,8 @@ class UiApplicationBoundary:
         runtime_control_activity: Callable[[], tuple[tuple[str, bool], ...]] | None = None,
     ) -> None:
         self._startup = startup
+        self._startup_task: asyncio.Task[None] | None = None
+        self._startup_closed = False
         self._input_runtime = input_runtime
         self._peer_capture = peer_capture
         self._settings = settings
@@ -369,6 +371,18 @@ class UiApplicationBoundary:
         self,
     ) -> tuple[ApplicationShutdownCallback, ...]:
         return (
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
+                owner_name="ApplicationStartupOwner",
+                callback_name="stop_ingress",
+                callback=self._freeze_startup,
+            ),
+            application_shutdown_callback(
+                phase=SHUTDOWN_PHASE_STOP_EXTERNAL_PRODUCERS,
+                owner_name="ApplicationStartupOwner",
+                callback_name="close",
+                callback=self._drain_startup,
+            ),
             application_shutdown_callback(
                 phase=SHUTDOWN_PHASE_FREEZE_INGRESS,
                 owner_name="GithubStarPromptRuntime",
@@ -469,6 +483,22 @@ class UiApplicationBoundary:
     def overlay_calibration(self) -> object | None:
         return self._state_owner.overlay_calibration()
 
+    def _freeze_startup(self) -> None:
+        self._startup_closed = True
+        task = self._startup_task
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _drain_startup(self) -> None:
+        task = self._startup_task
+        if task is None or task.done():
+            return
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if not task.cancelled():
+                raise
+
     async def start(self) -> None:
         attempt_id = f"startup-{uuid4().hex}"
         process_id = os.getpid()
@@ -481,7 +511,11 @@ class UiApplicationBoundary:
             )
         )
         try:
-            await self._startup.start()
+            if self._startup_closed:
+                raise asyncio.CancelledError
+            task = asyncio.create_task(self._startup.start(), name="application-startup")
+            self._startup_task = task
+            await task
         except BaseException as exc:
             cancelled = isinstance(exc, asyncio.CancelledError)
             primary = getattr(exc, "diagnostics", None)

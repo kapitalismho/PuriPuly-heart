@@ -98,6 +98,18 @@ from .wiring_llm_factory import _qwen_api_key_for_resolved_credential
 from .wiring_secrets_factory import require_secret
 
 logger = logging.getLogger(__name__)
+_LOCAL_CPU_MODEL_BY_PROVIDER = {
+    STT_PROVIDER_LOCAL_PARAKEET_V3: PARAKEET_V3_MODEL_ID,
+    STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: PARAKEET_JAPANESE_MODEL_ID,
+    STT_PROVIDER_LOCAL_QWEN: LOCAL_STT_MODEL_ID,
+}
+
+
+def prepare_local_stt_backend_dependencies(config: ResolvedSTTConfig) -> None:
+    from puripuly_heart.providers.stt.local_cpu import local_cpu_backend_type
+
+    if config.provider != STT_PROVIDER_LOCAL_CPU_AUTO:
+        local_cpu_backend_type(_LOCAL_CPU_MODEL_BY_PROVIDER[config.provider])
 
 
 def _log_gemini_vocabulary_truncation(input_count: int, kept_count: int) -> None:
@@ -1088,11 +1100,6 @@ def create_stt_backend_from_resolved_config(
     stream_label = config.channel
     keyterms = _resolved_stt_keyterms(config)
 
-    local_cpu_model_by_provider = {
-        STT_PROVIDER_LOCAL_PARAKEET_V3: PARAKEET_V3_MODEL_ID,
-        STT_PROVIDER_LOCAL_PARAKEET_JAPANESE: PARAKEET_JAPANESE_MODEL_ID,
-        STT_PROVIDER_LOCAL_QWEN: LOCAL_STT_MODEL_ID,
-    }
     if config.provider == STT_PROVIDER_LOCAL_CPU_AUTO:
         from puripuly_heart.providers.stt.local_cpu import LocalCPUAutoSTTBackend
 
@@ -1103,11 +1110,11 @@ def create_stt_backend_from_resolved_config(
             hotwords=keyterms,
             attempt_log_sink=basic_log_sink,
         )
-    if config.provider in local_cpu_model_by_provider:
+    if config.provider in _LOCAL_CPU_MODEL_BY_PROVIDER:
         from puripuly_heart.providers.stt.local_cpu import create_local_cpu_backend
 
         return create_local_cpu_backend(
-            local_cpu_model_by_provider[config.provider],
+            _LOCAL_CPU_MODEL_BY_PROVIDER[config.provider],
             source_language=config.source_language,
             sample_rate_hz=config.sample_rate_hz,
             stream_label=stream_label,
