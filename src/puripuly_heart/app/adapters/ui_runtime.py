@@ -754,6 +754,25 @@ class UiEngagementRuntimeAdapter:
             persist_sent_date=persist,
         )
 
+    async def claim_main_input_first_launch(self) -> bool:
+        current = self.settings.canonical
+        if current is None:
+            return True
+        if current.state.main_input_hint.first_launch_completed:
+            return False
+        next_settings = replace(
+            current,
+            state=replace(
+                current.state,
+                main_input_hint=replace(
+                    current.state.main_input_hint,
+                    first_launch_completed=True,
+                ),
+            ),
+        )
+        await self.settings_application.apply(next_settings, reload_settings_view=False)
+        return True
+
     def should_show_github_star_prompt(self) -> bool:
         return self.github_prompt.should_show()
 

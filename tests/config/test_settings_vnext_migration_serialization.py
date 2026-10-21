@@ -89,6 +89,30 @@ def test_concurrency_upgrade_preserves_custom_values_and_runs_once(
     assert tuple(tmp_path.glob("settings.json.pre-v*.bak")) == backups
 
 
+def test_main_input_first_launch_flag_survives_reload_and_defaults_off(
+    tmp_path: Path,
+) -> None:
+    current = _serialization().to_dict(AppSettingsVNext())
+    current["state"].pop("main_input_hint")
+    legacy_path = tmp_path / "legacy.json"
+    _write_json_bytes(legacy_path, current)
+
+    legacy = _compat().load_vnext_settings(legacy_path)
+
+    assert legacy.ok
+    assert legacy.settings.state.main_input_hint.first_launch_completed is False
+
+    completed = _serialization().to_dict(AppSettingsVNext())
+    completed["state"]["main_input_hint"]["first_launch_completed"] = True
+    completed_path = tmp_path / "completed.json"
+    _write_json_bytes(completed_path, completed)
+
+    reloaded = _compat().load_vnext_settings(completed_path)
+
+    assert reloaded.ok
+    assert reloaded.settings.state.main_input_hint.first_launch_completed is True
+
+
 def _final_dev_v30_fixture() -> dict[str, Any]:
     fixture_path = Path(__file__).parent / "fixtures" / "final_dev_v30_settings.json"
     return json.loads(fixture_path.read_text(encoding="utf-8"))

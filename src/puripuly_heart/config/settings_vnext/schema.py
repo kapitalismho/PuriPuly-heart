@@ -973,6 +973,11 @@ class IntegratedContextState:
 
 
 @dataclass(frozen=True, slots=True)
+class MainInputHintState:
+    first_launch_completed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
 class TelemetryOperationalState:
     anonymous_id: str | None = field(default_factory=new_anonymous_telemetry_identifier)
     last_sent_date_utc: str | None = None
@@ -995,6 +1000,7 @@ class PersistedOperationalState:
     github_star_prompt: GithubStarPromptState = field(default_factory=GithubStarPromptState)
     peer_translation: PeerTranslationState = field(default_factory=PeerTranslationState)
     integrated_context: IntegratedContextState = field(default_factory=IntegratedContextState)
+    main_input_hint: MainInputHintState = field(default_factory=MainInputHintState)
     telemetry: TelemetryOperationalState = field(default_factory=TelemetryOperationalState)
 
 
@@ -1105,6 +1111,7 @@ __all__ = [
     "is_safe_compatibility_extension_key",
     "LanguageIntent",
     "LocalLLMIntent",
+    "MainInputHintState",
     "ManagedConnectionState",
     "MANAGED_AUTH_CLAIM_SOURCE_DISCORD",
     "MANAGED_AUTH_CLAIM_SOURCE_QQ",

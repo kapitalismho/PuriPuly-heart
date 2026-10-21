@@ -363,6 +363,9 @@ class DashboardView(ft.Column):
         if self.on_message_input_activity:
             self.on_message_input_activity(bool(has_text))
 
+    def set_message_input_hint_key(self, key: str) -> None:
+        self.display_card.set_input_hint_key(key)
+
     def handle_message_input_tab_key(self) -> bool:
         if not self._message_input_focused:
             return False

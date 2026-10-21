@@ -103,6 +103,7 @@ UI_APPLICATION_USER_INTENT_METHODS = frozenset(
         "cancel_overlay_calibration",
         "capture_settings_view_change",
         "check_for_update",
+        "claim_main_input_first_launch",
         "clear_debug_audio_fault_profiles",
         "clear_managed_auth_pending_state",
         "clear_provider_verification",
@@ -1119,6 +1120,9 @@ class UiApplicationBoundary:
 
     async def record_app_active_day(self, active_date_utc: str) -> object:
         return await self._engagement.record_app_active_day(active_date_utc)
+
+    async def claim_main_input_first_launch(self) -> bool:
+        return bool(await self._engagement.claim_main_input_first_launch())
 
     def should_show_github_star_prompt(self) -> bool:
         return bool(self._engagement.should_show_github_star_prompt())

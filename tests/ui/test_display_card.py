@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from types import SimpleNamespace
 
 import pytest
 
 pytest.importorskip("flet")
 
+from puripuly_heart.ui import i18n as i18n_module
 from puripuly_heart.ui.components import display_card as display_card_module
 from puripuly_heart.ui.components.display_card import DisplayCard
 from puripuly_heart.ui.fonts import default_font_family
@@ -719,3 +721,52 @@ def test_display_updates_preserve_unsubmitted_input(monkeypatch: pytest.MonkeyPa
     card.set_status("disconnected")
     assert card._input_field.value == "still editing"
     assert submitted == []
+
+
+INPUT_HINT_POOL = {
+    "display.input_hint",
+    "display.input_hint_tip.cloud_stt",
+    "display.input_hint_tip.tab_swap",
+    "display.input_hint_tip.earmuffs",
+}
+
+
+def test_first_launch_always_uses_the_default_input_hint() -> None:
+    for seed in range(50):
+        key = display_card_module.choose_input_hint_key(
+            first_launch=True,
+            rng=random.Random(seed),
+        )
+        assert key == "display.input_hint"
+
+
+def test_later_launches_draw_from_the_whole_input_hint_pool() -> None:
+    drawn = {
+        display_card_module.choose_input_hint_key(first_launch=False, rng=random.Random(seed))
+        for seed in range(200)
+    }
+
+    assert drawn == INPUT_HINT_POOL
+
+
+@pytest.mark.parametrize("locale", i18n_module.available_locales())
+def test_every_input_hint_is_translated_in_every_locale(locale: str) -> None:
+    bundle = i18n_module._load_bundle(locale)
+
+    for key in INPUT_HINT_POOL:
+        assert bundle.get(key, "").strip()
+
+
+def test_chosen_input_hint_survives_a_locale_change(monkeypatch: pytest.MonkeyPatch) -> None:
+    card = DisplayCard(on_submit=lambda _text: None)
+    monkeypatch.setattr(type(card._input_field), "update", lambda self: None)
+    _mute_display_updates(monkeypatch, card)
+
+    i18n_module.set_locale("ko")
+    card.set_input_hint_key("display.input_hint_tip.tab_swap")
+    assert card._input_field.hint_text == "Tab 키를 누르면 언어 쌍이 전환되어요"
+
+    i18n_module.set_locale("en")
+    card.apply_locale()
+
+    assert card._input_field.hint_text == "Press Tab to switch the language pair"
