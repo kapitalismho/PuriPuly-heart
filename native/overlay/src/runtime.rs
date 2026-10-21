@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::future::Future;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Path;
 use std::sync::Arc;
@@ -2628,26 +2629,14 @@ async fn run_with_manifest_and_profile(
                 .await;
         }
 
-        let (mut bridge, snapshot) = match BridgeClient::connect(&manifest).await {
-            Ok(result) => result,
+        let initialized = initialize_and_connect_runtime(&manifest, async {
+            perform_startup_preflight().map_err(startup_error_from_preflight)?;
+            initialize_runtime_resources(&manifest, &logger).await
+        })
+        .await;
+        let ((renderer, openvr), mut bridge, snapshot) = match initialized {
+            Ok(initialized) => initialized,
             Err(error) => {
-                let startup_error = startup_error_from_bridge_error(error);
-                emit_startup_failure(&logger, &startup_error).await;
-                break 'runtime startup_error.exit_code();
-            }
-        };
-
-        if let Err(error) = perform_startup_preflight() {
-            let startup_error = startup_error_from_preflight(error);
-            let _ = bridge.close().await;
-            emit_startup_failure(&logger, &startup_error).await;
-            break 'runtime startup_error.exit_code();
-        }
-
-        let (renderer, openvr) = match initialize_runtime_resources(&manifest, &logger).await {
-            Ok(resources) => resources,
-            Err(error) => {
-                let _ = bridge.close().await;
                 emit_startup_failure(&logger, &error).await;
                 break 'runtime error.exit_code();
             }
@@ -2800,6 +2789,17 @@ where
     overlay_factory(overlay_instance_id).map_err(startup_error_from_openvr)
 }
 
+async fn initialize_and_connect_runtime<R>(
+    manifest: &OverlayManifest,
+    initialize: impl Future<Output = Result<R, StartupError>>,
+) -> Result<(R, BridgeClient, OverlayPresentationSnapshot), StartupError> {
+    let resources = initialize.await?;
+    let (bridge, snapshot) = BridgeClient::connect(manifest)
+        .await
+        .map_err(startup_error_from_bridge_error)?;
+    Ok((resources, bridge, snapshot))
+}
+
 async fn initialize_runtime_resources(
     manifest: &OverlayManifest,
     logger: &OverlayLogger,
@@ -2876,9 +2876,9 @@ fn caption_block_for_strip(strip: &OverlaySlot) -> CaptionBlock {
 #[cfg(test)]
 mod tests {
     use super::{
-        prepare_openvr_runtime, startup_error_from_runtime_failure, FrameCycleOutcome,
-        FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner, OverlayRuntime,
-        RetainedFrame, RuntimeFailure, SnapshotApplyOutcome, StartupError,
+        initialize_and_connect_runtime, prepare_openvr_runtime, startup_error_from_runtime_failure,
+        FrameCycleOutcome, FreshRetryChannel, NativeFreshSchedule, NativePresentationOwner,
+        OverlayRuntime, RetainedFrame, RuntimeFailure, SnapshotApplyOutcome, StartupError,
         NATIVE_FRESH_AUDIT_CAPACITY, NATIVE_FRESH_RETRY_MAX_COMPLETED,
     };
     use crate::bridge::{BridgeClient, BridgeIncoming};
@@ -3890,6 +3890,115 @@ mod tests {
         let (bridge, _) = BridgeClient::connect(&manifest).await.unwrap();
         (bridge, server)
     }
+    #[tokio::test]
+    async fn startup_initialization_can_exceed_acceptance_budget_before_authentication() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let manifest = controlled_manifest(listener.local_addr().unwrap());
+        let initialization_release = Arc::new(tokio::sync::Notify::new());
+        let server_release = initialization_release.clone();
+        let server = tokio::spawn(async move {
+            assert!(
+                tokio::time::timeout(Duration::from_millis(2100), listener.accept())
+                    .await
+                    .is_err()
+            );
+            server_release.notify_one();
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            let auth = ws.next().await.unwrap().unwrap();
+            let auth: serde_json::Value = serde_json::from_str(auth.to_text().unwrap()).unwrap();
+            assert_eq!(auth["type"], "auth");
+            ws.send(Message::Text(
+                json!({
+                    "type": "snapshot",
+                    "payload": {"revision": 9, "blocks": []}
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+            wait_for_owner_ready(&mut ws).await;
+            ws.send(Message::Text(json!({"type":"shutdown"}).to_string().into()))
+                .await
+                .unwrap();
+            while ws.next().await.is_some() {}
+        });
+        let start = Instant::now();
+        let initialized = initialize_and_connect_runtime(&manifest, async {
+            initialization_release.notified().await;
+            Ok((
+                CaptionRenderer::new_for_test().unwrap(),
+                FakeOpenVr::default(),
+            ))
+        });
+        let ((renderer, openvr), mut bridge, snapshot) =
+            tokio::time::timeout(Duration::from_secs(15), initialized)
+                .await
+                .unwrap()
+                .unwrap();
+        assert!(start.elapsed() > Duration::from_secs(2));
+        assert_eq!(snapshot.revision, 9);
+        let logger = controlled_logger(ControlledSink::new(ControlledSinkMode::Success));
+        let mut owner = NativePresentationOwner::new(snapshot, renderer, openvr);
+        tokio::time::timeout(Duration::from_secs(2), owner.run(&mut bridge, &logger))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(owner.runtime().ready_sent());
+        let _ = bridge.close().await;
+        server.await.unwrap();
+        logger.shutdown().unwrap();
+    }
+
+    #[tokio::test]
+    async fn startup_initialization_failures_preserve_cause_without_authentication() {
+        for error in [
+            StartupError::SteamVrNotRunning,
+            StartupError::OpenVrInit("controlled OpenVR failure".into()),
+            StartupError::RendererInit("controlled renderer failure".into()),
+        ] {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let manifest = controlled_manifest(listener.local_addr().unwrap());
+            let result =
+                initialize_and_connect_runtime::<()>(&manifest, async { Err(error.clone()) }).await;
+            assert!(matches!(result, Err(actual) if actual == error));
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), listener.accept())
+                    .await
+                    .is_err()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn startup_bridge_rejection_releases_initialized_resources() {
+        struct Resources(Arc<AtomicUsize>);
+        impl Drop for Resources {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let manifest = controlled_manifest(listener.local_addr().unwrap());
+        let drops = Arc::new(AtomicUsize::new(0));
+        let server = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = accept_async(stream).await.unwrap();
+            let _auth = ws.next().await.unwrap().unwrap();
+            ws.send(Message::Text(
+                json!({"type":"auth_error"}).to_string().into(),
+            ))
+            .await
+            .unwrap();
+        });
+        let result =
+            initialize_and_connect_runtime(&manifest, async { Ok(Resources(drops.clone())) }).await;
+        assert!(matches!(result, Err(StartupError::BridgeAuth(_))));
+        assert_eq!(drops.load(Ordering::SeqCst), 1);
+        server.await.unwrap();
+    }
+
     #[tokio::test]
     async fn production_owner_openvr_event_flood_does_not_starve_snapshot_submit() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

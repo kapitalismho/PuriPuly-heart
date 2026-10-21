@@ -373,6 +373,9 @@ Implementation: `core/runtime/output.py`, `core/orchestrator/translation_output_
 | Python runtime (`core/overlay/`, `core/runtime/overlay.py`) | Caption lifetime, scene delivery, and process lifecycle |
 | Native runtime (`native/overlay/src/runtime.rs`) | VR rendering and GPU resources |
 
+- **Startup ownership**
+  - Native resource initialization precedes bridge authentication and initial scene receipt. Python supervises the total startup lifetime and supplies the latest send-time-pruned scene when the child connects.
+  - Startup supervision and challenged scene-acceptance monitoring cover separate stages; initialization does not manufacture acceptance or extend a written scene's deadline. Startup budgets are documented in the [native overlay guide](../native/overlay/README.md#startup).
 - **Caption ownership**
   - `OverlayPresenter` owns caption admission and lifetime independently of providers.
   - Python owns logical caption state. Native rendering must not redefine that lifetime.
