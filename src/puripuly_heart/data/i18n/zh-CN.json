@@ -139,7 +139,7 @@
   "settings.translation_model.gemma4_26b_31b.description": "适合大多数情况",
   "settings.translation_model.deepseek_v4_flash.description": "",
   "settings.translation_model.deepseek_v4_flash_41.description": "擅长中文",
-  "settings.translation_model.gpt_6_luna.description": "翻译最出色，但稍慢一些",
+  "settings.translation_model.gpt_6_luna.description": "也可以通过 ChatGPT 订阅使用",
   "settings.translation_model.qwen38_flash.description": "DeepSeek 的不错替代选择",
   "settings.translation_model.local_llm.description": "也可以使用本地 LLM",
   "settings.translation_model.section.recommended_cloud": "推荐 / 云端",

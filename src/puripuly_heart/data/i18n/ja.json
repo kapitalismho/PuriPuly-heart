@@ -139,7 +139,7 @@
   "settings.translation_model.gemma4_26b_31b.description": "ほとんどの場面で優秀です",
   "settings.translation_model.deepseek_v4_flash.description": "",
   "settings.translation_model.deepseek_v4_flash_41.description": "中国語に強いです",
-  "settings.translation_model.gpt_6_luna.description": "翻訳が一番上手です 少し遅めです",
+  "settings.translation_model.gpt_6_luna.description": "ChatGPTのプランでも使えます",
   "settings.translation_model.qwen38_flash.description": "DeepSeekの良い代替手段です",
   "settings.translation_model.local_llm.description": "ローカルLLMも使用できます",
   "settings.translation_model.section.recommended_cloud": "おすすめ / クラウド",
