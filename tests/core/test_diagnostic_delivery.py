@@ -182,7 +182,13 @@ def test_stalled_writer_overflow_is_nonblocking_and_shutdown_loss_is_visible(tmp
         assert after["file"]["persistence"] == "incomplete"
     finally:
         release.set()
+        listener = sinks.file_queue_listener
+        thread = listener._thread
+        if thread is not None:
+            thread.join(timeout=5)
+        assert listener.cleanup_complete
         finish(root, sinks, service)
+        assert sinks.file_handler.stream is None
 
 
 @pytest.mark.asyncio

@@ -436,6 +436,7 @@ Logging contracts:
   - File delivery is asynchronous and bounded.
   - Live health observes queue, writer, rejection, and subscriber loss independently of writing to the failed sink.
   - Enqueue, write, and durable persistence are distinct. Current-run history is not a durable audit.
+  - Queue drain and listener-owned file finalization share one bounded close deadline. Retrying close or replacing the logging configuration cannot renew that deadline or transfer a live listener's cleanup to another writer.
 - **Privacy**
   - Technical diagnostics exclude credentials, user text, audio, arbitrary exception/child content, and personal paths.
   - Accepted conversation records keep their separate secret-protected path and explicit CLI content opt-ins.

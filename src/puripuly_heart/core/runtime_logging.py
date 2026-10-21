@@ -83,6 +83,7 @@ _QUEUE_HANDLER_LOG_FILE_ATTR = "_puripuly_heart_log_file"
 _QUEUE_HANDLER_FILE_HANDLER_ATTR = "_puripuly_heart_file_handler"
 _QUEUE_HANDLER_LISTENER_ATTR = "_puripuly_heart_queue_listener"
 _QUEUE_HANDLER_CLOSED_ATTR = "_puripuly_heart_queue_closed"
+_QUEUE_HANDLER_CLOSE_DEADLINE_ATTR = "_puripuly_heart_queue_close_deadline"
 _QUEUE_HANDLER_CLOSING_ATTR = "_puripuly_heart_queue_closing"
 _QUEUE_HANDLER_REFCOUNT_ATTR = "_puripuly_heart_queue_refcount"
 _QUEUE_HANDLER_QUEUE_ATTR = "_puripuly_heart_queue"
@@ -94,7 +95,7 @@ _LIVE_AUDIENCE_BASIC = LIVE_AUDIENCE_BASIC
 _TERMINAL_RECORD_ATTR = "_puripuly_heart_terminal_record"
 _MAIN_FILE_QUEUE_CAPACITY = 2048
 _MAIN_FILE_PRIORITY_RESERVE = 64
-_FILE_DRAIN_TIMEOUT_S = 2.0
+_FILE_CLOSE_TIMEOUT_S = 2.0
 _TERMINAL_ENQUEUE_TIMEOUT_S = 0.25
 _FILE_BATCH_MAX_AGE_S = 1.0
 _FILE_BATCH_MAX_BYTES = 64 * 1024
@@ -2046,7 +2047,7 @@ def _main_file_queue_for_handler(
 def _join_pending_file_queue(
     sinks: RuntimeLoggingSinks,
     *,
-    timeout_s: float | None = None,
+    deadline: float,
 ) -> bool:
     file_queue_handler = getattr(sinks, "file_queue_handler", None)
     if file_queue_handler is None:
@@ -2058,8 +2059,6 @@ def _join_pending_file_queue(
     )
     if file_queue is None:
         return True
-    timeout = _FILE_DRAIN_TIMEOUT_S if timeout_s is None else timeout_s
-    deadline = time.monotonic() + max(0.0, timeout)
     while file_queue.unfinished_tasks and time.monotonic() < deadline:
         time.sleep(0.005)
     return file_queue.unfinished_tasks == 0
@@ -2137,9 +2136,15 @@ def _note_oversized_rejection(sinks: RuntimeLoggingSinks) -> None:
 
 def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Handler) -> None:
     failures: list[Exception] = []
-    already_closing = bool(getattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, False))
-    setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
-    setattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, True)
+    started_at = time.monotonic()
+    with handler.lock:
+        already_closing = bool(getattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, False))
+        deadline = getattr(handler, _QUEUE_HANDLER_CLOSE_DEADLINE_ATTR, None)
+        if deadline is None:
+            deadline = started_at + _FILE_CLOSE_TIMEOUT_S
+            setattr(handler, _QUEUE_HANDLER_CLOSE_DEADLINE_ATTR, deadline)
+        setattr(handler, _QUEUE_HANDLER_REFCOUNT_ATTR, 0)
+        setattr(handler, _QUEUE_HANDLER_CLOSING_ATTR, True)
 
     file_queue = _main_file_queue_for_handler(handler)
     listener = getattr(handler, _QUEUE_HANDLER_LISTENER_ATTR, None)
@@ -2152,7 +2157,7 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
         file_queue_listener=listener,
         file_queue=file_queue,
     )
-    drained = _join_pending_file_queue(sinks)
+    drained = _join_pending_file_queue(sinks, deadline=deadline)
     initial_delivery_failures = (
         file_handler.delivery_failures
         if isinstance(file_handler, _BatchingRotatingFileHandler)
@@ -2184,7 +2189,7 @@ def _close_main_file_queue_handler(logger: logging.Logger, handler: logging.Hand
 
     listener_stopped = True
     if isinstance(listener, _SafeQueueListener):
-        listener_stopped = listener.stop_bounded(timeout_s=_TERMINAL_ENQUEUE_TIMEOUT_S)
+        listener_stopped = listener.stop_bounded(timeout_s=max(0.0, deadline - time.monotonic()))
         failures.extend(listener.cleanup_failures)
     elif isinstance(listener, QueueListener) and drained:
         try:
