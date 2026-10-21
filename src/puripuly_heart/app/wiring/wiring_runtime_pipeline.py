@@ -5,6 +5,7 @@ import contextlib
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 
 from puripuly_heart.app.ports.capture_vad_runtime import (
@@ -65,6 +66,7 @@ from puripuly_heart.core.orchestrator.translation_turn import (
 from puripuly_heart.core.osc.chatbox_paginator import ChatboxPaginator
 from puripuly_heart.core.osc.receiver_contract import VrcMicState
 from puripuly_heart.core.osc.udp_sender import VrchatOscUdpSender
+from puripuly_heart.core.owned_thread import run_owned_thread_call
 from puripuly_heart.core.runtime.output import OutputRuntime
 from puripuly_heart.core.runtime.peer_channel import PeerCaptureSessionOwner
 from puripuly_heart.core.runtime.provider_handle import ProviderRuntimeHandle
@@ -75,9 +77,11 @@ from puripuly_heart.core.storage.secrets import SecretStore
 from puripuly_heart.core.vrchat_scene_service import VrchatSceneService
 from puripuly_heart.domain.events import UIEvent
 
+from .wiring_composition import prepare_capture_runtime_dependencies
 from .wiring_llm_factory import (
     LlmFactoryResolvedExtras,
     llm_factory_extras_from_vnext,
+    prepare_llm_factory_extras,
     runtime_resolution_input_from_vnext,
 )
 from .wiring_local_asr_provider_runtime import LocalASRProviderRuntimeFactory
@@ -764,6 +768,7 @@ async def compose_runtime_pipeline(
     chatgpt_session: ChatGptAccessTokenPort | None = None,
 ) -> RuntimePipelineComponents:
     owned_resources = resources is None
+    await run_owned_thread_call(prepare_capture_runtime_dependencies)
     pipeline_resources = resources or RuntimePipelineResourceOwner()
     try:
         return await _compose_runtime_pipeline(
@@ -858,6 +863,16 @@ async def _compose_runtime_pipeline(
                 raise RuntimeError("managed Gemma translation runtime is unavailable")
             gemma_runtime = managed_gemma.runtime
             gemma_release = noop_managed_gemma_release
+        llm_extras = inputs.llm_extras
+        if inputs.llm_runtime_input is not None and gemma_runtime is None:
+            llm_extras = await run_owned_thread_call(
+                partial(
+                    prepare_llm_factory_extras,
+                    inputs.llm_runtime_input,
+                    secrets=secrets,
+                    extras=llm_extras,
+                )
+            )
         llm = create_translation_backend(
             translation_model=inputs.translation_model,
             secrets=secrets,
@@ -865,7 +880,7 @@ async def _compose_runtime_pipeline(
                 http_extensions or HttpExtensionRegistry(default_http_extensions_dir())
             ),
             runtime_input=inputs.llm_runtime_input,
-            extras=inputs.llm_extras,
+            extras=llm_extras,
             http_extension_id=inputs.http_extension_id,
             concurrency_limit=inputs.concurrency_limit,
             managed_release_service=managed_release.service,

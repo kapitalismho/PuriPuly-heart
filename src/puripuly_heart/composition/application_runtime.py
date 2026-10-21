@@ -262,7 +262,6 @@ from puripuly_heart.core.local_asr_provisioning import (
     LocalASRProvisioningPort,
     LocalASRProvisioningSnapshot,
 )
-from puripuly_heart.core.local_gpu_assets import local_gpu_model_path
 from puripuly_heart.core.local_translation.assets import GEMMA_26B_MODEL_ID
 from puripuly_heart.core.observability import DiagnosticEvent
 from puripuly_heart.core.orchestrator.configuration import (
@@ -1684,7 +1683,7 @@ def compose_application_runtime(
                 secrets=secrets,
                 clock=clock,
                 reset_deadline_s=STT_RESET_DEADLINE_S,
-                gpu_model_path=local_gpu_model_path(),
+                gpu_model_path=None,
                 on_final_transcript_suppressed=(
                     require_audio_diagnostics().on_final_transcript_suppressed
                 ),

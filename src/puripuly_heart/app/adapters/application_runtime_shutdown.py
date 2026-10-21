@@ -194,7 +194,8 @@ class ApplicationRuntimeShutdownAdapter:
             await owner.cancel()
 
     async def stop_self_capture_ingress(self) -> None:
-        await self.stop_self_capture()
+        if self.pipeline.self_capture is not None:
+            await self.stop_self_capture()
 
     async def close_vrc_mic_receiver_runtime(self) -> None:
         owner = self.vrc_mic_sync()

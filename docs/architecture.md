@@ -157,6 +157,9 @@ Protocol guides: [CLI](cli.md), [VRChat OSC](vrchat-osc.md), [HTTP extensions](h
 
 Composition may construct resources, but must transfer long-lived ownership to an explicit runtime owner.
 
+- Pipeline composition awaits passive capture and selected local-STT dependency preparation through the cancellation-draining owned-thread boundary before constructing and registering runtime owners on the event loop. Preparation does not start capture, load model weights, or declare readiness early. CPU selection does not resolve GPU-only model paths.
+- Managed OpenRouter construction may consume a one-construction credential observation bound to its exact configuration and secret-store identity. Live claim/release guards retain the secret store; lazy fallback construction obtains its own observation rather than retaining the primary provider's prepared data.
+
 ## Local Application Control
 
 GUI and headless hosts share application owners, runtime resources and turn-event contracts. Presentation adapters determine whether there is a main window.
@@ -433,6 +436,7 @@ Logging contracts:
   - File delivery is asynchronous and bounded.
   - Live health observes queue, writer, rejection, and subscriber loss independently of writing to the failed sink.
   - Enqueue, write, and durable persistence are distinct. Current-run history is not a durable audit.
+  - Queue drain and listener-owned file finalization share one bounded close deadline. Retrying close or replacing the logging configuration cannot renew that deadline or transfer a live listener's cleanup to another writer.
 - **Privacy**
   - Technical diagnostics exclude credentials, user text, audio, arbitrary exception/child content, and personal paths.
   - Accepted conversation records keep their separate secret-protected path and explicit CLI content opt-ins.
@@ -508,6 +512,7 @@ Shutdown order:
 
 - **Application coordination**
   - The application shutdown adapter coordinates capture, translation, output, child processes, and services.
+  - The UI application boundary freezes and cancels its owned startup task, then drains preparation before producer/resource teardown. Closing during startup cannot install a late pipeline; teardown observes existing capture owners without constructing missing ones.
   - Ordered teardown survives ordinary UI-task cancellation.
   - Child processes remain owned for the host lifetime.
 - **Failure ownership**

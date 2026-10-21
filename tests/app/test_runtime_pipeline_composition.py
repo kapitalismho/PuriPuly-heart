@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,6 +29,7 @@ from puripuly_heart.core.osc.receiver import VrcMicState
 from puripuly_heart.core.runtime.prebuilt_local_asr_provider_runtime import (
     PrebuiltLocalASRProviderRuntimeFactory,
 )
+from puripuly_heart.core.storage.secrets import InMemorySecretStore
 from puripuly_heart.domain.events import STTFinalEvent
 from puripuly_heart.domain.models import Transcript
 from tests.helpers.runtime_pipeline import pipeline_inputs_from_vnext
@@ -121,7 +123,7 @@ async def test_pipeline_composes_each_durable_owner_once_and_injects_same_identi
 
     pipeline = await compose_runtime_pipeline(
         inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
-        secrets=object(),
+        secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -208,7 +210,7 @@ async def test_pipeline_binds_stt_event_ingress_observer_to_translation_diagnost
 
     pipeline = await compose_runtime_pipeline(
         inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
-        secrets=object(),
+        secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -282,7 +284,7 @@ async def test_managed_gemma_startup_constructs_provider_without_preparing(
 
     pipeline = await compose_runtime_pipeline(
         inputs=pipeline_inputs_from_vnext(settings),
-        secrets=object(),
+        secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -368,7 +370,7 @@ async def test_pipeline_composition_preserves_runtime_configuration_and_gate(
 
     pipeline = await compose_runtime_pipeline(
         inputs=pipeline_inputs_from_vnext(settings),
-        secrets=object(),
+        secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=runtime_logging,
@@ -503,7 +505,7 @@ async def test_pipeline_output_keeps_peer_off_chatbox_and_channels_separate(
 
     pipeline = await compose_runtime_pipeline(
         inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
-        secrets=object(),
+        secrets=InMemorySecretStore(),
         config_path=Path("settings.json"),
         clock=SystemClock(),
         runtime_logging=None,
@@ -858,7 +860,7 @@ async def test_pipeline_composition_closes_pending_llm_on_early_failure(
     with pytest.raises(RuntimeError, match=f"{failure_stage} construction failed"):
         await compose_runtime_pipeline(
             inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
-            secrets=object(),
+            secrets=InMemorySecretStore(),
             config_path=Path("settings.json"),
             clock=SystemClock(),
             runtime_logging=None,
@@ -948,3 +950,181 @@ async def test_pipeline_launcher_retains_failed_cleanup_for_retry(
     await launcher.close()
     assert events == ["new_self"]
     assert launcher.failed_resources is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["ready", "cancel", "failure"])
+async def test_pipeline_dependency_preparation_remains_responsive_and_drains_cancellation(
+    monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    construction_threads = []
+    loop_thread = threading.get_ident()
+
+    def prepare() -> None:
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            assert release.wait(3)
+            if outcome == "failure":
+                raise OSError("dependency preparation failed")
+        finally:
+            finished.set()
+
+    def capture(label: str) -> CaptureOwner:
+        construction_threads.append(threading.get_ident())
+        return CaptureOwner(label)
+
+    monkeypatch.setattr(runtime_pipeline_module, "prepare_capture_runtime_dependencies", prepare)
+    monkeypatch.setattr(runtime_pipeline_module, "create_translation_backend", lambda **_kw: None)
+    monkeypatch.setattr(
+        runtime_pipeline_module, "VrchatOscUdpSender", lambda **_kw: RecordingSender()
+    )
+    monkeypatch.setattr(
+        runtime_pipeline_module, "ChatboxPaginator", lambda **_kw: RecordingChatbox()
+    )
+    task = asyncio.create_task(
+        compose_runtime_pipeline(
+            inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+            secrets=InMemorySecretStore(),
+            config_path=Path("settings.json"),
+            clock=SystemClock(),
+            runtime_logging=None,
+            managed_release=ManagedRelease(),
+            managed_delegate_ready=lambda: None,
+            local_asr_factory=lambda _secrets: PrebuiltLocalASRProviderRuntimeFactory(
+                self_provider=None, peer_provider=None
+            ),
+            self_capture_factory=lambda *_args: capture("self"),
+            peer_capture_factory=lambda *_args: capture("peer"),
+            vrc_mic_state=None,
+            vrc_mic_audio_gate=None,
+            receiver_active=False,
+            stt_failure_sink=lambda _message: None,
+        )
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        progressed = asyncio.Event()
+        loop.call_soon(progressed.set)
+        await asyncio.wait_for(progressed.wait(), 1)
+        assert not task.done()
+        assert construction_threads == []
+        if outcome == "cancel":
+            for _ in range(2):
+                task.cancel()
+                await asyncio.sleep(0)
+            assert not task.done()
+            assert not finished.is_set()
+        release.set()
+        if outcome == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, 1)
+        elif outcome == "failure":
+            with pytest.raises(OSError, match="dependency preparation failed"):
+                await asyncio.wait_for(task, 1)
+        else:
+            pipeline = await asyncio.wait_for(task, 1)
+            assert pipeline.self_capture.label == "self"
+            assert pipeline.peer_capture.label == "peer"
+            assert construction_threads == [loop_thread, loop_thread]
+            await pipeline.resource_owner.close()
+        assert finished.is_set()
+        if outcome != "ready":
+            assert construction_threads == []
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["ready", "cancel", "failure"])
+async def test_pipeline_managed_credential_observation_is_drained_before_loop_construction(
+    monkeypatch: pytest.MonkeyPatch, outcome: str
+) -> None:
+    loop = asyncio.get_running_loop()
+    loop_thread = threading.get_ident()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    constructors = []
+
+    class Store(InMemorySecretStore):
+        def get(self, key):
+            loop.call_soon_threadsafe(entered.set)
+            try:
+                assert release.wait(3)
+                if outcome == "failure":
+                    raise OSError("credential observation unavailable")
+                return super().get(key)
+            finally:
+                finished.set()
+
+    class Backend:
+        async def close(self):
+            pass
+
+    backend = Backend()
+
+    def create(**_kwargs):
+        constructors.append(threading.get_ident())
+        return backend
+
+    monkeypatch.setattr(runtime_pipeline_module, "create_translation_backend", create)
+    monkeypatch.setattr(
+        runtime_pipeline_module, "VrchatOscUdpSender", lambda **_kw: RecordingSender()
+    )
+    monkeypatch.setattr(
+        runtime_pipeline_module, "ChatboxPaginator", lambda **_kw: RecordingChatbox()
+    )
+    task = asyncio.create_task(
+        compose_runtime_pipeline(
+            inputs=pipeline_inputs_from_vnext(AppSettingsVNext()),
+            secrets=Store(),
+            config_path=Path("settings.json"),
+            clock=SystemClock(),
+            runtime_logging=None,
+            managed_release=ManagedRelease(),
+            managed_delegate_ready=lambda: None,
+            local_asr_factory=lambda _secrets: PrebuiltLocalASRProviderRuntimeFactory(
+                self_provider=None, peer_provider=None
+            ),
+            self_capture_factory=lambda *_args: CaptureOwner("self"),
+            peer_capture_factory=lambda *_args: CaptureOwner("peer"),
+            vrc_mic_state=None,
+            vrc_mic_audio_gate=None,
+            receiver_active=False,
+            stt_failure_sink=lambda _message: None,
+        )
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        progressed = asyncio.Event()
+        loop.call_soon(progressed.set)
+        await asyncio.wait_for(progressed.wait(), 1)
+        assert constructors == []
+        if outcome == "cancel":
+            for _ in range(2):
+                task.cancel()
+                await asyncio.sleep(0)
+            assert not task.done()
+            assert not finished.is_set()
+        release.set()
+        if outcome == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, 1)
+        else:
+            pipeline = await asyncio.wait_for(task, 1)
+            if outcome == "ready":
+                assert pipeline.llm_runtime.provider is backend
+                assert constructors == [loop_thread]
+            else:
+                assert pipeline.llm_runtime.provider is None
+                assert constructors == []
+            await pipeline.resource_owner.close()
+        assert finished.is_set()
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)

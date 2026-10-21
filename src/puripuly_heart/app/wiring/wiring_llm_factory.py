@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import os
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from puripuly_heart.app.ports.secret_store import SecretReadResult
 from puripuly_heart.app.services.managed_auth_claims import (
@@ -78,6 +78,7 @@ from puripuly_heart.core.observability import ProviderObservationPort
 from puripuly_heart.core.openrouter_credentials import (
     OPENROUTER_BYOK_API_KEY_ENV,
     OPENROUTER_BYOK_API_KEY_SECRET,
+    OpenRouterCredentialResolution,
     OpenRouterCredentialRuntimeConfig,
     load_managed_openrouter_user_identifier,
     resolve_openrouter_credentials,
@@ -122,9 +123,18 @@ class LlmFactoryManagedIdentity:
 
 
 @dataclass(frozen=True, slots=True)
+class _PreparedOpenRouterCredentials:
+    config: OpenRouterCredentialRuntimeConfig
+    secrets: SecretStore = field(repr=False)
+    resolution: OpenRouterCredentialResolution = field(repr=False)
+    user_identifier: str | None = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
 class LlmFactoryResolvedExtras:
     managed_identity: LlmFactoryManagedIdentity | None = None
     gpu_device_id: str = "auto"
+    openrouter_credentials: _PreparedOpenRouterCredentials | None = field(default=None, repr=False)
 
 
 def llm_factory_extras_from_vnext(settings: AppSettingsVNext) -> LlmFactoryResolvedExtras:
@@ -141,6 +151,38 @@ def llm_factory_extras_from_vnext(settings: AppSettingsVNext) -> LlmFactoryResol
             pending_delivery_ack_source=identity.pending_delivery_ack_source,
         ),
         gpu_device_id=settings.intent.translation.gpu_device_id,
+    )
+
+
+def prepare_llm_factory_extras(
+    runtime_input: RuntimeResolutionInput,
+    *,
+    secrets: SecretStore,
+    extras: LlmFactoryResolvedExtras | None,
+) -> LlmFactoryResolvedExtras:
+    current = extras or LlmFactoryResolvedExtras()
+    target = resolve_llm_config(runtime_input).primary
+    if target.provider != PROVIDER_OPENROUTER:
+        return current
+    source = _openrouter_source_for_resolved_credential(target.credential)
+    if source != OpenRouterCredentialSource.MANAGED:
+        return current
+    if _extras_have_opposite_managed_claim_source(current, target.credential):
+        raise ValueError("OpenRouter managed local claim conflict")
+    config = _openrouter_credential_config_from_resolved_fields(
+        credential=target.credential, selected_source=source, extras=current
+    )
+    resolution = resolve_openrouter_credentials(config, secrets=secrets)
+    user_identifier = (
+        load_managed_openrouter_user_identifier(config, secrets=secrets)
+        if resolution.api_key is not None
+        else None
+    )
+    return replace(
+        current,
+        openrouter_credentials=_PreparedOpenRouterCredentials(
+            config=config, secrets=secrets, resolution=resolution, user_identifier=user_identifier
+        ),
     )
 
 
@@ -625,7 +667,23 @@ def _openrouter_provider_from_resolved_fields(
             secrets=secrets,
             credential=credential,
         )
-        managed_api_key = resolve_openrouter_credentials(credential_config, secrets=secrets).api_key
+        observed = extras.openrouter_credentials if extras is not None else None
+        if (
+            observed is not None
+            and observed.config == credential_config
+            and observed.secrets is secrets
+        ):
+            managed_api_key = observed.resolution.api_key
+            user_identifier = observed.user_identifier
+        else:
+            managed_api_key = resolve_openrouter_credentials(
+                credential_config, secrets=secrets
+            ).api_key
+            user_identifier = (
+                load_managed_openrouter_user_identifier(credential_config, secrets=secrets)
+                if managed_api_key is not None and not force_managed_wrapper
+                else None
+            )
         if force_managed_wrapper or managed_api_key is None:
             from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
@@ -647,10 +705,7 @@ def _openrouter_provider_from_resolved_fields(
             )
         return OpenRouterLLMProvider(
             api_key=managed_api_key,
-            user_identifier=load_managed_openrouter_user_identifier(
-                credential_config,
-                secrets=secrets,
-            ),
+            user_identifier=user_identifier,
             model=model,
             models=models,
             routing_mode=routing_mode,
@@ -866,6 +921,8 @@ def create_llm_provider_from_resolved_config(
         qwen_low_latency_mode=qwen_low_latency_mode,
         chatgpt_session=chatgpt_session,
     )
+    if extras is not None and extras.openrouter_credentials is not None:
+        extras = replace(extras, openrouter_credentials=None)
     if len(config.attempts) > 1:
         fallback_managed_release_service = _shared_managed_release_service_for_fallback(
             base,

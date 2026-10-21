@@ -30,16 +30,29 @@ from puripuly_heart.core.stt.backend import (
     STTBackendSession,
     STTSessionProjection,
 )
-from puripuly_heart.providers.stt.local_parakeet_sherpa import (
-    LocalParakeetJapaneseSherpaSTTBackend,
-    LocalParakeetV3SherpaSTTBackend,
-)
 from puripuly_heart.providers.stt.local_qwen_sherpa import (
     LOCAL_ASR_PENDING_TTL_S,
     LocalQwenSherpaSTTBackend,
 )
 
 LocalCPUBackendFactory = Callable[..., STTBackend]
+
+
+def local_cpu_backend_type(model_id: str) -> type[STTBackend]:
+    if model_id == LOCAL_STT_MODEL_ID:
+        return LocalQwenSherpaSTTBackend
+    if model_id in {PARAKEET_V3_MODEL_ID, PARAKEET_JAPANESE_MODEL_ID}:
+        from puripuly_heart.providers.stt.local_parakeet_sherpa import (
+            LocalParakeetJapaneseSherpaSTTBackend,
+            LocalParakeetV3SherpaSTTBackend,
+        )
+
+        return (
+            LocalParakeetV3SherpaSTTBackend
+            if model_id == PARAKEET_V3_MODEL_ID
+            else LocalParakeetJapaneseSherpaSTTBackend
+        )
+    raise ValueError(f"Unsupported local CPU model: {model_id}")
 
 
 def create_local_cpu_backend(
@@ -55,12 +68,7 @@ def create_local_cpu_backend(
     queue_clock: Callable[[], float] = time.monotonic,
     attempt_log_sink: Callable[[str, int], None] | None = None,
 ) -> STTBackend:
-    if model_id not in {
-        LOCAL_STT_MODEL_ID,
-        PARAKEET_V3_MODEL_ID,
-        PARAKEET_JAPANESE_MODEL_ID,
-    }:
-        raise ValueError(f"Unsupported local CPU model: {model_id}")
+    backend_type = local_cpu_backend_type(model_id)
     manifest = load_local_stt_asset_manifest(model_id)
     resolved_root = model_root or default_local_stt_model_root()
     common = {
@@ -72,17 +80,13 @@ def create_local_cpu_backend(
         "queue_clock": queue_clock,
     }
     if model_id == LOCAL_STT_MODEL_ID:
-        return LocalQwenSherpaSTTBackend(
+        return backend_type(
             **common,
             language_hint=get_local_qwen_language_hint(source_language),
             hotwords=hotwords,
             attempt_log_sink=attempt_log_sink,
         )
-    if model_id == PARAKEET_V3_MODEL_ID:
-        return LocalParakeetV3SherpaSTTBackend(**common)
-    if model_id == PARAKEET_JAPANESE_MODEL_ID:
-        return LocalParakeetJapaneseSherpaSTTBackend(**common)
-    raise AssertionError(model_id)
+    return backend_type(**common)
 
 
 @dataclass(slots=True)
@@ -193,6 +197,9 @@ class LocalCPUAutoSTTBackend(STTBackend):
         if not snapshot.cpu_auto_available:
             raise LocalCPUAutoUnavailableError(snapshot)
         model_id = resolve_cpu_auto_model(self.source_language)
+        await run_owned_thread_call(partial(local_cpu_backend_type, model_id))
+        if self._closed:
+            raise RuntimeError("CPU Auto backend is closed")
         delegate = self.backend_factory(
             model_id,
             model_root=self.model_root,

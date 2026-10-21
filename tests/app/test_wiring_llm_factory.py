@@ -473,11 +473,12 @@ async def test_managed_factory_leaves_gpu_admission_to_shared_runtime_even_with_
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("prepared", [False, True])
 @pytest.mark.parametrize("source", ["discord", "qq"])
 @pytest.mark.parametrize(
     "authority", ["missing_view", "unacknowledged", "pending", "acknowledged", "legacy"]
 )
-async def test_real_managed_factory_obeys_canonical_credential_proof(source, authority):
+async def test_real_managed_factory_obeys_canonical_credential_proof(source, authority, prepared):
     from puripuly_heart.core.managed_openrouter_release import ManagedOpenRouterLLMProvider
 
     settings = _managed_china_settings() if source == "qq" else _managed_settings()
@@ -512,11 +513,25 @@ async def test_real_managed_factory_obeys_canonical_credential_proof(source, aut
                 credential="synthetic-key",
             ).encode(),
         )
+    extras = None if authority == "missing_view" else llm_factory_extras_from_vnext(settings)
+    if prepared:
+        from functools import partial
+
+        from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+        extras = await run_owned_thread_call(
+            partial(
+                wiring_llm_factory.prepare_llm_factory_extras,
+                wiring_llm_factory.runtime_resolution_input_from_vnext(settings),
+                secrets=secrets,
+                extras=extras,
+            )
+        )
     provider = create_llm_provider_from_resolved_config(
         _managed_china_resolved_config() if source == "qq" else _standard_managed_resolved_config(),
         secrets=secrets,
         managed_release_service=object(),
-        extras=None if authority == "missing_view" else llm_factory_extras_from_vnext(settings),
+        extras=extras,
     )
     try:
         assert isinstance(provider, SemaphoreLLMProvider)
@@ -525,5 +540,36 @@ async def test_real_managed_factory_obeys_canonical_credential_proof(source, aut
             assert provider.inner.api_key == "synthetic-key"
         else:
             assert isinstance(provider.inner, ManagedOpenRouterLLMProvider)
+    finally:
+        await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_prepared_primary_does_not_retain_credentials_for_lazy_fallback() -> None:
+    from functools import partial
+
+    from puripuly_heart.core.owned_thread import run_owned_thread_call
+
+    settings = _managed_settings()
+    runtime_input = wiring_llm_factory.runtime_resolution_input_from_vnext(settings)
+    secrets = InMemorySecretStore()
+    extras = await run_owned_thread_call(
+        partial(
+            wiring_llm_factory.prepare_llm_factory_extras,
+            runtime_input,
+            secrets=secrets,
+            extras=llm_factory_extras_from_vnext(settings),
+        )
+    )
+    provider = create_llm_provider_from_resolved_config(
+        resolve_llm_config(runtime_input),
+        secrets=secrets,
+        managed_release_service=object(),
+        extras=extras,
+    )
+    try:
+        secrets.set(OPENROUTER_MANAGED_QQ_API_KEY_SECRET, "new-opposite-claim")
+        with pytest.raises(ValueError, match="local claim conflict"):
+            await provider.inner.attempts[1].provider._ensure_delegate()
     finally:
         await provider.close()
