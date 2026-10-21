@@ -456,6 +456,8 @@ class OverlayPresenter(OverlaySink):
                     event,
                     now=now,
                     show_translation=self.show_translation,
+                    show_peer_original=self.show_peer_original,
+                    translation_enabled=self.translation_enabled,
                     visible_window_target_blocks=self.visible_window_target_blocks,
                     next_appearance_seq=self._next_appearance_seq,
                     terminal_update_reason=self._terminal_update_reason,
@@ -663,6 +665,8 @@ class OverlayPresenter(OverlaySink):
         self._presentation_state.promote_staged_self(
             now=now,
             show_translation=self.show_translation,
+            show_peer_original=self.show_peer_original,
+            translation_enabled=self.translation_enabled,
             capacity=self.visible_window_target_blocks,
         )
         self._drain_presentation_state_removals()

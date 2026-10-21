@@ -883,7 +883,7 @@ immediate-stop smoke supplies the distinct cancellation-safety evidence.
 
 | Executed selection | Result and limits |
 | --- | --- |
-| Final domain, configuration, core and architecture suites | 4,289 passed; four opt-in real-process skips; 210 existing websockets deprecation warnings |
+| Integrated domain, configuration, core and architecture suites at `766ae006` | 4,289 passed; four opt-in real-process skips; 210 existing websockets deprecation warnings |
 | Repaired streaming and producer-isolation suites | 94 passed; obsolete publication/wiring/empty diagnostic assertions removed, behavioral coverage retained |
 | Focused source, translation, chatbox, caption and retention neighbors | 463 passed; overlapping selection, not an additional suite total |
 | Output shutdown and caption-policy regressions after repair | 105 passed |
@@ -945,3 +945,59 @@ overlay and opaque backdrop with pre/post-capture region/z-order checks.
 Initial native shell quoting and log-decoding failures were corrected before
 interpreting successful checks. Initial Black failures were repaired using the
 repository formatter; final global checks passed.
+
+### Independent mixed-scene selection repair
+
+Whole-checkpoint review of `a52fcc97` → `766ae006` found one material mixed-window
+defect. A full scene containing an older finalized PEER and a newer translated
+SELF unnecessarily staged the next untranslated SELF, even though ordinary
+selection would replace only the older PEER. The independent production-owner
+probe observed the failed successor hidden until predecessor expiry. The
+Director accepted this P2 finding.
+
+Both staging and later promotion now forecast the actual next selection using
+the existing shared selector and current effective display preferences.
+Forecasts do not mutate stored entries, retirement, live pointers or appearance
+order. The translated SELF is protected only when it would actually lose its
+slot. Older finalized PEER can yield normally; newer finalized PEER and drawable
+active PEER still preserve their existing ordering/protection.
+
+Eight added cases cover both chronology orders, active/secondary-only/hidden
+PEER, translation-disabled drawability and promotion after preference or active
+protection changes. The affected caption/presenter/freshness suites passed 158
+tests. A fresh-process production-owner smoke observed immediate pending-source
+admission beside the retained translation at t=1.0, terminal failure without
+hiding it, and unchanged truthful fallback at t=7.9. Chatbox progression and
+appearance identity remained intact.
+
+The repaired integrated selection passed 705 caption, presenter, freshness,
+output, streaming, producer-isolation and architecture tests. Global Ruff and
+Black passed again. Earlier source/translation and native evidence is retained
+only where the bounded selection repair does not change its exercised path;
+these overlapping selections are not summed.
+
+Actual repaired PC pixels confirmed the reversed-order fix: after successor
+source arrived at 1.059477 s, the capture at 1.102059–1.138162 s showed the
+retained SELF translation beside successor source, without the older finalized
+PEER. The same content remained after both deliberately failed translation
+attempts. Inverse-order pixels retained the previous SELF until the new matching
+translation was ready. Active-PEER pixels retained the previous SELF during
+pending/failure and then progressed directly to a later ready successor.
+All three selected runs used identical repaired product hashes, ended with
+source idle and exited successfully.
+
+Two earlier control captures stopped on an owned-window identity/bounds/
+visibility guard: the inverse case saved no pixels; the active case saved only
+two initial safe frames. Their original exact causes remain unclassified,
+not product-selection failures or successful complete observations. Bounded
+continuations first established a populated owned window and guarded matching
+pixels before starting the scenario. Neither relaxed capture safety nor
+changed foreign windows. These completed both control observations.
+
+The repaired Python-to-native selection also passed all nine selected cases
+(296 other cases filtered, zero failures/skips). Its controlled sparse and
+burst/silence workloads again completed 28 and 11 fresh renders/submissions.
+All 120 completed rows among 292 retry rows carried matching fresh-render,
+producer-ready and submit-success witnesses. Native file hashes remained
+unchanged, so earlier release/startup and real offscreen GPU evidence remains
+applicable. This continuation does not add OpenVR or physical HMD evidence.

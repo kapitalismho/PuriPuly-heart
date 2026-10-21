@@ -501,6 +501,259 @@ async def test_latest_staged_source_fills_expired_readable_slot_without_replayin
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("peer_state", ["older_finalized", "newer_finalized", "older_active"])
+async def test_pending_and_failed_successor_stages_only_for_actual_translated_self_victim(
+    peer_state,
+):
+    provider, clock, osc = HeldTranslations(), FakeClock(), RecordingOscQueue()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, native_retry_enabled=True
+    )
+    harness = compose_translation_test_harness(
+        stt=None,
+        llm=provider,
+        osc=osc,
+        overlay_sink=presenter,
+        clock=clock,
+        low_latency_mode=True,
+        low_latency_finalize_wait_ms=0,
+        fallback_transcript_only=True,
+    )
+    adapter = harness.output_projection.overlay_event_adapter
+    peer_id = uuid4()
+
+    async def publish_peer():
+        if peer_state == "older_active":
+            await presenter.emit(
+                adapter.peer_active_update(
+                    text="peer", utterance_id=peer_id, occupant_key=f"peer:{peer_id}"
+                )
+            )
+        else:
+            await presenter.emit(
+                adapter.translation_final(
+                    utterance_id=peer_id,
+                    channel="peer",
+                    text="peer",
+                    source_language="ko",
+                    target_language="en",
+                    applied_context_mode=None,
+                )
+            )
+
+    try:
+        if peer_state != "newer_finalized":
+            await publish_peer()
+        clock.advance(0.2)
+        uid = uuid4()
+        await source(harness, uid, "alpha")
+        await eventually(lambda: ("alpha", "en") in provider.responses)
+        provider.finish("alpha", "A")
+        await harness.self_owner.handle_vad_event(SpeechEnd(uid))
+        await harness.translation_turns.wait_for_idle()
+        if peer_state == "newer_finalized":
+            await publish_peer()
+        before = presenter.snapshot()
+        alpha = next(block for block in before.blocks if block.primary_text == "alpha")
+        clock.advance(0.8)
+        uid = uuid4()
+        await source(harness, uid, "bravo")
+        await eventually(lambda: ("bravo", "en") in provider.responses)
+        await harness.self_owner.handle_vad_event(SpeechEnd(uid))
+        expected = (
+            [("alpha", "A"), ("bravo", "")]
+            if peer_state == "older_finalized"
+            else [(block.primary_text, block.secondary_text) for block in before.blocks]
+        )
+        assert visible(presenter) == expected
+        assert len(presenter.snapshot().blocks) == 2
+        if peer_state == "older_finalized":
+            current_alpha, successor = presenter.snapshot().blocks
+            assert (current_alpha.id, current_alpha.appearance_seq) == (
+                alpha.id,
+                alpha.appearance_seq,
+            )
+            assert alpha.appearance_seq < successor.appearance_seq
+            assert presenter.active_self_overlay_metadata().text == "bravo"
+            assert presenter.snapshot().native_quiet_tail_episodes.self.generation > (
+                before.native_quiet_tail_episodes.self.generation
+            )
+        else:
+            assert presenter.snapshot().native_quiet_tail_episodes.self == (
+                before.native_quiet_tail_episodes.self
+            )
+        provider.responses[("bravo", "en")].set_exception(RuntimeError("synthetic failure"))
+        await eventually(lambda: provider.calls.count(("bravo", "en")) == 2)
+        provider.responses[("bravo", "en")].set_exception(RuntimeError("synthetic final failure"))
+        await harness.translation_turns.wait_for_idle()
+        assert visible(presenter) == expected
+        assert [message.text for message in osc.messages] == ["alpha (A)", "bravo"]
+        assert presenter.active_self_overlay_metadata() is None
+        clock.advance(6.9)
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=False)
+        if peer_state != "older_active":
+            assert visible(presenter) == expected
+        print(
+            f"OWNER_SMOKE mixed_selection={peer_state} pending_and_failed=true "
+            f"scene={expected!r} chatbox={[message.text for message in osc.messages]!r} "
+            "before_expiry_s=7.9"
+        )
+    finally:
+        await harness.stop()
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "show_peer_original,translation_enabled,peer_visible",
+    [(True, True, True), (False, True, False), (False, False, True)],
+)
+async def test_source_only_active_peer_eligibility_controls_successor_admission(
+    show_peer_original, translation_enabled, peer_visible
+):
+    clock = FakeClock()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(),
+        clock=clock,
+        show_peer_original=show_peer_original,
+        translation_enabled=translation_enabled,
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    peer_id, first_id, successor_id = uuid4(), uuid4(), uuid4()
+    try:
+        await presenter.emit(
+            adapter.peer_active_update(
+                text="peer source", utterance_id=peer_id, occupant_key=f"peer:{peer_id}"
+            )
+        )
+        await presenter.emit(
+            adapter.self_active_update(
+                utterance_id=first_id,
+                occupant_key=f"self:{first_id}",
+                text="alpha",
+                secondary_text="A",
+                caption_source_closed=True,
+                caption_complete=True,
+                caption_revision=1,
+            )
+        )
+        before = visible(presenter)
+        await presenter.emit(
+            adapter.self_active_update(
+                utterance_id=successor_id,
+                occupant_key=f"self:{successor_id}",
+                text="bravo",
+                caption_source_closed=True,
+                caption_complete=False,
+                caption_revision=1,
+            )
+        )
+        assert visible(presenter) == (before if peer_visible else [("alpha", "A"), ("bravo", "")])
+        assert len(presenter.snapshot().blocks) == 2
+        if peer_visible:
+            peer = presenter.snapshot().blocks[0]
+            assert (peer.primary_text, peer.secondary_text, peer.secondary_enabled) == (
+                ("", "peer source", True) if translation_enabled else ("peer source", "", False)
+            )
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_staged_source_promotes_when_effective_preferences_hide_active_peer():
+    clock = FakeClock()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, native_retry_enabled=True
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    peer_id, first_id, successor_id = uuid4(), uuid4(), uuid4()
+    try:
+        await presenter.emit(
+            adapter.peer_active_update(
+                text="peer source", utterance_id=peer_id, occupant_key=f"peer:{peer_id}"
+            )
+        )
+        for uid, text, translated in ((first_id, "alpha", "A"), (successor_id, "bravo", "")):
+            await presenter.emit(
+                adapter.self_active_update(
+                    utterance_id=uid,
+                    occupant_key=f"self:{uid}",
+                    text=text,
+                    secondary_text=translated,
+                    caption_source_closed=True,
+                    caption_complete=True,
+                    caption_revision=1,
+                )
+            )
+        assert visible(presenter) == [("", "peer source"), ("alpha", "A")]
+        alpha = presenter.snapshot().blocks[1]
+        episode = presenter.snapshot().native_quiet_tail_episodes.self
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=False)
+        assert clock.now() == 0
+        assert visible(presenter) == [("alpha", "A"), ("bravo", "")]
+        assert presenter.snapshot().blocks[0].appearance_seq == alpha.appearance_seq
+        assert presenter.snapshot().native_quiet_tail_episodes.self.generation > episode.generation
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=True)
+        assert visible(presenter) == [("", "peer source"), ("bravo", "")]
+        await presenter.update_display_preferences(show_translation=True, show_peer_original=False)
+        assert visible(presenter) == [("bravo", "")]
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
+async def test_staged_source_replaces_older_peer_when_it_loses_active_protection():
+    clock = FakeClock()
+    presenter = OverlayPresenter(
+        calibration=OverlayCalibration(), clock=clock, native_retry_enabled=True
+    )
+    adapter = OverlayEventAdapter(clock=clock)
+    peer_id, first_id, successor_id = uuid4(), uuid4(), uuid4()
+    try:
+        await presenter.emit(
+            adapter.translation_final(
+                utterance_id=peer_id,
+                channel="peer",
+                text="peer",
+                source_language="ko",
+                target_language="en",
+                applied_context_mode=None,
+            )
+        )
+        await presenter.emit(
+            adapter.peer_active_update(
+                text="peer source", utterance_id=peer_id, occupant_key=f"peer:{peer_id}"
+            )
+        )
+        for uid, text, translated in ((first_id, "alpha", "A"), (successor_id, "bravo", "")):
+            await presenter.emit(
+                adapter.self_active_update(
+                    utterance_id=uid,
+                    occupant_key=f"self:{uid}",
+                    text=text,
+                    secondary_text=translated,
+                    caption_source_closed=True,
+                    caption_complete=True,
+                    caption_revision=1,
+                )
+            )
+        assert visible(presenter) == [("peer", "peer source"), ("alpha", "A")]
+        alpha = presenter.snapshot().blocks[1]
+        replacement_id = uuid4()
+        await presenter.emit(
+            adapter.peer_active_update(
+                text="", utterance_id=replacement_id, occupant_key=f"peer:{replacement_id}"
+            )
+        )
+        assert clock.now() == 0
+        assert visible(presenter) == [("alpha", "A"), ("bravo", "")]
+        assert presenter.snapshot().blocks[0].appearance_seq == alpha.appearance_seq
+        assert len(presenter.snapshot().blocks) == 2
+    finally:
+        await presenter.close()
+
+
+@pytest.mark.asyncio
 async def test_mixed_peer_capacity_stages_source_but_serves_latest_translated_scene():
     provider, clock = HeldTranslations(), FakeClock()
     presenter = OverlayPresenter(
