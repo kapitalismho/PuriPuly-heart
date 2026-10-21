@@ -726,7 +726,7 @@ def test_timed_out_close_leaves_listener_owned_cleanup_and_prevents_second_write
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(runtime_logging_module, "_FILE_DRAIN_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(runtime_logging_module, "_FILE_CLOSE_TIMEOUT_S", 0.05)
     monkeypatch.setattr(runtime_logging_module, "_TERMINAL_ENQUEUE_TIMEOUT_S", 0.05)
     root_logger = logging.getLogger(f"test.runtime_logging.queue.blocked_close.{uuid4()}")
     root_logger.handlers.clear()
@@ -1689,3 +1689,147 @@ def test_stt_startup_failure_identity_survives_persisted_redaction_without_exter
     finally:
         runtime_logging.close()
         file_handler.close()
+
+
+@pytest.mark.parametrize("finalizer_error", [False, True])
+def test_terminal_file_cleanup_uses_close_budget_and_preserves_finalizer_failure(
+    tmp_path, monkeypatch, finalizer_error
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.finalizer_budget.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    original_close = runtime_logging_module._close_file_handler
+    finalizer_threads = []
+
+    def delayed_close(handler):
+        finalizer_threads.append(threading.get_ident())
+        time.sleep(0.4)
+        original_close(handler)
+        if finalizer_error:
+            raise OSError("synthetic file finalizer failure")
+
+    monkeypatch.setattr(runtime_logging_module, "_close_file_handler", delayed_close)
+    root_logger.warning("[Lifecycle] boundary phase=cleanup")
+    try:
+        if finalizer_error:
+            with pytest.raises(OSError, match="synthetic file finalizer failure"):
+                sinks.close(force=True)
+        else:
+            sinks.close(force=True)
+        assert sinks.file_queue_handler not in root_logger.handlers
+        assert sinks.file_queue_listener.cleanup_complete
+        assert finalizer_threads and all(
+            thread != threading.get_ident() for thread in finalizer_threads
+        )
+        released = tmp_path / "released.log"
+        sinks.log_file.replace(released)
+        assert "phase=cleanup" in released.read_text(encoding="utf-8")
+    finally:
+        sinks.close(force=True)
+
+
+def test_file_close_shares_absolute_budget_and_retry_cannot_extend_listener_ownership(
+    tmp_path, monkeypatch
+) -> None:
+    root_logger = logging.getLogger(f"test.runtime_logging.shared_close_budget.{uuid4()}")
+    root_logger.handlers.clear()
+    root_logger.propagate = False
+    sinks = configure_main_logging(root_logger=root_logger, log_dir=tmp_path)
+    listener = sinks.file_queue_listener
+    writer_entered = threading.Event()
+    release_writer = threading.Event()
+    finalizer_entered = threading.Event()
+    release_finalizer = threading.Event()
+    finalizer_finished = threading.Event()
+    close_finished = threading.Event()
+    budget_started = threading.Event()
+    failures = []
+    finalizer_threads = []
+    closer_id = None
+
+    class Clock:
+        value = 0.0
+        sleep = staticmethod(time.sleep)
+
+        def monotonic(self):
+            value = self.value
+            if threading.get_ident() == closer_id:
+                budget_started.set()
+            return value
+
+    clock = Clock()
+    original_write = sinks.file_handler._write_pending
+    original_close = runtime_logging_module._close_file_handler
+
+    def write(pending):
+        writer_entered.set()
+        assert release_writer.wait(5)
+        original_write(pending)
+
+    def finalize(handler):
+        finalizer_threads.append(threading.get_ident())
+        finalizer_entered.set()
+        try:
+            assert release_finalizer.wait(5)
+            original_close(handler)
+        finally:
+            finalizer_finished.set()
+
+    def close():
+        nonlocal closer_id
+        closer_id = threading.get_ident()
+        try:
+            sinks.close(force=True)
+        except BaseException as exc:
+            failures.append(exc)
+        finally:
+            close_finished.set()
+
+    monkeypatch.setattr(runtime_logging_module, "time", clock)
+    monkeypatch.setattr(sinks.file_handler, "_write_pending", write)
+    monkeypatch.setattr(runtime_logging_module, "_close_file_handler", finalize)
+    closer = threading.Thread(target=close)
+    try:
+        root_logger.warning("[Lifecycle] boundary phase=cleanup")
+        assert writer_entered.wait(2)
+        closer.start()
+        assert budget_started.wait(2)
+        clock.value = 1.5
+        release_writer.set()
+        assert finalizer_entered.wait(2)
+        clock.value = 2.5
+        assert close_finished.wait(1.5)
+        assert len(failures) == 1
+        assert isinstance(failures[0], TimeoutError)
+        assert not finalizer_finished.is_set()
+        assert sinks.file_handler.stream is not None
+        assert sinks.file_queue_handler in root_logger.handlers
+        assert finalizer_threads == [listener._thread.ident]
+
+        for retry in (
+            lambda: sinks.close(force=True),
+            lambda: configure_main_logging(root_logger=root_logger, log_dir=tmp_path),
+        ):
+            started = time.monotonic()
+            with pytest.raises(TimeoutError, match="cleanup remains listener-owned"):
+                retry()
+            assert time.monotonic() - started < 1
+        assert not finalizer_finished.is_set()
+        assert len(finalizer_threads) == 1
+
+        release_finalizer.set()
+        assert finalizer_finished.wait(2)
+        _wait_until(lambda: listener.cleanup_complete)
+        sinks.close(force=True)
+        assert sinks.file_queue_handler not in root_logger.handlers
+        released = tmp_path / "released.log"
+        sinks.log_file.replace(released)
+        assert "phase=cleanup" in released.read_text(encoding="utf-8")
+    finally:
+        release_writer.set()
+        release_finalizer.set()
+        if closer.ident is not None:
+            closer.join(3)
+        _wait_until(lambda: listener.cleanup_complete)
+        sinks.close(force=True)

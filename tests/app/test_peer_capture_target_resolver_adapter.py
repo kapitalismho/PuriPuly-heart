@@ -9,6 +9,7 @@ from puripuly_heart.app.adapters.peer_capture_target_resolver import (
 )
 
 from puripuly_heart.app.wiring import create_peer_capture_target_resolver_adapter
+from puripuly_heart.core.audio.process_identity import default_current_user_process_snapshots
 from puripuly_heart.core.peer_capture import (
     PeerCaptureTargetIntent,
     PeerCaptureTargetStatus,
@@ -165,4 +166,4 @@ def test_wiring_factory_composes_fresh_process_resolver_adapter() -> None:
     second = adapter.resolver_factory()
     assert first is not second
     assert type(first).__name__ == "ProcessCaptureResolver"
-    assert type(first.snapshots).__name__ == "PsutilCurrentUserProcessSnapshots"
+    assert type(first.snapshots) is type(default_current_user_process_snapshots())

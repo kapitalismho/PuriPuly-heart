@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import threading
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -930,3 +931,126 @@ async def test_production_cancelled_same_channel_candidate_preserves_live_prepar
         )
         await owner.close()
     assert client.close_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["ready", "cancel", "failure"])
+async def test_cpu_backend_preparation_drains_without_constructing_cancelled_provider(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: str
+) -> None:
+    from puripuly_heart.core.storage.secrets import InMemorySecretStore
+
+    loop = asyncio.get_running_loop()
+    loop_thread = threading.get_ident()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    construction_threads = []
+    original_prepare = runtime_wiring.prepare_local_stt_backend_dependencies
+    original_create = runtime_wiring.create_stt_backend_from_resolved_config
+
+    def prepare(config: ResolvedSTTConfig) -> None:
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            assert release.wait(3)
+            if outcome == "failure":
+                raise OSError("selected backend unavailable")
+            original_prepare(config)
+        finally:
+            finished.set()
+
+    def create(config: ResolvedSTTConfig, **kwargs: object) -> object:
+        construction_threads.append(threading.get_ident())
+        return original_create(config, **kwargs)
+
+    monkeypatch.setattr(runtime_wiring, "prepare_local_stt_backend_dependencies", prepare)
+    monkeypatch.setattr(runtime_wiring, "create_stt_backend_from_resolved_config", create)
+    factory = SharedSTTProviderFactory(
+        secrets=InMemorySecretStore(),
+        clock=FakeClock(),
+        reset_deadline_s=300,
+        gpu_model_path=None,
+    )
+    request = replace(
+        _gpu_build_request("self", warmup=False), config=_resolved_config("self", "local_qwen")
+    )
+    task = asyncio.create_task(factory.create(request, gpu_runtime=object()))
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        progressed = asyncio.Event()
+        loop.call_soon(progressed.set)
+        await asyncio.wait_for(progressed.wait(), 1)
+        assert not task.done()
+        if outcome == "cancel":
+            for _ in range(2):
+                task.cancel()
+                await asyncio.sleep(0)
+            assert not task.done()
+            assert not finished.is_set()
+        release.set()
+        if outcome == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, 1)
+        elif outcome == "failure":
+            with pytest.raises(OSError, match="selected backend unavailable"):
+                await asyncio.wait_for(task, 1)
+        else:
+            provider = await asyncio.wait_for(task, 1)
+            assert provider.accepted_settings_scope[0] == "local_qwen"
+            assert construction_threads == [loop_thread]
+            await provider.close_backend()
+        assert finished.is_set()
+        if outcome != "ready":
+            assert construction_threads == []
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_gpu_backend_resolves_default_path_without_blocking_or_starting_capture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    model_path = tmp_path / "synthetic-selected.gguf"
+
+    class Runtime:
+        activation_calls = 0
+        deactivation_calls = 0
+
+        async def activate_channel(self, *_args, **_kwargs):
+            self.activation_calls += 1
+
+        async def deactivate_channel(self, *_args, **_kwargs):
+            self.deactivation_calls += 1
+
+    runtime = Runtime()
+
+    def resolve() -> Path:
+        loop.call_soon_threadsafe(entered.set)
+        assert release.wait(3)
+        return model_path
+
+    monkeypatch.setattr(runtime_wiring, "local_gpu_model_path", resolve)
+    factory = SharedSTTProviderFactory(
+        secrets=object(), clock=FakeClock(), reset_deadline_s=300, gpu_model_path=None
+    )
+    task = asyncio.create_task(
+        factory.create(_gpu_build_request("self", warmup=False), gpu_runtime=runtime)
+    )
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        assert not task.done()
+        release.set()
+        provider = await asyncio.wait_for(task, 1)
+        assert runtime.activation_calls == 0
+        assert provider.accepted_settings_scope[0] == "local_qwen_gpu"
+        assert provider.backend_prepare.__self__.model_path == model_path
+        await provider.close_backend()
+        assert runtime.activation_calls == 0
+        assert runtime.deactivation_calls == 1
+    finally:
+        release.set()
+        await asyncio.gather(task, return_exceptions=True)

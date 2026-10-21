@@ -118,6 +118,11 @@ TASK_CREATION_REVIEWS = (
         "PeerApplicationOwner retains shielded replacement cleanup and observes its result; the previous runtime remains owned until cleanup commits",
     ),
     *_reviews(
+        "app/services/ui_application.py",
+        {"UiApplicationBoundary.start": 1},
+        "UiApplicationBoundary retains and awaits startup; ingress freeze cancels it and the early shutdown drain waits for owned preparation before runtime teardown",
+    ),
+    *_reviews(
         "cli/host.py",
         {"GuiControlBoundary.start": 1},
         "Bounded grandfathering: GUI stop cancels its retained stop-request watcher without joining it; this is existing incomplete lifetime enforcement",

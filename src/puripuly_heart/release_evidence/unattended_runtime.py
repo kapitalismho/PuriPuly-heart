@@ -984,10 +984,12 @@ async def run_process(evidence_path: Path, thresholds_path: Path) -> dict[str, A
     try:
         import psutil
 
-        from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
+        from puripuly_heart.core.audio.process_identity import (
+            default_current_user_process_snapshots,
+        )
 
         process = psutil.Process()
-        snapshots_port = PsutilCurrentUserProcessSnapshots()
+        snapshots_port = default_current_user_process_snapshots()
         invocation_count = 0
 
         def enumerate_processes() -> tuple[float, int, str, int]:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from importlib import import_module
 
 from puripuly_heart.app.ports.audio_test import AudioTestCapturePort
 from puripuly_heart.app.ports.desktop_overlay import (
@@ -292,6 +293,25 @@ def create_vrchat_osc_presence_probe_owner(
     )
 
 
+def prepare_capture_runtime_dependencies() -> None:
+    for module in (
+        "puripuly_heart.core.runtime.audio_vad_loop",
+        "puripuly_heart.core.vad.bundled",
+        "puripuly_heart.core.vad.silero",
+        "puripuly_heart.app.adapters.self_capture.self_capture_source",
+        "puripuly_heart.app.adapters.self_capture.self_capture_vad",
+        "puripuly_heart.app.adapters.self_capture.self_capture_audio_loop",
+        "puripuly_heart.app.adapters.self_capture.self_capture_vad_sink",
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_source",
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_target_resolver",
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_vad",
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_admission",
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_audio_loop",
+        "puripuly_heart.app.adapters.peer_capture.peer_capture_vad_sink",
+    ):
+        import_module(module)
+
+
 def create_self_capture_source_adapter(
     *,
     log_diagnostic: Callable[..., object],
@@ -388,10 +408,12 @@ def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPo
         PeerCaptureTargetResolverAdapter,
     )
     from puripuly_heart.config.process_capture_resolution import ProcessCaptureResolver
-    from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
+    from puripuly_heart.core.audio.process_identity import (
+        default_current_user_process_snapshots,
+    )
 
     def create_process_resolver() -> ProcessCaptureResolver:
-        return ProcessCaptureResolver(snapshots=PsutilCurrentUserProcessSnapshots())
+        return ProcessCaptureResolver(snapshots=default_current_user_process_snapshots())
 
     return PeerCaptureTargetResolverAdapter(resolver_factory=create_process_resolver)
 

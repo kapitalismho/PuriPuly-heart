@@ -1182,3 +1182,58 @@ async def test_local_cpu_expiry_emits_boundary_without_decode(
     assert first == STTBackendTranscriptEvent(text="first result", is_final=True)
     assert expired == STTBackendTranscriptEvent(text="", is_final=True)
     await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cancel_open", [False, True])
+async def test_cpu_auto_close_drains_backend_type_preparation_without_late_delegate(
+    monkeypatch: pytest.MonkeyPatch, cancel_open: bool
+) -> None:
+    monkeypatch.setattr(
+        local_cpu_module,
+        "inspect_required_cpu_model_installs",
+        lambda *_a, **_kw: _ready_snapshot(),
+    )
+    loop = asyncio.get_running_loop()
+    entered = asyncio.Event()
+    release = threading.Event()
+    finished = threading.Event()
+    delegates = []
+
+    def prepare(_model_id: str) -> type[LocalQwenSherpaSTTBackend]:
+        loop.call_soon_threadsafe(entered.set)
+        try:
+            assert release.wait(3)
+            return LocalQwenSherpaSTTBackend
+        finally:
+            finished.set()
+
+    monkeypatch.setattr(local_cpu_module, "local_cpu_backend_type", prepare)
+    backend = LocalCPUAutoSTTBackend(
+        source_language="en", backend_factory=lambda *_a, **_kw: delegates.append(object())
+    )
+    opening = asyncio.create_task(backend.open_session())
+    closing = None
+    try:
+        await asyncio.wait_for(entered.wait(), 1)
+        if cancel_open:
+            for _ in range(2):
+                opening.cancel()
+                await asyncio.sleep(0)
+        closing = asyncio.create_task(backend.close())
+        await asyncio.sleep(0.02)
+        assert not opening.done()
+        assert not closing.done()
+        assert not finished.is_set()
+        release.set()
+        with pytest.raises(asyncio.CancelledError if cancel_open else RuntimeError):
+            await asyncio.wait_for(opening, 1)
+        await asyncio.wait_for(closing, 1)
+        assert finished.is_set()
+        assert delegates == []
+    finally:
+        release.set()
+        await asyncio.gather(
+            opening, *(() if closing is None else (closing,)), return_exceptions=True
+        )
+        await backend.close()

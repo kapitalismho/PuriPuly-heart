@@ -1,16 +1,52 @@
 from __future__ import annotations
 
+import sys
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 from puripuly_heart.config.process_capture_resolution import (
+    CurrentUserProcessSnapshotPort,
     ProcessSnapshot,
     ResolvedProcessCaptureIdentity,
+)
+from puripuly_heart.core.audio.windows_process_table import (
+    WindowsProcessRecord,
+    snapshot_windows_processes,
 )
 
 _WATCH_POLL_INTERVAL_S = 0.05
 _WATCH_JOIN_TIMEOUT_S = 0.5
+
+
+def default_current_user_process_snapshots() -> CurrentUserProcessSnapshotPort:
+    if sys.platform == "win32":
+        return WindowsCurrentUserProcessSnapshots()
+    return PsutilCurrentUserProcessSnapshots()
+
+
+@dataclass(slots=True)
+class WindowsCurrentUserProcessSnapshots:
+    scan: Callable[[], Iterable[WindowsProcessRecord]] = snapshot_windows_processes
+
+    def snapshots(self) -> Iterable[ProcessSnapshot]:
+        snapshots: list[ProcessSnapshot] = []
+        for record in self.scan():
+            executable_path = record.executable_path
+            if not isinstance(executable_path, str) or record.create_time is None:
+                instance_id = None
+            else:
+                instance_id = f"{record.pid}:{record.create_time}"
+            snapshots.append(
+                ProcessSnapshot(
+                    pid=record.pid,
+                    parent_pid=record.parent_pid or None,
+                    is_current_user=record.is_current_user,
+                    executable_path=executable_path,
+                    instance_id=instance_id,
+                )
+            )
+        return tuple(snapshots)
 
 
 @dataclass(slots=True)
