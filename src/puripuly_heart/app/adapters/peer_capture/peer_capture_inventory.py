@@ -10,13 +10,13 @@ from puripuly_heart.config.process_capture_resolution import (
     ProcessCaptureResolver,
 )
 from puripuly_heart.config.settings_vnext.schema import AppSettingsVNext
-from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
+from puripuly_heart.core.audio.process_identity import default_current_user_process_snapshots
 
 
 class WindowsProcessCaptureInventoryAdapter:
     def candidates(self) -> tuple[ProcessCaptureCandidate, ...]:
         return ProcessCaptureResolver(
-            snapshots=PsutilCurrentUserProcessSnapshots()
+            snapshots=default_current_user_process_snapshots()
         ).enumerate_candidates()
 
 

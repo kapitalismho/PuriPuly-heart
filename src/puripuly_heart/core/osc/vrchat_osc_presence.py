@@ -40,7 +40,10 @@ def probe_vrchat_osc_presence(
         iter_processes = process_iter
         list_connections = net_connections
 
-    vrchat_pids = _collect_vrchat_pids(iter_processes)
+    if process_iter is None and sys.platform == "win32":
+        vrchat_pids = _collect_windows_vrchat_pids()
+    else:
+        vrchat_pids = _collect_vrchat_pids(iter_processes)
     if not vrchat_pids:
         return VrchatOscPresence(vrchat_running=False, osc_listening=None)
 
@@ -99,6 +102,16 @@ def _collect_vrchat_pids(process_iter: Callable[..., object]) -> set[int]:
         except Exception:
             continue
     return pids
+
+
+def _collect_windows_vrchat_pids() -> set[int]:
+    from puripuly_heart.core.audio.windows_process_table import list_windows_processes
+
+    try:
+        entries = list_windows_processes()
+    except OSError:
+        return set()
+    return {entry.pid for entry in entries if entry.image_name.casefold() in _VRCHAT_PROCESS_NAMES}
 
 
 def _import_psutil():  # noqa: ANN201

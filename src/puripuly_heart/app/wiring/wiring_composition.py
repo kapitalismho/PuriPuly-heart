@@ -408,10 +408,12 @@ def create_peer_capture_target_resolver_adapter() -> PeerCaptureTargetResolverPo
         PeerCaptureTargetResolverAdapter,
     )
     from puripuly_heart.config.process_capture_resolution import ProcessCaptureResolver
-    from puripuly_heart.core.audio.process_identity import PsutilCurrentUserProcessSnapshots
+    from puripuly_heart.core.audio.process_identity import (
+        default_current_user_process_snapshots,
+    )
 
     def create_process_resolver() -> ProcessCaptureResolver:
-        return ProcessCaptureResolver(snapshots=PsutilCurrentUserProcessSnapshots())
+        return ProcessCaptureResolver(snapshots=default_current_user_process_snapshots())
 
     return PeerCaptureTargetResolverAdapter(resolver_factory=create_process_resolver)
 
