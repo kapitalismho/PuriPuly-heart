@@ -735,6 +735,54 @@ async def test_overlay_bridge_revalidates_successor_age_after_stalled_send() -> 
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("expired", [False, True])
+async def test_overlay_bridge_delayed_authentication_replays_only_latest_valid_scene(
+    expired: bool,
+) -> None:
+    clock = FakeClock(_now=10.0)
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        clock=clock,
+    )
+    await bridge.start()
+    try:
+        for revision, text in [(1, "replaced during initialization"), (2, "latest scene")]:
+            block_id = f"peer:{revision}"
+            await bridge.replace_snapshot(
+                OverlayPresentationSnapshot(
+                    revision=revision,
+                    blocks=[
+                        OverlayPresentationBlock(
+                            id=block_id,
+                            occupant_key=block_id,
+                            appearance_seq=revision,
+                            channel="peer",
+                            block_variant="finalized",
+                            primary_text=text,
+                            secondary_text="",
+                            secondary_enabled=False,
+                        )
+                    ],
+                ),
+                block_expirations={block_id: 11.0 if expired else 20.0},
+            )
+        clock.advance(2.5)
+        assert not any(receipt.outcome == "written" for receipt in bridge.delivery_receipts)
+        async with connect(bridge.url, ping_interval=None, compression=None) as ws:
+            await ws.send(_native_auth())
+            message = json.loads(await asyncio.wait_for(ws.recv(), timeout=1.0))
+            assert message["type"] == "snapshot"
+            blocks = message["payload"]["blocks"]
+            assert [block["primary_text"] for block in blocks] == (
+                [] if expired else ["latest scene"]
+            )
+            assert message["payload"]["revision"] >= 2
+    finally:
+        await bridge.stop()
+
+
+@pytest.mark.asyncio
 async def test_overlay_bridge_cancellation_is_ambiguous_and_replays_latest_on_reconnect() -> None:
     bridge = OverlayBridge(session_token="expected-token")
     stalled = _BlockingSendConnection()
@@ -1426,6 +1474,38 @@ def test_overlay_bridge_only_challenged_current_status_clears_acceptance_deadlin
     bridge._session_health.record_challenge(5, 100.0)
     assert bridge._session_health.handle_owner_status(status)
     assert bridge._session_health.native_acceptance_deadline is None
+
+
+def test_overlay_bridge_post_startup_unaccepted_scene_keeps_two_second_deadline() -> None:
+    clock = FakeClock(_now=100.0)
+    bridge = OverlayBridge(
+        session_token="expected-token",
+        overlay_instance_id="overlay-test",
+        clock=clock,
+    )
+    health = bridge._session_health
+    health.begin()
+    health.record_scene_written(1)
+    health.record_challenge(1, clock.now())
+    status = {
+        "type": "owner_status",
+        "overlay_instance_id": "overlay-test",
+        "runtime_generation": 1,
+        "health_challenge_id": 1,
+        "latest_applied_revision": 1,
+    }
+    assert health.handle_owner_status(status)["health_challenge_validated"]
+    assert health.native_acceptance_deadline is None
+    clock.advance(1.0)
+    health.record_scene_written(2)
+    clock.advance(1.999)
+    health.record_challenge(2, clock.now())
+    status["health_challenge_id"] = 2
+    assert health.handle_owner_status(status)["health_challenge_validated"]
+    health.record_scene_written(3)
+    assert health.failure_due() is None
+    clock.advance(0.001)
+    assert health.failure_due() == "native_acceptance_timeout"
 
 
 @pytest.mark.asyncio

@@ -108,6 +108,25 @@ receive ordering metadata remain non-reclaimable under this policy. The existing
 64-ID history limit remains: if unreclaimable IDs fill it, additional spatial
 identities are not admitted until capacity is freed or the history is reset.
 
+## Startup
+
+Native startup completes SteamVR preflight and OpenVR, renderer and font
+initialization before authenticating with the Python bridge or receiving the
+initial scene. Slow resource initialization therefore does not consume the
+scene's native-acceptance deadline. Initialization failures retain their startup
+cause without waiting for a bridge connection.
+
+The Python process supervisor retains one total 15 s production startup budget,
+including preparation, spawn, initialization and readiness. Timeout and OFF use
+the existing bounded process cleanup; the startup budget is not a promise that
+cleanup has already finished. Delayed authentication receives the latest scene
+after Python send-time expiry pruning, not a snapshot saved before initialization.
+
+After scene delivery, the 2 s native-acceptance deadline still requires a valid
+health-challenge response covering the current scene. Resource creation, a live
+process or an unchallenged status does not establish acceptance. Subsequent
+presentation progress and physical headset visibility remain separate observations.
+
 ## Caption Sizing
 
 Desktop and VR captions keep their selected preset or calibration font size for

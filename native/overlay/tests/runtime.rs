@@ -15,18 +15,17 @@ use puripuly_heart_overlay::manifest::{resolve_handoff_experiment, HandoffExperi
 use puripuly_heart_overlay::openvr::OpenVrEventSource;
 use puripuly_heart_overlay::runtime::SnapshotApplyOutcome;
 use puripuly_heart_overlay::{
-    load_manifest, resolve_quiet_tail_profile, run_with_manifest, submit_texture,
-    validate_manifest, AdapterIdentity, BridgeClient, CaptionBlock, CaptionChannel,
-    CaptionPresentation, CaptionRenderer, FakeOpenVr, NativePresentationOwner, OpenVrError,
-    OpenVrRuntimeEvent, OverlayBridgeEvent, OverlayFrameSubmitter, OverlayManifest,
-    OverlayPresentationBlock, OverlayPresentationBlockVariant, OverlayPresentationCalibration,
-    OverlayPresentationSnapshot, OverlayRuntime, PresentationBackend, PresentationCause,
-    PresentationCauseChannel, PresentationCauseKind, PresentationOutcome, PresentationStage,
-    PresentationStrategy, QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure,
-    SemanticRetirementFrontier, SpatialReanchorOutcome, SpeakerDividerBand, SpeakerStyle,
-    StartupError, EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE,
-    NATIVE_FRESH_RETRY_DEADLINE, NATIVE_FRESH_RETRY_MAX_COMPLETED,
-    NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
+    load_manifest, resolve_quiet_tail_profile, submit_texture, validate_manifest, AdapterIdentity,
+    BridgeClient, CaptionBlock, CaptionChannel, CaptionPresentation, CaptionRenderer, FakeOpenVr,
+    NativePresentationOwner, OpenVrError, OpenVrRuntimeEvent, OverlayBridgeEvent,
+    OverlayFrameSubmitter, OverlayManifest, OverlayPresentationBlock,
+    OverlayPresentationBlockVariant, OverlayPresentationCalibration, OverlayPresentationSnapshot,
+    OverlayRuntime, PresentationBackend, PresentationCause, PresentationCauseChannel,
+    PresentationCauseKind, PresentationOutcome, PresentationStage, PresentationStrategy,
+    QuietTailProfile, ReadinessOutcome, RenderedFrame, RuntimeFailure, SemanticRetirementFrontier,
+    SpatialReanchorOutcome, SpeakerDividerBand, SpeakerStyle, StartupError,
+    EXPECTED_CONTRACT_VERSION, NATIVE_FRESH_RETRY_CADENCE, NATIVE_FRESH_RETRY_DEADLINE,
+    NATIVE_FRESH_RETRY_MAX_COMPLETED, NATIVE_READINESS_NO_PROGRESS_TIMEOUT,
 };
 
 #[test]
@@ -6908,7 +6907,7 @@ fn validate_manifest_rejects_old_transition_and_future_contract_versions() {
 }
 
 #[tokio::test]
-async fn run_with_manifest_reports_bridge_auth_failures_as_startup_errors() {
+async fn bridge_auth_failure_preserves_startup_error() {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let server = tokio::spawn(async move {
@@ -6922,16 +6921,18 @@ async fn run_with_manifest_reports_bridge_auth_failures_as_startup_errors() {
         .unwrap();
     });
 
-    let log_dir = unique_log_dir("bridge-auth-failure");
-    let exit_code = run_with_manifest(OverlayManifest {
+    let manifest = OverlayManifest {
         bridge_url: format!("ws://{}", address),
-        log_dir,
         ..test_manifest()
-    })
-    .await;
-
+    };
+    let error = match BridgeClient::connect(&manifest).await {
+        Err(error) => puripuly_heart_overlay::runtime::startup_error_from_bridge_error(error),
+        Ok(_) => panic!("bridge unexpectedly authenticated"),
+    };
     server.await.unwrap();
-    assert_eq!(exit_code, StartupError::BridgeAuth("x".into()).exit_code());
+    assert!(matches!(error, StartupError::BridgeAuth(_)));
+    assert_eq!(error.failure_reason(), "bridge_auth_failed");
+    assert_eq!(error.exit_code(), 12);
 }
 
 #[test]
